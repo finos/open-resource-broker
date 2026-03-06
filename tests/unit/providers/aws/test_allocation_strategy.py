@@ -2,7 +2,7 @@
 
 import pytest
 
-from providers.aws.domain.template.value_objects import (
+from orb.providers.aws.domain.template.value_objects import (
     AWSAllocationStrategy,
     normalise_allocation_strategy,
 )

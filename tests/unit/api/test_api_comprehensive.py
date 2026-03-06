@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
-from application.dto.queries import GetRequestQuery, ListActiveRequestsQuery
-from application.request.dto import RequestStatusResponse
+from orb.api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
+from orb.application.dto.queries import GetRequestQuery, ListActiveRequestsQuery
+from orb.application.request.dto import RequestStatusResponse
 
 # Check if FastAPI is available
 try:
@@ -511,7 +511,7 @@ class TestAPIValidationComprehensive:
     def test_validation_module_exists(self):
         """Test that validation module exists."""
         try:
-            import api.validation as validation_module
+            import orb.api.validation as validation_module
 
             assert validation_module is not None
         except ImportError:
@@ -520,7 +520,7 @@ class TestAPIValidationComprehensive:
     def test_validation_functions(self):
         """Test validation functions exist."""
         try:
-            import api.validation as validation_module
+            import orb.api.validation as validation_module
 
             # Look for validation functions
             functions = [
@@ -538,7 +538,7 @@ class TestAPIValidationComprehensive:
     def test_validation_classes(self):
         """Test validation classes exist."""
         try:
-            import api.validation as validation_module
+            import orb.api.validation as validation_module
 
             # Look for validation classes
             classes = [

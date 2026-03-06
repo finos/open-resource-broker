@@ -7,10 +7,10 @@ import pytest
 from fastapi.testclient import TestClient
 from starlette.datastructures import URL
 
-from api.server import create_fastapi_app
-from config.schemas.server_schema import AuthConfig, ServerConfig
-from infrastructure.auth.strategy.bearer_token_strategy import BearerTokenStrategy
-from infrastructure.auth.strategy.no_auth_strategy import NoAuthStrategy
+from orb.api.server import create_fastapi_app
+from orb.config.schemas.server_schema import AuthConfig, ServerConfig
+from orb.infrastructure.auth.strategy.bearer_token_strategy import BearerTokenStrategy
+from orb.infrastructure.auth.strategy.no_auth_strategy import NoAuthStrategy
 
 
 class TestAuthenticationFlows:
@@ -147,7 +147,7 @@ class TestAuthenticationFlows:
     @pytest.mark.asyncio
     async def test_auth_context_creation(self):
         """Test authentication context creation from requests."""
-        from api.middleware.auth_middleware import AuthMiddleware
+        from orb.api.middleware.auth_middleware import AuthMiddleware
 
         # Create mock request
         class MockRequest:

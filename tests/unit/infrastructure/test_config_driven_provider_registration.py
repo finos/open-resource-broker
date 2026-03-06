@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from config.schemas.provider_strategy_schema import (
+from orb.config.schemas.provider_strategy_schema import (
     ProviderConfig,
     ProviderInstanceConfig,
 )
@@ -13,8 +13,8 @@ class TestConfigDrivenProviderRegistration:
 
     def test_register_providers_with_valid_config(self):
         """Test provider registration with valid configuration."""
-        from infrastructure.di.container import DIContainer
-        from infrastructure.di.provider_services import register_provider_services
+        from orb.infrastructure.di.container import DIContainer
+        from orb.infrastructure.di.provider_services import register_provider_services
 
         container = DIContainer()
 
@@ -31,8 +31,8 @@ class TestConfigDrivenProviderRegistration:
 
     def test_register_provider_utility_services_aws_available(self):
         """Test provider utility registration when AWS provider is available."""
-        from infrastructure.di.container import DIContainer
-        from infrastructure.di.provider_services import _register_provider_utility_services
+        from orb.infrastructure.di.container import DIContainer
+        from orb.infrastructure.di.provider_services import _register_provider_utility_services
 
         container = DIContainer()
 
@@ -45,8 +45,8 @@ class TestConfigDrivenProviderRegistration:
 
     def test_register_provider_utility_services_aws_unavailable(self):
         """Test provider utility registration when AWS provider is unavailable."""
-        from infrastructure.di.container import DIContainer
-        from infrastructure.di.provider_services import _register_provider_utility_services
+        from orb.infrastructure.di.container import DIContainer
+        from orb.infrastructure.di.provider_services import _register_provider_utility_services
 
         container = DIContainer()
 
@@ -56,8 +56,8 @@ class TestConfigDrivenProviderRegistration:
 
     def test_register_provider_utility_services_handles_import_error(self):
         """Test provider utility registration handles ImportError gracefully."""
-        from infrastructure.di.container import DIContainer
-        from infrastructure.di.provider_services import _register_provider_utility_services
+        from orb.infrastructure.di.container import DIContainer
+        from orb.infrastructure.di.provider_services import _register_provider_utility_services
 
         container = DIContainer()
 
@@ -67,8 +67,8 @@ class TestConfigDrivenProviderRegistration:
 
     def test_register_provider_utility_services_handles_exception(self):
         """Test provider utility registration handles general exceptions gracefully."""
-        from infrastructure.di.container import DIContainer
-        from infrastructure.di.provider_services import _register_provider_utility_services
+        from orb.infrastructure.di.container import DIContainer
+        from orb.infrastructure.di.provider_services import _register_provider_utility_services
 
         container = DIContainer()
 

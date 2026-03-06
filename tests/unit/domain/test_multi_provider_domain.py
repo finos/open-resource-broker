@@ -2,9 +2,9 @@
 
 import pytest
 
-from domain.request.aggregate import Request
-from domain.request.value_objects import RequestId, RequestType
-from domain.template.template_aggregate import Template
+from orb.domain.request.aggregate import Request
+from orb.domain.request.value_objects import RequestId, RequestType
+from orb.domain.template.template_aggregate import Template
 
 
 class TestTemplateMultiProviderFields:

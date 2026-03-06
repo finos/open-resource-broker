@@ -61,7 +61,7 @@ class ArchitectureValidator:
 
     def check_domain_layer_dependencies(self) -> None:
         """Check that domain layer doesn't depend on outer layers."""
-        domain_imports = self.analyze_imports("src/domain")
+        domain_imports = self.analyze_imports("src/orb/domain")
         self.layer_imports["domain"] = domain_imports
 
         for file_path, import_name in domain_imports:
@@ -71,25 +71,21 @@ class ArchitectureValidator:
             # Domain should not import from infrastructure or interface layers
             if any(
                 import_name == layer or import_name.startswith(layer + ".")
-                for layer in ["infrastructure", "interface", "src.infrastructure", "src.interface"]
+                for layer in ["orb.infrastructure", "orb.interface"]
             ):
                 self.violations.append(
                     f"{file_path}: Domain layer importing from outer layer: {import_name}"
                 )
 
             # Domain should not import from application layer
-            if (
-                import_name == "application"
-                or import_name.startswith("application.")
-                or "src.application" in import_name
-            ):
+            if import_name == "orb.application" or import_name.startswith("orb.application."):
                 self.violations.append(
                     f"{file_path}: Domain layer importing from Application layer: {import_name}"
                 )
 
     def check_application_layer_dependencies(self) -> None:
         """Check that application layer doesn't depend on interface layer."""
-        app_imports = self.analyze_imports("src/application")
+        app_imports = self.analyze_imports("src/orb/application")
         self.layer_imports["application"] = app_imports
 
         for file_path, import_name in app_imports:
@@ -97,18 +93,14 @@ class ArchitectureValidator:
                 continue
 
             # Application should not import from interface layer
-            if (
-                import_name == "interface"
-                or import_name.startswith("interface.")
-                or "src.interface" in import_name
-            ):
+            if import_name == "orb.interface" or import_name.startswith("orb.interface."):
                 self.violations.append(
                     f"{file_path}: Application layer importing from Interface layer: {import_name}"
                 )
 
     def check_infrastructure_layer_dependencies(self) -> None:
         """Check infrastructure layer dependencies."""
-        infra_imports = self.analyze_imports("src/infrastructure")
+        infra_imports = self.analyze_imports("src/orb/infrastructure")
         self.layer_imports["infrastructure"] = infra_imports
 
         for file_path, import_name in infra_imports:
@@ -116,18 +108,14 @@ class ArchitectureValidator:
                 continue
 
             # Infrastructure should not import from interface layer
-            if (
-                import_name == "interface"
-                or import_name.startswith("interface.")
-                or "src.interface" in import_name
-            ):
+            if import_name == "orb.interface" or import_name.startswith("orb.interface."):
                 self.violations.append(
                     f"{file_path}: Infrastructure layer importing from Interface layer: {import_name}"
                 )
 
     def check_interface_layer_dependencies(self) -> None:
         """Check interface layer dependencies (should be minimal)."""
-        interface_imports = self.analyze_imports("src/interface")
+        interface_imports = self.analyze_imports("src/orb/interface")
         self.layer_imports["interface"] = interface_imports
 
         # Interface layer can import from any layer (it's the outermost)

@@ -14,14 +14,14 @@ from moto import mock_aws
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from providers.aws.infrastructure.aws_client import AWSClient
-from providers.aws.infrastructure.handlers.asg.handler import ASGHandler
-from providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
-from providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
-from providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
-from providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
-from providers.aws.utilities.aws_operations import AWSOperations
+from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.infrastructure.aws_client import AWSClient
+from orb.providers.aws.infrastructure.handlers.asg.handler import ASGHandler
+from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
+from orb.providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
+from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
+from orb.providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
+from orb.providers.aws.utilities.aws_operations import AWSOperations
 from tests.utilities.reset_singletons import reset_all_singletons
 
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -169,7 +169,7 @@ def orb_config_dir(tmp_path, moto_vpc_resources):
 @pytest.fixture(autouse=True)
 def reset_singletons():
     """Reset DI container and all singletons before and after each test."""
-    from infrastructure.di.container import reset_container
+    from orb.infrastructure.di.container import reset_container
 
     reset_container()
     reset_all_singletons()
@@ -225,7 +225,7 @@ def _make_aws_client(region: str = REGION) -> AWSClient:
 
 
 def _make_launch_template_manager(aws_client: AWSClient, logger) -> AWSLaunchTemplateManager:
-    from providers.aws.infrastructure.launch_template.manager import LaunchTemplateResult
+    from orb.providers.aws.infrastructure.launch_template.manager import LaunchTemplateResult
 
     lt_manager = MagicMock(spec=AWSLaunchTemplateManager)
 

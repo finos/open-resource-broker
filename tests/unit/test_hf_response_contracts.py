@@ -7,10 +7,10 @@ immediately rather than discovered at runtime by an HF client.
 
 from unittest.mock import MagicMock
 
-from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
     HostFactorySchedulerStrategy,
 )
-from infrastructure.scheduler.hostfactory.response_formatter import (
+from orb.infrastructure.scheduler.hostfactory.response_formatter import (
     HostFactoryResponseFormatter,
 )
 

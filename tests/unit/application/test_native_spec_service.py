@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from application.services.native_spec_service import NativeSpecService
+from orb.application.services.native_spec_service import NativeSpecService
 
 
 class TestNativeSpecService:

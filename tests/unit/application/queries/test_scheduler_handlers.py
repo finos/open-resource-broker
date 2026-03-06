@@ -4,17 +4,17 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from application.dto.system import (
+from orb.application.dto.system import (
     SchedulerConfigurationResponse,
     SchedulerStrategyListResponse,
     ValidationResultDTO,
 )
-from application.queries.scheduler import (
+from orb.application.queries.scheduler import (
     GetSchedulerConfigurationQuery,
     ListSchedulerStrategiesQuery,
     ValidateSchedulerConfigurationQuery,
 )
-from application.queries.scheduler_handlers import (
+from orb.application.queries.scheduler_handlers import (
     GetSchedulerConfigurationHandler,
     ListSchedulerStrategiesHandler,
     ValidateSchedulerConfigurationHandler,
@@ -27,8 +27,8 @@ class TestListSchedulerStrategiesHandler:
     @pytest.fixture
     def handler(self):
         """Create handler instance."""
-        from application.services.scheduler_registry_service import SchedulerRegistryService
-        from domain.services.generic_filter_service import GenericFilterService
+        from orb.application.services.scheduler_registry_service import SchedulerRegistryService
+        from orb.domain.services.generic_filter_service import GenericFilterService
 
         mock_logger = Mock()
         mock_error_handler = Mock()
@@ -134,7 +134,7 @@ class TestGetSchedulerConfigurationHandler:
     @pytest.fixture
     def handler(self):
         """Create handler instance."""
-        from application.services.scheduler_registry_service import SchedulerRegistryService
+        from orb.application.services.scheduler_registry_service import SchedulerRegistryService
 
         mock_logger = Mock()
         mock_error_handler = Mock()
@@ -144,11 +144,14 @@ class TestGetSchedulerConfigurationHandler:
             "hostfactory",
             "hf",
         ]
-        mock_scheduler_service.is_scheduler_registered.side_effect = lambda name: name in [
-            "default",
-            "hostfactory",
-            "hf",
-        ]
+        mock_scheduler_service.is_scheduler_registered.side_effect = lambda name: (
+            name
+            in [
+                "default",
+                "hostfactory",
+                "hf",
+            ]
+        )
         return GetSchedulerConfigurationHandler(
             mock_logger, mock_error_handler, mock_scheduler_service
         )
@@ -254,7 +257,7 @@ class TestValidateSchedulerConfigurationHandler:
         """Create handler instance."""
         from unittest.mock import Mock
 
-        from application.services.scheduler_registry_service import SchedulerRegistryService
+        from orb.application.services.scheduler_registry_service import SchedulerRegistryService
 
         mock_logger = Mock()
         mock_error_handler = Mock()

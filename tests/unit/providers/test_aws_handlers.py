@@ -20,17 +20,17 @@ except ImportError:
 
 # Import AWS components
 try:
-    from providers.aws.domain.template.value_objects import AWSFleetType
-    from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
-    from providers.aws.infrastructure.handlers.asg.handler import ASGHandler
-    from providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
-    from providers.aws.infrastructure.handlers.run_instances.handler import (
+    from orb.providers.aws.domain.template.value_objects import AWSFleetType
+    from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
+    from orb.providers.aws.infrastructure.handlers.asg.handler import ASGHandler
+    from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
+    from orb.providers.aws.infrastructure.handlers.run_instances.handler import (
         RunInstancesHandler,
     )
-    from providers.aws.infrastructure.handlers.spot_fleet.handler import (
+    from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import (
         SpotFleetHandler,
     )
-    from providers.aws.utilities.aws_operations import AWSOperations
+    from orb.providers.aws.utilities.aws_operations import AWSOperations
 
     IMPORTS_AVAILABLE = True
 except ImportError as e:

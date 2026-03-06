@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from sdk.exceptions import HandlerDiscoveryError, MethodExecutionError
-from sdk.parameter_mapping import ParameterMapper
+from orb.sdk.exceptions import HandlerDiscoveryError, MethodExecutionError
+from orb.sdk.parameter_mapping import ParameterMapper
 
 # ---------------------------------------------------------------------------
 # Minimal fake command/query types for testing
@@ -89,7 +89,7 @@ class TestParameterMapper:
 
 class TestSDKMethodDiscoveryNameConversion:
     def setup_method(self):
-        from sdk.discovery import SDKMethodDiscovery
+        from orb.sdk.discovery import SDKMethodDiscovery
 
         self.disc = SDKMethodDiscovery()
 
@@ -129,7 +129,7 @@ class TestSDKMethodDiscoveryNameConversion:
 
 class TestSDKMethodDiscoveryMethodInfo:
     def setup_method(self):
-        from sdk.discovery import SDKMethodDiscovery
+        from orb.sdk.discovery import SDKMethodDiscovery
 
         self.disc = SDKMethodDiscovery()
 
@@ -167,7 +167,7 @@ class TestSDKMethodDiscoveryMethodInfo:
 
 class TestSDKMethodDiscoveryCreatedMethods:
     def setup_method(self):
-        from sdk.discovery import MethodInfo, SDKMethodDiscovery
+        from orb.sdk.discovery import MethodInfo, SDKMethodDiscovery
 
         self.disc = SDKMethodDiscovery()
         self.method_info = MethodInfo(
@@ -204,7 +204,7 @@ class TestSDKMethodDiscoveryCreatedMethods:
 
     @pytest.mark.asyncio
     async def test_command_method_calls_bus_execute(self):
-        from sdk.discovery import MethodInfo
+        from orb.sdk.discovery import MethodInfo
 
         cmd_info = MethodInfo(
             name="create_fake",
@@ -228,7 +228,7 @@ class TestSDKMethodDiscoveryCreatedMethods:
 
     @pytest.mark.asyncio
     async def test_command_method_raises_method_execution_error_on_failure(self):
-        from sdk.discovery import MethodInfo
+        from orb.sdk.discovery import MethodInfo
 
         cmd_info = MethodInfo(
             name="create_fake",
@@ -257,7 +257,7 @@ class TestDiscoverCQRSMethods:
     async def test_discover_returns_methods_dict(self):
         from unittest.mock import patch
 
-        from sdk.discovery import SDKMethodDiscovery
+        from orb.sdk.discovery import SDKMethodDiscovery
 
         disc = SDKMethodDiscovery()
         query_bus = AsyncMock()
@@ -281,7 +281,7 @@ class TestDiscoverCQRSMethods:
     async def test_discover_raises_handler_discovery_error_on_failure(self):
         from unittest.mock import patch
 
-        from sdk.discovery import SDKMethodDiscovery
+        from orb.sdk.discovery import SDKMethodDiscovery
 
         disc = SDKMethodDiscovery()
 
@@ -297,7 +297,7 @@ class TestDiscoverCQRSMethods:
 
 class TestStandardizeReturnType:
     def setup_method(self):
-        from sdk.discovery import SDKMethodDiscovery
+        from orb.sdk.discovery import SDKMethodDiscovery
 
         self.disc = SDKMethodDiscovery()
 

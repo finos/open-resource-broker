@@ -23,7 +23,7 @@ class _FallbackRegistry:
 
 # Import the singleton registry
 try:
-    from infrastructure.patterns.singleton_registry import SingletonRegistry
+    from orb.infrastructure.patterns.singleton_registry import SingletonRegistry
 except ImportError:
     # If the singleton registry doesn't exist yet, use the fallback
     SingletonRegistry = _FallbackRegistry
@@ -66,7 +66,7 @@ def _safe_reset_global_variable(module_name: str, variable_name: str) -> None:
 def _reset_circuit_breaker_states() -> None:
     """Clear class-level circuit breaker state so tests start with closed circuits."""
     try:
-        from infrastructure.resilience.strategy.circuit_breaker import CircuitBreakerStrategy
+        from orb.infrastructure.resilience.strategy.circuit_breaker import CircuitBreakerStrategy
 
         CircuitBreakerStrategy._circuit_states.clear()
     except ImportError:

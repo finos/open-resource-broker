@@ -6,13 +6,13 @@ from unittest.mock import AsyncMock, MagicMock
 import jwt
 import pytest
 
-from infrastructure.adapters.ports.auth import AuthContext, AuthStatus
-from infrastructure.auth.strategy.bearer_token_strategy_enhanced import (
+from orb.infrastructure.adapters.ports.auth import AuthContext, AuthStatus
+from orb.infrastructure.auth.strategy.bearer_token_strategy_enhanced import (
     EnhancedBearerTokenStrategy,
     RateLimiter,
 )
-from infrastructure.auth.token_blacklist import InMemoryTokenBlacklist, RedisTokenBlacklist
-from infrastructure.validation.input_validator import InputValidator, ValidationError
+from orb.infrastructure.auth.token_blacklist import InMemoryTokenBlacklist, RedisTokenBlacklist
+from orb.infrastructure.validation.input_validator import InputValidator, ValidationError
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -652,8 +652,8 @@ class TestAuthMiddlewareSecurityHeaders:
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
 
-        from api.middleware.auth_middleware import AuthMiddleware
-        from infrastructure.auth.strategy.no_auth_strategy import NoAuthStrategy
+        from orb.api.middleware.auth_middleware import AuthMiddleware
+        from orb.infrastructure.auth.strategy.no_auth_strategy import NoAuthStrategy
 
         app = FastAPI()
 
@@ -731,7 +731,7 @@ class TestAuthMiddlewareSecurityHeaders:
         """Normalized paths must not allow traversal to bypass excluded paths."""
         from unittest.mock import MagicMock
 
-        from api.middleware.auth_middleware import AuthMiddleware
+        from orb.api.middleware.auth_middleware import AuthMiddleware
 
         middleware = AuthMiddleware(
             app=MagicMock(),
@@ -755,7 +755,7 @@ class TestAuthMiddlewareSecurityHeaders:
         """Prefix paths must not bypass auth via excluded path matching."""
         from unittest.mock import MagicMock
 
-        from api.middleware.auth_middleware import AuthMiddleware
+        from orb.api.middleware.auth_middleware import AuthMiddleware
 
         middleware = AuthMiddleware(
             app=MagicMock(),

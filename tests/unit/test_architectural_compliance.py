@@ -118,8 +118,8 @@ class TestDDDCompliance:
     def test_aggregates_maintain_consistency(self):
         """Test that aggregate roots maintain business invariants."""
         try:
-            from domain.request.aggregate import Request
-            from domain.request.request_types import RequestType
+            from orb.domain.request.aggregate import Request
+            from orb.domain.request.request_types import RequestType
         except ImportError as e:
             pytest.skip(f"Could not import aggregates: {e}")
 
@@ -135,7 +135,7 @@ class TestDDDCompliance:
         assert request.requested_count > 0
 
         # Invariant: status should be valid
-        from domain.request.request_types import RequestStatus
+        from orb.domain.request.request_types import RequestStatus
 
         assert request.status in RequestStatus
 
@@ -145,7 +145,7 @@ class TestDDDCompliance:
     def test_domain_events_are_immutable(self):
         """Ensure all domain events are immutable."""
         try:
-            from domain.base.events import RequestCreatedEvent
+            from orb.domain.base.events import RequestCreatedEvent
         except ImportError as e:
             pytest.skip(f"Could not import domain events: {e}")
 
@@ -180,7 +180,7 @@ class TestSOLIDCompliance:
     def test_single_responsibility_principle(self):
         """Ensure each class has only one reason to change."""
         try:
-            from application.service import ApplicationService
+            from orb.application.service import ApplicationService
         except ImportError as e:
             pytest.skip(f"Could not import ApplicationService: {e}")
 
@@ -215,7 +215,7 @@ class TestSOLIDCompliance:
     def test_open_closed_principle(self):
         """Ensure classes are open for extension, closed for modification."""
         try:
-            from infrastructure.interfaces.provider import ProviderPort
+            from orb.infrastructure.interfaces.provider import ProviderPort
         except ImportError as e:
             pytest.skip(f"Could not import ProviderPort: {e}")
 
@@ -232,7 +232,7 @@ class TestSOLIDCompliance:
         methods that ProviderPort requires at the abstract level.
         """
         try:
-            from providers.aws.strategy.aws_provider_strategy import (
+            from orb.providers.aws.strategy.aws_provider_strategy import (
                 AWSProviderStrategy as AWSProvider,
             )
         except ImportError as e:
@@ -250,7 +250,7 @@ class TestSOLIDCompliance:
     def test_interface_segregation_principle(self):
         """Ensure clients depend only on interfaces they use."""
         try:
-            from infrastructure.interfaces.provider import ProviderPort
+            from orb.infrastructure.interfaces.provider import ProviderPort
         except ImportError as e:
             pytest.skip(f"Could not import ProviderPort: {e}")
 
@@ -269,7 +269,7 @@ class TestSOLIDCompliance:
         try:
             import inspect
 
-            from application.service import ApplicationService
+            from orb.application.service import ApplicationService
         except ImportError as e:
             pytest.skip(f"Could not import ApplicationService: {e}")
 
@@ -450,7 +450,7 @@ class TestDesignPatternCompliance:
     def test_repository_pattern_compliance(self):
         """Test Repository pattern implementation."""
         try:
-            from domain.base.ports import RepositoryPort as Repository
+            from orb.domain.base.ports import RepositoryPort as Repository
         except ImportError as e:
             pytest.skip(f"Could not import Repository: {e}")
 
@@ -462,7 +462,7 @@ class TestDesignPatternCompliance:
     def test_factory_pattern_compliance(self):
         """Test Factory pattern implementation."""
         try:
-            from infrastructure.di.container import DIContainer
+            from orb.infrastructure.di.container import DIContainer
         except ImportError as e:
             pytest.skip(f"Could not import DIContainer: {e}")
 
@@ -475,9 +475,9 @@ class TestDesignPatternCompliance:
     def test_aggregate_pattern_compliance(self):
         """Test Aggregate pattern implementation."""
         try:
-            from domain.base.entity import AggregateRoot
-            from domain.request.aggregate import Request
-            from domain.request.request_types import RequestType
+            from orb.domain.base.entity import AggregateRoot
+            from orb.domain.request.aggregate import Request
+            from orb.domain.request.request_types import RequestType
         except ImportError as e:
             pytest.skip(f"Could not import aggregate classes: {e}")
 
@@ -547,8 +547,8 @@ class TestCodeQualityCompliance:
     def test_proper_exception_hierarchy(self):
         """Test that exceptions follow correct hierarchy."""
         try:
-            from domain.base.exceptions import DomainException
-            from domain.request.exceptions import RequestValidationError
+            from orb.domain.base.exceptions import DomainException
+            from orb.domain.request.exceptions import RequestValidationError
         except ImportError as e:
             pytest.skip(f"Could not import exception classes: {e}")
 

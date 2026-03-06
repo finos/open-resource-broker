@@ -4,11 +4,11 @@ import threading
 
 import pytest
 
-from domain.base.di_contracts import DependencyRegistration, DILifecycle, DIScope
-from infrastructure.di.components.cqrs_registry import CQRSHandlerRegistry
-from infrastructure.di.components.dependency_resolver import DependencyResolver
-from infrastructure.di.components.service_registry import ServiceRegistry
-from infrastructure.di.exceptions import (
+from orb.domain.base.di_contracts import DependencyRegistration, DILifecycle, DIScope
+from orb.infrastructure.di.components.cqrs_registry import CQRSHandlerRegistry
+from orb.infrastructure.di.components.dependency_resolver import DependencyResolver
+from orb.infrastructure.di.components.service_registry import ServiceRegistry
+from orb.infrastructure.di.exceptions import (
     CircularDependencyError,
     DependencyResolutionError,
     FactoryError,

@@ -12,19 +12,19 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from config.manager import ConfigurationManager
-from domain.base.ports.logging_port import LoggingPort
-from infrastructure.template.configuration_manager import TemplateConfigurationManager
-from infrastructure.template.dtos import TemplateDTO
-from infrastructure.template.services.template_storage_service import (
+from orb.config.manager import ConfigurationManager
+from orb.domain.base.ports.logging_port import LoggingPort
+from orb.infrastructure.template.configuration_manager import TemplateConfigurationManager
+from orb.infrastructure.template.dtos import TemplateDTO
+from orb.infrastructure.template.services.template_storage_service import (
     TemplateStorageService,
 )
-from infrastructure.template.template_cache_service import (
+from orb.infrastructure.template.template_cache_service import (
     NoOpTemplateCacheService,
     TTLTemplateCacheService,
     create_template_cache_service,
 )
-from providers.aws.infrastructure.adapters.template_adapter import AWSTemplateAdapter
+from orb.providers.aws.infrastructure.adapters.template_adapter import AWSTemplateAdapter
 
 
 class TestRefactoredTemplateSystem:

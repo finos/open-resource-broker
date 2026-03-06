@@ -14,9 +14,11 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
-from infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings
-from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
+from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+from orb.infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings
+from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+    HostFactorySchedulerStrategy,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -178,7 +180,7 @@ def test_default_strategy_loads_snake_case_passthrough(tmp_path):
 
 def test_default_strategy_delegates_hf_file_to_hf_strategy(tmp_path):
     """Default strategy detects scheduler_type=hostfactory and delegates via registry when registered."""
-    from infrastructure.scheduler.registry import get_scheduler_registry
+    from orb.infrastructure.scheduler.registry import get_scheduler_registry
 
     registry = get_scheduler_registry()
     # Register both types so delegation can resolve the HF strategy class

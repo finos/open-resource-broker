@@ -5,8 +5,8 @@ import os
 import tempfile
 from unittest.mock import patch
 
-from bootstrap import Application
-from config.manager import ConfigurationManager
+from orb.bootstrap import Application
+from orb.config.manager import ConfigurationManager
 
 
 class TestConfigurationIntegration:
@@ -190,7 +190,7 @@ class TestConfigurationIntegration:
         """Test provider strategy factory integration with configuration."""
         from unittest.mock import Mock
 
-        from providers.factory import ProviderStrategyFactory
+        from orb.providers.factory import ProviderStrategyFactory
 
         # Create configuration
         config_data = {
@@ -234,7 +234,7 @@ class TestConfigurationIntegration:
         """Test end-to-end configuration validation."""
         from unittest.mock import Mock
 
-        from providers.factory import ProviderStrategyFactory
+        from orb.providers.factory import ProviderStrategyFactory
 
         # Test valid configuration
         valid_config = {
@@ -406,7 +406,7 @@ class TestConfigurationIntegration:
         # Test template defaults service integration
         from unittest.mock import Mock
 
-        from application.services.template_defaults_service import (
+        from orb.application.services.template_defaults_service import (
             TemplateDefaultsService,
         )
 

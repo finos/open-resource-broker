@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from domain.base.exceptions import DomainException
+from orb.domain.base.exceptions import DomainException
 
 
 class TestCLIShowValidation:

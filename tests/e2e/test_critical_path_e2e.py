@@ -17,15 +17,15 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from api.dependencies import (
+from orb.api.dependencies import (
     get_request_machines_handler,
     get_request_status_handler,
     get_return_machines_handler,
     get_return_requests_handler,
 )
-from api.server import create_fastapi_app
-from config.schemas.server_schema import AuthConfig, ServerConfig
-from infrastructure.di.buses import CommandBus, QueryBus
+from orb.api.server import create_fastapi_app
+from orb.config.schemas.server_schema import AuthConfig, ServerConfig
+from orb.infrastructure.di.buses import CommandBus, QueryBus
 
 # ---------------------------------------------------------------------------
 # Shared helpers and fixtures

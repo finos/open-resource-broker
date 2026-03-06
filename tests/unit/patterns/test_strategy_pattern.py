@@ -14,18 +14,18 @@ import pytest
 
 # Import strategy components with error handling
 try:
-    from providers.base.strategy.provider_context import ProviderContext
+    from orb.providers.base.strategy.provider_context import ProviderContext
 
-    from infrastructure.factories.provider_strategy_factory import (
+    from orb.infrastructure.factories.provider_strategy_factory import (
         ProviderStrategyFactory,
     )
-    from providers.base.strategy.composite_strategy import CompositeProviderStrategy
-    from providers.base.strategy.fallback_strategy import FallbackProviderStrategy
-    from providers.base.strategy.load_balancing_strategy import (
+    from orb.providers.base.strategy.composite_strategy import CompositeProviderStrategy
+    from orb.providers.base.strategy.fallback_strategy import FallbackProviderStrategy
+    from orb.providers.base.strategy.load_balancing_strategy import (
         LoadBalancingProviderStrategy,
     )
-    from providers.base.strategy.provider_selector import ProviderSelector
-    from providers.base.strategy.provider_strategy import (
+    from orb.providers.base.strategy.provider_selector import ProviderSelector
+    from orb.providers.base.strategy.provider_strategy import (
         ProviderOperation,
         ProviderResult,
         ProviderStrategy,

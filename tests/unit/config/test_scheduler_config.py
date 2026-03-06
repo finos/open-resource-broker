@@ -3,8 +3,8 @@
 import os
 from unittest.mock import patch
 
-from config.schemas.app_schema import AppConfig
-from config.schemas.scheduler_schema import SchedulerConfig
+from orb.config.schemas.app_schema import AppConfig
+from orb.config.schemas.scheduler_schema import SchedulerConfig
 
 
 class TestSchedulerConfig:

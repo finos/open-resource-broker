@@ -7,7 +7,7 @@ import pytest
 pytestmark = pytest.mark.skip(reason="infrastructure.persistence module path changed")
 
 try:
-    from infrastructure.persistence.json.strategy import JSONStorageStrategy
+    from orb.infrastructure.persistence.json.strategy import JSONStorageStrategy
 
     HAS_JSON_STRATEGY = True
 except ImportError:

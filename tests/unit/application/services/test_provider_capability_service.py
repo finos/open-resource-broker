@@ -9,7 +9,7 @@ pytestmark = pytest.mark.skip(
 )
 
 try:
-    from application.services.provider_capability_service import (
+    from orb.application.services.provider_capability_service import (
         ProviderCapabilityService,
         ValidationLevel,
         ValidationResult,
@@ -19,9 +19,9 @@ try:
 except ImportError:
     HAS_CAPABILITY_SERVICE = False
 
-from domain.base.ports import LoggingPort
-from domain.template.template_aggregate import Template
-from providers.base.strategy.provider_strategy import ProviderOperationType
+from orb.domain.base.ports import LoggingPort
+from orb.domain.template.template_aggregate import Template
+from orb.providers.base.strategy.provider_strategy import ProviderOperationType
 
 
 class TestProviderCapabilityService:

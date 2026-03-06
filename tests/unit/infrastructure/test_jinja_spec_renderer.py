@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from infrastructure.template.jinja_spec_renderer import JinjaSpecRenderer
+from orb.infrastructure.template.jinja_spec_renderer import JinjaSpecRenderer
 
 
 class TestJinjaSpecRenderer:

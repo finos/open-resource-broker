@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from infrastructure.storage.components.event_publisher import (
+from orb.infrastructure.storage.components.event_publisher import (
     EventPublisher,
     InMemoryEventPublisher,
     LoggingEventPublisher,

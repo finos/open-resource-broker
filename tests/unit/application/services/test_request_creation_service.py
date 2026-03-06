@@ -2,8 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
-from application.services.request_creation_service import RequestCreationService
-from domain.request.request_types import RequestType
+from orb.application.services.request_creation_service import RequestCreationService
+from orb.domain.request.request_types import RequestType
 
 
 def _make_command(

@@ -2,9 +2,9 @@
 
 from unittest.mock import Mock, patch
 
-from config.manager import ConfigurationManager
-from infrastructure.adapters.configuration_adapter import ConfigurationAdapter
-from providers.aws.infrastructure.services.aws_native_spec_service import (
+from orb.config.manager import ConfigurationManager
+from orb.infrastructure.adapters.configuration_adapter import ConfigurationAdapter
+from orb.providers.aws.infrastructure.services.aws_native_spec_service import (
     AWSNativeSpecService,
 )
 
@@ -60,10 +60,10 @@ class TestPackageNameIntegration:
             )
 
             # Create test template and request
-            from domain.request.aggregate import Request
-            from domain.request.value_objects import RequestId, RequestType
-            from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-            from providers.aws.domain.template.value_objects import ProviderApi
+            from orb.domain.request.aggregate import Request
+            from orb.domain.request.value_objects import RequestId, RequestType
+            from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+            from orb.providers.aws.domain.template.value_objects import ProviderApi
 
             template = AWSTemplate(
                 template_id="integration-test",

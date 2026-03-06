@@ -9,14 +9,14 @@ pytestmark = pytest.mark.skip(
 )
 
 try:
-    from providers.base.strategy.provider_context import ProviderContext
+    from orb.providers.base.strategy.provider_context import ProviderContext
 
     HAS_PROVIDER_CONTEXT = True
 except ImportError:
     HAS_PROVIDER_CONTEXT = False
 
-from domain.base.ports import LoggingPort
-from providers.base.strategy.provider_strategy import (
+from orb.domain.base.ports import LoggingPort
+from orb.providers.base.strategy.provider_strategy import (
     ProviderOperation,
     ProviderOperationType,
 )
@@ -37,7 +37,7 @@ class TestProviderContextIntegration:
 
     def test_provider_context_with_aws_strategy(self, provider_context):
         """Test provider context with AWS strategy integration."""
-        from providers.base.strategy.provider_strategy import (
+        from orb.providers.base.strategy.provider_strategy import (
             ProviderCapabilities,
             ProviderStrategy,
         )
@@ -76,7 +76,7 @@ class TestProviderContextIntegration:
 
     def test_multi_provider_context_scenario(self, provider_context):
         """Test multi-provider context scenario."""
-        from providers.base.strategy.provider_strategy import ProviderStrategy
+        from orb.providers.base.strategy.provider_strategy import ProviderStrategy
 
         # Create mock strategies for different providers
         aws_strategy = Mock(spec=ProviderStrategy)
@@ -107,7 +107,7 @@ class TestProviderContextIntegration:
 
     def test_provider_context_error_handling(self, provider_context):
         """Test provider context error handling scenarios."""
-        from providers.base.strategy.provider_strategy import ProviderStrategy
+        from orb.providers.base.strategy.provider_strategy import ProviderStrategy
 
         # Test with strategy that fails initialization
         failing_strategy = Mock(spec=ProviderStrategy)
@@ -122,7 +122,7 @@ class TestProviderContextIntegration:
 
     def test_provider_context_with_health_monitoring(self, provider_context):
         """Test provider context with health monitoring."""
-        from providers.base.strategy.provider_strategy import (
+        from orb.providers.base.strategy.provider_strategy import (
             ProviderHealthStatus,
             ProviderStrategy,
         )
@@ -150,7 +150,7 @@ class TestProviderContextIntegration:
     @pytest.mark.asyncio
     async def test_provider_context_operation_routing(self, provider_context):
         """Test operation routing to specific providers."""
-        from providers.base.strategy.provider_strategy import (
+        from orb.providers.base.strategy.provider_strategy import (
             ProviderCapabilities,
             ProviderResult,
             ProviderStrategy,
@@ -213,7 +213,7 @@ class TestProviderContextIntegration:
     @pytest.mark.asyncio
     async def test_provider_context_metrics_aggregation(self, provider_context):
         """Test metrics aggregation across multiple providers."""
-        from providers.base.strategy.provider_strategy import (
+        from orb.providers.base.strategy.provider_strategy import (
             ProviderCapabilities,
             ProviderResult,
             ProviderStrategy,
@@ -264,7 +264,7 @@ class TestProviderContextIntegration:
         import asyncio
         import threading
 
-        from providers.base.strategy.provider_strategy import (
+        from orb.providers.base.strategy.provider_strategy import (
             ProviderCapabilities,
             ProviderResult,
             ProviderStrategy,
@@ -342,7 +342,7 @@ class TestProviderContextIntegration:
     @pytest.mark.asyncio
     async def test_provider_context_failover_scenario(self, provider_context):
         """Test provider failover scenario."""
-        from providers.base.strategy.provider_strategy import (
+        from orb.providers.base.strategy.provider_strategy import (
             ProviderCapabilities,
             ProviderHealthStatus,
             ProviderResult,

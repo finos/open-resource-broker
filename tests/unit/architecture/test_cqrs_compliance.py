@@ -14,13 +14,13 @@ import pytest
 
 # Import available components
 try:
-    from application.base.command_handler import ApplicationCommandHandler
-    from application.dto.commands import (
+    from orb.application.base.command_handler import ApplicationCommandHandler
+    from orb.application.dto.commands import (
         CreateRequestCommand,
         UpdateRequestStatusCommand,
     )
-    from application.dto.queries import GetTemplateQuery, ListTemplatesQuery
-    from infrastructure.di.container import DIContainer
+    from orb.application.dto.queries import GetTemplateQuery, ListTemplatesQuery
+    from orb.infrastructure.di.container import DIContainer
 
     COMPONENTS_AVAILABLE = True
 except ImportError as e:
@@ -82,7 +82,7 @@ class TestCQRSCompliance:
         # UpdateRequestStatusCommand uses frozen=True, so assignment raises ValidationError
         from pydantic_core import ValidationError
 
-        from domain.request.value_objects import RequestStatus
+        from orb.domain.request.value_objects import RequestStatus
 
         command = UpdateRequestStatusCommand(
             request_id="test-request", status=RequestStatus.COMPLETED
@@ -190,7 +190,7 @@ class TestCQRSCompliance:
     def test_event_driven_architecture_support(self):
         """Test that CQRS supports event-driven patterns."""
         # Commands should potentially trigger events
-        from domain.request.value_objects import RequestStatus
+        from orb.domain.request.value_objects import RequestStatus
 
         command = UpdateRequestStatusCommand(
             request_id="test-request", status=RequestStatus.COMPLETED

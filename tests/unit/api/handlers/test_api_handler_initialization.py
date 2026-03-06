@@ -2,18 +2,18 @@
 
 from unittest.mock import MagicMock, patch
 
-from api.handlers.get_available_templates_handler import (
+from orb.api.handlers.get_available_templates_handler import (
     GetAvailableTemplatesRESTHandler,
 )
-from api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
-from api.handlers.get_return_requests_handler import GetReturnRequestsRESTHandler
-from api.handlers.request_machines_handler import RequestMachinesRESTHandler
-from api.handlers.request_return_machines_handler import (
+from orb.api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
+from orb.api.handlers.get_return_requests_handler import GetReturnRequestsRESTHandler
+from orb.api.handlers.request_machines_handler import RequestMachinesRESTHandler
+from orb.api.handlers.request_return_machines_handler import (
     RequestReturnMachinesRESTHandler,
 )
-from domain.base.ports import ErrorHandlingPort, LoggingPort, SchedulerPort
-from infrastructure.di.buses import CommandBus, QueryBus
-from monitoring.metrics import MetricsCollector
+from orb.domain.base.ports import ErrorHandlingPort, LoggingPort, SchedulerPort
+from orb.infrastructure.di.buses import CommandBus, QueryBus
+from orb.monitoring.metrics import MetricsCollector
 
 
 class TestAPIHandlerInitialization:
@@ -123,8 +123,8 @@ class TestAPIHandlerRegistration:
         self, mock_register_api_handlers, mock_register_fastapi
     ):
         """Test that register_server_services calls handlers when server is enabled and FastAPI is available."""
-        from config.schemas.server_schema import ServerConfig
-        from infrastructure.di.server_services import register_server_services
+        from orb.config.schemas.server_schema import ServerConfig
+        from orb.infrastructure.di.server_services import register_server_services
 
         container = MagicMock()
         config_manager = MagicMock()
@@ -140,8 +140,8 @@ class TestAPIHandlerRegistration:
 
     def test_register_server_services_without_fastapi(self):
         """Test that register_server_services handles missing FastAPI gracefully."""
-        from config.schemas.server_schema import ServerConfig
-        from infrastructure.di.server_services import register_server_services
+        from orb.config.schemas.server_schema import ServerConfig
+        from orb.infrastructure.di.server_services import register_server_services
 
         container = MagicMock()
         config_manager = MagicMock()
@@ -162,8 +162,8 @@ class TestAPIHandlerRegistration:
     @patch("infrastructure.di.server_services._register_api_handlers")
     def test_register_server_services_disabled(self, mock_register_api_handlers):
         """Test that register_server_services doesn't call _register_api_handlers when server is disabled."""
-        from config.schemas.server_schema import ServerConfig
-        from infrastructure.di.server_services import register_server_services
+        from orb.config.schemas.server_schema import ServerConfig
+        from orb.infrastructure.di.server_services import register_server_services
 
         container = MagicMock()
         config_manager = MagicMock()

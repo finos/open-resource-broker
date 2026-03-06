@@ -11,14 +11,14 @@ pytestmark = pytest.mark.skip(
 )
 
 try:
-    from providers.base.strategy.provider_context import ProviderContext
+    from orb.providers.base.strategy.provider_context import ProviderContext
 
     HAS_PROVIDER_CONTEXT = True
 except ImportError:
     HAS_PROVIDER_CONTEXT = False
 
-from domain.base.ports import LoggingPort
-from providers.base.strategy.provider_strategy import (
+from orb.domain.base.ports import LoggingPort
+from orb.providers.base.strategy.provider_strategy import (
     ProviderCapabilities,
     ProviderHealthStatus,
     ProviderOperation,

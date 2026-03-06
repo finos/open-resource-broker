@@ -5,7 +5,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
+from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+    HostFactorySchedulerStrategy,
+)
 
 
 def make_strategy():

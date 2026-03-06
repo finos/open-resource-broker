@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from config.platform_dirs import (
+from orb.config.platform_dirs import (
     get_config_location,
     get_logs_location,
     get_scripts_location,

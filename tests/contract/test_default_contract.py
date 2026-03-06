@@ -42,7 +42,7 @@ def _validate(instance: dict, schema: dict) -> None:
 
 
 def _make_default_template_dto():
-    from infrastructure.template.dtos import TemplateDTO
+    from orb.infrastructure.template.dtos import TemplateDTO
 
     return TemplateDTO(
         template_id="contract-tpl-default",

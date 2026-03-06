@@ -3,8 +3,8 @@
 import base64
 from unittest.mock import Mock
 
-from domain.base.ports.logging_port import LoggingPort
-from infrastructure.template.jinja_spec_renderer import JinjaSpecRenderer
+from orb.domain.base.ports.logging_port import LoggingPort
+from orb.infrastructure.template.jinja_spec_renderer import JinjaSpecRenderer
 
 
 class TestJinjaAdvancedRendering:

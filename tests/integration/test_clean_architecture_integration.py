@@ -4,12 +4,12 @@ from unittest.mock import Mock
 
 import pytest
 
-from application.services.template_defaults_service import TemplateDefaultsService
-from domain.base.ports.logging_port import LoggingPort
-from domain.template.extensions import TemplateExtensionRegistry
-from domain.template.factory import TemplateFactory
-from domain.template.template_aggregate import Template
-from providers.aws.configuration.template_extension import AWSTemplateExtensionConfig
+from orb.application.services.template_defaults_service import TemplateDefaultsService
+from orb.domain.base.ports.logging_port import LoggingPort
+from orb.domain.template.extensions import TemplateExtensionRegistry
+from orb.domain.template.factory import TemplateFactory
+from orb.domain.template.template_aggregate import Template
+from orb.providers.aws.configuration.template_extension import AWSTemplateExtensionConfig
 
 
 class TestCleanArchitectureIntegration:
@@ -105,7 +105,7 @@ class TestCleanArchitectureIntegration:
 
     def test_clean_template_schema_validation(self):
         """Test that cleaned template schema works correctly."""
-        from config.schemas.template_schema import TemplateConfig
+        from orb.config.schemas.template_schema import TemplateConfig
 
         # Test clean configuration (no AWS-specific fields)
         clean_config = {
@@ -255,7 +255,7 @@ class TestCleanArchitectureIntegration:
 
     def test_provider_strategy_schema_extensions(self):
         """Test provider strategy schema supports extensions."""
-        from config.schemas.provider_strategy_schema import (
+        from orb.config.schemas.provider_strategy_schema import (
             ProviderDefaults,
             ProviderInstanceConfig,
         )

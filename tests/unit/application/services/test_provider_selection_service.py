@@ -9,7 +9,7 @@ pytestmark = pytest.mark.skip(
 )
 
 try:
-    from application.services.provider_selection_service import (
+    from orb.application.services.provider_selection_service import (
         ProviderSelectionResult,
         ProviderSelectionService,
         SelectionStrategy,
@@ -19,13 +19,13 @@ try:
 except ImportError:
     HAS_SELECTION_SERVICE = False
 
-from config.managers.configuration_manager import ConfigurationManager
-from config.schemas.provider_strategy_schema import (
+from orb.config.managers.configuration_manager import ConfigurationManager
+from orb.config.schemas.provider_strategy_schema import (
     ProviderConfig,
     ProviderInstanceConfig,
 )
-from domain.base.ports import LoggingPort
-from domain.template.template_aggregate import Template
+from orb.domain.base.ports import LoggingPort
+from orb.domain.template.template_aggregate import Template
 
 
 class TestProviderSelectionService:

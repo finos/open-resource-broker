@@ -4,9 +4,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from mcp.discovery import MCPToolDefinition, MCPToolDiscovery
-from sdk.client import OpenResourceBroker
-from sdk.discovery import MethodInfo
+from orb.mcp.discovery import MCPToolDefinition, MCPToolDiscovery
+from orb.sdk.client import OpenResourceBroker
+from orb.sdk.discovery import MethodInfo
 
 
 class TestMCPToolDiscovery:

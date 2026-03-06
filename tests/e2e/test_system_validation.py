@@ -5,9 +5,9 @@ import os
 import tempfile
 from unittest.mock import Mock
 
-from bootstrap import Application
-from config.manager import ConfigurationManager
-from providers.factory import ProviderStrategyFactory
+from orb.bootstrap import Application
+from orb.config.manager import ConfigurationManager
+from orb.providers.factory import ProviderStrategyFactory
 
 
 class TestSystemValidation:

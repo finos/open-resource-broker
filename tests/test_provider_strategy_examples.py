@@ -14,7 +14,7 @@ pytestmark = pytest.mark.skip(
     reason="create_provider_context removed - using Provider Registry directly"
 )
 
-from providers.base.strategy import (
+from orb.providers.base.strategy import (
     CompositeProviderStrategy,
     CompositionConfig,
     CompositionMode,
@@ -131,7 +131,7 @@ class MockProvider1Strategy(ProviderStrategy):
 
     def __init__(self, config=None, should_fail=False, response_time_ms=100):
         """Initialize the instance."""
-        from infrastructure.interfaces.provider import ProviderConfig
+        from orb.infrastructure.interfaces.provider import ProviderConfig
 
         super().__init__(config or ProviderConfig(provider_type="provider1"))
         self.should_fail = should_fail
@@ -198,7 +198,7 @@ class MockProvider2Strategy(ProviderStrategy):
     """Mock implementation of Provider2 for testing."""
 
     def __init__(self, config=None, should_fail=False, response_time_ms=200):
-        from infrastructure.interfaces.provider import ProviderConfig
+        from orb.infrastructure.interfaces.provider import ProviderConfig
 
         super().__init__(config or ProviderConfig(provider_type="provider2"))
         self.should_fail = should_fail

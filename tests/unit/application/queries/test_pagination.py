@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from application.dto.queries import (
+from orb.application.dto.queries import (
     ListActiveRequestsQuery,
     ListMachinesQuery,
     ListReturnRequestsQuery,
     ListTemplatesQuery,
 )
-from application.request.queries import ListRequestsQuery
+from orb.application.request.queries import ListRequestsQuery
 
 # ---------------------------------------------------------------------------
 # Query DTO defaults
@@ -81,7 +81,7 @@ class TestListQueryPaginationCustomValues:
 
 class TestCLIFactoryPagination:
     def test_machine_factory_default_pagination(self):
-        from cli.factories.machine_command_factory import MachineCommandFactory
+        from orb.cli.factories.machine_command_factory import MachineCommandFactory
 
         factory = MachineCommandFactory()
         q = factory.create_list_machines_query()
@@ -89,7 +89,7 @@ class TestCLIFactoryPagination:
         assert q.offset == 0
 
     def test_machine_factory_custom_pagination(self):
-        from cli.factories.machine_command_factory import MachineCommandFactory
+        from orb.cli.factories.machine_command_factory import MachineCommandFactory
 
         factory = MachineCommandFactory()
         q = factory.create_list_machines_query(limit=10, offset=5)
@@ -97,14 +97,14 @@ class TestCLIFactoryPagination:
         assert q.offset == 5
 
     def test_machine_factory_caps_limit_at_1000(self):
-        from cli.factories.machine_command_factory import MachineCommandFactory
+        from orb.cli.factories.machine_command_factory import MachineCommandFactory
 
         factory = MachineCommandFactory()
         q = factory.create_list_machines_query(limit=9999)
         assert q.limit == 1000
 
     def test_request_factory_list_return_requests_default(self):
-        from cli.factories.request_command_factory import RequestCommandFactory
+        from orb.cli.factories.request_command_factory import RequestCommandFactory
 
         factory = RequestCommandFactory()
         q = factory.create_list_return_requests_query()
@@ -112,7 +112,7 @@ class TestCLIFactoryPagination:
         assert q.offset == 0
 
     def test_request_factory_list_return_requests_custom(self):
-        from cli.factories.request_command_factory import RequestCommandFactory
+        from orb.cli.factories.request_command_factory import RequestCommandFactory
 
         factory = RequestCommandFactory()
         q = factory.create_list_return_requests_query(limit=20, offset=40)
@@ -120,14 +120,14 @@ class TestCLIFactoryPagination:
         assert q.offset == 40
 
     def test_request_factory_list_return_requests_caps_limit(self):
-        from cli.factories.request_command_factory import RequestCommandFactory
+        from orb.cli.factories.request_command_factory import RequestCommandFactory
 
         factory = RequestCommandFactory()
         q = factory.create_list_return_requests_query(limit=5000)
         assert q.limit == 1000
 
     def test_request_factory_list_active_requests_default(self):
-        from cli.factories.request_command_factory import RequestCommandFactory
+        from orb.cli.factories.request_command_factory import RequestCommandFactory
 
         factory = RequestCommandFactory()
         q = factory.create_list_active_requests_query()
@@ -135,7 +135,7 @@ class TestCLIFactoryPagination:
         assert q.offset == 0
 
     def test_request_factory_list_active_requests_custom(self):
-        from cli.factories.request_command_factory import RequestCommandFactory
+        from orb.cli.factories.request_command_factory import RequestCommandFactory
 
         factory = RequestCommandFactory()
         q = factory.create_list_active_requests_query(limit=75, offset=25)
@@ -143,7 +143,7 @@ class TestCLIFactoryPagination:
         assert q.offset == 25
 
     def test_template_factory_default_pagination(self):
-        from cli.factories.template_command_factory import TemplateCommandFactory
+        from orb.cli.factories.template_command_factory import TemplateCommandFactory
 
         factory = TemplateCommandFactory()
         q = factory.create_list_templates_query()
@@ -151,7 +151,7 @@ class TestCLIFactoryPagination:
         assert q.offset == 0
 
     def test_template_factory_custom_pagination(self):
-        from cli.factories.template_command_factory import TemplateCommandFactory
+        from orb.cli.factories.template_command_factory import TemplateCommandFactory
 
         factory = TemplateCommandFactory()
         q = factory.create_list_templates_query(limit=30, offset=60)
@@ -159,7 +159,7 @@ class TestCLIFactoryPagination:
         assert q.offset == 60
 
     def test_template_factory_caps_limit_at_1000(self):
-        from cli.factories.template_command_factory import TemplateCommandFactory
+        from orb.cli.factories.template_command_factory import TemplateCommandFactory
 
         factory = TemplateCommandFactory()
         q = factory.create_list_templates_query(limit=2000)
@@ -227,7 +227,7 @@ class TestPaginationSliceLogic:
 
 class TestPaginationMetadata:
     def test_basic_construction(self):
-        from application.dto.base import PaginationMetadata
+        from orb.application.dto.base import PaginationMetadata
 
         meta = PaginationMetadata(
             total_count=100,
@@ -243,7 +243,7 @@ class TestPaginationMetadata:
         assert meta.returned_count == 10
 
     def test_last_page_has_more_false(self):
-        from application.dto.base import PaginationMetadata
+        from orb.application.dto.base import PaginationMetadata
 
         meta = PaginationMetadata(
             total_count=25,
@@ -256,7 +256,7 @@ class TestPaginationMetadata:
         assert meta.returned_count == 5
 
     def test_empty_result(self):
-        from application.dto.base import PaginationMetadata
+        from orb.application.dto.base import PaginationMetadata
 
         meta = PaginationMetadata(
             total_count=0,

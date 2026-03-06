@@ -9,7 +9,7 @@ pytestmark = pytest.mark.skip(
     reason="Test expects enhanced exception features (correlation_id, to_dict) not in current implementation"
 )
 
-from domain.base.exceptions import (
+from orb.domain.base.exceptions import (
     ApplicationError,
     DomainException,
     EntityNotFoundError,

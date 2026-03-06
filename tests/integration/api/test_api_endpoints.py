@@ -6,9 +6,9 @@ import pytest
 from fastapi import APIRouter
 from fastapi.testclient import TestClient
 
-from _package import __version__
-from api.server import create_fastapi_app
-from config.schemas.server_schema import AuthConfig, ServerConfig
+from orb._package import __version__
+from orb.api.server import create_fastapi_app
+from orb.config.schemas.server_schema import AuthConfig, ServerConfig
 
 
 class TestAPIEndpoints:

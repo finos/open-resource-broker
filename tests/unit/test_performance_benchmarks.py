@@ -18,9 +18,9 @@ except ImportError:
 
 # Import components for performance testing
 try:
-    from domain.request.aggregate import Request
-    from domain.template.template_aggregate import Template
-    from infrastructure.persistence.repositories.request_repository import (
+    from orb.domain.request.aggregate import Request
+    from orb.domain.template.template_aggregate import Template
+    from orb.infrastructure.persistence.repositories.request_repository import (
         RequestRepository,
     )
 

@@ -8,11 +8,11 @@ pytestmark = pytest.mark.skip(
     reason="infrastructure.registry.scheduler_registry module removed - using application services"
 )
 
-from domain.base.exceptions import ConfigurationError
-from infrastructure.registry.base_registry import BaseRegistration, BaseRegistry
+from orb.domain.base.exceptions import ConfigurationError
+from orb.infrastructure.registry.base_registry import BaseRegistration, BaseRegistry
 
 try:
-    from infrastructure.registry.scheduler_registry import (
+    from orb.infrastructure.registry.scheduler_registry import (
         SchedulerRegistry,
         UnsupportedSchedulerError,
         get_scheduler_registry,

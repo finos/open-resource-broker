@@ -15,11 +15,11 @@ import pytest
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../..")))
 
-from domain.request.aggregate import Request
-from domain.request.value_objects import RequestId, RequestType
-from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from providers.aws.exceptions.aws_exceptions import InfrastructureError
-from providers.aws.infrastructure.launch_template.manager import (
+from orb.domain.request.aggregate import Request
+from orb.domain.request.value_objects import RequestId, RequestType
+from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.exceptions.aws_exceptions import InfrastructureError
+from orb.providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
     LaunchTemplateResult,
 )
@@ -254,7 +254,7 @@ class TestAWSLaunchTemplateManager:
         """Test that _use_existing_template_strategy raises when template is not found."""
         from botocore.exceptions import ClientError
 
-        from providers.aws.exceptions.aws_exceptions import AWSValidationError
+        from orb.providers.aws.exceptions.aws_exceptions import AWSValidationError
 
         self.aws_template.launch_template_id = "lt-missing"
 

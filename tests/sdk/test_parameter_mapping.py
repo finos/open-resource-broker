@@ -5,7 +5,7 @@ Tests for SDK parameter mapping functionality.
 from dataclasses import dataclass
 from typing import Optional
 
-from sdk.parameter_mapping import ParameterMapper
+from orb.sdk.parameter_mapping import ParameterMapper
 
 
 @dataclass

@@ -9,10 +9,10 @@ pytestmark = pytest.mark.skip(
     reason="infrastructure.registry.storage_registry module removed - using application services"
 )
 
-from domain.base.exceptions import ConfigurationError
+from orb.domain.base.exceptions import ConfigurationError
 
 try:
-    from infrastructure.registry.storage_registry import (
+    from orb.infrastructure.registry.storage_registry import (
         StorageRegistration,
         StorageRegistry,
         UnsupportedStorageError,

@@ -17,7 +17,7 @@ class TestAWSProviderEnvironmentVariables:
     def test_aws_config_env_var_override(self):
         """Test AWS configuration environment variable override."""
         try:
-            from providers.aws.configuration.config import AWSProviderConfig
+            from orb.providers.aws.configuration.config import AWSProviderConfig
 
             # Test basic environment variable override
             with patch.dict(
@@ -40,7 +40,7 @@ class TestAWSProviderEnvironmentVariables:
     def test_aws_config_authentication_env_vars(self):
         """Test AWS authentication via environment variables."""
         try:
-            from providers.aws.configuration.config import AWSProviderConfig
+            from orb.providers.aws.configuration.config import AWSProviderConfig
 
             # Test profile-based authentication
             with patch.dict(os.environ, {"ORB_AWS_PROFILE": "production"}):
@@ -69,7 +69,7 @@ class TestAWSProviderEnvironmentVariables:
     def test_aws_config_service_settings_env_vars(self):
         """Test AWS service settings via environment variables."""
         try:
-            from providers.aws.configuration.config import AWSProviderConfig
+            from orb.providers.aws.configuration.config import AWSProviderConfig
 
             with patch.dict(
                 os.environ,
@@ -96,7 +96,7 @@ class TestAWSProviderEnvironmentVariables:
     def test_aws_config_proxy_settings_env_vars(self):
         """Test AWS proxy settings via environment variables."""
         try:
-            from providers.aws.configuration.config import AWSProviderConfig
+            from orb.providers.aws.configuration.config import AWSProviderConfig
 
             with patch.dict(
                 os.environ,
@@ -117,7 +117,7 @@ class TestAWSProviderEnvironmentVariables:
     def test_aws_config_legacy_fields_env_vars(self):
         """Test AWS legacy fields via environment variables."""
         try:
-            from providers.aws.configuration.config import AWSProviderConfig
+            from orb.providers.aws.configuration.config import AWSProviderConfig
 
             with patch.dict(
                 os.environ,
@@ -141,7 +141,7 @@ class TestAWSProviderEnvironmentVariables:
     def test_aws_config_type_conversion_env_vars(self):
         """Test AWS configuration type conversion from environment variables."""
         try:
-            from providers.aws.configuration.config import AWSProviderConfig
+            from orb.providers.aws.configuration.config import AWSProviderConfig
 
             # Test integer conversion
             with patch.dict(
@@ -168,7 +168,7 @@ class TestAWSProviderEnvironmentVariables:
     def test_aws_config_invalid_env_var_types(self):
         """Test AWS configuration with invalid environment variable types."""
         try:
-            from providers.aws.configuration.config import AWSProviderConfig
+            from orb.providers.aws.configuration.config import AWSProviderConfig
 
             # Test invalid integer conversion
             with patch.dict(os.environ, {"ORB_AWS_AWS_MAX_RETRIES": "not_a_number"}):
@@ -181,7 +181,7 @@ class TestAWSProviderEnvironmentVariables:
     def test_aws_config_json_fields_env_vars(self):
         """Test AWS configuration JSON fields via environment variables."""
         try:
-            from providers.aws.configuration.config import AWSProviderConfig
+            from orb.providers.aws.configuration.config import AWSProviderConfig
 
             handlers_json = '{"ec2_fleet": false, "spot_fleet": true, "asg": false}'
             launch_template_json = '{"create_per_request": false, "reuse_existing": true}'
@@ -206,7 +206,7 @@ class TestAWSProviderEnvironmentVariables:
     def test_aws_config_env_precedence_over_defaults(self):
         """Test environment variables take precedence over defaults."""
         try:
-            from providers.aws.configuration.config import AWSProviderConfig
+            from orb.providers.aws.configuration.config import AWSProviderConfig
 
             # Test that env vars override defaults
             with patch.dict(
@@ -236,7 +236,7 @@ class TestAWSProviderEnvironmentVariables:
     def test_aws_config_case_insensitive_env_vars(self):
         """Test AWS configuration case insensitive environment variables."""
         try:
-            from providers.aws.configuration.config import AWSProviderConfig
+            from orb.providers.aws.configuration.config import AWSProviderConfig
 
             with patch.dict(
                 os.environ,
@@ -258,7 +258,7 @@ class TestAWSProviderEnvironmentVariables:
     def test_aws_config_field_aliases_env_vars(self):
         """Test AWS configuration field names work via environment variables."""
         try:
-            from providers.aws.configuration.config import AWSProviderConfig
+            from orb.providers.aws.configuration.config import AWSProviderConfig
 
             # Use the actual field names (not aliases) for env var lookup
             with patch.dict(
@@ -280,8 +280,8 @@ class TestAWSProviderEnvironmentVariables:
     def test_provider_settings_registry_env_override(self):
         """Test provider settings registry with environment variable override."""
         try:
-            from config.schemas.provider_settings_registry import ProviderSettingsRegistry
-            from providers.aws.configuration.config import AWSProviderConfig
+            from orb.config.schemas.provider_settings_registry import ProviderSettingsRegistry
+            from orb.providers.aws.configuration.config import AWSProviderConfig
 
             # Register AWS provider
             ProviderSettingsRegistry.register_provider_settings("aws", AWSProviderConfig)
@@ -308,7 +308,7 @@ class TestAWSProviderEnvironmentVariables:
     def test_aws_config_validation_with_env_vars(self):
         """Test AWS configuration validation with environment variables."""
         try:
-            from providers.aws.configuration.config import AWSProviderConfig
+            from orb.providers.aws.configuration.config import AWSProviderConfig
 
             # Test valid authentication via env vars
             with patch.dict(os.environ, {"ORB_AWS_PROFILE": "valid-profile"}):
@@ -436,7 +436,7 @@ class TestAWSProviderComprehensive:
     def test_aws_client_exists(self):
         """Test that AWS client exists."""
         try:
-            from providers.aws.infrastructure.aws_client import AWSClient
+            from orb.providers.aws.infrastructure.aws_client import AWSClient
 
             assert AWSClient is not None
         except ImportError:
@@ -447,7 +447,7 @@ class TestAWSProviderComprehensive:
         try:
             from unittest.mock import Mock
 
-            from providers.aws.infrastructure.aws_client import AWSClient
+            from orb.providers.aws.infrastructure.aws_client import AWSClient
 
             mock_config = Mock()
             mock_logger = Mock()
@@ -463,7 +463,7 @@ class TestAWSProviderComprehensive:
     def test_aws_configuration_exists(self):
         """Test that AWS configuration exists."""
         try:
-            from providers.aws.configuration.config import AWSConfig
+            from orb.providers.aws.configuration.config import AWSConfig
 
             assert AWSConfig is not None
         except ImportError:
@@ -472,7 +472,7 @@ class TestAWSProviderComprehensive:
     def test_aws_configuration_initialization(self):
         """Test AWS configuration initialization."""
         try:
-            from providers.aws.configuration.config import AWSConfig
+            from orb.providers.aws.configuration.config import AWSConfig
 
             try:
                 config = AWSConfig()
@@ -509,7 +509,7 @@ class TestAWSProviderComprehensive:
     def test_aws_strategy_exists(self):
         """Test that AWS strategy exists."""
         try:
-            from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
+            from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
             assert AWSProviderStrategy is not None
         except ImportError:
@@ -518,8 +518,8 @@ class TestAWSProviderComprehensive:
     def test_aws_strategy_initialization(self):
         """Test AWS strategy initialization."""
         try:
-            from providers.aws.configuration.config import AWSProviderConfig
-            from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
+            from orb.providers.aws.configuration.config import AWSProviderConfig
+            from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
             config = AWSProviderConfig(profile="test-profile")
             strategy = AWSProviderStrategy(config=config, logger=Mock())
@@ -538,7 +538,7 @@ class TestAWSProviderComprehensive:
     def test_aws_exceptions_exist(self):
         """Test that AWS exceptions exist."""
         try:
-            from providers.aws.exceptions import aws_exceptions
+            from orb.providers.aws.exceptions import aws_exceptions
 
             assert aws_exceptions is not None
         except ImportError:
@@ -581,7 +581,7 @@ class TestProviderStrategyPatternsComprehensive:
     def test_composite_strategy_exists(self):
         """Test that composite strategy exists."""
         try:
-            from providers.base.strategy.composite_strategy import CompositeStrategy
+            from orb.providers.base.strategy.composite_strategy import CompositeStrategy
 
             assert CompositeStrategy is not None
         except ImportError:
@@ -590,7 +590,7 @@ class TestProviderStrategyPatternsComprehensive:
     def test_composite_strategy_initialization(self):
         """Test composite strategy initialization."""
         try:
-            from providers.base.strategy.composite_strategy import CompositeStrategy
+            from orb.providers.base.strategy.composite_strategy import CompositeStrategy
 
             # Try to create strategy
             try:
@@ -607,7 +607,7 @@ class TestProviderStrategyPatternsComprehensive:
     def test_fallback_strategy_exists(self):
         """Test that fallback strategy exists."""
         try:
-            from providers.base.strategy.fallback_strategy import FallbackStrategy
+            from orb.providers.base.strategy.fallback_strategy import FallbackStrategy
 
             assert FallbackStrategy is not None
         except ImportError:
@@ -616,7 +616,7 @@ class TestProviderStrategyPatternsComprehensive:
     def test_fallback_strategy_initialization(self):
         """Test fallback strategy initialization."""
         try:
-            from providers.base.strategy.fallback_strategy import FallbackStrategy
+            from orb.providers.base.strategy.fallback_strategy import FallbackStrategy
 
             # Try to create strategy
             try:
@@ -633,7 +633,7 @@ class TestProviderStrategyPatternsComprehensive:
     def test_load_balancing_strategy_exists(self):
         """Test that load balancing strategy exists."""
         try:
-            from providers.base.strategy.load_balancing_strategy import (
+            from orb.providers.base.strategy.load_balancing_strategy import (
                 LoadBalancingStrategy,
             )
 
@@ -644,7 +644,7 @@ class TestProviderStrategyPatternsComprehensive:
     def test_load_balancing_strategy_initialization(self):
         """Test load balancing strategy initialization."""
         try:
-            from providers.base.strategy.load_balancing_strategy import (
+            from orb.providers.base.strategy.load_balancing_strategy import (
                 LoadBalancingStrategy,
             )
 
@@ -663,7 +663,7 @@ class TestProviderStrategyPatternsComprehensive:
     def test_provider_context_exists(self):
         """Test that provider context exists."""
         try:
-            from providers.base.strategy.provider_context import ProviderContext
+            from orb.providers.base.strategy.provider_context import ProviderContext
 
             assert ProviderContext is not None
         except ImportError:
@@ -672,7 +672,7 @@ class TestProviderStrategyPatternsComprehensive:
     def test_provider_selector_exists(self):
         """Test that provider selector exists."""
         try:
-            from providers.base.strategy.provider_selector import ProviderSelector
+            from orb.providers.base.strategy.provider_selector import ProviderSelector
 
             assert ProviderSelector is not None
         except ImportError:
@@ -681,7 +681,7 @@ class TestProviderStrategyPatternsComprehensive:
     def test_provider_strategy_base_exists(self):
         """Test that provider strategy base exists."""
         try:
-            from providers.base.strategy.provider_strategy import ProviderStrategy
+            from orb.providers.base.strategy.provider_strategy import ProviderStrategy
 
             assert ProviderStrategy is not None
         except ImportError:
@@ -762,7 +762,7 @@ class TestAWSPersistenceComprehensive:
     def test_dynamodb_strategy_exists(self):
         """Test that DynamoDB strategy exists."""
         try:
-            from providers.aws.persistence.dynamodb.strategy import DynamoDBStrategy
+            from orb.providers.aws.persistence.dynamodb.strategy import DynamoDBStrategy
 
             assert DynamoDBStrategy is not None
         except ImportError:
@@ -771,7 +771,7 @@ class TestAWSPersistenceComprehensive:
     def test_dynamodb_unit_of_work_exists(self):
         """Test that DynamoDB unit of work exists."""
         try:
-            from providers.aws.persistence.dynamodb.unit_of_work import (
+            from orb.providers.aws.persistence.dynamodb.unit_of_work import (
                 DynamoDBUnitOfWork,
             )
 
@@ -782,7 +782,7 @@ class TestAWSPersistenceComprehensive:
     def test_dynamodb_registration_exists(self):
         """Test that DynamoDB registration exists."""
         try:
-            from providers.aws.persistence.dynamodb import registration
+            from orb.providers.aws.persistence.dynamodb import registration
 
             assert registration is not None
         except ImportError:
@@ -797,7 +797,7 @@ class TestAWSAuthenticationComprehensive:
     def test_cognito_strategy_exists(self):
         """Test that Cognito strategy exists."""
         try:
-            from providers.aws.auth.cognito_strategy import CognitoStrategy
+            from orb.providers.aws.auth.cognito_strategy import CognitoStrategy
 
             assert CognitoStrategy is not None
         except ImportError:
@@ -806,7 +806,7 @@ class TestAWSAuthenticationComprehensive:
     def test_iam_strategy_exists(self):
         """Test that IAM strategy exists."""
         try:
-            from providers.aws.auth.iam_strategy import IAMStrategy
+            from orb.providers.aws.auth.iam_strategy import IAMStrategy
 
             assert IAMStrategy is not None
         except ImportError:
@@ -846,7 +846,7 @@ class TestAWSResilienceComprehensive:
     def test_aws_retry_config_exists(self):
         """Test that AWS retry config exists."""
         try:
-            from providers.aws.resilience import aws_retry_config
+            from orb.providers.aws.resilience import aws_retry_config
 
             assert aws_retry_config is not None
         except ImportError:
@@ -855,7 +855,7 @@ class TestAWSResilienceComprehensive:
     def test_aws_retry_strategy_exists(self):
         """Test that AWS retry strategy exists."""
         try:
-            from providers.aws.resilience.aws_retry_strategy import AWSRetryStrategy
+            from orb.providers.aws.resilience.aws_retry_strategy import AWSRetryStrategy
 
             assert AWSRetryStrategy is not None
         except ImportError:
@@ -864,7 +864,7 @@ class TestAWSResilienceComprehensive:
     def test_aws_retry_errors_exist(self):
         """Test that AWS retry errors exist."""
         try:
-            from providers.aws.resilience import aws_retry_errors
+            from orb.providers.aws.resilience import aws_retry_errors
 
             assert aws_retry_errors is not None
         except ImportError:
@@ -879,7 +879,7 @@ class TestAWSTemplateInfrastructureComprehensive:
     def test_ami_cache_exists(self):
         """Test that AMI cache exists."""
         try:
-            from providers.aws.infrastructure.template.ami_cache import AMICache
+            from orb.providers.aws.infrastructure.template.ami_cache import AMICache
 
             assert AMICache is not None
         except ImportError:
@@ -888,7 +888,7 @@ class TestAWSTemplateInfrastructureComprehensive:
     def test_caching_ami_resolver_exists(self):
         """Test that caching AMI resolver exists."""
         try:
-            from providers.aws.infrastructure.template.caching_ami_resolver import (
+            from orb.providers.aws.infrastructure.template.caching_ami_resolver import (
                 CachingAMIResolver,
             )
 
@@ -899,7 +899,7 @@ class TestAWSTemplateInfrastructureComprehensive:
     def test_ssm_template_store_exists(self):
         """Test that SSM template store exists."""
         try:
-            from providers.aws.infrastructure.template.ssm_template_store import (
+            from orb.providers.aws.infrastructure.template.ssm_template_store import (
                 SSMTemplateStore,
             )
 
@@ -952,7 +952,7 @@ class TestProviderRegistrationComprehensive:
     def test_aws_registration_exists(self):
         """Test that AWS registration exists."""
         try:
-            from providers.aws import registration
+            from orb.providers.aws import registration
 
             assert registration is not None
         except ImportError:
@@ -961,7 +961,7 @@ class TestProviderRegistrationComprehensive:
     def test_provider_registry_exists(self):
         """Test that provider registry exists."""
         try:
-            from infrastructure.registry.provider_registry import ProviderRegistry
+            from orb.infrastructure.registry.provider_registry import ProviderRegistry
 
             assert ProviderRegistry is not None
         except ImportError:
@@ -970,7 +970,7 @@ class TestProviderRegistrationComprehensive:
     def test_provider_registry_initialization(self):
         """Test provider registry initialization."""
         try:
-            from infrastructure.registry.provider_registry import ProviderRegistry
+            from orb.infrastructure.registry.provider_registry import ProviderRegistry
 
             try:
                 registry = ProviderRegistry()

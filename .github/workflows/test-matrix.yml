@@ -109,15 +109,15 @@ jobs:
           
           # Test basic imports (should always work)
           try:
-              import orb_py
-              print('✓ Basic orb_py import works')
+              import orb
+              print('✓ Basic orb import works')
           except ImportError as e:
-              print(f'✗ Basic orb_py import failed: {e}')
+              print(f'✗ Basic orb import failed: {e}')
               sys.exit(1)
 
           # Test CLI imports
           try:
-              from cli.formatters import format_table
+              from orb.cli.formatters import format_table
               print('✓ CLI formatters import works')
           except ImportError as e:
               if '${{ matrix.package-variant }}' in ['.', '.[api]', '.[monitoring]']:
@@ -128,7 +128,7 @@ jobs:
 
           # Test API imports
           try:
-              from interface.serve_command_handler import handle_serve_command
+              from orb.interface.serve_command_handler import handle_serve_command
               print('✓ API handler import works')
           except ImportError as e:
               if '${{ matrix.package-variant }}' in ['.', '.[cli]', '.[monitoring]']:

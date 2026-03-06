@@ -2,9 +2,11 @@
 
 import pytest
 
-from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
-from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
-from infrastructure.scheduler.registration import create_default_strategy
+from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+    HostFactorySchedulerStrategy,
+)
+from orb.infrastructure.scheduler.registration import create_default_strategy
 
 
 class TestSchedulerStrategyInitialization:
@@ -64,7 +66,7 @@ class TestSchedulerStrategyRegistration:
 
     def test_register_scheduler_strategies(self):
         """Test that register_scheduler_strategies registers the default scheduler."""
-        from infrastructure.scheduler.registration import register_default_scheduler
+        from orb.infrastructure.scheduler.registration import register_default_scheduler
 
         # register_default_scheduler works with the global registry
         # Just verify it runs without error
@@ -75,7 +77,7 @@ class TestSchedulerStrategyRegistration:
 
     def test_register_all_scheduler_types(self):
         """Test that register_all_scheduler_types registers both strategies."""
-        from infrastructure.scheduler.registration import register_all_scheduler_types
+        from orb.infrastructure.scheduler.registration import register_all_scheduler_types
 
         try:
             register_all_scheduler_types()

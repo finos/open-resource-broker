@@ -8,10 +8,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
-from infrastructure.scheduler.default.field_mapper import DefaultFieldMapper
-from infrastructure.scheduler.hostfactory.field_mapper import HostFactoryFieldMapper
-from infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings
-from infrastructure.scheduler.hostfactory.transformations import HostFactoryTransformations
+from orb.infrastructure.scheduler.default.field_mapper import DefaultFieldMapper
+from orb.infrastructure.scheduler.hostfactory.field_mapper import HostFactoryFieldMapper
+from orb.infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings
+from orb.infrastructure.scheduler.hostfactory.transformations import HostFactoryTransformations
 
 # ---------------------------------------------------------------------------
 # HF mapper — input direction (camelCase → snake_case)
@@ -145,10 +145,10 @@ def test_hf_map_output_vm_type_produces_attributes():
     HostFactorySchedulerStrategy.format_templates_response via _build_hf_attributes.
     We test that path here via the strategy, not the mapper directly.
     """
-    from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+    from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
         HostFactorySchedulerStrategy,
     )
-    from infrastructure.template.dtos import TemplateDTO
+    from orb.infrastructure.template.dtos import TemplateDTO
 
     strategy = HostFactorySchedulerStrategy()
     dto = TemplateDTO(template_id="t1", max_instances=1, machine_types={"t3.medium": 1})

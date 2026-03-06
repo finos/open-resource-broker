@@ -8,22 +8,22 @@ pytestmark = pytest.mark.skip(
     reason="application.services modules removed (provider_capability_service, provider_selection_service)"
 )
 
-from application.commands.request_handlers import CreateMachineRequestHandler
-from application.dto.commands import CreateRequestCommand
+from orb.application.commands.request_handlers import CreateMachineRequestHandler
+from orb.application.dto.commands import CreateRequestCommand
 
 try:
-    from application.services.provider_capability_service import ProviderCapabilityService
-    from application.services.provider_selection_service import ProviderSelectionService
+    from orb.application.services.provider_capability_service import ProviderCapabilityService
+    from orb.application.services.provider_selection_service import ProviderSelectionService
 
     HAS_SERVICES = True
 except ImportError:
     HAS_SERVICES = False
 
-from domain.request.request_types import RequestStatus
-from infrastructure.di.buses import QueryBus
+from orb.domain.request.request_types import RequestStatus
+from orb.infrastructure.di.buses import QueryBus
 
 try:
-    from providers.base.strategy import ProviderContext
+    from orb.providers.base.strategy import ProviderContext
 
     HAS_PROVIDER_CONTEXT = True
 except ImportError:
@@ -55,7 +55,7 @@ class TestCreateMachineRequestHandlerPartial:
 
         # Mock QueryBus to return a template
         mock_query_bus = Mock(spec=QueryBus)
-        from domain.template.template_aggregate import Template
+        from orb.domain.template.template_aggregate import Template
 
         mock_template = Template(
             template_id="tmpl-1",
@@ -72,7 +72,7 @@ class TestCreateMachineRequestHandlerPartial:
 
         # Mock provider selection and capability services
         mock_provider_selection = Mock(spec=ProviderSelectionService)
-        from application.services.provider_selection_service import ProviderSelectionResult
+        from orb.application.services.provider_selection_service import ProviderSelectionResult
 
         mock_provider_selection.select_provider_for_template.return_value = ProviderSelectionResult(
             provider_type="aws",
@@ -82,7 +82,7 @@ class TestCreateMachineRequestHandlerPartial:
         )
 
         mock_provider_capability = Mock(spec=ProviderCapabilityService)
-        from application.services.provider_capability_service import ValidationResult
+        from orb.application.services.provider_capability_service import ValidationResult
 
         mock_provider_capability.validate_template_requirements.return_value = ValidationResult(
             is_valid=True,

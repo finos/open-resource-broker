@@ -34,10 +34,10 @@ class CQRSValidator:
 
         # Look for handler files
         for pattern in ["*handler*.py", "*handlers.py"]:
-            handler_files.extend(Path("src").rglob(pattern))
+            handler_files.extend(Path("src/orb").rglob(pattern))
 
         # Also check application layer specifically
-        app_path = Path("src/application")
+        app_path = Path("src/orb/application")
         if app_path.exists():
             for file_path in app_path.rglob("*.py"):
                 if "handler" in file_path.name.lower():

@@ -17,8 +17,8 @@ try:
 except ImportError:
     HAS_PSUTIL = False
 
-from bootstrap import Application
-from infrastructure.di.container import get_container
+from orb.bootstrap import Application
+from orb.infrastructure.di.container import get_container
 
 pytestmark = pytest.mark.skipif(not HAS_PSUTIL, reason="psutil not installed")
 
@@ -130,7 +130,7 @@ class TestLazyLoadingPerformance:
 
     def test_component_registration_performance(self):
         """Test component registration performance."""
-        from infrastructure.di.services import register_all_services
+        from orb.infrastructure.di.services import register_all_services
 
         container = get_container()
 
@@ -145,9 +145,9 @@ class TestLazyLoadingPerformance:
 
     def test_handler_discovery_performance(self):
         """Test handler discovery performance."""
-        from application.decorators import get_handler_registry_stats
-        from infrastructure.di.container import get_container
-        from infrastructure.di.handler_discovery import HandlerDiscoveryService
+        from orb.application.decorators import get_handler_registry_stats
+        from orb.infrastructure.di.container import get_container
+        from orb.infrastructure.di.handler_discovery import HandlerDiscoveryService
 
         container = get_container()
         discovery_service = HandlerDiscoveryService(container)
@@ -170,8 +170,8 @@ class TestLazyLoadingPerformance:
 
     def test_storage_registration_performance(self):
         """Test storage registration performance."""
-        from infrastructure.di.container import get_container
-        from infrastructure.di.storage_services import register_storage_services
+        from orb.infrastructure.di.container import get_container
+        from orb.infrastructure.di.storage_services import register_storage_services
 
         container = get_container()
         start_time = time.time()
@@ -185,7 +185,7 @@ class TestLazyLoadingPerformance:
 
     def test_scheduler_registration_performance(self):
         """Test scheduler registration performance."""
-        from infrastructure.scheduler.registration import register_active_scheduler_only
+        from orb.infrastructure.scheduler.registration import register_active_scheduler_only
 
         start_time = time.time()
         register_active_scheduler_only("default")

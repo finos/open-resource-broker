@@ -21,9 +21,9 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from providers.aws.infrastructure.aws_client import AWSClient
-from providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
+from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.infrastructure.aws_client import AWSClient
+from orb.providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
 
 REGION = "eu-west-2"
 SPOT_FLEET_ROLE = (
@@ -80,7 +80,7 @@ def _make_request(
 
 def _make_launch_template_manager(aws_client: AWSClient, logger: Any) -> Any:
     """Build a moto-backed launch template manager (same pattern as aws_mock conftest)."""
-    from providers.aws.infrastructure.launch_template.manager import (
+    from orb.providers.aws.infrastructure.launch_template.manager import (
         AWSLaunchTemplateManager,
         LaunchTemplateResult,
     )
@@ -129,12 +129,12 @@ def _make_factory(aws_client: AWSClient, logger: Any, config_port: Any) -> AWSHa
     """Build an AWSHandlerFactory with a moto-backed launch template manager injected."""
     factory = AWSHandlerFactory(aws_client=aws_client, logger=logger, config=config_port)
     # Pre-populate handler cache with real handlers that use the moto LT manager
-    from providers.aws.domain.template.value_objects import ProviderApi
-    from providers.aws.infrastructure.handlers.asg.handler import ASGHandler
-    from providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
-    from providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
-    from providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
-    from providers.aws.utilities.aws_operations import AWSOperations
+    from orb.providers.aws.domain.template.value_objects import ProviderApi
+    from orb.providers.aws.infrastructure.handlers.asg.handler import ASGHandler
+    from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
+    from orb.providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
+    from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
+    from orb.providers.aws.utilities.aws_operations import AWSOperations
 
     lt_manager = _make_launch_template_manager(aws_client, logger)
     aws_ops = AWSOperations(aws_client, logger, config_port)

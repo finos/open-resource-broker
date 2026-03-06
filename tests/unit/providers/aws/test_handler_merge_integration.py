@@ -2,8 +2,8 @@
 
 from unittest.mock import Mock, patch
 
-from providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
-from providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
+from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
+from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
 
 
 class TestHandlerMergeIntegration:

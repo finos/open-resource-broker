@@ -10,9 +10,9 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 
-from application.dto.queries import ListTemplatesQuery
-from bootstrap import Application
-from infrastructure.di.container import get_container
+from orb.application.dto.queries import ListTemplatesQuery
+from orb.bootstrap import Application
+from orb.infrastructure.di.container import get_container
 
 
 class TestLazyLoadingIntegration:

@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, patch
 
 from botocore.exceptions import ClientError
 
-from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
-from providers.aws.infrastructure.handlers.asg.handler import ASGHandler
+from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
+from orb.providers.aws.infrastructure.handlers.asg.handler import ASGHandler
 
 
 def _make_handler():

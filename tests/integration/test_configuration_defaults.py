@@ -15,12 +15,12 @@ def test_template_defaults_integration():
     print("=== Configuration Defaults Integration Test ===")
 
     try:
-        from application.services.template_defaults_service import (
+        from orb.application.services.template_defaults_service import (
             TemplateDefaultsService,
         )
-        from config.manager import ConfigurationManager
-        from infrastructure.logging.logger import get_logger
-        from infrastructure.storage.repositories.template_repository import (
+        from orb.config.manager import ConfigurationManager
+        from orb.infrastructure.logging.logger import get_logger
+        from orb.infrastructure.storage.repositories.template_repository import (
             TemplateSerializer,
         )
 
@@ -76,12 +76,12 @@ def test_template_defaults_precedence():
     print("\n=== Template Defaults Precedence Test ===")
 
     try:
-        from application.services.template_defaults_service import (
+        from orb.application.services.template_defaults_service import (
             TemplateDefaultsService,
         )
-        from config.manager import ConfigurationManager
-        from infrastructure.logging.logger import get_logger
-        from infrastructure.storage.repositories.template_repository import (
+        from orb.config.manager import ConfigurationManager
+        from orb.infrastructure.logging.logger import get_logger
+        from orb.infrastructure.storage.repositories.template_repository import (
             TemplateSerializer,
         )
 
@@ -142,11 +142,11 @@ def test_defaults_service_directly():
     print("\n=== Direct TemplateDefaultsService Test ===")
 
     try:
-        from application.services.template_defaults_service import (
+        from orb.application.services.template_defaults_service import (
             TemplateDefaultsService,
         )
-        from config.manager import ConfigurationManager
-        from infrastructure.logging.logger import get_logger
+        from orb.config.manager import ConfigurationManager
+        from orb.infrastructure.logging.logger import get_logger
 
         # Create service
         config_manager = ConfigurationManager()

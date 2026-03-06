@@ -4,9 +4,9 @@ from unittest.mock import MagicMock, patch
 
 from botocore.exceptions import ClientError
 
-from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
-from providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
+from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
+from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
 
 
 def _make_handler():

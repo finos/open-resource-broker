@@ -2,7 +2,7 @@
 
 import pytest
 
-from infrastructure.storage.components.version_manager import (
+from orb.infrastructure.storage.components.version_manager import (
     MemoryVersionManager,
     NoOpVersionManager,
     VersionManager,

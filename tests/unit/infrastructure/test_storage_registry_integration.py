@@ -9,7 +9,7 @@ pytestmark = pytest.mark.skip(
 )
 
 try:
-    from infrastructure.registry.storage_registry import (
+    from orb.infrastructure.registry.storage_registry import (
         get_storage_registry,
         reset_storage_registry,
     )
@@ -32,7 +32,7 @@ class TestStorageRegistryIntegration:
 
     def test_repository_factory_uses_storage_registry(self):
         """Test that repository factory uses storage registry."""
-        from infrastructure.utilities.factories.repository_factory import (
+        from orb.infrastructure.utilities.factories.repository_factory import (
             RepositoryFactory,
         )
 
@@ -77,8 +77,8 @@ class TestStorageRegistryIntegration:
 
     def test_di_container_uses_repository_factory(self):
         """Test that DI container uses repository factory."""
-        from infrastructure.di.container import DIContainer
-        from infrastructure.di.infrastructure_services import (
+        from orb.infrastructure.di.container import DIContainer
+        from orb.infrastructure.di.infrastructure_services import (
             _register_repository_services,
         )
 
@@ -117,7 +117,7 @@ class TestStorageRegistryIntegration:
 
     def test_unit_of_work_creation_via_registry(self):
         """Test unit of work creation via storage registry."""
-        from infrastructure.utilities.factories.repository_factory import (
+        from orb.infrastructure.utilities.factories.repository_factory import (
             RepositoryFactory,
         )
 
@@ -174,7 +174,7 @@ class TestStorageRegistryIntegration:
 
     def test_storage_registration_without_unit_of_work_factory(self):
         """Test storage registration without unit of work factory."""
-        from infrastructure.registry.storage_registry import UnsupportedStorageError
+        from orb.infrastructure.registry.storage_registry import UnsupportedStorageError
 
         registry = get_storage_registry()
 
@@ -192,7 +192,7 @@ class TestStorageRegistryIntegration:
 
     def test_end_to_end_repository_creation(self):
         """Test end-to-end repository creation flow."""
-        from infrastructure.utilities.factories.repository_factory import (
+        from orb.infrastructure.utilities.factories.repository_factory import (
             RepositoryFactory,
         )
 

@@ -12,9 +12,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-import api.dependencies as deps
-from api.server import create_fastapi_app
-from config.schemas.server_schema import AuthConfig, ServerConfig
+import orb.api.dependencies as deps
+from orb.api.server import create_fastapi_app
+from orb.config.schemas.server_schema import AuthConfig, ServerConfig
 
 # ---------------------------------------------------------------------------
 # Helpers

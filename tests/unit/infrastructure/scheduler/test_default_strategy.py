@@ -1,6 +1,6 @@
 """Tests for Default scheduler strategy."""
 
-from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 
 
 class TestDefaultSchedulerStrategy:

@@ -4,9 +4,11 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from application.request.dto import MachineReferenceDTO
-from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
-from providers.results import ProviderSelectionResult
+from orb.application.request.dto import MachineReferenceDTO
+from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+    HostFactorySchedulerStrategy,
+)
+from orb.providers.results import ProviderSelectionResult
 
 
 class MockRequestDTO:

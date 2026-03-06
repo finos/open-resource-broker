@@ -5,10 +5,10 @@ from unittest.mock import Mock
 import pytest
 from jinja2 import TemplateError, UndefinedError
 
-from application.services.native_spec_service import NativeSpecService
-from domain.base.ports.configuration_port import ConfigurationPort
-from domain.base.ports.logging_port import LoggingPort
-from domain.base.ports.spec_rendering_port import SpecRenderingPort
+from orb.application.services.native_spec_service import NativeSpecService
+from orb.domain.base.ports.configuration_port import ConfigurationPort
+from orb.domain.base.ports.logging_port import LoggingPort
+from orb.domain.base.ports.spec_rendering_port import SpecRenderingPort
 
 
 class TestNativeSpecErrorHandling:

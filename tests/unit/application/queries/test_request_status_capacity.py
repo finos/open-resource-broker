@@ -6,9 +6,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from application.services.request_status_service import RequestStatusService
-from domain.machine.machine_status import MachineStatus
-from domain.request.request_types import RequestStatus, RequestType
+from orb.application.services.request_status_service import RequestStatusService
+from orb.domain.machine.machine_status import MachineStatus
+from orb.domain.request.request_types import RequestStatus, RequestType
 
 
 def _request(

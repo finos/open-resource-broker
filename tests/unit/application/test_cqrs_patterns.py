@@ -6,16 +6,16 @@ import pytest
 
 # Import CQRS components that actually exist
 try:
-    from application.commands.request_handlers import (
+    from orb.application.commands.request_handlers import (
         CreateMachineRequestHandler as CreateRequestHandler,
     )
-    from application.dto.commands import (
+    from orb.application.dto.commands import (
         BaseCommand,
         CreateRequestCommand,
         UpdateRequestStatusCommand,
     )
-    from application.dto.queries import GetRequestStatusQuery
-    from infrastructure.di.buses import CommandBus, QueryBus
+    from orb.application.dto.queries import GetRequestStatusQuery
+    from orb.infrastructure.di.buses import CommandBus, QueryBus
 
     IMPORTS_AVAILABLE = True
 except ImportError as e:
@@ -210,13 +210,13 @@ class TestCommandBusImplementation:
         with patch("infrastructure.di.buses.get_command_handler_for_type") as mock_get_handler:
             # Mock container to return handler instances
             mock_container = Mock()
-            mock_container.get.side_effect = (
-                lambda cls: create_handler if cls == "CreateRequestHandler" else update_handler
+            mock_container.get.side_effect = lambda cls: (
+                create_handler if cls == "CreateRequestHandler" else update_handler
             )
 
             # Setup handler routing
-            mock_get_handler.side_effect = (
-                lambda cmd_type: "CreateRequestHandler"
+            mock_get_handler.side_effect = lambda cmd_type: (
+                "CreateRequestHandler"
                 if cmd_type == CreateRequestCommand
                 else "UpdateRequestHandler"
             )
@@ -311,14 +311,12 @@ class TestQueryBusImplementation:
         # Mock handler discovery
         with patch("infrastructure.di.buses.get_query_handler_for_type") as mock_get_handler:
             mock_container = Mock()
-            mock_container.get.side_effect = (
-                lambda cls: status_handler
-                if cls == "GetRequestStatusHandler"
-                else templates_handler
+            mock_container.get.side_effect = lambda cls: (
+                status_handler if cls == "GetRequestStatusHandler" else templates_handler
             )
 
-            mock_get_handler.side_effect = (
-                lambda query_type: "GetRequestStatusHandler"
+            mock_get_handler.side_effect = lambda query_type: (
+                "GetRequestStatusHandler"
                 if query_type == GetRequestStatusQuery
                 else "GetAvailableTemplatesHandler"
             )
@@ -503,7 +501,7 @@ class TestCommandHandlerImplementation:
         mock_query_bus.execute.return_value = None
 
         # Should raise exception for invalid command
-        from domain.base.exceptions import EntityNotFoundError
+        from orb.domain.base.exceptions import EntityNotFoundError
 
         with pytest.raises(EntityNotFoundError):
             await handler.handle(invalid_command)
@@ -662,8 +660,8 @@ class TestQueryHandlerImplementation:
         """Test that query handlers support filtering with real GetRequestHandler."""
         from unittest.mock import MagicMock, Mock
 
-        from application.dto.queries import GetRequestQuery
-        from application.queries.request_query_handlers import GetRequestHandler
+        from orb.application.dto.queries import GetRequestQuery
+        from orb.application.queries.request_query_handlers import GetRequestHandler
 
         # Mock dependencies
         mock_uow_factory = Mock()
@@ -717,8 +715,8 @@ class TestQueryHandlerImplementation:
         """Test that query handlers support data projections with real GetRequestStatusQueryHandler."""
         from unittest.mock import MagicMock, Mock
 
-        from application.dto.queries import GetRequestQuery
-        from application.queries.request_query_handlers import GetRequestHandler
+        from orb.application.dto.queries import GetRequestQuery
+        from orb.application.queries.request_query_handlers import GetRequestHandler
 
         # Mock dependencies
         mock_uow_factory = Mock()
@@ -774,8 +772,8 @@ class TestCQRSIntegration:
         """Test that CQRS integrates with event sourcing using real CommandBus."""
         from unittest.mock import Mock
 
-        from application.dto.commands import CreateRequestCommand
-        from infrastructure.di.buses import CommandBus
+        from orb.application.dto.commands import CreateRequestCommand
+        from orb.infrastructure.di.buses import CommandBus
 
         # Mock dependencies that CommandBus requires
         mock_container = Mock()
@@ -808,8 +806,8 @@ class TestCQRSIntegration:
         """Test that CQRS supports read models using real QueryBus and query classes."""
         from unittest.mock import Mock
 
-        from application.dto.queries import GetRequestQuery, ListActiveRequestsQuery
-        from infrastructure.di.buses import QueryBus
+        from orb.application.dto.queries import GetRequestQuery, ListActiveRequestsQuery
+        from orb.infrastructure.di.buses import QueryBus
 
         # Mock dependencies for QueryBus
         mock_container = Mock()
@@ -837,9 +835,9 @@ class TestCQRSIntegration:
         """Test that CQRS handles eventual consistency using real command and query DTOs."""
         from unittest.mock import Mock
 
-        from application.dto.commands import CreateRequestCommand, UpdateRequestStatusCommand
-        from application.dto.queries import GetRequestQuery, GetRequestStatusQuery
-        from infrastructure.di.buses import CommandBus, QueryBus
+        from orb.application.dto.commands import CreateRequestCommand, UpdateRequestStatusCommand
+        from orb.application.dto.queries import GetRequestQuery, GetRequestStatusQuery
+        from orb.infrastructure.di.buses import CommandBus, QueryBus
 
         # Mock dependencies for buses
         mock_container = Mock()
@@ -884,8 +882,8 @@ class TestCQRSIntegration:
         """Test that CQRS supports saga/process manager patterns."""
         from unittest.mock import Mock
 
-        from domain.base.ports import LoggingPort
-        from infrastructure.di.container import DIContainer
+        from orb.domain.base.ports import LoggingPort
+        from orb.infrastructure.di.container import DIContainer
 
         # Create mocks for required dependencies
         mock_container = Mock(spec=DIContainer)

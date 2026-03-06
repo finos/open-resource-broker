@@ -2,9 +2,11 @@
 
 from unittest.mock import MagicMock
 
-from application.services.provisioning_orchestration_service import ProvisioningResult
-from application.services.request_status_management_service import RequestStatusManagementService
-from domain.request.request_types import RequestStatus
+from orb.application.services.provisioning_orchestration_service import ProvisioningResult
+from orb.application.services.request_status_management_service import (
+    RequestStatusManagementService,
+)
+from orb.domain.request.request_types import RequestStatus
 
 
 def _make_service():

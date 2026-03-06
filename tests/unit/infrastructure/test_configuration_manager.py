@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from config.manager import ConfigurationManager
+from orb.config.manager import ConfigurationManager
 
 
 @pytest.mark.unit
@@ -179,7 +179,7 @@ class TestConfigurationManager:
 
     def test_get_provider_config_returns_config_object(self, tmp_path):
         """Test get_provider_config returns a ProviderConfig object."""
-        from config.schemas.provider_strategy_schema import ProviderConfig
+        from orb.config.schemas.provider_strategy_schema import ProviderConfig
 
         config_file = tmp_path / "config.json"
         config_file.write_text(json.dumps({"aws": {"region": "us-east-1"}}))
@@ -371,7 +371,7 @@ class TestConfigurationManagerEdgeCases:
 
     def test_get_typed_with_defaults_on_error(self, tmp_path):
         """Test get_typed_with_defaults returns defaults on error."""
-        from config.schemas.app_schema import AppConfig
+        from orb.config.schemas.app_schema import AppConfig
 
         config_file = tmp_path / "missing.json"  # Does not exist
 

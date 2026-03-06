@@ -8,7 +8,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from infrastructure.error.exception_type_mapper import ExceptionTypeMapper
+from orb.infrastructure.error.exception_type_mapper import ExceptionTypeMapper
 
 
 class CustomException(Exception):

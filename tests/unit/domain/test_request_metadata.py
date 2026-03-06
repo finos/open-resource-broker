@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from domain.request.request_metadata import (
+from orb.domain.request.request_metadata import (
     LaunchTemplateInfo,
     MachineCount,
     RequestConfiguration,

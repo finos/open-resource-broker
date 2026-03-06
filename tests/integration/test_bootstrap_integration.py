@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from bootstrap import Application
+from orb.bootstrap import Application
 
 
 class TestBootstrapIntegration:
@@ -12,7 +12,7 @@ class TestBootstrapIntegration:
 
     def _make_mock_container(self, mock_config_manager):
         """Create a mock DI container that returns mock_config_manager for ConfigurationPort."""
-        from domain.base.ports.configuration_port import ConfigurationPort
+        from orb.domain.base.ports.configuration_port import ConfigurationPort
 
         mock_container = Mock()
         mock_container.is_lazy_loading_enabled.return_value = False

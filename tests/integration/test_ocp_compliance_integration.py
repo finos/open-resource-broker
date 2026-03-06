@@ -5,8 +5,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from config.schemas.provider_strategy_schema import ProviderConfig, ProviderInstanceConfig
-from providers.registry import get_provider_registry
+from orb.config.schemas.provider_strategy_schema import ProviderConfig, ProviderInstanceConfig
+from orb.providers.registry import get_provider_registry
 
 
 @pytest.mark.integration
@@ -52,7 +52,7 @@ class TestOCPComplianceIntegration:
     @patch("providers.aws.strategy.aws_provider_strategy.AWSProviderStrategy")
     def test_aws_provider_registration_integration(self, mock_aws_strategy):
         """Test AWS provider registration integration."""
-        from providers.aws.registration import register_aws_provider
+        from orb.providers.aws.registration import register_aws_provider
 
         mock_strategy_instance = Mock()
         mock_aws_strategy.return_value = mock_strategy_instance
@@ -134,8 +134,8 @@ class TestOCPComplianceIntegration:
 
     def test_command_handler_integration(self):
         """Test command handler integration with registry."""
-        from application.commands.provider_handlers import RegisterProviderStrategyHandler
-        from application.provider.commands import RegisterProviderStrategyCommand
+        from orb.application.commands.provider_handlers import RegisterProviderStrategyHandler
+        from orb.application.provider.commands import RegisterProviderStrategyCommand
 
         registry = get_provider_registry()
         mock_strategy = Mock()
@@ -203,7 +203,7 @@ class TestOCPComplianceIntegration:
 
     def test_configuration_schema_no_legacy_mode(self):
         """Test that configuration schema no longer supports legacy mode."""
-        from config.schemas.provider_strategy_schema import ProviderMode
+        from orb.config.schemas.provider_strategy_schema import ProviderMode
 
         # Verify LEGACY mode is not in enum
         assert not hasattr(ProviderMode, "LEGACY")

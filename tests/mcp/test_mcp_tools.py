@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from mcp.discovery import MCPToolDiscovery
-from mcp.tools import OpenResourceBrokerMCPTools
-from sdk.client import OpenResourceBroker
+from orb.mcp.discovery import MCPToolDiscovery
+from orb.mcp.tools import OpenResourceBrokerMCPTools
+from orb.sdk.client import OpenResourceBroker
 
 
 class TestOpenResourceBrokerMCPTools:
@@ -293,7 +293,7 @@ class TestOpenResourceBrokerMCPTools:
         tools.tools = {"tool1": Mock(), "tool2": Mock()}
 
         with patch.object(tools, "get_tools_by_type") as mock_get_by_type:
-            mock_get_by_type.side_effect = lambda t: (["tool1"] if t == "query" else ["tool2"])
+            mock_get_by_type.side_effect = lambda t: ["tool1"] if t == "query" else ["tool2"]
 
             stats = tools.get_stats()
 

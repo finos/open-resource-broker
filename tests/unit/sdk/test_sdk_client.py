@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from sdk.client import OpenResourceBroker
-from sdk.config import SDKConfig
-from sdk.exceptions import ConfigurationError, ProviderError, SDKError
+from orb.sdk.client import OpenResourceBroker
+from orb.sdk.config import SDKConfig
+from orb.sdk.exceptions import ConfigurationError, ProviderError, SDKError
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -25,7 +25,7 @@ def _initialized_sdk(extra_methods: dict | None = None) -> OpenResourceBroker:
     sdk._query_bus = AsyncMock()
     sdk._command_bus = AsyncMock()
 
-    from sdk.discovery import SDKMethodDiscovery
+    from orb.sdk.discovery import SDKMethodDiscovery
 
     sdk._discovery = SDKMethodDiscovery()
 

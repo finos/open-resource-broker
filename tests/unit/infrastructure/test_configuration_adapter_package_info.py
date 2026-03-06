@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from infrastructure.adapters.configuration_adapter import ConfigurationAdapter
+from orb.infrastructure.adapters.configuration_adapter import ConfigurationAdapter
 
 
 class TestConfigurationAdapterPackageInfo:

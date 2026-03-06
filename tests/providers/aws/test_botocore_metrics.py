@@ -23,9 +23,9 @@ except ImportError:
         return func
 
 
-from domain.base.ports import LoggingPort
-from monitoring.metrics import MetricsCollector
-from providers.aws.infrastructure.instrumentation.botocore_metrics import (
+from orb.domain.base.ports import LoggingPort
+from orb.monitoring.metrics import MetricsCollector
+from orb.providers.aws.infrastructure.instrumentation.botocore_metrics import (
     BotocoreMetricsHandler,
     RequestContext,
 )
@@ -387,7 +387,7 @@ class TestAWSMetricsIntegration:
 
     def test_metrics_configuration_loading(self):
         """Test loading of AWS metrics configuration."""
-        from config.metrics_config import (
+        from orb.config.metrics_config import (
             DEFAULT_AWS_METRICS_CONFIG,
             TEST_AWS_METRICS_CONFIG,
             create_aws_metrics_config,
@@ -411,7 +411,7 @@ class TestAWSMetricsIntegration:
 
     def test_aws_metrics_definitions(self):
         """Test AWS metrics definitions."""
-        from monitoring.aws_metrics import (
+        from orb.monitoring.aws_metrics import (
             AWS_METRICS,
             get_metric_definition,
             get_service_metrics,

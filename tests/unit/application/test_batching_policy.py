@@ -1,6 +1,6 @@
 """Tests for BatchingPolicy."""
 
-from application.value_objects.batching_policy import BatchingPolicy
+from orb.application.value_objects.batching_policy import BatchingPolicy
 
 
 def test_split_exact_multiple():

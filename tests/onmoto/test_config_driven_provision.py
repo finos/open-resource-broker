@@ -19,14 +19,14 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from providers.aws.infrastructure.aws_client import AWSClient
-from providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
-from providers.aws.infrastructure.launch_template.manager import (
+from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.infrastructure.aws_client import AWSClient
+from orb.providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
+from orb.providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
     LaunchTemplateResult,
 )
-from providers.aws.utilities.aws_operations import AWSOperations
+from orb.providers.aws.utilities.aws_operations import AWSOperations
 
 REGION = "eu-west-2"
 
@@ -115,10 +115,10 @@ def _make_factory_with_config_port(
     aws_client: AWSClient, logger: Any, config_port: Any
 ) -> AWSHandlerFactory:
     """Build AWSHandlerFactory with pre-wired handlers using the given config_port."""
-    from providers.aws.domain.template.value_objects import ProviderApi
-    from providers.aws.infrastructure.handlers.asg.handler import ASGHandler
-    from providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
-    from providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
+    from orb.providers.aws.domain.template.value_objects import ProviderApi
+    from orb.providers.aws.infrastructure.handlers.asg.handler import ASGHandler
+    from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
+    from orb.providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
 
     factory = AWSHandlerFactory(aws_client=aws_client, logger=logger, config=config_port)
     lt_manager = _make_lt_manager(aws_client, logger)
@@ -296,8 +296,8 @@ class TestResourcePrefixConfig:
         self, moto_vpc_resources, orb_config_with_prefix, autoscaling_client
     ):
         """ASG name starts with the prefix configured in resource.prefixes.asg."""
-        from domain.base.ports import ConfigurationPort, LoggingPort
-        from infrastructure.di.container import get_container
+        from orb.domain.base.ports import ConfigurationPort, LoggingPort
+        from orb.infrastructure.di.container import get_container
 
         container = get_container()
         config_port = container.get(ConfigurationPort)
@@ -336,8 +336,8 @@ class TestResourcePrefixConfig:
         self, moto_vpc_resources, orb_config_no_prefix, autoscaling_client
     ):
         """ASG name does not start with 'ci-' when no prefix is configured."""
-        from domain.base.ports import ConfigurationPort, LoggingPort
-        from infrastructure.di.container import get_container
+        from orb.domain.base.ports import ConfigurationPort, LoggingPort
+        from orb.infrastructure.di.container import get_container
 
         container = get_container()
         config_port = container.get(ConfigurationPort)
@@ -374,8 +374,8 @@ class TestResourcePrefixConfig:
         self, moto_vpc_resources, orb_config_with_prefix, ec2_client
     ):
         """EC2 Fleet acquire succeeds and returns a fleet-* resource ID with prefix configured."""
-        from domain.base.ports import ConfigurationPort, LoggingPort
-        from infrastructure.di.container import get_container
+        from orb.domain.base.ports import ConfigurationPort, LoggingPort
+        from orb.infrastructure.di.container import get_container
 
         container = get_container()
         config_port = container.get(ConfigurationPort)
@@ -418,7 +418,7 @@ class TestTemplateDefaultsConfig:
         self, moto_vpc_resources, orb_config_no_defaults
     ):
         """acquire_hosts raises when template has no subnet_ids (empty defaults in config)."""
-        from providers.aws.exceptions.aws_exceptions import AWSValidationError
+        from orb.providers.aws.exceptions.aws_exceptions import AWSValidationError
 
         logger = _make_logger()
         config_port = MagicMock()
@@ -451,8 +451,8 @@ class TestTemplateDefaultsConfig:
     ):
         """TemplateConfigurationManager.get_template returns a template with subnet_ids
         populated from config template_defaults."""
-        from infrastructure.di.container import get_container
-        from infrastructure.template.configuration_manager import TemplateConfigurationManager
+        from orb.infrastructure.di.container import get_container
+        from orb.infrastructure.template.configuration_manager import TemplateConfigurationManager
 
         container = get_container()
         manager = container.get(TemplateConfigurationManager)
@@ -507,8 +507,8 @@ class TestConfigPortInjection:
         self, moto_vpc_resources, orb_config_with_prefix
     ):
         """container.get(ConfigurationPort).get_resource_prefix('asg') returns 'ci-'."""
-        from domain.base.ports import ConfigurationPort
-        from infrastructure.di.container import get_container
+        from orb.domain.base.ports import ConfigurationPort
+        from orb.infrastructure.di.container import get_container
 
         container = get_container()
         config_port = container.get(ConfigurationPort)
@@ -520,8 +520,8 @@ class TestConfigPortInjection:
         self, moto_vpc_resources, orb_config_no_prefix
     ):
         """get_resource_prefix returns '' when resource.prefixes is absent from config."""
-        from domain.base.ports import ConfigurationPort
-        from infrastructure.di.container import get_container
+        from orb.domain.base.ports import ConfigurationPort
+        from orb.infrastructure.di.container import get_container
 
         container = get_container()
         config_port = container.get(ConfigurationPort)
@@ -534,8 +534,8 @@ class TestConfigPortInjection:
     ):
         """Handlers created by AWSHandlerFactory share the same config_port and
         return consistent prefix values."""
-        from domain.base.ports import ConfigurationPort, LoggingPort
-        from infrastructure.di.container import get_container
+        from orb.domain.base.ports import ConfigurationPort, LoggingPort
+        from orb.infrastructure.di.container import get_container
 
         container = get_container()
         config_port = container.get(ConfigurationPort)

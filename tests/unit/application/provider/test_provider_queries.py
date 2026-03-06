@@ -1,6 +1,6 @@
 """Unit tests for provider strategy queries."""
 
-from application.provider.queries import (
+from orb.application.provider.queries import (
     GetProviderCapabilitiesQuery,
     GetProviderHealthQuery,
     GetProviderMetricsQuery,

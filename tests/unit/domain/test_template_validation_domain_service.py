@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from domain.base.results import ValidationLevel, ValidationResult
-from domain.services.template_validation_domain_service import (
+from orb.domain.base.results import ValidationLevel, ValidationResult
+from orb.domain.services.template_validation_domain_service import (
     TemplateValidationDomainService,
     _ProviderCapabilities,
 )

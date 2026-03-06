@@ -2,7 +2,7 @@
 
 import pytest
 
-from infrastructure.storage.components.entity_cache import (
+from orb.infrastructure.storage.components.entity_cache import (
     EntityCache,
     MemoryEntityCache,
     NoOpEntityCache,

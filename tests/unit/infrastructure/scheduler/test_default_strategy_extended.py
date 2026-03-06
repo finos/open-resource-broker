@@ -6,8 +6,10 @@ import tempfile
 from typing import cast
 from unittest.mock import MagicMock, patch
 
-from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
-from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
+from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+    HostFactorySchedulerStrategy,
+)
 
 
 def make_strategy():

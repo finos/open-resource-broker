@@ -9,15 +9,15 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from bootstrap import Application
-from config.manager import ConfigurationManager
-from infrastructure.di.buses import CommandBus, QueryBus
+from orb.bootstrap import Application
+from orb.config.manager import ConfigurationManager
+from orb.infrastructure.di.buses import CommandBus, QueryBus
 
 
 def _make_mock_container(mock_config_manager=None):
     """Create a mock DI container."""
-    from domain.base.ports.configuration_port import ConfigurationPort
-    from infrastructure.di.buses import CommandBus, QueryBus
+    from orb.domain.base.ports.configuration_port import ConfigurationPort
+    from orb.infrastructure.di.buses import CommandBus, QueryBus
 
     if mock_config_manager is None:
         mock_config_manager = _make_mock_config_manager()
@@ -115,7 +115,7 @@ class TestFullWorkflow:
 
         # Mock query execution to return empty template list
         with patch.object(query_bus, "execute_sync", return_value=[]) as mock_exec:
-            from application.dto.queries import ListTemplatesQuery
+            from orb.application.dto.queries import ListTemplatesQuery
 
             result = query_bus.execute_sync(ListTemplatesQuery())
             assert isinstance(result, list)

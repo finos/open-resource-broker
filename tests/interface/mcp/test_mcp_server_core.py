@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from interface.mcp.server.core import MCPMessage, OpenResourceBrokerMCPServer
+from orb.interface.mcp.server.core import MCPMessage, OpenResourceBrokerMCPServer
 
 
 class TestMCPMessage:

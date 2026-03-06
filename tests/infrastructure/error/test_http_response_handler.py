@@ -8,27 +8,27 @@ from http import HTTPStatus
 
 import pytest
 
-from domain.base.exceptions import (
+from orb.domain.base.exceptions import (
     BusinessRuleViolationError,
     ConfigurationError,
     EntityNotFoundError,
     InfrastructureError,
     ValidationError,
 )
-from domain.machine.exceptions import (
+from orb.domain.machine.exceptions import (
     MachineNotFoundError,
     MachineValidationError,
 )
-from domain.request.exceptions import (
+from orb.domain.request.exceptions import (
     RequestNotFoundError,
     RequestValidationError,
 )
-from domain.template.exceptions import (
+from orb.domain.template.exceptions import (
     TemplateNotFoundError,
     TemplateValidationError,
 )
-from infrastructure.error.exception_handler import ErrorCategory, ErrorCode
-from infrastructure.error.http_response_handler import HTTPErrorResponseHandler
+from orb.infrastructure.error.exception_handler import ErrorCategory, ErrorCode
+from orb.infrastructure.error.http_response_handler import HTTPErrorResponseHandler
 
 
 class TestHTTPErrorResponseHandler:

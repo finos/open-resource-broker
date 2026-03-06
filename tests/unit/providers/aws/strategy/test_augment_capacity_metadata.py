@@ -12,7 +12,7 @@ class _NoopLogger:
 @pytest.mark.unit
 def test_ec2_fleet_capacity_data_extraction():
     """EC2 Fleet fulfilled capacity is read from DescribeFleets response."""
-    from providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
+    from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
 
     mock_aws_client = Mock()
     mock_aws_client.ec2_client.describe_fleets.return_value = {
@@ -44,7 +44,7 @@ def test_ec2_fleet_capacity_data_extraction():
 @pytest.mark.unit
 def test_spot_fleet_capacity_data_extraction():
     """Spot Fleet fulfilled capacity is read from DescribeSpotFleetRequests response."""
-    from providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
+    from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
 
     mock_aws_client = Mock()
     mock_aws_client.ec2_client.describe_spot_fleet_requests.return_value = {
@@ -79,7 +79,7 @@ def test_spot_fleet_capacity_data_extraction():
 @pytest.mark.unit
 def test_asg_capacity_data_extraction():
     """ASG InService instance count and weighted capacity are read from DescribeAutoScalingGroups."""
-    from providers.aws.infrastructure.handlers.asg.handler import ASGHandler
+    from orb.providers.aws.infrastructure.handlers.asg.handler import ASGHandler
 
     mock_aws_client = Mock()
     mock_aws_client.autoscaling_client.describe_auto_scaling_groups.return_value = {

@@ -9,14 +9,14 @@ pytestmark = pytest.mark.skip(
 )
 
 try:
-    from infrastructure.registry.provider_registry import ProviderRegistry
+    from orb.infrastructure.registry.provider_registry import ProviderRegistry
 
     HAS_PROVIDER_REGISTRY = True
 except ImportError:
     HAS_PROVIDER_REGISTRY = False
 
 try:
-    from config.schemas.provider_strategy_schema import (
+    from orb.config.schemas.provider_strategy_schema import (
         ProviderConfig,
         ProviderInstanceConfig,
     )
@@ -184,7 +184,7 @@ class TestMultiInstanceProviderSupport:
             patch("providers.aws.registration.register_aws_provider") as mock_aws_register,
             patch("infrastructure.di.provider_services.get_logger"),
         ):
-            from infrastructure.di.provider_services import _register_providers
+            from orb.infrastructure.di.provider_services import _register_providers
 
             # Execute registration
             _register_providers()
@@ -201,7 +201,7 @@ class TestMultiInstanceProviderSupport:
 
     def test_provider_strategy_factory_with_instances(self):
         """Test ProviderStrategyFactory with named instances."""
-        from infrastructure.factories.provider_strategy_factory import (
+        from orb.infrastructure.factories.provider_strategy_factory import (
             ProviderStrategyFactory,
         )
 
@@ -243,7 +243,7 @@ class TestMultiInstanceProviderSupport:
 
     def test_provider_strategy_factory_fallback_to_type(self):
         """Test ProviderStrategyFactory fallback to provider type."""
-        from infrastructure.factories.provider_strategy_factory import (
+        from orb.infrastructure.factories.provider_strategy_factory import (
             ProviderStrategyFactory,
         )
 

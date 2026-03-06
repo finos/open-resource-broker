@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from interface.storage_command_handlers import (
+from orb.interface.storage_command_handlers import (
     handle_list_storage_strategies,
     handle_show_storage_config,
     handle_storage_health,
@@ -131,7 +131,7 @@ class TestStorageHandlerImports:
 
     def test_import_storage_handlers(self):
         """Test that all storage handlers can be imported."""
-        from interface.storage_command_handlers import (
+        from orb.interface.storage_command_handlers import (
             handle_list_storage_strategies,
             handle_show_storage_config,
             handle_storage_health,

@@ -2,8 +2,8 @@
 
 from unittest.mock import Mock, patch
 
-from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
+from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
 
 
 class TestableContextMixin(BaseContextMixin):

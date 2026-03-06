@@ -90,6 +90,6 @@ def reset_di_container():
     reads/writes to the first test's work directory.
     """
     yield
-    from infrastructure.di.container import reset_container
+    from orb.infrastructure.di.container import reset_container
 
     reset_container()

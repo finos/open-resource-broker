@@ -3,7 +3,7 @@
 from typing import cast
 from unittest.mock import MagicMock, patch
 
-from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 
 
 def make_strategy():

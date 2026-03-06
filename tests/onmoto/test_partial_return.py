@@ -15,14 +15,14 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from providers.aws.infrastructure.aws_client import AWSClient
-from providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
-from providers.aws.infrastructure.launch_template.manager import (
+from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.infrastructure.aws_client import AWSClient
+from orb.providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
+from orb.providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
     LaunchTemplateResult,
 )
-from providers.aws.utilities.aws_operations import AWSOperations
+from orb.providers.aws.utilities.aws_operations import AWSOperations
 
 REGION = "eu-west-2"
 

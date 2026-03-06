@@ -4,9 +4,9 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from providers.aws.configuration.config import AWSProviderConfig
-from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
-from providers.base.strategy import ProviderOperation, ProviderOperationType
+from orb.providers.aws.configuration.config import AWSProviderConfig
+from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
+from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
 
 
 class TestProviderStrategyDryRun:
@@ -47,13 +47,13 @@ class TestProviderStrategyDryRun:
                 operation.parameters.get("template_config", {}).get("provider_api", "RunInstances")
             ) or handlers.get("RunInstances")
             if handler is None:
-                from providers.base.strategy import ProviderResult
+                from orb.providers.base.strategy import ProviderResult
 
                 return ProviderResult.error_result("No handler found", "HANDLER_NOT_FOUND")
             result = handler.acquire_hosts(None, None)
             if isinstance(result, Exception):
                 raise result
-            from providers.base.strategy import ProviderResult
+            from orb.providers.base.strategy import ProviderResult
 
             return ProviderResult.success_result(
                 {"resource_ids": result.get("resource_ids", []), "instances": []},
@@ -63,7 +63,7 @@ class TestProviderStrategyDryRun:
         mock_instance_service.create_instances = _mock_create_instances
 
         def _mock_terminate(operation):
-            from providers.base.strategy import ProviderResult
+            from orb.providers.base.strategy import ProviderResult
 
             instance_ids = operation.parameters.get("instance_ids", [])
             return ProviderResult.success_result(

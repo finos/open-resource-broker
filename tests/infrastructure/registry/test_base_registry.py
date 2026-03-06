@@ -2,7 +2,7 @@
 
 from unittest.mock import Mock
 
-from infrastructure.registry.base_registry import BaseRegistry, RegistryMode
+from orb.infrastructure.registry.base_registry import BaseRegistry, RegistryMode
 
 
 class MockStrategy:

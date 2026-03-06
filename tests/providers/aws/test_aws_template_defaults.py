@@ -2,8 +2,8 @@
 
 import pytest
 
-from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from providers.aws.domain.template.value_objects import AWSFleetType, ProviderApi
+from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.domain.template.value_objects import AWSFleetType, ProviderApi
 
 
 class TestAWSTemplateDefaults:
@@ -146,7 +146,7 @@ class TestAWSTemplateExtensionConfig:
 
     def test_fleet_type_field_exists(self):
         """Test that fleet_type field exists in extension config."""
-        from providers.aws.configuration.template_extension import (
+        from orb.providers.aws.configuration.template_extension import (
             AWSTemplateExtensionConfig,
         )
 
@@ -158,7 +158,7 @@ class TestAWSTemplateExtensionConfig:
 
     def test_fleet_type_in_template_defaults(self):
         """Test that fleet_type is included in template defaults."""
-        from providers.aws.configuration.template_extension import (
+        from orb.providers.aws.configuration.template_extension import (
             AWSTemplateExtensionConfig,
         )
 
@@ -171,7 +171,7 @@ class TestAWSTemplateExtensionConfig:
 
     def test_fleet_type_none_not_in_defaults(self):
         """Test that None fleet_type is not included in defaults."""
-        from providers.aws.configuration.template_extension import (
+        from orb.providers.aws.configuration.template_extension import (
             AWSTemplateExtensionConfig,
         )
 

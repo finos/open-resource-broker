@@ -166,10 +166,10 @@ class TestCleanArchitecture:
     def test_layer_isolation(self):
         """Validate layer boundaries are maintained."""
         # Test that domain layer doesn't import infrastructure
-        from domain.base import entity
-        from domain.machine import aggregate as machine_agg
-        from domain.request import aggregate as request_agg
-        from domain.template import template_aggregate as aggregate
+        from orb.domain.base import entity
+        from orb.domain.machine import aggregate as machine_agg
+        from orb.domain.request import aggregate as request_agg
+        from orb.domain.template import template_aggregate as aggregate
 
         # Domain modules should not have infrastructure dependencies
         domain_modules = [entity, aggregate, request_agg, machine_agg]
@@ -186,9 +186,9 @@ class TestCleanArchitecture:
     def test_interface_segregation(self):
         """Test interface segregation principle compliance."""
         # Test that interfaces are focused and cohesive
-        from infrastructure.adapters.ports.auth.auth_port import AuthPort
-        from infrastructure.adapters.ports.auth.token_port import TokenPort
-        from infrastructure.adapters.ports.auth.user_port import UserPort
+        from orb.infrastructure.adapters.ports.auth.auth_port import AuthPort
+        from orb.infrastructure.adapters.ports.auth.token_port import TokenPort
+        from orb.infrastructure.adapters.ports.auth.user_port import UserPort
 
         # Interfaces should be small and focused
         auth_methods = [method for method in dir(AuthPort) if not method.startswith("_")]
@@ -217,7 +217,7 @@ class TestCleanArchitecture:
             assert app_service is not None
 
         # Test DI container properly inverts dependencies
-        from infrastructure.di.container import DIContainer
+        from orb.infrastructure.di.container import DIContainer
 
         container = DIContainer()
         assert hasattr(container, "register")
@@ -227,7 +227,7 @@ class TestCleanArchitecture:
         """Test ports and adapters (hexagonal architecture) implementation."""
         # Test that adapters implement ports
 
-        from infrastructure.adapters.logging_adapter import LoggingAdapter
+        from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
 
         # Adapters should implement the corresponding port interface
         assert hasattr(LoggingAdapter, "__init__")
@@ -291,8 +291,8 @@ class TestCleanArchitecture:
     def test_infrastructure_layer_boundaries(self):
         """Test infrastructure layer boundaries and responsibilities."""
         # Infrastructure should handle external concerns
-        from infrastructure.di.container import DIContainer
-        from infrastructure.storage.base.repository import StrategyBasedRepository
+        from orb.infrastructure.di.container import DIContainer
+        from orb.infrastructure.storage.base.repository import StrategyBasedRepository
 
         # Infrastructure components should exist
         assert StrategyBasedRepository is not None
@@ -308,8 +308,8 @@ class TestCleanArchitecture:
 
     def test_interface_layer_responsibilities(self):
         """Test interface layer (CLI, API) responsibilities."""
-        from api.server import create_fastapi_app
-        from cli.main import parse_args
+        from orb.api.server import create_fastapi_app
+        from orb.cli.main import parse_args
 
         # Interface layer should handle external communication
         assert callable(parse_args)
@@ -332,8 +332,8 @@ class TestCleanArchitecture:
         """Test that cross-cutting concerns are properly handled."""
         # Logging should be abstracted
         # Error handling should be centralized
-        from infrastructure.error.exception_handler import ExceptionHandler
-        from infrastructure.logging.logger import get_logger
+        from orb.infrastructure.error.exception_handler import ExceptionHandler
+        from orb.infrastructure.logging.logger import get_logger
 
         # Cross-cutting concerns should be injectable
         logger = get_logger(__name__)
@@ -344,7 +344,7 @@ class TestCleanArchitecture:
 
     def test_configuration_isolation(self):
         """Test that configuration is properly isolated."""
-        from config.manager import ConfigurationManager
+        from orb.config.manager import ConfigurationManager
 
         # Configuration should be centralized
         # ConfigurationManager is a class that manages configuration

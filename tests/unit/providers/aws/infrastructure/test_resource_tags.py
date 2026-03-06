@@ -4,12 +4,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from providers.aws.domain.template.value_objects import AWSFleetType
-from providers.aws.infrastructure.handlers.asg.handler import ASGHandler
-from providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
-from providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
-from providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
-from providers.aws.infrastructure.tags import build_resource_tags, build_system_tags, merge_tags
+from orb.providers.aws.domain.template.value_objects import AWSFleetType
+from orb.providers.aws.infrastructure.handlers.asg.handler import ASGHandler
+from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
+from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
+from orb.providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
+from orb.providers.aws.infrastructure.tags import build_resource_tags, build_system_tags, merge_tags
 
 ORB_SYSTEM_KEYS = {
     "orb:managed-by",

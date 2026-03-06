@@ -49,7 +49,7 @@ class TestCLIIntegration:
         mock_get_container.return_value = mock_container
 
         # Test async function-based handler
-        from interface.command_handlers import handle_provider_config
+        from orb.interface.command_handlers import handle_provider_config
 
         mock_command = Mock()
 
@@ -81,7 +81,7 @@ class TestCLIIntegration:
         mock_register_services.return_value = mock_container
 
         # Test async function-based handler
-        from interface.command_handlers import handle_validate_provider_config
+        from orb.interface.command_handlers import handle_validate_provider_config
 
         mock_command = Mock()
         mock_command.file = None
@@ -114,7 +114,7 @@ class TestCLIIntegration:
         mock_register_services.return_value = mock_container
 
         # Test async function-based handler
-        from interface.command_handlers import handle_reload_provider_config
+        from orb.interface.command_handlers import handle_reload_provider_config
 
         mock_command = Mock()
         mock_command.config_path = self.config_path

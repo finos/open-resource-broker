@@ -7,9 +7,9 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from domain.base.ports import LoggingPort
-from infrastructure.di.container import DIContainer
-from infrastructure.di.decorators import get_injectable_info, injectable, is_injectable
+from orb.domain.base.ports import LoggingPort
+from orb.infrastructure.di.container import DIContainer
+from orb.infrastructure.di.decorators import get_injectable_info, injectable, is_injectable
 
 
 # Test interfaces

@@ -2,7 +2,7 @@
 
 import pytest
 
-from domain.request.request_types import MachineResult, RequestStatus, RequestType
+from orb.domain.request.request_types import MachineResult, RequestStatus, RequestType
 
 
 class TestRequestType:

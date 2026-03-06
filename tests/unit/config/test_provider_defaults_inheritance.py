@@ -2,7 +2,7 @@
 
 from unittest.mock import patch
 
-from config.schemas.provider_strategy_schema import (
+from orb.config.schemas.provider_strategy_schema import (
     HandlerConfig,
     ProviderConfig,
     ProviderInstanceConfig,

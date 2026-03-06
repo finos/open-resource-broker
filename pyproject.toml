@@ -176,7 +176,7 @@ dev = [
     "git-changelog>=2.6.0,<3.0.0",
 ]
 [project.scripts]
-orb = "run:cli_main"
+orb = "orb.run:cli_main"
 
 [project.urls]
 Homepage = "https://github.com/awslabs/open-resource-broker"
@@ -191,7 +191,6 @@ where = ["src"]
 "" = "src"
 
 [tool.setuptools]
-py-modules = ["run", "_package", "bootstrap"]
 include-package-data = true
 
 [tool.setuptools.package-data]
@@ -199,7 +198,7 @@ include-package-data = true
 
 [tool.setuptools.data-files]
 "orb_config" = ["config/*.json"]
-"orb_scripts" = ["src/infrastructure/scheduler/hostfactory/scripts/*.sh", "src/infrastructure/scheduler/hostfactory/scripts/*.bat"]
+"orb_scripts" = ["src/orb/infrastructure/scheduler/hostfactory/scripts/*.sh", "src/orb/infrastructure/scheduler/hostfactory/scripts/*.bat"]
 
 
 
@@ -227,7 +226,7 @@ env = [
 ]
 
 [tool.coverage.run]
-source = ["src"]
+source = ["src/orb"]
 branch = true
 
 [tool.coverage.report]
@@ -323,13 +322,13 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.ruff.lint.isort]
-known-first-party = ["orb", "application", "config", "domain", "infrastructure", "interface", "api", "monitoring"]
+known-first-party = ["orb"]
 combine-as-imports = true
 
 [tool.pyright]
 pythonVersion = "3.9"
 pythonPlatform = "Linux"
-include = ["src"]
+include = ["src/orb"]
 exclude = ["tests", ".venv", "build", "dist"]
 typeCheckingMode = "basic"
 reportMissingImports = true

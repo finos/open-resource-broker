@@ -2,8 +2,8 @@
 
 import pytest
 
-from domain.request.request_identifiers import MachineReference, RequestId, ResourceIdentifier
-from domain.request.request_types import RequestType
+from orb.domain.request.request_identifiers import MachineReference, RequestId, ResourceIdentifier
+from orb.domain.request.request_types import RequestType
 
 
 class TestRequestId:

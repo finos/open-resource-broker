@@ -1,6 +1,6 @@
 """Integration tests for multi-provider configuration system."""
 
-from config.schemas.provider_strategy_schema import HandlerConfig, ProviderConfig
+from orb.config.schemas.provider_strategy_schema import HandlerConfig, ProviderConfig
 
 
 class TestMultiProviderConfiguration:

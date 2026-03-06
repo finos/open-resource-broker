@@ -110,7 +110,7 @@ def setup_sdk_test(request):
 
     # Teardown: reset DI container so next test gets a fresh one
     try:
-        from infrastructure.di import reset_container
+        from orb.infrastructure.di import reset_container
 
         reset_container()
     except Exception:
@@ -280,7 +280,7 @@ _CUSTOM_CASES = _build_custom_test_cases()
 @pytest.mark.asyncio
 async def test_sdk_full_cycle_default(setup_sdk_test, test_case):
     """Full acquire→return cycle for default scenario combinations."""
-    from sdk import OpenResourceBroker
+    from orb.sdk import OpenResourceBroker
 
     async with OpenResourceBroker(config_path=setup_sdk_test) as sdk:
         await _run_full_cycle(sdk, test_case)
@@ -295,7 +295,7 @@ async def test_sdk_full_cycle_default(setup_sdk_test, test_case):
 @pytest.mark.asyncio
 async def test_sdk_full_cycle_custom(setup_sdk_test, test_case):
     """Full acquire→return cycle for custom/edge-case scenarios."""
-    from sdk import OpenResourceBroker
+    from orb.sdk import OpenResourceBroker
 
     async with OpenResourceBroker(config_path=setup_sdk_test) as sdk:
         await _run_full_cycle(sdk, test_case)
@@ -309,7 +309,7 @@ async def test_sdk_full_cycle_custom(setup_sdk_test, test_case):
 @pytest.mark.asyncio
 async def test_sdk_smoke(setup_sdk_test):
     """Smoke: SDK initialises, lists templates, requests 1 machine, returns it."""
-    from sdk import OpenResourceBroker
+    from orb.sdk import OpenResourceBroker
 
     # Pick the simplest scenario: RunInstances ondemand default scheduler
     test_case = scenarios.get_test_case_by_name("default.RunInstances.ondemand")

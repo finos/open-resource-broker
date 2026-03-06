@@ -396,14 +396,14 @@ class TestCQRSMigrationValidation:
 
     def test_cqrs_buses_exist(self):
         """Test that CQRS buses exist and replace ApplicationService."""
-        from infrastructure.di.buses import CommandBus, QueryBus
+        from orb.infrastructure.di.buses import CommandBus, QueryBus
 
         assert CommandBus is not None
         assert QueryBus is not None
 
     def test_command_handlers_exist(self):
         """Test that command handlers exist."""
-        from application.commands.request_handlers import CreateMachineRequestHandler
+        from orb.application.commands.request_handlers import CreateMachineRequestHandler
 
         assert CreateMachineRequestHandler is not None
 
@@ -411,12 +411,12 @@ class TestCQRSMigrationValidation:
         """Test that query handlers exist."""
         # Check if query handlers exist
         try:
-            from application.queries.template_query_handlers import GetTemplateHandler
+            from orb.application.queries.template_query_handlers import GetTemplateHandler
 
             assert GetTemplateHandler is not None
         except ImportError:
             # Query handlers might be in different location
-            from application.template.query_handlers import GetTemplateHandler
+            from orb.application.template.query_handlers import GetTemplateHandler
 
             assert GetTemplateHandler is not None
 
@@ -481,13 +481,13 @@ class TestApplicationEventsComprehensive:
     def test_event_bus_exists(self):
         """Test that event bus exists."""
         try:
-            from application.events.bus.event_bus import EventBus
+            from orb.application.events.bus.event_bus import EventBus
 
             assert EventBus is not None
         except ImportError:
             # Event bus might be in different location
             try:
-                from infrastructure.di.buses import EventBus
+                from orb.infrastructure.di.buses import EventBus
 
                 assert EventBus is not None
             except ImportError:

@@ -3,13 +3,13 @@
 import asyncio
 from unittest.mock import Mock, patch
 
-from domain.request.aggregate import Request
-from domain.request.value_objects import RequestId, RequestType
-from domain.template.template_aggregate import Template
-from infrastructure.mocking.dry_run_context import dry_run_context
-from providers.aws.configuration.config import AWSProviderConfig
-from providers.aws.infrastructure.adapters import AWSProvisioningAdapter
-from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
+from orb.domain.request.aggregate import Request
+from orb.domain.request.value_objects import RequestId, RequestType
+from orb.domain.template.template_aggregate import Template
+from orb.infrastructure.mocking.dry_run_context import dry_run_context
+from orb.providers.aws.configuration.config import AWSProviderConfig
+from orb.providers.aws.infrastructure.adapters import AWSProvisioningAdapter
+from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
 
 class TestEndToEndDryRun:
@@ -98,11 +98,11 @@ class TestEndToEndDryRun:
     def test_dry_run_context_manager(self):
         """dry_run_context sets and clears the global dry-run flag."""
         with dry_run_context(True):
-            from infrastructure.mocking.dry_run_context import is_dry_run_active
+            from orb.infrastructure.mocking.dry_run_context import is_dry_run_active
 
             assert is_dry_run_active()
 
-        from infrastructure.mocking.dry_run_context import is_dry_run_active
+        from orb.infrastructure.mocking.dry_run_context import is_dry_run_active
 
         assert not is_dry_run_active()
 

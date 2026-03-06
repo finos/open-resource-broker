@@ -18,12 +18,14 @@ from unittest.mock import Mock
 
 import pytest
 
-from domain.base.ports.configuration_port import ConfigurationPort
-from domain.request.aggregate import Request
-from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from providers.aws.domain.template.value_objects import AWSFleetType
-from providers.aws.infrastructure.handlers.ec2_fleet.config_builder import EC2FleetConfigBuilder
-from providers.aws.infrastructure.handlers.spot_fleet.config_builder import SpotFleetConfigBuilder
+from orb.domain.base.ports.configuration_port import ConfigurationPort
+from orb.domain.request.aggregate import Request
+from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.domain.template.value_objects import AWSFleetType
+from orb.providers.aws.infrastructure.handlers.ec2_fleet.config_builder import EC2FleetConfigBuilder
+from orb.providers.aws.infrastructure.handlers.spot_fleet.config_builder import (
+    SpotFleetConfigBuilder,
+)
 
 
 @pytest.fixture

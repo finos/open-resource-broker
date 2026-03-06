@@ -44,7 +44,7 @@ HF_MACHINE_STATUSES = {"pending", "running", "terminated", "failed", "error"}
 
 def test_hf_all_domain_statuses_map_to_allowed_output(hf_strategy):
     """Every RequestStatus value maps to a value in the HF allowed status set."""
-    from domain.request.request_types import RequestStatus
+    from orb.domain.request.request_types import RequestStatus
 
     for domain_status in RequestStatus:
         mapped = hf_strategy._map_domain_status_to_hostfactory(domain_status.value)
@@ -171,7 +171,7 @@ def test_default_format_request_response_all_statuses_have_request_id(default_st
 
 def test_hf_no_domain_status_raises_on_mapping(hf_strategy):
     """_map_domain_status_to_hostfactory never raises for any RequestStatus value."""
-    from domain.request.request_types import RequestStatus
+    from orb.domain.request.request_types import RequestStatus
 
     for domain_status in RequestStatus:
         try:

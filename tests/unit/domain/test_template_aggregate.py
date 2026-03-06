@@ -4,12 +4,12 @@ from datetime import datetime, timezone
 
 import pytest
 
-from domain.template.exceptions import TemplateNotFoundError, TemplateValidationError
-from domain.template.template_aggregate import Template
+from orb.domain.template.exceptions import TemplateNotFoundError, TemplateValidationError
+from orb.domain.template.template_aggregate import Template
 
 # Try to import optional value objects - create mocks if not available
 try:
-    from domain.template.value_objects import TemplateId, TemplateName
+    from orb.domain.template.value_objects import TemplateId, TemplateName
 
     TEMPLATE_VALUE_OBJECTS_AVAILABLE = True
 except ImportError:

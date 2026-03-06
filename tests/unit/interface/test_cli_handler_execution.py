@@ -5,15 +5,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from domain.base.ports import SchedulerPort
-from infrastructure.di.buses import QueryBus
-from infrastructure.di.container import DIContainer
-from interface.request_command_handlers import handle_get_request_status
-from interface.scheduler_command_handlers import handle_list_scheduler_strategies
-from interface.storage_command_handlers import handle_list_storage_strategies
+from orb.domain.base.ports import SchedulerPort
+from orb.infrastructure.di.buses import QueryBus
+from orb.infrastructure.di.container import DIContainer
+from orb.interface.request_command_handlers import handle_get_request_status
+from orb.interface.scheduler_command_handlers import handle_list_scheduler_strategies
+from orb.interface.storage_command_handlers import handle_list_storage_strategies
 
 # Import CLI handlers
-from interface.template_command_handlers import handle_list_templates
+from orb.interface.template_command_handlers import handle_list_templates
 
 
 class TestCLIHandlerExecution:

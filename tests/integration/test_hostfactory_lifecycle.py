@@ -70,7 +70,7 @@ class MockAppService:
 
     def request_return_machines(self, machine_ids):
         req_id = f"ret-{uuid.uuid4().hex[:8]}"
-        from domain.machine.machine_identifiers import MachineId
+        from orb.domain.machine.machine_identifiers import MachineId
 
         ids = [MachineId(value=m["machineId"]) for m in machine_ids]
         success = self._provider.terminate_instances(ids)

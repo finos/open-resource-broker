@@ -1,12 +1,12 @@
 """Unit tests for provider strategy commands."""
 
-from application.provider.commands import (
+from orb.application.provider.commands import (
     ExecuteProviderOperationCommand,
     RegisterProviderStrategyCommand,
     UpdateProviderHealthCommand,
 )
-from domain.base.operations import Operation, OperationType
-from providers.base.strategy import ProviderHealthStatus
+from orb.domain.base.operations import Operation, OperationType
+from orb.providers.base.strategy import ProviderHealthStatus
 
 
 class TestProviderStrategyCommands:

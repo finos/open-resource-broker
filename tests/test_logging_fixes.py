@@ -21,20 +21,20 @@ pytestmark = pytest.mark.skip(
 )
 
 try:
-    from providers.base.strategy.provider_context import ProviderContext
+    from orb.providers.base.strategy.provider_context import ProviderContext
 
     HAS_PROVIDER_CONTEXT = True
 except ImportError:
     HAS_PROVIDER_CONTEXT = False
 
 try:
-    from application.services.provider_capability_service import ProviderCapabilityService
+    from orb.application.services.provider_capability_service import ProviderCapabilityService
 
     HAS_CAPABILITY_SERVICE = True
 except ImportError:
     HAS_CAPABILITY_SERVICE = False
-from bootstrap import Application
-from infrastructure.template.configuration_manager import TemplateConfigurationManager
+from orb.bootstrap import Application
+from orb.infrastructure.template.configuration_manager import TemplateConfigurationManager
 
 
 class LogCapture:

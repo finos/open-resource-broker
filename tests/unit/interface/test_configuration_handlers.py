@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from interface.command_handlers import (
+from orb.interface.command_handlers import (
     handle_provider_config,
     handle_reload_provider_config,
     handle_validate_provider_config,
@@ -80,7 +80,7 @@ class TestConfigurationHandlerImports:
 
     def test_import_configuration_handlers(self):
         """Test that all configuration handlers can be imported."""
-        from interface.command_handlers import (
+        from orb.interface.command_handlers import (
             handle_provider_config,
             handle_reload_provider_config,
             handle_validate_provider_config,

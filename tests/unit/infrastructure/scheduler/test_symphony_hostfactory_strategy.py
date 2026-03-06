@@ -2,8 +2,10 @@
 
 from unittest.mock import Mock
 
-from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
-from infrastructure.template.dtos import TemplateDTO
+from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+    HostFactorySchedulerStrategy,
+)
+from orb.infrastructure.template.dtos import TemplateDTO
 
 
 class TestSymphonyHostFactorySchedulerStrategy:

@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from sdk.client import OpenResourceBroker
-from sdk.config import SDKConfig
-from sdk.exceptions import ConfigurationError, ProviderError, SDKError
+from orb.sdk.client import OpenResourceBroker
+from orb.sdk.config import SDKConfig
+from orb.sdk.exceptions import ConfigurationError, ProviderError, SDKError
 
 
 class TestOpenResourceBroker:

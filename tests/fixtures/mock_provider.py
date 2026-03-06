@@ -2,8 +2,8 @@
 
 from typing import Any, Optional
 
-from domain.machine.machine_identifiers import MachineId
-from infrastructure.interfaces.provider import ProviderConfig
+from orb.domain.machine.machine_identifiers import MachineId
+from orb.infrastructure.interfaces.provider import ProviderConfig
 
 
 class MockProviderConfig(ProviderConfig):

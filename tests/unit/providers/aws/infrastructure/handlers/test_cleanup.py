@@ -4,10 +4,10 @@ from unittest.mock import MagicMock, patch
 
 from botocore.exceptions import ClientError
 
-from config.schemas.cleanup_schema import CleanupConfig, CleanupResourcesConfig
-from providers.aws.infrastructure.handlers.asg.handler import ASGHandler
-from providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
-from providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
+from orb.config.schemas.cleanup_schema import CleanupConfig, CleanupResourcesConfig
+from orb.providers.aws.infrastructure.handlers.asg.handler import ASGHandler
+from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
+from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
 
 # ---------------------------------------------------------------------------
 # Helpers

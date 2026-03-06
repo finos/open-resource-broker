@@ -56,7 +56,7 @@ def patch_moto_compat():
     """
     from unittest.mock import patch
 
-    from providers.aws.infrastructure.adapters.aws_provisioning_adapter import (
+    from orb.providers.aws.infrastructure.adapters.aws_provisioning_adapter import (
         AWSProvisioningAdapter,
     )
 
@@ -93,7 +93,7 @@ def _make_moto_aws_client(region: str = REGION) -> Any:
 
     import boto3
 
-    from providers.aws.infrastructure.aws_client import AWSClient
+    from orb.providers.aws.infrastructure.aws_client import AWSClient
 
     aws_client = MagicMock(spec=AWSClient)
     aws_client.ec2_client = boto3.client("ec2", region_name=region)
@@ -107,8 +107,8 @@ def _make_moto_lt_manager(aws_client: Any, logger: Any) -> Any:
     """Build a moto-backed launch template manager."""
     from unittest.mock import MagicMock
 
-    from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-    from providers.aws.infrastructure.launch_template.manager import (
+    from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+    from orb.providers.aws.infrastructure.launch_template.manager import (
         AWSLaunchTemplateManager,
         LaunchTemplateResult,
     )
@@ -171,19 +171,19 @@ def _inject_moto_factory_into_strategy(aws_client: Any, logger: Any, config_port
     _instance_service (and the underlying provisioning adapter) for one that
     uses the moto-backed aws_client, so RunInstances calls go through moto.
     """
-    from providers.aws.domain.template.value_objects import ProviderApi
-    from providers.aws.infrastructure.adapters.aws_provisioning_adapter import (
+    from orb.providers.aws.domain.template.value_objects import ProviderApi
+    from orb.providers.aws.infrastructure.adapters.aws_provisioning_adapter import (
         AWSProvisioningAdapter,
     )
-    from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
-    from providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
-    from providers.aws.infrastructure.handlers.asg.handler import ASGHandler
-    from providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
-    from providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
-    from providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
-    from providers.aws.services.instance_operation_service import AWSInstanceOperationService
-    from providers.aws.utilities.aws_operations import AWSOperations
-    from providers.registry import get_provider_registry
+    from orb.providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
+    from orb.providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
+    from orb.providers.aws.infrastructure.handlers.asg.handler import ASGHandler
+    from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
+    from orb.providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
+    from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
+    from orb.providers.aws.services.instance_operation_service import AWSInstanceOperationService
+    from orb.providers.aws.utilities.aws_operations import AWSOperations
+    from orb.providers.registry import get_provider_registry
 
     registry = get_provider_registry()
 
@@ -193,8 +193,8 @@ def _inject_moto_factory_into_strategy(aws_client: Any, logger: Any, config_port
     registry._strategy_cache.pop("aws_moto_eu-west-2", None)
 
     # Re-register the provider instance if needed (cache clear removed it)
-    from domain.base.ports import ConfigurationPort
-    from infrastructure.di.container import get_container
+    from orb.domain.base.ports import ConfigurationPort
+    from orb.infrastructure.di.container import get_container
 
     container = get_container()
     config_port = container.get(ConfigurationPort)
@@ -301,9 +301,9 @@ def _register_provider_instances() -> None:
     provider instance (e.g. 'aws_moto_eu-west-2') registered so that
     get_or_create_strategy() can find it.
     """
-    from domain.base.ports import ConfigurationPort
-    from infrastructure.di.container import get_container
-    from providers.registry import get_provider_registry
+    from orb.domain.base.ports import ConfigurationPort
+    from orb.infrastructure.di.container import get_container
+    from orb.providers.registry import get_provider_registry
 
     container = get_container()
     config_port = container.get(ConfigurationPort)
@@ -327,9 +327,9 @@ def cqrs_buses(orb_config_dir, moto_aws, moto_vpc_resources):
     """
     from unittest.mock import MagicMock
 
-    from application.ports.command_bus_port import CommandBusPort
-    from application.ports.query_bus_port import QueryBusPort
-    from infrastructure.di.container import get_container
+    from orb.application.ports.command_bus_port import CommandBusPort
+    from orb.application.ports.query_bus_port import QueryBusPort
+    from orb.infrastructure.di.container import get_container
 
     _register_provider_instances()
 
@@ -350,8 +350,8 @@ def cqrs_buses(orb_config_dir, moto_aws, moto_vpc_resources):
 @pytest.fixture
 def hf_strategy(orb_config_dir):
     """Resolve SchedulerPort (HostFactorySchedulerStrategy) from the DI container."""
-    from domain.base.ports.scheduler_port import SchedulerPort
-    from infrastructure.di.container import get_container
+    from orb.domain.base.ports.scheduler_port import SchedulerPort
+    from orb.infrastructure.di.container import get_container
 
     return get_container().get(SchedulerPort)
 
@@ -363,7 +363,7 @@ def hf_strategy(orb_config_dir):
 
 def _patch_spot_fleet_tag_specs(factory: Any) -> None:
     """Strip ResourceType=instance from SpotFleet TagSpecifications (moto rejects it)."""
-    from providers.aws.domain.template.value_objects import ProviderApi
+    from orb.providers.aws.domain.template.value_objects import ProviderApi
 
     spot_handler = factory._handlers.get(ProviderApi.SPOT_FLEET.value)
     if spot_handler is None:
@@ -389,7 +389,7 @@ def _patch_spot_fleet_tag_specs(factory: Any) -> None:
 
 async def _create_request(command_bus, template_id: str, count: int = 2) -> str:
     """Dispatch CreateRequestCommand and return the created request_id."""
-    from application.dto.commands import CreateRequestCommand
+    from orb.application.dto.commands import CreateRequestCommand
 
     command = CreateRequestCommand(template_id=template_id, requested_count=count)
     await command_bus.execute(command)
@@ -406,7 +406,7 @@ async def _create_request(command_bus, template_id: str, count: int = 2) -> str:
 
 async def _get_request(query_bus, request_id: str):
     """Dispatch GetRequestQuery and return the RequestDTO."""
-    from application.dto.queries import GetRequestQuery
+    from orb.application.dto.queries import GetRequestQuery
 
     query = GetRequestQuery(request_id=request_id)
     return await query_bus.execute(query)
@@ -556,8 +556,8 @@ def _patch_spot_fleet_via_container() -> None:
     otherwise we skip the patch (the test will still pass if moto accepts the request).
     """
     try:
-        from infrastructure.di.container import get_container
-        from providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
+        from orb.infrastructure.di.container import get_container
+        from orb.providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
 
         container = get_container()
         factory = container.get_optional(AWSHandlerFactory)

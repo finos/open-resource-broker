@@ -1,6 +1,6 @@
 """Tests for ConfigurationLoader environment variable handling."""
 
-from config.loader import ConfigurationLoader
+from orb.config.loader import ConfigurationLoader
 
 
 class TestLoaderEnv:

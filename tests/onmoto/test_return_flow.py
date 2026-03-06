@@ -20,10 +20,10 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from application.dto.commands import CreateRequestCommand, CreateReturnRequestCommand
-from application.dto.queries import GetRequestQuery
-from application.ports.command_bus_port import CommandBusPort
-from application.ports.query_bus_port import QueryBusPort
+from orb.application.dto.commands import CreateRequestCommand, CreateReturnRequestCommand
+from orb.application.dto.queries import GetRequestQuery
+from orb.application.ports.command_bus_port import CommandBusPort
+from orb.application.ports.query_bus_port import QueryBusPort
 
 _RET_PREFIX_RE = re.compile(r"^ret-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
@@ -40,13 +40,13 @@ def cqrs_buses(orb_config_dir):
     Also ensures all configured provider instances are registered in the
     provider registry so the CQRS provisioning path can dispatch to them.
     """
-    from infrastructure.di.container import get_container
+    from orb.infrastructure.di.container import get_container
 
     container = get_container()
 
     # Register all configured provider instances so execute_operation can find them
-    from domain.base.ports.configuration_port import ConfigurationPort
-    from providers.registry import get_provider_registry
+    from orb.domain.base.ports.configuration_port import ConfigurationPort
+    from orb.providers.registry import get_provider_registry
 
     registry = get_provider_registry()
     registry._config_port = container.get(ConfigurationPort)
@@ -107,8 +107,8 @@ def orb_config_dir(orb_config_dir):
 @pytest.fixture
 def run_instances_template_id(orb_config_dir):
     """Return the template_id of the first RunInstances template in the repository."""
-    from infrastructure.di.container import get_container
-    from infrastructure.template.configuration_manager import TemplateConfigurationManager
+    from orb.infrastructure.di.container import get_container
+    from orb.infrastructure.template.configuration_manager import TemplateConfigurationManager
 
     container = get_container()
     manager = container.get(TemplateConfigurationManager)

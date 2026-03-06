@@ -15,8 +15,8 @@ def test_template_repository_enhancements():
     print("=== Storage Strategy: Template Repository Enhancement Test ===")
 
     try:
-        from domain.template.template_aggregate import Template
-        from infrastructure.storage.repositories.template_repository import (
+        from orb.domain.template.template_aggregate import Template
+        from orb.infrastructure.storage.repositories.template_repository import (
             TemplateSerializer,
         )
 
@@ -80,9 +80,9 @@ def test_request_repository_enhancements():
     print("\n=== Request Repository Enhancement Test ===")
 
     try:
-        from domain.request.aggregate import Request
-        from domain.request.value_objects import RequestId, RequestType
-        from infrastructure.storage.repositories.request_repository import (
+        from orb.domain.request.aggregate import Request
+        from orb.domain.request.value_objects import RequestId, RequestType
+        from orb.infrastructure.storage.repositories.request_repository import (
             RequestSerializer,
         )
 
@@ -141,9 +141,9 @@ def test_machine_repository_enhancements():
     print("\n=== Machine Repository Enhancement Test ===")
 
     try:
-        from domain.base.value_objects import Tags
-        from domain.machine.aggregate import Machine
-        from infrastructure.storage.repositories.machine_repository import (
+        from orb.domain.base.value_objects import Tags
+        from orb.domain.machine.aggregate import Machine
+        from orb.infrastructure.storage.repositories.machine_repository import (
             MachineSerializer,
         )
 

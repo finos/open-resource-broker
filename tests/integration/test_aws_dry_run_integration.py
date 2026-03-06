@@ -4,13 +4,13 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from infrastructure.mocking.dry_run_context import dry_run_context, is_dry_run_active
-from providers.aws.infrastructure.dry_run_adapter import (
+from orb.infrastructure.mocking.dry_run_context import dry_run_context, is_dry_run_active
+from orb.providers.aws.infrastructure.dry_run_adapter import (
     aws_dry_run_context,
     get_aws_dry_run_status,
     is_aws_dry_run_active,
 )
-from providers.aws.managers.aws_instance_manager import AWSInstanceManager
+from orb.providers.aws.managers.aws_instance_manager import AWSInstanceManager
 
 
 @pytest.mark.integration
@@ -26,7 +26,7 @@ class TestAWSDryRunIntegration:
             assert is_dry_run_active()
             # is_aws_dry_run_active() requires moto to be installed
             # When moto is available it returns True, otherwise False
-            from providers.aws.infrastructure.dry_run_adapter import MOTO_AVAILABLE
+            from orb.providers.aws.infrastructure.dry_run_adapter import MOTO_AVAILABLE
 
             assert is_aws_dry_run_active() == MOTO_AVAILABLE
 

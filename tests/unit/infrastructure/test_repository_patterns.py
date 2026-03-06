@@ -9,19 +9,19 @@ import pytest
 
 # Import repository components
 try:
-    from domain.machine.repository import MachineRepository as MachineRepositoryInterface
-    from domain.request.aggregate import Request
-    from domain.request.repository import RequestRepository as RequestRepositoryInterface
-    from domain.request.value_objects import RequestStatus, RequestType
-    from domain.template.repository import TemplateRepository as TemplateRepositoryInterface
-    from infrastructure.persistence.json.strategy import JSONStorageStrategy
-    from infrastructure.persistence.repositories.machine_repository import (
+    from orb.domain.machine.repository import MachineRepository as MachineRepositoryInterface
+    from orb.domain.request.aggregate import Request
+    from orb.domain.request.repository import RequestRepository as RequestRepositoryInterface
+    from orb.domain.request.value_objects import RequestStatus, RequestType
+    from orb.domain.template.repository import TemplateRepository as TemplateRepositoryInterface
+    from orb.infrastructure.persistence.json.strategy import JSONStorageStrategy
+    from orb.infrastructure.persistence.repositories.machine_repository import (
         MachineRepositoryImpl as MachineRepository,
     )
-    from infrastructure.persistence.repositories.request_repository import (
+    from orb.infrastructure.persistence.repositories.request_repository import (
         RequestRepositoryImpl as RequestRepository,
     )
-    from infrastructure.persistence.repositories.template_repository import (
+    from orb.infrastructure.persistence.repositories.template_repository import (
         TemplateRepositoryImpl as TemplateRepository,
     )
 
@@ -508,9 +508,9 @@ class TestRepositoryPerformanceOptimization:
 
     def test_machine_repository_save_batch_uses_storage_batch(self):
         """MachineRepository.save_batch should call storage save_batch with serialized data."""
-        from domain.base.value_objects import InstanceId, InstanceType
-        from domain.machine.aggregate import Machine
-        from domain.machine.machine_status import MachineStatus
+        from orb.domain.base.value_objects import InstanceId, InstanceType
+        from orb.domain.machine.aggregate import Machine
+        from orb.domain.machine.machine_status import MachineStatus
 
         mock_storage = Mock()
         machine_repo = MachineRepository(storage_port=mock_storage)
@@ -550,7 +550,7 @@ class TestRepositoryPerformanceOptimization:
         request_repo = RequestRepository(storage_port=mock_storage)
 
         # Generate valid RequestId
-        from domain.request.value_objects import RequestId, RequestType
+        from orb.domain.request.value_objects import RequestId, RequestType
 
         valid_request_id = RequestId.generate(RequestType.ACQUIRE)
 

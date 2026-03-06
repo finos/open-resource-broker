@@ -1,0 +1,402 @@
+"""Application logging configuration."""
+
+from __future__ import annotations
+
+import json
+import logging
+import logging.handlers
+from datetime import datetime
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, Optional
+
+if TYPE_CHECKING:
+    from orb.config.schemas.logging_schema import LoggingConfig
+
+
+class ColoredFormatter(logging.Formatter):
+    """Formatter that adds colors to log levels."""
+
+    COLORS = {
+        "DEBUG": "\033[36m",  # Cyan
+        "INFO": "\033[32m",  # Green
+        "WARNING": "\033[33m",  # Yellow
+        "ERROR": "\033[31m",  # Red
+        "CRITICAL": "\033[35m",  # Magenta
+    }
+    RESET = "\033[0m"
+
+    def format(self, record):
+        """Format log record with colors."""
+        log_color = self.COLORS.get(record.levelname, "")
+        record.levelname = f"{log_color}{record.levelname}{self.RESET}"
+
+        # Shorten pathname by removing first 5 folders
+        path_parts = record.pathname.split("/")
+        if len(path_parts) > 5:
+            record.pathname = "/".join(path_parts[5:])
+
+        return super().format(record)
+
+
+class JsonFormatter(logging.Formatter):
+    """Format log records as JSON."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        """Initialize the instance."""
+        super().__init__()
+        self.default_fields = kwargs
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Format log record as JSON."""
+        # Get file path relative to project root if possible
+        file_path = record.pathname
+        try:
+            # Try to get relative path from src directory
+            src_index = file_path.find("/src/")
+            if src_index >= 0:
+                file_path = file_path[src_index + 1 :]  # +1 to remove leading slash
+        except Exception as e:
+            # Can't use logger here to avoid recursion
+            # Just use full path and continue
+            print(  # logging bootstrap
+                f"Warning: Error formatting log path: {e}"
+            )  # Simple console output for logging system errors
+
+        message = {
+            "timestamp": datetime.utcfromtimestamp(record.created).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
+            "file": file_path,
+            "location": f"{file_path}:{record.lineno} ({record.funcName})",
+            **self.default_fields,
+        }
+
+        if record.exc_info:
+            message["exception"] = self.formatException(record.exc_info)
+
+        if hasattr(record, "request_id"):
+            message["request_id"] = record.request_id  # type: ignore[attr-defined]
+
+        if hasattr(record, "correlation_id"):
+            message["correlation_id"] = record.correlation_id  # type: ignore[attr-defined]
+
+        # Include any extra fields provided in the log call
+        if hasattr(record, "extra"):
+            message.update(record.extra)  # type: ignore[attr-defined]
+
+        return json.dumps(message)
+
+
+class ContextLogger(logging.Logger):
+    """Logger that supports context information."""
+
+    def __init__(self, name: str, level: int = logging.NOTSET) -> None:
+        """Initialize context logger with name and level."""
+        super().__init__(name, level)
+        self._context: Dict[str, Any] = {}
+
+    def bind(self, **kwargs: Any) -> None:
+        """Bind context values to logger."""
+        self._context.update(kwargs)
+
+    def unbind(self, *keys: str) -> None:
+        """Remove context values from logger."""
+        for key in keys:
+            self._context.pop(key, None)
+
+    def _log(  # type: ignore[override]
+        self,
+        level: int,
+        msg: str,
+        args: tuple,
+        exc_info: Optional[Exception] = None,
+        extra: Optional[Dict[str, Any]] = None,
+        stack_info: bool = False,
+        stacklevel: int = 1,
+    ) -> None:
+        """Override _log to include context information."""
+        if extra is None:
+            extra = {}
+        extra.update(self._context)
+        # Increase stacklevel by 1 to skip our wrapper and report the correct caller
+        super()._log(level, msg, args, exc_info, extra, stack_info, stacklevel + 1)
+
+
+# Flag to track if logging has been initialized
+_logging_initialized = False
+
+
+def setup_logging(config: LoggingConfig) -> None:
+    """
+    Configure application logging.
+
+    Args:
+        config: Logging configuration
+    """
+    global _logging_initialized
+
+    # Only initialize logging once
+    if _logging_initialized:
+        return
+
+    # Set logging class
+    logging.setLoggerClass(ContextLogger)
+
+    # Create root logger
+    root_logger = logging.getLogger()
+
+    # Convert string level to numeric level
+    level_name = config.level.upper()
+    level = getattr(logging, level_name, logging.INFO)
+    root_logger.setLevel(level)
+
+    # Log the level being set
+    logger = get_logger(__name__)
+    logger.info(f"Setting root logger level to: {level_name}")
+
+    # Remove any existing handlers to prevent duplicates
+    for handler in list(root_logger.handlers):
+        root_logger.removeHandler(handler)
+
+    # Create formatters
+    json_formatter = JsonFormatter()
+
+    # Create a custom formatter that highlights filenames
+    class FileHighlightFormatter(ColoredFormatter):
+        def format(self, record):
+            # First apply the parent formatting (colors for log levels and path shortening)
+            formatted = super().format(record)
+
+            # Extract just the filename from the pathname
+            import os
+
+            filename = os.path.basename(record.pathname)
+
+            # Replace the full pathname with bold blue filename in the formatted string
+            # Pattern: [pathname:lineno (funcName)] -> [path/to/FILENAME:lineno (funcName)]
+            path_without_filename = record.pathname.replace(filename, "")
+            highlighted_path = f"{path_without_filename}\033[1;34m{filename}\033[0m"
+
+            # Replace the pathname in the formatted string
+            formatted = formatted.replace(f"[{record.pathname}:", f"[{highlighted_path}:")
+
+            return formatted
+
+    colored_formatter = FileHighlightFormatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s [%(pathname)s:%(lineno)d (%(funcName)s)]"
+    )
+
+    # Configure file logging first (so it gets clean record before console colors)
+    if config.file_path:
+        # Create log directory if needed
+        log_path = Path(config.file_path)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Create rotating file handler
+        file_handler = logging.handlers.RotatingFileHandler(
+            filename=str(log_path),
+            maxBytes=config.max_size,
+            backupCount=config.backup_count,
+        )
+        file_handler.setFormatter(json_formatter)
+        root_logger.addHandler(file_handler)
+
+    # Configure console logging after file logging
+    # Use config directly to avoid circular dependency during DI container initialization
+    console_enabled = config.console_enabled
+
+    if console_enabled:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(colored_formatter)  # Use colors for console
+        root_logger.addHandler(console_handler)
+
+    # Set default logging levels for third-party libraries
+    get_logger("boto3").setLevel(logging.WARNING)
+    get_logger("botocore").setLevel(logging.WARNING)
+    get_logger("urllib3").setLevel(logging.WARNING)
+
+    # Mark logging as initialized
+    _logging_initialized = True
+
+    # Log initialization
+    logging.getLogger(__name__).debug("Logging system initialized")
+
+
+def get_logger(name: str) -> ContextLogger:
+    """
+    Get a logger instance.
+
+    Args:
+        name: Logger name
+
+    Returns:
+        Logger instance
+    """
+    return logging.getLogger(name)  # type: ignore[return-value]
+
+
+class LoggerAdapter(logging.LoggerAdapter):
+    """Adapter that adds context to log records."""
+
+    def process(self, msg: str, kwargs: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:  # type: ignore[override]
+        """Process log record to add context."""
+        if "extra" not in kwargs:
+            kwargs["extra"] = {}
+        extra = kwargs["extra"]
+        if isinstance(extra, dict) and isinstance(self.extra, dict):
+            extra.update(self.extra)
+        return msg, kwargs
+
+
+def with_context(**context: Any) -> LoggerAdapter:
+    """
+    Create a logger adapter with context.
+
+    Args:
+        **context: Context key-value pairs
+
+    Returns:
+        Logger adapter with context
+    """
+    logger = get_logger(__name__)
+    return LoggerAdapter(logger, context)
+
+
+class RequestLogger:
+    """Logger for request-specific logging."""
+
+    def __init__(self, request_id: str, correlation_id: Optional[str] = None) -> None:
+        self.logger = with_context(
+            request_id=request_id, correlation_id=correlation_id or request_id
+        )
+
+    def info(self, msg: str, **kwargs: Any) -> None:
+        """Log info message."""
+        self.logger.info(msg, extra=kwargs)
+
+    def error(self, msg: str, exc_info: Optional[Exception] = None, **kwargs: Any) -> None:
+        """Log error message."""
+        self.logger.error(msg, exc_info=exc_info, extra=kwargs)
+
+    def warning(self, msg: str, **kwargs: Any) -> None:
+        """Log warning message."""
+        self.logger.warning(msg, extra=kwargs)
+
+    def debug(self, msg: str, **kwargs: Any) -> None:
+        """Log debug message."""
+        self.logger.debug(msg, extra=kwargs)
+
+
+class AuditLogger:
+    """Logger for audit events."""
+
+    def __init__(self) -> None:
+        self.logger = get_logger("audit")
+
+    def log_event(
+        self,
+        event_type: str,
+        user: str,
+        action: str,
+        resource: str,
+        status: str,
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """
+        Log an audit event.
+
+        Args:
+            event_type: Type of event
+            user: User performing the action
+            action: Action being performed
+            resource: Resource being acted upon
+            status: Status of the action
+            details: Additional event details
+        """
+        self.logger.info(
+            f"{event_type}: {action} on {resource} by {user} - {status}",
+            extra={
+                "event_type": event_type,
+                "user": user,
+                "action": action,
+                "resource": resource,
+                "status": status,
+                "details": details or {},
+                "timestamp": datetime.utcnow().isoformat(),
+            },
+        )
+
+
+class MetricsLogger:
+    """Logger for application metrics."""
+
+    def __init__(self) -> None:
+        self.logger = get_logger("metrics")
+
+    def log_timing(
+        self, operation: str, duration_ms: float, status: str = "success", **tags: str
+    ) -> None:
+        """
+        Log operation timing.
+
+        Args:
+            operation: Operation being timed
+            duration_ms: Duration in milliseconds
+            status: Operation status
+            **tags: Additional metric tags
+        """
+        self.logger.info(
+            f"{operation} took {duration_ms:.2f}ms",
+            extra={
+                "metric_type": "timing",
+                "operation": operation,
+                "duration_ms": duration_ms,
+                "status": status,
+                "tags": tags,
+                "timestamp": datetime.utcnow().isoformat(),
+            },
+        )
+
+    def log_counter(self, metric: str, value: int = 1, **tags: str) -> None:
+        """
+        Log counter metric.
+
+        Args:
+            metric: Metric name
+            value: Metric value
+            **tags: Additional metric tags
+        """
+        self.logger.info(
+            f"{metric}: {value}",
+            extra={
+                "metric_type": "counter",
+                "metric": metric,
+                "value": value,
+                "tags": tags,
+                "timestamp": datetime.utcnow().isoformat(),
+            },
+        )
+
+    def log_gauge(self, metric: str, value: float, **tags: str) -> None:
+        """
+        Log gauge metric.
+
+        Args:
+            metric: Metric name
+            value: Metric value
+            **tags: Additional metric tags
+        """
+        self.logger.info(
+            f"{metric}: {value}",
+            extra={
+                "metric_type": "gauge",
+                "metric": metric,
+                "value": value,
+                "tags": tags,
+                "timestamp": datetime.utcnow().isoformat(),
+            },
+        )

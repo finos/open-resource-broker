@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from interface.mcp.server.core import OpenResourceBrokerMCPServer
+from orb.interface.mcp.server.core import OpenResourceBrokerMCPServer
 
 
 class TestMCPProtocolCompliance:

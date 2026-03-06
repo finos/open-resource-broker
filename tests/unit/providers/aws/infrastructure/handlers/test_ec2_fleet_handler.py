@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from botocore.exceptions import ClientError
 
-from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
-from providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
+from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
+from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
 
 
 def _make_handler():
@@ -205,15 +205,15 @@ class TestEC2FleetHandlerCheckHostsStatus:
 class TestEC2FleetHandlerNameTag:
     def test_fleet_config_instance_tag_uses_config_prefix(self):
         """Instance Name tag in EC2Fleet config uses config_port prefix (instant fleet only)."""
-        from providers.aws.domain.template.aws_template_aggregate import AWSFleetType
+        from orb.providers.aws.domain.template.aws_template_aggregate import AWSFleetType
 
         aws_client = MagicMock()
         logger = MagicMock()
         aws_ops = MagicMock()
         launch_template_manager = MagicMock()
         config_port = MagicMock()
-        config_port.get_resource_prefix.side_effect = (
-            lambda rt: "pfx-" if rt == "fleet" else "inst-"
+        config_port.get_resource_prefix.side_effect = lambda rt: (
+            "pfx-" if rt == "fleet" else "inst-"
         )
 
         handler = EC2FleetHandler(

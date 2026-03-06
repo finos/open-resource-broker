@@ -10,8 +10,10 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
-from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
-from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
+from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+    HostFactorySchedulerStrategy,
+)
 from tests.onaws.plugin_io_schemas import (
     expected_get_available_templates_schema_default,
     expected_get_available_templates_schema_hostfactory,

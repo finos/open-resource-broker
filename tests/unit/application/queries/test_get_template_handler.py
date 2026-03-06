@@ -3,12 +3,12 @@ from unittest.mock import Mock
 
 import pytest
 
-from application.dto.queries import GetTemplateQuery
-from application.queries.template_query_handlers import GetTemplateHandler
-from domain.base.ports.container_port import ContainerPort
-from domain.base.ports.template_configuration_port import TemplateConfigurationPort
-from domain.template.factory import TemplateFactory
-from infrastructure.template.dtos import TemplateDTO
+from orb.application.dto.queries import GetTemplateQuery
+from orb.application.queries.template_query_handlers import GetTemplateHandler
+from orb.domain.base.ports.container_port import ContainerPort
+from orb.domain.base.ports.template_configuration_port import TemplateConfigurationPort
+from orb.domain.template.factory import TemplateFactory
+from orb.infrastructure.template.dtos import TemplateDTO
 
 
 class _FakeTemplateManager:

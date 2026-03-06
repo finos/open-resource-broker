@@ -8,10 +8,10 @@ pytestmark = pytest.mark.skip(
     reason="infrastructure.registry.provider_registry module removed - using application services"
 )
 
-from domain.base.exceptions import ConfigurationError
+from orb.domain.base.exceptions import ConfigurationError
 
 try:
-    from infrastructure.registry.provider_registry import (
+    from orb.infrastructure.registry.provider_registry import (
         ProviderRegistry,
         UnsupportedProviderError,
         get_provider_registry,

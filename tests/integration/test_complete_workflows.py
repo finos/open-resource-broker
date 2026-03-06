@@ -11,9 +11,9 @@ import pytest
 
 # Import components for integration testing
 try:
-    from application.service import ApplicationService
-    from domain.request.aggregate import Request
-    from infrastructure.storage.repositories.request_repository import (
+    from orb.application.service import ApplicationService
+    from orb.domain.request.aggregate import Request
+    from orb.infrastructure.storage.repositories.request_repository import (
         RequestRepository,
     )
 
@@ -182,7 +182,7 @@ class TestCompleteWorkflowIntegration:
         mock_template_service.get_template_by_id.return_value = mock_template
 
         # Mock command bus to simulate failure then success
-        from domain.request.exceptions import RequestProcessingError
+        from orb.domain.request.exceptions import RequestProcessingError
 
         mock_command_bus.dispatch.side_effect = [
             RequestProcessingError("Temporary failure"),  # First call fails

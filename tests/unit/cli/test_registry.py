@@ -2,7 +2,7 @@
 
 
 def test_system_reload_resolves_to_handler():
-    from cli.registry import build_registry, lookup
+    from orb.cli.registry import build_registry, lookup
 
     build_registry()
     handler = lookup("system", "reload")
@@ -10,7 +10,7 @@ def test_system_reload_resolves_to_handler():
 
 
 def test_request_status_singular_resolves():
-    from cli.registry import build_registry, lookup
+    from orb.cli.registry import build_registry, lookup
 
     build_registry()
     h1 = lookup("requests", "status")
@@ -20,8 +20,8 @@ def test_request_status_singular_resolves():
 
 
 def test_templates_validate_resolves_to_dedicated_handler():
-    from cli.registry import build_registry, lookup
-    from interface.template_command_handlers import handle_validate_template
+    from orb.cli.registry import build_registry, lookup
+    from orb.interface.template_command_handlers import handle_validate_template
 
     build_registry()
     handler = lookup("templates", "validate")
@@ -29,7 +29,7 @@ def test_templates_validate_resolves_to_dedicated_handler():
 
 
 def test_unknown_command_returns_none():
-    from cli.registry import build_registry, lookup
+    from orb.cli.registry import build_registry, lookup
 
     build_registry()
     assert lookup("nonexistent", "action") is None

@@ -2,15 +2,15 @@
 
 import pytest
 
-from domain.base.value_objects import InstanceType
-from domain.machine.aggregate import Machine
-from domain.machine.exceptions import (
+from orb.domain.base.value_objects import InstanceType
+from orb.domain.machine.aggregate import Machine
+from orb.domain.machine.exceptions import (
     InvalidMachineStateError,
     MachineNotFoundError,
     MachineValidationError,
 )
-from domain.machine.machine_identifiers import MachineId
-from domain.machine.machine_status import MachineStatus
+from orb.domain.machine.machine_identifiers import MachineId
+from orb.domain.machine.machine_status import MachineStatus
 
 # ---------------------------------------------------------------------------
 # Helpers

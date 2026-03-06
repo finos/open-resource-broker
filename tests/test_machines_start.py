@@ -34,7 +34,7 @@ async def test_machines_start_specific_ids():
         mock_container.get.side_effect = mock_get
 
         # Act
-        from interface.machine_command_handlers import handle_start_machines
+        from orb.interface.machine_command_handlers import handle_start_machines
 
         result = await handle_start_machines(args)
 
@@ -83,7 +83,7 @@ async def test_machines_start_all():
         mock_container.get.side_effect = mock_get
 
         # Act
-        from interface.machine_command_handlers import handle_start_machines
+        from orb.interface.machine_command_handlers import handle_start_machines
 
         result = await handle_start_machines(args)
 
@@ -94,7 +94,7 @@ async def test_machines_start_all():
 @pytest.mark.asyncio
 async def test_machines_start_validation_errors():
     """Test validation errors."""
-    from interface.machine_command_handlers import handle_start_machines
+    from orb.interface.machine_command_handlers import handle_start_machines
 
     # Test: no machine IDs and no --all
     args1 = argparse.Namespace()
