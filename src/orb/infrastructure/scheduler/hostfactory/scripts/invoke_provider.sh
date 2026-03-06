@@ -62,8 +62,8 @@ if [ "$USE_LOCAL_DEV" = "true" ] || [ "$USE_LOCAL_DEV" = "1" ]; then
     # Local development mode - use python -m orb from project root
     # echo "Using local development mode (python -m orb)" >&2
 
-    # Add project root to PYTHONPATH
-    export PYTHONPATH="${PROJECT_ROOT}:${PYTHONPATH}"
+    # Add project root and src/ to PYTHONPATH so orb package is importable
+    export PYTHONPATH="${PROJECT_ROOT}/src:${PROJECT_ROOT}:${PYTHONPATH}"
 
     # Check if src/orb/run.py exists
     if [ ! -f "${PROJECT_ROOT}/src/orb/run.py" ]; then
@@ -94,8 +94,8 @@ if [ "$USE_LOCAL_DEV" = "true" ] || [ "$USE_LOCAL_DEV" = "1" ]; then
         i=$((i + 1))
     done
 
-    # Execute: python -m orb [-f <file>] <everything else verbatim>
-	    "$PYTHON_CMD" -m orb "${file_args[@]}" "${pass_args[@]}" 2>&1 | tee -a "$SCRIPTS_LOG_FILE"
+    # Execute: src/orb/run.py [-f <file>] <everything else verbatim>
+	    "$PYTHON_CMD" "${PROJECT_ROOT}/src/orb/run.py" "${file_args[@]}" "${pass_args[@]}" 2>&1 | tee -a "$SCRIPTS_LOG_FILE"
 	    exit "${PIPESTATUS[0]}"
 
 else
