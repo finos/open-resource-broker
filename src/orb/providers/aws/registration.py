@@ -247,12 +247,11 @@ def _register_aws_template_adapter(logger: "Optional[LoggingPort]" = None) -> No
     """Register AWS template adapter with the DI container."""
     try:
         from orb.domain.base.ports.template_adapter_port import TemplateAdapterPort
-        from orb.infrastructure.di.container import get_container
-
         from orb.infrastructure.adapters.template_adapter import (
             AWSTemplateAdapter,
             create_aws_template_adapter,
         )
+        from orb.infrastructure.di.container import get_container
 
         container = get_container()
 

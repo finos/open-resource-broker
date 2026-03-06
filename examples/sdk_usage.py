@@ -19,8 +19,8 @@ from pathlib import Path
 # Ensure src/ is on the path when running directly from the repo root
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from sdk import OpenResourceBroker
-from sdk.exceptions import ConfigurationError, MethodExecutionError, ProviderError, SDKError
+from orb.sdk import ORBClient
+from orb.sdk.exceptions import ConfigurationError, MethodExecutionError, ProviderError, SDKError
 
 
 def parse_args() -> argparse.Namespace:
@@ -70,7 +70,7 @@ def _print_json(label: str, data: object) -> None:
     print(json.dumps(data, indent=2, default=str))
 
 
-async def demo_list_templates(sdk: OpenResourceBroker) -> list:
+async def demo_list_templates(sdk: ORBClient) -> list:
     """List available templates and return them."""
     print("\n[1] Listing available templates...")
     try:
@@ -90,7 +90,7 @@ async def demo_list_templates(sdk: OpenResourceBroker) -> list:
 
 
 async def demo_request_machines(
-    sdk: OpenResourceBroker, template_id: str, count: int, dry_run: bool
+    sdk: ORBClient, template_id: str, count: int, dry_run: bool
 ) -> str | None:
     """Request machines and return the request_id, or None on failure."""
     print(f"\n[2] Requesting {count} machine(s) from template '{template_id}'...")
@@ -118,7 +118,7 @@ async def demo_request_machines(
         return None
 
 
-async def demo_check_status(sdk: OpenResourceBroker, request_id: str) -> None:
+async def demo_check_status(sdk: ORBClient, request_id: str) -> None:
     """Check the status of a request."""
     print(f"\n[3] Checking status of request '{request_id}'...")
     try:
@@ -132,7 +132,7 @@ async def demo_check_status(sdk: OpenResourceBroker, request_id: str) -> None:
 
 
 async def demo_return_machines(
-    sdk: OpenResourceBroker, machine_ids: list[str], dry_run: bool
+    sdk: ORBClient, machine_ids: list[str], dry_run: bool
 ) -> None:
     """Return machines by ID."""
     print(f"\n[4] Returning {len(machine_ids)} machine(s)...")
@@ -162,7 +162,7 @@ async def main() -> int:
     print("=" * 45)
 
     try:
-        sdk = OpenResourceBroker(**sdk_kwargs)
+        sdk = ORBClient(**sdk_kwargs)
     except ConfigurationError as e:
         print(f"Configuration error: {e}")
         return 1

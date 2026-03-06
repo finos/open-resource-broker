@@ -13,7 +13,7 @@ graph TD
         CLI[CLI Commands]
         API[REST API]
         MCP[MCP Server]
-        SDK[Python SDK<br/>OpenResourceBroker<br/>Async Client API]
+        SDK[Python SDK<br/>ORBClient<br/>Async Client API]
     end
 
     %% Application Layer

@@ -11,7 +11,7 @@ Usage:
 """
 
 from orb._package import __version__
-from orb.sdk.client import ORBClient, OpenResourceBroker
+from orb.sdk.client import OpenResourceBroker, ORBClient
 from orb.sdk.config import SDKConfig
 from orb.sdk.exceptions import ConfigurationError, ProviderError, SDKError
 

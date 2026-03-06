@@ -51,9 +51,9 @@ The core provider interface defines the contract that all cloud providers must i
 ```python
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
-from src.domain.machine import Machine
-from src.domain.request import Request
-from src.domain.template import Template
+from orb.domain.machine import Machine
+from orb.domain.request import Request
+from orb.domain.template import Template
 
 class ProviderInterface(ABC):
     """Abstract interface for cloud providers."""
@@ -105,7 +105,7 @@ The provider factory creates provider instances dynamically:
 
 ```python
 from typing import Dict, Type, Optional
-from src.infrastructure.logging.logger import get_logger
+from orb.infrastructure.logging.logger import get_logger
 
 class ProviderFactory:
     """Factory for creating provider instances."""
@@ -133,7 +133,7 @@ class ProviderFactory:
         return list(cls._providers.keys())
 
 # Register AWS provider
-from src.providers.aws.aws_provider import AWSProvider
+from orb.providers.aws.aws_provider import AWSProvider
 ProviderFactory.register_provider("aws", AWSProvider)
 ```
 
@@ -185,10 +185,10 @@ graph TB
 
 ```python
 from typing import List, Dict, Any, Optional
-from src.infrastructure.interfaces.provider import ProviderInterface
-from src.providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
-from src.providers.aws.configuration.config import AWSConfig
-from src.providers.aws.utilities.aws_operations import AWSOperations
+from orb.infrastructure.interfaces.provider import ProviderInterface
+from orb.providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
+from orb.providers.aws.configuration.config import AWSConfig
+from orb.providers.aws.utilities.aws_operations import AWSOperations
 
 class AWSProvider(ProviderInterface):
     """AWS cloud provider implementation."""
@@ -253,7 +253,7 @@ class AWSProvider(ProviderInterface):
 ```python
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
-from src.providers.aws.utilities.aws_operations import AWSOperations
+from orb.providers.aws.utilities.aws_operations import AWSOperations
 
 class BaseAWSHandler(ABC):
     """Base class for all AWS handlers."""
@@ -500,7 +500,7 @@ class AWSOperations:
 
 ```python
 # src/providers/provider1/provider1_provider.py
-from src.infrastructure.interfaces.provider import ProviderInterface
+from orb.infrastructure.interfaces.provider import ProviderInterface
 
 class Provider1Provider(ProviderInterface):
     """Provider1 cloud provider implementation."""
@@ -526,7 +526,7 @@ class Provider1Provider(ProviderInterface):
 from typing import Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from infrastructure.interfaces.provider import BaseProviderConfig
+from orb.infrastructure.interfaces.provider import BaseProviderConfig
 
 class Provider1ProviderConfig(BaseSettings, BaseProviderConfig):
     """Provider1 provider configuration with automatic environment variable support."""
@@ -561,7 +561,7 @@ class Provider1ProviderConfig(BaseSettings, BaseProviderConfig):
 
 ```python
 # src/providers/provider1/__init__.py
-from config.schemas.provider_settings_registry import ProviderSettingsRegistry
+from orb.config.schemas.provider_settings_registry import ProviderSettingsRegistry
 from .configuration.config import Provider1ProviderConfig
 
 # Register Provider1 provider settings for automatic environment variable support
@@ -572,7 +572,7 @@ ProviderSettingsRegistry.register_provider_settings("provider1", Provider1Provid
 
 ```python
 # Register Provider1 provider
-from src.providers.provider1.provider1_provider import Provider1Provider
+from orb.providers.provider1.provider1_provider import Provider1Provider
 ProviderFactory.register_provider("provider1", Provider1Provider)
 ```
 
@@ -673,7 +673,7 @@ export ORB_AWS_HANDLERS__SPOT_FLEET=false
 The provider settings registry manages BaseSettings classes for automatic environment variable loading:
 
 ```python
-from config.schemas.provider_settings_registry import ProviderSettingsRegistry
+from orb.config.schemas.provider_settings_registry import ProviderSettingsRegistry
 
 # Register provider settings class
 ProviderSettingsRegistry.register_provider_settings("aws", AWSProviderConfig)

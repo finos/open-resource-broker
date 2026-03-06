@@ -47,7 +47,7 @@ Usage:
         status = await client.get_request_status(request_id=request1.id)
 """
 
-from .client import ORB, ORBClient, OpenResourceBroker
+from .client import ORB, OpenResourceBroker, ORBClient
 from .config import SDKConfig
 from .exceptions import ConfigurationError, ProviderError, SDKError
 

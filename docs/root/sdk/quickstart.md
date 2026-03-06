@@ -1,6 +1,6 @@
 # Open Resource Broker SDK Quickstart
 
-The Open Resource Broker SDK (orb_py) provides a clean, async-first programmatic interface for cloud resource provisioning operations.
+The Open Resource Broker SDK provides a clean, async-first programmatic interface for cloud resource provisioning operations.
 
 ## Key Features
 
@@ -14,10 +14,10 @@ The Open Resource Broker SDK (orb_py) provides a clean, async-first programmatic
 
 ```bash
 # Install the base package
-pip install orb-py
+pip install open-resource-broker
 
 # Or install with SDK support
-pip install orb-py[sdk]
+pip install open-resource-broker[sdk]
 ```
 
 ## Basic Usage
@@ -25,7 +25,7 @@ pip install orb-py[sdk]
 ### Context Manager (Recommended)
 
 ```python
-from orb_py import orb
+from orb import ORBClient as orb
 
 async with orb(provider="aws") as sdk:
     # List available templates
@@ -69,7 +69,7 @@ These convenience methods map to the underlying CQRS methods:
 ### Manual Initialization
 
 ```python
-from orb_py import orb
+from orb import ORBClient as orb
 
 sdk = orb(provider="aws")
 await sdk.initialize()
@@ -285,7 +285,7 @@ async with orb(provider="aws") as sdk:
 ## Error Handling
 
 ```python
-from orb_py import orb, SDKError, ConfigurationError, ProviderError
+from orb import ORBClient as orb, SDKError, ConfigurationError, ProviderError
 
 try:
     async with orb(provider="aws") as sdk:
@@ -313,7 +313,7 @@ except SDKError as e:
 ### Custom Middleware
 
 ```python
-from orb_py import orb, SDKMiddleware
+from orb import ORBClient as orb, SDKMiddleware
 
 class LoggingMiddleware(SDKMiddleware):
     async def process(self, method_name, args, kwargs, next_handler):
