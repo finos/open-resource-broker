@@ -51,7 +51,7 @@ def _register_provider_utility_services(container: DIContainer) -> None:
         import importlib.util
 
         # Check if AWS provider is available
-        if importlib.util.find_spec("src.providers.aws"):
+        if importlib.util.find_spec("orb.providers.aws"):
             try:
                 from orb.providers.aws.registration import register_aws_services_with_di
 

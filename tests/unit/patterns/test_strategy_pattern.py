@@ -98,7 +98,7 @@ class TestStrategyPattern:
         """Validate strategy composition patterns."""
         # Test composite strategy behavior
         with patch(
-            "src.providers.base.strategy.composite_strategy.CompositeProviderStrategy"
+            "orb.providers.base.strategy.composite_strategy.CompositeProviderStrategy"
         ) as mock_composite:
             mock_instance = Mock()
             mock_composite.return_value = mock_instance
@@ -170,7 +170,7 @@ class TestStrategyPattern:
         """Validate fallback strategy mechanisms."""
         # Test fallback strategy behavior
         with patch(
-            "src.providers.base.strategy.fallback_strategy.FallbackProviderStrategy"
+            "orb.providers.base.strategy.fallback_strategy.FallbackProviderStrategy"
         ) as mock_fallback:
             mock_instance = Mock()
             mock_fallback.return_value = mock_instance
@@ -214,7 +214,7 @@ class TestStrategyPattern:
         """Test load balancing strategy implementation."""
         # Test load balancing across multiple providers
         with patch(
-            "src.providers.base.strategy.load_balancing_strategy.LoadBalancingProviderStrategy"
+            "orb.providers.base.strategy.load_balancing_strategy.LoadBalancingProviderStrategy"
         ) as mock_load_balancer:
             mock_instance = Mock()
             mock_load_balancer.return_value = mock_instance
@@ -280,7 +280,7 @@ class TestStrategyPattern:
         """Test strategy error handling and resilience."""
         # Test that strategies handle errors gracefully
         with patch(
-            "src.providers.base.strategy.composite_strategy.CompositeProviderStrategy"
+            "orb.providers.base.strategy.composite_strategy.CompositeProviderStrategy"
         ) as mock_composite:
             mock_instance = Mock()
             mock_composite.return_value = mock_instance
@@ -313,7 +313,7 @@ class TestStrategyPattern:
         """Test strategy metrics and monitoring capabilities."""
         # Test that strategies can be monitored
         with patch(
-            "src.providers.base.strategy.load_balancing_strategy.LoadBalancingProviderStrategy"
+            "orb.providers.base.strategy.load_balancing_strategy.LoadBalancingProviderStrategy"
         ) as mock_load_balancer:
             mock_instance = Mock()
             mock_load_balancer.return_value = mock_instance
@@ -338,7 +338,7 @@ class TestStrategyPattern:
         """Test strategy state management and thread safety."""
         # Test that strategies manage state correctly
         with patch(
-            "src.providers.base.strategy.load_balancing_strategy.LoadBalancingProviderStrategy"
+            "orb.providers.base.strategy.load_balancing_strategy.LoadBalancingProviderStrategy"
         ) as mock_load_balancer:
             mock_instance = Mock()
             mock_load_balancer.return_value = mock_instance
@@ -425,7 +425,7 @@ class TestStrategyPattern:
 
         # Test chaining strategies
         with patch(
-            "src.providers.base.strategy.composite_strategy.CompositeProviderStrategy"
+            "orb.providers.base.strategy.composite_strategy.CompositeProviderStrategy"
         ) as mock_composite:
             mock_instance = Mock()
             mock_composite.return_value = mock_instance

@@ -94,15 +94,15 @@ class TestCleanArchitecture:
         # Define allowed dependencies for each layer
         allowed_deps = {
             "domain": [],  # Domain should not depend on other layers
-            "application": ["src.domain"],  # Application can depend on domain
+            "application": ["orb.domain"],  # Application can depend on domain
             "infrastructure": [
-                "src.domain",
-                "src.application",
+                "orb.domain",
+                "orb.application",
             ],  # Infrastructure can depend on domain and application
             "interface": [
-                "src.domain",
-                "src.application",
-                "src.infrastructure",
+                "orb.domain",
+                "orb.application",
+                "orb.infrastructure",
             ],  # Interface can depend on all
         }
 
@@ -177,7 +177,7 @@ class TestCleanArchitecture:
         for module in domain_modules:
             module_file = module.__file__
             violations = self._check_forbidden_imports(
-                module_file, ["boto3", "fastapi", "sqlalchemy", "src.infrastructure"]
+                module_file, ["boto3", "fastapi", "sqlalchemy", "orb.infrastructure"]
             )
             assert len(violations) == 0, (
                 f"Domain module {module} has infrastructure dependencies: {violations}"

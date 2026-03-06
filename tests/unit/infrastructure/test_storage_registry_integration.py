@@ -95,7 +95,7 @@ class TestStorageRegistryIntegration:
         with (
             patch("orb.infrastructure.persistence.registration.register_all_storage_types"),
             patch(
-                "src.infrastructure.utilities.factories.repository_factory.RepositoryFactory"
+                "orb.infrastructure.utilities.factories.repository_factory.RepositoryFactory"
             ) as mock_factory_class,
         ):
             mock_factory_class.return_value = mock_factory
@@ -131,7 +131,7 @@ class TestStorageRegistryIntegration:
         mock_registry.create_unit_of_work.return_value = mock_unit_of_work
 
         with patch(
-            "src.infrastructure.utilities.factories.repository_factory.get_storage_registry"
+            "orb.infrastructure.utilities.factories.repository_factory.get_storage_registry"
         ) as mock_get_registry:
             mock_get_registry.return_value = mock_registry
 
@@ -224,7 +224,7 @@ class TestStorageRegistryIntegration:
         mock_repository = Mock()
 
         with patch(
-            "src.infrastructure.persistence.repositories.request_repository.RequestRepositoryImpl"
+            "orb.infrastructure.persistence.repositories.request_repository.RequestRepositoryImpl"
         ) as mock_repo_class:
             mock_repo_class.return_value = mock_repository
 

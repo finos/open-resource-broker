@@ -104,13 +104,13 @@ class TestJSONStorageRegistration:
         with (
             patch("orb.infrastructure.persistence.json.strategy.JSONStorageStrategy"),
             patch(
-                "src.infrastructure.persistence.repositories.request_repository.RequestRepository"
+                "orb.infrastructure.persistence.repositories.request_repository.RequestRepository"
             ),
             patch(
-                "src.infrastructure.persistence.repositories.machine_repository.MachineRepository"
+                "orb.infrastructure.persistence.repositories.machine_repository.MachineRepository"
             ),
             patch(
-                "src.infrastructure.persistence.repositories.template_repository.TemplateRepository"
+                "orb.infrastructure.persistence.repositories.template_repository.TemplateRepository"
             ),
             patch("orb.infrastructure.persistence.json.unit_of_work.JSONUnitOfWork"),
         ):
@@ -209,13 +209,13 @@ class TestSQLStorageRegistration:
         with (
             patch("orb.infrastructure.persistence.sql.registration.SQLStorageStrategy"),
             patch(
-                "src.infrastructure.persistence.repositories.request_repository.RequestRepository"
+                "orb.infrastructure.persistence.repositories.request_repository.RequestRepository"
             ),
             patch(
-                "src.infrastructure.persistence.repositories.machine_repository.MachineRepository"
+                "orb.infrastructure.persistence.repositories.machine_repository.MachineRepository"
             ),
             patch(
-                "src.infrastructure.persistence.repositories.template_repository.TemplateRepository"
+                "orb.infrastructure.persistence.repositories.template_repository.TemplateRepository"
             ),
             patch("orb.infrastructure.persistence.sql.registration.SQLUnitOfWork"),
         ):
@@ -296,13 +296,13 @@ class TestDynamoDBStorageRegistration:
         with (
             patch("orb.providers.aws.persistence.dynamodb.registration.DynamoDBStorageStrategy"),
             patch(
-                "src.infrastructure.persistence.repositories.request_repository.RequestRepository"
+                "orb.infrastructure.persistence.repositories.request_repository.RequestRepository"
             ),
             patch(
-                "src.infrastructure.persistence.repositories.machine_repository.MachineRepository"
+                "orb.infrastructure.persistence.repositories.machine_repository.MachineRepository"
             ),
             patch(
-                "src.infrastructure.persistence.repositories.template_repository.TemplateRepository"
+                "orb.infrastructure.persistence.repositories.template_repository.TemplateRepository"
             ),
             patch("orb.providers.aws.persistence.dynamodb.registration.DynamoDBUnitOfWork"),
         ):
@@ -405,7 +405,7 @@ class TestCentralStorageRegistration:
 
         # Mock available types
         with patch(
-            "src.infrastructure.persistence.registration.get_available_storage_types"
+            "orb.infrastructure.persistence.registration.get_available_storage_types"
         ) as mock_get_types:
             mock_get_types.return_value = ["json", "sql"]
 

@@ -173,7 +173,7 @@ class TestInjectableDecorator:
         error_container.get.side_effect = Exception("Container error")
 
         with patch(
-            "infrastructure.di.container.get_container",
+            "orb.infrastructure.di.container.get_container",
             return_value=error_container,
         ):
             # Should raise exception since required dependency can't be resolved

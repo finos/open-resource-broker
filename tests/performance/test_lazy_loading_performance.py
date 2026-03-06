@@ -153,7 +153,7 @@ class TestLazyLoadingPerformance:
         discovery_service = HandlerDiscoveryService(container)
 
         start_time = time.time()
-        discovery_service.discover_and_register_handlers("src.application")
+        discovery_service.discover_and_register_handlers("orb.application")
         discovery_time = (time.time() - start_time) * 1000
 
         results = get_handler_registry_stats()
