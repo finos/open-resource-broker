@@ -231,7 +231,8 @@ async def handle_create_template(args: argparse.Namespace) -> dict[str, Any]:
             name=template_config.get("name"),
             description=template_config.get("description"),
             provider_api=provider_api,
-            instance_type=template_config.get("instance_type") or template_config.get("instanceType"),
+            instance_type=template_config.get("instance_type")
+            or template_config.get("instanceType"),
             image_id=image_id,
             tags=template_config.get("tags", {}),
             configuration=template_config,

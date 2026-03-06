@@ -73,9 +73,7 @@ class RequestReturnMachinesRESTHandler(
             return
 
         # Validate input data
-        if not input_data or (
-            "machine_ids" not in input_data and "machines" not in input_data
-        ):
+        if not input_data or ("machine_ids" not in input_data and "machines" not in input_data):
             raise ValueError("Input must include 'machine_ids' or 'machines' key")
 
         # Flat list path (preferred)
