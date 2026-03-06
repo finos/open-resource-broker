@@ -103,11 +103,11 @@ class APIHandlerFactory:
         """
         # Handler name to module mapping (by convention)
         handler_mappings = {
-            "get_available_templates": "src.api.handlers.get_available_templates_handler",
-            "request_machines": "src.api.handlers.request_machines_handler",
-            "get_request_status": "src.api.handlers.get_request_status_handler",
-            "get_return_requests": "src.api.handlers.get_return_requests_handler",
-            "request_return_machines": "src.api.handlers.request_return_machines_handler",
+            "get_available_templates": "orb.api.handlers.get_available_templates_handler",
+            "request_machines": "orb.api.handlers.request_machines_handler",
+            "get_request_status": "orb.api.handlers.get_request_status_handler",
+            "get_return_requests": "orb.api.handlers.get_return_requests_handler",
+            "request_return_machines": "orb.api.handlers.request_return_machines_handler",
         }
 
         # Handler name to class name mapping (by convention)

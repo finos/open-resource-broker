@@ -142,7 +142,7 @@ class ProviderRegistry(BaseRegistry):
             return True
 
         # Try to dynamically import and register
-        module_name = f"providers.{provider_type}.registration"
+        module_name = f"orb.providers.{provider_type}.registration"
         try:
             if self._logger:
                 self._logger.debug("Attempting to register provider type: %s", provider_type)
@@ -211,7 +211,7 @@ class ProviderRegistry(BaseRegistry):
                 self._logger.debug("Registering provider instance: %s", provider_instance.name)
 
             # Dynamically import provider registration module
-            module = importlib.import_module(f"providers.{provider_type}.registration")
+            module = importlib.import_module(f"orb.providers.{provider_type}.registration")
 
             # Call provider's instance registration function
             register_func = getattr(module, f"register_{provider_type}_provider_instance")

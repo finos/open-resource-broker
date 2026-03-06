@@ -323,7 +323,7 @@ jobs:
     - name: Delete old untagged container images
       uses: actions/delete-package-versions@v5
       with:
-        package-name: ${{ needs.config.outputs.container-image }}
+        package-name: ${{ github.event.repository.name }}
         package-type: container
         min-versions-to-keep: 0
         delete-only-untagged-versions: true
@@ -331,7 +331,7 @@ jobs:
     - name: Delete old tagged versions (preserve releases and special tags)
       uses: actions/delete-package-versions@v5
       with:
-        package-name: ${{ needs.config.outputs.container-image }}
+        package-name: ${{ github.event.repository.name }}
         package-type: container
         min-versions-to-keep: 5
         ignore-versions: '^(latest|main|dev|develop|python.*|v?\d+\.\d+\.\d+.*)$'
