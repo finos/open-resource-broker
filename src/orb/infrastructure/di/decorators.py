@@ -286,7 +286,7 @@ def get_injectable_info(cls: type) -> dict[str, Any]:
                     "type": annotation,
                     "optional": _is_optional_type(annotation),
                     "has_default": param.default != inspect.Parameter.empty,
-                    "default}": (
+                    "default": (
                         param.default if param.default != inspect.Parameter.empty else None
                     ),
                 }
