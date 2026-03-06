@@ -161,21 +161,14 @@ See the [CLI Reference](docs/root/cli/cli-reference.md) for the full flag refere
 <details>
 <summary>AWS Provider Setup</summary>
 
-### Prerequisites
+ORB uses boto3's standard credential chain — any method that works with the AWS CLI works with ORB.
 
-- AWS credentials configured via `aws configure`, an IAM instance profile, or environment variables:
+```bash
+# Verify your credentials are active
+aws sts get-caller-identity
+```
 
-  ```bash
-  export AWS_ACCESS_KEY_ID=...
-  export AWS_SECRET_ACCESS_KEY=...
-  export AWS_DEFAULT_REGION=us-east-1
-  ```
-
-- Verify credentials are active:
-
-  ```bash
-  aws sts get-caller-identity
-  ```
+**Supported credential methods:** AWS CLI profiles, environment variables (`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`), IAM instance profiles, SSO (`aws sso login`), and credential process.
 
 ### Supported resource types
 
@@ -186,58 +179,7 @@ See the [CLI Reference](docs/root/cli/cli-reference.md) for the full flag refere
 | `SpotFleet` | Cost-optimized spot instance fleets |
 | `AutoScalingGroup` | Managed scaling groups |
 
-### Required IAM permissions
-
-<details>
-<summary>IAM policy JSON</summary>
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "ec2:DescribeVpcs",
-        "ec2:DescribeSubnets",
-        "ec2:DescribeSecurityGroups",
-        "ec2:DescribeImages",
-        "ec2:DescribeInstances",
-        "ec2:DescribeInstanceTypes",
-        "ec2:RunInstances",
-        "ec2:TerminateInstances",
-        "ec2:CreateFleet",
-        "ec2:DeleteFleet",
-        "ec2:DescribeFleets",
-        "ec2:RequestSpotFleet",
-        "ec2:CancelSpotFleetRequests",
-        "ec2:DescribeSpotFleetRequests",
-        "ec2:DescribeSpotFleetInstances",
-        "ec2:CreateTags",
-        "autoscaling:CreateAutoScalingGroup",
-        "autoscaling:UpdateAutoScalingGroup",
-        "autoscaling:DeleteAutoScalingGroup",
-        "autoscaling:DescribeAutoScalingGroups",
-        "autoscaling:CreateLaunchConfiguration",
-        "autoscaling:DeleteLaunchConfiguration",
-        "ec2:CreateLaunchTemplate",
-        "ec2:DeleteLaunchTemplate",
-        "ec2:DescribeLaunchTemplates",
-        "iam:PassRole"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
-```
-
-</details>
-
-For SpotFleet, you also need the `AWSServiceRoleForEC2SpotFleet` service-linked role. If it doesn't exist yet:
-
-```bash
-aws iam create-service-linked-role --aws-service-name spotfleet.amazonaws.com
-```
+See the [AWS Provider Guide](docs/root/user_guide/configuration.md) for required IAM permissions and SpotFleet service-linked role setup.
 
 </details>
 
@@ -246,22 +188,18 @@ aws iam create-service-linked-role --aws-service-name spotfleet.amazonaws.com
 <details>
 <summary>Configuration</summary>
 
-ORB stores its config in `~/.config/orb/config.json` (Linux/macOS) after `orb init`. Override the location with:
+`orb init` creates a `config.json` in a location based on your install type (virtualenv, user install, system install, or development checkout). Override with:
 
 ```bash
 export ORB_CONFIG_DIR=/path/to/config
 ```
-
-Key environment variables:
 
 | Variable | Description |
 |---|---|
 | `ORB_CONFIG_DIR` | Override config directory path |
 | `ORB_LOG_LEVEL` | Logging level: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 
-For the REST API server, copy `.env.example` to `.env` and configure `HF_SERVER_*`, `HF_AUTH_*`, and `HF_STORAGE_*` variables.
-
-See the [Configuration Guide](docs/root/user_guide/configuration.md) for the full reference.
+See the [Configuration Guide](docs/root/user_guide/configuration.md) for path resolution details, environment variables, and REST API server setup.
 
 </details>
 
