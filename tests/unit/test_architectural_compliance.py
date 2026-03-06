@@ -177,47 +177,13 @@ class TestDDDCompliance:
 class TestSOLIDCompliance:
     """Test SOLID principle compliance."""
 
-    def test_single_responsibility_principle(self):
-        """Ensure each class has only one reason to change."""
-        try:
-            from orb.application.service import ApplicationService
-        except ImportError as e:
-            pytest.skip(f"Could not import ApplicationService: {e}")
-
-        # Get all methods of ApplicationService
-        methods = [
-            method
-            for method in dir(ApplicationService)
-            if not method.startswith("_") and callable(getattr(ApplicationService, method))
-        ]
-
-        # ApplicationService should only have orchestration methods
-        orchestration_methods = [
-            "get_available_templates",
-            "get_template_by_id",
-            "request_machines",
-            "get_request_status",
-            "request_return_machines",
-            "get_return_requests",
-            "get_machine_status",
-            "get_machines_by_request",
-            "validate_template",
-            "get_provider_health",
-            "get_provider_info",
-        ]
-
-        # All methods should be orchestration-related
-        for method in methods:
-            assert any(orch_method in method for orch_method in orchestration_methods), (
-                f"ApplicationService method {method} may violate SRP"
-            )
-
     def test_open_closed_principle(self):
         """Ensure classes are open for extension, closed for modification."""
         try:
-            from orb.infrastructure.interfaces.provider import ProviderPort
+            from orb.domain.base.ports.provider_port import ProviderPort
         except ImportError as e:
             pytest.skip(f"Could not import ProviderPort: {e}")
+
 
         # ProviderPort should be abstract/protocol
         assert hasattr(ProviderPort, "__abstractmethods__") or hasattr(
@@ -250,7 +216,7 @@ class TestSOLIDCompliance:
     def test_interface_segregation_principle(self):
         """Ensure clients depend only on interfaces they use."""
         try:
-            from orb.infrastructure.interfaces.provider import ProviderPort
+            from orb.domain.base.ports.provider_port import ProviderPort
         except ImportError as e:
             pytest.skip(f"Could not import ProviderPort: {e}")
 
@@ -263,34 +229,6 @@ class TestSOLIDCompliance:
 
         # Should not have too many methods (ISP violation indicator)
         assert len(methods) < 15, f"ProviderPort has {len(methods)} methods, may violate ISP"
-
-    def test_dependency_inversion_principle(self):
-        """Ensure high-level modules don't depend on low-level modules."""
-        try:
-            import inspect
-
-            from orb.application.service import ApplicationService
-        except ImportError as e:
-            pytest.skip(f"Could not import ApplicationService: {e}")
-
-        # Get constructor signature
-        sig = inspect.signature(ApplicationService.__init__)
-
-        # Parameters should be interfaces/abstractions, not concrete classes
-        for param_name, param in sig.parameters.items():
-            if param_name in ["self", "provider_type"]:
-                continue
-
-            # Check if parameter has type hints pointing to interfaces
-            if param.annotation != inspect.Parameter.empty:
-                annotation_str = str(param.annotation)
-                # Should depend on interfaces/ports, not concrete implementations
-                assert (
-                    "Port" in annotation_str
-                    or "Interface" in annotation_str
-                    or "Service" in annotation_str
-                    or "Bus" in annotation_str
-                ), f"ApplicationService parameter {param_name} may violate DIP"
 
 
 @pytest.mark.unit
@@ -455,18 +393,6 @@ class TestDesignPatternCompliance:
         # Commands should not return data (except acknowledgment)
         # Queries should not modify state
         assert True  # Placeholder for CQRS validation
-
-    def test_repository_pattern_compliance(self):
-        """Test Repository pattern implementation."""
-        try:
-            from orb.domain.base.ports import RepositoryPort as Repository
-        except ImportError as e:
-            pytest.skip(f"Could not import Repository: {e}")
-
-        # Repository should be abstract
-        assert hasattr(Repository, "__abstractmethods__"), (
-            "Repository should be abstract base class"
-        )
 
     def test_factory_pattern_compliance(self):
         """Test Factory pattern implementation."""

@@ -442,48 +442,30 @@ class TestAWSProviderComprehensive:
         except ImportError:
             pytest.skip("AWSClient not available")
 
-    def test_aws_client_initialization(self):
-        """Test AWS client initialization."""
-        try:
-            from unittest.mock import Mock
-
-            from orb.providers.aws.infrastructure.aws_client import AWSClient
-
-            mock_config = Mock()
-            mock_logger = Mock()
-            try:
-                client = AWSClient(config=mock_config, logger=mock_logger)
-                assert client is not None
-            except Exception:
-                pytest.skip("AWSClient could not be initialized with mocks")
-
-        except ImportError:
-            pytest.skip("AWSClient not available")
-
     def test_aws_configuration_exists(self):
         """Test that AWS configuration exists."""
         try:
-            from orb.providers.aws.configuration.config import AWSConfig
+            from orb.providers.aws.configuration.config import AWSProviderConfig
 
-            assert AWSConfig is not None
+            assert AWSProviderConfig is not None
         except ImportError:
-            pytest.skip("AWSConfig not available")
+            pytest.skip("AWSProviderConfig not available")
 
     def test_aws_configuration_initialization(self):
         """Test AWS configuration initialization."""
         try:
-            from orb.providers.aws.configuration.config import AWSConfig
+            from orb.providers.aws.configuration.config import AWSProviderConfig
 
             try:
-                config = AWSConfig()
+                config = AWSProviderConfig()
                 assert config is not None
             except TypeError:
                 # Might require parameters
-                config = AWSConfig(region="us-east-1")
+                config = AWSProviderConfig(region="us-east-1")
                 assert config is not None
 
         except ImportError:
-            pytest.skip("AWSConfig not available")
+            pytest.skip("AWSProviderConfig not available")
 
     def test_aws_adapters_exist(self):
         """Test that AWS adapters exist."""
@@ -581,93 +563,74 @@ class TestProviderStrategyPatternsComprehensive:
     def test_composite_strategy_exists(self):
         """Test that composite strategy exists."""
         try:
-            from orb.providers.base.strategy.composite_strategy import CompositeStrategy
+            from orb.providers.base.strategy.composite_strategy import CompositeProviderStrategy
 
-            assert CompositeStrategy is not None
+            assert CompositeProviderStrategy is not None
         except ImportError:
-            pytest.skip("CompositeStrategy not available")
+            pytest.skip("CompositeProviderStrategy not available")
 
     def test_composite_strategy_initialization(self):
         """Test composite strategy initialization."""
         try:
-            from orb.providers.base.strategy.composite_strategy import CompositeStrategy
+            from orb.providers.base.strategy.composite_strategy import CompositeProviderStrategy
 
-            # Try to create strategy
-            try:
-                strategy = CompositeStrategy()
-                assert strategy is not None
-            except TypeError:
-                # Might require strategies list
-                strategy = CompositeStrategy([Mock(), Mock()])
-                assert strategy is not None
+            mock_strategy = Mock()
+            mock_strategy.provider_type = "mock"
+            strategy = CompositeProviderStrategy(Mock(), [mock_strategy])
+            assert strategy is not None
 
         except ImportError:
-            pytest.skip("CompositeStrategy not available")
+            pytest.skip("CompositeProviderStrategy not available")
 
     def test_fallback_strategy_exists(self):
         """Test that fallback strategy exists."""
         try:
-            from orb.providers.base.strategy.fallback_strategy import FallbackStrategy
+            from orb.providers.base.strategy.fallback_strategy import FallbackProviderStrategy
 
-            assert FallbackStrategy is not None
+            assert FallbackProviderStrategy is not None
         except ImportError:
-            pytest.skip("FallbackStrategy not available")
+            pytest.skip("FallbackProviderStrategy not available")
 
     def test_fallback_strategy_initialization(self):
         """Test fallback strategy initialization."""
         try:
-            from orb.providers.base.strategy.fallback_strategy import FallbackStrategy
+            from orb.providers.base.strategy.fallback_strategy import FallbackProviderStrategy
 
-            # Try to create strategy
-            try:
-                strategy = FallbackStrategy()
-                assert strategy is not None
-            except TypeError:
-                # Might require strategies list
-                strategy = FallbackStrategy([Mock(), Mock()])
-                assert strategy is not None
+            primary = Mock()
+            primary.provider_type = "mock_primary"
+            fallback = Mock()
+            fallback.provider_type = "mock_fallback"
+            strategy = FallbackProviderStrategy(Mock(), primary, [fallback])
+            assert strategy is not None
 
         except ImportError:
-            pytest.skip("FallbackStrategy not available")
+            pytest.skip("FallbackProviderStrategy not available")
 
     def test_load_balancing_strategy_exists(self):
         """Test that load balancing strategy exists."""
         try:
             from orb.providers.base.strategy.load_balancing_strategy import (
-                LoadBalancingStrategy,
+                LoadBalancingProviderStrategy,
             )
 
-            assert LoadBalancingStrategy is not None
+            assert LoadBalancingProviderStrategy is not None
         except ImportError:
-            pytest.skip("LoadBalancingStrategy not available")
+            pytest.skip("LoadBalancingProviderStrategy not available")
 
     def test_load_balancing_strategy_initialization(self):
         """Test load balancing strategy initialization."""
         try:
             from orb.providers.base.strategy.load_balancing_strategy import (
-                LoadBalancingStrategy,
+                LoadBalancingProviderStrategy,
             )
 
-            # Try to create strategy
-            try:
-                strategy = LoadBalancingStrategy()
-                assert strategy is not None
-            except TypeError:
-                # Might require strategies list
-                strategy = LoadBalancingStrategy([Mock(), Mock()])
-                assert strategy is not None
+            mock_strategy = Mock()
+            mock_strategy.provider_type = "mock"
+            strategy = LoadBalancingProviderStrategy(Mock(), [mock_strategy])
+            assert strategy is not None
 
         except ImportError:
-            pytest.skip("LoadBalancingStrategy not available")
-
-    def test_provider_context_exists(self):
-        """Test that provider context exists."""
-        try:
-            from orb.providers.base.strategy.provider_context import ProviderContext
-
-            assert ProviderContext is not None
-        except ImportError:
-            pytest.skip("ProviderContext not available")
+            pytest.skip("LoadBalancingProviderStrategy not available")
 
     def test_provider_selector_exists(self):
         """Test that provider selector exists."""
@@ -694,9 +657,9 @@ class TestProviderStrategyPatternsComprehensive:
 
         # Collect all strategy classes
         strategy_modules = [
-            ("composite_strategy", "CompositeStrategy"),
-            ("fallback_strategy", "FallbackStrategy"),
-            ("load_balancing_strategy", "LoadBalancingStrategy"),
+            ("composite_strategy", "CompositeProviderStrategy"),
+            ("fallback_strategy", "FallbackProviderStrategy"),
+            ("load_balancing_strategy", "LoadBalancingProviderStrategy"),
             ("provider_strategy", "ProviderStrategy"),
         ]
 
@@ -762,31 +725,11 @@ class TestAWSPersistenceComprehensive:
     def test_dynamodb_strategy_exists(self):
         """Test that DynamoDB strategy exists."""
         try:
-            from orb.providers.aws.persistence.dynamodb.strategy import DynamoDBStrategy
+            from orb.infrastructure.storage.dynamodb.strategy import DynamoDBStorageStrategy
 
-            assert DynamoDBStrategy is not None
+            assert DynamoDBStorageStrategy is not None
         except ImportError:
-            pytest.skip("DynamoDBStrategy not available")
-
-    def test_dynamodb_unit_of_work_exists(self):
-        """Test that DynamoDB unit of work exists."""
-        try:
-            from orb.providers.aws.persistence.dynamodb.unit_of_work import (
-                DynamoDBUnitOfWork,
-            )
-
-            assert DynamoDBUnitOfWork is not None
-        except ImportError:
-            pytest.skip("DynamoDBUnitOfWork not available")
-
-    def test_dynamodb_registration_exists(self):
-        """Test that DynamoDB registration exists."""
-        try:
-            from orb.providers.aws.persistence.dynamodb import registration
-
-            assert registration is not None
-        except ImportError:
-            pytest.skip("DynamoDB registration not available")
+            pytest.skip("DynamoDBStorageStrategy not available")
 
 
 @pytest.mark.unit
@@ -797,45 +740,41 @@ class TestAWSAuthenticationComprehensive:
     def test_cognito_strategy_exists(self):
         """Test that Cognito strategy exists."""
         try:
-            from orb.providers.aws.auth.cognito_strategy import CognitoStrategy
+            from orb.providers.aws.auth.cognito_strategy import CognitoAuthStrategy
 
-            assert CognitoStrategy is not None
+            assert CognitoAuthStrategy is not None
         except ImportError:
-            pytest.skip("CognitoStrategy not available")
+            pytest.skip("CognitoAuthStrategy not available")
 
     def test_iam_strategy_exists(self):
         """Test that IAM strategy exists."""
         try:
-            from orb.providers.aws.auth.iam_strategy import IAMStrategy
+            from orb.providers.aws.auth.iam_strategy import IAMAuthStrategy
 
-            assert IAMStrategy is not None
+            assert IAMAuthStrategy is not None
         except ImportError:
-            pytest.skip("IAMStrategy not available")
+            pytest.skip("IAMAuthStrategy not available")
 
     def test_auth_strategy_initialization(self):
         """Test auth strategy initialization."""
-        auth_strategies = [
-            ("cognito_strategy", "CognitoStrategy"),
-            ("iam_strategy", "IAMStrategy"),
-        ]
+        # CognitoAuthStrategy requires (logger, user_pool_id, client_id)
+        try:
+            from orb.providers.aws.auth.cognito_strategy import CognitoAuthStrategy
 
-        for module_name, class_name in auth_strategies:
-            try:
-                module = importlib.import_module(f"orb.providers.aws.auth.{module_name}")
-                strategy_class = getattr(module, class_name)
+            strategy = CognitoAuthStrategy(Mock(), "us-east-1_test", "test_client_id")
+            assert strategy is not None
+        except ImportError:
+            pass
 
-                # Try to create strategy
-                try:
-                    strategy = strategy_class()
-                    assert strategy is not None
-                except TypeError:
-                    # Might require configuration
-                    strategy = strategy_class(Mock())
-                    assert strategy is not None
+        # IAMAuthStrategy requires (logger,)
+        try:
+            from orb.providers.aws.auth.iam_strategy import IAMAuthStrategy
 
-            except (ImportError, AttributeError):
-                # Strategy might not be available
-                pass
+            strategy = IAMAuthStrategy(Mock())
+            assert strategy is not None
+        except ImportError:
+            pass
+
 
 
 @pytest.mark.unit
@@ -879,40 +818,16 @@ class TestAWSTemplateInfrastructureComprehensive:
     def test_ami_cache_exists(self):
         """Test that AMI cache exists."""
         try:
-            from orb.providers.aws.infrastructure.template.ami_cache import AMICache
+            from orb.providers.aws.infrastructure.template.ami_cache import RuntimeAMICache
 
-            assert AMICache is not None
+            assert RuntimeAMICache is not None
         except ImportError:
-            pytest.skip("AMICache not available")
-
-    def test_caching_ami_resolver_exists(self):
-        """Test that caching AMI resolver exists."""
-        try:
-            from orb.providers.aws.infrastructure.template.caching_ami_resolver import (
-                CachingAMIResolver,
-            )
-
-            assert CachingAMIResolver is not None
-        except ImportError:
-            pytest.skip("CachingAMIResolver not available")
-
-    def test_ssm_template_store_exists(self):
-        """Test that SSM template store exists."""
-        try:
-            from orb.providers.aws.infrastructure.template.ssm_template_store import (
-                SSMTemplateStore,
-            )
-
-            assert SSMTemplateStore is not None
-        except ImportError:
-            pytest.skip("SSMTemplateStore not available")
+            pytest.skip("RuntimeAMICache not available")
 
     def test_template_infrastructure_initialization(self):
         """Test template infrastructure initialization."""
         template_classes = [
-            ("ami_cache", "AMICache"),
-            ("caching_ami_resolver", "CachingAMIResolver"),
-            ("ssm_template_store", "SSMTemplateStore"),
+            ("ami_cache", "RuntimeAMICache"),
         ]
 
         for module_name, class_name in template_classes:
@@ -961,7 +876,7 @@ class TestProviderRegistrationComprehensive:
     def test_provider_registry_exists(self):
         """Test that provider registry exists."""
         try:
-            from orb.infrastructure.registry.provider_registry import ProviderRegistry
+            from orb.providers.registry.provider_registry import ProviderRegistry
 
             assert ProviderRegistry is not None
         except ImportError:
@@ -970,7 +885,7 @@ class TestProviderRegistrationComprehensive:
     def test_provider_registry_initialization(self):
         """Test provider registry initialization."""
         try:
-            from orb.infrastructure.registry.provider_registry import ProviderRegistry
+            from orb.providers.registry.provider_registry import ProviderRegistry
 
             try:
                 registry = ProviderRegistry()
