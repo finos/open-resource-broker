@@ -224,7 +224,7 @@ jobs:
     - name: Delete untagged container images
       uses: actions/delete-package-versions@v5
       with:
-        package-name: ${{ needs.config.outputs.container-image }}
+        package-name: ${{ github.event.repository.name }}
         package-type: container
         min-versions-to-keep: 0
         delete-only-untagged-versions: true
