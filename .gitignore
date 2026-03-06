@@ -120,6 +120,10 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 .mypy_cache/
+pytest-of-*/
+
+# CLI tool caches
+*_cache_*/
 
 # Documentation
 docs-backup/
