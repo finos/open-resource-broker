@@ -1,5 +1,6 @@
 """FastAPI server factory and application setup."""
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 try:
@@ -180,6 +181,16 @@ def create_fastapi_app(server_config: Any) -> Any:
             "auth_enabled": server_config.auth.enabled,
             "auth_strategy": (server_config.auth.strategy if server_config.auth.enabled else None),
         }
+
+    # Serve favicon from project logo assets
+    _favicon_path = Path(__file__).resolve().parents[3] / "docs" / "assets" / "orb-icon.png"
+    if _favicon_path.exists():
+
+        @app.get("/favicon.ico", include_in_schema=False)
+        async def favicon() -> Any:
+            from fastapi.responses import FileResponse
+
+            return FileResponse(_favicon_path, media_type="image/png")
 
     # Register API routers
     _register_routers(app)

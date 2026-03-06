@@ -1,0 +1,14 @@
+/* ORB brand colors — #0f62fe (blue accent), #262e3d (dark navy) */
+:root {
+  --md-primary-fg-color: #0f62fe;
+  --md-primary-fg-color--light: #4589ff;
+  --md-primary-fg-color--dark: #0043ce;
+  --md-accent-fg-color: #0f62fe;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #4589ff;
+  --md-primary-fg-color--light: #78a9ff;
+  --md-primary-fg-color--dark: #0f62fe;
+  --md-accent-fg-color: #4589ff;
+}

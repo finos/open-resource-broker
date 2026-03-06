@@ -13,16 +13,18 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
+  logo: assets/orb-icon.svg
+  favicon: assets/orb-icon.png
   palette:
     - scheme: default
-      primary: green
-      accent: green
+      primary: indigo
+      accent: indigo
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - scheme: slate
-      primary: green
-      accent: green
+      primary: indigo
+      accent: indigo
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
@@ -42,6 +44,9 @@ theme:
 extra:
   version:
     provider: mike
+
+extra_css:
+  - assets/extra.css
 
 plugins:
   - search

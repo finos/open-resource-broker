@@ -1,13 +1,30 @@
-# Open Resource Broker
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/orb-logo-horizontal-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/orb-logo-horizontal.svg">
+    <img alt="Open Resource Broker" src="docs/assets/orb-logo-horizontal.svg" width="520">
+  </picture>
+</p>
 
-[![Test Matrix](https://github.com/awslabs/open-resource-broker/workflows/Test%20Matrix/badge.svg)](https://github.com/awslabs/open-resource-broker/actions/workflows/test-matrix.yml)
-[![Quality Checks](https://github.com/awslabs/open-resource-broker/workflows/Quality%20Checks/badge.svg)](https://github.com/awslabs/open-resource-broker/actions/workflows/ci-quality.yml)
-[![Security Scanning](https://github.com/awslabs/open-resource-broker/workflows/Security%20Scanning/badge.svg)](https://github.com/awslabs/open-resource-broker/actions/workflows/security-code.yml)
-[![Latest Release](https://img.shields.io/github/v/release/awslabs/open-resource-broker)](https://github.com/awslabs/open-resource-broker/releases)
-[![PyPI Version](https://img.shields.io/pypi/v/orb-py)](https://pypi.org/project/orb-py/)
-[![License](https://img.shields.io/github/license/awslabs/open-resource-broker)](LICENSE)
+<p align="center">
+  <strong>Dynamic cloud resource provisioning via CLI and optional REST API</strong>
+</p>
 
-Open Resource Broker (ORB) — dynamic cloud resource provisioning via CLI and optional REST API.
+<p align="center">
+  <a href="https://github.com/awslabs/open-resource-broker/actions/workflows/test-matrix.yml"><img src="https://github.com/awslabs/open-resource-broker/workflows/Test%20Matrix/badge.svg" alt="Test Matrix"></a>
+  <a href="https://github.com/awslabs/open-resource-broker/actions/workflows/ci-quality.yml"><img src="https://github.com/awslabs/open-resource-broker/workflows/Quality%20Checks/badge.svg" alt="Quality Checks"></a>
+  <a href="https://github.com/awslabs/open-resource-broker/actions/workflows/security-code.yml"><img src="https://github.com/awslabs/open-resource-broker/workflows/Security%20Scanning/badge.svg" alt="Security Scanning"></a>
+  <br>
+  <a href="https://github.com/awslabs/open-resource-broker/releases"><img src="https://img.shields.io/github/v/release/awslabs/open-resource-broker" alt="Latest Release"></a>
+  <a href="https://pypi.org/project/orb-py/"><img src="https://img.shields.io/pypi/v/orb-py" alt="PyPI Version"></a>
+  <a href="https://pypi.org/project/orb-py/"><img src="https://img.shields.io/pypi/pyversions/orb-py" alt="Python Versions"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/awslabs/open-resource-broker" alt="License"></a>
+  <br>
+  <a href="https://deepwiki.com/awslabs/open-resource-broker"><img src="https://img.shields.io/badge/DeepWiki-awslabs%2Fopen--resource--broker-blue?logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgMThjLTQuNDIgMC04LTMuNTgtOC04czMuNTgtOCA4LTggOCAzLjU4IDggOC0zLjU4IDgtOCA4eiIgZmlsbD0id2hpdGUiLz48cGF0aCBkPSJNMTEgN2gydjZoLTJ6bTAgOGgydjJoLTJ6IiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==" alt="DeepWiki"></a>
+  <a href="https://awslabs.github.io/open-resource-broker/"><img src="https://img.shields.io/badge/docs-awslabs.github.io-blue" alt="Documentation"></a>
+</p>
+
+---
 
 ORB lets you request, track, and return cloud compute resources through a single CLI. It integrates with IBM Spectrum Symphony as a HostFactory provider plugin and also works standalone. It supports AWS (EC2, Auto Scaling Groups, SpotFleet, EC2Fleet) and is designed to be extended to additional providers. Resources are provisioned on demand and returned when no longer needed.
 
@@ -390,11 +407,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development guide.
 
 ---
 
-## Documentation
-
-[![Python Versions](https://img.shields.io/pypi/pyversions/orb-py)](https://pypi.org/project/orb-py/)
-[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/22c627f01aad3fc08ca69a676ebf9696/raw/coverage.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/advanced-metrics.yml)
-[![Lines of Code](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/22c627f01aad3fc08ca69a676ebf9696/raw/lines-of-code.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/advanced-metrics.yml)
+<details>
+<summary>Documentation</summary>
 
 - [Quick Start](docs/root/getting_started/quick_start.md)
 - [CLI Reference](docs/root/cli/cli-reference.md)
@@ -407,6 +421,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development guide.
 - [DeepWiki](https://deepwiki.com/awslabs/open-resource-broker) — AI-generated codebase documentation
 
 Full docs: [awslabs.github.io/open-resource-broker](https://awslabs.github.io/open-resource-broker/)
+
+</details>
 
 ---
 
