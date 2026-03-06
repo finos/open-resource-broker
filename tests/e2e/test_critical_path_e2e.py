@@ -49,7 +49,6 @@ def _make_command_bus(return_value: Any = None) -> AsyncMock:
     return bus
 
 
-
 @pytest.fixture
 def app():
     return create_fastapi_app(_server_config())
@@ -136,9 +135,13 @@ class TestRequestLifecycle:
     def test_list_requests_returns_response(self, app, client: TestClient):
         """GET /api/v1/requests/ returns a list of requests."""
         mock_req1 = Mock()
-        mock_req1.model_dump = Mock(return_value={"request_id": "req-acquire-001", "status": "running"})
+        mock_req1.model_dump = Mock(
+            return_value={"request_id": "req-acquire-001", "status": "running"}
+        )
         mock_req2 = Mock()
-        mock_req2.model_dump = Mock(return_value={"request_id": "req-acquire-002", "status": "complete"})
+        mock_req2.model_dump = Mock(
+            return_value={"request_id": "req-acquire-002", "status": "complete"}
+        )
 
         mock_query_bus = AsyncMock()
         mock_query_bus.execute = AsyncMock(return_value=[mock_req1, mock_req2])
