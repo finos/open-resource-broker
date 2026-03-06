@@ -109,29 +109,29 @@ jobs:
           
           # Test basic imports (should always work)
           try:
-              import orb
-              print('✓ Basic orb import works')
+              import orb_py
+              print('✓ Basic orb_py import works')
           except ImportError as e:
-              print(f'✗ Basic orb import failed: {e}')
+              print(f'✗ Basic orb_py import failed: {e}')
               sys.exit(1)
-          
+
           # Test CLI imports
           try:
-              from src.cli.formatters import format_table
+              from cli.formatters import format_table
               print('✓ CLI formatters import works')
           except ImportError as e:
-              if '${{ matrix.package-variant }}' in ['orb-py', 'orb-py[api]', 'orb-py[monitoring]']:
+              if '${{ matrix.package-variant }}' in ['.', '.[api]', '.[monitoring]']:
                   print(f'✓ Expected CLI import failure for ${{ matrix.package-variant }}: {e}')
               else:
                   print(f'✗ Unexpected CLI import failure: {e}')
                   sys.exit(1)
-          
+
           # Test API imports
           try:
-              from src.interface.serve_command_handler import handle_serve_command
+              from interface.serve_command_handler import handle_serve_command
               print('✓ API handler import works')
           except ImportError as e:
-              if '${{ matrix.package-variant }}' in ['orb-py', 'orb-py[cli]', 'orb-py[monitoring]']:
+              if '${{ matrix.package-variant }}' in ['.', '.[cli]', '.[monitoring]']:
                   print(f'✓ Expected API import failure for ${{ matrix.package-variant }}: {e}')
               else:
                   print(f'✗ Unexpected API import failure: {e}')
