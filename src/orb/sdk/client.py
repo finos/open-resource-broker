@@ -12,7 +12,7 @@ from typing import Any, Callable, Dict, Optional
 
 from orb.bootstrap import Application
 from orb.domain.base.ports.configuration_port import ConfigurationPort
-from orb.infrastructure.di.container import create_container, get_container
+from orb.infrastructure.di.container import create_container
 
 from .config import SDKConfig
 from .discovery import MethodInfo, SDKMethodDiscovery
@@ -132,9 +132,12 @@ class ORBClient:
                     provider=self._config.provider,
                 )
 
-            # Apply region/profile overrides from SDK config (mirrors CLI pattern)
+            # Apply region/profile overrides from SDK config (mirrors CLI pattern).
+            # Use self._container (the per-client isolated container), not the
+            # module-level singleton returned by get_container(), so that overrides
+            # from one ORBClient instance never bleed into another.
             if self._config.region or self._config.profile:
-                config_port = get_container().get(ConfigurationPort)
+                config_port = self._container.get(ConfigurationPort)
                 if self._config.region:
                     config_port.override_provider_region(self._config.region)
                 if self._config.profile:

@@ -258,13 +258,14 @@ class TestRegionProfileOverrides:
         sdk = OpenResourceBroker(config={"provider": "aws", "region": "us-east-1"})
         mock_app, mock_disc = self._make_init_mocks()
         mock_config_port = MagicMock()
+        mock_container = MagicMock()
+        mock_container.get.return_value = mock_config_port
 
         with (
             patch("orb.sdk.client.Application", return_value=mock_app),
             patch("orb.sdk.client.SDKMethodDiscovery", return_value=mock_disc),
-            patch("orb.sdk.client.get_container") as mock_get_container,
+            patch("orb.sdk.client.create_container", return_value=mock_container),
         ):
-            mock_get_container.return_value.get.return_value = mock_config_port
             await sdk.initialize()
 
         mock_config_port.override_provider_region.assert_called_once_with("us-east-1")
@@ -275,13 +276,14 @@ class TestRegionProfileOverrides:
         sdk = OpenResourceBroker(config={"provider": "aws", "profile": "prod"})
         mock_app, mock_disc = self._make_init_mocks()
         mock_config_port = MagicMock()
+        mock_container = MagicMock()
+        mock_container.get.return_value = mock_config_port
 
         with (
             patch("orb.sdk.client.Application", return_value=mock_app),
             patch("orb.sdk.client.SDKMethodDiscovery", return_value=mock_disc),
-            patch("orb.sdk.client.get_container") as mock_get_container,
+            patch("orb.sdk.client.create_container", return_value=mock_container),
         ):
-            mock_get_container.return_value.get.return_value = mock_config_port
             await sdk.initialize()
 
         mock_config_port.override_provider_profile.assert_called_once_with("prod")
@@ -294,13 +296,14 @@ class TestRegionProfileOverrides:
         )
         mock_app, mock_disc = self._make_init_mocks()
         mock_config_port = MagicMock()
+        mock_container = MagicMock()
+        mock_container.get.return_value = mock_config_port
 
         with (
             patch("orb.sdk.client.Application", return_value=mock_app),
             patch("orb.sdk.client.SDKMethodDiscovery", return_value=mock_disc),
-            patch("orb.sdk.client.get_container") as mock_get_container,
+            patch("orb.sdk.client.create_container", return_value=mock_container),
         ):
-            mock_get_container.return_value.get.return_value = mock_config_port
             await sdk.initialize()
 
         mock_config_port.override_provider_region.assert_called_once_with("eu-west-1")
@@ -310,15 +313,17 @@ class TestRegionProfileOverrides:
     async def test_no_overrides_when_region_and_profile_absent(self):
         sdk = OpenResourceBroker(config={"provider": "aws"})
         mock_app, mock_disc = self._make_init_mocks()
+        mock_container = MagicMock()
 
         with (
             patch("orb.sdk.client.Application", return_value=mock_app),
             patch("orb.sdk.client.SDKMethodDiscovery", return_value=mock_disc),
-            patch("orb.sdk.client.get_container") as mock_get_container,
+            patch("orb.sdk.client.create_container", return_value=mock_container),
         ):
             await sdk.initialize()
 
-        mock_get_container.assert_not_called()
+        # container.get should never be called when no region/profile configured
+        mock_container.get.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

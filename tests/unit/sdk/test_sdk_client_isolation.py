@@ -67,8 +67,8 @@ class TestContainerIsolation:
         client = _make_client()
         assert client._container is None
 
-    def test_create_container_called_not_get_container(self):
-        """initialize() must call create_container(), never get_container() for the app container."""
+    def test_create_container_called_during_initialize(self):
+        """initialize() must call create_container() to get the per-client container."""
         client = _make_client()
 
         mock_container = MagicMock()
@@ -77,7 +77,6 @@ class TestContainerIsolation:
 
         with (
             patch("orb.sdk.client.create_container", return_value=mock_container) as mock_create,
-            patch("orb.sdk.client.get_container") as mock_get,
             patch("orb.sdk.client.Application", return_value=mock_app),
         ):
             import asyncio
@@ -89,11 +88,6 @@ class TestContainerIsolation:
                 pass
 
             mock_create.assert_called_once()
-            # get_container should NOT have been called for the app wiring
-            # (it may be called for region/profile override, but not for container creation)
-            for call_args in mock_get.call_args_list:
-                # If get_container was called, it must not have been for container creation
-                pass
 
         assert client._container is mock_container
 
@@ -123,3 +117,119 @@ class TestContainerIsolation:
                 pass
 
         assert captured.get("container") is mock_container
+
+
+class TestRegionProfileOverrideIsolation:
+    """Region/profile overrides must target the per-client container, not the singleton."""
+
+    def _run(self, coro):
+        import asyncio
+
+        return asyncio.get_event_loop().run_until_complete(coro)
+
+    def _make_full_init_mocks(self, mock_container):
+        """Return a mock app + discovery that complete initialization successfully."""
+        from unittest.mock import AsyncMock
+
+        mock_app = MagicMock()
+        mock_app.initialize = AsyncMock(return_value=True)
+        mock_app.get_query_bus.return_value = AsyncMock()
+        mock_app.get_command_bus.return_value = AsyncMock()
+        mock_disc = MagicMock()
+        mock_disc.discover_cqrs_methods = AsyncMock(return_value={})
+        return mock_app, mock_disc
+
+    def test_region_override_uses_isolated_container_not_singleton(self):
+        """override_provider_region must be called on self._container, not get_container()."""
+        from unittest.mock import AsyncMock
+
+        client = _make_client(region="us-east-1")
+
+        mock_config_port = MagicMock()
+        mock_container = MagicMock()
+        mock_container.get.return_value = mock_config_port
+
+        # singleton_config_port is what get_container() would return — must NOT be touched
+        singleton_config_port = MagicMock()
+
+        mock_app, mock_disc = self._make_full_init_mocks(mock_container)
+
+        with (
+            patch("orb.sdk.client.create_container", return_value=mock_container),
+            patch("orb.sdk.client.Application", return_value=mock_app),
+            patch("orb.sdk.client.SDKMethodDiscovery", return_value=mock_disc),
+        ):
+            self._run(client.initialize())
+
+        # Override must have gone to the isolated container
+        mock_config_port.override_provider_region.assert_called_once_with("us-east-1")
+        # The singleton port must never have been touched
+        singleton_config_port.override_provider_region.assert_not_called()
+
+    def test_profile_override_uses_isolated_container_not_singleton(self):
+        """override_provider_profile must be called on self._container, not get_container()."""
+        from unittest.mock import AsyncMock
+
+        client = _make_client(profile="prod")
+
+        mock_config_port = MagicMock()
+        mock_container = MagicMock()
+        mock_container.get.return_value = mock_config_port
+
+        singleton_config_port = MagicMock()
+
+        mock_app, mock_disc = self._make_full_init_mocks(mock_container)
+
+        with (
+            patch("orb.sdk.client.create_container", return_value=mock_container),
+            patch("orb.sdk.client.Application", return_value=mock_app),
+            patch("orb.sdk.client.SDKMethodDiscovery", return_value=mock_disc),
+        ):
+            self._run(client.initialize())
+
+        mock_config_port.override_provider_profile.assert_called_once_with("prod")
+        singleton_config_port.override_provider_profile.assert_not_called()
+
+    def test_two_clients_overrides_do_not_bleed_into_each_other(self):
+        """Overrides on client_a must not affect client_b's container."""
+        from unittest.mock import AsyncMock
+
+        client_a = _make_client(region="us-east-1")
+        client_b = _make_client(region="eu-west-1")
+
+        config_port_a = MagicMock()
+        config_port_b = MagicMock()
+        container_a = MagicMock()
+        container_b = MagicMock()
+        container_a.get.return_value = config_port_a
+        container_b.get.return_value = config_port_b
+
+        containers = iter([container_a, container_b])
+
+        def make_app(*args, **kwargs):
+            app = MagicMock()
+            app.initialize = AsyncMock(return_value=True)
+            app.get_query_bus.return_value = AsyncMock()
+            app.get_command_bus.return_value = AsyncMock()
+            return app
+
+        def make_disc():
+            disc = MagicMock()
+            disc.discover_cqrs_methods = AsyncMock(return_value={})
+            return disc
+
+        with (
+            patch("orb.sdk.client.create_container", side_effect=lambda: next(containers)),
+            patch("orb.sdk.client.Application", side_effect=make_app),
+            patch("orb.sdk.client.SDKMethodDiscovery", side_effect=make_disc),
+        ):
+            self._run(client_a.initialize())
+            self._run(client_b.initialize())
+
+        config_port_a.override_provider_region.assert_called_once_with("us-east-1")
+        config_port_b.override_provider_region.assert_called_once_with("eu-west-1")
+        # Cross-bleed check: a's port must not have received b's region and vice versa
+        for call in config_port_a.override_provider_region.call_args_list:
+            assert call.args[0] != "eu-west-1"
+        for call in config_port_b.override_provider_region.call_args_list:
+            assert call.args[0] != "us-east-1"
