@@ -317,6 +317,11 @@ def _create_configured_container() -> DIContainer:
     return container
 
 
+def create_container() -> DIContainer:
+    """Create a new isolated DI container instance (not the singleton)."""
+    return _create_configured_container()
+
+
 def reset_container() -> None:
     """Reset the global container instance."""
     global _container_instance
@@ -329,6 +334,7 @@ def reset_container() -> None:
 
 __all__: list[str] = [
     "DIContainer",
+    "create_container",
     "get_container",
     "reset_container",
     "timed_operation",

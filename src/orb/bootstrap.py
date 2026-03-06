@@ -21,11 +21,13 @@ class Application:
         config_path: Optional[str] = None,
         config_dict: Optional[dict[str, Any]] = None,
         skip_validation: bool = False,
+        container: Optional[Any] = None,
     ) -> None:
         """Initialize the instance."""
         self.config_path = config_path
         self.config_dict = config_dict
         self._initialized = False
+        self._external_container = container
 
         # Skip validation for commands that don't need it (templates, init, help)
         if not skip_validation:
@@ -47,9 +49,12 @@ class Application:
     def _ensure_container(self) -> None:
         """Ensure DI container is created (lazy initialization)."""
         if self._container is None:
-            from orb.infrastructure.di.container import get_container
+            if self._external_container is not None:
+                self._container = self._external_container
+            else:
+                from orb.infrastructure.di.container import get_container
 
-            self._container = get_container()
+                self._container = get_container()
 
             # Pre-register ConfigurationManager with config_dict if provided,
             # so DI container uses in-memory config instead of file discovery.
