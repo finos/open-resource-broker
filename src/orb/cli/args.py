@@ -343,11 +343,11 @@ def parse_args() -> tuple[argparse.Namespace, dict]:
     Returns:
         tuple: (parsed_args, resource_parsers_dict)
     """
-    from orb._package import DOCS_URL
+    from orb._package import DESCRIPTION, DOCS_URL
 
     parser = argparse.ArgumentParser(
         prog=os.path.basename(sys.argv[0]),
-        description="Open Resource Broker - Cloud resource management for IBM Spectrum Symphony.",
+        description=DESCRIPTION,
         formatter_class=HELP_FORMATTER,
         epilog=f"""
 Examples:

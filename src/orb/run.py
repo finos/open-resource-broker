@@ -67,6 +67,3 @@ def cli_main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
-    sys.exit(0)
-
-    asyncio.run(main())

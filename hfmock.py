@@ -160,7 +160,7 @@ class HostFactoryMock:
             os.environ["LOG_DESTINATION"] = "file"
 
             hf_scripts_location = (
-                Path(__file__).parent / "src/infrastructure/scheduler/hostfactory/scripts"
+                Path(__file__).parent / "src/orb/infrastructure/scheduler/hostfactory/scripts"
             )
 
         self.get_available_templates_script = os.path.join(
