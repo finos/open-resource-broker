@@ -75,7 +75,7 @@ class HandlerDiscoveryService:
         os.makedirs(cache_dir, exist_ok=True)
         return os.path.join(cache_dir, "handler_discovery.json")
 
-    def discover_and_register_handlers(self, base_package: str = "application") -> None:
+    def discover_and_register_handlers(self, base_package: str = "orb.application") -> None:
         """
         Discover all handlers and register them with the DI container.
         Uses caching to improve performance on subsequent runs.
@@ -325,7 +325,7 @@ class HandlerDiscoveryService:
     def _fallback_to_full_discovery(self) -> None:
         """Fall back to full discovery if cache loading fails."""
         logger.info("Falling back to full handler discovery")
-        self._discover_handlers("application")
+        self._discover_handlers("orb.application")
         self._register_handlers()
 
     def _get_source_file_mtimes(self, base_package: str) -> dict[str, float]:

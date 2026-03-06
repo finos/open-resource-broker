@@ -1,6 +1,6 @@
 """Image resolution domain exception."""
 
-from src.domain.base.exceptions import DomainException
+from orb.domain.base.exceptions import DomainException
 
 
 class ImageResolutionError(DomainException):

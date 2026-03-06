@@ -5,7 +5,7 @@ import os
 import time
 from typing import Any, Dict, Optional
 
-from src.domain.services.image_cache import ImageCache
+from orb.domain.services.image_cache import ImageCache
 
 
 class AWSImageCache(ImageCache):
