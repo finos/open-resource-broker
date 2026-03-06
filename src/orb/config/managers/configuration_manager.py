@@ -38,15 +38,29 @@ class ConfigurationManager:
     It uses ConfigurationLoader to load configuration from multiple sources.
     """
 
-    def __init__(self, config_file: Optional[str] = None) -> None:
-        """Initialize configuration manager with lazy loading."""
-        # Use platform dirs for default config file discovery
-        if config_file is None:
+    def __init__(
+        self,
+        config_file: Optional[str] = None,
+        config_dict: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Initialize configuration manager with lazy loading.
+
+        Args:
+            config_file: Path to config file. If None, uses platform default.
+            config_dict: In-memory config dict. If provided, file loading is skipped.
+        """
+        self._config_dict = config_dict
+
+        if config_dict is not None:
+            # In-memory config — no file needed
+            self._config_file = config_file  # May be None, that's fine
+        elif config_file is None:
             from orb.config.platform_dirs import get_config_location
 
             config_file = str(get_config_location() / "config.json")
-
-        self._config_file = config_file
+            self._config_file = config_file
+        else:
+            self._config_file = config_file
         self._loader: Optional[ConfigurationLoader] = None
         self._app_config: Optional[AppConfig] = None
 
@@ -80,8 +94,10 @@ class ConfigurationManager:
         return self._app_config
 
     def _load_app_config(self) -> AppConfig:
-        """Load application configuration from loader."""
+        """Load application configuration from loader or in-memory dict."""
         try:
+            if self._config_dict is not None:
+                return self.loader.create_app_config(self._config_dict)
             raw_config = self.loader.load(self._config_file, config_manager=self)
             return self.loader.create_app_config(raw_config)
         except Exception as e:
@@ -91,7 +107,10 @@ class ConfigurationManager:
     def _ensure_raw_config(self) -> dict[str, Any]:
         """Ensure raw configuration is loaded."""
         if self._raw_config is None:
-            self._raw_config = self.loader.load(self._config_file, config_manager=self)
+            if self._config_dict is not None:
+                self._raw_config = self._config_dict
+            else:
+                self._raw_config = self.loader.load(self._config_file, config_manager=self)
         return self._raw_config
 
     def _ensure_type_converter(self) -> ConfigTypeConverter:

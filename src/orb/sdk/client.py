@@ -40,6 +40,7 @@ class ORBClient:
         provider: str = "aws",
         config: Optional[dict[str, Any]] = None,
         config_path: Optional[str] = None,
+        app_config: Optional[dict[str, Any]] = None,
         **kwargs,
     ) -> None:
         """
@@ -47,8 +48,10 @@ class ORBClient:
 
         Args:
             provider: Cloud provider type (aws, mock, etc.)
-            config: Configuration dictionary
+            config: SDK configuration dictionary (timeout, log_level, etc.)
             config_path: Path to configuration file
+            app_config: Application config dict — replaces config.json on disk.
+                        Pass the same structure as config.json to run without filesystem.
             **kwargs: Additional configuration options
         """
         # Configuration setup
@@ -71,6 +74,9 @@ class ORBClient:
 
         # Validate configuration
         self._config.validate()
+
+        # Application-level config dict (replaces config.json)
+        self._app_config = app_config
 
         # Internal components (lazy initialization)
         self._app: Optional[Application] = None
@@ -108,7 +114,11 @@ class ORBClient:
                 )
 
             # skip_validation=True bypasses StartupValidator (sys.exit) in Application.__init__
-            self._app = Application(config_path=self._config.config_path, skip_validation=True)
+            self._app = Application(
+                config_path=self._config.config_path,
+                config_dict=self._app_config,
+                skip_validation=True,
+            )
 
             if not await self._app.initialize():
                 raise ProviderError(

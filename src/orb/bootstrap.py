@@ -16,9 +16,15 @@ from orb.infrastructure.logging.logger import get_logger, setup_logging
 class Application:
     """DI-based application context manager with registration pattern."""
 
-    def __init__(self, config_path: Optional[str] = None, skip_validation: bool = False) -> None:
+    def __init__(
+        self,
+        config_path: Optional[str] = None,
+        config_dict: Optional[dict[str, Any]] = None,
+        skip_validation: bool = False,
+    ) -> None:
         """Initialize the instance."""
         self.config_path = config_path
+        self.config_dict = config_dict
         self._initialized = False
 
         # Skip validation for commands that don't need it (templates, init, help)
@@ -44,6 +50,16 @@ class Application:
             from orb.infrastructure.di.container import get_container
 
             self._container = get_container()
+
+            # Pre-register ConfigurationManager with config_dict if provided,
+            # so DI container uses in-memory config instead of file discovery.
+            if self.config_dict is not None:
+                from orb.config.managers.configuration_manager import ConfigurationManager
+
+                cm = ConfigurationManager(
+                    config_file=self.config_path, config_dict=self.config_dict
+                )
+                self._container.register_instance(ConfigurationManager, cm)
 
             # Set up domain container for decorators
             if not self._domain_container_set:

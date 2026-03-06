@@ -106,6 +106,28 @@ async with orb(config=config) as sdk:
     pass
 ```
 
+### Application Config (No Filesystem Required)
+
+For environments without config.json on disk (Lambda, notebooks, CI), pass the
+full application config as a dict:
+
+```python
+app_config = {
+    "provider": {
+        "type": "aws",
+        "providers": [{
+            "name": "default",
+            "type": "aws",
+            "region": "us-east-1"
+        }]
+    },
+    "storage": {"type": "json"}
+}
+
+async with orb(app_config=app_config) as sdk:
+    templates = await sdk.list_templates()
+```
+
 ### Configuration File
 
 ```python
