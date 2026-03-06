@@ -319,18 +319,16 @@ jobs:
       packages: write
 
     steps:
-    - name: Delete old untagged container images (keep 5 most recent)
+    - name: Delete old untagged container images
       uses: actions/delete-package-versions@v5
-      continue-on-error: true
       with:
         package-name: ${{ needs.config.outputs.container-image }}
         package-type: container
-        min-versions-to-keep: 5
+        min-versions-to-keep: 0
         delete-only-untagged-versions: true
 
     - name: Delete old tagged versions (preserve releases and special tags)
       uses: actions/delete-package-versions@v5
-      continue-on-error: true
       with:
         package-name: ${{ needs.config.outputs.container-image }}
         package-type: container
