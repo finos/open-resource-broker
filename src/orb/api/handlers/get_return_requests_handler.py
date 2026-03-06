@@ -15,8 +15,6 @@ from orb.config.schemas.common_schema import RequestConfig
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
 from orb.domain.base.ports.scheduler_port import SchedulerPort
-from orb.infrastructure.di.container import get_container
-
 # Exception handling infrastructure
 from orb.infrastructure.error.decorators import handle_interface_exceptions
 from orb.monitoring.metrics import MetricsCollector
@@ -34,6 +32,7 @@ class GetReturnRequestsRESTHandler(BaseAPIHandler[dict[str, Any], ReturnRequestR
         query_bus: "QueryBus",
         command_bus: "CommandBus",
         scheduler_strategy: SchedulerPort,
+        config_manager: ConfigurationManager,
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
         metrics: Optional[MetricsCollector] = None,
@@ -46,6 +45,7 @@ class GetReturnRequestsRESTHandler(BaseAPIHandler[dict[str, Any], ReturnRequestR
             query_bus: Query bus for CQRS queries
             command_bus: Command bus for CQRS commands
             scheduler_strategy: Scheduler strategy for field mapping
+            config_manager: Configuration manager for request config
             logger: Logging port for operation logging
             error_handler: Error handling port for exception management
             metrics: Optional metrics collector
@@ -56,6 +56,7 @@ class GetReturnRequestsRESTHandler(BaseAPIHandler[dict[str, Any], ReturnRequestR
         self._query_bus = query_bus
         self._command_bus = command_bus
         self._scheduler_strategy = scheduler_strategy
+        self._config_manager = config_manager
         self._metrics_collector = metrics
         self._cache_duration = cache_duration
         self._cache = {}
@@ -355,9 +356,7 @@ class GetReturnRequestsRESTHandler(BaseAPIHandler[dict[str, Any], ReturnRequestR
             return 0
 
         # Get default grace period from configuration
-        container = get_container()
-        config_manager = container.get(ConfigurationManager)
-        config = config_manager.get_typed(RequestConfig)
+        config = self._config_manager.get_typed(RequestConfig)
         default_grace_period = config.default_grace_period
 
         # Check if machine is spot instance

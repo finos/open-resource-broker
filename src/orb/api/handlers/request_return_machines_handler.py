@@ -154,17 +154,12 @@ class RequestReturnMachinesRESTHandler(
                     "all_machines": True,
                 }
 
-                # Create return request for all machines using CQRS command
-                from orb.api.utils.request_id_generator import generate_request_id
-                from orb.domain.request.request_types import RequestType
-
-                request_id = generate_request_id(RequestType.RETURN)
                 command = CreateReturnRequestCommand(
                     machine_ids=[],
-                    metadata=metadata,  # Empty list indicates all machines
+                    metadata=metadata,
                 )
-                # Execute command — CQRS commands return None; use pre-generated request_id
                 await self._command_bus.execute(cast(Any, command))
+                request_id = command.created_request_ids[0] if command.created_request_ids else None
 
                 if self.logger:
                     self.logger.info(
@@ -176,7 +171,6 @@ class RequestReturnMachinesRESTHandler(
                         },
                     )
 
-                # Create response DTO
                 return RequestReturnMachinesResponse(
                     request_id=request_id,
                     message="Return request created for all machines",
@@ -222,14 +216,9 @@ class RequestReturnMachinesRESTHandler(
                     "correlation_id": correlation_id,
                 }
 
-                # Create return request using CQRS command
-                from orb.api.utils.request_id_generator import generate_request_id
-                from orb.domain.request.request_types import RequestType
-
-                request_id = generate_request_id(RequestType.RETURN)
                 command = CreateReturnRequestCommand(machine_ids=machine_ids, metadata=metadata)
-                # Execute command — CQRS commands return None; use pre-generated request_id
                 await self._command_bus.execute(cast(Any, command))
+                request_id = command.created_request_ids[0] if command.created_request_ids else None
 
                 # Record metrics if available
                 if self._metrics_collector:

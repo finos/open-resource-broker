@@ -83,6 +83,7 @@ class TestAPIHandlerInitialization:
             query_bus=self.query_bus,
             command_bus=self.command_bus,
             scheduler_strategy=self.scheduler_strategy,
+            config_manager=MagicMock(),
             logger=self.logger,
             error_handler=self.error_handler,
             metrics=self.metrics,

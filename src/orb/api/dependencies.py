@@ -87,14 +87,6 @@ def get_request_status_handler():
     return container.get(GetRequestStatusRESTHandler)
 
 
-def get_return_requests_handler():
-    """Get return requests API handler from DI container."""
-
-    container = get_di_container()
-    from orb.api.handlers.get_return_requests_handler import GetReturnRequestsRESTHandler
-
-    return container.get(GetReturnRequestsRESTHandler)
-
 
 def get_return_machines_handler():
     """Get return machines API handler from DI container."""

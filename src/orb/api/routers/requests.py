@@ -14,7 +14,6 @@ except ImportError:
 from orb.api.dependencies import (
     get_query_bus,
     get_request_status_handler,
-    get_return_requests_handler,
 )
 from orb.infrastructure.error.decorators import handle_rest_exceptions
 
@@ -22,10 +21,9 @@ router = APIRouter(prefix="/requests", tags=["Requests"])
 
 # Module-level dependency variables to avoid B008 warnings
 REQUEST_STATUS_HANDLER = Depends(get_request_status_handler)
-RETURN_REQUESTS_HANDLER = Depends(get_return_requests_handler)
 QUERY_BUS = Depends(get_query_bus)
 STATUS_QUERY = Query(None, description="Filter by request status")
-LIMIT_QUERY = Query(None, description="Limit number of results")
+LIMIT_QUERY = Query(50, description="Limit number of results")
 
 
 @router.get(
@@ -82,12 +80,16 @@ async def list_requests(
 @router.get("/return", summary="List Return Requests", description="List requests pending return")
 @handle_rest_exceptions(endpoint="/api/v1/requests/return", method="GET")
 async def list_return_requests(
-    handler=RETURN_REQUESTS_HANDLER,
+    limit: int = LIMIT_QUERY,
+    query_bus=QUERY_BUS,
 ) -> JSONResponse:
     """List requests that are pending return."""
-    api_request = {"input_data": {}}
-    result = await handler.handle(api_request)
-    return JSONResponse(content=jsonable_encoder(result))
+    from orb.application.dto.queries import ListReturnRequestsQuery
+
+    query = ListReturnRequestsQuery(limit=limit)
+    results = await query_bus.execute(query)
+    serialized = [r.to_dict() if hasattr(r, "to_dict") else r for r in results] if isinstance(results, list) else results
+    return JSONResponse(content=jsonable_encoder(serialized))
 
 
 _TERMINAL_STATUSES = {"complete", "completed", "failed", "error", "cancelled", "canceled"}
