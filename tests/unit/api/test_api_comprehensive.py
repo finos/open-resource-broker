@@ -235,7 +235,9 @@ class TestRequestStatusHandlerBehaviour:
         # post_process_response no longer calls format_request_response (correct — that was
         # the wrong formatter for status responses). Verify the response is correctly structured.
         result_dict = result.model_dump() if hasattr(result, "model_dump") else result
-        assert result_dict["requests"][0]["request_id"] == "req-12345678-1234-1234-1234-123456789012"
+        assert (
+            result_dict["requests"][0]["request_id"] == "req-12345678-1234-1234-1234-123456789012"
+        )
 
         # Ensure the correct query type was used
         query_bus.execute.assert_awaited_once()

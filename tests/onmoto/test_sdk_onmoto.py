@@ -462,8 +462,7 @@ class TestSDKTemplates:
             templates = _extract_templates(result)
 
             known_ids = {
-                _get_template_field(tpl, "template_id", "templateId")
-                for tpl in templates
+                _get_template_field(tpl, "template_id", "templateId") for tpl in templates
             } - {None}
 
             assert len(known_ids) > 0, "No template IDs found in list_templates() result"
