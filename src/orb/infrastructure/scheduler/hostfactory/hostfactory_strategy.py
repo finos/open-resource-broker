@@ -699,7 +699,9 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
 
     def get_scripts_directory(self) -> Path | None:
         """Return the path to the HostFactory scripts directory."""
-        return Path("src/orb/infrastructure/scheduler/hostfactory/scripts/")
+        from orb._package import PACKAGE_ROOT
+
+        return PACKAGE_ROOT / "infrastructure/scheduler/hostfactory/scripts"
 
     def _templates_filename_pattern_key(self) -> str:
         return "provider_specific"

@@ -14,11 +14,16 @@ import logging
 import sys
 from pathlib import Path
 
+import yaml
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+_project = yaml.safe_load(open(Path(__file__).parent.parent.parent / ".project.yml"))
+PACKAGE_ROOT = _project.get("build", {}).get("package_root", "src/orb")
 
 
 class ArchitectureValidator:
@@ -61,7 +66,7 @@ class ArchitectureValidator:
 
     def check_domain_layer_dependencies(self) -> None:
         """Check that domain layer doesn't depend on outer layers."""
-        domain_imports = self.analyze_imports("src/orb/domain")
+        domain_imports = self.analyze_imports(f"{PACKAGE_ROOT}/domain")
         self.layer_imports["domain"] = domain_imports
 
         for file_path, import_name in domain_imports:
@@ -85,7 +90,7 @@ class ArchitectureValidator:
 
     def check_application_layer_dependencies(self) -> None:
         """Check that application layer doesn't depend on interface layer."""
-        app_imports = self.analyze_imports("src/orb/application")
+        app_imports = self.analyze_imports(f"{PACKAGE_ROOT}/application")
         self.layer_imports["application"] = app_imports
 
         for file_path, import_name in app_imports:
@@ -100,7 +105,7 @@ class ArchitectureValidator:
 
     def check_infrastructure_layer_dependencies(self) -> None:
         """Check infrastructure layer dependencies."""
-        infra_imports = self.analyze_imports("src/orb/infrastructure")
+        infra_imports = self.analyze_imports(f"{PACKAGE_ROOT}/infrastructure")
         self.layer_imports["infrastructure"] = infra_imports
 
         for file_path, import_name in infra_imports:
@@ -115,7 +120,7 @@ class ArchitectureValidator:
 
     def check_interface_layer_dependencies(self) -> None:
         """Check interface layer dependencies (should be minimal)."""
-        interface_imports = self.analyze_imports("src/orb/interface")
+        interface_imports = self.analyze_imports(f"{PACKAGE_ROOT}/interface")
         self.layer_imports["interface"] = interface_imports
 
         # Interface layer can import from any layer (it's the outermost)

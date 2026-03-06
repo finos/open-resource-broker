@@ -20,6 +20,7 @@ repository:
   registry: ghcr.io # Container registry
 build:
   platforms: [linux/amd64, linux/arm64] # Container platforms
+  package_root: src/orb
 ci:
   test_timeout: 300 # Test timeout in seconds
   coverage_threshold: 70 # Minimum coverage percentage

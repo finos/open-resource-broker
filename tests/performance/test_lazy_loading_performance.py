@@ -10,6 +10,8 @@ from unittest.mock import patch
 
 import pytest
 
+from orb._package import PACKAGE_ROOT_STR
+
 try:
     import psutil
 
@@ -42,7 +44,7 @@ class TestLazyLoadingPerformance:
 
         start_time = time.time()
         result = subprocess.run(
-            [sys.executable, "src/orb/run.py", "--help"],
+            [sys.executable, f"{PACKAGE_ROOT_STR}/run.py", "--help"],
             check=False,
             capture_output=True,
             text=True,
@@ -204,7 +206,7 @@ class TestLazyLoadingPerformance:
 
         start_time = time.time()
         result = subprocess.run(
-            [sys.executable, "src/orb/run.py", "templates", "list"],
+            [sys.executable, f"{PACKAGE_ROOT_STR}/run.py", "templates", "list"],
             check=False,
             capture_output=True,
             text=True,

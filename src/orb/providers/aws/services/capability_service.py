@@ -78,7 +78,7 @@ class AWSCapabilityService:
 
     def generate_provider_name(self, config: dict[str, Any]) -> str:
         """Generate AWS provider name: aws_{profile}_{region}"""
-        profile = config.get("profile", "default")
+        profile = config.get("profile") or "instance-profile"
         region = config.get("region", "us-east-1")
 
         sanitized_profile = re.sub(r"[^a-zA-Z0-9\-_]", "-", profile)
@@ -93,7 +93,7 @@ class AWSCapabilityService:
                 "profile": parts[1],
                 "region": "_".join(parts[2:]),  # Handle regions with underscores
             }
-        return {"type": "aws", "profile": "default", "region": "us-east-1"}
+        return {"type": "aws", "profile": "instance-profile", "region": "us-east-1"}
 
     def get_provider_name_pattern(self) -> str:
         """Get the naming pattern for AWS providers."""

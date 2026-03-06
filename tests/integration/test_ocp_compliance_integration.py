@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from orb._package import PACKAGE_ROOT_STR
 from orb.config.schemas.provider_strategy_schema import ProviderConfig, ProviderInstanceConfig
 from orb.providers.registry import get_provider_registry
 
@@ -180,7 +181,7 @@ class TestOCPComplianceIntegration:
     def test_no_hard_coded_conditionals(self):
         """Test that no hard-coded provider conditionals exist in key files."""
         files_to_check = [
-            "src/orb/application/commands/provider_handlers.py",
+            f"{PACKAGE_ROOT_STR}/application/commands/provider_handlers.py",
         ]
 
         for file_path in files_to_check:

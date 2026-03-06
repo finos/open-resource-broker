@@ -23,6 +23,8 @@ import os
 import sys
 from unittest.mock import Mock
 
+from orb._package import PACKAGE_ROOT_STR
+
 # Add project root to path
 sys.path.insert(0, os.path.abspath("."))
 
@@ -448,10 +450,10 @@ def test_import_consistency():
         print("   Checking import consistency...")
 
         handler_files = [
-            "src/orb/providers/aws/infrastructure/handlers/spot_fleet_handler.py",
-            "src/orb/providers/aws/infrastructure/handlers/ec2_fleet_handler.py",
-            "src/orb/providers/aws/infrastructure/handlers/run_instances_handler.py",
-            "src/orb/providers/aws/infrastructure/handlers/asg_handler.py",
+            f"{PACKAGE_ROOT_STR}/providers/aws/infrastructure/handlers/spot_fleet_handler.py",
+            f"{PACKAGE_ROOT_STR}/providers/aws/infrastructure/handlers/ec2_fleet_handler.py",
+            f"{PACKAGE_ROOT_STR}/providers/aws/infrastructure/handlers/run_instances_handler.py",
+            f"{PACKAGE_ROOT_STR}/providers/aws/infrastructure/handlers/asg_handler.py",
         ]
 
         # Required imports for all handlers

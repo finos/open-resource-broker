@@ -33,11 +33,12 @@ if [ "$LOG_SCRIPTS" = "true" ] || [ "$LOG_SCRIPTS" = "1" ]; then
 fi
 
 # Get script directory and project root
-# Walk up from SCRIPT_DIR until we find src/orb/run.py (works whether scripts are at
+# Walk up from SCRIPT_DIR until we find ${PACKAGE_ROOT}/run.py (works whether scripts are at
 # scripts/ after orb init or at src/infrastructure/scheduler/hostfactory/scripts/ in dev)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+PACKAGE_ROOT=$(python3 -c "import yaml; print(yaml.safe_load(open('.project.yml'))['build']['package_root'])" 2>/dev/null || echo "src/orb")
 PROJECT_ROOT="$SCRIPT_DIR"
-while [ "$PROJECT_ROOT" != "/" ] && [ ! -f "$PROJECT_ROOT/src/orb/run.py" ]; do
+while [ "$PROJECT_ROOT" != "/" ] && [ ! -f "$PROJECT_ROOT/${PACKAGE_ROOT}/run.py" ]; do
     PROJECT_ROOT="$(dirname "$PROJECT_ROOT")"
 done
 
@@ -65,9 +66,9 @@ if [ "$USE_LOCAL_DEV" = "true" ] || [ "$USE_LOCAL_DEV" = "1" ]; then
     # Add project root and src/ to PYTHONPATH so orb package is importable
     export PYTHONPATH="${PROJECT_ROOT}/src:${PROJECT_ROOT}:${PYTHONPATH}"
 
-    # Check if src/orb/run.py exists
-    if [ ! -f "${PROJECT_ROOT}/src/orb/run.py" ]; then
-        echo "Error: src/orb/run.py not found at ${PROJECT_ROOT}/src/orb/run.py" >&2
+    # Check if ${PACKAGE_ROOT}/run.py exists
+    if [ ! -f "${PROJECT_ROOT}/${PACKAGE_ROOT}/run.py" ]; then
+        echo "Error: ${PACKAGE_ROOT}/run.py not found at ${PROJECT_ROOT}/${PACKAGE_ROOT}/run.py" >&2
         echo "Make sure you're running from the correct directory or install the package." >&2
         exit 1
     fi
@@ -94,8 +95,8 @@ if [ "$USE_LOCAL_DEV" = "true" ] || [ "$USE_LOCAL_DEV" = "1" ]; then
         i=$((i + 1))
     done
 
-    # Execute: src/orb/run.py [-f <file>] <everything else verbatim>
-	    "$PYTHON_CMD" "${PROJECT_ROOT}/src/orb/run.py" "${file_args[@]}" "${pass_args[@]}" 2>&1 | tee -a "$SCRIPTS_LOG_FILE"
+    # Execute: ${PACKAGE_ROOT}/run.py [-f <file>] <everything else verbatim>
+	    "$PYTHON_CMD" "${PROJECT_ROOT}/${PACKAGE_ROOT}/run.py" "${file_args[@]}" "${pass_args[@]}" 2>&1 | tee -a "$SCRIPTS_LOG_FILE"
 	    exit "${PIPESTATUS[0]}"
 
 else

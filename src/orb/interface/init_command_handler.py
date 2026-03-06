@@ -260,7 +260,7 @@ def _interactive_setup() -> Dict[str, Any]:
 
         # Extract final values for backward compatibility
         region = provider_config.get("region", "us-east-1")
-        profile = provider_config.get("profile", "default")
+        profile = provider_config.get("profile") or None
 
         print_newline()
         print_separator(char="-", color="cyan")
@@ -418,12 +418,12 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
         infrastructure_defaults = {}
         if discover_choice in ["y", "yes"]:
             region = provider_config.get("region", "us-east-1")
-            profile = provider_config.get("profile", "default")
+            profile = provider_config.get("profile") or None
             infrastructure_defaults = _discover_infrastructure(provider_type, region, profile)
 
         return {
             "type": provider_type,
-            "profile": provider_config.get("profile", "default"),
+            "profile": provider_config.get("profile") or None,
             "region": provider_config.get("region", "us-east-1"),
             "infrastructure_defaults": infrastructure_defaults,
         }
@@ -517,7 +517,7 @@ def _get_credential_requirements(provider_type: str) -> dict:
         return {}
 
 
-def _discover_infrastructure(provider_type: str, region: str, profile: str) -> Dict[str, Any]:
+def _discover_infrastructure(provider_type: str, region: str, profile: str | None) -> Dict[str, Any]:
     """Discover infrastructure interactively using provider strategy."""
     try:
         from orb.providers.registry import get_provider_registry
@@ -570,7 +570,7 @@ def _get_default_config(args) -> Dict[str, Any]:
 
     first_provider = {
         "type": args.provider or default_provider,
-        "profile": args.profile or "default",
+        "profile": args.profile or None,
         "region": args.region or "us-east-1",
         "infrastructure_defaults": infrastructure_defaults,
     }
@@ -637,7 +637,8 @@ def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
             # Fallback to simple name generation
             import re
 
-            sanitized_profile = re.sub(r"[^a-zA-Z0-9\-_]", "-", provider_data["profile"])
+            profile_for_name = provider_data["profile"] or "instance-profile"
+            sanitized_profile = re.sub(r"[^a-zA-Z0-9\-_]", "-", profile_for_name)
             provider_name = f"{provider_type}_{sanitized_profile}_{provider_data['region']}"
 
         # Create provider instance

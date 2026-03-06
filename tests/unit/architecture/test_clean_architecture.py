@@ -14,6 +14,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from orb._package import PACKAGE_ROOT_STR
+
 
 @pytest.mark.unit
 @pytest.mark.architecture
@@ -24,10 +26,14 @@ class TestCleanArchitecture:
         """Ensure dependencies point inward only."""
         # Define layer hierarchy (outer -> inner)
         layers = {
-            "interface": ["src/orb/interface", "src/orb/cli", "src/orb/api"],
-            "infrastructure": ["src/orb/infrastructure"],
-            "application": ["src/orb/application"],
-            "domain": ["src/orb/domain"],
+            "interface": [
+                f"{PACKAGE_ROOT_STR}/interface",
+                f"{PACKAGE_ROOT_STR}/cli",
+                f"{PACKAGE_ROOT_STR}/api",
+            ],
+            "infrastructure": [f"{PACKAGE_ROOT_STR}/infrastructure"],
+            "application": [f"{PACKAGE_ROOT_STR}/application"],
+            "domain": [f"{PACKAGE_ROOT_STR}/domain"],
         }
 
         # Test that domain layer has no outward dependencies
@@ -236,7 +242,7 @@ class TestCleanArchitecture:
         """Test that domain layer is independent of external frameworks."""
         # Domain layer should not import external frameworks
         domain_files = []
-        domain_path = Path("src/orb/domain")
+        domain_path = Path(f"{PACKAGE_ROOT_STR}/domain")
 
         if domain_path.exists():
             for py_file in domain_path.rglob("*.py"):

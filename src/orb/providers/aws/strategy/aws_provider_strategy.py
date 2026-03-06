@@ -336,7 +336,7 @@ class AWSProviderStrategy(ProviderStrategy):
         if self._infrastructure_service is None:
             self._infrastructure_service = AWSInfrastructureDiscoveryService(
                 region=self._aws_config.region,
-                profile=self._aws_config.profile or "",
+                profile=self._aws_config.profile or None,
                 logger=self._logger,
             )
         return self._infrastructure_service

@@ -125,7 +125,13 @@ def get_scripts_location() -> Path:
         return get_config_location().parent / "scripts"
 
     elif mode == "editable":
-        return (base_path or Path.cwd()) / "src/orb/infrastructure/scheduler/hostfactory/scripts"
+        from orb._package import PACKAGE_ROOT
+
+        return (
+            (base_path or Path.cwd())
+            / PACKAGE_ROOT
+            / "infrastructure/scheduler/hostfactory/scripts"
+        )
 
     elif mode == "user":
         try:

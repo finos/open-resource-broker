@@ -126,7 +126,7 @@ class AWSClient:
             self._logger.info(
                 "AWS client initialized with region: %s, profile: %s, retries: %d, timeouts: connect=%ds, read=%ds",
                 self.region_name,
-                self.profile_name or "default",
+                self.profile_name or "credential-chain",
                 max_attempts,
                 connect_timeout,
                 read_timeout,

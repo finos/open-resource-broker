@@ -75,6 +75,10 @@ if not config:
         },
     }
 
+# Canonical package root — all path references should use this instead of hardcoding "src/orb"
+PACKAGE_ROOT = Path((config or {}).get("build", {}).get("package_root", "src/orb"))
+PACKAGE_ROOT_STR = str(PACKAGE_ROOT)
+
 # Export the same interface
 PACKAGE_NAME = config["project"]["name"]
 PACKAGE_NAME_SHORT = config["project"]["short_name"]

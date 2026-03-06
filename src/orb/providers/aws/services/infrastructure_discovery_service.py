@@ -3,8 +3,6 @@
 from dataclasses import dataclass
 from typing import Any, Optional
 
-import boto3
-
 from orb.domain.base.ports import LoggingPort
 
 
@@ -55,7 +53,7 @@ class SecurityGroupInfo:
 class AWSInfrastructureDiscoveryService:
     """Service for AWS infrastructure discovery."""
 
-    def __init__(self, region: str, profile: str, logger: Optional[LoggingPort] = None):
+    def __init__(self, region: str, profile: Optional[str], logger: Optional[LoggingPort] = None):
         self.region = region
         self.profile = profile
         self._logger = logger
@@ -63,8 +61,10 @@ class AWSInfrastructureDiscoveryService:
         # Create AWS session and clients
         from botocore.config import Config
 
+        from orb.providers.aws.session_factory import AWSSessionFactory
+
         _config = Config(connect_timeout=10, read_timeout=30, retries={"max_attempts": 3})
-        session = boto3.Session(profile_name=profile, region_name=region)
+        session = AWSSessionFactory.create_session(profile=profile, region=region)
         self.ec2_client = session.client("ec2", config=_config)
         self.iam_client = session.client("iam", config=_config)
         self.sts_client = session.client("sts", config=_config)

@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 
+from orb._package import PACKAGE_ROOT_STR
 from orb.application.dto.queries import ListTemplatesQuery
 from orb.bootstrap import Application
 from orb.infrastructure.di.container import get_container
@@ -216,7 +217,7 @@ class TestLazyLoadingCompatibility:
         for cmd in commands_to_test:
             try:
                 result = subprocess.run(
-                    [sys.executable, "src/orb/run.py", *cmd],
+                    [sys.executable, f"{PACKAGE_ROOT_STR}/run.py", *cmd],
                     check=False,
                     capture_output=True,
                     text=True,
