@@ -22,9 +22,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 REGION = "eu-west-2"
-REQUEST_ID_RE = re.compile(
-    r"^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-)
+REQUEST_ID_RE = re.compile(r"^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 pytestmark = [pytest.mark.moto, pytest.mark.sdk]
 
@@ -78,9 +76,7 @@ def patch_moto_compat():
 def _extract_request_id(result) -> str | None:
     if isinstance(result, dict):
         return (
-            result.get("requestId")
-            or result.get("request_id")
-            or result.get("created_request_id")
+            result.get("requestId") or result.get("request_id") or result.get("created_request_id")
         )
     return getattr(result, "request_id", None) or getattr(result, "created_request_id", None)
 
@@ -100,10 +96,7 @@ def _extract_machine_ids(result) -> list[str]:
         if requests and isinstance(requests[0], dict):
             machines = requests[0].get("machines", [])
             return [
-                mid
-                for m in machines
-                for mid in [m.get("machineId") or m.get("machine_id")]
-                if mid
+                mid for m in machines for mid in [m.get("machineId") or m.get("machine_id")] if mid
             ]
     machines = getattr(result, "machines", [])
     return [str(mid) for m in machines for mid in [getattr(m, "machine_id", None)] if mid]
@@ -399,7 +392,9 @@ class TestSDKRequestLifecycle:
     """Full request lifecycle via ORBClient against moto AWS."""
 
     @pytest.mark.asyncio
-    async def test_create_request_returns_request_id(self, orb_config_dir, moto_aws, moto_vpc_resources):
+    async def test_create_request_returns_request_id(
+        self, orb_config_dir, moto_aws, moto_vpc_resources
+    ):
         """create_request() returns a valid request_id."""
         import json
 
@@ -421,7 +416,9 @@ class TestSDKRequestLifecycle:
             )
 
     @pytest.mark.asyncio
-    async def test_get_request_status_after_create(self, orb_config_dir, moto_aws, moto_vpc_resources):
+    async def test_get_request_status_after_create(
+        self, orb_config_dir, moto_aws, moto_vpc_resources
+    ):
         """get_request() returns status after create_request()."""
         import json
 
@@ -452,7 +449,9 @@ class TestSDKRequestLifecycle:
             )
 
     @pytest.mark.asyncio
-    async def test_full_request_and_return_cycle(self, orb_config_dir, moto_aws, moto_vpc_resources):
+    async def test_full_request_and_return_cycle(
+        self, orb_config_dir, moto_aws, moto_vpc_resources
+    ):
         """Full cycle: create_request -> get_request -> create_return_request.
 
         Uses RunInstances because moto fully supports instance creation.
