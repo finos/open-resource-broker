@@ -9,7 +9,21 @@
 
 Open Resource Broker (ORB) — dynamic cloud resource provisioning via CLI and optional REST API.
 
-ORB lets you request, track, and return cloud compute resources through a single CLI. It supports AWS (EC2, Auto Scaling Groups, SpotFleet, EC2Fleet) and is designed to be extended to additional providers. Resources are provisioned on demand and returned when no longer needed.
+ORB lets you request, track, and return cloud compute resources through a single CLI. It integrates with IBM Spectrum Symphony as a HostFactory provider plugin and also works standalone. It supports AWS (EC2, Auto Scaling Groups, SpotFleet, EC2Fleet) and is designed to be extended to additional providers. Resources are provisioned on demand and returned when no longer needed.
+
+### Providers
+
+| Provider | Resource Types | Status |
+|---|---|---|
+| **AWS** | EC2 RunInstances, EC2Fleet, SpotFleet, Auto Scaling Groups | Supported |
+| *Custom* | Extensible via provider registry | [Guide](docs/root/developer_guide/architecture.md) |
+
+### Schedulers
+
+| Scheduler | Integration | Description |
+|---|---|---|
+| **HostFactory** | IBM Spectrum Symphony | ORB runs as a HostFactory provider plugin for Symphony |
+| **Default** | Standalone | Direct CLI and REST API usage without an external scheduler |
 
 ## Quick Start
 
@@ -226,9 +240,121 @@ ORB is built on Clean Architecture with Domain-Driven Design (DDD) and CQRS:
 - **Infrastructure layer** — AWS adapters, DI container, storage strategies
 - **Interface layer** — CLI, REST API, MCP server
 
-The provider and scheduler systems use Strategy/Registry patterns, making it straightforward to add new cloud providers or scheduler integrations.
+The **provider system** uses a Strategy/Registry pattern — each cloud provider (AWS, future providers) registers its own strategy, handlers, and template format. The **scheduler system** uses the same pattern — HostFactory and Default schedulers are interchangeable strategies behind a common port.
 
 See the [Architecture Guide](docs/root/developer_guide/architecture.md) for details.
+
+</details>
+
+---
+
+<details>
+<summary>MCP Server (AI Assistant Integration)</summary>
+
+ORB provides a Model Context Protocol (MCP) server for AI assistant integration:
+
+```bash
+# Start MCP server in stdio mode (for AI assistants)
+orb mcp serve --stdio
+
+# Start as TCP server (for development/testing)
+orb mcp serve --port 3000 --host localhost
+```
+
+**Available MCP Tools:**
+- Provider Management: `check_provider_health`, `list_providers`, `get_provider_config`
+- Template Operations: `list_templates`, `get_template`, `validate_template`
+- Infrastructure Requests: `request_machines`, `get_request_status`, `return_machines`
+
+**Available MCP Resources:**
+- `templates://` — Available compute templates
+- `requests://` — Provisioning requests
+- `machines://` — Compute instances
+- `providers://` — Cloud providers
+
+**Claude Desktop Configuration:**
+```json
+{
+  "mcpServers": {
+    "open-resource-broker": {
+      "command": "orb",
+      "args": ["mcp", "serve", "--stdio"]
+    }
+  }
+}
+```
+
+</details>
+
+---
+
+<details>
+<summary>REST API</summary>
+
+```bash
+# Get available templates
+curl -X GET "http://localhost:8000/api/v1/templates"
+
+# Create machine request
+curl -X POST "http://localhost:8000/api/v1/requests" \
+  -H "Content-Type: application/json" \
+  -d '{"templateId": "my-template", "maxNumber": 5}'
+
+# Check request status
+curl -X GET "http://localhost:8000/api/v1/requests/req-12345"
+```
+
+Start the API server with `pip install "orb-py[api]"` and `orb system serve`.
+
+</details>
+
+---
+
+<details>
+<summary>HostFactory Integration</summary>
+
+ORB integrates with IBM Spectrum Symphony as a HostFactory provider plugin:
+
+- **API Compatibility**: Full compatibility with HostFactory API requirements
+- **Attribute Generation**: Automatic CPU and RAM specs based on AWS instance types
+- **Output Format Compliance**: Native support for HostFactory expected output formats
+- **Configuration Integration**: Works with existing HostFactory configurations
+
+Example HostFactory template output:
+
+```json
+{
+  "templates": [
+    {
+      "templateId": "t3-medium-template",
+      "maxNumber": 5,
+      "attributes": {
+        "type": ["String", "X86_64"],
+        "ncpus": ["Numeric", "2"],
+        "nram": ["Numeric", "4096"]
+      }
+    }
+  ]
+}
+```
+
+See the [HostFactory Guide](docs/root/hostfactory/integration_guide.md) for full integration details.
+
+</details>
+
+---
+
+<details>
+<summary>Docker Deployment</summary>
+
+```bash
+git clone https://github.com/awslabs/open-resource-broker.git
+cd open-resource-broker
+cp .env.example .env
+# Edit .env with your configuration
+docker-compose up -d
+curl http://localhost:8000/health
+```
 
 </details>
 
@@ -266,6 +392,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development guide.
 
 ## Documentation
 
+[![Python Versions](https://img.shields.io/pypi/pyversions/orb-py)](https://pypi.org/project/orb-py/)
+[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/22c627f01aad3fc08ca69a676ebf9696/raw/coverage.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/advanced-metrics.yml)
+[![Lines of Code](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/22c627f01aad3fc08ca69a676ebf9696/raw/lines-of-code.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/advanced-metrics.yml)
+
 - [Quick Start](docs/root/getting_started/quick_start.md)
 - [CLI Reference](docs/root/cli/cli-reference.md)
 - [Configuration Guide](docs/root/user_guide/configuration.md)
@@ -274,6 +404,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development guide.
 - [Architecture](docs/root/developer_guide/architecture.md)
 - [API Reference](docs/root/api/readme.md)
 - [Deployment](docs/root/deployment/readme.md)
+- [DeepWiki](https://deepwiki.com/awslabs/open-resource-broker) — AI-generated codebase documentation
 
 Full docs: [awslabs.github.io/open-resource-broker](https://awslabs.github.io/open-resource-broker/)
 
