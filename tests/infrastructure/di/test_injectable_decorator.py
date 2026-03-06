@@ -211,7 +211,7 @@ class TestInjectableDecorator:
 
         assert "manual" in deps
         assert deps["manual"]["has_default"]
-        assert deps["manual"]["default}"] == "default"
+        assert deps["manual"]["default"] == "default"
 
     def test_non_injectable_class(self):
         """Test behavior with non-injectable classes."""
