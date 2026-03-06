@@ -271,6 +271,10 @@ class SDKMethodDiscovery:
 
         async def sdk_method(**kwargs):
             try:
+                # Extract serialization options before CQRS mapping
+                raw_response = kwargs.pop("raw_response", False)
+                output_format = kwargs.pop("format", None)
+
                 # Map CLI-style parameters to CQRS parameters
                 mapped_kwargs = ParameterMapper.map_parameters(query_type, kwargs)
 
@@ -280,9 +284,18 @@ class SDKMethodDiscovery:
                 # Execute via query bus directly
                 result = await query_bus.execute(query)
 
-                # Standardize return type to dict
-                return self._standardize_return_type(result)
+                # Return raw result if requested (skip standardization)
+                if raw_response:
+                    return result
 
+                # Standardize return type to dict
+                standardized = self._standardize_return_type(result)
+
+                # Apply output format if requested
+                return self._apply_format(standardized, output_format)
+
+            except MethodExecutionError:
+                raise
             except Exception as e:
                 raise MethodExecutionError(
                     f"Failed to execute {method_info.name}: {e!s}",
@@ -300,6 +313,43 @@ class SDKMethodDiscovery:
         sdk_method._method_info = method_info
 
         return sdk_method
+
+    _SUPPORTED_FORMATS = {"json", "yaml"}
+
+    def _apply_format(self, data: Any, output_format: Optional[str]) -> Any:
+        """
+        Apply output format conversion if requested.
+
+        Args:
+            data: Standardized dict/list data
+            output_format: 'json', 'yaml', or None (return as-is)
+
+        Returns:
+            Formatted string or original data if no format specified
+        """
+        if not output_format:
+            return data
+
+        output_format = output_format.lower()
+        if output_format not in self._SUPPORTED_FORMATS:
+            from .exceptions import SDKError
+
+            raise SDKError(
+                f"Unsupported format: {output_format!r}. "
+                f"Supported: {', '.join(sorted(self._SUPPORTED_FORMATS))}"
+            )
+
+        if output_format == "json":
+            import json
+
+            return json.dumps(data, indent=2, default=str)
+
+        if output_format == "yaml":
+            import yaml
+
+            return yaml.dump(data, default_flow_style=False, sort_keys=False)
+
+        return data
 
     # Output fields populated by handlers on mutable command objects after execution.
     # Keyed by command class name so the lookup is O(1) and requires no imports here.
@@ -337,6 +387,10 @@ class SDKMethodDiscovery:
 
         async def sdk_method(**kwargs):
             try:
+                # Extract serialization options before CQRS mapping
+                raw_response = kwargs.pop("raw_response", False)
+                output_format = kwargs.pop("format", None)
+
                 # Map CLI-style parameters to CQRS parameters
                 mapped_kwargs = ParameterMapper.map_parameters(command_type, kwargs)
 
@@ -349,9 +403,18 @@ class SDKMethodDiscovery:
                 # Commands return void; check for handler-populated output fields
                 result = self._extract_command_output(command)
 
-                # Standardize return type to dict
-                return self._standardize_return_type(result)
+                # Return raw result if requested (skip standardization)
+                if raw_response:
+                    return result
 
+                # Standardize return type to dict
+                standardized = self._standardize_return_type(result)
+
+                # Apply output format if requested
+                return self._apply_format(standardized, output_format)
+
+            except MethodExecutionError:
+                raise
             except Exception as e:
                 raise MethodExecutionError(
                     f"Failed to execute {method_info.name}: {e!s}",

@@ -6,6 +6,7 @@ application service and CQRS infrastructure with automatic
 handler discovery for zero code duplication.
 """
 
+import asyncio
 from contextlib import suppress
 from typing import Any, Callable, Dict, Optional
 
@@ -16,6 +17,7 @@ from orb.infrastructure.di.container import get_container
 from .config import SDKConfig
 from .discovery import MethodInfo, SDKMethodDiscovery
 from .exceptions import ConfigurationError, ProviderError, SDKError
+from .middleware import SDKMiddleware, build_middleware_chain
 
 
 class ORBClient:
@@ -76,6 +78,7 @@ class ORBClient:
         self._command_bus = None
         self._discovery: Optional[SDKMethodDiscovery] = None
         self._methods: dict[str, Callable] = {}
+        self._middlewares: list[SDKMiddleware] = []
         self._initialized = False
 
     async def initialize(self) -> bool:
@@ -139,6 +142,10 @@ class ORBClient:
             # Dynamically add methods to SDK instance
             for method_name, method_func in self._methods.items():
                 setattr(self, method_name, method_func)
+
+            # Apply middleware if any were added before initialization
+            if self._middlewares:
+                self._apply_middleware_to_methods()
 
             self._initialized = True
             return True
@@ -305,6 +312,55 @@ class ORBClient:
             "query_methods": len(query_methods),
             "available_methods": list(self._methods.keys()),
         }
+
+    async def batch(self, operations: list) -> list[Any]:
+        """
+        Execute multiple SDK operations concurrently and return results in order.
+
+        Uses asyncio.gather under the hood. If any operation raises, the exception
+        is captured and included in the results list rather than re-raised.
+
+        Args:
+            operations: List of awaitables returned by SDK methods
+
+        Returns:
+            List of results in the same order as the input operations.
+            Failed operations have their exception instance at that index.
+
+        Raises:
+            SDKError: If the SDK is not initialized
+        """
+        if not self._initialized:
+            raise SDKError(
+                "SDK not initialized. Call initialize() or use as async context manager."
+            )
+
+        if not operations:
+            return []
+
+        return list(await asyncio.gather(*operations, return_exceptions=True))
+
+    def add_middleware(self, middleware: SDKMiddleware) -> None:
+        """
+        Add middleware to the SDK method execution pipeline.
+
+        Middleware is applied in order — first added is outermost (called first).
+        Can be called before or after initialization.
+
+        Args:
+            middleware: SDKMiddleware instance to add
+        """
+        self._middlewares.append(middleware)
+
+        # Re-wrap already-discovered methods if initialized
+        if self._initialized:
+            self._apply_middleware_to_methods()
+
+    def _apply_middleware_to_methods(self) -> None:
+        """Re-wrap all discovered methods with the current middleware chain."""
+        for method_name, raw_method in self._methods.items():
+            wrapped = build_middleware_chain(self._middlewares, method_name, raw_method)
+            setattr(self, method_name, wrapped)
 
     # CLI-equivalent convenience methods
     async def request_machines(self, template_id: str, count: int, **kwargs) -> Any:

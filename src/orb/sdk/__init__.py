@@ -56,6 +56,7 @@ from .exceptions import (
     ProviderError,
     SDKError,
 )
+from .middleware import SDKMiddleware
 
 # Convenient alias
 orb = ORBClient
@@ -71,4 +72,5 @@ __all__: list[str] = [
     "ProviderError",
     "SDKConfig",
     "SDKError",
+    "SDKMiddleware",
 ]
