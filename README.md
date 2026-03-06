@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <strong>Dynamic cloud resource provisioning via CLI and optional REST API</strong>
+  <strong>Unified API for orchestrating and provisioning compute capacity</strong>
 </p>
 
 <p align="center">
@@ -20,12 +20,24 @@
 
 ---
 
-ORB lets you request, track, and return cloud compute resources through a single CLI. It integrates with IBM Spectrum Symphony as a HostFactory provider plugin and also works standalone. It supports AWS (EC2, Auto Scaling Groups, SpotFleet, EC2Fleet) and is designed to be extended to additional providers. Resources are provisioned on demand and returned when no longer needed.
+ORB is a unified API for orchestrating and provisioning compute capacity programmatically. Define what you need in a template, request it, track it, return it — through a CLI, REST API, Python SDK, or MCP server.
+
+Built for AWS today (EC2, Auto Scaling Groups, SpotFleet, EC2Fleet), with an extensible provider system for adding new cloud backends.
 
 | Provider | Resource Types | Status |
 |---|---|---|
 | **AWS** | EC2 RunInstances, EC2Fleet, SpotFleet, Auto Scaling Groups | Supported |
 | *Custom* | Extensible via provider registry | [Guide](docs/root/developer_guide/architecture.md) |
+
+**Scheduler support:**
+- **HostFactory** — runs as an [IBM Spectrum Symphony provider plugin](#hostfactory-integration)
+- **Standalone** — direct usage without an external scheduler
+
+**Interface modes** (ordered by typical usage):
+- **CLI** — primary interface for all operations
+- **REST API** — HTTP endpoints for service integration (`pip install "orb-py[api]"`)
+- **Python SDK** — async-first programmatic access (`from orb import ORBClient`)
+- **MCP Server** — AI assistant integration via Model Context Protocol
 
 ## Quick Start
 
@@ -33,8 +45,30 @@ ORB lets you request, track, and return cloud compute resources through a single
 pip install orb-py
 orb init
 orb templates generate
+```
+
+### 1. Pick a template
+
+```bash
 orb templates list
+```
+
+### 2. Request machines
+
+```bash
 orb machines request <template-id> 3
+```
+
+### 3. Check status
+
+```bash
+orb requests status <request-id>
+```
+
+### 4. Return machines when done
+
+```bash
+orb machines return --request-id <request-id>
 ```
 
 ---
@@ -251,6 +285,54 @@ See the [Architecture Guide](docs/root/developer_guide/architecture.md) for deta
 ---
 
 <details>
+<summary>REST API</summary>
+
+```bash
+# Get available templates
+curl -X GET "http://localhost:8000/api/v1/templates"
+
+# Create machine request
+curl -X POST "http://localhost:8000/api/v1/requests" \
+  -H "Content-Type: application/json" \
+  -d '{"templateId": "my-template", "maxNumber": 5}'
+
+# Check request status
+curl -X GET "http://localhost:8000/api/v1/requests/req-12345"
+```
+
+Start the API server with `pip install "orb-py[api]"` and `orb system serve`.
+
+</details>
+
+---
+
+<details>
+<summary>Python SDK</summary>
+
+```python
+from orb import ORBClient as orb
+
+async with orb(provider="aws") as sdk:
+    # List templates
+    templates = await sdk.list_templates(active_only=True)
+
+    # Request machines
+    request = await sdk.request_machines(
+        template_id=templates[0].template_id,
+        count=3
+    )
+
+    # Check status
+    status = await sdk.get_request_status(request_id=request.id)
+```
+
+See the [SDK Quickstart](docs/root/sdk/quickstart.md) for the full guide.
+
+</details>
+
+---
+
+<details>
 <summary>MCP Server (AI Assistant Integration)</summary>
 
 ORB provides a Model Context Protocol (MCP) server for AI assistant integration:
@@ -291,38 +373,27 @@ orb mcp serve --port 3000 --host localhost
 ---
 
 <details>
-<summary>REST API</summary>
-
-```bash
-# Get available templates
-curl -X GET "http://localhost:8000/api/v1/templates"
-
-# Create machine request
-curl -X POST "http://localhost:8000/api/v1/requests" \
-  -H "Content-Type: application/json" \
-  -d '{"templateId": "my-template", "maxNumber": 5}'
-
-# Check request status
-curl -X GET "http://localhost:8000/api/v1/requests/req-12345"
-```
-
-Start the API server with `pip install "orb-py[api]"` and `orb system serve`.
-
-</details>
-
----
-
-<details>
 <summary>HostFactory Integration</summary>
 
-ORB integrates with IBM Spectrum Symphony as a HostFactory provider plugin:
+ORB integrates with IBM Spectrum Symphony as a HostFactory provider plugin, providing full API compatibility through shell scripts:
 
-- **API Compatibility**: Full compatibility with HostFactory API requirements
-- **Attribute Generation**: Automatic CPU and RAM specs based on AWS instance types
-- **Output Format Compliance**: Native support for HostFactory expected output formats
-- **Configuration Integration**: Works with existing HostFactory configurations
+| Script | Description |
+|---|---|
+| `getAvailableTemplates.sh` | List available compute templates |
+| `requestMachines.sh` | Request new compute instances |
+| `getRequestStatus.sh` | Poll request status |
+| `requestReturnMachines.sh` | Return instances |
+| `getReturnRequests.sh` | Check return request status |
 
-Example HostFactory template output:
+Scripts are available for both Linux (bash) and Windows (bat). They are generated automatically by `orb init` and placed in your config directory.
+
+**Key features:**
+- Full HostFactory API compatibility
+- Automatic CPU and RAM attribute generation from AWS instance types
+- Native HostFactory output format (camelCase JSON)
+- Drop-in replacement for existing provider plugins
+
+Example template output:
 
 ```json
 {

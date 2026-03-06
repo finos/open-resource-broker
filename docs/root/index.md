@@ -1,63 +1,50 @@
-# Open Resource Broker
+<p align="center">
+  <img alt="Open Resource Broker" src="assets/orb-logo-horizontal.svg" width="480">
+</p>
 
-Welcome to the Open Resource Broker documentation. ORB integrates with IBM Spectrum Symphony Host Factory and cloud providers to enable dynamic provisioning of compute resources via a CLI and optional REST API.
+<p align="center">
+  <strong>Unified API for orchestrating and provisioning compute capacity</strong>
+</p>
 
-## Documentation Navigation
+---
 
-### Getting Started
-- **[Quick Start Guide](getting_started/quick_start.md)** - Get up and running in minutes
-- **[Installation Guide](user_guide/installation.md)** - Detailed installation instructions
-- **[Configuration Guide](user_guide/configuration.md)** - System configuration options
+Welcome to the Open Resource Broker documentation. ORB lets you define what compute capacity you need in a template, request it, track it, and return it — through a CLI, REST API, Python SDK, or MCP server.
 
-### Architecture & Design
-- **[System Overview](architecture/system_overview.md)** - High-level architecture overview
-- **[Clean Architecture](architecture/clean_architecture.md)** - Architectural principles and patterns
-- **[System Diagrams](architecture/system_diagrams.md)** - Visual architecture representations
+## Getting Started
 
-### Developer Resources
-- **[Developer Guide](developer_guide/architecture.md)** - Development-focused guidance
-- **[API Reference](api/readme.md)** - REST API documentation
-- **[Testing Guide](testing/readme.md)** - Testing strategies and examples
+- **[Quick Start Guide](getting_started/quick_start.md)** — get up and running in minutes
+- **[Installation Guide](user_guide/installation.md)** — detailed installation instructions
+- **[Configuration Guide](user_guide/configuration.md)** — system configuration options
 
-### Deployment & Operations
-- **[Deployment Guide](deployment/readme.md)** - Complete deployment documentation
-- **[Operational Tools](operational/tools.md)** - Monitoring and maintenance tools
+## Architecture & Design
 
-## Quick Start
+- **[System Overview](architecture/system_overview.md)** — high-level architecture overview
+- **[Clean Architecture](architecture/clean_architecture.md)** — architectural principles and patterns
+- **[System Diagrams](architecture/system_diagrams.md)** — visual architecture representations
 
-```bash
-pip install orb-py
-orb init
-orb templates generate
-orb templates list
-orb machines request <template-id> 3
-```
+## Developer Resources
 
-See the [Quick Start Guide](getting_started/quick_start.md) for a full walkthrough.
+- **[Developer Guide](developer_guide/architecture.md)** — development-focused guidance
+- **[SDK Quickstart](sdk/quickstart.md)** — programmatic access via Python SDK
+- **[API Reference](api/readme.md)** — REST API documentation
+- **[Testing Guide](testing/readme.md)** — testing strategies and examples
+
+## Deployment & Operations
+
+- **[Deployment Guide](deployment/readme.md)** — complete deployment documentation
+- **[HostFactory Integration](hostfactory/integration_guide.md)** — IBM Spectrum Symphony integration
+- **[Operational Tools](operational/tools.md)** — monitoring and maintenance tools
 
 ## Features
 
-- **AWS Provider**: EC2 Instances, Auto Scaling Groups, Spot Fleet, EC2 Fleet
-- **CLI**: Primary interface for all operations
-- **Optional REST API**: Enable with `pip install "orb-py[api]"`
-- **Clean Architecture**: Domain-Driven Design with CQRS patterns
-- **Extensible**: Strategy/Registry pattern for adding providers and schedulers
-
-## Supported Providers
-
-### Amazon Web Services (AWS)
-- **EC2 Instances**: Direct instance provisioning via RunInstances
-- **Auto Scaling Groups**: Managed scaling groups
-- **Spot Fleet**: Cost-optimized spot instances
-- **EC2 Fleet**: Fleet provisioning with mixed instance types
-
-## Documentation Structure
-
-- **[User Guide](user_guide/installation.md)**: End-user documentation
-- **[Deployment Guide](deployment/readme.md)**: Deployment documentation
-- **[Developer Guide](developer_guide/architecture.md)**: Architecture and development
-- **[API Reference](api/readme.md)**: REST API documentation (optional feature)
+- **AWS Provider** — EC2 Instances, Auto Scaling Groups, Spot Fleet, EC2 Fleet
+- **CLI** — primary interface for all operations
+- **REST API** — HTTP endpoints for service integration
+- **Python SDK** — async-first programmatic access
+- **MCP Server** — AI assistant integration
+- **Clean Architecture** — Domain-Driven Design with CQRS patterns
+- **Extensible** — Strategy/Registry pattern for adding providers and schedulers
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
+This project is licensed under the Apache License 2.0 — see the LICENSE file for details.

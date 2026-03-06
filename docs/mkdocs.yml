@@ -1,5 +1,5 @@
 site_name: Open Resource Broker
-site_description: Provider-agnostic Host Factory plugin for IBM Spectrum Symphony
+site_description: Unified API for orchestrating and provisioning compute capacity
 site_url: https://awslabs.github.io/open-resource-broker
 repo_url: https://github.com/awslabs/open-resource-broker
 repo_name: open-resource-broker
