@@ -1,0 +1,33 @@
+#!/bin/bash
+set -e
+
+# Run pre-push checks (reads .pre-commit-config.yaml, pre-push stage hooks)
+pre-commit run --hook-stage pre-push
+
+# Run bug scanner
+echo "Running bug scanner..."
+
+find_ubs() {
+  if command -v ubs >/dev/null 2>&1; then
+    command -v ubs
+  elif [ -x "$HOME/.local/bin/ubs" ]; then
+    echo "$HOME/.local/bin/ubs"
+  elif [ -x "/usr/local/bin/ubs" ]; then
+    echo "/usr/local/bin/ubs"
+  else
+    return 1
+  fi
+}
+
+UBS_CMD="$(find_ubs)" || {
+  echo "WARNING: 'ubs' command not found, skipping bug scan." >&2
+  exit 0
+}
+
+if ! "$UBS_CMD" . 2>&1 | tail -30; then
+  echo ""
+  echo "ERROR: Bug scanner found issues. Fix them or use: git push --no-verify"
+  exit 1
+fi
+
+echo "OK: Bug scan passed"
