@@ -24,10 +24,9 @@ ORB is a unified API for orchestrating and provisioning compute capacity program
 
 Built for AWS today (EC2, Auto Scaling Groups, SpotFleet, EC2Fleet), with an extensible provider system for adding new cloud backends.
 
-| Provider | Resource Types | Status |
-|---|---|---|
-| **AWS** | EC2 RunInstances, EC2Fleet, SpotFleet, Auto Scaling Groups | Supported |
-| *Custom* | Extensible via provider registry | [Guide](docs/root/developer_guide/architecture.md) |
+**Provider support:**
+- **AWS** — EC2 RunInstances, EC2Fleet, SpotFleet, Auto Scaling Groups
+- **Custom** — extensible via [provider registry](docs/root/developer_guide/architecture.md)
 
 **Scheduler support:**
 - **HostFactory** — runs as an [IBM Spectrum Symphony provider plugin](#hostfactory-integration)

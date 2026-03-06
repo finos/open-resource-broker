@@ -295,7 +295,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --cov=orb --cov-report=term-missing --cov-report=html"
+addopts = "-v --cov --cov-report=term-missing --cov-report=html"
 markers = [
     "aws: marks tests that require real AWS credentials",
     "manual_aws: marks tests that must be run manually against AWS",
@@ -314,7 +314,7 @@ env = [
 ]
 
 [tool.coverage.run]
-source = ["src/orb"]  # keep in sync with .project.yml build.package_root
+source = ["src/orb"]
 branch = true
 
 [tool.coverage.report]
