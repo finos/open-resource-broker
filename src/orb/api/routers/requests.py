@@ -88,7 +88,11 @@ async def list_return_requests(
 
     query = ListReturnRequestsQuery(limit=limit)
     results = await query_bus.execute(query)
-    serialized = [r.to_dict() if hasattr(r, "to_dict") else r for r in results] if isinstance(results, list) else results
+    serialized = (
+        [r.to_dict() if hasattr(r, "to_dict") else r for r in results]
+        if isinstance(results, list)
+        else results
+    )
     return JSONResponse(content=jsonable_encoder(serialized))
 
 

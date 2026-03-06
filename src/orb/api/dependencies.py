@@ -87,7 +87,6 @@ def get_request_status_handler():
     return container.get(GetRequestStatusRESTHandler)
 
 
-
 def get_return_machines_handler():
     """Get return machines API handler from DI container."""
 
