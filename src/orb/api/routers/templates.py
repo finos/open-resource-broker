@@ -1,14 +1,15 @@
 """Template management API routes."""
 
 from datetime import datetime
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 try:
-    from fastapi import APIRouter, Body, HTTPException, Query
+    from fastapi import APIRouter, Body, Depends, HTTPException, Query
     from fastapi.responses import JSONResponse
 except ImportError:
     raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
 
+from orb.api.dependencies import get_command_bus, get_query_bus
 from orb.api.models.base import APIRequest
 from orb.application.dto.queries import GetTemplateQuery, ListTemplatesQuery, ValidateTemplateQuery
 from orb.application.template.commands import (
@@ -16,13 +17,13 @@ from orb.application.template.commands import (
     DeleteTemplateCommand,
     UpdateTemplateCommand,
 )
-from orb.infrastructure.di.buses import CommandBus, QueryBus
-from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_rest_exceptions
 
 router = APIRouter(prefix="/templates", tags=["Templates"])
 
 # Module-level dependency variables to avoid B008 warnings
+QUERY_BUS = Depends(get_query_bus)
+COMMAND_BUS = Depends(get_command_bus)
 PROVIDER_API_QUERY = Query(None, description="Filter by provider API")
 TEMPLATE_DATA_BODY = Body(...)
 
@@ -88,6 +89,7 @@ class TemplateUpdateRequest(APIRequest):
 @handle_rest_exceptions(endpoint="/api/v1/templates", method="GET")
 async def list_templates(
     provider_api: Optional[str] = PROVIDER_API_QUERY,
+    query_bus=QUERY_BUS,
 ) -> JSONResponse:
     """
     List all available templates.
@@ -95,12 +97,6 @@ async def list_templates(
     - **provider_api**: Filter templates by provider API
     """
     try:
-        container = get_container()
-        query_bus = container.get(QueryBus)
-
-        if not query_bus:
-            raise HTTPException(status_code=500, detail="QueryBus not available")
-
         query = ListTemplatesQuery(provider_api=provider_api, active_only=True)
         templates = await query_bus.execute(query)
 
@@ -136,6 +132,7 @@ async def list_templates(
 @handle_rest_exceptions(endpoint="/api/v1/templates/{template_id}", method="GET")
 async def get_template(
     template_id: str,
+    query_bus=QUERY_BUS,
 ) -> JSONResponse:
     """
     Get a specific template by ID.
@@ -143,12 +140,6 @@ async def get_template(
     - **template_id**: Template identifier
     """
     try:
-        container = get_container()
-        query_bus = container.get(QueryBus)
-
-        if not query_bus:
-            raise HTTPException(status_code=500, detail="QueryBus not available")
-
         query = GetTemplateQuery(template_id=template_id)
         template = await query_bus.execute(query)
 
@@ -179,19 +170,13 @@ async def get_template(
 
 @router.post("/", summary="Create Template", description="Create a new template")
 @handle_rest_exceptions(endpoint="/api/v1/templates", method="POST")
-async def create_template(template_data: TemplateCreateRequest) -> JSONResponse:
+async def create_template(template_data: TemplateCreateRequest, command_bus=COMMAND_BUS) -> JSONResponse:
     """
     Create a new template.
 
     - **template_data**: Template configuration data
     """
     try:
-        container = get_container()
-        command_bus = container.get(CommandBus)
-
-        if not command_bus:
-            raise HTTPException(status_code=500, detail="CommandBus not available")
-
         template_dict = template_data.model_dump(exclude_unset=True)
 
         command = CreateTemplateCommand(
@@ -205,7 +190,7 @@ async def create_template(template_data: TemplateCreateRequest) -> JSONResponse:
             configuration=template_dict,
         )
 
-        await command_bus.execute(cast(Any, command))
+        await command_bus.execute(command)
 
         return JSONResponse(
             status_code=201,
@@ -228,7 +213,7 @@ async def create_template(template_data: TemplateCreateRequest) -> JSONResponse:
     description="Update an existing template",
 )
 @handle_rest_exceptions(endpoint="/api/v1/templates/{template_id}", method="PUT")
-async def update_template(template_id: str, template_data: TemplateUpdateRequest) -> JSONResponse:
+async def update_template(template_id: str, template_data: TemplateUpdateRequest, command_bus=COMMAND_BUS) -> JSONResponse:
     """
     Update an existing template.
 
@@ -236,12 +221,6 @@ async def update_template(template_id: str, template_data: TemplateUpdateRequest
     - **template_data**: Updated template configuration data
     """
     try:
-        container = get_container()
-        command_bus = container.get(CommandBus)
-
-        if not command_bus:
-            raise HTTPException(status_code=500, detail="CommandBus not available")
-
         template_dict = template_data.model_dump(exclude_unset=True)
 
         command = UpdateTemplateCommand(
@@ -251,7 +230,7 @@ async def update_template(template_id: str, template_data: TemplateUpdateRequest
             configuration=template_dict,
         )
 
-        await command_bus.execute(cast(Any, command))
+        await command_bus.execute(command)
 
         return JSONResponse(
             status_code=200,
@@ -270,21 +249,15 @@ async def update_template(template_id: str, template_data: TemplateUpdateRequest
 
 @router.delete("/{template_id}", summary="Delete Template", description="Delete a template")
 @handle_rest_exceptions(endpoint="/api/v1/templates/{template_id}", method="DELETE")
-async def delete_template(template_id: str) -> JSONResponse:
+async def delete_template(template_id: str, command_bus=COMMAND_BUS) -> JSONResponse:
     """
     Delete a template.
 
     - **template_id**: Template identifier
     """
     try:
-        container = get_container()
-        command_bus = container.get(CommandBus)
-
-        if not command_bus:
-            raise HTTPException(status_code=500, detail="CommandBus not available")
-
         command = DeleteTemplateCommand(template_id=template_id)
-        await command_bus.execute(cast(Any, command))
+        await command_bus.execute(command)
 
         return JSONResponse(
             status_code=200,
@@ -309,6 +282,7 @@ async def delete_template(template_id: str) -> JSONResponse:
 @handle_rest_exceptions(endpoint="/api/v1/templates/validate", method="POST")
 async def validate_template(
     template_data: dict[str, Any] = TEMPLATE_DATA_BODY,
+    query_bus=QUERY_BUS,
 ) -> JSONResponse:
     """
     Validate template configuration.
@@ -316,12 +290,6 @@ async def validate_template(
     - **template_data**: Template configuration to validate
     """
     try:
-        container = get_container()
-        query_bus = container.get(QueryBus)
-
-        if not query_bus:
-            raise HTTPException(status_code=500, detail="QueryBus not available")
-
         query = ValidateTemplateQuery(template_config=template_data)
         validation_result = await query_bus.execute(query)
 
@@ -350,17 +318,11 @@ async def validate_template(
 
 @router.post("/refresh", summary="Refresh Templates", description="Refresh template cache")
 @handle_rest_exceptions(endpoint="/api/v1/templates/refresh", method="POST")
-async def refresh_templates() -> JSONResponse:
+async def refresh_templates(query_bus=QUERY_BUS) -> JSONResponse:
     """
     Refresh template cache and reload from files.
     """
     try:
-        container = get_container()
-        query_bus = container.get(QueryBus)
-
-        if not query_bus:
-            raise HTTPException(status_code=500, detail="QueryBus not available")
-
         query = ListTemplatesQuery(provider_api=None, active_only=True)
         templates = await query_bus.execute(query)
         template_count = len(templates) if templates else 0
