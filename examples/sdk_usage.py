@@ -131,9 +131,7 @@ async def demo_check_status(sdk: ORBClient, request_id: str) -> None:
         print(f"    Status check failed: {e.message}")
 
 
-async def demo_return_machines(
-    sdk: ORBClient, machine_ids: list[str], dry_run: bool
-) -> None:
+async def demo_return_machines(sdk: ORBClient, machine_ids: list[str], dry_run: bool) -> None:
     """Return machines by ID."""
     print(f"\n[4] Returning {len(machine_ids)} machine(s)...")
     if dry_run:
