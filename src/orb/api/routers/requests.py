@@ -79,7 +79,11 @@ async def list_requests(
 
         query = ListActiveRequestsQuery(limit=limit or 50, all_resources=True)
         results = await query_bus.execute(query)
-        serialized = [r.to_dict() if hasattr(r, "to_dict") else r for r in results] if isinstance(results, list) else results
+        serialized = (
+            [r.to_dict() if hasattr(r, "to_dict") else r for r in results]
+            if isinstance(results, list)
+            else results
+        )
         return JSONResponse(content=jsonable_encoder(serialized))
 
     from orb.application.request.queries import ListRequestsQuery

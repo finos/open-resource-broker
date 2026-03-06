@@ -10,7 +10,11 @@ try:
 except ImportError:
     raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
 
-from orb.api.dependencies import get_query_bus, get_request_machines_handler, get_return_machines_handler
+from orb.api.dependencies import (
+    get_query_bus,
+    get_request_machines_handler,
+    get_return_machines_handler,
+)
 from orb.api.models.base import APIRequest
 from orb.infrastructure.error.decorators import handle_rest_exceptions
 
@@ -125,7 +129,11 @@ async def list_machines(
 
     query = ListMachinesQuery(status=status, request_id=request_id, limit=limit)
     results = await query_bus.execute(query)
-    serialized = [r.to_dict() if hasattr(r, "to_dict") else r for r in results] if isinstance(results, list) else results
+    serialized = (
+        [r.to_dict() if hasattr(r, "to_dict") else r for r in results]
+        if isinstance(results, list)
+        else results
+    )
     return JSONResponse(content=jsonable_encoder(serialized))
 
 
