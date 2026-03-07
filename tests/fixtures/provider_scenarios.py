@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from domain.machine.machine_identifiers import MachineId
+from orb.domain.machine.machine_identifiers import MachineId
 
 
 class ProviderScenarios:

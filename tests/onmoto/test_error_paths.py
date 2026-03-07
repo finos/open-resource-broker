@@ -12,7 +12,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from providers.aws.exceptions.aws_exceptions import AWSValidationError
+from orb.providers.aws.exceptions.aws_exceptions import AWSValidationError
 from tests.onmoto.conftest import (
     _make_aws_client,
     _make_config_port,
@@ -35,12 +35,12 @@ def _make_strategy(scheduler_type: str = "default"):
     """Build a lightweight scheduler strategy with no DI needed."""
     logger = _make_logger()
     if scheduler_type == "hostfactory":
-        from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+        from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
             HostFactorySchedulerStrategy,
         )
 
         return HostFactorySchedulerStrategy(logger=logger)
-    from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+    from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 
     return DefaultSchedulerStrategy(logger=logger)
 
@@ -341,7 +341,7 @@ class TestEC2FleetHandlerEdgeCases:
         assert result["success"] is False
 
     def test_check_hosts_status_no_resource_ids_raises(self, handler):
-        from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
+        from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 
         request = make_request(resource_ids=[])
         with pytest.raises(AWSInfrastructureError):
@@ -491,7 +491,7 @@ class TestRunInstancesHandlerEdgeCases:
         return {"subnet_id": subnet["Subnet"]["SubnetId"], "sg_id": sg["GroupId"]}
 
     def test_acquire_hosts_missing_image_id_raises_validation_error(self, handler, vpc):
-        from providers.aws.exceptions.aws_exceptions import AWSValidationError
+        from orb.providers.aws.exceptions.aws_exceptions import AWSValidationError
 
         bad_template = make_aws_template(subnet_id=vpc["subnet_id"], sg_id=vpc["sg_id"])
         bad_template = bad_template.model_copy(update={"image_id": None})
@@ -501,7 +501,7 @@ class TestRunInstancesHandlerEdgeCases:
             handler.acquire_hosts(request, bad_template)
 
     def test_acquire_hosts_missing_subnet_raises_validation_error(self, handler, vpc):
-        from providers.aws.exceptions.aws_exceptions import AWSValidationError
+        from orb.providers.aws.exceptions.aws_exceptions import AWSValidationError
 
         bad_template = make_aws_template(subnet_id=vpc["subnet_id"], sg_id=vpc["sg_id"])
         bad_template = bad_template.model_copy(update={"subnet_ids": []})
@@ -584,7 +584,7 @@ class TestASGHandlerEdgeCases:
         return {"subnet_id": subnet["Subnet"]["SubnetId"], "sg_id": sg["GroupId"]}
 
     def test_acquire_hosts_missing_sg_raises_validation_error(self, handler, vpc):
-        from providers.aws.exceptions.aws_exceptions import AWSValidationError
+        from orb.providers.aws.exceptions.aws_exceptions import AWSValidationError
 
         bad_template = make_aws_template(subnet_id=vpc["subnet_id"], sg_id=vpc["sg_id"])
         bad_template = bad_template.model_copy(update={"security_group_ids": []})

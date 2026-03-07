@@ -5,9 +5,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from infrastructure.storage.adapters.strategy_adapter import StorageStrategyAdapter
-from infrastructure.storage.base.strategy import BaseStorageStrategy, StorageStrategy
-from infrastructure.storage.interfaces import (
+from orb.infrastructure.storage.adapters.strategy_adapter import StorageStrategyAdapter
+from orb.infrastructure.storage.base.strategy import BaseStorageStrategy, StorageStrategy
+from orb.infrastructure.storage.interfaces import (
     BatchStorage,
     StorageReader,
     StorageWriter,

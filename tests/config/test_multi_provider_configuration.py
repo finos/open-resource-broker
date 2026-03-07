@@ -2,8 +2,8 @@
 
 import pytest
 
-from config.managers.type_converter import ConfigTypeConverter
-from providers.aws.configuration.config import AWSProviderConfig
+from orb.config.managers.type_converter import ConfigTypeConverter
+from orb.providers.aws.configuration.config import AWSProviderConfig
 
 
 class TestMultiProviderConfiguration:

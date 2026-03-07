@@ -2,7 +2,7 @@
 
 import pytest
 
-from infrastructure.validation import (
+from orb.infrastructure.validation import (
     ValidationError,
     sanitize_input,
     validate_alphanumeric,

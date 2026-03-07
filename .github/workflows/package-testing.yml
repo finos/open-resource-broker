@@ -84,10 +84,10 @@ jobs:
           
           # Test core imports always work
           try:
-              import run
-              from bootstrap import Application
-              from domain.base.exceptions import DomainException
-              from infrastructure.logging.logger import get_logger
+              import orb.run
+              from orb.bootstrap import Application
+              from orb.domain.base.exceptions import DomainException
+              from orb.infrastructure.logging.logger import get_logger
               print('PASS: Core imports successful')
           except ImportError as e:
               print(f'FAIL: Core import failed: {e}')
@@ -97,20 +97,20 @@ jobs:
       - name: Test CLI functionality
         run: |
           # Test basic CLI works
-          python -m run --help
-          python -m run --version
-          
+          python -m orb --help
+          python -m orb --version
+
           # Test commands that should work in all variants
-          python -m run templates list --help || echo "Templates command help failed (expected in some cases)"
+          python -m orb templates list --help || echo "Templates command help failed (expected in some cases)"
 
       - name: Test CLI Rich formatting
         if: matrix.variant.test_cli_rich
         run: |
           python -c "
           try:
-              from cli.formatters import format_generic_table
-              from cli.console import get_console
-              
+              from orb.cli.formatters import format_generic_table
+              from orb.cli.console import get_console
+
               # Test Rich table formatting
               test_data = [{'id': '1', 'name': 'test'}]
               result = format_generic_table(test_data, 'Test Items')
@@ -137,9 +137,9 @@ jobs:
               print('PASS: Rich correctly not available in minimal variant')
           
           # Test CLI still works with fallbacks
-          from cli.formatters import format_generic_table
-          from cli.console import get_console
-          
+          from orb.cli.formatters import format_generic_table
+          from orb.cli.console import get_console
+
           test_data = [{'id': '1', 'name': 'test'}]
           result = format_generic_table(test_data, 'Test Items')
           print('PASS: CLI fallback formatting works')
@@ -154,7 +154,7 @@ jobs:
         run: |
           python -c "
           try:
-              from api.server import create_fastapi_app
+              from orb.api.server import create_fastapi_app
               print('PASS: FastAPI imports successful')
               
               # Test app creation (basic test)
@@ -177,7 +177,7 @@ jobs:
           
           # Test that API server creation fails gracefully
           try:
-              from api.server import create_fastapi_app
+              from orb.api.server import create_fastapi_app
               try:
                   create_fastapi_app(None)
                   print('FAIL: API should have failed without FastAPI')
@@ -197,7 +197,7 @@ jobs:
         run: |
           python -c "
           try:
-              from monitoring.health import HealthCheck
+              from orb.monitoring.health import HealthCheck
               print('PASS: Monitoring imports successful')
               
               # Test basic monitoring functionality
@@ -225,7 +225,7 @@ jobs:
           
           # Monitoring should still import but with limited functionality
           try:
-              from monitoring.health import HealthCheck
+              from orb.monitoring.health import HealthCheck
               print('PASS: Monitoring module imports with limited functionality')
           except ImportError as e:
               print(f'FAIL: Monitoring module should import even without optional deps: {e}')
@@ -262,7 +262,7 @@ jobs:
           # Test CLI without Rich
           with patch.dict(sys.modules, {'rich': None, 'rich.console': None, 'rich.table': None}):
               try:
-                  from cli.console import get_console, print_success
+                  from orb.cli.console import get_console, print_success
                   console = get_console()
                   print('PASS: CLI console works without Rich')
               except Exception as e:
@@ -272,7 +272,7 @@ jobs:
           # Test API without FastAPI
           with patch.dict(sys.modules, {'fastapi': None}):
               try:
-                  from api.server import create_fastapi_app
+                  from orb.api.server import create_fastapi_app
                   try:
                       create_fastapi_app(None)
                       print('FAIL: API should fail without FastAPI')
@@ -322,13 +322,13 @@ jobs:
                   print(f'PASS: {dep} correctly not available')
           
           # Test that core functionality still works
-          import run
-          from bootstrap import Application
-          from domain.base.exceptions import DomainException
+          import orb.run
+          from orb.bootstrap import Application
+          from orb.domain.base.exceptions import DomainException
           print('PASS: Core functionality works without optional deps')
-          
+
           # Test CLI with fallbacks
-          from cli.console import get_console
+          from orb.cli.console import get_console
           console = get_console()
           console.print('Test message')
           print('PASS: CLI works with fallbacks')
@@ -360,7 +360,7 @@ jobs:
           
           # Test API error message
           try:
-              from api.server import create_fastapi_app
+              from orb.api.server import create_fastapi_app
               try:
                   create_fastapi_app(None)
                   print('FAIL: API should have failed')
@@ -404,10 +404,10 @@ jobs:
           # Test all functionality works together
           python -c "
           # Test all imports work
-          from cli.formatters import format_generic_table
-          from cli.console import get_console
-          from api.server import create_fastapi_app
-          from monitoring.health import HealthCheck
+          from orb.cli.formatters import format_generic_table
+          from orb.cli.console import get_console
+          from orb.api.server import create_fastapi_app
+          from orb.monitoring.health import HealthCheck
           
           print('PASS: All modules import successfully')
           
@@ -426,8 +426,8 @@ jobs:
 
       - name: Test CLI commands
         run: |
-          python -m run --help
-          python -m run --version
+          python -m orb --help
+          python -m orb --version
           echo "PASS: CLI commands work"
 
   summary:

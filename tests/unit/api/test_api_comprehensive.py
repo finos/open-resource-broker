@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
-from application.dto.queries import GetRequestQuery, ListActiveRequestsQuery
-from application.request.dto import RequestStatusResponse
+from orb.api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
+from orb.application.dto.queries import GetRequestQuery, ListActiveRequestsQuery
+from orb.application.request.dto import RequestStatusResponse
 
 # Check if FastAPI is available
 try:
@@ -37,7 +37,7 @@ class TestAPIHandlersComprehensive:
 
         for handler_file in handler_files:
             try:
-                module = importlib.import_module(f"api.handlers.{handler_file}")
+                module = importlib.import_module(f"orb.api.handlers.{handler_file}")
                 handler_modules.append((handler_file, module))
             except ImportError:
                 continue
@@ -235,7 +235,9 @@ class TestRequestStatusHandlerBehaviour:
         # post_process_response no longer calls format_request_response (correct — that was
         # the wrong formatter for status responses). Verify the response is correctly structured.
         result_dict = result.model_dump() if hasattr(result, "model_dump") else result
-        assert result_dict["requests"][0]["requestId"] == "req-12345678-1234-1234-1234-123456789012"
+        assert (
+            result_dict["requests"][0]["request_id"] == "req-12345678-1234-1234-1234-123456789012"
+        )
 
         # Ensure the correct query type was used
         query_bus.execute.assert_awaited_once()
@@ -247,12 +249,12 @@ class TestRequestStatusHandlerBehaviour:
         command_bus = Mock()
 
         mock_req = Mock()
-        mock_req.to_dict.return_value = {"requestId": "req-2", "status": "running"}
+        mock_req.to_dict.return_value = {"request_id": "req-2", "status": "running"}
         query_bus.execute = AsyncMock(return_value=[mock_req])
 
         scheduler = Mock()
         scheduler.format_request_response = AsyncMock(
-            return_value={"requests": [{"requestId": "req-2", "status": "running"}]}
+            return_value={"requests": [{"request_id": "req-2", "status": "running"}]}
         )
 
         handler = GetRequestStatusRESTHandler(
@@ -270,7 +272,7 @@ class TestRequestStatusHandlerBehaviour:
         query_bus.execute.assert_awaited_once()
         assert isinstance(query_bus.execute.call_args.args[0], ListActiveRequestsQuery)
         result_dict = result.model_dump() if hasattr(result, "model_dump") else result
-        assert result_dict["requests"][0]["requestId"] == "req-2"
+        assert result_dict["requests"][0]["request_id"] == "req-2"
 
     @pytest.mark.asyncio
     async def test_long_requests_use_get_request_query(self):
@@ -280,7 +282,7 @@ class TestRequestStatusHandlerBehaviour:
         scheduler.format_request_response = AsyncMock(
             return_value={
                 "requests": [
-                    {"requestId": "req-87654321-4321-4321-4321-210987654321", "status": "complete"}
+                    {"request_id": "req-87654321-4321-4321-4321-210987654321", "status": "complete"}
                 ]
             }
         )
@@ -317,11 +319,11 @@ class TestAPIModelsComprehensive:
     def get_model_modules(self):
         """Get all model modules."""
         model_modules = []
-        model_files = ["base", "request_machines", "requests", "responses", "templates"]
+        model_files = ["base", "requests", "responses", "templates"]
 
         for model_file in model_files:
             try:
-                module = importlib.import_module(f"api.models.{model_file}")
+                module = importlib.import_module(f"orb.api.models.{model_file}")
                 model_modules.append((model_file, module))
             except ImportError:
                 continue
@@ -452,7 +454,7 @@ class TestAPIRoutersComprehensive:
 
         for router_file in router_files:
             try:
-                module = importlib.import_module(f"api.routers.{router_file}")
+                module = importlib.import_module(f"orb.api.routers.{router_file}")
                 router_modules.append((router_file, module))
             except ImportError:
                 continue
@@ -511,7 +513,7 @@ class TestAPIValidationComprehensive:
     def test_validation_module_exists(self):
         """Test that validation module exists."""
         try:
-            import api.validation as validation_module
+            import orb.api.validation as validation_module
 
             assert validation_module is not None
         except ImportError:
@@ -520,7 +522,7 @@ class TestAPIValidationComprehensive:
     def test_validation_functions(self):
         """Test validation functions exist."""
         try:
-            import api.validation as validation_module
+            import orb.api.validation as validation_module
 
             # Look for validation functions
             functions = [
@@ -538,7 +540,7 @@ class TestAPIValidationComprehensive:
     def test_validation_classes(self):
         """Test validation classes exist."""
         try:
-            import api.validation as validation_module
+            import orb.api.validation as validation_module
 
             # Look for validation classes
             classes = [

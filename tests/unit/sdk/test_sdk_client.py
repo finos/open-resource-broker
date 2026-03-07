@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from sdk.client import OpenResourceBroker
-from sdk.config import SDKConfig
-from sdk.exceptions import ConfigurationError, ProviderError, SDKError
+from orb.sdk.client import OpenResourceBroker
+from orb.sdk.config import SDKConfig
+from orb.sdk.exceptions import ConfigurationError, ProviderError, SDKError
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -25,7 +25,7 @@ def _initialized_sdk(extra_methods: dict | None = None) -> OpenResourceBroker:
     sdk._query_bus = AsyncMock()
     sdk._command_bus = AsyncMock()
 
-    from sdk.discovery import SDKMethodDiscovery
+    from orb.sdk.discovery import SDKMethodDiscovery
 
     sdk._discovery = SDKMethodDiscovery()
 
@@ -95,8 +95,8 @@ class TestOpenResourceBrokerInitialize:
         mock_app.get_command_bus.return_value = AsyncMock()
 
         with (
-            patch("sdk.client.Application", return_value=mock_app),
-            patch("sdk.client.SDKMethodDiscovery") as mock_disc_cls,
+            patch("orb.sdk.client.Application", return_value=mock_app),
+            patch("orb.sdk.client.SDKMethodDiscovery") as mock_disc_cls,
         ):
             mock_disc = MagicMock()
             mock_disc.discover_cqrs_methods = AsyncMock(return_value={})
@@ -120,7 +120,7 @@ class TestOpenResourceBrokerInitialize:
         mock_app = AsyncMock()
         mock_app.initialize.return_value = False
 
-        with patch("sdk.client.Application", return_value=mock_app):
+        with patch("orb.sdk.client.Application", return_value=mock_app):
             with pytest.raises(ProviderError):
                 await sdk.initialize()
 
@@ -134,7 +134,7 @@ class TestOpenResourceBrokerInitialize:
         mock_app.get_query_bus.return_value = None
         mock_app.get_command_bus.return_value = None
 
-        with patch("sdk.client.Application", return_value=mock_app):
+        with patch("orb.sdk.client.Application", return_value=mock_app):
             with pytest.raises(ConfigurationError, match="CQRS buses not available"):
                 await sdk.initialize()
 
@@ -148,8 +148,8 @@ class TestOpenResourceBrokerInitialize:
         mock_app.cleanup = AsyncMock()
 
         with (
-            patch("sdk.client.Application", return_value=mock_app),
-            patch("sdk.client.SDKMethodDiscovery") as mock_disc_cls,
+            patch("orb.sdk.client.Application", return_value=mock_app),
+            patch("orb.sdk.client.SDKMethodDiscovery") as mock_disc_cls,
         ):
             mock_disc = MagicMock()
             mock_disc.discover_cqrs_methods = AsyncMock(return_value={})
@@ -239,6 +239,94 @@ class TestOpenResourceBrokerIntrospection:
 
 
 # ---------------------------------------------------------------------------
+# Region / profile override wiring
+# ---------------------------------------------------------------------------
+
+
+class TestRegionProfileOverrides:
+    def _make_init_mocks(self):
+        mock_app = MagicMock()
+        mock_app.initialize = AsyncMock(return_value=True)
+        mock_app.get_query_bus.return_value = AsyncMock()
+        mock_app.get_command_bus.return_value = AsyncMock()
+        mock_disc = MagicMock()
+        mock_disc.discover_cqrs_methods = AsyncMock(return_value={})
+        return mock_app, mock_disc
+
+    @pytest.mark.asyncio
+    async def test_region_override_applied_after_initialize(self):
+        sdk = OpenResourceBroker(config={"provider": "aws", "region": "us-east-1"})
+        mock_app, mock_disc = self._make_init_mocks()
+        mock_config_port = MagicMock()
+        mock_container = MagicMock()
+        mock_container.get.return_value = mock_config_port
+
+        with (
+            patch("orb.sdk.client.Application", return_value=mock_app),
+            patch("orb.sdk.client.SDKMethodDiscovery", return_value=mock_disc),
+            patch("orb.sdk.client.create_container", return_value=mock_container),
+        ):
+            await sdk.initialize()
+
+        mock_config_port.override_provider_region.assert_called_once_with("us-east-1")
+        mock_config_port.override_provider_profile.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_profile_override_applied_after_initialize(self):
+        sdk = OpenResourceBroker(config={"provider": "aws", "profile": "prod"})
+        mock_app, mock_disc = self._make_init_mocks()
+        mock_config_port = MagicMock()
+        mock_container = MagicMock()
+        mock_container.get.return_value = mock_config_port
+
+        with (
+            patch("orb.sdk.client.Application", return_value=mock_app),
+            patch("orb.sdk.client.SDKMethodDiscovery", return_value=mock_disc),
+            patch("orb.sdk.client.create_container", return_value=mock_container),
+        ):
+            await sdk.initialize()
+
+        mock_config_port.override_provider_profile.assert_called_once_with("prod")
+        mock_config_port.override_provider_region.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_region_and_profile_both_applied(self):
+        sdk = OpenResourceBroker(
+            config={"provider": "aws", "region": "eu-west-1", "profile": "staging"}
+        )
+        mock_app, mock_disc = self._make_init_mocks()
+        mock_config_port = MagicMock()
+        mock_container = MagicMock()
+        mock_container.get.return_value = mock_config_port
+
+        with (
+            patch("orb.sdk.client.Application", return_value=mock_app),
+            patch("orb.sdk.client.SDKMethodDiscovery", return_value=mock_disc),
+            patch("orb.sdk.client.create_container", return_value=mock_container),
+        ):
+            await sdk.initialize()
+
+        mock_config_port.override_provider_region.assert_called_once_with("eu-west-1")
+        mock_config_port.override_provider_profile.assert_called_once_with("staging")
+
+    @pytest.mark.asyncio
+    async def test_no_overrides_when_region_and_profile_absent(self):
+        sdk = OpenResourceBroker(config={"provider": "aws"})
+        mock_app, mock_disc = self._make_init_mocks()
+        mock_container = MagicMock()
+
+        with (
+            patch("orb.sdk.client.Application", return_value=mock_app),
+            patch("orb.sdk.client.SDKMethodDiscovery", return_value=mock_disc),
+            patch("orb.sdk.client.create_container", return_value=mock_container),
+        ):
+            await sdk.initialize()
+
+        # container.get should never be called when no region/profile configured
+        mock_container.get.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # Convenience methods
 # ---------------------------------------------------------------------------
 
@@ -258,7 +346,7 @@ class TestConvenienceMethods:
 
         result = await sdk.request_machines("tmpl-1", 3)
 
-        mock_create.assert_awaited_once_with(template_id="tmpl-1", machine_count=3)
+        mock_create.assert_awaited_once_with(template_id="tmpl-1", count=3)
         assert result == {"request_id": "req-123"}
 
     @pytest.mark.asyncio
@@ -294,3 +382,47 @@ class TestConvenienceMethods:
 
         mock_health.assert_awaited_once()
         assert result == {"status": "healthy"}
+
+
+# ---------------------------------------------------------------------------
+# sys.exit / missing config safety
+# ---------------------------------------------------------------------------
+
+
+class TestInitializeMissingConfigSafety:
+    @pytest.mark.asyncio
+    async def test_missing_config_raises_configuration_error_not_system_exit(self):
+        """initialize() must raise ConfigurationError, never kill the process."""
+        sdk = OpenResourceBroker(config={"provider": "aws"})
+
+        with patch("orb.sdk.client.Application", side_effect=SystemExit(1)):
+            with pytest.raises(ConfigurationError):
+                await sdk.initialize()
+
+    @pytest.mark.asyncio
+    async def test_missing_config_does_not_raise_system_exit(self):
+        """SystemExit must never propagate out of initialize()."""
+        sdk = OpenResourceBroker(config={"provider": "aws"})
+
+        with patch("orb.sdk.client.Application", side_effect=SystemExit(1)):
+            try:
+                await sdk.initialize()
+            except ConfigurationError:
+                pass  # expected
+            except SystemExit:
+                pytest.fail("initialize() raised SystemExit — process would have been killed")
+
+    def test_nonexistent_config_path_raises_configuration_error(self, tmp_path):
+        """A config_path that does not exist raises ConfigurationError at construction."""
+        with pytest.raises(ConfigurationError, match="not found"):
+            OpenResourceBroker(config_path=str(tmp_path / "does_not_exist.json"))
+
+    @pytest.mark.asyncio
+    async def test_downstream_sys_exit_converted_to_configuration_error(self):
+        """If Application.__init__ somehow calls sys.exit, it is caught and converted."""
+        sdk = OpenResourceBroker(config={"provider": "aws", "dummy": "value"})
+        sdk._config.config_path = None
+
+        with patch("orb.sdk.client.Application", side_effect=SystemExit(1)):
+            with pytest.raises(ConfigurationError, match="exit code 1"):
+                await sdk.initialize()

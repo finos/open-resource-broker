@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "orb-py"
 version = "1.1.2"
-description = "Cloud provider integration plugin for IBM Spectrum Symphony Host Factory"
+description = "Open Resource Broker (ORB) — dynamic cloud resource provisioning via CLI and REST API"
 readme = "README.md"
 license = "Apache-2.0"
 authors = [
@@ -88,7 +88,94 @@ all = [
     "orb-py[cli,api,monitoring]",
 ]
 
+# ---------------------------------------------------------------------------
+# pip compatibility shims for [dependency-groups] (PEP 735)
+#
+# pip does not yet support PEP 735 dependency-groups.  The authoritative dev
+# dependency lists live in [dependency-groups] below.  These optional-deps
+# mirror them so `pip install -e ".[dev]"` keeps working.  When pip gains
+# PEP 735 support these shims can be removed.
+# ---------------------------------------------------------------------------
+ci = [
+    # Code Quality Tools
+    "ruff>=0.1.0",
+    "pathspec>=0.11.0",
+    "pyright>=1.1.408,<2.0.0",
+    "mypy>=1.6.1,<2.0.0",
+    "bandit>=1.7.5,<2.0.0",
+    "bandit-sarif-formatter>=1.1.1,<2.0.0",
+    # Testing Framework
+    "pytest>=7.4.3,<10.0.0",
+    "pytest-cov>=4.1.0,<8.0.0",
+    "pytest-env>=1.1.1,<2.0.0",
+    "pytest-mock>=3.12.0,<4.0.0",
+    "pytest-asyncio>=0.21.1,<2.0.0",
+    "pytest-timeout>=2.2.0,<3.0.0",
+    "pytest-xdist>=3.3.1,<4.0.0",
+    "pytest-html>=4.1.1,<5.0.0",
+    "pytest-benchmark>=5.1.0,<6.0.0",
+    "coverage>=7.3.2,<8.0.0",
+    # Test dependencies for API and template tests
+    "fastapi>=0.128.0",
+    "httpx>=0.27.0",
+    "jinja2>=3.1.0",
+    # AWS Testing
+    "moto[all]>=5.1.19,<6.0.0",
+    "responses>=0.24.0,<1.0.0",
+    "requests-mock>=1.11.0,<2.0.0",
+    "joserfc>=1.6.1",
+    "werkzeug>=3.1.6",
+    "nltk>=3.9.3",
+    # Essential Type Stubs
+    "types-PyYAML>=6.0.12.12,<7.0.0",
+    "types-python-dateutil>=2.8.19.14,<3.0.0",
+    # Build Tools
+    "tomli>=2.0.0,<3.0.0",
+    # Security Scanning
+    "safety>=3.7.0,<4.0.0",
+    "pip-audit>=2.6.1,<3.0.0",
+    "semgrep>=1.45.0,<2.0.0",
+    "cyclonedx-bom>=4.0.0,<8.0.0",
+    "peewee>=3.18.3",
+    "marshmallow>=4.1.2",
+    # Documentation
+    "mkdocs>=1.5.0,<2.0.0",
+    "mkdocs-material>=9.1.0,<10.0.0",
+    "mkdocstrings>=0.22.0,<2.0.0",
+    "mkdocstrings-python>=1.1.0,<2.0.0",
+    "mkdocs-gen-files>=0.5.0,<1.0.0",
+    "mkdocs-literate-nav>=0.6.0,<1.0.0",
+    "mkdocs-section-index>=0.3.0,<1.0.0",
+    "mike>=1.1.0,<3.0.0",
+    # Build and Packaging
+    "build>=1.0.3,<2.0.0",
+    "wheel>=0.41.3,<1.0.0",
+]
+dev = [
+    "orb-py[ci]",
+    "virtualenv>=20.26.6",
+    "pre-commit>=3.5.0,<5.0.0",
+    "bump2version>=1.0.1,<2.0.0",
+    "python-semantic-release>=10.0.0,<11.0.0",
+    "line-profiler>=4.1.1,<6.0.0",
+    "memory-profiler>=0.61.0,<1.0.0",
+    "py-spy>=0.3.14,<1.0.0",
+    "py-cpuinfo>=9.0.0,<10.0.0",
+    "ipdb>=0.13.13,<1.0.0",
+    "ipython>=8.16.1,<9.0.0",
+    "radon>=6.0.1,<7.0.0",
+    "pip-tools>=7.3.0,<8.0.0",
+    "twine>=4.0.0",
+    "git-changelog>=2.6.0,<3.0.0",
+]
+
 [dependency-groups]
+# ---------------------------------------------------------------------------
+# Authoritative dev dependency definitions (PEP 735).
+# Use: `uv sync --group dev` or `uv sync --group ci`
+# The [project.optional-dependencies] ci/dev sections above are pip shims
+# that mirror these lists for `pip install -e ".[dev]"` compatibility.
+# ---------------------------------------------------------------------------
 # CI Dependencies: What CI needs to test, lint, and build docs
 ci = [
     # Code Quality Tools (ruff replaces black/isort/flake8/pylint)
@@ -160,6 +247,7 @@ ci = [
 
 # Dev Dependencies: Additional dev tools (includes all CI deps)
 dev = [
+    {include-group = "ci"},
     "virtualenv>=20.26.6",  # Security: Fix CVE-2024-53899 command injection
     "pre-commit>=3.5.0,<5.0.0",
     "bump2version>=1.0.1,<2.0.0",
@@ -176,7 +264,7 @@ dev = [
     "git-changelog>=2.6.0,<3.0.0",
 ]
 [project.scripts]
-orb = "run:cli_main"
+orb = "orb.run:cli_main"
 
 [project.urls]
 Homepage = "https://github.com/awslabs/open-resource-broker"
@@ -191,7 +279,6 @@ where = ["src"]
 "" = "src"
 
 [tool.setuptools]
-py-modules = ["run", "_package", "bootstrap"]
 include-package-data = true
 
 [tool.setuptools.package-data]
@@ -199,7 +286,7 @@ include-package-data = true
 
 [tool.setuptools.data-files]
 "orb_config" = ["config/*.json"]
-"orb_scripts" = ["src/infrastructure/scheduler/hostfactory/scripts/*.sh", "src/infrastructure/scheduler/hostfactory/scripts/*.bat"]
+"orb_scripts" = ["src/orb/infrastructure/scheduler/hostfactory/scripts/*.sh", "src/orb/infrastructure/scheduler/hostfactory/scripts/*.bat"]  # keep in sync with .project.yml build.package_root
 
 
 
@@ -208,7 +295,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --cov=orb --cov-report=term-missing --cov-report=html"
+addopts = "-v --cov --cov-report=term-missing --cov-report=html"
 markers = [
     "aws: marks tests that require real AWS credentials",
     "manual_aws: marks tests that must be run manually against AWS",
@@ -227,7 +314,7 @@ env = [
 ]
 
 [tool.coverage.run]
-source = ["src"]
+source = ["src/orb"]
 branch = true
 
 [tool.coverage.report]
@@ -323,21 +410,20 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.ruff.lint.isort]
-known-first-party = ["orb", "application", "config", "domain", "infrastructure", "interface", "api", "monitoring"]
+known-first-party = ["orb"]
 combine-as-imports = true
 
 [tool.pyright]
-pythonVersion = "3.9"
+pythonVersion = "3.12"
 pythonPlatform = "Linux"
-include = ["src"]
-exclude = ["tests", ".venv", "build", "dist"]
+include = ["src/orb"]  # keep in sync with .project.yml build.package_root
+exclude = [".venv", "build", "dist"]
 typeCheckingMode = "basic"
 reportMissingImports = true
 reportMissingTypeStubs = false
-reportUnusedImports = true
 reportUnusedVariable = true
+reportUnusedImport = true
 reportPrivateUsage = false
-useLibraryCodeForTypes = true
 venvPath = "."
 venv = ".venv"
 

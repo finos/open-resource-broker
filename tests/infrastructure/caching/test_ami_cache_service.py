@@ -2,7 +2,7 @@
 
 import time
 
-from infrastructure.caching.ami_cache_service import AMICacheService
+from orb.infrastructure.caching.ami_cache_service import AMICacheService
 
 
 class TestAMICacheService:

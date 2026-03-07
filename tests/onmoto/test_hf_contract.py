@@ -64,7 +64,7 @@ def _make_config_port(prefix: str = "") -> Any:
 
 
 def _make_aws_client(region: str = REGION) -> Any:
-    from providers.aws.infrastructure.aws_client import AWSClient
+    from orb.providers.aws.infrastructure.aws_client import AWSClient
 
     aws_client = MagicMock(spec=AWSClient)
     aws_client.ec2_client = boto3.client("ec2", region_name=region)
@@ -74,8 +74,8 @@ def _make_aws_client(region: str = REGION) -> Any:
 
 
 def _make_launch_template_manager(aws_client: Any, logger: Any) -> Any:
-    from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-    from providers.aws.infrastructure.launch_template.manager import (
+    from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+    from orb.providers.aws.infrastructure.launch_template.manager import (
         AWSLaunchTemplateManager,
         LaunchTemplateResult,
     )
@@ -121,8 +121,8 @@ def _make_launch_template_manager(aws_client: Any, logger: Any) -> Any:
 
 
 def _make_run_instances_handler(aws_client: Any, logger: Any, config_port: Any) -> Any:
-    from providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
-    from providers.aws.utilities.aws_operations import AWSOperations
+    from orb.providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
+    from orb.providers.aws.utilities.aws_operations import AWSOperations
 
     aws_ops = AWSOperations(aws_client, logger, config_port)
     lt_manager = _make_launch_template_manager(aws_client, logger)
@@ -153,7 +153,7 @@ def _make_request(
 
 
 def _run_instances_template(subnet_id: str, sg_id: str) -> Any:
-    from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+    from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
     return AWSTemplate(
         template_id="tpl-run-contract",
@@ -262,9 +262,9 @@ def _build_request_dto_from_run_instances(
 @pytest.fixture
 def hf_strat(orb_config_dir):
     """Return the HostFactorySchedulerStrategy from the DI container."""
-    from domain.base.ports.scheduler_port import SchedulerPort
-    from infrastructure.di.container import get_container
-    from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+    from orb.domain.base.ports.scheduler_port import SchedulerPort
+    from orb.infrastructure.di.container import get_container
+    from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
         HostFactorySchedulerStrategy,
     )
 
@@ -279,9 +279,9 @@ def hf_strat(orb_config_dir):
 @pytest.fixture
 def default_strat(orb_config_dir):
     """Return a DefaultSchedulerStrategy sharing the same template_defaults_service."""
-    from domain.base.ports.scheduler_port import SchedulerPort
-    from infrastructure.di.container import get_container
-    from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+    from orb.domain.base.ports.scheduler_port import SchedulerPort
+    from orb.infrastructure.di.container import get_container
+    from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 
     container = get_container()
     hf = container.get(SchedulerPort)
@@ -307,8 +307,8 @@ def sg_id(moto_vpc_resources):
 
 def _get_all_template_dtos(strat: Any, orb_config_dir: Path) -> list:
     """Load all TemplateDTOs via the strategy's template pipeline."""
-    from infrastructure.di.container import get_container
-    from infrastructure.template.configuration_manager import TemplateConfigurationManager
+    from orb.infrastructure.di.container import get_container
+    from orb.infrastructure.template.configuration_manager import TemplateConfigurationManager
 
     container = get_container()
     manager = container.get(TemplateConfigurationManager)

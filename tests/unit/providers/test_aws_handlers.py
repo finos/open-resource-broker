@@ -1,7 +1,7 @@
 """Tests for AWS handler implementations."""
 
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import boto3
 import pytest
@@ -20,17 +20,17 @@ except ImportError:
 
 # Import AWS components
 try:
-    from providers.aws.domain.template.value_objects import AWSFleetType
-    from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
-    from providers.aws.infrastructure.handlers.asg.handler import ASGHandler
-    from providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
-    from providers.aws.infrastructure.handlers.run_instances.handler import (
+    from orb.providers.aws.domain.template.value_objects import AWSFleetType
+    from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
+    from orb.providers.aws.infrastructure.handlers.asg.handler import ASGHandler
+    from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
+    from orb.providers.aws.infrastructure.handlers.run_instances.handler import (
         RunInstancesHandler,
     )
-    from providers.aws.infrastructure.handlers.spot_fleet.handler import (
+    from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import (
         SpotFleetHandler,
     )
-    from providers.aws.utilities.aws_operations import AWSOperations
+    from orb.providers.aws.utilities.aws_operations import AWSOperations
 
     IMPORTS_AVAILABLE = True
 except ImportError as e:
@@ -445,16 +445,8 @@ class TestEC2FleetHandler:
         )
         template = SimpleNamespace(template_id="tmpl-123", fleet_type=AWSFleetType.INSTANT)
 
-        with patch(
-            "providers.aws.infrastructure.handlers.ec2_fleet.handler.AWSValidationAdapter"
-        ) as mock_validation_cls:
-            mock_validation_cls.return_value.get_valid_fleet_types_for_api.return_value = [
-                "instant",
-                "request",
-                "maintain",
-            ]
-            with pytest.raises(AWSInfrastructureError):
-                handler._create_fleet_internal(request, template)
+        with pytest.raises(AWSInfrastructureError):
+            handler._create_fleet_internal(request, template)
 
     def test_ec2_fleet_instant_errors_with_instances_marks_partial_success(self):
         """Instant fleet errors with instances should preserve errors and instance IDs without raising."""
@@ -504,16 +496,8 @@ class TestEC2FleetHandler:
         )
         template = SimpleNamespace(template_id="tmpl-789", fleet_type=AWSFleetType.INSTANT)
 
-        with patch(
-            "providers.aws.infrastructure.handlers.ec2_fleet.handler.AWSValidationAdapter"
-        ) as mock_validation_cls:
-            mock_validation_cls.return_value.get_valid_fleet_types_for_api.return_value = [
-                "instant",
-                "request",
-                "maintain",
-            ]
-            fleet_response = handler._create_fleet_internal(request, template)
-            fleet_id = fleet_response["fleet_id"]
+        fleet_response = handler._create_fleet_internal(request, template)
+        fleet_id = fleet_response["fleet_id"]
 
         assert fleet_id == "fleet-789"
         assert logger.warning.called
@@ -549,16 +533,8 @@ class TestEC2FleetHandler:
         )
         template = SimpleNamespace(template_id="tmpl-456", fleet_type=AWSFleetType.INSTANT)
 
-        with patch(
-            "providers.aws.infrastructure.handlers.ec2_fleet.handler.AWSValidationAdapter"
-        ) as mock_validation_cls:
-            mock_validation_cls.return_value.get_valid_fleet_types_for_api.return_value = [
-                "instant",
-                "request",
-                "maintain",
-            ]
-            fleet_response = handler._create_fleet_internal(request, template)
-            fleet_id = fleet_response["fleet_id"]
+        fleet_response = handler._create_fleet_internal(request, template)
+        fleet_id = fleet_response["fleet_id"]
 
         assert fleet_id == "fleet-456"
         assert request.metadata == {}

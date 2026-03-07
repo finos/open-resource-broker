@@ -10,17 +10,17 @@ from unittest.mock import Mock
 
 import pytest
 
-from application.commands.request_handlers import CreateMachineRequestHandler
-from application.dto.commands import CreateRequestCommand
-from domain.base import UnitOfWorkFactory
-from domain.base.ports import (
+from orb.application.commands.request_handlers import CreateMachineRequestHandler
+from orb.application.dto.commands import CreateRequestCommand
+from orb.domain.base import UnitOfWorkFactory
+from orb.domain.base.ports import (
     ErrorHandlingPort,
     EventPublisherPort,
     LoggingPort,
     ProviderSelectionPort,
 )
-from infrastructure.di.buses import CommandBus, QueryBus
-from infrastructure.di.container import DIContainer
+from orb.infrastructure.di.buses import CommandBus, QueryBus
+from orb.infrastructure.di.container import DIContainer
 
 
 @pytest.mark.integration
@@ -51,8 +51,8 @@ class TestCQRSArchitectureIntegration:
 
         # Configure container.get to return appropriate mocks
         def get_mock(service_type):
-            from domain.base.ports.configuration_port import ConfigurationPort
-            from domain.base.ports.scheduler_port import SchedulerPort
+            from orb.domain.base.ports.configuration_port import ConfigurationPort
+            from orb.domain.base.ports.scheduler_port import SchedulerPort
 
             if service_type == ConfigurationPort:
                 return mock_config_manager
@@ -96,7 +96,7 @@ class TestCQRSArchitectureIntegration:
         bus = Mock(spec=QueryBus)
 
         # Mock template query response
-        from domain.template.template_aggregate import Template
+        from orb.domain.template.template_aggregate import Template
 
         mock_template = Template(
             template_id="web-server-template",
@@ -121,7 +121,7 @@ class TestCQRSArchitectureIntegration:
         port = Mock(spec=ProviderSelectionPort)
 
         # Mock selection result
-        from domain.base.results import ProviderSelectionResult
+        from orb.domain.base.results import ProviderSelectionResult
 
         selection_result = ProviderSelectionResult(
             provider_type="aws",
@@ -132,7 +132,7 @@ class TestCQRSArchitectureIntegration:
         port.select_provider_for_template.return_value = selection_result
         port.get_available_strategies.return_value = ["aws-aws-default"]
 
-        from domain.base.results import ValidationResult
+        from orb.domain.base.results import ValidationResult
 
         port.validate_template_requirements.return_value = ValidationResult(
             is_valid=True,
@@ -144,7 +144,7 @@ class TestCQRSArchitectureIntegration:
         )
 
         # Mock execute_operation as async
-        from providers.base.strategy.provider_strategy import ProviderResult
+        from orb.providers.base.strategy.provider_strategy import ProviderResult
 
         provider_result = ProviderResult(
             success=True,
@@ -168,7 +168,7 @@ class TestCQRSArchitectureIntegration:
         service = Mock()  # Remove spec since ProviderCapabilityService was removed
 
         # Mock validation result
-        from domain.base.results import ValidationResult
+        from orb.domain.base.results import ValidationResult
 
         validation_result = ValidationResult(
             is_valid=True,
@@ -254,7 +254,7 @@ class TestCQRSArchitectureIntegration:
 
     def test_provider_capability_service_integration(self, mock_provider_capability_service):
         """Test provider capability service integration."""
-        from domain.template.template_aggregate import Template
+        from orb.domain.template.template_aggregate import Template
 
         # Create test template
         template = Template(
@@ -282,7 +282,7 @@ class TestCQRSArchitectureIntegration:
 
     def test_provider_selection_port_integration(self, mock_provider_selection_port):
         """Test provider selection port integration."""
-        from domain.template.template_aggregate import Template
+        from orb.domain.template.template_aggregate import Template
 
         # Create test template
         template = Template(
@@ -311,8 +311,8 @@ class TestCQRSArchitectureIntegration:
         """Test provider operation integration."""
         from unittest.mock import AsyncMock
 
-        from providers.base.strategy import ProviderOperation, ProviderOperationType
-        from providers.base.strategy.provider_strategy import ProviderResult
+        from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
+        from orb.providers.base.strategy.provider_strategy import ProviderResult
 
         # Mock as async
         result = ProviderResult(
@@ -365,7 +365,7 @@ class TestCQRSArchitectureIntegration:
         # Mock provider selection port to return failure
         from unittest.mock import AsyncMock
 
-        from providers.base.strategy.provider_strategy import ProviderResult
+        from orb.providers.base.strategy.provider_strategy import ProviderResult
 
         failure_result = ProviderResult(
             success=False,

@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from infrastructure.auth.token_blacklist import InMemoryTokenBlacklist
+from orb.infrastructure.auth.token_blacklist import InMemoryTokenBlacklist
 
 
 @pytest.mark.asyncio

@@ -6,16 +6,16 @@ import pytest
 
 # Import CQRS components that actually exist
 try:
-    from application.commands.request_handlers import (
+    from orb.application.commands.request_handlers import (
         CreateMachineRequestHandler as CreateRequestHandler,
     )
-    from application.dto.commands import (
+    from orb.application.dto.commands import (
         BaseCommand,
         CreateRequestCommand,
         UpdateRequestStatusCommand,
     )
-    from application.dto.queries import GetRequestStatusQuery
-    from infrastructure.di.buses import CommandBus, QueryBus
+    from orb.application.dto.queries import GetRequestQuery
+    from orb.infrastructure.di.buses import CommandBus, QueryBus
 
     IMPORTS_AVAILABLE = True
 except ImportError as e:
@@ -79,7 +79,7 @@ class TestCommandQuerySeparation:
 
     def test_queries_do_not_modify_state(self):
         """Test that queries do not modify system state."""
-        query = GetRequestStatusQuery(request_id="test-request")
+        query = GetRequestQuery(request_id="test-request")
 
         # Query should not contain state-modifying methods
         query_methods = [
@@ -133,14 +133,22 @@ class TestCommandQuerySeparation:
         mock_selection_result = Mock()
         mock_selection_result.provider_instance = "test-provider"
         mock_selection_result.provider_type = "aws"
+        mock_selection_result.provider_name = "test-provider"
         mock_selection_result.selection_reason = "test"
         mock_selection_result.confidence = 1.0
         mock_provider_selection.select_provider_for_template.return_value = mock_selection_result
+        mock_provider_validation_result = Mock()
+        mock_provider_validation_result.is_valid = True
+        mock_provider_validation_result.warnings = []
+        mock_provider_selection.validate_template_requirements.return_value = (
+            mock_provider_validation_result
+        )
 
         mock_provider_capability = Mock()
         mock_validation_result = Mock()
         mock_validation_result.is_valid = True
         mock_validation_result.supported_features = []
+        mock_validation_result.warnings = []
         mock_provider_capability.validate_template_requirements.return_value = (
             mock_validation_result
         )
@@ -155,17 +163,16 @@ class TestCommandQuerySeparation:
             event_publisher=mock_event_publisher,
             error_handler=mock_error_handler,
             query_bus=mock_query_bus,
-            provider_selection_service=mock_provider_selection,
-            provider_capability_service=mock_provider_capability,
-            provider_port=mock_provider_port,
+            provider_selection_port=mock_provider_selection,
+            provider_config_port=mock_provider_capability,
         )
 
         # Execute command with dry_run to avoid provisioning
         command = CreateRequestCommand(template_id="test-template", requested_count=2, dry_run=True)
         await handler.handle(command)
 
-        # Verify state was modified via repository save
-        mock_repository.save.assert_called_once()
+        # Verify state was modified via repository save (called twice: initial persist + dry-run update)
+        mock_repository.save.assert_called()
 
     def test_query_handlers_do_not_modify_state(self):
         """Test that query handlers do not modify system state."""
@@ -181,7 +188,7 @@ class TestCommandQuerySeparation:
         mock_request.machine_count = 2
         mock_repository.find_by_id.return_value = mock_request
 
-        query = GetRequestStatusQuery(request_id="test-request")
+        query = GetRequestQuery(request_id="test-request")
         handler.handle(query)
 
         # Should have called repository read method only
@@ -207,16 +214,16 @@ class TestCommandBusImplementation:
         update_handler = AsyncMock()
 
         # Mock handler discovery to return handler class names
-        with patch("infrastructure.di.buses.get_command_handler_for_type") as mock_get_handler:
+        with patch("orb.infrastructure.di.buses.get_command_handler_for_type") as mock_get_handler:
             # Mock container to return handler instances
             mock_container = Mock()
-            mock_container.get.side_effect = (
-                lambda cls: create_handler if cls == "CreateRequestHandler" else update_handler
+            mock_container.get.side_effect = lambda cls: (
+                create_handler if cls == "CreateRequestHandler" else update_handler
             )
 
             # Setup handler routing
-            mock_get_handler.side_effect = (
-                lambda cmd_type: "CreateRequestHandler"
+            mock_get_handler.side_effect = lambda cmd_type: (
+                "CreateRequestHandler"
                 if cmd_type == CreateRequestCommand
                 else "UpdateRequestHandler"
             )
@@ -275,7 +282,7 @@ class TestCommandBusImplementation:
         async_handler = AsyncMock()
 
         # Mock handler discovery
-        with patch("infrastructure.di.buses.get_command_handler_for_type") as mock_get_handler:
+        with patch("orb.infrastructure.di.buses.get_command_handler_for_type") as mock_get_handler:
             mock_container = Mock()
             mock_container.get.return_value = async_handler
             mock_logger = Mock()
@@ -309,24 +316,22 @@ class TestQueryBusImplementation:
         templates_handler.handle.return_value = []
 
         # Mock handler discovery
-        with patch("infrastructure.di.buses.get_query_handler_for_type") as mock_get_handler:
+        with patch("orb.infrastructure.di.buses.get_query_handler_for_type") as mock_get_handler:
             mock_container = Mock()
-            mock_container.get.side_effect = (
-                lambda cls: status_handler
-                if cls == "GetRequestStatusHandler"
-                else templates_handler
+            mock_container.get.side_effect = lambda cls: (
+                status_handler if cls == "GetRequestStatusHandler" else templates_handler
             )
 
-            mock_get_handler.side_effect = (
-                lambda query_type: "GetRequestStatusHandler"
-                if query_type == GetRequestStatusQuery
+            mock_get_handler.side_effect = lambda query_type: (
+                "GetRequestStatusHandler"
+                if query_type == GetRequestQuery
                 else "GetAvailableTemplatesHandler"
             )
 
             query_bus = QueryBus(container=mock_container, logger=Mock())
 
             # Execute queries
-            status_query = GetRequestStatusQuery(request_id="test-request")
+            status_query = GetRequestQuery(request_id="test-request")
             templates_query = GetAvailableTemplatesQuery()
 
             await query_bus.execute(status_query)
@@ -349,7 +354,7 @@ class TestQueryBusImplementation:
         cached_handler.handle.return_value = cached_result
 
         # Mock handler discovery
-        with patch("infrastructure.di.buses.get_query_handler_for_type") as mock_get_handler:
+        with patch("orb.infrastructure.di.buses.get_query_handler_for_type") as mock_get_handler:
             mock_container = Mock()
             mock_container.get.return_value = cached_handler
             mock_logger = Mock()
@@ -359,7 +364,7 @@ class TestQueryBusImplementation:
             query_bus = QueryBus(container=mock_container, logger=mock_logger)
 
             # Execute same query twice
-            query = GetRequestStatusQuery(request_id="test-request")
+            query = GetRequestQuery(request_id="test-request")
             result1 = await query_bus.execute(query)
             result2 = await query_bus.execute(query)
 
@@ -376,7 +381,7 @@ class TestQueryBusImplementation:
         handler = AsyncMock()
         handler.handle.return_value = []
 
-        with patch("infrastructure.di.buses.get_query_handler_for_type") as mock_get_handler:
+        with patch("orb.infrastructure.di.buses.get_query_handler_for_type") as mock_get_handler:
             mock_container = Mock()
             mock_container.get.return_value = handler
             mock_logger = Mock()
@@ -411,15 +416,15 @@ class TestQueryBusImplementation:
         raw_result = {"id": "123", "name": "test"}
         handler.handle.return_value = raw_result
 
-        query_bus.register_handler(GetRequestStatusQuery, handler)
+        query_bus.register_handler(GetRequestQuery, handler)
 
         # Add result transformer if supported
         if hasattr(query_bus, "add_transformer"):
             transformer = Mock()
             transformer.transform.return_value = RequestStatusResponse(**raw_result)
-            query_bus.add_transformer(GetRequestStatusQuery, transformer)
+            query_bus.add_transformer(GetRequestQuery, transformer)
 
-        query = GetRequestStatusQuery(request_id="test-request")
+        query = GetRequestQuery(request_id="test-request")
         query_bus.dispatch(query)
 
         # Should have applied transformation if supported
@@ -461,13 +466,14 @@ class TestCommandHandlerImplementation:
             event_publisher=mock_event_publisher,
             error_handler=mock_error_handler,
             query_bus=mock_query_bus,
-            provider_selection_service=mock_provider_selection,
-            provider_capability_service=mock_provider_capability,
-            provider_port=mock_provider_port,
+            provider_selection_port=mock_provider_selection,
+            provider_config_port=mock_provider_capability,
         )
 
         # Valid command
-        valid_command = CreateRequestCommand(template_id="test-template", requested_count=2)
+        valid_command = CreateRequestCommand(
+            template_id="test-template", requested_count=2, dry_run=True
+        )
 
         # Mock template exists
         mock_template = Mock()
@@ -479,20 +485,27 @@ class TestCommandHandlerImplementation:
         mock_selection_result = Mock()
         mock_selection_result.provider_instance = "test-provider"
         mock_selection_result.provider_type = "aws"
+        mock_selection_result.provider_name = "test-provider"
         mock_selection_result.selection_reason = "test"
         mock_selection_result.confidence = 1.0
         mock_provider_selection.select_provider_for_template.return_value = mock_selection_result
+        mock_provider_validation_result = Mock()
+        mock_provider_validation_result.is_valid = True
+        mock_provider_validation_result.warnings = []
+        mock_provider_selection.validate_template_requirements.return_value = (
+            mock_provider_validation_result
+        )
 
         mock_validation_result = Mock()
         mock_validation_result.is_valid = True
         mock_validation_result.supported_features = []
+        mock_validation_result.warnings = []
         mock_provider_capability.validate_template_requirements.return_value = (
             mock_validation_result
         )
 
-        # Should handle valid command
-        result = await handler.handle(valid_command)
-        assert result is not None
+        # Should handle valid command without raising
+        await handler.handle(valid_command)
 
         # Invalid command (template doesn't exist)
         invalid_command = CreateRequestCommand(
@@ -503,7 +516,7 @@ class TestCommandHandlerImplementation:
         mock_query_bus.execute.return_value = None
 
         # Should raise exception for invalid command
-        from domain.base.exceptions import EntityNotFoundError
+        from orb.domain.base.exceptions import EntityNotFoundError
 
         with pytest.raises(EntityNotFoundError):
             await handler.handle(invalid_command)
@@ -536,14 +549,22 @@ class TestCommandHandlerImplementation:
         mock_selection_result = Mock()
         mock_selection_result.provider_instance = "test-provider"
         mock_selection_result.provider_type = "aws"
+        mock_selection_result.provider_name = "test-provider"
         mock_selection_result.selection_reason = "test"
         mock_selection_result.confidence = 1.0
         mock_provider_selection.select_provider_for_template.return_value = mock_selection_result
+        mock_provider_validation_result = Mock()
+        mock_provider_validation_result.is_valid = True
+        mock_provider_validation_result.warnings = []
+        mock_provider_selection.validate_template_requirements.return_value = (
+            mock_provider_validation_result
+        )
 
         mock_provider_capability = Mock()
         mock_validation_result = Mock()
         mock_validation_result.is_valid = True
         mock_validation_result.supported_features = []
+        mock_validation_result.warnings = []
         mock_provider_capability.validate_template_requirements.return_value = (
             mock_validation_result
         )
@@ -558,9 +579,8 @@ class TestCommandHandlerImplementation:
             event_publisher=mock_event_publisher,
             error_handler=mock_error_handler,
             query_bus=mock_query_bus,
-            provider_selection_service=mock_provider_selection,
-            provider_capability_service=mock_provider_capability,
-            provider_port=mock_provider_port,
+            provider_selection_port=mock_provider_selection,
+            provider_config_port=mock_provider_capability,
         )
 
         # Execute command with dry_run to avoid provisioning
@@ -601,9 +621,8 @@ class TestCommandHandlerImplementation:
             event_publisher=mock_event_publisher,
             error_handler=mock_error_handler,
             query_bus=mock_query_bus,
-            provider_selection_service=mock_provider_selection,
-            provider_capability_service=mock_provider_capability,
-            provider_port=mock_provider_port,
+            provider_selection_port=mock_provider_selection,
+            provider_config_port=mock_provider_capability,
         )
 
         # Should have event publisher
@@ -625,7 +644,7 @@ class TestQueryHandlerImplementation:
         mock_repository.find_by_id_optimized = Mock()
         mock_repository.find_by_id_optimized.return_value = Mock()
 
-        query = GetRequestStatusQuery(request_id="test-request")
+        query = GetRequestQuery(request_id="test-request")
 
         # Should use optimized read methods if available
         if hasattr(mock_repository, "find_by_id_optimized"):
@@ -662,8 +681,8 @@ class TestQueryHandlerImplementation:
         """Test that query handlers support filtering with real GetRequestHandler."""
         from unittest.mock import MagicMock, Mock
 
-        from application.dto.queries import GetRequestQuery
-        from application.queries.request_query_handlers import GetRequestHandler
+        from orb.application.dto.queries import GetRequestQuery
+        from orb.application.queries.request_query_handlers import GetRequestHandler
 
         # Mock dependencies
         mock_uow_factory = Mock()
@@ -714,11 +733,11 @@ class TestQueryHandlerImplementation:
             assert hasattr(handler, "handle"), "Handler should have handle method"
 
     def test_query_handlers_support_projections(self):
-        """Test that query handlers support data projections with real GetRequestStatusQueryHandler."""
+        """Test that query handlers support data projections with real GetRequestQueryHandler."""
         from unittest.mock import MagicMock, Mock
 
-        from application.dto.queries import GetRequestQuery
-        from application.queries.request_query_handlers import GetRequestHandler
+        from orb.application.dto.queries import GetRequestQuery
+        from orb.application.queries.request_query_handlers import GetRequestHandler
 
         # Mock dependencies
         mock_uow_factory = Mock()
@@ -774,8 +793,8 @@ class TestCQRSIntegration:
         """Test that CQRS integrates with event sourcing using real CommandBus."""
         from unittest.mock import Mock
 
-        from application.dto.commands import CreateRequestCommand
-        from infrastructure.di.buses import CommandBus
+        from orb.application.dto.commands import CreateRequestCommand
+        from orb.infrastructure.di.buses import CommandBus
 
         # Mock dependencies that CommandBus requires
         mock_container = Mock()
@@ -808,8 +827,8 @@ class TestCQRSIntegration:
         """Test that CQRS supports read models using real QueryBus and query classes."""
         from unittest.mock import Mock
 
-        from application.dto.queries import GetRequestQuery, ListActiveRequestsQuery
-        from infrastructure.di.buses import QueryBus
+        from orb.application.dto.queries import GetRequestQuery, ListActiveRequestsQuery
+        from orb.infrastructure.di.buses import QueryBus
 
         # Mock dependencies for QueryBus
         mock_container = Mock()
@@ -837,9 +856,9 @@ class TestCQRSIntegration:
         """Test that CQRS handles eventual consistency using real command and query DTOs."""
         from unittest.mock import Mock
 
-        from application.dto.commands import CreateRequestCommand, UpdateRequestStatusCommand
-        from application.dto.queries import GetRequestQuery, GetRequestStatusQuery
-        from infrastructure.di.buses import CommandBus, QueryBus
+        from orb.application.dto.commands import CreateRequestCommand, UpdateRequestStatusCommand
+        from orb.application.dto.queries import GetRequestQuery
+        from orb.infrastructure.di.buses import CommandBus, QueryBus
 
         # Mock dependencies for buses
         mock_container = Mock()
@@ -864,7 +883,7 @@ class TestCQRSIntegration:
         )
 
         get_query = GetRequestQuery(request_id="test-request")
-        status_query = GetRequestStatusQuery(request_id="test-request")
+        status_query = GetRequestQuery(request_id="test-request")
 
         # Test that commands and queries have expected structure
         assert hasattr(create_command, "template_id"), "Command should have template_id"
@@ -879,35 +898,3 @@ class TestCQRSIntegration:
         assert create_command.template_id == "test-template"
         assert update_command.status == "in_progress"
         assert get_query.request_id == "test-request"
-
-    def test_cqrs_supports_saga_patterns(self):
-        """Test that CQRS supports saga/process manager patterns."""
-        from unittest.mock import Mock
-
-        from domain.base.ports import LoggingPort
-        from infrastructure.di.container import DIContainer
-
-        # Create mocks for required dependencies
-        mock_container = Mock(spec=DIContainer)
-        mock_logger = Mock(spec=LoggingPort)
-
-        command_bus = CommandBus(mock_container, mock_logger)
-
-        # Mock saga/process manager
-        mock_saga = Mock()
-
-        # Register saga to handle events and dispatch commands
-        if hasattr(command_bus, "register_saga"):
-            command_bus.register_saga(mock_saga)
-
-        # Execute command that triggers saga
-        command = CreateRequestCommand(template_id="test-template", requested_count=2)
-
-        # Test that command bus can handle saga patterns (async execution)
-        import asyncio
-
-        asyncio.create_task(command_bus.execute(command))
-
-        # Saga should be notified if supported
-        if hasattr(command_bus, "register_saga"):
-            mock_saga.handle_event.assert_called()

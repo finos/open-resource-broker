@@ -10,11 +10,11 @@ import pytest
 
 # Import components for security testing
 try:
-    from domain.request.aggregate import Request
-    from domain.request.exceptions import RequestValidationError
-    from domain.request.request_types import RequestType
-    from domain.template.exceptions import TemplateValidationError
-    from domain.template.template_aggregate import Template
+    from orb.domain.request.aggregate import Request
+    from orb.domain.request.exceptions import RequestValidationError
+    from orb.domain.request.request_types import RequestType
+    from orb.domain.template.exceptions import TemplateValidationError
+    from orb.domain.template.template_aggregate import Template
 
     IMPORTS_AVAILABLE = True
 except ImportError as e:

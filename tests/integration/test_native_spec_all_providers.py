@@ -4,16 +4,16 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from application.services.native_spec_service import NativeSpecService
-from domain.base.ports import ConfigurationPort, LoggingPort
-from domain.base.ports.spec_rendering_port import SpecRenderingPort
-from domain.request.aggregate import Request
-from domain.request.request_identifiers import RequestId
-from domain.request.request_types import RequestType
-from domain.template.exceptions import InvalidTemplateConfigurationError
-from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from providers.aws.domain.template.value_objects import ProviderApi
-from providers.aws.infrastructure.services.aws_native_spec_service import (
+from orb.application.services.native_spec_service import NativeSpecService
+from orb.domain.base.ports import ConfigurationPort, LoggingPort
+from orb.domain.base.ports.spec_rendering_port import SpecRenderingPort
+from orb.domain.request.aggregate import Request
+from orb.domain.request.request_identifiers import RequestId
+from orb.domain.request.request_types import RequestType
+from orb.domain.template.exceptions import InvalidTemplateConfigurationError
+from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.domain.template.value_objects import ProviderApi
+from orb.providers.aws.infrastructure.services.aws_native_spec_service import (
     AWSNativeSpecService,
 )
 
@@ -54,7 +54,7 @@ class TestNativeSpecAllProviders:
                     try:
                         tmpl = env.from_string(v)
                     except TemplateSyntaxError:
-                        from domain.template.exceptions import InvalidTemplateConfigurationError
+                        from orb.domain.template.exceptions import InvalidTemplateConfigurationError
 
                         raise InvalidTemplateConfigurationError(f"Invalid template syntax: {v}")
                     try:
@@ -82,7 +82,7 @@ class TestNativeSpecAllProviders:
         def _render_from_file(path, ctx):
             # Load the file content via read_json_file then render
             try:
-                from infrastructure.utilities.file.json_utils import read_json_file
+                from orb.infrastructure.utilities.file.json_utils import read_json_file
 
                 content = read_json_file(path)
                 return _render(content, ctx)
@@ -380,7 +380,7 @@ class TestNativeSpecAllProviders:
         assert api_result["TargetCapacitySpecification"]["SpotTargetCapacity"] == "3"
         assert api_result["ReplaceUnhealthyInstances"] is True
 
-    @patch("providers.aws.infrastructure.services.aws_native_spec_service.read_json_file")
+    @patch("orb.providers.aws.infrastructure.services.aws_native_spec_service.read_json_file")
     def test_file_based_native_specs_integration(self, mock_read_file):
         """Test template with file-based native specs."""
         # Mock file contents

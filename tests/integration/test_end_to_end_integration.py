@@ -15,25 +15,25 @@ import pytest
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from domain.base.value_objects import InstanceType
-from domain.machine.aggregate import Machine
-from domain.machine.machine_identifiers import MachineId
-from domain.request.aggregate import Request
-from domain.request.request_types import RequestStatus, RequestType
-from domain.request.value_objects import RequestId
-from domain.template.template_aggregate import Template
-from infrastructure.storage.repositories.machine_repository import (
+from orb.domain.base.value_objects import InstanceType
+from orb.domain.machine.aggregate import Machine
+from orb.domain.machine.machine_identifiers import MachineId
+from orb.domain.request.aggregate import Request
+from orb.domain.request.request_types import RequestStatus, RequestType
+from orb.domain.request.value_objects import RequestId
+from orb.domain.template.template_aggregate import Template
+from orb.infrastructure.storage.repositories.machine_repository import (
     MachineRepositoryImpl,
 )
-from infrastructure.storage.repositories.request_repository import (
+from orb.infrastructure.storage.repositories.request_repository import (
     RequestRepositoryImpl,
 )
-from infrastructure.storage.repositories.template_repository import (
+from orb.infrastructure.storage.repositories.template_repository import (
     TemplateRepositoryImpl,
 )
-from providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
-from providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
-from providers.aws.infrastructure.launch_template.manager import (
+from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
+from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
+from orb.providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
     LaunchTemplateResult,
 )

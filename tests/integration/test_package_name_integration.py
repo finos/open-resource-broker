@@ -2,9 +2,9 @@
 
 from unittest.mock import Mock, patch
 
-from config.manager import ConfigurationManager
-from infrastructure.adapters.configuration_adapter import ConfigurationAdapter
-from providers.aws.infrastructure.services.aws_native_spec_service import (
+from orb.config.manager import ConfigurationManager
+from orb.infrastructure.adapters.configuration_adapter import ConfigurationAdapter
+from orb.providers.aws.infrastructure.services.aws_native_spec_service import (
     AWSNativeSpecService,
 )
 
@@ -21,10 +21,10 @@ class TestPackageNameIntegration:
         """Test complete package name flow from configuration to template rendering."""
         # Arrange - patch _package module attributes
         with (
-            patch("_package.PACKAGE_NAME", "test-plugin"),
-            patch("_package.__version__", "2.0.0"),
-            patch("_package.DESCRIPTION", "Test plugin"),
-            patch("_package.AUTHOR", "Test Author"),
+            patch("orb._package.PACKAGE_NAME", "test-plugin"),
+            patch("orb._package.__version__", "2.0.0"),
+            patch("orb._package.DESCRIPTION", "Test plugin"),
+            patch("orb._package.AUTHOR", "Test Author"),
         ):
             # Act - get package info
             package_info = self.config_adapter.get_package_info()
@@ -48,10 +48,10 @@ class TestPackageNameIntegration:
     def test_native_spec_service_uses_package_info(self):
         """Test that native spec service correctly uses package info in context."""
         with (
-            patch("_package.PACKAGE_NAME", "integration-test-plugin"),
-            patch("_package.__version__", "3.0.0"),
-            patch("_package.DESCRIPTION", "Test"),
-            patch("_package.AUTHOR", "Test"),
+            patch("orb._package.PACKAGE_NAME", "integration-test-plugin"),
+            patch("orb._package.__version__", "3.0.0"),
+            patch("orb._package.DESCRIPTION", "Test"),
+            patch("orb._package.AUTHOR", "Test"),
         ):
             # Mock native spec service
             mock_native_spec = Mock()
@@ -60,10 +60,10 @@ class TestPackageNameIntegration:
             )
 
             # Create test template and request
-            from domain.request.aggregate import Request
-            from domain.request.value_objects import RequestId, RequestType
-            from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-            from providers.aws.domain.template.value_objects import ProviderApi
+            from orb.domain.request.aggregate import Request
+            from orb.domain.request.value_objects import RequestId, RequestType
+            from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+            from orb.providers.aws.domain.template.value_objects import ProviderApi
 
             template = AWSTemplate(
                 template_id="integration-test",

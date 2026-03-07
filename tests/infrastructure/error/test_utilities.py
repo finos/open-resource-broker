@@ -1,7 +1,7 @@
 """Tests for error handling utilities."""
 
-from domain.base.exceptions import EntityNotFoundError, ValidationError
-from infrastructure.error.utilities import (
+from orb.domain.base.exceptions import EntityNotFoundError, ValidationError
+from orb.infrastructure.error.utilities import (
     build_error_context,
     format_error_message,
     format_stack_trace,

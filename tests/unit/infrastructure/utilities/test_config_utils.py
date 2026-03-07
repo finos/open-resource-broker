@@ -6,8 +6,8 @@ import tempfile
 
 import pytest
 
-from domain.base.exceptions import ConfigurationError
-from infrastructure.utilities.config_utils import ConfigFileLoader
+from orb.domain.base.exceptions import ConfigurationError
+from orb.infrastructure.utilities.config_utils import ConfigFileLoader
 
 
 class TestConfigFileLoader:

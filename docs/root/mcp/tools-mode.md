@@ -19,7 +19,7 @@ MCP Tools Mode automatically discovers all SDK methods and exposes them as MCP t
 ### Direct Integration in AI Assistants
 
 ```python
-from orb_py.mcp import OpenResourceBrokerMCPTools
+from orb.mcp import OpenResourceBrokerMCPTools
 
 # Initialize MCP tools
 async with OpenResourceBrokerMCPTools(provider="aws") as tools:
@@ -240,7 +240,7 @@ async with OpenResourceBrokerMCPTools() as tools:
     "hostfactory": {
       "command": "python",
       "args": ["-c", "
-        from orb_py.mcp import OpenResourceBrokerMCPTools
+        from orb.mcp import OpenResourceBrokerMCPTools
         import asyncio
         import json
 

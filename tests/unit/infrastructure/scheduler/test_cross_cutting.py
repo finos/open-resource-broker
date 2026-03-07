@@ -5,8 +5,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
-from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
-from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
+from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+    HostFactorySchedulerStrategy,
+)
 from tests.unit.infrastructure.scheduler.conftest import (
     _MINIMAL_HF_TEMPLATE_ON_DISK,
     _MINIMAL_SNAKE_TEMPLATE,

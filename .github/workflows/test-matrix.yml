@@ -106,38 +106,40 @@ jobs:
         run: |
           python -c "
           import sys
-          
+          variant = '${{ matrix.package-variant }}'
+
           # Test basic imports (should always work)
           try:
-              import orb_py
-              print('✓ Basic orb_py import works')
+              import orb
+              print('✓ Basic orb import works')
           except ImportError as e:
-              print(f'✗ Basic orb_py import failed: {e}')
+              print(f'✗ Basic orb import failed: {e}')
               sys.exit(1)
 
-          # Test CLI imports
-          try:
-              from cli.formatters import format_table
-              print('✓ CLI formatters import works')
-          except ImportError as e:
-              if '${{ matrix.package-variant }}' in ['.', '.[api]', '.[monitoring]']:
-                  print(f'✓ Expected CLI import failure for ${{ matrix.package-variant }}: {e}')
-              else:
-                  print(f'✗ Unexpected CLI import failure: {e}')
+          # Test CLI flag: RICH_AVAILABLE reflects whether rich is installed
+          from orb.cli.console import RICH_AVAILABLE
+          if variant in ['.[cli]', '.[all]']:
+              if not RICH_AVAILABLE:
+                  print(f'✗ Expected RICH_AVAILABLE=True for {variant} but got False')
                   sys.exit(1)
+              print(f'✓ RICH_AVAILABLE=True as expected for {variant}')
+          else:
+              print(f'✓ RICH_AVAILABLE={RICH_AVAILABLE} (rich not required for {variant})')
 
-          # Test API imports
+          # Test API imports: fastapi is only available with .[api] or .[all]
           try:
-              from interface.serve_command_handler import handle_serve_command
-              print('✓ API handler import works')
-          except ImportError as e:
-              if '${{ matrix.package-variant }}' in ['.', '.[cli]', '.[monitoring]']:
-                  print(f'✓ Expected API import failure for ${{ matrix.package-variant }}: {e}')
-              else:
-                  print(f'✗ Unexpected API import failure: {e}')
+              from orb.api.routers.machines import router
+              if variant in ['.', '.[cli]', '.[monitoring]']:
+                  print(f'✗ Expected API import to fail for {variant} but it succeeded')
                   sys.exit(1)
-          
-          print('✓ All import tests passed for ${{ matrix.package-variant }}')
+              print(f'✓ API router import works for {variant}')
+          except ImportError as e:
+              if variant in ['.[api]', '.[all]']:
+                  print(f'✗ Unexpected API import failure for {variant}: {e}')
+                  sys.exit(1)
+              print(f'✓ Expected API import failure for {variant}')
+
+          print(f'✓ All import tests passed for {variant}')
           "
 
   e2e-tests:

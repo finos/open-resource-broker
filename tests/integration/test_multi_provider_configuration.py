@@ -1,6 +1,6 @@
 """Integration tests for multi-provider configuration system."""
 
-from config.schemas.provider_strategy_schema import HandlerConfig, ProviderConfig
+from orb.config.schemas.provider_strategy_schema import HandlerConfig, ProviderConfig
 
 
 class TestMultiProviderConfiguration:
@@ -75,7 +75,7 @@ class TestMultiProviderConfiguration:
         import json
         from pathlib import Path
 
-        config_files = ["config/default_config.json", "awscpinst/config/config.json"]
+        config_files = ["config/default_config.json"]
 
         for config_file in config_files:
             config_path = Path(config_file)

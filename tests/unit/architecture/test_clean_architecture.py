@@ -14,6 +14,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from orb._package import PACKAGE_ROOT_STR
+
 
 @pytest.mark.unit
 @pytest.mark.architecture
@@ -24,10 +26,14 @@ class TestCleanArchitecture:
         """Ensure dependencies point inward only."""
         # Define layer hierarchy (outer -> inner)
         layers = {
-            "interface": ["src/interface", "src/cli", "src/api"],
-            "infrastructure": ["src/infrastructure"],
-            "application": ["src/application"],
-            "domain": ["src/domain"],
+            "interface": [
+                f"{PACKAGE_ROOT_STR}/interface",
+                f"{PACKAGE_ROOT_STR}/cli",
+                f"{PACKAGE_ROOT_STR}/api",
+            ],
+            "infrastructure": [f"{PACKAGE_ROOT_STR}/infrastructure"],
+            "application": [f"{PACKAGE_ROOT_STR}/application"],
+            "domain": [f"{PACKAGE_ROOT_STR}/domain"],
         }
 
         # Test that domain layer has no outward dependencies
@@ -94,15 +100,15 @@ class TestCleanArchitecture:
         # Define allowed dependencies for each layer
         allowed_deps = {
             "domain": [],  # Domain should not depend on other layers
-            "application": ["src.domain"],  # Application can depend on domain
+            "application": ["orb.domain"],  # Application can depend on domain
             "infrastructure": [
-                "src.domain",
-                "src.application",
+                "orb.domain",
+                "orb.application",
             ],  # Infrastructure can depend on domain and application
             "interface": [
-                "src.domain",
-                "src.application",
-                "src.infrastructure",
+                "orb.domain",
+                "orb.application",
+                "orb.infrastructure",
             ],  # Interface can depend on all
         }
 
@@ -166,10 +172,10 @@ class TestCleanArchitecture:
     def test_layer_isolation(self):
         """Validate layer boundaries are maintained."""
         # Test that domain layer doesn't import infrastructure
-        from domain.base import entity
-        from domain.machine import aggregate as machine_agg
-        from domain.request import aggregate as request_agg
-        from domain.template import template_aggregate as aggregate
+        from orb.domain.base import entity
+        from orb.domain.machine import aggregate as machine_agg
+        from orb.domain.request import aggregate as request_agg
+        from orb.domain.template import template_aggregate as aggregate
 
         # Domain modules should not have infrastructure dependencies
         domain_modules = [entity, aggregate, request_agg, machine_agg]
@@ -177,7 +183,7 @@ class TestCleanArchitecture:
         for module in domain_modules:
             module_file = module.__file__
             violations = self._check_forbidden_imports(
-                module_file, ["boto3", "fastapi", "sqlalchemy", "src.infrastructure"]
+                module_file, ["boto3", "fastapi", "sqlalchemy", "orb.infrastructure"]
             )
             assert len(violations) == 0, (
                 f"Domain module {module} has infrastructure dependencies: {violations}"
@@ -186,9 +192,9 @@ class TestCleanArchitecture:
     def test_interface_segregation(self):
         """Test interface segregation principle compliance."""
         # Test that interfaces are focused and cohesive
-        from infrastructure.adapters.ports.auth.auth_port import AuthPort
-        from infrastructure.adapters.ports.auth.token_port import TokenPort
-        from infrastructure.adapters.ports.auth.user_port import UserPort
+        from orb.infrastructure.adapters.ports.auth.auth_port import AuthPort
+        from orb.infrastructure.adapters.ports.auth.token_port import TokenPort
+        from orb.infrastructure.adapters.ports.auth.user_port import UserPort
 
         # Interfaces should be small and focused
         auth_methods = [method for method in dir(AuthPort) if not method.startswith("_")]
@@ -207,7 +213,7 @@ class TestCleanArchitecture:
         # Test that high-level modules don't depend on low-level modules
         # Mock the ProviderValidationService since it requires many dependencies
         with patch(
-            "application.services.provider_validation_service.ProviderValidationService"
+            "orb.application.services.provider_validation_service.ProviderValidationService"
         ) as mock_app_service:
             mock_instance = Mock()
             mock_app_service.return_value = mock_instance
@@ -217,7 +223,7 @@ class TestCleanArchitecture:
             assert app_service is not None
 
         # Test DI container properly inverts dependencies
-        from infrastructure.di.container import DIContainer
+        from orb.infrastructure.di.container import DIContainer
 
         container = DIContainer()
         assert hasattr(container, "register")
@@ -227,7 +233,7 @@ class TestCleanArchitecture:
         """Test ports and adapters (hexagonal architecture) implementation."""
         # Test that adapters implement ports
 
-        from infrastructure.adapters.logging_adapter import LoggingAdapter
+        from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
 
         # Adapters should implement the corresponding port interface
         assert hasattr(LoggingAdapter, "__init__")
@@ -236,7 +242,7 @@ class TestCleanArchitecture:
         """Test that domain layer is independent of external frameworks."""
         # Domain layer should not import external frameworks
         domain_files = []
-        domain_path = Path("src/domain")
+        domain_path = Path(f"{PACKAGE_ROOT_STR}/domain")
 
         if domain_path.exists():
             for py_file in domain_path.rglob("*.py"):
@@ -265,7 +271,7 @@ class TestCleanArchitecture:
         """Test application service layer compliance."""
         # Mock the ProviderValidationService since it requires many dependencies
         with patch(
-            "application.services.provider_validation_service.ProviderValidationService"
+            "orb.application.services.provider_validation_service.ProviderValidationService"
         ) as mock_app_service:
             mock_instance = Mock()
             mock_app_service.return_value = mock_instance
@@ -291,8 +297,8 @@ class TestCleanArchitecture:
     def test_infrastructure_layer_boundaries(self):
         """Test infrastructure layer boundaries and responsibilities."""
         # Infrastructure should handle external concerns
-        from infrastructure.di.container import DIContainer
-        from infrastructure.storage.base.repository import StrategyBasedRepository
+        from orb.infrastructure.di.container import DIContainer
+        from orb.infrastructure.storage.base.repository import StrategyBasedRepository
 
         # Infrastructure components should exist
         assert StrategyBasedRepository is not None
@@ -308,8 +314,8 @@ class TestCleanArchitecture:
 
     def test_interface_layer_responsibilities(self):
         """Test interface layer (CLI, API) responsibilities."""
-        from api.server import create_fastapi_app
-        from cli.main import parse_args
+        from orb.api.server import create_fastapi_app
+        from orb.cli.main import parse_args
 
         # Interface layer should handle external communication
         assert callable(parse_args)
@@ -332,8 +338,8 @@ class TestCleanArchitecture:
         """Test that cross-cutting concerns are properly handled."""
         # Logging should be abstracted
         # Error handling should be centralized
-        from infrastructure.error.exception_handler import ExceptionHandler
-        from infrastructure.logging.logger import get_logger
+        from orb.infrastructure.error.exception_handler import ExceptionHandler
+        from orb.infrastructure.logging.logger import get_logger
 
         # Cross-cutting concerns should be injectable
         logger = get_logger(__name__)
@@ -344,7 +350,7 @@ class TestCleanArchitecture:
 
     def test_configuration_isolation(self):
         """Test that configuration is properly isolated."""
-        from config.manager import ConfigurationManager
+        from orb.config.manager import ConfigurationManager
 
         # Configuration should be centralized
         # ConfigurationManager is a class that manages configuration

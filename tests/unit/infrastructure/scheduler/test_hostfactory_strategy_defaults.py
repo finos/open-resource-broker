@@ -5,7 +5,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
+from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+    HostFactorySchedulerStrategy,
+)
 
 
 def make_strategy():
@@ -48,7 +50,7 @@ class TestMapTemplateFieldsCallsApplyTemplateDefaults:
         self.strategy._template_defaults_service = cast(None, None)
 
         with (
-            patch("infrastructure.di.container.is_container_ready", return_value=False),
+            patch("orb.infrastructure.di.container.is_container_ready", return_value=False),
             patch.object(self.strategy, "_get_provider_name", return_value="test-provider"),
         ):
             result = self.strategy._map_template_fields(self._minimal_template(), None)

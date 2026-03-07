@@ -3,8 +3,8 @@
 import unittest
 from unittest.mock import Mock
 
-from application.dto.base import BaseDTO, BaseResponse
-from cli.response_formatter import CLIResponseFormatter, create_cli_formatter
+from orb.application.dto.base import BaseDTO, BaseResponse
+from orb.cli.response_formatter import CLIResponseFormatter, create_cli_formatter
 
 
 class MockDTO(BaseDTO):

@@ -356,6 +356,69 @@ This will show:
 }
 ```
 
+## Config Directory Resolution
+
+`orb init` creates configuration files in a directory determined by your install type. The resolution order is:
+
+1. **`ORB_CONFIG_DIR` environment variable** — always wins if set
+2. **Virtual environment** — `{venv_parent}/config/` (standard venvs and symlink venvs like uv/mise)
+3. **Development mode** — `{project_root}/config/` (detected by `pyproject.toml` in parent directories)
+4. **User install** (`pip install --user`) — `~/.local/orb/config/`
+5. **System install** — `{sys.prefix}/orb/config/`
+6. **Fallback** — `{cwd}/config/`
+
+Work, logs, and scripts directories are siblings of the config directory (e.g. `{venv_parent}/work/`, `{venv_parent}/logs/`). Override individually with `ORB_WORK_DIR`, `ORB_LOG_DIR`.
+
+## AWS IAM Permissions
+
+ORB requires the following IAM permissions for the AWS provider. Scope the `Resource` field to your account/region as needed.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeVpcs",
+        "ec2:DescribeSubnets",
+        "ec2:DescribeSecurityGroups",
+        "ec2:DescribeImages",
+        "ec2:DescribeInstances",
+        "ec2:DescribeInstanceTypes",
+        "ec2:RunInstances",
+        "ec2:TerminateInstances",
+        "ec2:CreateFleet",
+        "ec2:DeleteFleet",
+        "ec2:DescribeFleets",
+        "ec2:RequestSpotFleet",
+        "ec2:CancelSpotFleetRequests",
+        "ec2:DescribeSpotFleetRequests",
+        "ec2:DescribeSpotFleetInstances",
+        "ec2:CreateTags",
+        "autoscaling:CreateAutoScalingGroup",
+        "autoscaling:UpdateAutoScalingGroup",
+        "autoscaling:DeleteAutoScalingGroup",
+        "autoscaling:DescribeAutoScalingGroups",
+        "autoscaling:CreateLaunchConfiguration",
+        "autoscaling:DeleteLaunchConfiguration",
+        "ec2:CreateLaunchTemplate",
+        "ec2:DeleteLaunchTemplate",
+        "ec2:DescribeLaunchTemplates",
+        "iam:PassRole"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+For SpotFleet, you also need the `AWSServiceRoleForEC2SpotFleet` service-linked role. Create it if it doesn't exist:
+
+```bash
+aws iam create-service-linked-role --aws-service-name spotfleet.amazonaws.com
+```
+
 ## Configuration Sections
 
 ### Provider Configuration

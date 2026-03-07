@@ -12,20 +12,21 @@ Critical paths covered:
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi.testclient import TestClient
 
-from api.dependencies import (
+from orb.api.dependencies import (
+    get_command_bus,
+    get_query_bus,
     get_request_machines_handler,
     get_request_status_handler,
     get_return_machines_handler,
-    get_return_requests_handler,
 )
-from api.server import create_fastapi_app
-from config.schemas.server_schema import AuthConfig, ServerConfig
-from infrastructure.di.buses import CommandBus, QueryBus
+from orb.api.server import create_fastapi_app
+from orb.config.schemas.server_schema import AuthConfig, ServerConfig
+from orb.infrastructure.di.buses import CommandBus, QueryBus
 
 # ---------------------------------------------------------------------------
 # Shared helpers and fixtures
@@ -46,20 +47,6 @@ def _make_command_bus(return_value: Any = None) -> AsyncMock:
     bus = AsyncMock(spec=CommandBus)
     bus.execute = AsyncMock(return_value=return_value)
     return bus
-
-
-def _make_container(query_bus: Any = None, command_bus: Any = None) -> Mock:
-    container = Mock()
-
-    def _get(svc_type: type) -> Any:
-        if svc_type is QueryBus:
-            return query_bus
-        if svc_type is CommandBus:
-            return command_bus
-        return Mock()
-
-    container.get.side_effect = _get
-    return container
 
 
 @pytest.fixture
@@ -147,14 +134,19 @@ class TestRequestLifecycle:
 
     def test_list_requests_returns_response(self, app, client: TestClient):
         """GET /api/v1/requests/ returns a list of requests."""
-        mock_result = [
-            {"requestId": "req-acquire-001", "status": "running"},
-            {"requestId": "req-acquire-002", "status": "complete"},
-        ]
-        mock_handler = AsyncMock()
-        mock_handler.handle = AsyncMock(return_value=mock_result)
+        mock_req1 = Mock()
+        mock_req1.model_dump = Mock(
+            return_value={"request_id": "req-acquire-001", "status": "running"}
+        )
+        mock_req2 = Mock()
+        mock_req2.model_dump = Mock(
+            return_value={"request_id": "req-acquire-002", "status": "complete"}
+        )
 
-        app.dependency_overrides[get_return_requests_handler] = lambda: mock_handler
+        mock_query_bus = AsyncMock()
+        mock_query_bus.execute = AsyncMock(return_value=[mock_req1, mock_req2])
+
+        app.dependency_overrides[get_query_bus] = lambda: mock_query_bus
         try:
             response = client.get("/api/v1/requests/")
         finally:
@@ -347,20 +339,22 @@ class TestRequestLifecycle:
 class TestTemplateManagement:
     """E2E tests for template management flows."""
 
-    def test_list_templates_returns_empty_list(self, client: TestClient):
+    def test_list_templates_returns_empty_list(self, app, client: TestClient):
         """GET /api/v1/templates/ returns empty list when no templates exist."""
         query_bus = _make_query_bus(return_value=[])
-        container = _make_container(query_bus=query_bus)
 
-        with patch("api.routers.templates.get_container", return_value=container):
+        app.dependency_overrides[get_query_bus] = lambda: query_bus
+        try:
             response = client.get("/api/v1/templates/")
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == 200
         data = response.json()
         assert data["templates"] == []
         assert data["total_count"] == 0
 
-    def test_list_templates_returns_templates(self, client: TestClient):
+    def test_list_templates_returns_templates(self, app, client: TestClient):
         """GET /api/v1/templates/ returns available templates."""
         mock_template = Mock()
         template_data = {
@@ -372,17 +366,19 @@ class TestTemplateManagement:
         mock_template.model_dump = Mock(return_value=template_data)
 
         query_bus = _make_query_bus(return_value=[mock_template])
-        container = _make_container(query_bus=query_bus)
 
-        with patch("api.routers.templates.get_container", return_value=container):
+        app.dependency_overrides[get_query_bus] = lambda: query_bus
+        try:
             response = client.get("/api/v1/templates/")
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == 200
         data = response.json()
         assert data["total_count"] == 1
         assert data["templates"][0]["template_id"] == "tpl-001"
 
-    def test_get_template_by_id_returns_template(self, client: TestClient):
+    def test_get_template_by_id_returns_template(self, app, client: TestClient):
         """GET /api/v1/templates/{id} returns the template."""
         mock_template = Mock()
         template_data = {"template_id": "tpl-001", "name": "test-template"}
@@ -390,38 +386,42 @@ class TestTemplateManagement:
         mock_template.model_dump = Mock(return_value=template_data)
 
         query_bus = _make_query_bus(return_value=mock_template)
-        container = _make_container(query_bus=query_bus)
 
-        with patch("api.routers.templates.get_container", return_value=container):
+        app.dependency_overrides[get_query_bus] = lambda: query_bus
+        try:
             response = client.get("/api/v1/templates/tpl-001")
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == 200
         data = response.json()
         assert data["template"]["template_id"] == "tpl-001"
 
-    def test_get_template_not_found_returns_error(self, client: TestClient):
+    def test_get_template_not_found_returns_error(self, app, client: TestClient):
         """GET /api/v1/templates/{id} returns an error when template does not exist.
 
         Note: the handle_rest_exceptions decorator wraps HTTPException into
         InfrastructureError, so the response is 500 rather than 404.
         """
         query_bus = _make_query_bus(return_value=None)
-        container = _make_container(query_bus=query_bus)
 
-        with patch("api.routers.templates.get_container", return_value=container):
+        app.dependency_overrides[get_query_bus] = lambda: query_bus
+        try:
             response = client.get("/api/v1/templates/nonexistent-tpl")
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code in (404, 500, 503)
 
-    def test_create_template_returns_201(self, client: TestClient):
+    def test_create_template_returns_201(self, app, client: TestClient):
         """POST /api/v1/templates/ creates a template and returns 201."""
         mock_cmd_response = Mock()
         mock_cmd_response.validation_errors = []
 
         command_bus = _make_command_bus(return_value=mock_cmd_response)
-        container = _make_container(command_bus=command_bus)
 
-        with patch("api.routers.templates.get_container", return_value=container):
+        app.dependency_overrides[get_command_bus] = lambda: command_bus
+        try:
             response = client.post(
                 "/api/v1/templates/",
                 json={
@@ -432,6 +432,8 @@ class TestTemplateManagement:
                     "subnet_ids": ["subnet-abc"],
                 },
             )
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == 201
         data = response.json()
@@ -445,7 +447,7 @@ class TestTemplateManagement:
         )
         assert response.status_code == 422
 
-    def test_create_template_validation_errors_return_error(self, client: TestClient):
+    def test_create_template_validation_errors_return_error(self, app, client: TestClient):
         """POST /api/v1/templates/ with validation errors from handler returns 201.
 
         The create_template router does not inspect validation_errors on the command
@@ -456,9 +458,9 @@ class TestTemplateManagement:
         mock_cmd_response.validation_errors = ["image_id is required", "subnet_ids is required"]
 
         command_bus = _make_command_bus(return_value=mock_cmd_response)
-        container = _make_container(command_bus=command_bus)
 
-        with patch("api.routers.templates.get_container", return_value=container):
+        app.dependency_overrides[get_command_bus] = lambda: command_bus
+        try:
             response = client.post(
                 "/api/v1/templates/",
                 json={
@@ -467,51 +469,57 @@ class TestTemplateManagement:
                     "image_id": "",
                 },
             )
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == 201
 
-    def test_update_template_returns_200(self, client: TestClient):
+    def test_update_template_returns_200(self, app, client: TestClient):
         """PUT /api/v1/templates/{id} updates a template."""
         mock_cmd_response = Mock()
         mock_cmd_response.validation_errors = []
 
         command_bus = _make_command_bus(return_value=mock_cmd_response)
-        container = _make_container(command_bus=command_bus)
 
-        with patch("api.routers.templates.get_container", return_value=container):
+        app.dependency_overrides[get_command_bus] = lambda: command_bus
+        try:
             response = client.put(
                 "/api/v1/templates/tpl-001",
                 json={"name": "updated-name"},
             )
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == 200
         data = response.json()
         assert data["templateId"] == "tpl-001"
 
-    def test_delete_template_returns_200(self, client: TestClient):
+    def test_delete_template_returns_200(self, app, client: TestClient):
         """DELETE /api/v1/templates/{id} deletes a template."""
         mock_cmd_response = Mock()
         mock_cmd_response.validation_errors = []
 
         command_bus = _make_command_bus(return_value=mock_cmd_response)
-        container = _make_container(command_bus=command_bus)
 
-        with patch("api.routers.templates.get_container", return_value=container):
+        app.dependency_overrides[get_command_bus] = lambda: command_bus
+        try:
             response = client.delete("/api/v1/templates/tpl-001")
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == 200
         data = response.json()
         assert data["templateId"] == "tpl-001"
 
-    def test_template_create_then_get_flow(self, client: TestClient):
+    def test_template_create_then_get_flow(self, app, client: TestClient):
         """Create a template then retrieve it - full create->get flow."""
         # Step 1: create
         mock_cmd_response = Mock()
         mock_cmd_response.validation_errors = []
         command_bus = _make_command_bus(return_value=mock_cmd_response)
-        container = _make_container(command_bus=command_bus)
 
-        with patch("api.routers.templates.get_container", return_value=container):
+        app.dependency_overrides[get_command_bus] = lambda: command_bus
+        try:
             create_resp = client.post(
                 "/api/v1/templates/",
                 json={
@@ -520,6 +528,8 @@ class TestTemplateManagement:
                     "image_id": "ami-abc",
                 },
             )
+        finally:
+            app.dependency_overrides.clear()
         assert create_resp.status_code == 201
 
         # Step 2: retrieve
@@ -528,42 +538,48 @@ class TestTemplateManagement:
         mock_template.to_dict = Mock(return_value=flow_data)
         mock_template.model_dump = Mock(return_value=flow_data)
         query_bus = _make_query_bus(return_value=mock_template)
-        container2 = _make_container(query_bus=query_bus)
 
-        with patch("api.routers.templates.get_container", return_value=container2):
+        app.dependency_overrides[get_query_bus] = lambda: query_bus
+        try:
             get_resp = client.get("/api/v1/templates/tpl-flow-001")
+        finally:
+            app.dependency_overrides.clear()
 
         assert get_resp.status_code == 200
         assert get_resp.json()["template"]["template_id"] == "tpl-flow-001"
 
-    def test_template_refresh_returns_count(self, client: TestClient):
+    def test_template_refresh_returns_count(self, app, client: TestClient):
         """POST /api/v1/templates/refresh returns refreshed template count."""
         mock_template = Mock()
         refresh_data = {"template_id": "tpl-001"}
         mock_template.to_dict = Mock(return_value=refresh_data)
         mock_template.model_dump = Mock(return_value=refresh_data)
         query_bus = _make_query_bus(return_value=[mock_template])
-        container = _make_container(query_bus=query_bus)
 
-        with patch("api.routers.templates.get_container", return_value=container):
+        app.dependency_overrides[get_query_bus] = lambda: query_bus
+        try:
             response = client.post("/api/v1/templates/refresh")
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == 200
         data = response.json()
         assert data["templateCount"] == 1
         assert data["cacheStats"]["refreshed"] is True
 
-    def test_list_templates_with_provider_api_filter(self, client: TestClient):
+    def test_list_templates_with_provider_api_filter(self, app, client: TestClient):
         """GET /api/v1/templates/?provider_api=ec2_fleet passes filter to query bus."""
         mock_template = Mock()
         ec2_data = {"template_id": "tpl-ec2", "provider_api": "ec2_fleet"}
         mock_template.to_dict = Mock(return_value=ec2_data)
         mock_template.model_dump = Mock(return_value=ec2_data)
         query_bus = _make_query_bus(return_value=[mock_template])
-        container = _make_container(query_bus=query_bus)
 
-        with patch("api.routers.templates.get_container", return_value=container):
+        app.dependency_overrides[get_query_bus] = lambda: query_bus
+        try:
             response = client.get("/api/v1/templates/?provider_api=ec2_fleet")
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == 200
         assert query_bus.execute.called
@@ -576,9 +592,9 @@ class TestTemplateManagement:
         mock_cmd_response = Mock()
         mock_cmd_response.validation_errors = []
         command_bus = _make_command_bus(return_value=mock_cmd_response)
-        container = _make_container(command_bus=command_bus)
 
-        with patch("api.routers.templates.get_container", return_value=container):
+        app.dependency_overrides[get_command_bus] = lambda: command_bus
+        try:
             create_resp = client.post(
                 "/api/v1/templates/",
                 json={
@@ -589,6 +605,8 @@ class TestTemplateManagement:
                     "subnet_ids": ["subnet-abc"],
                 },
             )
+        finally:
+            app.dependency_overrides.clear()
         assert create_resp.status_code == 201
         assert create_resp.json()["templateId"] == template_id
 
@@ -603,10 +621,12 @@ class TestTemplateManagement:
         mock_template.to_dict = Mock(return_value=get_data)
         mock_template.model_dump = Mock(return_value=get_data)
         query_bus = _make_query_bus(return_value=mock_template)
-        container2 = _make_container(query_bus=query_bus)
 
-        with patch("api.routers.templates.get_container", return_value=container2):
+        app.dependency_overrides[get_query_bus] = lambda: query_bus
+        try:
             get_resp = client.get(f"/api/v1/templates/{template_id}")
+        finally:
+            app.dependency_overrides.clear()
         assert get_resp.status_code == 200
         assert get_resp.json()["template"]["template_id"] == template_id
 
@@ -649,20 +669,35 @@ class TestTemplateManagement:
 class TestMachineLifecycle:
     """E2E tests for machine lifecycle flows."""
 
-    def test_list_machines_endpoint_exists(self, client: TestClient):
-        """GET /api/v1/machines/ endpoint is reachable (returns 501 - not yet implemented)."""
-        response = client.get("/api/v1/machines/")
-        # Endpoint exists but is not yet implemented
-        assert response.status_code == 501
-        data = response.json()
-        assert "error" in data
+    def test_list_machines_endpoint_exists(self, app, client: TestClient):
+        """GET /api/v1/machines/ endpoint is reachable and returns results."""
+        mock_machine = Mock()
+        mock_machine.to_dict = Mock(return_value={"machine_id": "i-abc123", "status": "running"})
 
-    def test_get_machine_endpoint_exists(self, client: TestClient):
-        """GET /api/v1/machines/{id} endpoint is reachable (returns 501 - not yet implemented)."""
-        response = client.get("/api/v1/machines/i-abc123")
-        assert response.status_code == 501
-        data = response.json()
-        assert "error" in data
+        query_bus = _make_query_bus(return_value=[mock_machine])
+
+        app.dependency_overrides[get_query_bus] = lambda: query_bus
+        try:
+            response = client.get("/api/v1/machines/")
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+
+    def test_get_machine_endpoint_exists(self, app, client: TestClient):
+        """GET /api/v1/machines/{id} endpoint is reachable and returns a result."""
+        mock_machine = Mock()
+        mock_machine.to_dict = Mock(return_value={"machine_id": "i-abc123", "status": "running"})
+
+        query_bus = _make_query_bus(return_value=mock_machine)
+
+        app.dependency_overrides[get_query_bus] = lambda: query_bus
+        try:
+            response = client.get("/api/v1/machines/i-abc123")
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 200
 
     def test_provision_machines_then_check_status(self, app, client: TestClient):
         """Provision machines then verify status is queryable."""
@@ -769,7 +804,7 @@ class TestMachineLifecycle:
             app.dependency_overrides.clear()
 
         call_args = mock_return_handler.handle.call_args[0][0]
-        returned_ids = [m["machineId"] for m in call_args["input_data"]["machines"]]
+        returned_ids = call_args["input_data"]["machine_ids"]
         assert returned_ids == machine_ids
 
 
@@ -798,17 +833,19 @@ class TestConfigurationManagement:
         assert data["service"] == "open-resource-broker"
         assert data["auth_enabled"] is False
 
-    def test_template_refresh_triggers_cache_reload(self, client: TestClient):
+    def test_template_refresh_triggers_cache_reload(self, app, client: TestClient):
         """POST /api/v1/templates/refresh reloads template cache."""
         templates = [Mock(), Mock()]
         for t in templates:
             t.model_dump = Mock(return_value={"template_id": f"tpl-{id(t)}"})
 
         query_bus = _make_query_bus(return_value=templates)
-        container = _make_container(query_bus=query_bus)
 
-        with patch("api.routers.templates.get_container", return_value=container):
+        app.dependency_overrides[get_query_bus] = lambda: query_bus
+        try:
             response = client.post("/api/v1/templates/refresh")
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == 200
         data = response.json()
@@ -847,22 +884,20 @@ class TestConfigurationManagement:
         for path in expected_paths:
             assert path in paths, f"Expected path {path!r} not found in OpenAPI schema"
 
-    def test_query_bus_unavailable_returns_500(self, client: TestClient):
-        """When QueryBus is not in container, endpoint returns 500."""
-        container = Mock()
-        container.get.return_value = None
-
-        with patch("api.routers.templates.get_container", return_value=container):
+    def test_query_bus_unavailable_returns_500(self, app, client: TestClient):
+        """When QueryBus is not available, endpoint returns 500."""
+        app.dependency_overrides[get_query_bus] = lambda: None
+        try:
             response = client.get("/api/v1/templates/")
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code in (500, 503)
 
-    def test_command_bus_unavailable_returns_500(self, client: TestClient):
-        """When CommandBus is not in container, create template returns 500."""
-        container = Mock()
-        container.get.return_value = None
-
-        with patch("api.routers.templates.get_container", return_value=container):
+    def test_command_bus_unavailable_returns_500(self, app, client: TestClient):
+        """When CommandBus is not available, create template returns 500."""
+        app.dependency_overrides[get_command_bus] = lambda: None
+        try:
             response = client.post(
                 "/api/v1/templates/",
                 json={
@@ -871,6 +906,8 @@ class TestConfigurationManagement:
                     "image_id": "ami-abc",
                 },
             )
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code in (500, 503)
 

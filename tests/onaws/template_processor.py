@@ -284,13 +284,15 @@ class TemplateProcessor:
     def _make_strategy(scheduler_type: str):
         """Return the production scheduler strategy instance for the given type."""
         if scheduler_type == "hostfactory":
-            from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+            from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
                 HostFactorySchedulerStrategy,
             )
 
             return HostFactorySchedulerStrategy()
         else:
-            from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+            from orb.infrastructure.scheduler.default.default_strategy import (
+                DefaultSchedulerStrategy,
+            )
 
             return DefaultSchedulerStrategy()
 

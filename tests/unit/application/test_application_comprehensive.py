@@ -26,7 +26,7 @@ class TestCommandHandlersComprehensive:
 
         for handler_file in handler_files:
             try:
-                module = importlib.import_module(f"application.commands.{handler_file}")
+                module = importlib.import_module(f"orb.application.commands.{handler_file}")
                 handler_modules.append((handler_file, module))
             except ImportError:
                 continue
@@ -165,7 +165,7 @@ class TestQueryHandlersComprehensive:
 
         for handler_file in handler_files:
             try:
-                module = importlib.import_module(f"application.queries.{handler_file}")
+                module = importlib.import_module(f"orb.application.queries.{handler_file}")
                 handler_modules.append((handler_file, module))
             except ImportError:
                 continue
@@ -259,7 +259,7 @@ class TestApplicationDTOsComprehensive:
 
         for dto_file in dto_files:
             try:
-                module = importlib.import_module(f"application.dto.{dto_file}")
+                module = importlib.import_module(f"orb.application.dto.{dto_file}")
                 dto_modules.append((dto_file, module))
             except ImportError:
                 continue
@@ -396,14 +396,14 @@ class TestCQRSMigrationValidation:
 
     def test_cqrs_buses_exist(self):
         """Test that CQRS buses exist and replace ApplicationService."""
-        from infrastructure.di.buses import CommandBus, QueryBus
+        from orb.infrastructure.di.buses import CommandBus, QueryBus
 
         assert CommandBus is not None
         assert QueryBus is not None
 
     def test_command_handlers_exist(self):
         """Test that command handlers exist."""
-        from application.commands.request_handlers import CreateMachineRequestHandler
+        from orb.application.commands.request_handlers import CreateMachineRequestHandler
 
         assert CreateMachineRequestHandler is not None
 
@@ -411,12 +411,12 @@ class TestCQRSMigrationValidation:
         """Test that query handlers exist."""
         # Check if query handlers exist
         try:
-            from application.queries.template_query_handlers import GetTemplateHandler
+            from orb.application.queries.template_query_handlers import GetTemplateHandler
 
             assert GetTemplateHandler is not None
         except ImportError:
             # Query handlers might be in different location
-            from application.template.query_handlers import GetTemplateHandler
+            from orb.application.template.query_handlers import GetTemplateHandler
 
             assert GetTemplateHandler is not None
 
@@ -432,7 +432,7 @@ class TestApplicationEventsComprehensive:
 
         # Check base events
         try:
-            module = importlib.import_module("application.events.base.event_handler")
+            module = importlib.import_module("orb.application.events.base.event_handler")
             event_modules.append(("base.event_handler", module))
         except ImportError:
             pass
@@ -448,7 +448,7 @@ class TestApplicationEventsComprehensive:
 
         for handler_file in handler_files:
             try:
-                module = importlib.import_module(f"application.events.handlers.{handler_file}")
+                module = importlib.import_module(f"orb.application.events.handlers.{handler_file}")
                 event_modules.append((f"handlers.{handler_file}", module))
             except ImportError:
                 continue
@@ -481,13 +481,13 @@ class TestApplicationEventsComprehensive:
     def test_event_bus_exists(self):
         """Test that event bus exists."""
         try:
-            from application.events.bus.event_bus import EventBus
+            from orb.application.events.bus.event_bus import EventBus
 
             assert EventBus is not None
         except ImportError:
             # Event bus might be in different location
             try:
-                from infrastructure.di.buses import EventBus
+                from orb.infrastructure.di.buses import EventBus
 
                 assert EventBus is not None
             except ImportError:

@@ -4,9 +4,9 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from providers.aws.configuration.config import AWSProviderConfig
-from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
-from providers.base.strategy import ProviderOperation, ProviderOperationType
+from orb.providers.aws.configuration.config import AWSProviderConfig
+from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
+from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
 
 
 class TestProviderStrategyDryRun:
@@ -47,13 +47,13 @@ class TestProviderStrategyDryRun:
                 operation.parameters.get("template_config", {}).get("provider_api", "RunInstances")
             ) or handlers.get("RunInstances")
             if handler is None:
-                from providers.base.strategy import ProviderResult
+                from orb.providers.base.strategy import ProviderResult
 
                 return ProviderResult.error_result("No handler found", "HANDLER_NOT_FOUND")
             result = handler.acquire_hosts(None, None)
             if isinstance(result, Exception):
                 raise result
-            from providers.base.strategy import ProviderResult
+            from orb.providers.base.strategy import ProviderResult
 
             return ProviderResult.success_result(
                 {"resource_ids": result.get("resource_ids", []), "instances": []},
@@ -63,7 +63,7 @@ class TestProviderStrategyDryRun:
         mock_instance_service.create_instances = _mock_create_instances
 
         def _mock_terminate(operation):
-            from providers.base.strategy import ProviderResult
+            from orb.providers.base.strategy import ProviderResult
 
             instance_ids = operation.parameters.get("instance_ids", [])
             return ProviderResult.success_result(
@@ -74,7 +74,7 @@ class TestProviderStrategyDryRun:
         self.aws_strategy._instance_service = mock_instance_service
 
     @pytest.mark.asyncio
-    @patch("providers.aws.infrastructure.dry_run_adapter.aws_dry_run_context")
+    @patch("orb.providers.aws.infrastructure.dry_run_adapter.aws_dry_run_context")
     async def test_provider_operation_without_dry_run_context(self, mock_dry_run_context):
         """Test provider operation execution without dry-run context."""
         # Create operation without dry-run context
@@ -110,7 +110,7 @@ class TestProviderStrategyDryRun:
         self.mock_handler.acquire_hosts.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("providers.aws.infrastructure.dry_run_adapter.aws_dry_run_context")
+    @patch("orb.providers.aws.infrastructure.dry_run_adapter.aws_dry_run_context")
     async def test_provider_operation_with_dry_run_context(self, mock_dry_run_context):
         """Test provider operation execution with dry-run context."""
         # Mock the context manager
@@ -204,7 +204,7 @@ class TestProviderStrategyDryRun:
         assert "Unsupported operation" in result.error_message
 
     @pytest.mark.asyncio
-    @patch("providers.aws.infrastructure.dry_run_adapter.aws_dry_run_context")
+    @patch("orb.providers.aws.infrastructure.dry_run_adapter.aws_dry_run_context")
     async def test_multiple_operations_with_mixed_dry_run_contexts(self, mock_dry_run_context):
         """Test multiple operations with different dry-run contexts."""
         # Mock the context manager

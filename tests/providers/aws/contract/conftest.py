@@ -17,13 +17,13 @@ from moto import mock_aws
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
-from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from providers.aws.infrastructure.aws_client import AWSClient
-from providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
-from providers.aws.infrastructure.handlers.asg.handler import ASGHandler
-from providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
-from providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
-from providers.aws.utilities.aws_operations import AWSOperations
+from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.infrastructure.aws_client import AWSClient
+from orb.providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
+from orb.providers.aws.infrastructure.handlers.asg.handler import ASGHandler
+from orb.providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
+from orb.providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
+from orb.providers.aws.utilities.aws_operations import AWSOperations
 from tests.utilities.reset_singletons import reset_all_singletons
 
 REGION = "eu-west-2"
@@ -41,7 +41,7 @@ SPOT_FLEET_ROLE = (
 
 @pytest.fixture(autouse=True)
 def reset_singletons():
-    from infrastructure.di.container import reset_container
+    from orb.infrastructure.di.container import reset_container
 
     reset_container()
     reset_all_singletons()
@@ -119,7 +119,7 @@ def _make_aws_client(region: str = REGION) -> AWSClient:
 
 
 def _make_lt_manager(aws_client: AWSClient, logger: Any) -> Any:
-    from providers.aws.infrastructure.launch_template.manager import LaunchTemplateResult
+    from orb.providers.aws.infrastructure.launch_template.manager import LaunchTemplateResult
 
     lt_manager = MagicMock(spec=AWSLaunchTemplateManager)
 
@@ -358,8 +358,10 @@ def invalid_template_for_validation():
 def validation_adapter(_logger):
     from unittest.mock import Mock
 
-    from providers.aws.configuration.validator import AWSProviderConfig
-    from providers.aws.infrastructure.adapters.aws_validation_adapter import AWSValidationAdapter
+    from orb.providers.aws.configuration.validator import AWSProviderConfig
+    from orb.providers.aws.infrastructure.adapters.aws_validation_adapter import (
+        AWSValidationAdapter,
+    )
 
     config = Mock(spec=AWSProviderConfig)
     config.handlers = Mock()

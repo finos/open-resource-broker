@@ -6,10 +6,10 @@ from unittest.mock import Mock
 
 import pytest
 
-from domain.machine.aggregate import Machine
-from domain.request.aggregate import Request
-from domain.template.template_aggregate import Template
-from infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
+from orb.domain.machine.aggregate import Machine
+from orb.domain.request.aggregate import Request
+from orb.domain.template.template_aggregate import Template
+from orb.infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
 
 
 class ConcreteSchedulerStrategy(BaseSchedulerStrategy):

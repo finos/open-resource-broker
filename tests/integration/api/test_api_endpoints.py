@@ -6,9 +6,9 @@ import pytest
 from fastapi import APIRouter
 from fastapi.testclient import TestClient
 
-from _package import __version__
-from api.server import create_fastapi_app
-from config.schemas.server_schema import AuthConfig, ServerConfig
+from orb._package import __version__
+from orb.api.server import create_fastapi_app
+from orb.config.schemas.server_schema import AuthConfig, ServerConfig
 
 
 class TestAPIEndpoints:
@@ -39,7 +39,7 @@ class TestAPIEndpoints:
         server_config = ServerConfig(
             enabled=True, auth=AuthConfig(enabled=False, strategy="replace")
         )
-        with patch("api.server._register_routers") as mock_register:
+        with patch("orb.api.server._register_routers") as mock_register:
             mock_register.side_effect = self._install_stub_routes
             app = create_fastapi_app(server_config)
         return TestClient(app)
@@ -52,10 +52,10 @@ class TestAPIEndpoints:
             auth=AuthConfig(
                 enabled=True,
                 strategy="bearer_token",
-                bearer_token={"secret_key": "test-secret"},
+                bearer_token={"secret_key": "test-secret-key-minimum-32-bytes!"},
             ),
         )
-        with patch("api.server._register_routers") as mock_register:
+        with patch("orb.api.server._register_routers") as mock_register:
             mock_register.side_effect = self._install_stub_routes
             app = create_fastapi_app(server_config)
         return TestClient(app, raise_server_exceptions=False)

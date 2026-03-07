@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from domain.base.results import ValidationLevel, ValidationResult
-from domain.services.template_validation_domain_service import (
+from orb.domain.base.results import ValidationLevel, ValidationResult
+from orb.domain.services.template_validation_domain_service import (
     TemplateValidationDomainService,
     _ProviderCapabilities,
 )
@@ -54,7 +54,7 @@ def _patched_validation_result(**kwargs):
     return ValidationResult(**kwargs)
 
 
-PATCH_TARGET = "domain.services.template_validation_domain_service.ValidationResult"
+PATCH_TARGET = "orb.domain.services.template_validation_domain_service.ValidationResult"
 
 
 class TestTemplateValidationDomainService:

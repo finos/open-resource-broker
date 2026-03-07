@@ -65,7 +65,7 @@ def _validate(instance: dict, schema: dict) -> None:
 
 def _make_hf_template_dto(strategy):
     """Build a TemplateDTO that the HF strategy can format."""
-    from infrastructure.template.dtos import TemplateDTO
+    from orb.infrastructure.template.dtos import TemplateDTO
 
     return TemplateDTO(
         template_id="contract-tpl-hf",

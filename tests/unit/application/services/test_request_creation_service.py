@@ -2,8 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
-from application.services.request_creation_service import RequestCreationService
-from domain.request.request_types import RequestType
+from orb.application.services.request_creation_service import RequestCreationService
+from orb.domain.request.request_types import RequestType
 
 
 def _make_command(
@@ -56,7 +56,7 @@ class TestRequestCreationService:
         fake_request.request_id = "req-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
         fake_request.provider_api = None
 
-        with patch("application.services.request_creation_service.Request") as MockRequest:
+        with patch("orb.application.services.request_creation_service.Request") as MockRequest:
             MockRequest.create_new_request = MagicMock(return_value=fake_request)
             result = self.svc.create_machine_request(cmd, template, selection)
 
@@ -76,7 +76,7 @@ class TestRequestCreationService:
         fake_request.request_id = "req-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
         fake_request.provider_api = None
 
-        with patch("application.services.request_creation_service.Request") as MockRequest:
+        with patch("orb.application.services.request_creation_service.Request") as MockRequest:
             MockRequest.create_new_request = MagicMock(return_value=fake_request)
             self.svc.create_machine_request(cmd, template, selection)
 
@@ -96,7 +96,7 @@ class TestRequestCreationService:
         fake_request.request_id = "req-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
         fake_request.provider_api = None
 
-        with patch("application.services.request_creation_service.Request") as MockRequest:
+        with patch("orb.application.services.request_creation_service.Request") as MockRequest:
             MockRequest.create_new_request = MagicMock(return_value=fake_request)
             result = self.svc.create_machine_request(cmd, template, selection)
 
@@ -111,7 +111,7 @@ class TestRequestCreationService:
         fake_request.request_id = "req-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
         fake_request.provider_api = None
 
-        with patch("application.services.request_creation_service.Request") as MockRequest:
+        with patch("orb.application.services.request_creation_service.Request") as MockRequest:
             MockRequest.create_new_request = MagicMock(return_value=fake_request)
             result = self.svc.create_machine_request(cmd, template, selection)
 
@@ -126,7 +126,7 @@ class TestRequestCreationService:
         fake_request.request_id = "req-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
         fake_request.provider_api = None
 
-        with patch("application.services.request_creation_service.Request") as MockRequest:
+        with patch("orb.application.services.request_creation_service.Request") as MockRequest:
             MockRequest.create_new_request = MagicMock(return_value=fake_request)
             self.svc.create_machine_request(cmd, template, selection)
 
@@ -142,7 +142,7 @@ class TestRequestCreationService:
         fake_request.request_id = "req-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
         fake_request.provider_api = None
 
-        with patch("application.services.request_creation_service.Request") as MockRequest:
+        with patch("orb.application.services.request_creation_service.Request") as MockRequest:
             MockRequest.create_new_request = MagicMock(return_value=fake_request)
             self.svc.create_machine_request(cmd, template, selection)
 
@@ -158,7 +158,7 @@ class TestRequestCreationService:
         fake_request.request_id = "req-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
         fake_request.provider_api = None
 
-        with patch("application.services.request_creation_service.Request") as MockRequest:
+        with patch("orb.application.services.request_creation_service.Request") as MockRequest:
             MockRequest.create_new_request = MagicMock(return_value=fake_request)
             self.svc.create_machine_request(cmd, template, selection)
 
@@ -174,7 +174,7 @@ class TestRequestCreationService:
         fake_request.request_id = "req-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
         fake_request.provider_api = None
 
-        with patch("application.services.request_creation_service.Request") as MockRequest:
+        with patch("orb.application.services.request_creation_service.Request") as MockRequest:
             MockRequest.create_new_request = MagicMock(return_value=fake_request)
             self.svc.create_machine_request(cmd, template, selection)
 

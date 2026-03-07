@@ -10,9 +10,11 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
-from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
-from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
-from infrastructure.template.dtos import TemplateDTO
+from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+    HostFactorySchedulerStrategy,
+)
+from orb.infrastructure.template.dtos import TemplateDTO
 from tests.unit.infrastructure.scheduler.conftest import (
     _MINIMAL_HF_TEMPLATE_ON_DISK,
     _MINIMAL_SNAKE_TEMPLATE,
@@ -139,7 +141,7 @@ def test_default_load_passthrough_snake_case(tmp_path):
 
 def test_default_load_delegates_hf_file_to_hf_strategy(tmp_path):
     """Default strategy detects scheduler_type=hostfactory and delegates to HF strategy."""
-    from infrastructure.scheduler.registry import get_scheduler_registry
+    from orb.infrastructure.scheduler.registry import get_scheduler_registry
 
     registry = get_scheduler_registry()
     if not registry.is_registered("hostfactory"):
@@ -157,7 +159,7 @@ def test_default_load_delegates_hf_file_to_hf_strategy(tmp_path):
 
 def test_hf_load_delegates_default_file_to_default_strategy(tmp_path):
     """HF strategy detects scheduler_type=default and delegates to Default strategy."""
-    from infrastructure.scheduler.registry import get_scheduler_registry
+    from orb.infrastructure.scheduler.registry import get_scheduler_registry
 
     registry = get_scheduler_registry()
     if not registry.is_registered("hostfactory"):
@@ -292,7 +294,7 @@ def test_hf_parse_template_config_provider_api_alias_normalisation():
 
 
 def test_default_parse_template_config_creates_template_object():
-    from domain.template.template_aggregate import Template
+    from orb.domain.template.template_aggregate import Template
 
     strategy = make_default_strategy()
     raw = {
@@ -324,7 +326,7 @@ def test_hf_generation_produces_camelcase_keys():
 
 def test_hf_generation_no_snake_case_for_mapped_fields():
     """No snake_case keys for fields that have a defined HF mapping."""
-    from infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings
+    from orb.infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings
 
     strategy = make_hf_strategy()
     generated = strategy.format_templates_for_generation([_MINIMAL_SNAKE_TEMPLATE])

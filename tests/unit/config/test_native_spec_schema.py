@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from config.schemas.native_spec_schema import NativeSpecConfig
+from orb.config.schemas.native_spec_schema import NativeSpecConfig
 
 
 class TestNativeSpecConfig:

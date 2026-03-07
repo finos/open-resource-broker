@@ -71,18 +71,18 @@ import boto3
 
 # Import application components - with error handling
 try:
-    from config.manager import ConfigurationManager
-    from config.schemas.app_schema import AppConfig
-    from domain.base.value_objects import InstanceId, ResourceId
-    from domain.machine.aggregate import Machine
-    from domain.request.aggregate import Request
-    from domain.template.template_aggregate import Template
-    from infrastructure.di.buses import CommandBus, QueryBus
-    from infrastructure.di.container import DIContainer
-    from infrastructure.template.services.template_storage_service import (
+    from orb.config.manager import ConfigurationManager
+    from orb.config.schemas.app_schema import AppConfig
+    from orb.domain.base.value_objects import InstanceId, ResourceId
+    from orb.domain.machine.aggregate import Machine
+    from orb.domain.request.aggregate import Request
+    from orb.domain.template.template_aggregate import Template
+    from orb.infrastructure.di.buses import CommandBus, QueryBus
+    from orb.infrastructure.di.container import DIContainer
+    from orb.infrastructure.template.services.template_storage_service import (
         TemplateStorageService as TemplatePersistenceService,
     )
-    from providers.aws.configuration.config import AWSProviderConfig as AWSConfig
+    from orb.providers.aws.configuration.config import AWSProviderConfig as AWSConfig
 
     IMPORTS_AVAILABLE = True
 except ImportError as e:

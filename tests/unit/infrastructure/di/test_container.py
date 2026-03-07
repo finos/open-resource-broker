@@ -5,9 +5,9 @@ from unittest.mock import patch
 
 import pytest
 
-from domain.base.di_contracts import DIScope
-from infrastructure.di.container import DIContainer, timed_operation
-from infrastructure.di.exceptions import (
+from orb.domain.base.di_contracts import DIScope
+from orb.infrastructure.di.container import DIContainer, timed_operation
+from orb.infrastructure.di.exceptions import (
     CircularDependencyError,
     DependencyResolutionError,
 )
@@ -448,11 +448,11 @@ class TestDIContainer:
 
         # Mock injectable decorator
         with patch(
-            "src.infrastructure.di.components.dependency_resolver.is_injectable",
+            "orb.infrastructure.di.components.dependency_resolver.is_injectable",
             return_value=True,
         ):
             with patch(
-                "src.infrastructure.di.components.dependency_resolver.get_injectable_metadata",
+                "orb.infrastructure.di.components.dependency_resolver.get_injectable_metadata",
                 return_value=None,
             ):
                 self.container.register_injectable_class(InjectableService)
@@ -488,7 +488,7 @@ class TestTimedOperation:
 
     def test_timed_operation_fast(self):
         """Test timed operation with fast execution."""
-        with patch("infrastructure.di.container.logger") as mock_logger:
+        with patch("orb.infrastructure.di.container.logger") as mock_logger:
             with timed_operation("fast_operation"):
                 pass  # Fast operation
 
@@ -498,7 +498,7 @@ class TestTimedOperation:
 
     def test_timed_operation_slow(self):
         """Test timed operation with slow execution."""
-        with patch("infrastructure.di.container.logger") as mock_logger:
+        with patch("orb.infrastructure.di.container.logger") as mock_logger:
             with timed_operation("slow_operation"):
                 import time
 
@@ -509,7 +509,7 @@ class TestTimedOperation:
 
     def test_timed_operation_with_exception(self):
         """Test timed operation when exception occurs."""
-        with patch("infrastructure.di.container.logger") as mock_logger:
+        with patch("orb.infrastructure.di.container.logger") as mock_logger:
             try:
                 with timed_operation("failing_operation"):
                     raise ValueError("Test exception")

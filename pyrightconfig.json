@@ -1,6 +1,0 @@
-{
-  "pythonVersion": "3.12",
-  "typeCheckingMode": "basic",
-  "include": ["src"],
-  "extraPaths": ["src"]
-}

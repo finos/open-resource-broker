@@ -11,11 +11,16 @@ import logging
 import sys
 from pathlib import Path
 
+import yaml
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+_project = yaml.safe_load(open(Path(__file__).parent.parent.parent / ".project.yml"))
+PACKAGE_ROOT = _project.get("build", {}).get("package_root", "src/orb")
 
 
 class CQRSValidator:
@@ -34,10 +39,10 @@ class CQRSValidator:
 
         # Look for handler files
         for pattern in ["*handler*.py", "*handlers.py"]:
-            handler_files.extend(Path("src").rglob(pattern))
+            handler_files.extend(Path(PACKAGE_ROOT).rglob(pattern))
 
         # Also check application layer specifically
-        app_path = Path("src/application")
+        app_path = Path(f"{PACKAGE_ROOT}/application")
         if app_path.exists():
             for file_path in app_path.rglob("*.py"):
                 if "handler" in file_path.name.lower():

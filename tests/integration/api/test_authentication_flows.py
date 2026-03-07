@@ -7,10 +7,10 @@ import pytest
 from fastapi.testclient import TestClient
 from starlette.datastructures import URL
 
-from api.server import create_fastapi_app
-from config.schemas.server_schema import AuthConfig, ServerConfig
-from infrastructure.auth.strategy.bearer_token_strategy import BearerTokenStrategy
-from infrastructure.auth.strategy.no_auth_strategy import NoAuthStrategy
+from orb.api.server import create_fastapi_app
+from orb.config.schemas.server_schema import AuthConfig, ServerConfig
+from orb.infrastructure.auth.strategy.bearer_token_strategy import BearerTokenStrategy
+from orb.infrastructure.auth.strategy.no_auth_strategy import NoAuthStrategy
 
 
 class TestAuthenticationFlows:
@@ -63,11 +63,9 @@ class TestAuthenticationFlows:
         response = client.get("/health")
         assert response.status_code == 200
 
-        # Test protected endpoint without token (should fail)
-        # Note: auth failures return 500 because _handle_auth_failure raises HTTPException(401)
-        # inside the middleware's try/except block, which catches it and re-raises as 500.
+        # Test protected endpoint without token (should fail with 401)
         response = client.get("/info")
-        assert response.status_code in (401, 500)
+        assert response.status_code == 401
 
         # Verify the auth strategy itself works correctly when used directly
         strategy = BearerTokenStrategy(
@@ -82,12 +80,8 @@ class TestAuthenticationFlows:
         assert result.is_authenticated
         assert result.user_id == "test-user"
 
-        # Note: the /info endpoint with a valid token returns 500 due to a known
-        # registry bug where create_strategy_by_type passes kwargs as a positional
-        # dict to BearerTokenStrategy.__init__, making secret_key a dict instead
-        # of a string. This is a src/ bug outside the scope of this test fix.
         response = client.get("/info", headers={"Authorization": f"Bearer {token}"})
-        assert response.status_code in (200, 500)
+        assert response.status_code == 200
 
     def test_invalid_token_handling(self):
         """Test handling of invalid tokens."""
@@ -97,7 +91,10 @@ class TestAuthenticationFlows:
             auth=AuthConfig(
                 enabled=True,
                 strategy="bearer_token",
-                bearer_token={"secret_key": "test-secret-key", "algorithm": "HS256"},
+                bearer_token={
+                    "secret_key": "test-secret-key-minimum-32-bytes!",
+                    "algorithm": "HS256",
+                },
             ),
         )
 
@@ -107,23 +104,23 @@ class TestAuthenticationFlows:
         # Test with invalid token format
         headers = {"Authorization": "Bearer invalid-token"}
         response = client.get("/info", headers=headers)
-        assert response.status_code in (401, 500)
+        assert response.status_code == 401
 
         # Test with missing Bearer prefix
         headers = {"Authorization": "invalid-token"}
         response = client.get("/info", headers=headers)
-        assert response.status_code in (401, 500)
+        assert response.status_code == 401
 
         # Test with empty authorization header
         headers = {"Authorization": ""}
         response = client.get("/info", headers=headers)
-        assert response.status_code in (401, 500)
+        assert response.status_code == 401
 
     def test_expired_token_handling(self):
         """Test handling of expired tokens."""
         # Create strategy with very short expiry
         strategy = BearerTokenStrategy(
-            secret_key="test-secret-key",
+            secret_key="test-secret-key-minimum-32-bytes!",
             algorithm="HS256",
             token_expiry=1,  # 1 second expiry
             enabled=True,
@@ -147,7 +144,7 @@ class TestAuthenticationFlows:
     @pytest.mark.asyncio
     async def test_auth_context_creation(self):
         """Test authentication context creation from requests."""
-        from api.middleware.auth_middleware import AuthMiddleware
+        from orb.api.middleware.auth_middleware import AuthMiddleware
 
         # Create mock request
         class MockRequest:
@@ -181,7 +178,7 @@ class TestAuthenticationFlows:
             auth=AuthConfig(
                 enabled=True,
                 strategy="bearer_token",
-                bearer_token={"secret_key": "test-key"},
+                bearer_token={"secret_key": "test-secret-key-minimum-32-bytes!"},
             ),
         )
 

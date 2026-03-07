@@ -3,18 +3,18 @@
 from datetime import datetime
 
 import pytest
+from pydantic import ValidationError
 
 # Import domain events and aggregates
 try:
-    from domain.base.events import (
+    from orb.domain.base.events import (
         RequestCompletedEvent,
         RequestCreatedEvent,
         RequestStatusChangedEvent,
     )
-    from domain.base.events.base_events import BaseEvent
-    from domain.base.events.domain_events import DomainEvent
-    from domain.request.aggregate import Request
-    from domain.request.value_objects import RequestStatus, RequestType
+    from orb.domain.base.events.base_events import DomainEvent
+    from orb.domain.request.aggregate import Request
+    from orb.domain.request.value_objects import RequestStatus, RequestType
 
     IMPORTS_AVAILABLE = True
 except ImportError as e:
@@ -29,7 +29,10 @@ class TestDomainEventGeneration:
     def test_request_aggregate_generates_created_event(self):
         """Test that Request aggregate generates RequestCreatedEvent."""
         request = Request.create_new_request(
-            template_id="test-template", machine_count=2, requester_id="test-user"
+            request_type=RequestType.ACQUIRE,
+            template_id="test-template",
+            machine_count=2,
+            provider_type="aws",
         )
 
         events = request.get_domain_events()
@@ -37,81 +40,74 @@ class TestDomainEventGeneration:
 
         created_event = next((e for e in events if isinstance(e, RequestCreatedEvent)), None)
         assert created_event is not None, "Should generate RequestCreatedEvent"
-        assert created_event.request_id == str(request.id.value)
         assert created_event.template_id == "test-template"
         assert created_event.machine_count == 2
-        assert created_event.requester_id == "test-user"
 
     def test_request_status_change_generates_event(self):
         """Test that request status changes generate events."""
         request = Request.create_new_request(
-            template_id="test-template", machine_count=2, requester_id="test-user"
+            request_type=RequestType.ACQUIRE,
+            template_id="test-template",
+            machine_count=2,
+            provider_type="aws",
         )
 
-        # Clear initial events
-        request.clear_domain_events()
+        # start_processing returns a new immutable instance
+        updated_request = request.start_processing()
 
-        # Change status
-        request.start_processing()
-
-        events = request.get_domain_events()
+        events = updated_request.get_domain_events()
         status_event = next((e for e in events if isinstance(e, RequestStatusChangedEvent)), None)
         assert status_event is not None, "Status change should generate event"
         assert status_event.old_status == RequestStatus.PENDING.value
-        assert status_event.new_status == RequestStatus.PROCESSING.value
+        assert status_event.new_status == RequestStatus.IN_PROGRESS.value
 
     def test_request_completion_generates_event(self):
         """Test that request completion generates event."""
         request = Request.create_new_request(
-            template_id="test-template", machine_count=2, requester_id="test-user"
+            request_type=RequestType.ACQUIRE,
+            template_id="test-template",
+            machine_count=2,
+            provider_type="aws",
         )
 
-        request.start_processing()
-        request.clear_domain_events()
+        processing = request.start_processing()
+        # complete() returns a new immutable instance
+        completed = processing.complete(message="All machines provisioned")
 
-        # Complete the request
-        machine_ids = ["i-123", "i-456"]
-        request.complete_successfully(
-            machine_ids=machine_ids, completion_message="All machines provisioned"
-        )
-
-        events = request.get_domain_events()
+        events = completed.get_domain_events()
         completed_event = next((e for e in events if isinstance(e, RequestCompletedEvent)), None)
         assert completed_event is not None, "Completion should generate event"
-        assert completed_event.machine_ids == machine_ids
-        assert completed_event.success is True
+        assert completed_event.completion_status == RequestStatus.COMPLETED.value
 
     def test_request_failure_generates_event(self):
         """Test that request failure generates event."""
         request = Request.create_new_request(
-            template_id="test-template", machine_count=2, requester_id="test-user"
+            request_type=RequestType.ACQUIRE,
+            template_id="test-template",
+            machine_count=2,
+            provider_type="aws",
         )
 
-        request.start_processing()
-        request.clear_domain_events()
+        processing = request.start_processing()
+        # fail() returns a new immutable instance; no domain event is emitted by fail()
+        failed = processing.fail("Insufficient capacity")
 
-        # Fail the request
-        error_message = "Insufficient capacity"
-        request.fail_with_error(error_message)
-
-        events = request.get_domain_events()
-        completed_event = next((e for e in events if isinstance(e, RequestCompletedEvent)), None)
-        assert completed_event is not None, "Failure should generate completion event"
-        assert completed_event.success is False
-        assert completed_event.error_message == error_message
+        # fail() does not emit a RequestCompletedEvent — verify the status is FAILED
+        assert failed.status == RequestStatus.FAILED
 
     def test_return_request_generates_events(self):
         """Test that return request creation generates events."""
         machine_ids = ["i-123", "i-456"]
         request = Request.create_return_request(
-            machine_ids=machine_ids, requester_id="test-user", reason="No longer needed"
+            machine_ids=machine_ids,
+            provider_type="aws",
+            provider_name="test-provider",
         )
 
         events = request.get_domain_events()
         created_event = next((e for e in events if isinstance(e, RequestCreatedEvent)), None)
         assert created_event is not None, "Return request should generate created event"
         assert created_event.request_type == RequestType.RETURN.value
-        assert created_event.machine_ids == machine_ids
 
 
 @pytest.mark.unit
@@ -122,27 +118,29 @@ class TestDomainEventProperties:
         """Test that domain events cannot be modified after creation."""
         event = RequestCreatedEvent(
             request_id="test-request",
+            aggregate_id="test-request",
+            aggregate_type="Request",
             template_id="test-template",
             machine_count=2,
-            requester_id="test-user",
-            request_type=RequestType.NEW.value,
+            request_type=RequestType.ACQUIRE.value,
         )
 
-        # Try to modify the event (should fail)
-        with pytest.raises((AttributeError, TypeError)):
+        # Try to modify the event (should fail — frozen=True)
+        with pytest.raises((AttributeError, TypeError, ValidationError)):
             event.request_id = "modified-request"
 
-        with pytest.raises((AttributeError, TypeError)):
+        with pytest.raises((AttributeError, TypeError, ValidationError)):
             event.machine_count = 5
 
     def test_domain_events_have_timestamps(self):
         """Test that domain events have appropriate timestamps."""
         event = RequestCreatedEvent(
             request_id="test-request",
+            aggregate_id="test-request",
+            aggregate_type="Request",
             template_id="test-template",
             machine_count=2,
-            requester_id="test-user",
-            request_type=RequestType.NEW.value,
+            request_type=RequestType.ACQUIRE.value,
         )
 
         assert hasattr(event, "occurred_at"), "Events should have timestamp"
@@ -153,18 +151,20 @@ class TestDomainEventProperties:
         """Test that domain events have unique identifiers."""
         event1 = RequestCreatedEvent(
             request_id="test-request-1",
+            aggregate_id="test-request-1",
+            aggregate_type="Request",
             template_id="test-template",
             machine_count=2,
-            requester_id="test-user",
-            request_type=RequestType.NEW.value,
+            request_type=RequestType.ACQUIRE.value,
         )
 
         event2 = RequestCreatedEvent(
             request_id="test-request-2",
+            aggregate_id="test-request-2",
+            aggregate_type="Request",
             template_id="test-template",
             machine_count=2,
-            requester_id="test-user",
-            request_type=RequestType.NEW.value,
+            request_type=RequestType.ACQUIRE.value,
         )
 
         assert hasattr(event1, "event_id"), "Events should have unique ID"
@@ -175,10 +175,11 @@ class TestDomainEventProperties:
         """Test that domain events can be serialized."""
         event = RequestCreatedEvent(
             request_id="test-request",
+            aggregate_id="test-request",
+            aggregate_type="Request",
             template_id="test-template",
             machine_count=2,
-            requester_id="test-user",
-            request_type=RequestType.NEW.value,
+            request_type=RequestType.ACQUIRE.value,
         )
 
         # Should be able to convert to dict
@@ -214,29 +215,33 @@ class TestEventInheritanceHierarchy:
         """Test the complete event inheritance chain."""
         event = RequestCreatedEvent(
             request_id="test-request",
+            aggregate_id="test-request",
+            aggregate_type="Request",
             template_id="test-template",
             machine_count=2,
-            requester_id="test-user",
-            request_type=RequestType.NEW.value,
+            request_type=RequestType.ACQUIRE.value,
         )
 
         assert isinstance(event, DomainEvent), "Should be instance of DomainEvent"
-        assert isinstance(event, BaseEvent), "Should be instance of BaseEvent"
 
     def test_event_type_identification(self):
         """Test that events can be identified by type."""
         created_event = RequestCreatedEvent(
             request_id="test-request",
+            aggregate_id="test-request",
+            aggregate_type="Request",
             template_id="test-template",
             machine_count=2,
-            requester_id="test-user",
-            request_type=RequestType.NEW.value,
+            request_type=RequestType.ACQUIRE.value,
         )
 
         status_event = RequestStatusChangedEvent(
             request_id="test-request",
+            aggregate_id="test-request",
+            aggregate_type="Request",
+            request_type=RequestType.ACQUIRE.value,
             old_status=RequestStatus.PENDING.value,
-            new_status=RequestStatus.PROCESSING.value,
+            new_status=RequestStatus.IN_PROGRESS.value,
         )
 
         # Should be able to distinguish event types
@@ -252,7 +257,10 @@ class TestEventAggregateInteraction:
     def test_aggregate_event_collection(self):
         """Test that aggregates collect events properly."""
         request = Request.create_new_request(
-            template_id="test-template", machine_count=2, requester_id="test-user"
+            request_type=RequestType.ACQUIRE,
+            template_id="test-template",
+            machine_count=2,
+            provider_type="aws",
         )
 
         # Should have events
@@ -267,19 +275,24 @@ class TestEventAggregateInteraction:
     def test_multiple_operations_generate_multiple_events(self):
         """Test that multiple operations generate multiple events."""
         request = Request.create_new_request(
-            template_id="test-template", machine_count=2, requester_id="test-user"
+            request_type=RequestType.ACQUIRE,
+            template_id="test-template",
+            machine_count=2,
+            provider_type="aws",
         )
 
-        # Perform multiple operations
-        request.start_processing()
-        request.complete_successfully(machine_ids=["i-123", "i-456"], completion_message="Success")
+        # Each operation returns a new instance; collect all events across instances
+        processing = request.start_processing()
+        completed = processing.complete(message="Success")
 
-        events = request.get_domain_events()
-        # Should have: Created, StatusChanged, Completed events
-        assert len(events) >= 3, f"Should have at least 3 events, got {len(events)}"
+        # Gather events from all instances
+        all_events = (
+            request.get_domain_events()
+            + processing.get_domain_events()
+            + completed.get_domain_events()
+        )
 
-        # Check event types
-        event_types = [type(event).__name__ for event in events]
+        event_types = [type(e).__name__ for e in all_events]
         assert "RequestCreatedEvent" in event_types
         assert "RequestStatusChangedEvent" in event_types
         assert "RequestCompletedEvent" in event_types
@@ -287,17 +300,25 @@ class TestEventAggregateInteraction:
     def test_event_ordering(self):
         """Test that events are generated in correct order."""
         request = Request.create_new_request(
-            template_id="test-template", machine_count=2, requester_id="test-user"
+            request_type=RequestType.ACQUIRE,
+            template_id="test-template",
+            machine_count=2,
+            provider_type="aws",
         )
 
-        request.start_processing()
-        request.complete_successfully(machine_ids=["i-123", "i-456"], completion_message="Success")
+        processing = request.start_processing()
+        completed = processing.complete(message="Success")
 
-        events = request.get_domain_events()
+        # Collect events in order across the immutable chain
+        all_events = (
+            request.get_domain_events()
+            + processing.get_domain_events()
+            + completed.get_domain_events()
+        )
 
         # Events should be in chronological order
-        for i in range(1, len(events)):
-            assert events[i - 1].occurred_at <= events[i].occurred_at, (
+        for i in range(1, len(all_events)):
+            assert all_events[i - 1].occurred_at <= all_events[i].occurred_at, (
                 "Events should be in chronological order"
             )
 
@@ -309,11 +330,11 @@ class TestEventBusinessLogic:
     def test_event_contains_business_relevant_data(self):
         """Test that events contain all business-relevant data."""
         request = Request.create_new_request(
+            request_type=RequestType.ACQUIRE,
             template_id="test-template",
             machine_count=2,
-            requester_id="test-user",
-            priority=1,
-            tags={"Environment": "test"},
+            provider_type="aws",
+            metadata={"tags": {"Environment": "test"}},
         )
 
         events = request.get_domain_events()
@@ -322,55 +343,51 @@ class TestEventBusinessLogic:
         assert created_event is not None
         assert created_event.template_id == "test-template"
         assert created_event.machine_count == 2
-        assert created_event.requester_id == "test-user"
-        # Should include business context
-        if hasattr(created_event, "priority"):
-            assert created_event.priority == 1
         if hasattr(created_event, "tags"):
             assert created_event.tags == {"Environment": "test"}
 
     def test_status_change_event_captures_transition(self):
         """Test that status change events capture the complete transition."""
         request = Request.create_new_request(
-            template_id="test-template", machine_count=2, requester_id="test-user"
+            request_type=RequestType.ACQUIRE,
+            template_id="test-template",
+            machine_count=2,
+            provider_type="aws",
         )
 
-        request.clear_domain_events()
         old_status = request.status
-        request.start_processing()
-        new_status = request.status
+        updated = request.start_processing()
+        new_status = updated.status
 
-        events = request.get_domain_events()
+        events = updated.get_domain_events()
         status_event = next((e for e in events if isinstance(e, RequestStatusChangedEvent)), None)
 
         assert status_event is not None
         assert status_event.old_status == old_status.value
         assert status_event.new_status == new_status.value
-        assert status_event.request_id == str(request.id.value)
+        assert status_event.request_id == str(updated.request_id.value)
 
     def test_completion_event_captures_outcome(self):
         """Test that completion events capture the complete outcome."""
         request = Request.create_new_request(
-            template_id="test-template", machine_count=2, requester_id="test-user"
+            request_type=RequestType.ACQUIRE,
+            template_id="test-template",
+            machine_count=2,
+            provider_type="aws",
         )
 
-        request.start_processing()
-        request.clear_domain_events()
-
+        processing = request.start_processing()
         machine_ids = ["i-123", "i-456"]
-        completion_message = "All machines provisioned successfully"
-        request.complete_successfully(
-            machine_ids=machine_ids, completion_message=completion_message
+        completed = processing.add_machine_ids(machine_ids).complete(
+            message="All machines provisioned successfully"
         )
 
-        events = request.get_domain_events()
+        events = completed.get_domain_events()
         completed_event = next((e for e in events if isinstance(e, RequestCompletedEvent)), None)
 
         assert completed_event is not None
-        assert completed_event.success is True
-        assert completed_event.machine_ids == machine_ids
-        assert completed_event.completion_message == completion_message
-        assert completed_event.error_message is None
+        assert completed_event.completion_status == RequestStatus.COMPLETED.value
+        assert sorted(completed_event.machine_ids) == sorted(machine_ids)
 
 
 @pytest.mark.unit
@@ -380,19 +397,24 @@ class TestEventSystemIntegration:
     def test_events_support_audit_trail(self):
         """Test that events provide complete audit trail."""
         request = Request.create_new_request(
-            template_id="test-template", machine_count=2, requester_id="test-user"
+            request_type=RequestType.ACQUIRE,
+            template_id="test-template",
+            machine_count=2,
+            provider_type="aws",
         )
 
-        # Perform complete lifecycle
-        request.start_processing()
-        request.complete_successfully(machine_ids=["i-123", "i-456"], completion_message="Success")
+        processing = request.start_processing()
+        completed = processing.complete(message="Success")
 
-        events = request.get_domain_events()
+        all_events = (
+            request.get_domain_events()
+            + processing.get_domain_events()
+            + completed.get_domain_events()
+        )
 
-        # Should be able to reconstruct the complete story from events
-        created_events = [e for e in events if isinstance(e, RequestCreatedEvent)]
-        status_events = [e for e in events if isinstance(e, RequestStatusChangedEvent)]
-        completed_events = [e for e in events if isinstance(e, RequestCompletedEvent)]
+        created_events = [e for e in all_events if isinstance(e, RequestCreatedEvent)]
+        status_events = [e for e in all_events if isinstance(e, RequestStatusChangedEvent)]
+        completed_events = [e for e in all_events if isinstance(e, RequestCompletedEvent)]
 
         assert len(created_events) >= 1, "Should have creation event"
         assert len(status_events) >= 1, "Should have status change events"
@@ -400,25 +422,30 @@ class TestEventSystemIntegration:
 
     def test_events_support_replay(self):
         """Test that events support event sourcing replay."""
-        # Create events that could be used for replay
         events = [
             RequestCreatedEvent(
                 request_id="test-request",
+                aggregate_id="test-request",
+                aggregate_type="Request",
                 template_id="test-template",
                 machine_count=2,
-                requester_id="test-user",
-                request_type=RequestType.NEW.value,
+                request_type=RequestType.ACQUIRE.value,
             ),
             RequestStatusChangedEvent(
                 request_id="test-request",
+                aggregate_id="test-request",
+                aggregate_type="Request",
+                request_type=RequestType.ACQUIRE.value,
                 old_status=RequestStatus.PENDING.value,
-                new_status=RequestStatus.PROCESSING.value,
+                new_status=RequestStatus.IN_PROGRESS.value,
             ),
             RequestCompletedEvent(
                 request_id="test-request",
-                success=True,
+                aggregate_id="test-request",
+                aggregate_type="Request",
+                request_type=RequestType.ACQUIRE.value,
+                completion_status=RequestStatus.COMPLETED.value,
                 machine_ids=["i-123", "i-456"],
-                completion_message="Success",
             ),
         ]
 
@@ -432,18 +459,20 @@ class TestEventSystemIntegration:
         """Test that events support deduplication."""
         event1 = RequestCreatedEvent(
             request_id="test-request",
+            aggregate_id="test-request",
+            aggregate_type="Request",
             template_id="test-template",
             machine_count=2,
-            requester_id="test-user",
-            request_type=RequestType.NEW.value,
+            request_type=RequestType.ACQUIRE.value,
         )
 
         event2 = RequestCreatedEvent(
             request_id="test-request",
+            aggregate_id="test-request",
+            aggregate_type="Request",
             template_id="test-template",
             machine_count=2,
-            requester_id="test-user",
-            request_type=RequestType.NEW.value,
+            request_type=RequestType.ACQUIRE.value,
         )
 
         # Events should have unique IDs for deduplication

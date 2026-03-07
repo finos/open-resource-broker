@@ -2,18 +2,18 @@
 
 from unittest.mock import MagicMock, patch
 
-from api.handlers.get_available_templates_handler import (
+from orb.api.handlers.get_available_templates_handler import (
     GetAvailableTemplatesRESTHandler,
 )
-from api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
-from api.handlers.get_return_requests_handler import GetReturnRequestsRESTHandler
-from api.handlers.request_machines_handler import RequestMachinesRESTHandler
-from api.handlers.request_return_machines_handler import (
+from orb.api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
+from orb.api.handlers.get_return_requests_handler import GetReturnRequestsRESTHandler
+from orb.api.handlers.request_machines_handler import RequestMachinesRESTHandler
+from orb.api.handlers.request_return_machines_handler import (
     RequestReturnMachinesRESTHandler,
 )
-from domain.base.ports import ErrorHandlingPort, LoggingPort, SchedulerPort
-from infrastructure.di.buses import CommandBus, QueryBus
-from monitoring.metrics import MetricsCollector
+from orb.domain.base.ports import ErrorHandlingPort, LoggingPort, SchedulerPort
+from orb.infrastructure.di.buses import CommandBus, QueryBus
+from orb.monitoring.metrics import MetricsCollector
 
 
 class TestAPIHandlerInitialization:
@@ -83,6 +83,7 @@ class TestAPIHandlerInitialization:
             query_bus=self.query_bus,
             command_bus=self.command_bus,
             scheduler_strategy=self.scheduler_strategy,
+            config_manager=MagicMock(),
             logger=self.logger,
             error_handler=self.error_handler,
             metrics=self.metrics,
@@ -117,14 +118,14 @@ class TestAPIHandlerInitialization:
 class TestAPIHandlerRegistration:
     """Test API handler registration in server_services.py."""
 
-    @patch("infrastructure.di.server_services._register_fastapi_services")
-    @patch("infrastructure.di.server_services._register_api_handlers")
+    @patch("orb.infrastructure.di.server_services._register_fastapi_services")
+    @patch("orb.infrastructure.di.server_services._register_api_handlers")
     def test_register_server_services_with_fastapi(
         self, mock_register_api_handlers, mock_register_fastapi
     ):
         """Test that register_server_services calls handlers when server is enabled and FastAPI is available."""
-        from config.schemas.server_schema import ServerConfig
-        from infrastructure.di.server_services import register_server_services
+        from orb.config.schemas.server_schema import ServerConfig
+        from orb.infrastructure.di.server_services import register_server_services
 
         container = MagicMock()
         config_manager = MagicMock()
@@ -139,9 +140,9 @@ class TestAPIHandlerRegistration:
         mock_register_api_handlers.assert_called_once_with(container)
 
     def test_register_server_services_without_fastapi(self):
-        """Test that register_server_services handles missing FastAPI gracefully."""
-        from config.schemas.server_schema import ServerConfig
-        from infrastructure.di.server_services import register_server_services
+        """Test that register_server_services raises when FastAPI is unavailable."""
+        from orb.config.schemas.server_schema import ServerConfig
+        from orb.infrastructure.di.server_services import register_server_services
 
         container = MagicMock()
         config_manager = MagicMock()
@@ -150,20 +151,21 @@ class TestAPIHandlerRegistration:
         config_manager.get_typed.return_value = server_config
         container.get.return_value = config_manager
 
-        with patch("infrastructure.di.server_services._register_fastapi_services") as mock_fastapi:
+        with patch(
+            "orb.infrastructure.di.server_services._register_fastapi_services"
+        ) as mock_fastapi:
             mock_fastapi.side_effect = ImportError("No module named 'fastapi'")
 
-            # Act - should not raise exception
-            register_server_services(container)
+            import pytest
 
-            # Assert - function completes without error
-            assert True
+            with pytest.raises(ImportError, match="No module named 'fastapi'"):
+                register_server_services(container)
 
-    @patch("infrastructure.di.server_services._register_api_handlers")
+    @patch("orb.infrastructure.di.server_services._register_api_handlers")
     def test_register_server_services_disabled(self, mock_register_api_handlers):
         """Test that register_server_services doesn't call _register_api_handlers when server is disabled."""
-        from config.schemas.server_schema import ServerConfig
-        from infrastructure.di.server_services import register_server_services
+        from orb.config.schemas.server_schema import ServerConfig
+        from orb.infrastructure.di.server_services import register_server_services
 
         container = MagicMock()
         config_manager = MagicMock()

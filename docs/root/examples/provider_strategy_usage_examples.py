@@ -16,15 +16,14 @@ logger = logging.getLogger(__name__)
 
 # Import AWS provider components
 try:
-    from src.providers.aws.config import AWSConfig
-
-    from src.providers.aws.strategy import AWSProviderStrategy
+    from orb.providers.aws.configuration.config import AWSProviderConfig
+    from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 except ImportError:
     # Fallback for documentation examples
-    AWSConfig = None
+    AWSProviderConfig = None
     AWSProviderStrategy = None
 
-from src.providers.base.strategy import (
+from orb.providers.base.strategy import (
     AggregationPolicy,
     CompositeProviderStrategy,
     CompositionConfig,
@@ -69,9 +68,9 @@ class Provider1Strategy(ProviderStrategy):
 
     def __init__(self, config: Provider1Config, logger=None):
         """Initialize Provider1Strategy with configuration and logger."""
-        from src.infrastructure.interfaces.provider import ProviderConfig
+        from orb.infrastructure.interfaces.provider import BaseProviderConfig
 
-        super().__init__(ProviderConfig(provider_type="provider1"))
+        super().__init__(BaseProviderConfig(provider_type="provider1"))
         self._config = config
         self._logger = logger
         self._client = None
@@ -307,10 +306,10 @@ def example_runtime_switching():
     context = create_provider_context()
 
     # Create multiple providers
-    from src.providers.aws.configuration.config import AWSConfig
-    from src.providers.aws.strategy import AWSProviderStrategy
+    from orb.providers.aws.configuration.config import AWSProviderConfig
+    from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
-    aws_config = AWSConfig(region="us-east-1", profile="default")
+    aws_config = AWSProviderConfig(region="us-east-1", profile="default")
     aws_strategy = AWSProviderStrategy(aws_config)
 
     provider1_config = Provider1Config(
@@ -367,7 +366,7 @@ def example_load_balancing():
     logger.info("-" * 40)
 
     # Create multiple provider strategies
-    aws_config = AWSConfig(region="us-east-1", profile="default")
+    aws_config = AWSProviderConfig(region="us-east-1", profile="default")
     aws_strategy = AWSProviderStrategy(aws_config)
 
     provider1_config = Provider1Config(
@@ -429,7 +428,7 @@ def example_fallback_resilience():
     logger.info("-" * 40)
 
     # Create primary and fallback strategies
-    aws_config = AWSConfig(region="us-east-1", profile="default")
+    aws_config = AWSProviderConfig(region="us-east-1", profile="default")
     primary_strategy = AWSProviderStrategy(aws_config)
 
     provider1_config = Provider1Config(
@@ -492,7 +491,7 @@ def example_multi_provider_composition():
     logger.info("-" * 40)
 
     # Create multiple strategies
-    aws_config = AWSConfig(region="us-east-1", profile="default")
+    aws_config = AWSProviderConfig(region="us-east-1", profile="default")
     aws_strategy = AWSProviderStrategy(aws_config)
 
     provider1_config = Provider1Config(
@@ -559,7 +558,7 @@ def example_production_monitoring():
     # Create provider context with multiple strategies
     context = create_provider_context()
 
-    aws_config = AWSConfig(region="us-east-1", profile="default")
+    aws_config = AWSProviderConfig(region="us-east-1", profile="default")
     aws_strategy = AWSProviderStrategy(aws_config)
 
     provider1_config = Provider1Config(
@@ -671,7 +670,7 @@ def example_configuration_driven_setup():
     strategies = []
 
     if config["provider"]["providers"]["aws"]["enabled"]:
-        aws_config = AWSConfig(
+        aws_config = AWSProviderConfig(
             region=config["provider"]["providers"]["aws"]["region"],
             profile=config["provider"]["providers"]["aws"]["profile"],
         )

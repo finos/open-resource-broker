@@ -2,7 +2,7 @@
 
 import pytest
 
-from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
 
 def _make_template(allocation_strategy: str, **kwargs) -> AWSTemplate:

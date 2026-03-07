@@ -12,9 +12,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-import api.dependencies as deps
-from api.server import create_fastapi_app
-from config.schemas.server_schema import AuthConfig, ServerConfig
+import orb.api.dependencies as deps
+from orb.api.server import create_fastapi_app
+from orb.config.schemas.server_schema import AuthConfig, ServerConfig
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -24,7 +24,7 @@ from config.schemas.server_schema import AuthConfig, ServerConfig
 def _make_request_machines_response(request_id: str):
     """Build a minimal RequestMachinesResponse-like object."""
     mock = MagicMock()
-    mock.to_dict.return_value = {"requestId": request_id, "message": "Request VM success."}
+    mock.to_dict.return_value = {"request_id": request_id, "message": "Request VM success."}
     return mock
 
 

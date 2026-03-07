@@ -59,7 +59,7 @@ class TestLoggingIntegration:
         command_with_dry_run = [
             python_executable,
             "-m",
-            "src.cli.main",
+            "orb.cli.main",
             "--dry-run",
             *command,
         ]

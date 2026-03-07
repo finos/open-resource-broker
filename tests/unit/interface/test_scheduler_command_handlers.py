@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from interface.scheduler_command_handlers import (
+from orb.interface.scheduler_command_handlers import (
     handle_list_scheduler_strategies,
     handle_show_scheduler_config,
     handle_validate_scheduler_config,
@@ -20,7 +20,7 @@ class TestSchedulerCommandHandlers:
         """Test list scheduler strategies handler."""
         args = Namespace(resource="scheduler", action="list")
 
-        with patch("interface.scheduler_command_handlers.get_container") as mock_get_container:
+        with patch("orb.interface.scheduler_command_handlers.get_container") as mock_get_container:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 
@@ -38,7 +38,7 @@ class TestSchedulerCommandHandlers:
         """Test show scheduler configuration handler."""
         args = Namespace(resource="scheduler", action="show")
 
-        with patch("interface.scheduler_command_handlers.get_container") as mock_get_container:
+        with patch("orb.interface.scheduler_command_handlers.get_container") as mock_get_container:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 
@@ -55,7 +55,7 @@ class TestSchedulerCommandHandlers:
         """Test validate scheduler configuration handler."""
         args = Namespace(resource="scheduler", action="validate")
 
-        with patch("interface.scheduler_command_handlers.get_container") as mock_get_container:
+        with patch("orb.interface.scheduler_command_handlers.get_container") as mock_get_container:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 
@@ -74,7 +74,7 @@ class TestSchedulerHandlerImports:
 
     def test_import_scheduler_handlers(self):
         """Test that all scheduler handlers can be imported."""
-        from interface.scheduler_command_handlers import (
+        from orb.interface.scheduler_command_handlers import (
             handle_list_scheduler_strategies,
             handle_show_scheduler_config,
             handle_validate_scheduler_config,

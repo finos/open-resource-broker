@@ -9,8 +9,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from config.manager import ConfigurationManager
-from providers.factory import ProviderStrategyFactory
+from orb.config.manager import ConfigurationManager
+from orb.providers.factory import ProviderStrategyFactory
 
 
 class TestPerformance:

@@ -2,7 +2,7 @@
 
 from unittest.mock import Mock, patch
 
-from providers.aws.infrastructure.services.aws_native_spec_service import (
+from orb.providers.aws.infrastructure.services.aws_native_spec_service import (
     AWSNativeSpecService,
 )
 

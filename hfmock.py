@@ -159,9 +159,18 @@ class HostFactoryMock:
             # os.environ["AWS_PROVIDER_LOG_DIR"] = "./logs"
             os.environ["LOG_DESTINATION"] = "file"
 
-            hf_scripts_location = (
-                Path(__file__).parent / "src/infrastructure/scheduler/hostfactory/scripts"
+            # Use scripts from orb init output (./scripts/) to exercise the real deployment path.
+            # Falls back to source tree for development without orb init.
+            _config_dir = Path(os.environ.get("ORB_CONFIG_DIR", Path(__file__).parent))
+            _init_scripts = _config_dir / "scripts"
+            from orb._package import PACKAGE_ROOT
+
+            _source_scripts = (
+                Path(__file__).parent
+                / PACKAGE_ROOT
+                / "infrastructure/scheduler/hostfactory/scripts"
             )
+            hf_scripts_location = _init_scripts if _init_scripts.exists() else _source_scripts
 
         self.get_available_templates_script = os.path.join(
             hf_scripts_location, "getAvailableTemplates.sh"

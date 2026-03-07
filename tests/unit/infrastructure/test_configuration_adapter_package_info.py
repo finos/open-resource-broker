@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from infrastructure.adapters.configuration_adapter import ConfigurationAdapter
+from orb.infrastructure.adapters.configuration_adapter import ConfigurationAdapter
 
 
 class TestConfigurationAdapterPackageInfo:
@@ -15,7 +15,7 @@ class TestConfigurationAdapterPackageInfo:
         self.mock_config_manager = Mock()
         self.adapter = ConfigurationAdapter(self.mock_config_manager)
 
-    @patch("infrastructure.adapters.configuration_adapter._package", create=True)
+    @patch("orb.infrastructure.adapters.configuration_adapter._package", create=True)
     def test_get_package_info_success(self, mock_package):
         """Test successful package info retrieval."""
         # Arrange - patch the _package module-level name used inside get_package_info
@@ -28,7 +28,7 @@ class TestConfigurationAdapterPackageInfo:
         with patch.dict(
             "sys.modules",
             {
-                "_package": type(
+                "orb._package": type(
                     "FakePackage",
                     (),
                     {
@@ -53,8 +53,8 @@ class TestConfigurationAdapterPackageInfo:
         """Test that ImportError is raised when _package module is not available."""
         from unittest.mock import patch
 
-        # Setting sys.modules["_package"] = None forces ImportError on `from _package import ...`
-        with patch.dict("sys.modules", {"_package": None}):
+        # Setting sys.modules["orb._package"] = None forces ImportError on `from orb._package import ...`
+        with patch.dict("sys.modules", {"orb._package": None}):
             adapter = ConfigurationAdapter(self.mock_config_manager)
             with pytest.raises(ImportError):
                 adapter.get_package_info()
@@ -69,7 +69,7 @@ class TestConfigurationAdapterPackageInfo:
         fake_pkg.DESCRIPTION = "A description"
         fake_pkg.AUTHOR = "An author"
 
-        with patch.dict("sys.modules", {"_package": fake_pkg}):
+        with patch.dict("sys.modules", {"orb._package": fake_pkg}):
             result = self.adapter.get_package_info()
 
         assert result["name"] == "test-package"

@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock
 
-from infrastructure.scheduler.registration import (
+from orb.infrastructure.scheduler.registration import (
     create_default_strategy,
     create_symphony_hostfactory_strategy,
 )
@@ -13,9 +13,9 @@ class TestTemplateDefaultsWiring:
 
     def _make_container(self, template_defaults_service=None):
         """Build a minimal mock container with get_optional support."""
-        from domain.base.ports.configuration_port import ConfigurationPort
-        from domain.base.ports.logging_port import LoggingPort
-        from domain.template.ports.template_defaults_port import TemplateDefaultsPort
+        from orb.domain.base.ports.configuration_port import ConfigurationPort
+        from orb.domain.base.ports.logging_port import LoggingPort
+        from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
 
         mock_defaults = template_defaults_service or MagicMock()
 
@@ -64,7 +64,7 @@ class TestTemplateDefaultsWiring:
 
     def test_hostfactory_strategy_type(self):
         """Factory returns a HostFactorySchedulerStrategy instance."""
-        from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+        from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
             HostFactorySchedulerStrategy,
         )
 
@@ -75,7 +75,7 @@ class TestTemplateDefaultsWiring:
 
     def test_default_strategy_type(self):
         """Factory returns a DefaultSchedulerStrategy instance."""
-        from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+        from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 
         container, _ = self._make_container()
         strategy = create_default_strategy(container)

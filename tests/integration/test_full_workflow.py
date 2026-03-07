@@ -9,15 +9,15 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from bootstrap import Application
-from config.manager import ConfigurationManager
-from infrastructure.di.buses import CommandBus, QueryBus
+from orb.bootstrap import Application
+from orb.config.manager import ConfigurationManager
+from orb.infrastructure.di.buses import CommandBus, QueryBus
 
 
 def _make_mock_container(mock_config_manager=None):
     """Create a mock DI container."""
-    from domain.base.ports.configuration_port import ConfigurationPort
-    from infrastructure.di.buses import CommandBus, QueryBus
+    from orb.domain.base.ports.configuration_port import ConfigurationPort
+    from orb.infrastructure.di.buses import CommandBus, QueryBus
 
     if mock_config_manager is None:
         mock_config_manager = _make_mock_config_manager()
@@ -67,8 +67,8 @@ async def _init_app(config_path=None):
     mock_container = _make_mock_container(mock_config_manager)
 
     with (
-        patch("infrastructure.di.container.get_container", return_value=mock_container),
-        patch("providers.registry.get_provider_registry") as mock_get_registry,
+        patch("orb.infrastructure.di.container.get_container", return_value=mock_container),
+        patch("orb.providers.registry.get_provider_registry") as mock_get_registry,
     ):
         mock_registry = Mock()
         mock_registry.get_registered_providers.return_value = ["aws"]
@@ -115,7 +115,7 @@ class TestFullWorkflow:
 
         # Mock query execution to return empty template list
         with patch.object(query_bus, "execute_sync", return_value=[]) as mock_exec:
-            from application.dto.queries import ListTemplatesQuery
+            from orb.application.dto.queries import ListTemplatesQuery
 
             result = query_bus.execute_sync(ListTemplatesQuery())
             assert isinstance(result, list)
@@ -232,7 +232,7 @@ class TestFullWorkflow:
     async def test_error_handling_integration(self):
         """Test error handling integration."""
         # Test initialization failure
-        with patch("infrastructure.di.container.get_container") as mock_get_container:
+        with patch("orb.infrastructure.di.container.get_container") as mock_get_container:
             mock_container = Mock()
             mock_container.is_lazy_loading_enabled.return_value = False
             mock_container.get.side_effect = Exception("Initialization failed")

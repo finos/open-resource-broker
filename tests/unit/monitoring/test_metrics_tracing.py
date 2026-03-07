@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from monitoring.metrics import MetricsCollector
+from orb.monitoring.metrics import MetricsCollector
 
 
 def test_tracing_disabled_by_default(tmp_path):

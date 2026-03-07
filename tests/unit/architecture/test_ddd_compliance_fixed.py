@@ -11,9 +11,9 @@ This module validates that the codebase properly implements DDD patterns includi
 import pytest
 from pydantic import ValidationError
 
-from domain.base.exceptions import DomainException
-from domain.base.value_objects import InstanceId, ResourceId, ResourceQuota
-from domain.template.template_aggregate import Template
+from orb.domain.base.exceptions import DomainException
+from orb.domain.base.value_objects import InstanceId, ResourceId, ResourceQuota
+from orb.domain.template.template_aggregate import Template
 
 
 @pytest.mark.unit

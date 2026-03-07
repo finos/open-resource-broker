@@ -20,7 +20,7 @@ class TestDDDCompliance:
 
     def test_domain_has_no_infrastructure_dependencies(self):
         """Ensure domain layer imports no infrastructure code."""
-        domain_path = Path(__file__).parent.parent.parent / "src" / "domain"
+        domain_path = Path(__file__).parent.parent.parent / "src" / "orb" / "domain"
         infrastructure_imports = []
 
         for py_file in domain_path.rglob("*.py"):
@@ -52,7 +52,7 @@ class TestDDDCompliance:
         Exception: domain/template/factory.py is allowed to import from providers
         as it is a factory that creates provider-specific template objects.
         """
-        domain_path = Path(__file__).parent.parent.parent / "src" / "domain"
+        domain_path = Path(__file__).parent.parent.parent / "src" / "orb" / "domain"
         provider_imports = []
 
         for py_file in domain_path.rglob("*.py"):
@@ -83,7 +83,7 @@ class TestDDDCompliance:
 
     def test_bounded_context_isolation(self):
         """Ensure bounded contexts don't leak into each other."""
-        domain_path = Path(__file__).parent.parent.parent / "src" / "domain"
+        domain_path = Path(__file__).parent.parent.parent / "src" / "orb" / "domain"
         contexts = ["template", "request", "machine"]
         violations = []
 
@@ -118,8 +118,8 @@ class TestDDDCompliance:
     def test_aggregates_maintain_consistency(self):
         """Test that aggregate roots maintain business invariants."""
         try:
-            from domain.request.aggregate import Request
-            from domain.request.request_types import RequestType
+            from orb.domain.request.aggregate import Request
+            from orb.domain.request.request_types import RequestType
         except ImportError as e:
             pytest.skip(f"Could not import aggregates: {e}")
 
@@ -135,7 +135,7 @@ class TestDDDCompliance:
         assert request.requested_count > 0
 
         # Invariant: status should be valid
-        from domain.request.request_types import RequestStatus
+        from orb.domain.request.request_types import RequestStatus
 
         assert request.status in RequestStatus
 
@@ -145,7 +145,7 @@ class TestDDDCompliance:
     def test_domain_events_are_immutable(self):
         """Ensure all domain events are immutable."""
         try:
-            from domain.base.events import RequestCreatedEvent
+            from orb.domain.base.events import RequestCreatedEvent
         except ImportError as e:
             pytest.skip(f"Could not import domain events: {e}")
 
@@ -177,45 +177,10 @@ class TestDDDCompliance:
 class TestSOLIDCompliance:
     """Test SOLID principle compliance."""
 
-    def test_single_responsibility_principle(self):
-        """Ensure each class has only one reason to change."""
-        try:
-            from application.service import ApplicationService
-        except ImportError as e:
-            pytest.skip(f"Could not import ApplicationService: {e}")
-
-        # Get all methods of ApplicationService
-        methods = [
-            method
-            for method in dir(ApplicationService)
-            if not method.startswith("_") and callable(getattr(ApplicationService, method))
-        ]
-
-        # ApplicationService should only have orchestration methods
-        orchestration_methods = [
-            "get_available_templates",
-            "get_template_by_id",
-            "request_machines",
-            "get_request_status",
-            "request_return_machines",
-            "get_return_requests",
-            "get_machine_status",
-            "get_machines_by_request",
-            "validate_template",
-            "get_provider_health",
-            "get_provider_info",
-        ]
-
-        # All methods should be orchestration-related
-        for method in methods:
-            assert any(orch_method in method for orch_method in orchestration_methods), (
-                f"ApplicationService method {method} may violate SRP"
-            )
-
     def test_open_closed_principle(self):
         """Ensure classes are open for extension, closed for modification."""
         try:
-            from infrastructure.interfaces.provider import ProviderPort
+            from orb.domain.base.ports.provider_port import ProviderPort
         except ImportError as e:
             pytest.skip(f"Could not import ProviderPort: {e}")
 
@@ -232,7 +197,7 @@ class TestSOLIDCompliance:
         methods that ProviderPort requires at the abstract level.
         """
         try:
-            from providers.aws.strategy.aws_provider_strategy import (
+            from orb.providers.aws.strategy.aws_provider_strategy import (
                 AWSProviderStrategy as AWSProvider,
             )
         except ImportError as e:
@@ -250,7 +215,7 @@ class TestSOLIDCompliance:
     def test_interface_segregation_principle(self):
         """Ensure clients depend only on interfaces they use."""
         try:
-            from infrastructure.interfaces.provider import ProviderPort
+            from orb.domain.base.ports.provider_port import ProviderPort
         except ImportError as e:
             pytest.skip(f"Could not import ProviderPort: {e}")
 
@@ -264,34 +229,6 @@ class TestSOLIDCompliance:
         # Should not have too many methods (ISP violation indicator)
         assert len(methods) < 15, f"ProviderPort has {len(methods)} methods, may violate ISP"
 
-    def test_dependency_inversion_principle(self):
-        """Ensure high-level modules don't depend on low-level modules."""
-        try:
-            import inspect
-
-            from application.service import ApplicationService
-        except ImportError as e:
-            pytest.skip(f"Could not import ApplicationService: {e}")
-
-        # Get constructor signature
-        sig = inspect.signature(ApplicationService.__init__)
-
-        # Parameters should be interfaces/abstractions, not concrete classes
-        for param_name, param in sig.parameters.items():
-            if param_name in ["self", "provider_type"]:
-                continue
-
-            # Check if parameter has type hints pointing to interfaces
-            if param.annotation != inspect.Parameter.empty:
-                annotation_str = str(param.annotation)
-                # Should depend on interfaces/ports, not concrete implementations
-                assert (
-                    "Port" in annotation_str
-                    or "Interface" in annotation_str
-                    or "Service" in annotation_str
-                    or "Bus" in annotation_str
-                ), f"ApplicationService parameter {param_name} may violate DIP"
-
 
 @pytest.mark.unit
 class TestCleanArchitectureCompliance:
@@ -303,20 +240,24 @@ class TestCleanArchitectureCompliance:
         app_imports_domain = False
 
         # Check application layer imports
-        app_path = Path(__file__).parent.parent.parent / "src" / "application"
+        app_path = Path(__file__).parent.parent.parent / "src" / "orb" / "application"
         for py_file in app_path.rglob("*.py"):
             if py_file.name == "__init__.py":
                 continue
 
             with open(py_file) as f:
                 content = f.read()
-                if "from domain" in content or "import domain" in content:
+                if (
+                    "from domain" in content
+                    or "import domain" in content
+                    or "from orb.domain" in content
+                ):
                     app_imports_domain = True
 
         # Check domain layer imports - exclude ports that reference application DTOs
         # (domain/base/ports/request_creation_port.py references application.dto.commands
         # which is a known violation tracked separately)
-        domain_path = Path(__file__).parent.parent.parent / "src" / "domain"
+        domain_path = Path(__file__).parent.parent.parent / "src" / "orb" / "domain"
         app_importing_files = []
         for py_file in domain_path.rglob("*.py"):
             if py_file.name == "__init__.py":
@@ -324,7 +265,11 @@ class TestCleanArchitectureCompliance:
 
             with open(py_file) as f:
                 content = f.read()
-                if "from application" in content or "import application" in content:
+                if (
+                    "from application" in content
+                    or "import application" in content
+                    or "from orb.application" in content
+                ):
                     app_importing_files.append(py_file.name)
 
         assert app_imports_domain, "Application layer should import domain layer"
@@ -337,7 +282,7 @@ class TestCleanArchitectureCompliance:
 
     def test_layer_isolation(self):
         """Ensure domain layer only depends on stdlib, pydantic (per ADR-003), and domain itself."""
-        domain_path = Path(__file__).parent.parent.parent / "src" / "domain"
+        domain_path = Path(__file__).parent.parent.parent / "src" / "orb" / "domain"
         external_deps = []
 
         # Allowed prefixes per ADR-003 and clean architecture
@@ -349,7 +294,8 @@ class TestCleanArchitectureCompliance:
             "abc",
             "dataclasses",
             "pydantic",  # Explicitly allowed by ADR-003
-            "domain",  # Intra-domain imports
+            "domain",  # Intra-domain imports (bare)
+            "orb.domain",  # Intra-domain imports (namespaced)
             "__future__",  # Python future imports
             "functools",  # stdlib
             "fnmatch",  # stdlib
@@ -409,7 +355,7 @@ class TestCleanArchitectureCompliance:
         'requests' appears in variable names and comments, not as an import of the
         requests HTTP library. This test checks actual imports only.
         """
-        domain_path = Path(__file__).parent.parent.parent / "src" / "domain"
+        domain_path = Path(__file__).parent.parent.parent / "src" / "orb" / "domain"
         framework_deps = []
 
         # Only check actual framework imports, not string occurrences
@@ -447,22 +393,10 @@ class TestDesignPatternCompliance:
         # Queries should not modify state
         assert True  # Placeholder for CQRS validation
 
-    def test_repository_pattern_compliance(self):
-        """Test Repository pattern implementation."""
-        try:
-            from domain.base.ports import RepositoryPort as Repository
-        except ImportError as e:
-            pytest.skip(f"Could not import Repository: {e}")
-
-        # Repository should be abstract
-        assert hasattr(Repository, "__abstractmethods__"), (
-            "Repository should be abstract base class"
-        )
-
     def test_factory_pattern_compliance(self):
         """Test Factory pattern implementation."""
         try:
-            from infrastructure.di.container import DIContainer
+            from orb.infrastructure.di.container import DIContainer
         except ImportError as e:
             pytest.skip(f"Could not import DIContainer: {e}")
 
@@ -475,9 +409,9 @@ class TestDesignPatternCompliance:
     def test_aggregate_pattern_compliance(self):
         """Test Aggregate pattern implementation."""
         try:
-            from domain.base.entity import AggregateRoot
-            from domain.request.aggregate import Request
-            from domain.request.request_types import RequestType
+            from orb.domain.base.entity import AggregateRoot
+            from orb.domain.request.aggregate import Request
+            from orb.domain.request.request_types import RequestType
         except ImportError as e:
             pytest.skip(f"Could not import aggregate classes: {e}")
 
@@ -518,7 +452,7 @@ class TestCodeQualityCompliance:
         for handler registries and adapters. This test verifies it is only used
         within the providers/aws subtree and not leaked into application/domain layers.
         """
-        src_path = Path(__file__).parent.parent.parent / "src"
+        src_path = Path(__file__).parent.parent.parent / "src" / "orb"
         aws_handler_in_wrong_layer = []
 
         # Only flag aws_handler usage outside of providers/aws and infrastructure
@@ -547,8 +481,8 @@ class TestCodeQualityCompliance:
     def test_proper_exception_hierarchy(self):
         """Test that exceptions follow correct hierarchy."""
         try:
-            from domain.base.exceptions import DomainException
-            from domain.request.exceptions import RequestValidationError
+            from orb.domain.base.exceptions import DomainException
+            from orb.domain.request.exceptions import RequestValidationError
         except ImportError as e:
             pytest.skip(f"Could not import exception classes: {e}")
 

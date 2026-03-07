@@ -5,11 +5,11 @@ from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
 
-from application.dto.responses import RequestDTO
-from config.manager import ConfigurationManager
-from domain.base import UnitOfWorkFactory
-from domain.base.ports import LoggingPort
-from infrastructure.caching.request_cache_service import RequestCacheService
+from orb.application.dto.responses import RequestDTO
+from orb.config.manager import ConfigurationManager
+from orb.domain.base import UnitOfWorkFactory
+from orb.domain.base.ports import LoggingPort
+from orb.infrastructure.caching.request_cache_service import RequestCacheService
 
 
 class TestRequestCacheService:
@@ -136,7 +136,7 @@ class TestRequestCacheService:
         # Should not raise any exceptions
         cache_service.cache_request(request_dto)
 
-    @patch("infrastructure.caching.request_cache_service.datetime")
+    @patch("orb.infrastructure.caching.request_cache_service.datetime")
     def test_cache_validity_check(self, mock_datetime, cache_service):
         """Test cache validity checking logic."""
         # Mock current time

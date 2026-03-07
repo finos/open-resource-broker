@@ -75,8 +75,8 @@ def test_domain_validation():
 def test_aws_template_basic():
     """Test basic AWSTemplate creation."""
     try:
-        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-        from providers.aws.domain.template.value_objects import ProviderApi
+        from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+        from orb.providers.aws.domain.template.value_objects import ProviderApi
 
         print("   Testing basic AWSTemplate creation...")
 
@@ -115,8 +115,8 @@ def test_aws_template_basic():
 def test_aws_template_spot_fleet():
     """Test SpotFleet AWSTemplate creation."""
     try:
-        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-        from providers.aws.domain.template.value_objects import (
+        from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+        from orb.providers.aws.domain.template.value_objects import (
             AWSFleetType,
             ProviderApi,
         )
@@ -158,8 +158,8 @@ def test_aws_template_spot_fleet():
 def test_request_creation():
     """Test Request creation."""
     try:
-        from domain.request.aggregate import Request
-        from domain.request.value_objects import RequestType
+        from orb.domain.request.aggregate import Request
+        from orb.domain.request.value_objects import RequestType
 
         print("   Testing Request creation...")
 
@@ -197,8 +197,8 @@ def test_base_handler_validation():
     try:
         from unittest.mock import Mock
 
-        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-        from providers.aws.domain.template.value_objects import (
+        from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+        from orb.providers.aws.domain.template.value_objects import (
             AWSFleetType,
             ProviderApi,
         )
@@ -206,7 +206,7 @@ def test_base_handler_validation():
         print("   Testing base handler validation...")
 
         # Create a concrete handler for testing (using SpotFleetHandler)
-        from providers.aws.infrastructure.handlers.spot_fleet.handler import (
+        from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import (
             SpotFleetHandler,
         )
 

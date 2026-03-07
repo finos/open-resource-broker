@@ -1,8 +1,8 @@
 """Integration tests showing utilities working with ExceptionHandler."""
 
-from domain.base.exceptions import EntityNotFoundError, ValidationError
-from infrastructure.error.exception_handler import ExceptionContext, ExceptionHandler
-from infrastructure.error.utilities import (
+from orb.domain.base.exceptions import EntityNotFoundError, ValidationError
+from orb.infrastructure.error.exception_handler import ExceptionContext, ExceptionHandler
+from orb.infrastructure.error.utilities import (
     build_error_context,
     format_error_message,
     format_stack_trace,

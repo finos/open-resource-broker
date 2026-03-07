@@ -5,22 +5,22 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from domain.base.ports import SchedulerPort
-from infrastructure.di.buses import QueryBus
-from infrastructure.di.container import DIContainer
-from interface.request_command_handlers import handle_get_request_status
-from interface.scheduler_command_handlers import handle_list_scheduler_strategies
-from interface.storage_command_handlers import handle_list_storage_strategies
+from orb.domain.base.ports import SchedulerPort
+from orb.infrastructure.di.buses import QueryBus
+from orb.infrastructure.di.container import DIContainer
+from orb.interface.request_command_handlers import handle_get_request_status
+from orb.interface.scheduler_command_handlers import handle_list_scheduler_strategies
+from orb.interface.storage_command_handlers import handle_list_storage_strategies
 
 # Import CLI handlers
-from interface.template_command_handlers import handle_list_templates
+from orb.interface.template_command_handlers import handle_list_templates
 
 
 class TestCLIHandlerExecution:
     """Test CLI handler execution."""
 
     @pytest.mark.asyncio
-    @patch("interface.template_command_handlers.get_container")
+    @patch("orb.interface.template_command_handlers.get_container")
     async def test_handle_list_templates(self, mock_get_container):
         """Test that handle_list_templates executes correctly."""
         container = MagicMock(spec=DIContainer)
@@ -59,7 +59,7 @@ class TestCLIHandlerExecution:
         assert "templates" in result
 
     @pytest.mark.asyncio
-    @patch("interface.scheduler_command_handlers.get_container")
+    @patch("orb.interface.scheduler_command_handlers.get_container")
     async def test_handle_list_scheduler_strategies(self, mock_get_container):
         """Test that handle_list_scheduler_strategies executes correctly."""
         container = MagicMock(spec=DIContainer)
@@ -90,7 +90,7 @@ class TestCLIHandlerExecution:
         query_bus.execute.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("interface.storage_command_handlers.get_container")
+    @patch("orb.interface.storage_command_handlers.get_container")
     async def test_handle_list_storage_strategies(self, mock_get_container):
         """Test that handle_list_storage_strategies executes correctly."""
         container = MagicMock(spec=DIContainer)
@@ -122,7 +122,7 @@ class TestCLIHandlerExecution:
         query_bus.execute.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("interface.request_command_handlers.get_container")
+    @patch("orb.interface.request_command_handlers.get_container")
     async def test_handle_get_request_status(self, mock_get_container):
         """Test that handle_get_request_status executes correctly."""
         container = MagicMock(spec=DIContainer)
@@ -132,11 +132,10 @@ class TestCLIHandlerExecution:
         request_dto = MagicMock()
         query_bus.execute.return_value = request_dto
 
-        scheduler_strategy.parse_request_data.return_value = {
-            "requests": [{"request_id": "request1"}]
-        }
+        # parse_request_data returns a list for the "requests" branch (both strategies)
+        scheduler_strategy.parse_request_data.return_value = [{"request_id": "req-abc123"}]
         scheduler_strategy.format_request_status_response.return_value = {
-            "requests": [{"requestId": "request1", "status": "complete"}]
+            "requests": [{"requestId": "req-abc123", "status": "complete"}]
         }
 
         container.get.side_effect = lambda x: {
@@ -147,7 +146,7 @@ class TestCLIHandlerExecution:
         mock_get_container.return_value = container
 
         args = argparse.Namespace(
-            request_id="request1",
+            request_id="req-abc123",
             request_ids=[],
             flag_request_ids=[],
             all=False,
@@ -156,13 +155,16 @@ class TestCLIHandlerExecution:
         result = await handle_get_request_status(args)
 
         assert isinstance(result, dict)
+        # Verify the query bus was actually called — proves request_id was extracted correctly
+        query_bus.execute.assert_called_once()
+        scheduler_strategy.format_request_status_response.assert_called_once()
 
 
 class TestFormatConversionConsistency:
     """Test format conversion consistency."""
 
     @pytest.mark.asyncio
-    @patch("interface.template_command_handlers.get_container")
+    @patch("orb.interface.template_command_handlers.get_container")
     async def test_format_conversion_in_template_handler(self, mock_get_container):
         """Test that format conversion is done using the scheduler strategy in template handlers."""
         container = MagicMock(spec=DIContainer)

@@ -4,9 +4,9 @@ from unittest.mock import MagicMock, patch
 
 from botocore.exceptions import ClientError
 
-from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
-from providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
+from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
+from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
 
 
 def _make_handler():
@@ -258,7 +258,7 @@ class TestSpotFleetHandlerNameTag:
             return_value={"target_capacity": 2, "on_demand_count": 0},
         ):
             with patch(
-                "providers.aws.infrastructure.handlers.shared.fleet_override_builder.build_spot_fleet_overrides",
+                "orb.providers.aws.infrastructure.handlers.shared.fleet_override_builder.build_spot_fleet_overrides",
                 return_value=[],
             ):
                 fleet_config = handler._config_builder._build_legacy(

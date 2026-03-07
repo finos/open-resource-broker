@@ -1,0 +1,5 @@
+#!/bin/bash
+set -e
+
+# Run pre-push checks (reads .pre-commit-config.yaml, pre-push stage hooks)
+pre-commit run --hook-stage pre-push

@@ -8,10 +8,12 @@ from typing import Any, Dict, List
 def _get_templates_for_resolution() -> List[Dict[str, Any]]:
     """Get templates for ID resolution using handler classmethods, with filesystem fallback."""
     try:
-        from providers.aws.infrastructure.handlers.asg.handler import ASGHandler
-        from providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
-        from providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
-        from providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
+        from orb.providers.aws.infrastructure.handlers.asg.handler import ASGHandler
+        from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
+        from orb.providers.aws.infrastructure.handlers.run_instances.handler import (
+            RunInstancesHandler,
+        )
+        from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
 
         templates = []
         for handler_class in [EC2FleetHandler, SpotFleetHandler, ASGHandler, RunInstancesHandler]:

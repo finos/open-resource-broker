@@ -59,7 +59,7 @@ RUN uv pip install --no-cache /tmp/*.whl \
 
 # Copy only runtime files needed
 COPY config/ ./config/
-COPY src/infrastructure/scheduler/hostfactory/scripts/ ./scripts/
+COPY src/orb/infrastructure/scheduler/hostfactory/scripts/ ./scripts/
 COPY deployment/docker/docker-entrypoint.sh ./docker-entrypoint.sh
 
 # Set permissions and environment in single layer

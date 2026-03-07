@@ -20,13 +20,13 @@ class TestCriticalImports:
     def test_run_py_imports(self):
         """Test all imports needed by run.py."""
         # These imports must work for CLI scripts to function
-        from bootstrap import Application
-        from domain.base.exceptions import DomainException
-        from domain.request.value_objects import RequestStatus
-        from infrastructure.logging.logger import get_logger
+        from orb.bootstrap import Application
+        from orb.domain.base.exceptions import DomainException
+        from orb.domain.request.value_objects import RequestStatus
+        from orb.infrastructure.logging.logger import get_logger
 
         # Interface command handlers (function-based)
-        from interface.command_handlers import (
+        from orb.interface.command_handlers import (
             CLICommandHandler,
             handle_get_request_status,
         )
@@ -43,16 +43,16 @@ class TestCriticalImports:
         """Test that value objects are in their correct locations after decomposition."""
         # Request domain value objects
         # Base domain value objects
-        from domain.base.value_objects import InstanceId, InstanceType, ResourceId
+        from orb.domain.base.value_objects import InstanceId, InstanceType, ResourceId
 
         # Machine domain value objects
-        from domain.machine.value_objects import (
+        from orb.domain.machine.value_objects import (
             MachineId,
             MachineStatus,
             MachineType,
             PriceType,
         )
-        from domain.request.value_objects import (
+        from orb.domain.request.value_objects import (
             MachineReference,
             RequestId,
             RequestStatus,
@@ -60,7 +60,7 @@ class TestCriticalImports:
         )
 
         # Template domain value objects
-        from domain.template.value_objects import ProviderConfiguration, TemplateId
+        from orb.domain.template.value_objects import ProviderConfiguration, TemplateId
 
         # Verify all imports successful
         assert all(
@@ -85,15 +85,15 @@ class TestCriticalImports:
         """Test that deprecated import paths fail as expected."""
         # These imports should fail after value object decomposition
         with pytest.raises(ImportError, match="cannot import name 'MachineStatus'"):
-            from domain.request.value_objects import MachineStatus  # noqa: F401
+            from orb.domain.request.value_objects import MachineStatus  # noqa: F401
 
         # BaseCommandHandler should not be available from interface layer
         with pytest.raises(ImportError, match="cannot import name 'BaseCommandHandler'"):
-            from interface.command_handlers import BaseCommandHandler  # noqa: F401
+            from orb.interface.command_handlers import BaseCommandHandler  # noqa: F401
 
     def test_bootstrap_application(self):
         """Test that the main Application class can be instantiated."""
-        from bootstrap import Application
+        from orb.bootstrap import Application
 
         # Should be able to create application instance
         app = Application()
@@ -102,8 +102,8 @@ class TestCriticalImports:
 
     def test_command_handler_inheritance(self):
         """Test that command handlers have correct inheritance."""
-        from application.interfaces.command_handler import CommandHandler
-        from interface.command_handlers import CLICommandHandler
+        from orb.application.interfaces.command_handler import CommandHandler
+        from orb.interface.command_handlers import CLICommandHandler
 
         # CLICommandHandler should inherit from CommandHandler (CQRS interface)
         assert issubclass(CLICommandHandler, CommandHandler)
@@ -114,7 +114,7 @@ class TestDomainBoundaries:
 
     def test_machine_domain_exports(self):
         """Test machine domain exports are correct."""
-        from domain.machine.value_objects import __all__ as machine_exports
+        from orb.domain.machine.value_objects import __all__ as machine_exports
 
         expected_machine_objects = [
             "MachineStatus",
@@ -131,7 +131,7 @@ class TestDomainBoundaries:
 
     def test_request_domain_exports(self):
         """Test request domain exports are correct."""
-        from domain.request.value_objects import __all__ as request_exports
+        from orb.domain.request.value_objects import __all__ as request_exports
 
         expected_request_objects = [
             "RequestStatus",
@@ -151,7 +151,7 @@ class TestDomainBoundaries:
 
     def test_template_domain_exports(self):
         """Test template domain exports are correct."""
-        from domain.template.value_objects import __all__ as template_exports
+        from orb.domain.template.value_objects import __all__ as template_exports
 
         expected_template_objects = ["TemplateId", "ProviderConfiguration"]
 
@@ -165,16 +165,16 @@ class TestBackwardCompatibility:
     def test_common_application_imports(self):
         """Test imports commonly used in application layer."""
         # These should work without issues
-        from application.dto.commands import RequestStatus
-        from application.request.dto import MachineReference
+        from orb.application.dto.commands import RequestStatus
+        from orb.application.request.dto import MachineReference
 
         assert RequestStatus is not None
         assert MachineReference is not None
 
     def test_provider_layer_imports(self):
         """Test imports used in provider layer."""
-        from providers.aws.infrastructure.adapters.machine_adapter import MachineStatus
-        from providers.aws.infrastructure.adapters.request_adapter import RequestType
+        from orb.providers.aws.infrastructure.adapters.machine_adapter import MachineStatus
+        from orb.providers.aws.infrastructure.adapters.request_adapter import RequestType
 
         assert MachineStatus is not None
         assert RequestType is not None

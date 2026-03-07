@@ -7,7 +7,7 @@ project:
   pypi_name: orb-py # PyPI distribution name
   short_name: orb # CLI command name
   version: 1.1.2
-  description: "Cloud provider integration plugin for IBM Spectrum Symphony Host Factory"
+  description: "Open Resource Broker (ORB) — dynamic cloud resource provisioning via CLI and REST API"
   author: "AWS Professional Services"
   email: "aws-proserve@amazon.com"
   license: "Apache-2.0"
@@ -20,6 +20,7 @@ repository:
   registry: ghcr.io # Container registry
 build:
   platforms: [linux/amd64, linux/arm64] # Container platforms
+  package_root: src/orb
 ci:
   test_timeout: 300 # Test timeout in seconds
   coverage_threshold: 70 # Minimum coverage percentage

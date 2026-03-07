@@ -10,6 +10,8 @@ from unittest.mock import patch
 
 import pytest
 
+from orb._package import PACKAGE_ROOT_STR
+
 try:
     import psutil
 
@@ -17,8 +19,8 @@ try:
 except ImportError:
     HAS_PSUTIL = False
 
-from bootstrap import Application
-from infrastructure.di.container import get_container
+from orb.bootstrap import Application
+from orb.infrastructure.di.container import get_container
 
 pytestmark = pytest.mark.skipif(not HAS_PSUTIL, reason="psutil not installed")
 
@@ -42,7 +44,7 @@ class TestLazyLoadingPerformance:
 
         start_time = time.time()
         result = subprocess.run(
-            [sys.executable, "src/run.py", "--help"],
+            [sys.executable, f"{PACKAGE_ROOT_STR}/run.py", "--help"],
             check=False,
             capture_output=True,
             text=True,
@@ -130,7 +132,7 @@ class TestLazyLoadingPerformance:
 
     def test_component_registration_performance(self):
         """Test component registration performance."""
-        from infrastructure.di.services import register_all_services
+        from orb.infrastructure.di.services import register_all_services
 
         container = get_container()
 
@@ -145,15 +147,15 @@ class TestLazyLoadingPerformance:
 
     def test_handler_discovery_performance(self):
         """Test handler discovery performance."""
-        from application.decorators import get_handler_registry_stats
-        from infrastructure.di.container import get_container
-        from infrastructure.di.handler_discovery import HandlerDiscoveryService
+        from orb.application.decorators import get_handler_registry_stats
+        from orb.infrastructure.di.container import get_container
+        from orb.infrastructure.di.handler_discovery import HandlerDiscoveryService
 
         container = get_container()
         discovery_service = HandlerDiscoveryService(container)
 
         start_time = time.time()
-        discovery_service.discover_and_register_handlers("src.application")
+        discovery_service.discover_and_register_handlers("orb.application")
         discovery_time = (time.time() - start_time) * 1000
 
         results = get_handler_registry_stats()
@@ -170,8 +172,8 @@ class TestLazyLoadingPerformance:
 
     def test_storage_registration_performance(self):
         """Test storage registration performance."""
-        from infrastructure.di.container import get_container
-        from infrastructure.di.storage_services import register_storage_services
+        from orb.infrastructure.di.container import get_container
+        from orb.infrastructure.di.storage_services import register_storage_services
 
         container = get_container()
         start_time = time.time()
@@ -185,7 +187,7 @@ class TestLazyLoadingPerformance:
 
     def test_scheduler_registration_performance(self):
         """Test scheduler registration performance."""
-        from infrastructure.scheduler.registration import register_active_scheduler_only
+        from orb.infrastructure.scheduler.registration import register_active_scheduler_only
 
         start_time = time.time()
         register_active_scheduler_only("default")
@@ -204,7 +206,7 @@ class TestLazyLoadingPerformance:
 
         start_time = time.time()
         result = subprocess.run(
-            [sys.executable, "src/run.py", "templates", "list"],
+            [sys.executable, f"{PACKAGE_ROOT_STR}/run.py", "templates", "list"],
             check=False,
             capture_output=True,
             text=True,

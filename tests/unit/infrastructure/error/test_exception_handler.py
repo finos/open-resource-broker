@@ -11,27 +11,27 @@ from unittest.mock import Mock
 import pytest
 
 # Import all exception types for testing
-from domain.base.exceptions import (
+from orb.domain.base.exceptions import (
     ConfigurationError,
     InfrastructureError,
     ValidationError,
 )
-from domain.request.exceptions import RequestValidationError
-from domain.template.exceptions import TemplateNotFoundError
-from infrastructure.error.decorators import (
+from orb.domain.request.exceptions import RequestValidationError
+from orb.domain.template.exceptions import TemplateNotFoundError
+from orb.infrastructure.error.decorators import (
     handle_application_exceptions,
     handle_domain_exceptions,
     handle_exceptions,
     handle_infrastructure_exceptions,
     handle_provider_exceptions,
 )
-from infrastructure.error.exception_handler import (
+from orb.infrastructure.error.exception_handler import (
     ExceptionContext,
     ExceptionHandler,
     get_exception_handler,
     reset_exception_handler,
 )
-from providers.aws.exceptions.aws_exceptions import LaunchError
+from orb.providers.aws.exceptions.aws_exceptions import LaunchError
 
 
 class TestExceptionContext:

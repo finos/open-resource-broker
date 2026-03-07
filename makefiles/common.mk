@@ -37,6 +37,7 @@ DOCS_URL := https://$(REPO_ORG).github.io/$(PACKAGE_NAME)
 # Project settings
 PROJECT := $(PACKAGE_NAME)
 PACKAGE := src
+PACKAGE_ROOT := $(shell python3 -c "import yaml; print(yaml.safe_load(open('.project.yml'))['build']['package_root'])" 2>/dev/null || echo "src/orb")
 TESTS := tests
 TESTS_UNIT := $(TESTS)/unit
 TESTS_INTEGRATION := $(TESTS)/integration
@@ -50,7 +51,7 @@ COVERAGE_HTML := htmlcov
 
 # Test settings
 PYTEST_ARGS := -v --tb=short --durations=10
-PYTEST_COV_ARGS := --cov=$(PACKAGE) --cov-report=term-missing --cov-branch --no-cov-on-fail
+PYTEST_COV_ARGS := --cov=$(PACKAGE_ROOT) --cov-report=term-missing --cov-branch --no-cov-on-fail
 PYTEST_TIMEOUT := --timeout=300
 PYTEST_MAXFAIL := --maxfail=5
 

@@ -7,9 +7,9 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from fastapi.testclient import TestClient
 
-from api.server import create_fastapi_app
-from config.schemas.server_schema import AuthConfig, ServerConfig
-from infrastructure.auth.strategy.bearer_token_strategy import BearerTokenStrategy
+from orb.api.server import create_fastapi_app
+from orb.config.schemas.server_schema import AuthConfig, ServerConfig
+from orb.infrastructure.auth.strategy.bearer_token_strategy import BearerTokenStrategy
 
 
 class TestAuthenticationPerformance:
@@ -33,7 +33,7 @@ class TestAuthenticationPerformance:
                 enabled=True,
                 strategy="bearer_token",
                 bearer_token={
-                    "secret_key": "performance-test-secret-key",
+                    "secret_key": "performance-test-secret-key-32b!",
                     "algorithm": "HS256",
                 },
             ),
@@ -43,7 +43,7 @@ class TestAuthenticationPerformance:
 
         # Create valid token
         strategy = BearerTokenStrategy(
-            secret_key="performance-test-secret-key", algorithm="HS256", enabled=True
+            secret_key="performance-test-secret-key-32b!", algorithm="HS256", enabled=True
         )
         token = strategy._create_access_token(
             user_id="perf-test-user", roles=["user"], permissions=["read"]
@@ -132,7 +132,7 @@ class TestAuthenticationPerformance:
     def test_token_validation_performance(self):
         """Test JWT token validation performance."""
         strategy = BearerTokenStrategy(
-            secret_key="performance-test-secret", algorithm="HS256", enabled=True
+            secret_key="performance-test-secret-key-32b!", algorithm="HS256", enabled=True
         )
 
         # Create test token

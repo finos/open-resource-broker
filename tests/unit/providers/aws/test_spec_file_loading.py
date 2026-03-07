@@ -5,9 +5,9 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from domain.base.ports.configuration_port import ConfigurationPort
-from domain.base.ports.spec_rendering_port import SpecRenderingPort
-from providers.aws.infrastructure.services.aws_native_spec_service import (
+from orb.domain.base.ports.configuration_port import ConfigurationPort
+from orb.domain.base.ports.spec_rendering_port import SpecRenderingPort
+from orb.providers.aws.infrastructure.services.aws_native_spec_service import (
     AWSNativeSpecService,
 )
 
@@ -42,7 +42,7 @@ class TestSpecFileLoading:
         }
 
         with patch(
-            "providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
+            "orb.providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
         ) as mock_read:
             mock_read.return_value = spec_content
 
@@ -65,7 +65,7 @@ class TestSpecFileLoading:
         spec_content = {"Type": "maintain"}
 
         with patch(
-            "providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
+            "orb.providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
         ) as mock_read:
             mock_read.return_value = spec_content
 
@@ -82,7 +82,7 @@ class TestSpecFileLoading:
         spec_content = {"Type": "instant"}
 
         with patch(
-            "providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
+            "orb.providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
         ) as mock_read:
             mock_read.return_value = spec_content
 
@@ -92,7 +92,7 @@ class TestSpecFileLoading:
             assert result == spec_content
             mock_read.assert_called_once_with("specs/aws/test-template.json")
 
-    @patch("providers.aws.infrastructure.services.aws_native_spec_service.read_json_file")
+    @patch("orb.providers.aws.infrastructure.services.aws_native_spec_service.read_json_file")
     def test_load_spec_file_not_found(self, mock_read):
         """Test spec file loading when file doesn't exist."""
         mock_read.side_effect = FileNotFoundError("File not found")
@@ -106,7 +106,7 @@ class TestSpecFileLoading:
         with pytest.raises(FileNotFoundError):
             self.service._load_spec_file("nonexistent.json")
 
-    @patch("providers.aws.infrastructure.services.aws_native_spec_service.read_json_file")
+    @patch("orb.providers.aws.infrastructure.services.aws_native_spec_service.read_json_file")
     def test_load_spec_file_invalid_json(self, mock_read):
         """Test spec file loading with invalid JSON."""
         mock_read.side_effect = json.JSONDecodeError("Invalid JSON", "doc", 0)
@@ -122,7 +122,7 @@ class TestSpecFileLoading:
 
     def test_resolve_launch_template_spec_inline(self):
         """Test resolving inline launch template spec."""
-        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+        from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
         inline_spec = {
             "LaunchTemplateName": "test-lt",
@@ -145,7 +145,7 @@ class TestSpecFileLoading:
 
     def test_resolve_launch_template_spec_file(self):
         """Test resolving launch template spec from file."""
-        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+        from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
         file_spec = {
             "LaunchTemplateName": "file-lt",
@@ -172,7 +172,7 @@ class TestSpecFileLoading:
 
     def test_resolve_launch_template_spec_none(self):
         """Test resolving launch template spec when none specified."""
-        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+        from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
         template = AWSTemplate(
             template_id="test-template",
@@ -189,7 +189,7 @@ class TestSpecFileLoading:
 
     def test_resolve_provider_api_spec_inline(self):
         """Test resolving inline provider API spec."""
-        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+        from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
         inline_spec = {
             "Type": "instant",
@@ -212,7 +212,7 @@ class TestSpecFileLoading:
 
     def test_resolve_provider_api_spec_file(self):
         """Test resolving provider API spec from file."""
-        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+        from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
         file_spec = {
             "Type": "maintain",
@@ -239,7 +239,7 @@ class TestSpecFileLoading:
 
     def test_resolve_provider_api_spec_none(self):
         """Test resolving provider API spec when none specified."""
-        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+        from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
         template = AWSTemplate(
             template_id="test-template",
@@ -284,7 +284,7 @@ class TestSpecFileLoading:
             }
 
             with patch(
-                "providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
+                "orb.providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
             ) as mock_read:
                 mock_read.return_value = {"test": "data"}
 
@@ -303,7 +303,7 @@ class TestSpecFileLoading:
         spec_content = {"Type": "instant"}
 
         with patch(
-            "providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
+            "orb.providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
         ) as mock_read:
             mock_read.return_value = spec_content
 
@@ -326,7 +326,7 @@ class TestSpecFileLoading:
 
         # Note: This test assumes YAML support is added to the file utilities
         with patch(
-            "providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
+            "orb.providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
         ) as mock_read:
             mock_read.return_value = {"Type": "maintain"}
 
@@ -337,7 +337,7 @@ class TestSpecFileLoading:
 
     def test_spec_resolution_priority(self):
         """Test that inline specs take priority over file specs."""
-        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+        from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
         # This should not be possible due to validation, but test the resolution logic
         inline_spec = {"Type": "instant"}

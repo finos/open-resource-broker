@@ -18,7 +18,7 @@ class TestSchedulerNativeSpecParsing:
         TemplateDTO does not have launch_template_spec as a field - it is not preserved
         through the HF field mapper. The test verifies the core fields are mapped correctly.
         """
-        from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+        from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
             HostFactorySchedulerStrategy,
         )
 
@@ -52,7 +52,7 @@ class TestSchedulerNativeSpecParsing:
         TemplateDTO does not have provider_api_spec as a top-level field.
         The test verifies core fields are mapped correctly.
         """
-        from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+        from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
             HostFactorySchedulerStrategy,
         )
 
@@ -82,7 +82,7 @@ class TestSchedulerNativeSpecParsing:
 
     def test_parse_template_without_native_spec_fields(self):
         """Test parsing template without native spec fields."""
-        from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+        from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
             HostFactorySchedulerStrategy,
         )
 

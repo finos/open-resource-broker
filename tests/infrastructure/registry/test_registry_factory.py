@@ -2,7 +2,7 @@
 
 import pytest
 
-from infrastructure.registry.registry_factory import RegistryFactory
+from orb.infrastructure.registry.registry_factory import RegistryFactory
 
 
 class MockService:

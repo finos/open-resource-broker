@@ -1,6 +1,6 @@
 """Tests verifying all known HF-spec fields have entries in HostFactoryFieldMappings."""
 
-from infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings
+from orb.infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings
 
 # Fields that every HF provider must be able to map (generic + AWS-specific combined)
 REQUIRED_GENERIC_FIELDS = [

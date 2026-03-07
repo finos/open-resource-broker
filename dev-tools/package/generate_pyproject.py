@@ -79,6 +79,7 @@ def update_pyproject_selective(pyproject_path: Path) -> None:
     # Get metadata updates
     package_name = _get_config_value(".project.name")
     package_name_short = _get_config_value(".project.short_name")
+    package_root = _get_config_value(".build.package_root")
 
     # Get PyPI-specific name, fallback to package_name if not set
     pypi_name = _get_config_value(".project.pypi_name")
@@ -198,7 +199,7 @@ def update_pyproject_selective(pyproject_path: Path) -> None:
             new_lines.extend(
                 [
                     "[project.scripts]",
-                    f'{package_name_short} = "run:cli_main"',
+                    f'{package_name_short} = "orb.run:cli_main"',
                     "",
                 ]
             )
@@ -232,6 +233,22 @@ def update_pyproject_selective(pyproject_path: Path) -> None:
                 ]
             )
             # Skip existing mypy section
+            i += 1
+            while i < len(lines) and not lines[i].strip().startswith("["):
+                i += 1
+            continue
+
+        elif line.startswith("[tool.coverage.run]"):
+            # Replace coverage source with package_root from .project.yml
+            new_lines.extend(
+                [
+                    "[tool.coverage.run]",
+                    f'source = ["{package_root}"]',
+                    "branch = true",
+                    "",
+                ]
+            )
+            # Skip existing coverage.run section
             i += 1
             while i < len(lines) and not lines[i].strip().startswith("["):
                 i += 1

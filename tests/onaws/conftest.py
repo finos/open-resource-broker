@@ -53,6 +53,31 @@ def _get_aws_profile_and_region() -> tuple[str | None, str | None]:
     return None, region
 
 
+def pytest_configure(config) -> None:
+    """Pre-flight check: verify orb init has been run."""
+    config_dir = os.environ.get("ORB_CONFIG_DIR", ".")
+    config_path = Path(config_dir)
+
+    scripts_dir = config_path / "scripts"
+
+    if not scripts_dir.exists():
+        pytest.exit(
+            "onaws pre-flight failed: scripts/ directory not found.\n"
+            "Run 'orb init' first to set up the environment.\n"
+            f"Looked in: {scripts_dir.resolve()}",
+            returncode=1,
+        )
+
+    invoke_script = scripts_dir / "invoke_provider.sh"
+    if not invoke_script.exists():
+        pytest.exit(
+            "onaws pre-flight failed: scripts/invoke_provider.sh not found.\n"
+            "Run 'orb init' first to set up the environment.\n"
+            f"Looked in: {invoke_script.resolve()}",
+            returncode=1,
+        )
+
+
 def pytest_sessionstart(session: pytest.Session) -> None:
     """Check AWS credentials once before any AWS tests run.
 
@@ -90,6 +115,6 @@ def reset_di_container():
     reads/writes to the first test's work directory.
     """
     yield
-    from infrastructure.di.container import reset_container
+    from orb.infrastructure.di.container import reset_container
 
     reset_container()

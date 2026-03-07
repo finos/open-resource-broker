@@ -1,4 +1,4 @@
-from providers.aws.configuration.config import AWSProviderConfig
+from orb.providers.aws.configuration.config import AWSProviderConfig
 
 
 def test_legacy_connection_timeout_ms_converts_to_seconds() -> None:

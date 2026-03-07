@@ -180,7 +180,7 @@ def _build_templates_file(scheduler_type: str, subnet_ids: list, sg_id: str) -> 
 @pytest.fixture(autouse=True)
 def reset_singletons():
     """Reset DI container and all singletons before and after each test."""
-    from infrastructure.di.container import reset_container
+    from orb.infrastructure.di.container import reset_container
 
     reset_container()
     reset_all_singletons()
@@ -206,7 +206,7 @@ def _make_mock_logger() -> Any:
 @pytest.fixture
 def hf_strategy():
     """HostFactorySchedulerStrategy with no external dependencies."""
-    from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+    from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
         HostFactorySchedulerStrategy,
     )
 
@@ -216,7 +216,7 @@ def hf_strategy():
 @pytest.fixture
 def default_strategy():
     """DefaultSchedulerStrategy with no external dependencies."""
-    from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+    from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 
     return DefaultSchedulerStrategy(logger=_make_mock_logger())
 
@@ -235,7 +235,7 @@ def make_request_dto(
     """Build a minimal RequestDTO for formatter tests."""
     from datetime import datetime, timezone
 
-    from application.request.dto import RequestDTO
+    from orb.application.request.dto import RequestDTO
 
     return RequestDTO(
         request_id=request_id,
@@ -254,7 +254,7 @@ def make_machine_ref_dto(
     private_ip: str = "10.0.1.5",
 ) -> Any:
     """Build a minimal MachineReferenceDTO for formatter tests."""
-    from application.request.dto import MachineReferenceDTO
+    from orb.application.request.dto import MachineReferenceDTO
 
     return MachineReferenceDTO(
         machine_id=machine_id,

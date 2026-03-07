@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from interface.command_handlers import (
+from orb.interface.command_handlers import (
     handle_provider_config,
     handle_reload_provider_config,
     handle_validate_provider_config,
@@ -41,7 +41,7 @@ class TestProviderConfigHandlers:
         """Test handle_provider_config function - takes only args, no app param."""
         args = Namespace(resource="provider", action="config")
 
-        with patch("interface.system_command_handlers.get_container") as mock_get_container:
+        with patch("orb.interface.system_command_handlers.get_container") as mock_get_container:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 
@@ -80,7 +80,7 @@ class TestConfigurationHandlerImports:
 
     def test_import_configuration_handlers(self):
         """Test that all configuration handlers can be imported."""
-        from interface.command_handlers import (
+        from orb.interface.command_handlers import (
             handle_provider_config,
             handle_reload_provider_config,
             handle_validate_provider_config,

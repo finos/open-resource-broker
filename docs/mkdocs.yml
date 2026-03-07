@@ -1,5 +1,5 @@
 site_name: Open Resource Broker
-site_description: Provider-agnostic Host Factory plugin for IBM Spectrum Symphony
+site_description: Unified API for orchestrating and provisioning compute capacity
 site_url: https://awslabs.github.io/open-resource-broker
 repo_url: https://github.com/awslabs/open-resource-broker
 repo_name: open-resource-broker
@@ -13,16 +13,18 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
+  logo: assets/orb-icon.svg
+  favicon: assets/orb-icon.png
   palette:
     - scheme: default
-      primary: green
-      accent: green
+      primary: indigo
+      accent: indigo
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - scheme: slate
-      primary: green
-      accent: green
+      primary: indigo
+      accent: indigo
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
@@ -42,6 +44,9 @@ theme:
 extra:
   version:
     provider: mike
+
+extra_css:
+  - assets/extra.css
 
 plugins:
   - search
@@ -94,6 +99,9 @@ nav:
     - Monitoring: user_guide/monitoring.md
     - Troubleshooting: user_guide/troubleshooting.md
     - Deployment: user_guide/deployment.md
+    - API Reference: user_guide/api_reference.md
+    - Infrastructure Commands: user_guide/infrastructure-commands.md
+    - Attribute-Based Instance Selection: user_guide/abis.md
   - Architecture & Development:
     - Architecture:
       - System Overview: architecture/system_overview.md
@@ -103,6 +111,10 @@ nav:
       - CQRS Pattern: architecture/cqrs_pattern.md
       - Dependency Injection: architecture/dependency_injection.md
       - Lazy Loading Design: architecture/lazy-loading-design.md
+      - Machine Discovery Flow: architecture/machine-discovery-flow.md
+      - Multi-Provider Design: architecture/multi-provider-design.md
+      - Field Mapping Architecture: architecture/field_mapping_architecture.md
+      - Metrics Report: architecture/metrics_report.md
     - Design Patterns:
       - Strategy Pattern: patterns/strategy_pattern.md
       - Factory Pattern: patterns/factory_pattern.md
@@ -123,15 +135,21 @@ nav:
       - Resilience Patterns: developer_guide/resilience.md
       - Performance Optimization: developer_guide/performance-optimization.md
       - Development Setup: developer_guide/development.md
-      - Testing: development/testing.md
+      - BaseSetting Providers: developer_guide/basesettings-providers.md
+      - Changelog Management: developer_guide/changelog_management.md
+      - Releases: developer_guide/releases.md
+      - Testing: developer_guide/testing.md
+      - Testing Guide: development/testing.md
   - Deployment & Operations:
     - Deployment:
       - Overview: deployment/readme.md
       - Docker Deployment: deployment/docker.md
       - Cloud Platforms: deployment/cloud_platforms.md
       - Traditional Deployment: deployment/traditional.md
+      - PyPI Setup: deployment/pypi-setup.md
       - Security: deployment/security.md
       - Monitoring: deployment/monitoring.md
+      - Dev Deployment: deployment/dev_deployment_documentation.md
     - Operations:
       - Backup and Recovery: operational/backup_recovery.md
       - Migration: operational/migration.md
@@ -143,9 +161,16 @@ nav:
       - Requirements Compliance: hostfactory/requirements_compliance.md
       - Feature Mapping: hostfactory/feature_mapping.md
       - Deployment Scenarios: hostfactory/deployment_scenarios.md
+      - Supported APIs: hostfactory/supported-apis.md
   - CLI Reference:
+    - Overview: cli/README.md
+    - Full CLI Reference: cli/cli-reference.md
     - Template Commands: cli/template-commands.md
     - Scheduler Commands: cli/scheduler-commands.md
+    - Infrastructure Commands: cli/infrastructure-commands.md
+    - Multi-Provider Templates: cli/multi-provider-templates.md
+    - Provider Override: cli/provider-override.md
+    - Filtering: cli/filtering.md
   - MCP Integration:
     - Integration Guide: mcp/integration-guide.md
     - Tools Mode: mcp/tools-mode.md
@@ -162,26 +187,12 @@ nav:
       - Configuration Guide: configuration-guide.md
       - Examples: configuration/examples.md
       - Native Spec Config: configuration/native-spec-config.md
-    - Deployment:
-      - Overview: deployment/readme.md
-      - Docker Deployment: deployment/docker.md
-      - Cloud Platforms: deployment/cloud_platforms.md
-      - Traditional Deployment: deployment/traditional.md
-      - PyPI Setup: deployment/pypi-setup.md
-      - Security: deployment/security.md
-      - Monitoring: deployment/monitoring.md
-    - Architecture:
-      - System Overview: architecture/system_overview.md
-      - Clean Architecture: architecture/clean_architecture.md
-      - Template Infrastructure: architecture/template-infrastructure.md
-      - System Diagrams: architecture/system_diagrams.md
-      - CQRS Pattern: architecture/cqrs_pattern.md
-      - Dependency Injection: architecture/dependency_injection.md
-      - Lazy Loading Design: architecture/lazy-loading-design.md
-      - Machine Discovery Flow: architecture/machine-discovery-flow.md
-      - Multi-Provider Design: architecture/multi-provider-design.md
-      - Field Mapping Architecture: architecture/field_mapping_architecture.md
-    - Testing Guide: testing/readme.md
+      - Environment Variables: configuration/environment-variables.md
+      - Multi-Provider: configuration/multi-provider.md
+      - Provider Naming Guide: configuration/provider-naming-guide.md
+    - Testing:
+      - Testing Guide: testing/readme.md
+      - System Tests (onaws): testing/system-tests-onaws.md
     - Guides & Patterns:
       - Native Spec Guide: native-spec-guide.md
       - Provider Strategy: provider_strategy_guide.md

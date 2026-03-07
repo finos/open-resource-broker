@@ -15,7 +15,7 @@ class TestDependencyInjectionComprehensive:
     def test_di_container_exists(self):
         """Test that DI container exists."""
         try:
-            from infrastructure.di.container import Container
+            from orb.infrastructure.di.container import Container
 
             assert Container is not None
         except ImportError:
@@ -24,7 +24,7 @@ class TestDependencyInjectionComprehensive:
     def test_di_container_initialization(self):
         """Test DI container initialization."""
         try:
-            from infrastructure.di.container import Container
+            from orb.infrastructure.di.container import Container
 
             container = Container()
             assert container is not None
@@ -40,7 +40,7 @@ class TestDependencyInjectionComprehensive:
     def test_di_container_registration(self):
         """Test DI container service registration."""
         try:
-            from infrastructure.di.container import Container
+            from orb.infrastructure.di.container import Container
 
             container = Container()
 
@@ -66,7 +66,7 @@ class TestDependencyInjectionComprehensive:
     def test_di_container_resolution(self):
         """Test DI container service resolution."""
         try:
-            from infrastructure.di.container import Container
+            from orb.infrastructure.di.container import Container
 
             container = Container()
             mock_service = Mock()
@@ -98,7 +98,7 @@ class TestDependencyInjectionComprehensive:
     def test_command_query_buses_exist(self):
         """Test that command and query buses exist."""
         try:
-            from infrastructure.di.buses import CommandBus, QueryBus
+            from orb.infrastructure.di.buses import CommandBus, QueryBus
 
             assert CommandBus is not None
             assert QueryBus is not None
@@ -108,7 +108,7 @@ class TestDependencyInjectionComprehensive:
     def test_bus_initialization(self):
         """Test bus initialization."""
         try:
-            from infrastructure.di.buses import CommandBus, QueryBus
+            from orb.infrastructure.di.buses import CommandBus, QueryBus
 
             # Test CommandBus
             try:
@@ -135,7 +135,7 @@ class TestDependencyInjectionComprehensive:
     async def test_bus_send_methods(self):
         """Test bus send methods."""
         try:
-            from infrastructure.di.buses import CommandBus, QueryBus
+            from orb.infrastructure.di.buses import CommandBus, QueryBus
 
             # Test CommandBus send
             try:
@@ -182,7 +182,9 @@ class TestPersistenceLayerComprehensive:
 
         for repo_file in repo_files:
             try:
-                module = importlib.import_module(f"infrastructure.storage.repositories.{repo_file}")
+                module = importlib.import_module(
+                    f"orb.infrastructure.storage.repositories.{repo_file}"
+                )
                 repo_modules.append((repo_file, module))
             except ImportError:
                 continue
@@ -300,10 +302,10 @@ class TestPersistenceLayerComprehensive:
         strategy_modules = []
 
         strategy_paths = [
-            "infrastructure.storage.json.strategy",
-            "infrastructure.storage.sql.strategy",
-            "infrastructure.storage.base.strategy",
-            "infrastructure.storage.dynamodb.strategy",
+            "orb.infrastructure.storage.json.strategy",
+            "orb.infrastructure.storage.sql.strategy",
+            "orb.infrastructure.storage.base.strategy",
+            "orb.infrastructure.storage.dynamodb.strategy",
         ]
 
         for strategy_path in strategy_paths:
@@ -320,10 +322,10 @@ class TestPersistenceLayerComprehensive:
         uow_modules = []
 
         uow_paths = [
-            "infrastructure.storage.json.unit_of_work",
-            "infrastructure.storage.sql.unit_of_work",
-            "infrastructure.storage.base.unit_of_work",
-            "infrastructure.storage.dynamodb.unit_of_work",
+            "orb.infrastructure.storage.json.unit_of_work",
+            "orb.infrastructure.storage.sql.unit_of_work",
+            "orb.infrastructure.storage.base.unit_of_work",
+            "orb.infrastructure.storage.dynamodb.unit_of_work",
         ]
 
         for uow_path in uow_paths:
@@ -344,7 +346,7 @@ class TestErrorHandlingComprehensive:
     def test_exception_handler_exists(self):
         """Test that exception handler exists."""
         try:
-            from infrastructure.error.exception_handler import ExceptionHandler
+            from orb.infrastructure.error.exception_handler import ExceptionHandler
 
             assert ExceptionHandler is not None
         except ImportError:
@@ -353,7 +355,7 @@ class TestErrorHandlingComprehensive:
     def test_exception_handler_initialization(self):
         """Test exception handler initialization."""
         try:
-            from infrastructure.error.exception_handler import ExceptionHandler
+            from orb.infrastructure.error.exception_handler import ExceptionHandler
 
             # Try to create instance
             try:
@@ -370,7 +372,7 @@ class TestErrorHandlingComprehensive:
     def test_error_decorators_exist(self):
         """Test that error decorators exist."""
         try:
-            from infrastructure.error.decorators import handle_interface_exceptions
+            from orb.infrastructure.error.decorators import handle_interface_exceptions
 
             assert handle_interface_exceptions is not None
         except ImportError:
@@ -379,7 +381,7 @@ class TestErrorHandlingComprehensive:
     def test_error_middleware_exists(self):
         """Test that error middleware exists."""
         try:
-            from infrastructure.error import error_middleware
+            from orb.infrastructure.error import error_middleware
 
             assert error_middleware is not None
         except ImportError:
@@ -394,7 +396,7 @@ class TestLoggingComprehensive:
     def test_logger_exists(self):
         """Test that logger exists."""
         try:
-            from infrastructure.logging.logger import Logger
+            from orb.infrastructure.logging.logger import Logger
 
             assert Logger is not None
         except ImportError:
@@ -403,7 +405,7 @@ class TestLoggingComprehensive:
     def test_logger_initialization(self):
         """Test logger initialization."""
         try:
-            from infrastructure.logging.logger import Logger
+            from orb.infrastructure.logging.logger import Logger
 
             try:
                 logger = Logger()
@@ -419,7 +421,7 @@ class TestLoggingComprehensive:
     def test_logger_singleton_exists(self):
         """Test that logger singleton exists."""
         try:
-            from infrastructure.logging.logger_singleton import LoggerSingleton
+            from orb.infrastructure.logging.logger_singleton import LoggerSingleton
 
             assert LoggerSingleton is not None
         except ImportError:
@@ -434,7 +436,7 @@ class TestTemplateInfrastructureComprehensive:
     def test_template_loader_exists(self):
         """Test that template loader exists."""
         try:
-            from infrastructure.template.loader import TemplateLoader
+            from orb.infrastructure.template.loader import TemplateLoader
 
             assert TemplateLoader is not None
         except ImportError:
@@ -443,7 +445,7 @@ class TestTemplateInfrastructureComprehensive:
     def test_template_configuration_store_exists(self):
         """Test that template configuration store exists."""
         try:
-            from infrastructure.template.configuration_store import (
+            from orb.infrastructure.template.configuration_store import (
                 TemplateConfigurationStore,
             )
 
@@ -454,7 +456,7 @@ class TestTemplateInfrastructureComprehensive:
     def test_template_cache_service_exists(self):
         """Test that template cache service exists."""
         try:
-            from infrastructure.template.template_cache_service import (
+            from orb.infrastructure.template.template_cache_service import (
                 TemplateCacheService,
             )
 
@@ -465,7 +467,7 @@ class TestTemplateInfrastructureComprehensive:
     def test_format_converter_exists(self):
         """Test that format converter exists."""
         try:
-            from infrastructure.template.format_converter import FormatConverter
+            from orb.infrastructure.template.format_converter import FormatConverter
 
             assert FormatConverter is not None
         except ImportError:
@@ -490,7 +492,7 @@ class TestAdaptersComprehensive:
 
         for adapter_file in adapter_files:
             try:
-                module = importlib.import_module(f"src.infrastructure.adapters.{adapter_file}")
+                module = importlib.import_module(f"orb.infrastructure.adapters.{adapter_file}")
                 adapter_modules.append((adapter_file, module))
             except ImportError:
                 continue
@@ -563,11 +565,11 @@ class TestFactoriesComprehensive:
 
         # Check different factory locations
         factory_paths = [
-            "src.infrastructure.factories.provider_strategy_factory",
-            "src.infrastructure.utilities.factories.api_handler_factory",
-            "src.infrastructure.utilities.factories.repository_factory",
-            "src.infrastructure.utilities.factories.sql_engine_factory",
-            "src.infrastructure.adapters.factories.container_adapter_factory",
+            "orb.infrastructure.factories.provider_strategy_factory",
+            "orb.infrastructure.utilities.factories.api_handler_factory",
+            "orb.infrastructure.utilities.factories.repository_factory",
+            "orb.infrastructure.utilities.factories.sql_engine_factory",
+            "orb.infrastructure.adapters.factories.container_adapter_factory",
         ]
 
         for factory_path in factory_paths:

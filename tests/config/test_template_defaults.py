@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from application.services.template_defaults_service import TemplateDefaultsService
-from domain.base.ports.logging_port import LoggingPort
+from orb.application.services.template_defaults_service import TemplateDefaultsService
+from orb.domain.base.ports.logging_port import LoggingPort
 
 
 class TestTemplateDefaultsService:
@@ -279,7 +279,7 @@ class TestTemplateDefaultsIntegration:
 
     def test_scheduler_strategy_integration(self):
         """Test integration with scheduler strategy."""
-        from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+        from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
             HostFactorySchedulerStrategy,
         )
 
@@ -319,10 +319,10 @@ class TestTemplateDefaultsIntegration:
 
     def test_template_configuration_manager_integration(self):
         """Test integration with template configuration manager."""
-        from infrastructure.template.configuration_manager import (
+        from orb.infrastructure.template.configuration_manager import (
             TemplateConfigurationManager,
         )
-        from infrastructure.template.dtos import TemplateDTO
+        from orb.infrastructure.template.dtos import TemplateDTO
 
         # Create mock dependencies
         mock_config_manager = Mock()
@@ -349,7 +349,7 @@ class TestTemplateDefaultsIntegration:
         # Create mock file metadata
         from datetime import datetime
 
-        from infrastructure.template.configuration_manager import TemplateFileMetadata
+        from orb.infrastructure.template.configuration_manager import TemplateFileMetadata
 
         file_metadata = TemplateFileMetadata(
             path=Path("/fake/path"),

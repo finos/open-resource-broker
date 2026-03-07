@@ -21,7 +21,7 @@ The Open Resource Broker uses Pydantic BaseSettings to provide:
 from typing import Optional, List
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from infrastructure.interfaces.provider import BaseProviderConfig
+from orb.infrastructure.interfaces.provider import BaseProviderConfig
 
 class Provider1ProviderConfig(BaseSettings, BaseProviderConfig):
     """Provider1 provider configuration with automatic environment variable support."""
@@ -70,7 +70,7 @@ class Provider1ProviderConfig(BaseSettings, BaseProviderConfig):
 
 ```python
 # src/providers/provider1/__init__.py
-from config.schemas.provider_settings_registry import ProviderSettingsRegistry
+from orb.config.schemas.provider_settings_registry import ProviderSettingsRegistry
 from .configuration.config import Provider1ProviderConfig
 
 # Register Provider1 provider settings for automatic environment variable support
@@ -82,7 +82,7 @@ ProviderSettingsRegistry.register_provider_settings("provider1", Provider1Provid
 ```python
 # src/providers/provider1/provider1_provider.py
 from typing import Dict, Any
-from infrastructure.interfaces.provider import ProviderInterface
+from orb.infrastructure.interfaces.provider import ProviderInterface
 from .configuration.config import Provider1ProviderConfig
 
 class Provider1Provider(ProviderInterface):
@@ -254,7 +254,7 @@ The provider factory automatically uses BaseSettings for configuration:
 
 ```python
 # src/providers/factory.py
-from config.schemas.provider_settings_registry import ProviderSettingsRegistry
+from orb.config.schemas.provider_settings_registry import ProviderSettingsRegistry
 
 class ProviderStrategyFactory:
     def create_provider_config(self, instance_config: ProviderInstanceConfig):
@@ -324,7 +324,7 @@ class Provider1ProviderConfig(BaseSettings, BaseProviderConfig):
 
 ```python
 import pytest
-from providers.provider1.configuration.config import Provider1ProviderConfig
+from orb.providers.provider1.configuration.config import Provider1ProviderConfig
 
 def test_provider1_config_validation():
     """Test Provider1 configuration validation."""

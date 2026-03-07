@@ -6,9 +6,9 @@ import jwt
 import pytest
 from fastapi.testclient import TestClient
 
-from api.server import create_fastapi_app
-from config.schemas.server_schema import AuthConfig, ServerConfig
-from infrastructure.auth.strategy.bearer_token_strategy import BearerTokenStrategy
+from orb.api.server import create_fastapi_app
+from orb.config.schemas.server_schema import AuthConfig, ServerConfig
+from orb.infrastructure.auth.strategy.bearer_token_strategy import BearerTokenStrategy
 
 
 class TestAuthenticationSecurity:
@@ -59,7 +59,7 @@ class TestAuthenticationSecurity:
         """Test that tokens with wrong signatures are rejected."""
         # Create token with different secret
         wrong_strategy = BearerTokenStrategy(
-            secret_key="wrong-secret-key", algorithm="HS256", enabled=True
+            secret_key="wrong-secret-key-padded-to-32bytes!!", algorithm="HS256", enabled=True
         )
         wrong_token = wrong_strategy._create_access_token(
             user_id="test-user", roles=["user"], permissions=["read"]
@@ -176,17 +176,12 @@ class TestAuthenticationSecurity:
             pass
 
     def test_weak_secret_detection(self):
-        """Test that weak secrets are handled appropriately."""
-        # This is more of a configuration test
+        """Test that weak secrets (< 32 bytes) are rejected at construction time."""
         weak_secrets = ["", "123", "password", "secret"]
 
         for weak_secret in weak_secrets:
-            # In production, weak secrets should be rejected or warned about
-            # For now, just verify the strategy can be created
-            strategy = BearerTokenStrategy(secret_key=weak_secret, algorithm="HS256", enabled=True)
-
-            # The strategy should work but ideally warn about weak secrets
-            assert strategy.secret_key == weak_secret
+            with pytest.raises(ValueError, match="at least 32 bytes"):
+                BearerTokenStrategy(secret_key=weak_secret, algorithm="HS256", enabled=True)
 
     def test_timing_attack_resistance(self, auth_client, valid_token):
         """Test resistance to timing attacks."""

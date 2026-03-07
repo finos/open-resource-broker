@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from config.schemas.provider_strategy_schema import (
+from orb.config.schemas.provider_strategy_schema import (
     ProviderConfig,
     ProviderInstanceConfig,
 )
@@ -13,15 +13,17 @@ class TestConfigDrivenProviderRegistration:
 
     def test_register_providers_with_valid_config(self):
         """Test provider registration with valid configuration."""
-        from infrastructure.di.container import DIContainer
-        from infrastructure.di.provider_services import register_provider_services
+        from orb.infrastructure.di.container import DIContainer
+        from orb.infrastructure.di.provider_services import register_provider_services
 
         container = DIContainer()
 
         with (
-            patch("infrastructure.di.provider_services._register_application_services") as mock_app,
             patch(
-                "infrastructure.di.provider_services._register_provider_utility_services"
+                "orb.infrastructure.di.provider_services._register_application_services"
+            ) as mock_app,
+            patch(
+                "orb.infrastructure.di.provider_services._register_provider_utility_services"
             ) as mock_util,
         ):
             register_provider_services(container)
@@ -31,22 +33,24 @@ class TestConfigDrivenProviderRegistration:
 
     def test_register_provider_utility_services_aws_available(self):
         """Test provider utility registration when AWS provider is available."""
-        from infrastructure.di.container import DIContainer
-        from infrastructure.di.provider_services import _register_provider_utility_services
+        from orb.infrastructure.di.container import DIContainer
+        from orb.infrastructure.di.provider_services import _register_provider_utility_services
 
         container = DIContainer()
 
         with (
             patch("importlib.util.find_spec", return_value=MagicMock()),
-            patch("providers.aws.registration.register_aws_services_with_di") as mock_aws_register,
+            patch(
+                "orb.providers.aws.registration.register_aws_services_with_di"
+            ) as mock_aws_register,
         ):
             _register_provider_utility_services(container)
             mock_aws_register.assert_called_once_with(container)
 
     def test_register_provider_utility_services_aws_unavailable(self):
         """Test provider utility registration when AWS provider is unavailable."""
-        from infrastructure.di.container import DIContainer
-        from infrastructure.di.provider_services import _register_provider_utility_services
+        from orb.infrastructure.di.container import DIContainer
+        from orb.infrastructure.di.provider_services import _register_provider_utility_services
 
         container = DIContainer()
 
@@ -56,8 +60,8 @@ class TestConfigDrivenProviderRegistration:
 
     def test_register_provider_utility_services_handles_import_error(self):
         """Test provider utility registration handles ImportError gracefully."""
-        from infrastructure.di.container import DIContainer
-        from infrastructure.di.provider_services import _register_provider_utility_services
+        from orb.infrastructure.di.container import DIContainer
+        from orb.infrastructure.di.provider_services import _register_provider_utility_services
 
         container = DIContainer()
 
@@ -67,15 +71,15 @@ class TestConfigDrivenProviderRegistration:
 
     def test_register_provider_utility_services_handles_exception(self):
         """Test provider utility registration handles general exceptions gracefully."""
-        from infrastructure.di.container import DIContainer
-        from infrastructure.di.provider_services import _register_provider_utility_services
+        from orb.infrastructure.di.container import DIContainer
+        from orb.infrastructure.di.provider_services import _register_provider_utility_services
 
         container = DIContainer()
 
         with (
             patch("importlib.util.find_spec", return_value=MagicMock()),
             patch(
-                "providers.aws.registration.register_aws_services_with_di",
+                "orb.providers.aws.registration.register_aws_services_with_di",
                 side_effect=RuntimeError("registration failed"),
             ),
         ):

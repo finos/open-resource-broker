@@ -1,0 +1,209 @@
+"""Startup validation for ORB application."""
+
+import json
+import os
+import sys
+from pathlib import Path
+from typing import Any, Optional, cast
+
+from botocore.exceptions import ClientError, NoCredentialsError
+from pydantic import ValidationError
+
+from orb._package import DOCS_URL
+from orb.cli.console import print_command, print_error, print_info, print_warning
+from orb.config.schemas.app_schema import AppConfig
+
+
+class StartupValidator:
+    """Validates ORB startup requirements with fail-fast behavior."""
+
+    def __init__(self, config_path: Optional[str] = None):
+        self.config_path = config_path
+        self.config_data: Optional[dict] = None
+        self.app_config: Optional[AppConfig] = None
+
+    def validate_startup(self) -> None:
+        """Validate startup requirements. Exit on critical failures."""
+        try:
+            self._validate_critical()
+            self._validate_important()
+        except SystemExit:
+            raise
+        except Exception as e:
+            self._error(f"Unexpected validation error: {e}")
+            sys.exit(1)
+
+    def _validate_critical(self) -> None:
+        """Critical validation - must pass to start."""
+        # 1. Config file exists
+        if not self._find_config_file():
+            print_error("Configuration file not found")
+            self._print_config_help()
+            sys.exit(1)
+
+        # 2. Config is valid JSON
+        try:
+            with open(self.config_path or "") as f:  # type: ignore[arg-type]
+                self.config_data = json.load(f)
+        except json.JSONDecodeError as e:
+            print_error(f"Invalid JSON in config file: {self.config_path}")
+            print_error(f"  {e}")
+            print_info("")
+            print_info("To fix:")
+            print_info(f"  1. Check JSON syntax in: {self.config_path}")
+            print_command("  2. Or reinitialize: orb init --force")
+            sys.exit(1)
+        except Exception as e:
+            print_error(f"Cannot read config file: {self.config_path}")
+            print_error(f"  {e}")
+            print_info("")
+            print_info("To fix:")
+            print_info("  1. Check file permissions")
+            print_command("  2. Or reinitialize: orb init --force")
+            sys.exit(1)
+
+        # 3. Config validates against Pydantic schema
+        try:
+            self.app_config = AppConfig(**(self.config_data or {}))
+        except ValidationError as e:
+            print_error(f"Invalid configuration in: {self.config_path}")
+            for error in e.errors():
+                field = " -> ".join(str(x) for x in error["loc"])
+                print_error(f"  {field}: {error['msg']}")
+            print_info("")
+            print_info("To fix:")
+            print_info(f"  1. Edit config file: {self.config_path}")
+            print_command("  2. Or reinitialize: orb init --force")
+            sys.exit(1)
+
+    def _validate_important(self) -> None:
+        """Important validation - warn but continue."""
+        # 1. Default config template exists
+        if not self._check_default_config():
+            print_info("Default config template not found")
+            print_command("  Run: orb init")
+
+        # 2. Templates file exists
+        if not self._check_templates_file():
+            print_info("Templates file not found")
+            print_command("  Run: orb templates generate")
+
+        # 3. AWS credentials configured
+        if not self._check_aws_credentials():
+            print_warning("AWS credentials not configured")
+            print_command("  Configure with: aws configure")
+            print_info("  Or set environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY")
+
+    def _find_config_file(self) -> bool:
+        """Find config file using discovery hierarchy."""
+        if self.config_path and Path(self.config_path).exists():
+            return True
+
+        # Discovery hierarchy
+        candidates = [
+            os.environ.get("ORB_CONFIG_FILE"),
+            os.path.join(os.environ.get("ORB_CONFIG_DIR", ""), "config.json"),
+            "./config/config.json",
+        ]
+
+        for candidate in candidates:
+            if candidate and Path(candidate).exists():
+                self.config_path = candidate
+                return True
+
+        return False
+
+    def _check_templates_file(self) -> bool:
+        """Check if any template files exist in the hierarchy."""
+        if not self.app_config:
+            return False
+
+        from orb.domain.base.ports.scheduler_port import SchedulerPort
+        from orb.infrastructure.di.container import get_container
+
+        container = get_container()
+        scheduler = container.get(SchedulerPort)
+
+        template_paths = cast(Any, scheduler).get_template_paths()
+        return any(Path(path).exists() for path in template_paths)
+
+    def _check_default_config(self) -> bool:
+        """Check if default_config.json template exists."""
+        from orb.config.loader import ConfigurationLoader
+
+        resolved_path = ConfigurationLoader._resolve_file_path(
+            "template", "default_config.json", explicit_path=None, config_manager=None
+        )
+
+        return resolved_path is not None and Path(resolved_path).exists()
+
+    def _check_aws_credentials(self) -> bool:
+        """Check if AWS credentials are configured."""
+        if not self.app_config:
+            return False
+
+        try:
+            # Get AWS config from first provider
+            providers = self.app_config.provider.providers
+            if not providers:
+                return True  # No AWS providers configured
+
+            aws_provider = next((p for p in providers if p.type == "aws"), None)
+            if not aws_provider:
+                return True  # No AWS providers
+
+            # Try to get AWS credentials
+            profile = aws_provider.config.get("profile", "default")
+            region = aws_provider.config.get("region", "us-east-1")
+
+            from botocore.config import Config
+
+            from orb.providers.aws.session_factory import AWSSessionFactory
+
+            session = AWSSessionFactory.create_session(profile, region)
+            session.client(
+                "sts",
+                config=Config(connect_timeout=10, read_timeout=30, retries={"max_attempts": 3}),
+            ).get_caller_identity()
+            return True
+
+        except (NoCredentialsError, ClientError):
+            return False
+        except Exception:
+            return True  # Don't fail on unexpected errors
+
+    def _print_config_help(self) -> None:
+        """Print helpful config location information."""
+        from orb.config.loader import ConfigurationLoader
+
+        print_info("")
+        print_info("Configuration not found in:")
+
+        default_resolved = ConfigurationLoader._resolve_file_path(
+            "template", "default_config.json", explicit_path=None, config_manager=None
+        )
+        if default_resolved:
+            print_info(f"  - {default_resolved}")
+
+        config_resolved = ConfigurationLoader._resolve_file_path(
+            "conf", "config.json", explicit_path=None, config_manager=None
+        )
+        if config_resolved:
+            print_info(f"  - {config_resolved}")
+
+        print_info("")
+        print_info("To initialize:")
+        print_command("  orb init")
+        print_info("")
+        print_info("Or specify config:")
+        print_command("  orb --config /path/to/config.json templates list")
+        print_info("")
+        print_info(f"Documentation: {DOCS_URL}")
+
+    def _error(self, message: str) -> None:
+        """Print error message to stderr."""
+        print_error(message)
+
+    def _warn(self, message: str) -> None:
+        """Print warning message to stderr."""
+        print_warning(message)

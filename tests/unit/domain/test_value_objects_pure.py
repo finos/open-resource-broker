@@ -2,7 +2,7 @@
 
 import pytest
 
-from domain.base.value_objects_pure import (
+from orb.domain.base.value_objects_pure import (
     ARN,
     InstanceId,
     InstanceType,

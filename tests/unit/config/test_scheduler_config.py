@@ -3,8 +3,8 @@
 import os
 from unittest.mock import patch
 
-from config.schemas.app_schema import AppConfig
-from config.schemas.scheduler_schema import SchedulerConfig
+from orb.config.schemas.app_schema import AppConfig
+from orb.config.schemas.scheduler_schema import SchedulerConfig
 
 
 class TestSchedulerConfig:
@@ -95,7 +95,7 @@ class TestAppConfigWithScheduler:
             },
         }
         mock_registry = patch(
-            "providers.registry.get_provider_registry",
+            "orb.providers.registry.get_provider_registry",
             return_value=type(
                 "R", (), {"get_registered_providers": lambda self: ["aws", "provider1"]}
             )(),

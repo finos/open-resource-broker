@@ -1,6 +1,6 @@
 """Tests for deep merge utility."""
 
-from infrastructure.utilities.common.deep_merge import deep_merge
+from orb.infrastructure.utilities.common.deep_merge import deep_merge
 
 
 class TestDeepMerge:

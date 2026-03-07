@@ -2,7 +2,7 @@
 
 from unittest.mock import patch
 
-from config.schemas.provider_strategy_schema import (
+from orb.config.schemas.provider_strategy_schema import (
     HandlerConfig,
     ProviderConfig,
     ProviderInstanceConfig,
@@ -181,7 +181,7 @@ class TestProviderDefaultsInheritance:
     def test_multi_provider_type_inheritance(self):
         """Test inheritance works independently for different provider types."""
         mock_registry = patch(
-            "providers.registry.get_provider_registry",
+            "orb.providers.registry.get_provider_registry",
             return_value=type(
                 "R", (), {"get_registered_providers": lambda self: ["aws", "provider1"]}
             )(),
@@ -368,7 +368,7 @@ class TestProviderDefaultsInheritance:
     def test_inheritance_with_missing_defaults(self):
         """Test behavior when provider type has no defaults defined."""
         mock_registry = patch(
-            "providers.registry.get_provider_registry",
+            "orb.providers.registry.get_provider_registry",
             return_value=type(
                 "R", (), {"get_registered_providers": lambda self: ["aws", "provider2"]}
             )(),

@@ -31,7 +31,7 @@ class TestCLIIntegration:
         return self.config_path
 
     @pytest.mark.asyncio
-    @patch("interface.system_command_handlers.get_container")
+    @patch("orb.interface.system_command_handlers.get_container")
     async def test_get_provider_config_cli_e2e(self, mock_get_container):
         """Test getProviderConfig CLI operation end-to-end."""
         # Setup mocks
@@ -49,7 +49,7 @@ class TestCLIIntegration:
         mock_get_container.return_value = mock_container
 
         # Test async function-based handler
-        from interface.command_handlers import handle_provider_config
+        from orb.interface.command_handlers import handle_provider_config
 
         mock_command = Mock()
 
@@ -59,7 +59,7 @@ class TestCLIIntegration:
         assert result["config"] == expected_config
 
     @pytest.mark.asyncio
-    @patch("src.infrastructure.di.services.register_all_services")
+    @patch("orb.infrastructure.di.services.register_all_services")
     async def test_validate_provider_config_cli_e2e(self, mock_register_services):
         """Test validateProviderConfig CLI operation end-to-end."""
         # Setup mocks
@@ -81,7 +81,7 @@ class TestCLIIntegration:
         mock_register_services.return_value = mock_container
 
         # Test async function-based handler
-        from interface.command_handlers import handle_validate_provider_config
+        from orb.interface.command_handlers import handle_validate_provider_config
 
         mock_command = Mock()
         mock_command.file = None
@@ -92,7 +92,7 @@ class TestCLIIntegration:
         assert "provider configuration" in result["message"].lower()
 
     @pytest.mark.asyncio
-    @patch("src.infrastructure.di.services.register_all_services")
+    @patch("orb.infrastructure.di.services.register_all_services")
     async def test_reload_provider_config_cli_e2e(self, mock_register_services):
         """Test reloadProviderConfig CLI operation end-to-end."""
         # Setup mocks
@@ -114,7 +114,7 @@ class TestCLIIntegration:
         mock_register_services.return_value = mock_container
 
         # Test async function-based handler
-        from interface.command_handlers import handle_reload_provider_config
+        from orb.interface.command_handlers import handle_reload_provider_config
 
         mock_command = Mock()
         mock_command.config_path = self.config_path

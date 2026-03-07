@@ -101,8 +101,15 @@ class TestDockerfile:
                 timeout=300,
             )
 
-            if "Cannot connect to the Docker daemon" in result.stderr:
-                pytest.skip("Docker daemon not running")
+            if result.returncode != 0 and any(
+                msg in result.stderr
+                for msg in [
+                    "Cannot connect to the Docker daemon",
+                    "permission denied while trying to connect to the Docker daemon",
+                    "Is the docker daemon running",
+                ]
+            ):
+                pytest.skip("Docker daemon not available")
 
             assert result.returncode == 0, f"Docker build failed: {result.stderr}"
             assert "Successfully tagged orb-api:test-build" in result.stdout or result.stderr

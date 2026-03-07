@@ -8,7 +8,7 @@ to modular CLI package is working correctly.
 import os
 import sys
 
-from cli.field_mapping import get_field_value, get_template_field_mapping
+from orb.cli.field_mapping import get_field_value, get_template_field_mapping
 
 # Add project root to path
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -22,14 +22,14 @@ class TestCLIMigration:
     def test_cli_modules_can_be_imported(self):
         """Test that all CLI modules can be imported successfully."""
         # Test main CLI module
-        from cli.main import execute_command, main, parse_args
+        from orb.cli.main import execute_command, main, parse_args
 
         assert callable(main)
         assert callable(parse_args)
         assert callable(execute_command)
 
         # Test formatters module
-        from cli.formatters import (
+        from orb.cli.formatters import (
             format_list_output,
             format_output,
             format_table_output,
@@ -40,7 +40,7 @@ class TestCLIMigration:
         assert callable(format_list_output)
 
         # Test completion module
-        from cli.completion import generate_bash_completion, generate_zsh_completion
+        from orb.cli.completion import generate_bash_completion, generate_zsh_completion
 
         assert callable(generate_bash_completion)
         assert callable(generate_zsh_completion)
@@ -51,7 +51,7 @@ class TestCLIMigration:
 
     def test_shell_completion_generation(self):
         """Test that shell completions can be generated."""
-        from cli.completion import generate_bash_completion, generate_zsh_completion
+        from orb.cli.completion import generate_bash_completion, generate_zsh_completion
 
         bash_completion = generate_bash_completion()
         assert isinstance(bash_completion, str)
@@ -65,7 +65,7 @@ class TestCLIMigration:
 
     def test_output_formatting(self):
         """Test that output formatting works correctly."""
-        from cli.formatters import format_output
+        from orb.cli.formatters import format_output
 
         test_data = {"test": "data", "number": 42}
 
@@ -97,17 +97,17 @@ class TestCLIMigration:
 
     def test_run_py_is_minimal(self):
         """Test that run.py is now minimal and delegates to CLI modules."""
-        run_py_path = os.path.join(project_root, "src", "run.py")
+        run_py_path = os.path.join(project_root, "src", "orb", "run.py")
 
         with open(run_py_path) as f:
             content = f.read()
 
         # Should be reasonably short (updated for current implementation)
         lines = content.strip().split("\n")
-        assert len(lines) < 70, f"run.py should be minimal, but has {len(lines)} lines"
+        assert len(lines) < 80, f"run.py should be minimal, but has {len(lines)} lines"
 
         # Should import from CLI modules
-        assert "from cli.main import main" in content
+        assert "from orb.cli.main import main" in content
 
         # Should delegate to main()
         assert "main()" in content

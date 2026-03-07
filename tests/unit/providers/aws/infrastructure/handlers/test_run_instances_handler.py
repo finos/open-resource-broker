@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from botocore.exceptions import ClientError
 
-from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
-from providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
+from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
+from orb.providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
 
 
 def _make_handler():

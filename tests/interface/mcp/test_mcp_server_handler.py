@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from interface.mcp.server.handler import handle_mcp_serve
+from orb.interface.mcp.server.handler import handle_mcp_serve
 
 
 class TestMCPServerHandler:
@@ -33,8 +33,8 @@ class TestMCPServerHandler:
     async def test_handle_mcp_serve_stdio_mode(self, stdio_args, mock_app):
         """Test MCP serve handler in stdio mode."""
         with (
-            patch("interface.mcp.server.handler._run_stdio_server") as mock_stdio,
-            patch("interface.mcp.server.handler.get_container", return_value=mock_app),
+            patch("orb.interface.mcp.server.handler._run_stdio_server") as mock_stdio,
+            patch("orb.interface.mcp.server.handler.get_container", return_value=mock_app),
         ):
             mock_stdio.return_value = None
 
@@ -47,8 +47,8 @@ class TestMCPServerHandler:
     async def test_handle_mcp_serve_tcp_mode(self, tcp_args, mock_app):
         """Test MCP serve handler in TCP mode."""
         with (
-            patch("interface.mcp.server.handler._run_tcp_server") as mock_tcp,
-            patch("interface.mcp.server.handler.get_container", return_value=mock_app),
+            patch("orb.interface.mcp.server.handler._run_tcp_server") as mock_tcp,
+            patch("orb.interface.mcp.server.handler.get_container", return_value=mock_app),
         ):
             mock_tcp.return_value = None
 
@@ -63,8 +63,8 @@ class TestMCPServerHandler:
     @pytest.mark.asyncio
     async def test_stdio_server_message_handling(self, mock_app):
         """Test stdio server message handling."""
-        from interface.mcp.server.core import OpenResourceBrokerMCPServer
-        from interface.mcp.server.handler import _run_stdio_server
+        from orb.interface.mcp.server.core import OpenResourceBrokerMCPServer
+        from orb.interface.mcp.server.handler import _run_stdio_server
 
         mcp_server = OpenResourceBrokerMCPServer(app=mock_app)
 
@@ -91,7 +91,7 @@ class TestMCPServerHandler:
     @pytest.mark.asyncio
     async def test_tcp_server_client_handling(self, mock_app):
         """Test TCP server client handling."""
-        from interface.mcp.server.handler import _run_tcp_server
+        from orb.interface.mcp.server.handler import _run_tcp_server
 
         # Mock asyncio.start_server
         with patch("asyncio.start_server") as mock_start_server:
@@ -107,7 +107,7 @@ class TestMCPServerHandler:
             mock_start_server.return_value = mock_server
 
             # Run TCP server (should exit on KeyboardInterrupt)
-            from interface.mcp.server.core import OpenResourceBrokerMCPServer
+            from orb.interface.mcp.server.core import OpenResourceBrokerMCPServer
 
             mcp_server = OpenResourceBrokerMCPServer(app=mock_app)
 
@@ -134,8 +134,8 @@ class TestMCPServerHandler:
     async def test_error_handling_in_handler(self, stdio_args, mock_app):
         """Test error handling in MCP serve handler."""
         with (
-            patch("interface.mcp.server.handler._run_stdio_server") as mock_stdio,
-            patch("interface.mcp.server.handler.get_container", return_value=mock_app),
+            patch("orb.interface.mcp.server.handler._run_stdio_server") as mock_stdio,
+            patch("orb.interface.mcp.server.handler.get_container", return_value=mock_app),
         ):
             mock_stdio.side_effect = Exception("Test error")
 

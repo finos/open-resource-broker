@@ -12,12 +12,12 @@ from datetime import date, datetime
 
 import pytest
 
-from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
     HostFactorySchedulerStrategy,
 )
-from infrastructure.template.dtos import TemplateDTO
-from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
+from orb.infrastructure.template.dtos import TemplateDTO
+from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
 
 
 def _make_strategy() -> HostFactorySchedulerStrategy:

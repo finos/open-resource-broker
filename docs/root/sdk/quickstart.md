@@ -1,6 +1,6 @@
 # Open Resource Broker SDK Quickstart
 
-The Open Resource Broker SDK (orb_py) provides a clean, async-first programmatic interface for cloud resource provisioning operations.
+The Open Resource Broker SDK provides a clean, async-first programmatic interface for cloud resource provisioning operations.
 
 ## Key Features
 
@@ -13,11 +13,8 @@ The Open Resource Broker SDK (orb_py) provides a clean, async-first programmatic
 ## Installation
 
 ```bash
-# Install the base package
+# Install the base package (SDK is included)
 pip install orb-py
-
-# Or install with SDK support
-pip install orb-py[sdk]
 ```
 
 ## Basic Usage
@@ -25,7 +22,7 @@ pip install orb-py[sdk]
 ### Context Manager (Recommended)
 
 ```python
-from orb_py import orb
+from orb import ORBClient as orb
 
 async with orb(provider="aws") as sdk:
     # List available templates
@@ -35,13 +32,13 @@ async with orb(provider="aws") as sdk:
     # Create machines using CLI-style convenience method
     if templates:
         request = await sdk.request_machines(
-            template_id=templates[0].template_id,
+            template_id=templates[0]["template_id"],
             count=5
         )
-        print(f"Created request: {request.id}")
+        print(f"Created request: {request['created_request_id']}")
 
         # Check status
-        status = await sdk.get_request_status(request_id=request.id)
+        status = await sdk.get_request(request_id=request["created_request_id"])
         print(f"Request status: {status}")
 ```
 
@@ -62,14 +59,14 @@ async with orb(provider="aws") as sdk:
 ```
 
 These convenience methods map to the underlying CQRS methods:
-- `request_machines(template_id, count)` → `create_request(template_id=template_id, machine_count=count)`
+- `request_machines(template_id, count)` → `create_request(template_id=template_id, count=count)`
 - `show_template(template_id)` → `get_template(template_id=template_id)`
 - `health_check()` → `get_provider_health()`
 
 ### Manual Initialization
 
 ```python
-from orb_py import orb
+from orb import ORBClient as orb
 
 sdk = orb(provider="aws")
 await sdk.initialize()
@@ -84,38 +81,112 @@ finally:
 
 ## Configuration
 
+There are five ways to configure `ORBClient`. They are not mutually exclusive — `config=` and `app_config=` can be combined, and environment variables are always read as the baseline when neither `config=` nor `config_path=` is passed.
+
+| Parameter | Controls | Use when |
+|-----------|----------|----------|
+| _(none)_ | SDK settings from env vars | Local dev with env vars set |
+| `config=` | SDK-level settings (timeout, log_level, region, etc.) | Programmatic SDK tuning |
+| `config_path=` | Path to app config JSON on disk | Standard on-disk deployment |
+| `app_config=` | Full application config as dict | Lambda, notebooks, CI — no filesystem |
+| env vars only | SDK settings via `ORB_*` variables | Container / shell environments |
+
+### Default (no arguments)
+
+When no config arguments are passed, the SDK reads `ORB_*` environment variables and falls back to built-in defaults:
+
+```python
+async with orb() as sdk:
+    # provider=aws, timeout=300, log_level=INFO (or whatever ORB_* vars are set)
+    templates = await sdk.list_templates()
+```
+
 ### Environment Variables
+
+All SDK-level settings can be set via environment variables:
 
 ```bash
 export ORB_PROVIDER=aws
 export ORB_REGION=us-east-1
 export ORB_PROFILE=default
 export ORB_TIMEOUT=300
+export ORB_RETRY_ATTEMPTS=3
 export ORB_LOG_LEVEL=INFO
+export ORB_CONFIG_FILE=/path/to/config.json   # app config file path
 ```
 
-### Configuration Dictionary
+`ORB_CONFIG_FILE` points to the application config JSON (equivalent to `config_path=`). The other variables map directly to `SDKConfig` fields.
+
+### SDK Config Dictionary (`config=`)
+
+Pass SDK-level settings as a dict. These control the SDK's own behaviour — timeout, log level, region override, etc. — not the application config structure.
 
 ```python
 config = {
     "provider": "aws",
     "region": "us-west-2",
     "timeout": 600,
-    "log_level": "DEBUG"
+    "log_level": "DEBUG",
+    "retry_attempts": 5,
 }
 
 async with orb(config=config) as sdk:
-    # Use SDK with custom configuration
     pass
 ```
 
-### Configuration File
+### Config File on Disk (`config_path=`)
+
+Load the full application config from a JSON file. This is the standard mode for deployed services that have a config.json on disk.
 
 ```python
-# Load from JSON file
-async with orb(config_path="config.json") as sdk:
+async with orb(config_path="/etc/orb/config.json") as sdk:
     pass
 ```
+
+The file must follow the same structure as the platform's `config.json`. A `ConfigurationError` is raised if the file does not exist.
+
+### In-Memory Application Config (`app_config=`)
+
+For environments without a config file on disk (Lambda functions, Jupyter notebooks, CI pipelines), pass the full application config as a dict. This is equivalent to what would normally be in `config.json`.
+
+```python
+app_config = {
+    "provider": {
+        "type": "aws",
+        "providers": [{
+            "name": "default",
+            "type": "aws",
+            "region": "us-east-1"
+        }]
+    },
+    "storage": {"type": "json"}
+}
+
+async with orb(app_config=app_config) as sdk:
+    templates = await sdk.list_templates()
+```
+
+`app_config=` and `config=` can be combined — `app_config` sets the application config structure while `config` tunes SDK behaviour:
+
+```python
+async with orb(app_config=app_config, config={"timeout": 600, "log_level": "DEBUG"}) as sdk:
+    pass
+```
+
+### Per-Client Isolation
+
+Each `ORBClient` instance creates its own isolated DI container. Multiple clients in the same process don't share state:
+
+```python
+# Two clients with different regions — fully isolated
+async with orb(app_config={"provider": {"type": "aws", "providers": [{"name": "east", "type": "aws", "region": "us-east-1"}]}, "storage": {"type": "json"}}) as east_client:
+    async with orb(app_config={"provider": {"type": "aws", "providers": [{"name": "west", "type": "aws", "region": "us-west-2"}]}, "storage": {"type": "json"}}) as west_client:
+        # Each client operates independently
+        east_templates = await east_client.list_templates()
+        west_templates = await west_client.list_templates()
+```
+
+For a complete working example, see `docs/root/examples/sdk_usage.py` in the repository.
 
 ## CLI vs SDK Equivalents
 
@@ -123,11 +194,11 @@ For users familiar with the CLI, the SDK provides both convenience methods and d
 
 | CLI Command | SDK Convenience Method | SDK CQRS Method |
 |-------------|----------------------|-----------------|
-| `orb machines request <template_id> <count>` | `sdk.request_machines(template_id, count)` | `sdk.create_request(template_id=template_id, machine_count=count)` |
+| `orb machines request <template_id> <count>` | `sdk.request_machines(template_id, count)` | `sdk.create_request(template_id=template_id, count=count)` |
 | `orb templates show <template_id>` | `sdk.show_template(template_id)` | `sdk.get_template(template_id=template_id)` |
 | `orb providers health` | `sdk.health_check()` | `sdk.get_provider_health()` |
 | `orb templates list` | N/A | `sdk.list_templates()` |
-| `orb requests status <request_id>` | N/A | `sdk.get_request_status(request_id=request_id)` |
+| `orb requests status <request_id>` | N/A | `sdk.get_request(request_id=request_id)` |
 
 ### Example Usage Comparison
 
@@ -142,10 +213,9 @@ async with orb(provider="aws") as sdk:
 async with orb(provider="aws") as sdk:
     template = await sdk.get_template(template_id="my-template")
     request = await sdk.create_request(
-        template_id="my-template", 
-        machine_count=3,
-        timeout=1800,
-        priority="high"
+        template_id="my-template",
+        count=3,
+        timeout=1800
     )
     health = await sdk.get_provider_health()
 ```
@@ -171,6 +241,19 @@ async with orb(provider="mock") as sdk:
     # Get SDK statistics
     stats = sdk.get_stats()
     print(f"SDK stats: {stats}")
+```
+
+### Type Safety
+
+The SDK provides `ORBClientProtocol` for IDE autocompletion and type checking:
+
+```python
+from orb.sdk import ORBClientProtocol
+
+async def provision_machines(client: ORBClientProtocol, template_id: str, count: int):
+    """Type-safe function accepting any ORBClient-compatible object."""
+    request = await client.create_request(template_id=template_id, count=count)
+    return await client.get_request(request_id=request["created_request_id"])
 ```
 
 ## Common Operations
@@ -218,18 +301,15 @@ async with orb(provider="aws") as sdk:
     # Create machine request
     request = await sdk.create_request(
         template_id="basic-template",
-        machine_count=3,
+        count=3,
         timeout=1800
     )
 
     # Monitor request status
-    status = await sdk.get_request_status(request_id=request.id)
+    status = await sdk.get_request(request_id=request["created_request_id"])
 
-    # List machines
-    machines = await sdk.list_machines(status="running")
-
-    # Get machine details
-    machine = await sdk.get_machine(machine_id="i-1234567890abcdef0")
+    # List active requests
+    requests = await sdk.list_active_requests()
 
     # Return machines when done
     return_request = await sdk.create_return_request(
@@ -241,14 +321,11 @@ async with orb(provider="aws") as sdk:
 
 ```python
 async with orb(provider="aws") as sdk:
-    # List requests
-    requests = await sdk.list_requests(status="pending")
+    # List active requests
+    requests = await sdk.list_active_requests()
 
-    # Get request details
-    request = await sdk.get_request(request_id="req-12345678")
-
-    # Cancel request
-    await sdk.cancel_request(request_id="req-12345678")
+    # Get request status
+    status = await sdk.get_request(request_id="req-12345678")
 ```
 
 ### Provider Operations
@@ -259,7 +336,7 @@ async with orb(provider="aws") as sdk:
     health = await sdk.get_provider_health()
 
     # List available providers
-    providers = await sdk.list_providers()
+    providers = await sdk.list_available_providers()
 
     # Get provider configuration
     config = await sdk.get_provider_config()
@@ -274,18 +351,13 @@ async with orb(provider="aws") as sdk:
 async with orb(provider="aws") as sdk:
     # Get system status
     status = await sdk.get_system_status()
-
-    # Run health check
-    health = await sdk.check_system_health(detailed=True)
-
-    # Get system metrics
-    metrics = await sdk.get_system_metrics()
 ```
 
 ## Error Handling
 
 ```python
-from orb_py import orb, SDKError, ConfigurationError, ProviderError
+from orb import ORBClient as orb
+from orb.sdk.exceptions import SDKError, ConfigurationError, ProviderError
 
 try:
     async with orb(provider="aws") as sdk:
@@ -301,23 +373,21 @@ except SDKError as e:
 ### Error Types
 
 - **SDKError**: Base class for all SDK errors
-- **ConfigurationError**: Configuration-related errors
-- **ProviderError**: Cloud provider-related errors
-- **ValidationError**: Input validation errors
-- **ResourceNotFoundError**: Resource not found errors
-- **AuthenticationError**: Authentication-related errors
-- **NetworkError**: Network-related errors
+- **ConfigurationError**: Configuration-related errors (invalid config, missing files)
+- **ProviderError**: Cloud provider initialization or operation errors
+- **HandlerDiscoveryError**: CQRS handler discovery failures
+- **MethodExecutionError**: SDK method execution failures
 
 ## Advanced Usage
 
 ### Custom Middleware
 
 ```python
-from orb_py import orb, SDKMiddleware
+from orb import ORBClient as orb, SDKMiddleware
 
 class LoggingMiddleware(SDKMiddleware):
     async def process(self, method_name, args, kwargs, next_handler):
-        print(f"Calling {method_name} with args={args}, kwargs={kwargs}")
+        print(f"Calling {method_name} with kwargs={kwargs}")
         result = await next_handler(args, kwargs)
         print(f"{method_name} returned: {result}")
         return result
@@ -339,30 +409,56 @@ async with orb(provider="aws") as sdk:
     ])
 
     for result in results:
-        print(f"Request ID: {result.id}")
+        print(f"Request ID: {result['created_request_id']}")
+```
+
+Failed operations do not raise — the exception instance is returned at that index instead. Always check before accessing result fields:
+
+```python
+results = await sdk.batch([
+    sdk.create_request("template-us-east", 2),
+    sdk.create_request("template-invalid", 1),  # will fail
+    sdk.create_request("template-eu-west", 1)
+])
+
+for i, result in enumerate(results):
+    if isinstance(result, Exception):
+        print(f"Operation {i} failed: {result}")
+    else:
+        print(f"Operation {i} succeeded: {result['created_request_id']}")
 ```
 
 ### Custom Serialization
 
+All SDK methods accept optional serialization parameters:
+
+- `raw_response=True` — returns the raw handler result without dict conversion. Takes precedence over `format`.
+- `format="json"` — returns a JSON string instead of a dict.
+- `format="yaml"` — returns a YAML string instead of a dict.
+
 ```python
 async with orb(provider="aws") as sdk:
-    # Get raw response data
+    # Raw handler result — no dict conversion applied
     raw_data = await sdk.list_templates(raw_response=True)
 
-    # Custom serialization format
-    yaml_data = await sdk.list_templates(format="yaml")
+    # JSON string representation
+    json_str = await sdk.list_templates(format="json")
+
+    # YAML string representation
+    yaml_str = await sdk.list_templates(format="yaml")
+
+    # raw_response takes precedence — format is ignored here
+    raw_data = await sdk.list_templates(raw_response=True, format="json")
 ```
 
 ## Performance Considerations
 
-- **Connection Pooling**: The SDK uses connection pooling for better performance
-- **Caching**: Query results are cached when appropriate
 - **Async Operations**: All operations are async for better concurrency
 - **Batch Processing**: Use batch operations for multiple requests
 
 ## Next Steps
 
-- [API Reference](#api-reference) - Complete method documentation
 - [Configuration Guide](#configuration) - Detailed configuration options
-- [Examples](examples/) - More usage examples
-- [Integration Guide](#integration) - Integrating with existing applications
+- [Method Discovery](#method-discovery) - Explore available SDK methods
+- [Error Handling](#error-handling) - Handle errors and exceptions
+- [Advanced Usage](#advanced-usage) - Middleware, batch operations, and serialization

@@ -5,8 +5,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from application.commands.request_handlers import CreateReturnRequestHandler
-from application.dto.commands import CreateReturnRequestCommand
+from orb.application.commands.request_handlers import CreateReturnRequestHandler
+from orb.application.dto.commands import CreateReturnRequestCommand
 
 
 class TestReturnValidationFix:

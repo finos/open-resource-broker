@@ -3,9 +3,9 @@
 import json
 from pathlib import Path
 
-from config.manager import ConfigurationManager
-from infrastructure.adapters.configuration_adapter import ConfigurationAdapter
-from monitoring.metrics import MetricsCollector
+from orb.config.manager import ConfigurationManager
+from orb.infrastructure.adapters.configuration_adapter import ConfigurationAdapter
+from orb.monitoring.metrics import MetricsCollector
 
 
 def test_default_config_includes_tracing_keys(tmp_path):

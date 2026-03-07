@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from sdk.config import SDKConfig
-from sdk.exceptions import ConfigurationError
+from orb.sdk.config import SDKConfig
+from orb.sdk.exceptions import ConfigurationError
 
 
 class TestSDKConfigDefaults:

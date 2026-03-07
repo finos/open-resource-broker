@@ -18,7 +18,7 @@ The Open Resource Broker provides direct MCP integration through its tools imple
 The Open Resource Broker implements direct MCP tools integration without requiring a separate server process:
 
 ```python
-from orb_py.mcp import OpenResourceBrokerMCPTools
+from orb.mcp import OpenResourceBrokerMCPTools
 
 async with OpenResourceBrokerMCPTools(provider="aws") as mcp_tools:
     # List available tools

@@ -21,10 +21,10 @@ class TestImportGuards:
         """Test CLI console works without Rich installed."""
         with patch.dict(sys.modules, {"rich": None, "rich.console": None, "rich_argparse": None}):
             # Force reimport to test fallback
-            if "cli.console" in sys.modules:
-                del sys.modules["cli.console"]
+            if "orb.cli.console" in sys.modules:
+                del sys.modules["orb.cli.console"]
 
-            from cli.console import get_console, print_error, print_success
+            from orb.cli.console import get_console, print_error, print_success
 
             console = get_console()
             assert console is not None
@@ -37,10 +37,10 @@ class TestImportGuards:
         """Test CLI formatters work without Rich installed."""
         with patch.dict(sys.modules, {"rich": None, "rich.table": None, "rich.console": None}):
             # Force reimport to test fallback
-            if "cli.formatters" in sys.modules:
-                del sys.modules["cli.formatters"]
+            if "orb.cli.formatters" in sys.modules:
+                del sys.modules["orb.cli.formatters"]
 
-            from cli.formatters import format_generic_list, format_generic_table
+            from orb.cli.formatters import format_generic_list, format_generic_table
 
             test_data = [
                 {"id": "1", "name": "test1", "status": "active"},
@@ -62,10 +62,10 @@ class TestImportGuards:
         """Test CLI main works without rich-argparse."""
         with patch.dict(sys.modules, {"rich_argparse": None}):
             # Force reimport to test fallback
-            if "cli.main" in sys.modules:
-                del sys.modules["cli.main"]
+            if "orb.cli.main" in sys.modules:
+                del sys.modules["orb.cli.main"]
 
-            from cli.main import parse_args
+            from orb.cli.main import parse_args
 
             # Should use standard argparse formatter
             # This is a basic test - full CLI testing would need more setup
@@ -84,10 +84,10 @@ class TestImportGuards:
             },
         ):
             # Force reimport to test guard
-            if "api.server" in sys.modules:
-                del sys.modules["api.server"]
+            if "orb.api.server" in sys.modules:
+                del sys.modules["orb.api.server"]
 
-            from api.server import create_fastapi_app
+            from orb.api.server import create_fastapi_app
 
             with pytest.raises(ImportError) as exc_info:
                 create_fastapi_app(None)
@@ -108,10 +108,10 @@ class TestImportGuards:
             },
         ):
             # Force reimport to test guards
-            if "monitoring.health" in sys.modules:
-                del sys.modules["monitoring.health"]
+            if "orb.monitoring.health" in sys.modules:
+                del sys.modules["orb.monitoring.health"]
 
-            from monitoring.health import HealthStatus
+            from orb.monitoring.health import HealthStatus
 
             # Should create but with limited functionality
             health_status = HealthStatus(name="test", status="healthy", details={"test": "value"})
@@ -136,9 +136,9 @@ class TestImportGuards:
 
         with patch.dict(sys.modules, {mod: None for mod in optional_modules}):
             # These should never fail
-            from bootstrap import Application
-            from domain.base.exceptions import DomainException
-            from infrastructure.logging.logger import get_logger
+            from orb.bootstrap import Application
+            from orb.domain.base.exceptions import DomainException
+            from orb.infrastructure.logging.logger import get_logger
 
             assert Application is not None
             assert DomainException is not None
@@ -161,10 +161,10 @@ class TestPackageVariants:
                 sys.executable,
                 "-c",
                 """
-import run
-from bootstrap import Application
-from domain.base.exceptions import DomainException
-from infrastructure.logging.logger import get_logger
+import orb.run
+from orb.bootstrap import Application
+from orb.domain.base.exceptions import DomainException
+from orb.infrastructure.logging.logger import get_logger
 print('CORE_IMPORTS_OK')
             """,
             ],
@@ -184,8 +184,8 @@ print('CORE_IMPORTS_OK')
                 sys.executable,
                 "-c",
                 """
-from cli.formatters import format_generic_table
-from cli.console import get_console
+from orb.cli.formatters import format_generic_table
+from orb.cli.console import get_console
 
 # Test with sample data
 test_data = [{'id': '1', 'name': 'test'}]
@@ -210,10 +210,10 @@ class TestErrorMessages:
     def test_api_error_message_helpful(self):
         """Test API error message tells user how to install."""
         with patch.dict(sys.modules, {"fastapi": None}):
-            if "api.server" in sys.modules:
-                del sys.modules["api.server"]
+            if "orb.api.server" in sys.modules:
+                del sys.modules["orb.api.server"]
 
-            from api.server import create_fastapi_app
+            from orb.api.server import create_fastapi_app
 
             with pytest.raises(ImportError) as exc_info:
                 create_fastapi_app(None)

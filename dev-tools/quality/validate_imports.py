@@ -20,22 +20,22 @@ def validate_critical_imports():
     """Validate critical imports that are used by main entry points."""
     critical_imports = [
         # Bootstrap and main entry points
-        "src.bootstrap",
-        "src.run",
+        "orb.bootstrap",
+        "orb.run",
         # Domain core
-        "src.domain.base.exceptions",
-        "src.domain.request.value_objects",
-        "src.domain.machine.value_objects",
+        "orb.domain.base.exceptions",
+        "orb.domain.request.value_objects",
+        "orb.domain.machine.value_objects",
         # Application layer
-        "src.application.base.handlers",
-        "src.application.commands.machine_handlers",
-        "src.application.queries.machine_query_handlers",
+        "orb.application.base.handlers",
+        "orb.application.commands.machine_handlers",
+        "orb.application.queries.machine_query_handlers",
         # Infrastructure core
-        "src.infrastructure.di.container",
-        "src.infrastructure.logging.logger",
-        "src.config.manager",
+        "orb.infrastructure.di.container",
+        "orb.infrastructure.logging.logger",
+        "orb.config.manager",
         # Interface layer
-        "src.interface.command_handlers",
+        "orb.interface.command_handlers",
     ]
 
     failed_imports = []

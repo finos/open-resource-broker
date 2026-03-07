@@ -5,7 +5,7 @@ from typing import Any, Dict
 
 import pytest
 
-from infrastructure.storage.components.entity_serializer import (
+from orb.infrastructure.storage.components.entity_serializer import (
     BaseEntitySerializer,
     EntitySerializer,
 )

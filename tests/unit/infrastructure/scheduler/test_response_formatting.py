@@ -19,9 +19,11 @@ try:
 except ImportError:
     _JSONSCHEMA_AVAILABLE = False
 
-from application.request.dto import MachineReferenceDTO, RequestDTO
-from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
-from infrastructure.template.dtos import TemplateDTO
+from orb.application.request.dto import MachineReferenceDTO, RequestDTO
+from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+    HostFactorySchedulerStrategy,
+)
+from orb.infrastructure.template.dtos import TemplateDTO
 from tests.onaws.plugin_io_schemas import (
     expected_get_available_templates_schema_default,
     expected_get_available_templates_schema_hostfactory,

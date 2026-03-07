@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from bootstrap import Application
+from orb.bootstrap import Application
 
 
 class TestBootstrapIntegration:
@@ -12,7 +12,7 @@ class TestBootstrapIntegration:
 
     def _make_mock_container(self, mock_config_manager):
         """Create a mock DI container that returns mock_config_manager for ConfigurationPort."""
-        from domain.base.ports.configuration_port import ConfigurationPort
+        from orb.domain.base.ports.configuration_port import ConfigurationPort
 
         mock_container = Mock()
         mock_container.is_lazy_loading_enabled.return_value = False
@@ -45,19 +45,19 @@ class TestBootstrapIntegration:
         return mock_config_manager
 
     @pytest.mark.asyncio
-    @patch("infrastructure.logging.logger.setup_logging")
+    @patch("orb.infrastructure.logging.logger.setup_logging")
     async def test_application_initialization_with_provider_config(self, mock_setup_logging):
         """Test application initialization with integrated provider configuration."""
         mock_config_manager = self._make_mock_config_manager()
 
         with (
-            patch("infrastructure.di.container.get_container") as mock_get_container,
+            patch("orb.infrastructure.di.container.get_container") as mock_get_container,
             patch.object(
                 Application,
                 "_preload_templates",
                 new_callable=lambda: lambda self: AsyncMock(return_value=None)(),
             ),
-            patch("providers.registry.get_provider_registry") as mock_get_registry,
+            patch("orb.providers.registry.get_provider_registry") as mock_get_registry,
         ):
             mock_container = self._make_mock_container(mock_config_manager)
             mock_get_container.return_value = mock_container
@@ -76,7 +76,7 @@ class TestBootstrapIntegration:
         assert app._initialized is True
 
     @pytest.mark.asyncio
-    @patch("infrastructure.logging.logger.setup_logging")
+    @patch("orb.infrastructure.logging.logger.setup_logging")
     async def test_application_initialization_with_legacy_config(self, mock_setup_logging):
         """Test application initialization with legacy provider configuration."""
         mock_config_manager = self._make_mock_config_manager()
@@ -84,8 +84,8 @@ class TestBootstrapIntegration:
         mock_config_manager.is_provider_strategy_enabled.return_value = False
 
         with (
-            patch("infrastructure.di.container.get_container") as mock_get_container,
-            patch("providers.registry.get_provider_registry") as mock_get_registry,
+            patch("orb.infrastructure.di.container.get_container") as mock_get_container,
+            patch("orb.providers.registry.get_provider_registry") as mock_get_registry,
         ):
             mock_container = self._make_mock_container(mock_config_manager)
             mock_get_container.return_value = mock_container
@@ -106,7 +106,7 @@ class TestBootstrapIntegration:
     @pytest.mark.asyncio
     async def test_application_initialization_failure(self):
         """Test application initialization failure handling."""
-        with patch("infrastructure.di.container.get_container") as mock_get_container:
+        with patch("orb.infrastructure.di.container.get_container") as mock_get_container:
             mock_container = Mock()
             mock_container.is_lazy_loading_enabled.return_value = False
             mock_container.get.side_effect = Exception("Configuration error")
@@ -119,14 +119,14 @@ class TestBootstrapIntegration:
         assert app._initialized is False
 
     @pytest.mark.asyncio
-    @patch("infrastructure.logging.logger.setup_logging")
+    @patch("orb.infrastructure.logging.logger.setup_logging")
     async def test_get_provider_info_integration(self, mock_setup_logging):
         """Test provider info retrieval integration."""
         mock_config_manager = self._make_mock_config_manager()
 
         with (
-            patch("infrastructure.di.container.get_container") as mock_get_container,
-            patch("providers.registry.get_provider_registry") as mock_get_registry,
+            patch("orb.infrastructure.di.container.get_container") as mock_get_container,
+            patch("orb.providers.registry.get_provider_registry") as mock_get_registry,
         ):
             mock_container = self._make_mock_container(mock_config_manager)
             mock_get_container.return_value = mock_container
@@ -159,14 +159,14 @@ class TestBootstrapIntegration:
         assert provider_info == {"status": "not_initialized"}
 
     @pytest.mark.asyncio
-    @patch("infrastructure.logging.logger.setup_logging")
+    @patch("orb.infrastructure.logging.logger.setup_logging")
     async def test_context_manager_integration(self, mock_setup_logging):
         """Test application context manager integration."""
         mock_config_manager = self._make_mock_config_manager()
 
         with (
-            patch("infrastructure.di.container.get_container") as mock_get_container,
-            patch("providers.registry.get_provider_registry") as mock_get_registry,
+            patch("orb.infrastructure.di.container.get_container") as mock_get_container,
+            patch("orb.providers.registry.get_provider_registry") as mock_get_registry,
         ):
             mock_container = self._make_mock_container(mock_config_manager)
             mock_get_container.return_value = mock_container
@@ -188,7 +188,7 @@ class TestBootstrapIntegration:
     @pytest.mark.asyncio
     async def test_context_manager_initialization_failure(self):
         """Test context manager with initialization failure."""
-        with patch("infrastructure.di.container.get_container") as mock_get_container:
+        with patch("orb.infrastructure.di.container.get_container") as mock_get_container:
             mock_container = Mock()
             mock_container.is_lazy_loading_enabled.return_value = False
             mock_container.get.side_effect = Exception("Initialization failed")

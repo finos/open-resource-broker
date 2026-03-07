@@ -3,7 +3,7 @@
 import os
 from unittest.mock import patch
 
-from config.utils.env_expansion import expand_config_env_vars, expand_env_vars
+from orb.config.utils.env_expansion import expand_config_env_vars, expand_env_vars
 
 
 class TestEnvironmentVariableExpansion:

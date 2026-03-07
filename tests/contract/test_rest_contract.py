@@ -91,7 +91,7 @@ def _validate(instance: dict, schema: dict, label: str = "") -> None:
 def rest_client(orb_config_dir_hf):
     """FastAPI TestClient with DI container booted against moto config."""
     try:
-        from api.server import create_fastapi_app
+        from orb.api.server import create_fastapi_app
     except ImportError as exc:
         pytest.skip(f"Could not import REST app: {exc}")
 

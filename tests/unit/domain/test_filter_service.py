@@ -2,8 +2,8 @@
 
 import pytest
 
-from domain.services.filter_service import FilterOperator, MachineFilter
-from domain.services.generic_filter_service import GenericFilter, GenericFilterService
+from orb.domain.services.filter_service import FilterOperator, MachineFilter
+from orb.domain.services.generic_filter_service import GenericFilter, GenericFilterService
 
 
 class TestFilterOperator:

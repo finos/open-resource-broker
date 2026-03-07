@@ -6,7 +6,7 @@ against the current implementation and should be made green by fixing the field 
 
 import pytest
 
-from application.dto.template_dto import TemplateDTO
+from orb.application.dto.template_dto import TemplateDTO
 
 # Fields that must never appear in ondemand templates
 ONDEMAND_FORBIDDEN = {

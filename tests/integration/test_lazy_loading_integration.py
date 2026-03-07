@@ -10,9 +10,10 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 
-from application.dto.queries import ListTemplatesQuery
-from bootstrap import Application
-from infrastructure.di.container import get_container
+from orb._package import PACKAGE_ROOT_STR
+from orb.application.dto.queries import ListTemplatesQuery
+from orb.bootstrap import Application
+from orb.infrastructure.di.container import get_container
 
 
 class TestLazyLoadingIntegration:
@@ -21,7 +22,7 @@ class TestLazyLoadingIntegration:
     @pytest.fixture
     def app(self):
         """Create application instance for testing."""
-        return Application()
+        return Application(skip_validation=True)
 
     @pytest_asyncio.fixture
     async def initialized_app(self, app):
@@ -129,8 +130,8 @@ class TestLazyLoadingIntegration:
     @pytest.mark.asyncio
     async def test_multiple_app_instances(self):
         """Test that multiple application instances work correctly."""
-        app1 = Application()
-        app2 = Application()
+        app1 = Application(skip_validation=True)
+        app2 = Application(skip_validation=True)
 
         await app1.initialize()
         await app2.initialize()
@@ -147,7 +148,7 @@ class TestLazyLoadingIntegration:
         """Test that async context manager works correctly."""
 
         async def run_test():
-            async with Application() as app:
+            async with Application(skip_validation=True) as app:
                 assert app._initialized
                 provider_info = app.get_provider_info()
                 assert isinstance(provider_info, dict)
@@ -165,7 +166,7 @@ class TestLazyLoadingErrorHandling:
 
     def test_uninitialized_app_access(self):
         """Test that accessing uninitialized app raises appropriate errors."""
-        app = Application()
+        app = Application(skip_validation=True)
 
         with pytest.raises(RuntimeError, match="Application not initialized"):
             app.get_query_bus()
@@ -175,7 +176,7 @@ class TestLazyLoadingErrorHandling:
 
     def test_initialization_failure_handling(self):
         """Test handling of initialization failures."""
-        app = Application()
+        app = Application(skip_validation=True)
 
         # Mock a failure in initialization
         with patch.object(app, "_ensure_config_manager", side_effect=Exception("Config error")):
@@ -186,7 +187,7 @@ class TestLazyLoadingErrorHandling:
         """Test handling of lazy component creation failures."""
 
         async def run_test():
-            app = Application()
+            app = Application(skip_validation=True)
             await app.initialize()
 
             # Mock a failure in lazy component creation
@@ -216,7 +217,7 @@ class TestLazyLoadingCompatibility:
         for cmd in commands_to_test:
             try:
                 result = subprocess.run(
-                    [sys.executable, "src/run.py", *cmd],
+                    [sys.executable, f"{PACKAGE_ROOT_STR}/run.py", *cmd],
                     check=False,
                     capture_output=True,
                     text=True,
@@ -236,8 +237,8 @@ class TestLazyLoadingCompatibility:
     def test_configuration_compatibility(self):
         """Test that configuration system is compatible with lazy loading."""
         # Test with different config paths
-        app1 = Application()
-        app2 = Application(config_path="config/default_config.json")
+        app1 = Application(skip_validation=True)
+        app2 = Application(config_path="config/default_config.json", skip_validation=True)
 
         # Both should create successfully
         assert app1.config_path is None
@@ -247,7 +248,7 @@ class TestLazyLoadingCompatibility:
         """Test that provider strategy system works with lazy loading."""
 
         async def run_test():
-            app = Application()
+            app = Application(skip_validation=True)
             await app.initialize()
 
             provider_info = app.get_provider_info()
@@ -278,7 +279,7 @@ class TestLazyLoadingPerformanceIntegration:
         """Test first access performance in integration context."""
         import time
 
-        app = Application()
+        app = Application(skip_validation=True)
         await app.initialize()
 
         start_time = time.time()
@@ -295,7 +296,7 @@ class TestLazyLoadingPerformanceIntegration:
         """Test cached access performance in integration context."""
         import time
 
-        app = Application()
+        app = Application(skip_validation=True)
         await app.initialize()
 
         # First access (triggers lazy loading)

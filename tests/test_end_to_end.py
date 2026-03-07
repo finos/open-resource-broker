@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 def test_application_service_instantiation():
     """Test that ApplicationService can be imported."""
-    from application.services.template_defaults_service import TemplateDefaultsService
+    from orb.application.services.template_defaults_service import TemplateDefaultsService
 
     # Just test that the class can be imported
     assert TemplateDefaultsService is not None
@@ -26,7 +26,7 @@ def test_application_service_instantiation():
 
 def test_configuration_loading():
     """Test that configuration can be loaded."""
-    from config.manager import ConfigurationManager
+    from orb.config.manager import ConfigurationManager
 
     config_manager = ConfigurationManager()
     # Use the correct method name
@@ -40,7 +40,7 @@ def test_configuration_loading():
 @patch("boto3.client")
 def test_aws_provider_adapter(mock_boto_client):
     """Test that AWS provider adapter can be instantiated."""
-    from providers.aws.strategy.aws_provider_adapter import AWSProviderAdapter
+    from orb.providers.aws.strategy.aws_provider_adapter import AWSProviderAdapter
 
     # Mock AWS client
     mock_client = MagicMock()
@@ -57,7 +57,7 @@ def test_aws_provider_adapter(mock_boto_client):
 
 def test_template_operations():
     """Test template-related operations."""
-    from domain.template.value_objects import TemplateId
+    from orb.domain.template.value_objects import TemplateId
 
     # Test template ID creation
     template_id = TemplateId(value="test-template")
@@ -78,7 +78,7 @@ def test_template_operations():
 
 def test_request_operations():
     """Test request-related operations."""
-    from domain.request.value_objects import RequestId
+    from orb.domain.request.value_objects import RequestId
 
     # Test request ID creation
     request_id = RequestId(value="req-12345678-1234-1234-1234-123456789012")
@@ -98,7 +98,7 @@ def test_request_operations():
 
 def test_machine_operations():
     """Test machine-related operations."""
-    from domain.machine.value_objects import MachineId
+    from orb.domain.machine.value_objects import MachineId
 
     # Test machine ID creation
     machine_id = MachineId(value="i-1234567890abcdef0")
@@ -117,13 +117,13 @@ def test_machine_operations():
     assert machine_data["status"] == "running"
 
 
-@patch("infrastructure.logging.logger.get_logger")
+@patch("orb.infrastructure.logging.logger.get_logger")
 def test_logging_functionality(mock_get_logger):
     """Test that logging functionality works."""
     mock_logger = MagicMock()
     mock_get_logger.return_value = mock_logger
 
-    from infrastructure.logging.logger import get_logger
+    from orb.infrastructure.logging.logger import get_logger
 
     logger = get_logger(__name__)
     logger.info("Test message")
@@ -134,8 +134,8 @@ def test_logging_functionality(mock_get_logger):
 
 def test_exception_handling():
     """Test that exception handling works."""
-    from domain.base.exceptions import DomainException, ValidationError
-    from providers.aws.exceptions.aws_exceptions import AWSError
+    from orb.domain.base.exceptions import DomainException, ValidationError
+    from orb.providers.aws.exceptions.aws_exceptions import AWSError
 
     # Test domain exceptions
     try:

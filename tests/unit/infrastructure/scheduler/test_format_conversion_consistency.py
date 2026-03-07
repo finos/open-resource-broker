@@ -4,11 +4,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from domain.base.ports import SchedulerPort
-from domain.template import Template
-from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
-from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
-from infrastructure.template.dtos import TemplateDTO
+from orb.domain.base.ports import SchedulerPort
+from orb.domain.template import Template
+from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+    HostFactorySchedulerStrategy,
+)
+from orb.infrastructure.template.dtos import TemplateDTO
 
 
 class TestFormatConversionConsistency:
@@ -27,7 +29,7 @@ class TestFormatConversionConsistency:
         mock_provider_service = MagicMock()
         mock_container.get.return_value = mock_provider_service
 
-        with patch("infrastructure.di.container.get_container", return_value=mock_container):
+        with patch("orb.infrastructure.di.container.get_container", return_value=mock_container):
             self.symphony_strategy = HostFactorySchedulerStrategy()
 
         # Sample data for testing
@@ -124,7 +126,7 @@ class TestFormatConversionInHandlers:
 
     def test_format_conversion_in_api_handler(self):
         """Test that format conversion is done using the scheduler strategy in API handlers."""
-        from api.handlers.get_available_templates_handler import (
+        from orb.api.handlers.get_available_templates_handler import (
             GetAvailableTemplatesRESTHandler,
         )
 
@@ -149,9 +151,9 @@ class TestFormatConversionInHandlers:
         """Test that format conversion is done using the scheduler strategy in CLI handlers."""
         import argparse
 
-        from interface.template_command_handlers import handle_list_templates
+        from orb.interface.template_command_handlers import handle_list_templates
 
-        with patch("src.interface.template_command_handlers.get_container") as mock_get_container:
+        with patch("orb.interface.template_command_handlers.get_container") as mock_get_container:
             container = MagicMock()
             query_bus = MagicMock()
             scheduler_strategy = MagicMock(spec=SchedulerPort)

@@ -106,9 +106,9 @@ def test_end_to_end_integration():
 def test_provider_strategy_integration():
     """Test that provider strategy properly integrates with consolidated handlers."""
     try:
-        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-        from providers.aws.domain.template.value_objects import ProviderApi
-        from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
+        from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+        from orb.providers.aws.domain.template.value_objects import ProviderApi
+        from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
         print("   Testing provider strategy handler integration...")
 
@@ -121,7 +121,7 @@ def test_provider_strategy_integration():
 
         # Test that provider strategy can be instantiated
         try:
-            from providers.aws.configuration.config import AWSProviderConfig
+            from orb.providers.aws.configuration.config import AWSProviderConfig
 
             # Create appropriate AWS config
             aws_config = AWSProviderConfig(region="us-west-2", profile="default")
@@ -181,12 +181,12 @@ def test_provider_strategy_integration():
 def test_launch_template_integration():
     """Test that launch template manager integrates properly with handlers."""
     try:
-        from domain.request.aggregate import Request
-        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-        from providers.aws.infrastructure.handlers.spot_fleet.handler import (
+        from orb.domain.request.aggregate import Request
+        from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+        from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import (
             SpotFleetHandler,
         )
-        from providers.aws.infrastructure.launch_template.manager import (
+        from orb.providers.aws.infrastructure.launch_template.manager import (
             AWSLaunchTemplateManager,
         )
 
@@ -240,7 +240,7 @@ def test_launch_template_integration():
             lt_manager.create_or_update_launch_template = Mock(return_value=mock_result)
 
             # Create test data
-            from providers.aws.domain.template.value_objects import ProviderApi
+            from orb.providers.aws.domain.template.value_objects import ProviderApi
 
             aws_template = AWSTemplate(
                 template_id="test-template",
@@ -250,7 +250,7 @@ def test_launch_template_integration():
                 provider_api=ProviderApi.SPOT_FLEET,
             )
 
-            from domain.request.value_objects import RequestType
+            from orb.domain.request.value_objects import RequestType
 
             request = Request.create_new_request(
                 request_type=RequestType.ACQUIRE,
@@ -286,15 +286,15 @@ def test_launch_template_integration():
 def test_handler_routing():
     """Test that handlers are properly routed based on provider API."""
     try:
-        from providers.aws.domain.template.value_objects import ProviderApi
-        from providers.aws.infrastructure.handlers.asg.handler import ASGHandler
-        from providers.aws.infrastructure.handlers.ec2_fleet.handler import (
+        from orb.providers.aws.domain.template.value_objects import ProviderApi
+        from orb.providers.aws.infrastructure.handlers.asg.handler import ASGHandler
+        from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import (
             EC2FleetHandler,
         )
-        from providers.aws.infrastructure.handlers.run_instances.handler import (
+        from orb.providers.aws.infrastructure.handlers.run_instances.handler import (
             RunInstancesHandler,
         )
-        from providers.aws.infrastructure.handlers.spot_fleet.handler import (
+        from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import (
             SpotFleetHandler,
         )
 
@@ -363,10 +363,10 @@ def test_handler_routing():
 def test_domain_model_flow():
     """Test that AWSTemplate flows properly through the system."""
     try:
-        from domain.request.aggregate import Request
-        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-        from providers.aws.domain.template.value_objects import ProviderApi
-        from providers.aws.infrastructure.handlers.spot_fleet.handler import (
+        from orb.domain.request.aggregate import Request
+        from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+        from orb.providers.aws.domain.template.value_objects import ProviderApi
+        from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import (
             SpotFleetHandler,
         )
 
@@ -383,7 +383,7 @@ def test_domain_model_flow():
         )
 
         # Create test Request
-        from domain.request.value_objects import RequestType
+        from orb.domain.request.value_objects import RequestType
 
         _ = Request.create_new_request(
             request_type=RequestType.ACQUIRE,
@@ -449,9 +449,9 @@ def test_domain_model_flow():
 def test_error_handling_integration():
     """Test that integrated error handling works across the integration."""
     try:
-        from providers.aws.exceptions.aws_exceptions import AWSValidationError
-        from providers.aws.infrastructure.handlers.base_handler import AWSHandler
-        from providers.aws.infrastructure.handlers.spot_fleet.handler import (
+        from orb.providers.aws.exceptions.aws_exceptions import AWSValidationError
+        from orb.providers.aws.infrastructure.handlers.base_handler import AWSHandler
+        from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import (
             SpotFleetHandler,
         )
 
@@ -520,7 +520,7 @@ def test_error_handling_integration():
 def test_performance_metrics_integration():
     """Test that performance metrics work across the integration."""
     try:
-        from providers.aws.infrastructure.handlers.base_handler import AWSHandler
+        from orb.providers.aws.infrastructure.handlers.base_handler import AWSHandler
 
         print("   Testing performance metrics integration...")
 
@@ -550,20 +550,20 @@ def test_performance_metrics_integration():
 def test_full_end_to_end_flow():
     """Test the complete end-to-end flow with mocked dependencies."""
     try:
-        from domain.request.aggregate import Request
-        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-        from providers.aws.domain.template.value_objects import ProviderApi
-        from providers.aws.infrastructure.handlers.spot_fleet.handler import (
+        from orb.domain.request.aggregate import Request
+        from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+        from orb.providers.aws.domain.template.value_objects import ProviderApi
+        from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import (
             SpotFleetHandler,
         )
-        from providers.aws.infrastructure.launch_template.manager import (
+        from orb.providers.aws.infrastructure.launch_template.manager import (
             AWSLaunchTemplateManager,
         )
 
         print("   Testing full end-to-end flow...")
 
         # Create test data
-        from providers.aws.domain.template.value_objects import AWSFleetType
+        from orb.providers.aws.domain.template.value_objects import AWSFleetType
 
         aws_template = AWSTemplate(
             template_id="e2e-test-template",
@@ -576,7 +576,7 @@ def test_full_end_to_end_flow():
             fleet_type=AWSFleetType.REQUEST.value,
         )
 
-        from domain.request.value_objects import RequestType
+        from orb.domain.request.value_objects import RequestType
 
         request = Request.create_new_request(
             request_type=RequestType.ACQUIRE,

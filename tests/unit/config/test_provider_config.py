@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from config.schemas.provider_strategy_schema import (
+from orb.config.schemas.provider_strategy_schema import (
     CircuitBreakerConfig,
     HealthCheckConfig,
     ProviderConfig,
@@ -57,7 +57,7 @@ class TestProviderInstanceConfig:
 
     def test_provider_type_validation(self):
         """Test provider type validation."""
-        from providers.registry import get_provider_registry
+        from orb.providers.registry import get_provider_registry
 
         registry = get_provider_registry()
 

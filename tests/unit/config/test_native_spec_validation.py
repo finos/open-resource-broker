@@ -3,9 +3,9 @@
 import pytest
 from pydantic import ValidationError
 
-from config.schemas.native_spec_schema import NativeSpecConfig
-from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from providers.aws.domain.template.value_objects import ProviderApi
+from orb.config.schemas.native_spec_schema import NativeSpecConfig
+from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.domain.template.value_objects import ProviderApi
 
 
 class TestNativeSpecValidation:

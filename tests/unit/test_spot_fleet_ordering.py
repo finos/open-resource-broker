@@ -9,9 +9,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
-from providers.aws.infrastructure.handlers.spot_fleet.validator import SpotFleetValidator
+from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
+from orb.providers.aws.infrastructure.handlers.spot_fleet.validator import SpotFleetValidator
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -184,7 +184,7 @@ class TestFleetRoleResolutionPassesValidation:
 
     def test_no_fleet_role_anywhere_fails_validation(self):
         """When fleet_role is None and config has none either, validation raises."""
-        from providers.aws.exceptions.aws_exceptions import AWSValidationError
+        from orb.providers.aws.exceptions.aws_exceptions import AWSValidationError
 
         config_port = MagicMock()
         config_port.get_provider_config.return_value = None
@@ -218,7 +218,7 @@ class TestSpotFleetValidatorFleetRole:
         self.validator = SpotFleetValidator(aws_client=self.aws_client, logger=self.logger)
 
     def test_missing_fleet_role_raises(self):
-        from providers.aws.exceptions.aws_exceptions import AWSValidationError
+        from orb.providers.aws.exceptions.aws_exceptions import AWSValidationError
 
         template = _make_template(fleet_role=None)
         with pytest.raises(AWSValidationError, match="Fleet role ARN is required"):
