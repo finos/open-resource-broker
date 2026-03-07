@@ -7,6 +7,7 @@ calling handle_message() with JSON-RPC 2.0 envelopes — no subprocess, no TCP.
 import json
 import logging
 import os
+import re
 import shutil
 import time
 
@@ -71,6 +72,8 @@ _console = logging.StreamHandler()
 _console.setLevel(logging.DEBUG)
 _console.setFormatter(_formatter)
 log.addHandler(_console)
+
+REQUEST_ID_RE = re.compile(r"^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 
 # ---------------------------------------------------------------------------
@@ -297,6 +300,7 @@ async def _run_full_cycle_mcp(
 
     request_id = _extract_request_id(request_result)
     assert request_id, f"No request_id in response: {request_result}"
+    assert REQUEST_ID_RE.match(request_id), f"request_id {request_id!r} does not match expected format"
     tracked_request_ids.append(request_id)
     log.info("Got request_id: %s", request_id)
 

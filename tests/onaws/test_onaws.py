@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import time
 from typing import Optional
 
@@ -28,6 +29,8 @@ os.environ["USE_LOCAL_DEV"] = "1"
 os.environ.setdefault("HF_LOGDIR", "./logs")  # Set log directory to avoid permission issues
 os.environ.setdefault("AWS_PROVIDER_LOG_DIR", "./logss")
 os.environ["LOG_DESTINATION"] = "file"
+
+REQUEST_ID_RE = re.compile(r"^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 
 def _get_boto_clients():
@@ -1391,6 +1394,8 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
         else:
             pytest.fail(f"AWS provider response missing requestId field. Response: {res}")
 
+    assert REQUEST_ID_RE.match(request_id), f"request_id {request_id!r} does not match expected format"
+
     # log.debug(json.dumps(res, indent=4))
 
     # Get scheduler type for validation
@@ -1724,6 +1729,7 @@ def test_partial_return_reduces_capacity(setup_host_factory_mock_with_scenario, 
         )
     if not request_id:
         pytest.fail(f"Request ID missing in response: {json.dumps(request_response, indent=2)}")
+    assert REQUEST_ID_RE.match(request_id), f"request_id {request_id!r} does not match expected format"
 
     # 1.5: Wait for provisioning completion
     log.info("1.5: Waiting for provisioning completion (request_id: %s)", request_id)

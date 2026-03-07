@@ -25,51 +25,12 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
+from tests.onmoto.conftest import _inject_moto_factory, _make_logger, _make_moto_aws_client
+
 REGION = "eu-west-2"
 REQUEST_ID_RE = re.compile(r"^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 pytestmark = [pytest.mark.moto, pytest.mark.cli]
-
-
-# ---------------------------------------------------------------------------
-# Moto compatibility patches
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture(autouse=True)
-def patch_moto_compat():
-    """Patch moto-incompatible behaviours for all tests in this module.
-
-    1. AWSImageResolutionService.is_resolution_needed -> False
-       Prevents SSM path resolution which moto cannot fulfil.
-
-    2. AWSProvisioningAdapter._provision_via_handlers synthesises instances
-       from instance_ids so the orchestration loop sees fulfilled_count > 0.
-    """
-    from orb.providers.aws.infrastructure.adapters.aws_provisioning_adapter import (
-        AWSProvisioningAdapter,
-    )
-
-    _original_provision = AWSProvisioningAdapter._provision_via_handlers
-
-    def _patched_provision(self, request, template, dry_run=False):
-        result = _original_provision(self, request, template, dry_run=dry_run)
-        if isinstance(result, dict) and not result.get("instances"):
-            instance_ids = result.get("instance_ids") or result.get("resource_ids", [])
-            iids = [i for i in instance_ids if i.startswith("i-")]
-            if iids:
-                result["instances"] = [{"instance_id": iid} for iid in iids]
-        return result
-
-    with (
-        patch(
-            "orb.providers.aws.infrastructure.services.aws_image_resolution_service"
-            ".AWSImageResolutionService.is_resolution_needed",
-            return_value=False,
-        ),
-        patch.object(AWSProvisioningAdapter, "_provision_via_handlers", _patched_provision),
-    ):
-        yield
 
 
 # ---------------------------------------------------------------------------
@@ -136,180 +97,6 @@ def _run_orb_cli(args: list[str]) -> dict:  # type: ignore[return]
 
 
 # ---------------------------------------------------------------------------
-# Moto factory injection (mirrors test_sdk_onmoto.py)
-# ---------------------------------------------------------------------------
-
-
-def _make_moto_aws_client():
-    from unittest.mock import MagicMock
-
-    import boto3
-
-    from orb.providers.aws.infrastructure.aws_client import AWSClient
-
-    aws_client = MagicMock(spec=AWSClient)
-    aws_client.ec2_client = boto3.client("ec2", region_name=REGION)
-    aws_client.autoscaling_client = boto3.client("autoscaling", region_name=REGION)
-    aws_client.sts_client = boto3.client("sts", region_name=REGION)
-    aws_client.ssm_client = boto3.client("ssm", region_name=REGION)
-    return aws_client
-
-
-def _make_logger():
-    from unittest.mock import MagicMock
-
-    logger = MagicMock()
-    logger.debug = MagicMock()
-    logger.info = MagicMock()
-    logger.warning = MagicMock()
-    logger.error = MagicMock()
-    return logger
-
-
-def _make_lt_manager(aws_client):
-    from unittest.mock import MagicMock
-
-    from orb.providers.aws.infrastructure.launch_template.manager import (
-        AWSLaunchTemplateManager,
-        LaunchTemplateResult,
-    )
-
-    lt_manager = MagicMock(spec=AWSLaunchTemplateManager)
-
-    def _create_or_update(template, request):
-        lt_name = f"orb-lt-{request.request_id}"
-        try:
-            resp = aws_client.ec2_client.create_launch_template(
-                LaunchTemplateName=lt_name,
-                LaunchTemplateData={
-                    "ImageId": template.image_id or "ami-12345678",
-                    "InstanceType": (
-                        next(iter(template.machine_types.keys()))
-                        if template.machine_types
-                        else "t3.micro"
-                    ),
-                    "NetworkInterfaces": [
-                        {
-                            "DeviceIndex": 0,
-                            "SubnetId": template.subnet_ids[0] if template.subnet_ids else "",
-                            "Groups": template.security_group_ids or [],
-                            "AssociatePublicIpAddress": False,
-                        }
-                    ],
-                },
-            )
-            lt_id = resp["LaunchTemplate"]["LaunchTemplateId"]
-            version = str(resp["LaunchTemplate"]["LatestVersionNumber"])
-        except Exception:
-            lt_id = "lt-mock"
-            version = "1"
-        return LaunchTemplateResult(
-            template_id=lt_id,
-            version=version,
-            template_name=lt_name,
-            is_new_template=True,
-        )
-
-    lt_manager.create_or_update_launch_template.side_effect = _create_or_update
-    return lt_manager
-
-
-def _inject_moto_factory(aws_client, logger) -> None:
-    """Swap the DI-wired AWSProviderStrategy's internals for moto-backed ones.
-
-    Must be called after the CLI has initialised Application (i.e. after the
-    first _run_orb_cli call that triggers app.initialize()).  Since the DI
-    container is reset between CLI calls we re-inject before each call that
-    needs real AWS operations.
-    """
-    from orb.domain.base.ports import ConfigurationPort
-    from orb.infrastructure.di.container import get_container
-    from orb.providers.aws.domain.template.value_objects import ProviderApi
-    from orb.providers.aws.infrastructure.adapters.aws_provisioning_adapter import (
-        AWSProvisioningAdapter,
-    )
-    from orb.providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
-    from orb.providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
-    from orb.providers.aws.infrastructure.handlers.asg.handler import ASGHandler
-    from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
-    from orb.providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
-    from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
-    from orb.providers.aws.services.instance_operation_service import AWSInstanceOperationService
-    from orb.providers.aws.utilities.aws_operations import AWSOperations
-    from orb.providers.registry import get_provider_registry
-
-    registry = get_provider_registry()
-    registry._strategy_cache.pop("aws_moto_eu-west-2", None)
-
-    container = get_container()
-    cfg_port = container.get(ConfigurationPort)
-    provider_config = cfg_port.get_provider_config()
-    if provider_config:
-        for pi in provider_config.get_active_providers():
-            if not registry.is_provider_instance_registered(pi.name):
-                registry.ensure_provider_instance_registered_from_config(pi)
-
-    strategy = registry.get_or_create_strategy("aws_moto_eu-west-2")
-    if strategy is None:
-        return
-
-    lt_manager = _make_lt_manager(aws_client)
-    aws_ops = AWSOperations(aws_client, logger, cfg_port)
-    factory = AWSHandlerFactory(aws_client=aws_client, logger=logger, config=cfg_port)
-
-    factory._handlers[ProviderApi.ASG.value] = ASGHandler(
-        aws_client=aws_client,
-        logger=logger,
-        aws_ops=aws_ops,
-        launch_template_manager=lt_manager,
-        config_port=cfg_port,
-    )
-    factory._handlers[ProviderApi.EC2_FLEET.value] = EC2FleetHandler(
-        aws_client=aws_client,
-        logger=logger,
-        aws_ops=aws_ops,
-        launch_template_manager=lt_manager,
-        config_port=cfg_port,
-    )
-    factory._handlers[ProviderApi.RUN_INSTANCES.value] = RunInstancesHandler(
-        aws_client=aws_client,
-        logger=logger,
-        aws_ops=aws_ops,
-        launch_template_manager=lt_manager,
-        config_port=cfg_port,
-    )
-    factory._handlers[ProviderApi.SPOT_FLEET.value] = SpotFleetHandler(
-        aws_client=aws_client,
-        logger=logger,
-        aws_ops=aws_ops,
-        launch_template_manager=lt_manager,
-        config_port=cfg_port,
-    )
-
-    strategy._aws_client = aws_client
-    handler_registry = strategy._get_handler_registry()
-    handler_registry._handler_factory = factory
-    handler_registry._handler_cache = dict(factory._handlers)
-
-    machine_adapter = AWSMachineAdapter(aws_client=aws_client, logger=logger)
-    provisioning_adapter = AWSProvisioningAdapter(
-        aws_client=aws_client,
-        logger=logger,
-        provider_strategy=strategy,
-        config_port=cfg_port,
-    )
-    instance_service = AWSInstanceOperationService(
-        aws_client=aws_client,
-        logger=logger,
-        provisioning_adapter=provisioning_adapter,
-        machine_adapter=machine_adapter,
-        provider_name="aws_moto_eu-west-2",
-        provider_type="aws",
-    )
-    strategy._instance_service = instance_service
-
-
-# ---------------------------------------------------------------------------
 # Helpers to extract fields from CLI JSON output
 # ---------------------------------------------------------------------------
 
@@ -369,7 +156,7 @@ class TestCLIMachinesRequest:
 
         async def _patched_initialize(self, dry_run=False):
             result = await _original_initialize(self, dry_run=dry_run)
-            _inject_moto_factory(aws_client, logger)
+            _inject_moto_factory(aws_client, logger, None)
             return result
 
         with patch.object(Application, "initialize", _patched_initialize):
@@ -396,7 +183,7 @@ class TestCLIRequestsStatus:
 
         async def _patched_initialize(self, dry_run=False):
             result = await _original_initialize(self, dry_run=dry_run)
-            _inject_moto_factory(aws_client, logger)
+            _inject_moto_factory(aws_client, logger, None)
             return result
 
         with patch.object(Application, "initialize", _patched_initialize):
@@ -439,7 +226,7 @@ class TestCLIFullLifecycle:
 
         async def _patched_initialize(self, dry_run=False):
             result = await _original_initialize(self, dry_run=dry_run)
-            _inject_moto_factory(aws_client, logger)
+            _inject_moto_factory(aws_client, logger, None)
             return result
 
         with patch.object(Application, "initialize", _patched_initialize):
@@ -494,7 +281,7 @@ class TestCLIRequestsList:
 
         async def _patched_initialize(self, dry_run=False):
             result = await _original_initialize(self, dry_run=dry_run)
-            _inject_moto_factory(aws_client, logger)
+            _inject_moto_factory(aws_client, logger, None)
             return result
 
         with patch.object(Application, "initialize", _patched_initialize):

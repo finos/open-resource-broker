@@ -373,7 +373,7 @@ def setup_cleanup_e2e(request, test_session_id):
     os.environ["AWS_PROVIDER_LOG_DIR"] = str(test_config_dir / "logs")
     os.environ["HF_LOGDIR"] = str(test_config_dir / "logs")
 
-    config_path = str(test_config_dir / "config" / "config.json")
+    config_path = str(test_config_dir / "config.json")
 
     _tracked_request_ids: list[str] = []
 

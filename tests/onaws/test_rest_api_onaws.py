@@ -96,6 +96,7 @@ REST_TIMEOUTS = scenarios_rest_api.REST_API_TIMEOUTS
 REST_API_SERVER_CFG = scenarios_rest_api.REST_API_SERVER
 MAX_CONCURRENCY = int(os.environ.get("REST_API_MAX_CONCURRENCY", 2))
 LAUNCH_DELAY = float(os.environ.get("REST_API_LAUNCH_DELAY_SEC", 3.0))
+REQUEST_ID_RE = re.compile(r"^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 WorkerResult = namedtuple("WorkerResult", "scenario status error traceback")
 
 
@@ -975,6 +976,7 @@ def test_rest_api_partial_return_reduces_capacity(
     request_id = request_response.get("request_id")
     if not request_id:
         pytest.fail(f"Request ID missing in response: {request_response}")
+    assert REQUEST_ID_RE.match(request_id), f"request_id {request_id!r} does not match expected format"
 
     status_response = _wait_for_request_completion_rest(
         rest_api_client,
@@ -1800,6 +1802,7 @@ def test_rest_api_control_loop(rest_api_client, setup_rest_api_environment, test
     request_id = request_response.get("request_id")
     if not request_id:
         pytest.fail(f"Request ID missing in response: {request_response}")
+    assert REQUEST_ID_RE.match(request_id), f"request_id {request_id!r} does not match expected format"
 
     log.info(f"Request ID: {request_id}")
 
