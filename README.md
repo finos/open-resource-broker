@@ -1,8 +1,8 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/orb-logo-horizontal-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="docs/assets/orb-logo-horizontal.svg">
-    <img alt="Open Resource Broker" src="docs/assets/orb-logo-horizontal.svg" width="520">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/awslabs/open-resource-broker/main/docs/assets/orb-logo-horizontal-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/awslabs/open-resource-broker/main/docs/assets/orb-logo-horizontal.svg">
+    <img alt="Open Resource Broker" src="https://raw.githubusercontent.com/awslabs/open-resource-broker/main/docs/assets/orb-logo-horizontal.svg" width="520">
   </picture>
 </p>
 
