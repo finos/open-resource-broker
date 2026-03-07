@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "orb-py"
-version = "1.2.1"
+version = "1.2.2"
 description = "Open Resource Broker (ORB) — dynamic cloud resource provisioning via CLI and REST API"
 readme = "README.md"
 license = "Apache-2.0"
