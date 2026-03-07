@@ -8,6 +8,7 @@ Uses session UUID tag for cleanup safety.
 import asyncio
 import logging
 import os
+import re
 import shutil
 import time
 
@@ -70,6 +71,8 @@ _console = logging.StreamHandler()
 _console.setLevel(logging.DEBUG)
 _console.setFormatter(_formatter)
 log.addHandler(_console)
+
+REQUEST_ID_RE = re.compile(r"^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 # ---------------------------------------------------------------------------
 # Test cases
@@ -481,6 +484,7 @@ async def _run_cleanup_verification(
 
     request_id = _extract_request_id(request_result)
     assert request_id, f"No request_id in response: {request_result}"
+    assert REQUEST_ID_RE.match(request_id), f"request_id {request_id!r} does not match expected format"
     tracked_request_ids.append(request_id)
     log.info("Got request_id: %s", request_id)
 

@@ -245,9 +245,6 @@ class TestSDKRequestLifecycle:
         self, orb_config_dir, moto_aws, moto_vpc_resources, scenario: TestScenario
     ):
         """create_request() returns a valid request_id."""
-        if scenario.provider_api != "RunInstances":
-            pytest.xfail(reason=f"moto does not fully support {scenario.provider_api}")
-
         import json
 
         from orb.sdk.client import ORBClient
@@ -273,9 +270,6 @@ class TestSDKRequestLifecycle:
         self, orb_config_dir, moto_aws, moto_vpc_resources, scenario: TestScenario
     ):
         """get_request() returns a well-formed status response after create_request()."""
-        if scenario.provider_api != "RunInstances":
-            pytest.xfail(reason=f"moto does not fully support {scenario.provider_api}")
-
         import json
 
         from orb.sdk.client import ORBClient
@@ -331,9 +325,6 @@ class TestSDKRequestLifecycle:
         - create_return_request returns a response with a message field
         - machine state transitions are verified where possible
         """
-        if scenario.provider_api != "RunInstances":
-            pytest.xfail(reason=f"moto does not fully support {scenario.provider_api}")
-
         import json
 
         from orb.sdk.client import ORBClient
@@ -448,9 +439,6 @@ class TestSDKRequestLifecycle:
     @pytest.mark.parametrize("scenario", get_smoke_scenarios(), ids=lambda s: s.scenario_id)
     async def test_list_requests_after_create(self, orb_config_dir, moto_aws, moto_vpc_resources, scenario: TestScenario):
         """list_requests() includes the newly created request."""
-        if scenario.provider_api != "RunInstances":
-            pytest.xfail(reason=f"moto does not fully support {scenario.provider_api}")
-
         import json
 
         from orb.sdk.client import ORBClient

@@ -181,9 +181,6 @@ class TestMCPRequestLifecycle:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("scenario", get_smoke_scenarios(), ids=lambda s: s.scenario_id)
     async def test_request_machines_returns_request_id(self, mcp_server, scenario: TestScenario):
-        if scenario.provider_api != "RunInstances":
-            pytest.xfail(reason=f"moto does not fully support {scenario.provider_api}")
-
         resp = await _send(
             mcp_server,
             "tools/call",
@@ -201,9 +198,6 @@ class TestMCPRequestLifecycle:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("scenario", get_smoke_scenarios(), ids=lambda s: s.scenario_id)
     async def test_get_request_status_after_request(self, mcp_server, scenario: TestScenario):
-        if scenario.provider_api != "RunInstances":
-            pytest.xfail(reason=f"moto does not fully support {scenario.provider_api}")
-
         # Create a request first
         req_resp = await _send(
             mcp_server,
@@ -238,9 +232,6 @@ class TestMCPRequestLifecycle:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("scenario", get_smoke_scenarios(), ids=lambda s: s.scenario_id)
     async def test_full_lifecycle_request_and_return(self, mcp_server, scenario: TestScenario):
-        if scenario.provider_api != "RunInstances":
-            pytest.xfail(reason=f"moto does not fully support {scenario.provider_api}")
-
         # 1. Request machines
         req_resp = await _send(
             mcp_server,
@@ -316,9 +307,6 @@ class TestMCPRequestLifecycle:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("scenario", get_smoke_scenarios(), ids=lambda s: s.scenario_id)
     async def test_list_return_requests_after_return(self, mcp_server, scenario: TestScenario):
-        if scenario.provider_api != "RunInstances":
-            pytest.xfail(reason=f"moto does not fully support {scenario.provider_api}")
-
         # Create and return a request
         req_resp = await _send(
             mcp_server,

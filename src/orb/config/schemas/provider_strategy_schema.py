@@ -97,7 +97,8 @@ class ProviderInstanceConfig(BaseModel):
     enabled: bool = Field(True, description="Whether this provider is enabled")
     priority: int = Field(0, description="Provider priority (lower = higher priority)")
     weight: int = Field(100, description="Provider weight for load balancing")
-    # Keep dict for backward compatibility
+    # Account-scoped properties (fleet_role, profile, region) belong here, not in
+    # template_defaults — they apply to the whole provider account, not individual templates.
     config: dict[str, Any] = Field(
         default_factory=dict, description="Provider-specific configuration"
     )

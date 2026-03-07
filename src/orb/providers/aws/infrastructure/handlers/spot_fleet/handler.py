@@ -195,6 +195,11 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
     def _resolve_fleet_role(self, aws_template: AWSTemplate) -> AWSTemplate:
         """Resolve short or cross-service fleet role ARNs to full SpotFleet ARNs.
 
+        fleet_role is read from provider.config (not template_defaults) because it is
+        account-scoped — a single IAM role applies to all fleets in the account, so it
+        belongs alongside other account-scoped properties (profile, region) rather than
+        in per-template defaults.
+
         Requires STS access, so lives on the handler rather than the builder.
         Returns the template unchanged if no resolution is needed.
         """

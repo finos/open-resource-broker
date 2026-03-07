@@ -58,6 +58,7 @@ class OpenResourceBrokerMCPServer:
         from orb.interface.request_command_handlers import (
             handle_get_request_status,
             handle_get_return_requests,
+            handle_list_requests,
             handle_request_machines,
             handle_request_return_machines,
         )
@@ -86,6 +87,7 @@ class OpenResourceBrokerMCPServer:
 
         # Request tools
         self.tools["get_request_status"] = handle_get_request_status
+        self.tools["list_requests"] = handle_list_requests
         self.tools["request_machines"] = handle_request_machines
         self.tools["list_return_requests"] = handle_get_return_requests
         self.tools["return_machines"] = handle_request_return_machines

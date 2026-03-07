@@ -311,6 +311,18 @@ async def _run_full_cycle_mcp(
     )
     log.info("get_request_status confirmed request_id: %s", request_id)
 
+    # 1b. Verify request is visible via list_requests
+    list_result = await _call_tool(mcp_server, "list_requests", {})
+    listed_ids = [
+        req.get("request_id") or req.get("requestId")
+        for req in list_result.get("requests", [])
+        if isinstance(req, dict)
+    ]
+    assert request_id in listed_ids, (
+        f"request_id {request_id!r} not found in list_requests response: {list_result}"
+    )
+    log.info("list_requests confirmed request_id: %s", request_id)
+
     # 2. Poll until complete
     deadline = time.time() + MCP_TIMEOUTS["request_completion"]
     terminal = {"complete", "complete_with_error", "failed", "cancelled", "timeout"}

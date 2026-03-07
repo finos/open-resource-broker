@@ -150,9 +150,6 @@ class TestRequestMachines:
     @pytest.mark.parametrize("scenario", get_smoke_scenarios(), ids=lambda s: s.scenario_id)
     async def test_request_machines_returns_request_id(self, rest_client, scenario: TestScenario):
         """POST /api/v1/machines/request returns 202 with a valid request_id."""
-        if scenario.provider_api != "RunInstances":
-            pytest.xfail(reason=f"moto does not fully support {scenario.provider_api}")
-
         resp = await rest_client.post(
             "/api/v1/machines/request",
             json={"template_id": scenario.template_id, "count": scenario.capacity},
@@ -192,9 +189,6 @@ class TestRequestStatus:
     @pytest.mark.parametrize("scenario", get_smoke_scenarios(), ids=lambda s: s.scenario_id)
     async def test_get_status_after_request(self, rest_client, scenario: TestScenario):
         """GET /api/v1/requests/{request_id}/status returns 200 with known status."""
-        if scenario.provider_api != "RunInstances":
-            pytest.xfail(reason=f"moto does not fully support {scenario.provider_api}")
-
         # Create a request first
         create_resp = await rest_client.post(
             "/api/v1/machines/request",
@@ -235,9 +229,6 @@ class TestListRequests:
     @pytest.mark.parametrize("scenario", get_smoke_scenarios(), ids=lambda s: s.scenario_id)
     async def test_list_requests_includes_created_request(self, rest_client, scenario: TestScenario):
         """GET /api/v1/requests includes the previously created request_id."""
-        if scenario.provider_api != "RunInstances":
-            pytest.xfail(reason=f"moto does not fully support {scenario.provider_api}")
-
         # Create a request
         create_resp = await rest_client.post(
             "/api/v1/machines/request",
@@ -282,9 +273,6 @@ class TestReturnMachines:
     @pytest.mark.parametrize("scenario", get_smoke_scenarios(), ids=lambda s: s.scenario_id)
     async def test_return_machines_returns_message(self, rest_client, scenario: TestScenario):
         """POST /api/v1/machines/return with valid machine_ids returns 2xx with message."""
-        if scenario.provider_api != "RunInstances":
-            pytest.xfail(reason=f"moto does not fully support {scenario.provider_api}")
-
         # Create a request and get machine IDs from status
         create_resp = await rest_client.post(
             "/api/v1/machines/request",
@@ -355,9 +343,6 @@ class TestFullLifecycle:
     @pytest.mark.parametrize("scenario", get_smoke_scenarios(), ids=lambda s: s.scenario_id)
     async def test_full_request_lifecycle(self, rest_client, scenario: TestScenario):
         """Full lifecycle: request -> status -> list -> return (if machines available)."""
-        if scenario.provider_api != "RunInstances":
-            pytest.xfail(reason=f"moto does not fully support {scenario.provider_api}")
-
         # 1. Verify templates are available
         templates_resp = await rest_client.get("/api/v1/templates/")
         assert templates_resp.status_code == 200

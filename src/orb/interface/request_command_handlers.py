@@ -424,6 +424,29 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> dict[str
     return {"requestId": request_id, "message": "Return request created successfully"}
 
 
+@handle_interface_exceptions(context="list_requests", interface_type="cli")
+async def handle_list_requests(args: "argparse.Namespace") -> dict[str, Any]:
+    """
+    List all active provisioning requests.
+
+    Args:
+        args: Argument namespace
+
+    Returns:
+        All active requests in scheduler format
+    """
+    container = get_container()
+    query_bus = container.get(QueryBus)
+    scheduler_strategy = container.get(SchedulerPort)
+
+    from orb.application.dto.queries import ListActiveRequestsQuery
+
+    query = ListActiveRequestsQuery(all_resources=True)
+    request_dtos = await query_bus.execute(query)
+
+    return scheduler_strategy.format_request_status_response(request_dtos)
+
+
 @handle_interface_exceptions(context="cancel_request", interface_type="cli")
 async def handle_cancel_request(args: "argparse.Namespace") -> dict[str, Any]:
     """Handle cancel request operations."""

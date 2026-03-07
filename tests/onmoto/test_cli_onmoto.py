@@ -128,9 +128,6 @@ class TestCLIMachinesRequest:
     @pytest.mark.parametrize("scenario", get_smoke_scenarios(), ids=lambda s: s.scenario_id)
     def test_cli_machines_request(self, orb_config_dir, moto_aws, scenario: TestScenario):
         """'orb machines request' returns a valid request_id."""
-        if scenario.provider_api != "RunInstances":
-            pytest.mark.xfail(reason=f"moto does not fully support {scenario.provider_api}")
-
         aws_client = _make_moto_aws_client()
         logger = _make_logger()
 
@@ -160,9 +157,6 @@ class TestCLIRequestsStatus:
     @pytest.mark.parametrize("scenario", get_smoke_scenarios(), ids=lambda s: s.scenario_id)
     def test_cli_requests_status(self, orb_config_dir, moto_aws, scenario: TestScenario):
         """'orb requests status <id>' returns a known status and echoes back the request_id."""
-        if scenario.provider_api != "RunInstances":
-            pytest.mark.xfail(reason=f"moto does not fully support {scenario.provider_api}")
-
         aws_client = _make_moto_aws_client()
         logger = _make_logger()
 
@@ -204,9 +198,6 @@ class TestCLIFullLifecycle:
     @pytest.mark.parametrize("scenario", get_smoke_scenarios(), ids=lambda s: s.scenario_id)
     def test_cli_full_lifecycle(self, orb_config_dir, moto_aws, scenario: TestScenario):
         """request -> status -> return: machines appear and return succeeds."""
-        if scenario.provider_api != "RunInstances":
-            pytest.mark.xfail(reason=f"moto does not fully support {scenario.provider_api}")
-
         aws_client = _make_moto_aws_client()
         logger = _make_logger()
 
@@ -353,9 +344,6 @@ class TestCLIRequestsList:
     @pytest.mark.parametrize("scenario", get_smoke_scenarios(), ids=lambda s: s.scenario_id)
     def test_cli_requests_list(self, orb_config_dir, moto_aws, scenario: TestScenario):
         """'orb requests list' includes the newly created request_id."""
-        if scenario.provider_api != "RunInstances":
-            pytest.mark.xfail(reason=f"moto does not fully support {scenario.provider_api}")
-
         aws_client = _make_moto_aws_client()
         logger = _make_logger()
 
