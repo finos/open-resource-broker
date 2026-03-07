@@ -30,5 +30,5 @@ else
 fi
 
 # Output in format expected by GitHub Actions
-echo "primary-tags=$PRIMARY_TAGS"
-echo "python-tags=$PYTHON_TAGS"
+echo "primary_tags=$PRIMARY_TAGS"
+echo "python_tags=$PYTHON_TAGS"
