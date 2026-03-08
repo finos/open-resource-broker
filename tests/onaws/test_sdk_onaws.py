@@ -6,7 +6,6 @@ calling the CQRS bus directly in-process — no shell scripts, no HTTP server.
 
 import logging
 import os
-import re
 import shutil
 import time
 
@@ -16,6 +15,7 @@ import pytest
 from tests.onaws import scenarios
 from tests.onaws.cleanup_helpers import (
     cleanup_launch_templates_for_request,
+    get_machine_ids_from_ec2 as _get_machine_ids_from_ec2_helper,
     wait_for_instances_terminated,
 )
 from tests.onaws.scenarios import CUSTOM_TEST_CASES
@@ -75,7 +75,7 @@ _console.setLevel(logging.DEBUG)
 _console.setFormatter(_formatter)
 log.addHandler(_console)
 
-REQUEST_ID_RE = re.compile(r"^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+from tests.shared.constants import REQUEST_ID_RE
 
 
 # ---------------------------------------------------------------------------
@@ -197,53 +197,11 @@ def setup_sdk_test(request, test_session_id):
 
 
 def _get_machine_ids_from_ec2(request_id: str) -> list[str]:
-    """Look up instance IDs tagged with orb:request-id=<request_id> in EC2.
-
-    Used in teardown when the SDK cleanup path has already run and we just need
-    instance IDs to pass to wait_for_instances_terminated. Never raises.
-    """
-    try:
-        response = ec2_client.describe_instances(
-            Filters=[
-                {"Name": "tag:orb:request-id", "Values": [request_id]},
-                {"Name": "instance-state-name", "Values": ["pending", "running", "stopping", "stopped"]},
-            ]
-        )
-        ids = []
-        for reservation in response.get("Reservations", []):
-            for inst in reservation.get("Instances", []):
-                ids.append(inst["InstanceId"])
-        return ids
-    except Exception as exc:
-        log.warning("_get_machine_ids_from_ec2 failed for %s: %s", request_id, exc)
-        return []
+    return _get_machine_ids_from_ec2_helper(request_id, ec2_client)
 
 
-def _extract_request_status(result) -> str:
-    """Extract status string from whatever get_request_status returns."""
-    if isinstance(result, dict):
-        # HF envelope: {"requests": [{"status": ...}]}
-        requests = result.get("requests", [])
-        if requests and isinstance(requests[0], dict):
-            return requests[0].get("status", "unknown")
-        return result.get("status", "unknown")
-    # DTO object
-    return getattr(result, "status", "unknown")
-
-
-def _extract_machine_ids(result) -> list[str]:
-    """Extract machine IDs from a request status response."""
-    if isinstance(result, dict):
-        requests = result.get("requests", [])
-        if requests and isinstance(requests[0], dict):
-            machines = requests[0].get("machines", [])
-            return [
-                mid for m in machines for mid in [m.get("machineId") or m.get("machine_id")] if mid
-            ]
-    # DTO object
-    machines = getattr(result, "machines", [])
-    return [str(mid) for m in machines for mid in [getattr(m, "machine_id", None)] if mid]
-
+from tests.shared.response_helpers import extract_machine_ids as _extract_machine_ids
+from tests.shared.response_helpers import extract_status as _extract_request_status
 
 # ---------------------------------------------------------------------------
 # Core test logic (shared by parametrised and single tests)
@@ -488,6 +446,10 @@ async def test_sdk_unknown_template_returns_error(setup_sdk_test):
             assert is_error, (
                 f"Expected error response for unknown template, got: {result}"
             )
-        except Exception:
-            # Any exception is acceptable — the system rejected the request
-            pass
+        except Exception as exc:
+            # Any exception is acceptable — verify it's related to the template lookup
+            assert (
+                "NonExistent" in str(exc)
+                or "not found" in str(exc).lower()
+                or "error" in str(exc).lower()
+            ), f"Unexpected exception type for unknown template: {exc}"

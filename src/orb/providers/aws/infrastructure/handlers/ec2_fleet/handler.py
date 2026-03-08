@@ -642,9 +642,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                                 ec2_fleet_instance_ids.add(instance_id)
                                 group_ids_to_fetch.add(ec2_fleet_id)
 
-                                # For instant fleets the fleet record is deleted by AWS;
-                                # capture the request_id from instance tags so cleanup
-                                # can proceed even when describe_fleets returns empty.
+                                # AWS deletes instant fleet records; recover request_id from instance tags for cleanup.
                                 instance_tags = {
                                     t.get("Key"): t.get("Value")
                                     for t in instance.get("Tags", [])

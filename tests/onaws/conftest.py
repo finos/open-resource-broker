@@ -1,6 +1,7 @@
 """onaws integration test configuration."""
 
 import json
+import logging
 import os
 import sys
 import uuid
@@ -148,8 +149,6 @@ def nuclear_cleanup(test_session_id: str):
         asg = boto_session.client("autoscaling", region_name=region)
         cleanup_all_orb_resources(ec2, autoscaling_client=asg, session_id=test_session_id)
     except Exception as exc:
-        import logging
-
         logging.getLogger("onaws.conftest").warning(
             "nuclear_cleanup: failed with %s", exc
         )

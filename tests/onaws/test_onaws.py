@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import re
 import time
 from typing import Optional
 
@@ -30,7 +29,7 @@ os.environ.setdefault("HF_LOGDIR", "./logs")  # Set log directory to avoid permi
 os.environ.setdefault("AWS_PROVIDER_LOG_DIR", "./logss")
 os.environ["LOG_DESTINATION"] = "file"
 
-REQUEST_ID_RE = re.compile(r"^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+from tests.shared.constants import REQUEST_ID_RE
 
 
 def _get_boto_clients():
@@ -1396,23 +1395,6 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
 
     assert REQUEST_ID_RE.match(request_id), f"request_id {request_id!r} does not match expected format"
 
-    # log.debug(json.dumps(res, indent=4))
-
-    # Verify request appears in `orb requests list`
-    import subprocess  # nosec B404
-    import sys as _sys
-
-    _list_proc = subprocess.run(  # nosec B603
-        [_sys.executable, "-m", "orb", "requests", "list"],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    assert request_id in _list_proc.stdout, (
-        f"request_id {request_id!r} not found in `orb requests list` output: {_list_proc.stdout!r}"
-    )
-    log.info("orb requests list confirmed request_id: %s", request_id)
-
     # Get scheduler type for validation
     scheduler_type = get_scheduler_from_scenario(test_case) if test_case else "hostfactory"
     request_machines_schema = _resolve_request_machines_schema(res, scheduler_type)
@@ -1989,6 +1971,31 @@ def test_unknown_template_returns_error(setup_host_factory_mock):
         assert is_error, (
             f"Expected error response for unknown template, got: {result}"
         )
-    except Exception:
-        # Any exception is acceptable — the system rejected the request
-        pass
+    except Exception as exc:
+        # Any exception is acceptable — verify it's related to the template lookup
+        assert (
+            "NonExistent" in str(exc)
+            or "not found" in str(exc).lower()
+            or "error" in str(exc).lower()
+        ), f"Unexpected exception type for unknown template: {exc}"
+
+
+def test_requests_list_cli_shows_request_id(setup_host_factory_mock):
+    """orb requests list output includes a request_id after request_machines."""
+    import subprocess  # nosec B404
+    import sys as _sys
+
+    hfm = setup_host_factory_mock
+    res = hfm.request_machines("ASG-OnDemand", 1)
+    request_id = res.get("requestId") or res.get("request_id") or ""
+    assert request_id, f"No request_id in request_machines response: {res}"
+
+    proc = subprocess.run(  # nosec B603
+        [_sys.executable, "-m", "orb", "requests", "list"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert request_id in proc.stdout, (
+        f"request_id {request_id!r} not found in `orb requests list` output: {proc.stdout!r}"
+    )

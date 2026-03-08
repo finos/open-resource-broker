@@ -421,7 +421,7 @@ pythonPlatform = "Linux"
 include = ["src/orb", "tests/shared", "tests/onmoto"]  # keep in sync with .project.yml build.package_root
 exclude = [
     ".venv", "build", "dist",
-    # onmoto files with pre-existing type errors outside the scope of this change
+    # onmoto files with pre-existing type errors, excluded until resolved
     "tests/onmoto/test_config_driven_provision.py",
     "tests/onmoto/test_cqrs_control_loop.py",
     "tests/onmoto/test_hf_contract.py",

@@ -23,8 +23,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 from tests.onmoto.conftest import _inject_moto_factory, _make_logger, _make_moto_aws_client
 from tests.shared.scenarios import TestScenario, get_smoke_scenarios
 
+from tests.shared.constants import REQUEST_ID_RE
+
 REGION = "eu-west-2"
-REQUEST_ID_RE = re.compile(r"^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 pytestmark = [pytest.mark.moto, pytest.mark.sdk]
 

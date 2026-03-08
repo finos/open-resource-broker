@@ -28,8 +28,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 from tests.onmoto.conftest import _inject_moto_factory, _make_logger, _make_moto_aws_client
 from tests.shared.scenarios import TestScenario, get_smoke_scenarios
 
+from tests.shared.constants import REQUEST_ID_RE
+
 REGION = "eu-west-2"
-REQUEST_ID_RE = re.compile(r"^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 pytestmark = [pytest.mark.moto, pytest.mark.cli]
 
@@ -106,6 +107,20 @@ from tests.shared.response_helpers import extract_request_id as _extract_request
 from tests.shared.response_helpers import extract_status as _extract_status
 
 
+def _make_patched_initialize(aws_client, logger):
+    """Return an async Application.initialize replacement that injects the moto factory."""
+    from orb.bootstrap import Application
+
+    _original_initialize = Application.initialize
+
+    async def _patched_initialize(self, dry_run=False):
+        result = await _original_initialize(self, dry_run=dry_run)
+        _inject_moto_factory(aws_client, logger, None)
+        return result
+
+    return _patched_initialize
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -128,18 +143,11 @@ class TestCLIMachinesRequest:
     @pytest.mark.parametrize("scenario", get_smoke_scenarios(), ids=lambda s: s.scenario_id)
     def test_cli_machines_request(self, orb_config_dir, moto_aws, scenario: TestScenario):
         """'orb machines request' returns a valid request_id."""
-        aws_client = _make_moto_aws_client()
-        logger = _make_logger()
-
-        # Patch Application.initialize to inject moto factory after app boots
         from orb.bootstrap import Application
 
-        _original_initialize = Application.initialize
-
-        async def _patched_initialize(self, dry_run=False):
-            result = await _original_initialize(self, dry_run=dry_run)
-            _inject_moto_factory(aws_client, logger, None)
-            return result
+        aws_client = _make_moto_aws_client()
+        logger = _make_logger()
+        _patched_initialize = _make_patched_initialize(aws_client, logger)
 
         with patch.object(Application, "initialize", _patched_initialize):
             result = _run_orb_cli(
@@ -157,17 +165,11 @@ class TestCLIRequestsStatus:
     @pytest.mark.parametrize("scenario", get_smoke_scenarios(), ids=lambda s: s.scenario_id)
     def test_cli_requests_status(self, orb_config_dir, moto_aws, scenario: TestScenario):
         """'orb requests status <id>' returns a known status and echoes back the request_id."""
-        aws_client = _make_moto_aws_client()
-        logger = _make_logger()
-
         from orb.bootstrap import Application
 
-        _original_initialize = Application.initialize
-
-        async def _patched_initialize(self, dry_run=False):
-            result = await _original_initialize(self, dry_run=dry_run)
-            _inject_moto_factory(aws_client, logger, None)
-            return result
+        aws_client = _make_moto_aws_client()
+        logger = _make_logger()
+        _patched_initialize = _make_patched_initialize(aws_client, logger)
 
         with patch.object(Application, "initialize", _patched_initialize):
             create_result = _run_orb_cli(
@@ -198,17 +200,11 @@ class TestCLIFullLifecycle:
     @pytest.mark.parametrize("scenario", get_smoke_scenarios(), ids=lambda s: s.scenario_id)
     def test_cli_full_lifecycle(self, orb_config_dir, moto_aws, scenario: TestScenario):
         """request -> status -> return: machines appear and return succeeds."""
-        aws_client = _make_moto_aws_client()
-        logger = _make_logger()
-
         from orb.bootstrap import Application
 
-        _original_initialize = Application.initialize
-
-        async def _patched_initialize(self, dry_run=False):
-            result = await _original_initialize(self, dry_run=dry_run)
-            _inject_moto_factory(aws_client, logger, None)
-            return result
+        aws_client = _make_moto_aws_client()
+        logger = _make_logger()
+        _patched_initialize = _make_patched_initialize(aws_client, logger)
 
         with patch.object(Application, "initialize", _patched_initialize):
             # 1. Create request
@@ -268,93 +264,47 @@ class TestCLIFullLifecycle:
 class TestCLIErrorHandling:
     def test_cli_machines_request_unknown_template(self, orb_config_dir, moto_aws):
         """'orb machines request' with a non-existent template returns an error (non-zero exit or error in output)."""
-        import json
-        import os
-
         from orb.bootstrap import Application
 
         aws_client = _make_moto_aws_client()
         logger = _make_logger()
+        _patched_initialize = _make_patched_initialize(aws_client, logger)
 
-        _original_initialize = Application.initialize
-
-        async def _patched_initialize(self, dry_run=False):
-            result = await _original_initialize(self, dry_run=dry_run)
-            _inject_moto_factory(aws_client, logger, None)
-            return result
-
-        # Capture raw output — the CLI may produce non-JSON on error, so we
-        # bypass _run_orb_cli's JSON assertion and inspect stdout directly.
-        import asyncio
-        import contextlib
-        import io
-        import sys
-        from unittest.mock import patch
-
-        from orb.cli.main import main
-        from orb.infrastructure.di.container import reset_container
-
-        original_argv = sys.argv[:]
-        original_console = os.environ.get("ORB_LOG_CONSOLE_ENABLED")
-        sys.argv = ["orb", "machines", "request", "--template", "NonExistent-Template-XYZ", "--count", "1"]
-        os.environ["ORB_LOG_CONSOLE_ENABLED"] = "false"
-
-        stdout_capture = io.StringIO()
-        exit_code = 0
-        try:
-            with contextlib.redirect_stdout(stdout_capture):
-                with patch.object(Application, "initialize", _patched_initialize):
-                    try:
-                        asyncio.run(main())
-                    except SystemExit as exc:
-                        exit_code = exc.code if isinstance(exc.code, int) else 1
-        finally:
-            sys.argv = original_argv
-            if original_console is None:
-                os.environ.pop("ORB_LOG_CONSOLE_ENABLED", None)
-            else:
-                os.environ["ORB_LOG_CONSOLE_ENABLED"] = original_console
-            reset_container()
-
-        output = stdout_capture.getvalue().strip()
-
-        # Either a non-zero exit code or an error indicator in the output
-        if exit_code == 0 and output:
+        with patch.object(Application, "initialize", _patched_initialize):
             try:
-                parsed = json.loads(output)
-                if isinstance(parsed, list) and len(parsed) == 2:
-                    parsed, exit_code = parsed[0], parsed[1]
-                has_error = (
-                    (isinstance(parsed, dict) and (
-                        parsed.get("error") or
-                        parsed.get("status") == "error" or
-                        "not found" in str(parsed).lower() or
-                        "NonExistent" in str(parsed)
-                    ))
+                result = _run_orb_cli(
+                    ["machines", "request", "--template", "NonExistent-Template-XYZ", "--count", "1"]
                 )
-                assert has_error or exit_code != 0, (
-                    f"Expected error for unknown template, got exit_code={exit_code} output={output}"
-                )
-            except json.JSONDecodeError:
-                # Non-JSON output on error path is acceptable
-                pass
+            except AssertionError:
+                # _run_orb_cli raises AssertionError for non-JSON or empty output —
+                # both are acceptable error signals for an unknown template
+                return
+
+        # If we got JSON back, it must indicate an error
+        exit_code = 0
+        if isinstance(result, list) and len(result) == 2 and isinstance(result[1], int):
+            result, exit_code = result[0], result[1]
+
+        has_error = isinstance(result, dict) and (
+            result.get("error")
+            or result.get("status") == "error"
+            or "not found" in str(result).lower()
+            or "NonExistent" in str(result)
+        )
+        assert has_error or exit_code != 0, (
+            f"Expected error for unknown template, got exit_code={exit_code} result={result}"
+        )
 
 
 class TestCLIRequestsList:
     @pytest.mark.parametrize("scenario", get_smoke_scenarios(), ids=lambda s: s.scenario_id)
     def test_cli_requests_list(self, orb_config_dir, moto_aws, scenario: TestScenario):
         """'orb requests list' includes the newly created request_id."""
-        aws_client = _make_moto_aws_client()
-        logger = _make_logger()
-
         from orb.bootstrap import Application
 
-        _original_initialize = Application.initialize
-
-        async def _patched_initialize(self, dry_run=False):
-            result = await _original_initialize(self, dry_run=dry_run)
-            _inject_moto_factory(aws_client, logger, None)
-            return result
+        aws_client = _make_moto_aws_client()
+        logger = _make_logger()
+        _patched_initialize = _make_patched_initialize(aws_client, logger)
 
         with patch.object(Application, "initialize", _patched_initialize):
             create_result = _run_orb_cli(

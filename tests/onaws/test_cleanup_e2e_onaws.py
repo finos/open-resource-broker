@@ -8,7 +8,6 @@ Uses session UUID tag for cleanup safety.
 import asyncio
 import logging
 import os
-import re
 import shutil
 import time
 
@@ -18,6 +17,7 @@ import pytest
 from tests.onaws import scenarios
 from tests.onaws.cleanup_helpers import (
     cleanup_launch_templates_for_request,
+    get_machine_ids_from_ec2 as _get_machine_ids_from_ec2_helper,
     wait_for_instances_terminated,
 )
 from tests.onaws.scenarios import SPOT_VM_TYPES
@@ -72,7 +72,7 @@ _console.setLevel(logging.DEBUG)
 _console.setFormatter(_formatter)
 log.addHandler(_console)
 
-REQUEST_ID_RE = re.compile(r"^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+from tests.shared.constants import REQUEST_ID_RE
 
 # ---------------------------------------------------------------------------
 # Test cases
@@ -272,40 +272,9 @@ def _assert_launch_templates_deleted(request_id: str) -> None:
 # Response extraction helpers
 # ---------------------------------------------------------------------------
 
-
-def _extract_request_id(result) -> str:
-    if isinstance(result, dict):
-        return (
-            result.get("requestId")
-            or result.get("request_id")
-            or (result.get("requests") or [{}])[0].get("requestId")
-            or ""
-        )
-    return getattr(result, "request_id", None) or ""
-
-
-def _extract_request_status(result) -> str:
-    if isinstance(result, dict):
-        requests = result.get("requests", [])
-        if requests and isinstance(requests[0], dict):
-            return requests[0].get("status", "unknown")
-        return result.get("status", "unknown")
-    return getattr(result, "status", "unknown")
-
-
-def _extract_machine_ids(result) -> list[str]:
-    if isinstance(result, dict):
-        requests = result.get("requests", [])
-        if requests and isinstance(requests[0], dict):
-            machines = requests[0].get("machines", [])
-            return [
-                mid
-                for m in machines
-                for mid in [m.get("machineId") or m.get("machine_id")]
-                if mid
-            ]
-    machines = getattr(result, "machines", [])
-    return [str(mid) for m in machines for mid in [getattr(m, "machine_id", None)] if mid]
+from tests.shared.response_helpers import extract_machine_ids as _extract_machine_ids
+from tests.shared.response_helpers import extract_request_id as _extract_request_id
+from tests.shared.response_helpers import extract_status as _extract_request_status
 
 
 def _extract_resource_ids(result) -> list[str]:
@@ -318,25 +287,7 @@ def _extract_resource_ids(result) -> list[str]:
 
 
 def _get_machine_ids_from_ec2(request_id: str) -> list[str]:
-    """Look up instance IDs tagged with orb:request-id in EC2. Never raises."""
-    try:
-        response = ec2_client.describe_instances(
-            Filters=[
-                {"Name": "tag:orb:request-id", "Values": [request_id]},
-                {
-                    "Name": "instance-state-name",
-                    "Values": ["pending", "running", "stopping", "stopped"],
-                },
-            ]
-        )
-        ids = []
-        for reservation in response.get("Reservations", []):
-            for inst in reservation.get("Instances", []):
-                ids.append(inst["InstanceId"])
-        return ids
-    except Exception as exc:
-        log.warning("_get_machine_ids_from_ec2 failed for %s: %s", request_id, exc)
-        return []
+    return _get_machine_ids_from_ec2_helper(request_id, ec2_client)
 
 
 # ---------------------------------------------------------------------------
@@ -364,7 +315,6 @@ def setup_cleanup_e2e(request, test_session_id):
 
     processor.generate_test_templates(test_name, overrides=overrides)
 
-    test_config_dir = processor.run_templates_dir / test_name
     (test_config_dir / "logs").mkdir(exist_ok=True)
     (test_config_dir / "work").mkdir(exist_ok=True)
 

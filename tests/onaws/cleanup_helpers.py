@@ -118,6 +118,29 @@ def cleanup_launch_templates_for_request(request_id: str, ec2_client) -> None:
         )
 
 
+def get_machine_ids_from_ec2(request_id: str, ec2_client) -> List[str]:
+    """Look up instance IDs tagged with orb:request-id=<request_id> in EC2.
+
+    Used in teardown when the cleanup path has already run and we just need
+    instance IDs to pass to wait_for_instances_terminated. Never raises.
+    """
+    try:
+        response = ec2_client.describe_instances(
+            Filters=[
+                {"Name": "tag:orb:request-id", "Values": [request_id]},
+                {"Name": "instance-state-name", "Values": ["pending", "running", "stopping", "stopped"]},
+            ]
+        )
+        ids = []
+        for reservation in response.get("Reservations", []):
+            for inst in reservation.get("Instances", []):
+                ids.append(inst["InstanceId"])
+        return ids
+    except Exception as exc:
+        log.warning("get_machine_ids_from_ec2 failed for %s: %s", request_id, exc)
+        return []
+
+
 def cleanup_tracked_requests(
     tracked_request_ids: List[str],
     hfm,

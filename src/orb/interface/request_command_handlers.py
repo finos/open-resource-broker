@@ -426,15 +426,7 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> dict[str
 
 @handle_interface_exceptions(context="list_requests", interface_type="cli")
 async def handle_list_requests(args: "argparse.Namespace") -> dict[str, Any]:
-    """
-    List all active provisioning requests.
-
-    Args:
-        args: Argument namespace
-
-    Returns:
-        All active requests in scheduler format
-    """
+    """List all active provisioning requests."""
     container = get_container()
     query_bus = container.get(QueryBus)
     scheduler_strategy = container.get(SchedulerPort)

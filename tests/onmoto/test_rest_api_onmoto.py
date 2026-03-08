@@ -11,7 +11,6 @@ Moto limitations accounted for (same patches as test_sdk_onmoto.py):
 - AWSProvisioningAdapter: patched to synthesise instances from instance_ids
 """
 
-import re
 import sys
 from pathlib import Path
 
@@ -23,8 +22,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 from tests.onmoto.conftest import _inject_moto_factory, _make_logger, _make_moto_aws_client
 from tests.shared.scenarios import TestScenario, get_smoke_scenarios
 
+from tests.shared.constants import REQUEST_ID_RE
+
 REGION = "eu-west-2"
-REQUEST_ID_RE = re.compile(r"^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 pytestmark = [pytest.mark.moto, pytest.mark.rest_api]
 
@@ -311,7 +311,7 @@ class TestReturnMachines:
         )
         return_body = return_resp.json()
         # Response must carry a message field
-        assert "message" in return_body or return_body, (
+        assert "message" in return_body, (
             f"Return response missing 'message': {return_body}"
         )
 

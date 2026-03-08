@@ -7,7 +7,6 @@ calling handle_message() with JSON-RPC 2.0 envelopes — no subprocess, no TCP.
 import json
 import logging
 import os
-import re
 import shutil
 import time
 
@@ -17,6 +16,7 @@ import pytest
 from tests.onaws import scenarios
 from tests.onaws.cleanup_helpers import (
     cleanup_launch_templates_for_request,
+    get_machine_ids_from_ec2 as _get_machine_ids_from_ec2_helper,
     wait_for_instances_terminated,
 )
 from tests.onaws.template_processor import TemplateProcessor
@@ -73,7 +73,7 @@ _console.setLevel(logging.DEBUG)
 _console.setFormatter(_formatter)
 log.addHandler(_console)
 
-REQUEST_ID_RE = re.compile(r"^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+from tests.shared.constants import REQUEST_ID_RE
 
 
 # ---------------------------------------------------------------------------
@@ -194,26 +194,7 @@ def setup_mcp_test(request, test_session_id):
 
 
 def _get_machine_ids_from_ec2(request_id: str) -> list[str]:
-    """Look up instance IDs tagged with orb:request-id=<request_id> in EC2.
-
-    Used in teardown when the MCP cleanup path has already run and we just need
-    instance IDs to pass to wait_for_instances_terminated. Never raises.
-    """
-    try:
-        response = ec2_client.describe_instances(
-            Filters=[
-                {"Name": "tag:orb:request-id", "Values": [request_id]},
-                {"Name": "instance-state-name", "Values": ["pending", "running", "stopping", "stopped"]},
-            ]
-        )
-        ids = []
-        for reservation in response.get("Reservations", []):
-            for inst in reservation.get("Instances", []):
-                ids.append(inst["InstanceId"])
-        return ids
-    except Exception as exc:
-        log.warning("_get_machine_ids_from_ec2 failed for %s: %s", request_id, exc)
-        return []
+    return _get_machine_ids_from_ec2_helper(request_id, ec2_client)
 
 
 async def _call_tool(mcp_server, tool_name: str, arguments: dict, msg_id: int = 1) -> dict:
@@ -247,32 +228,9 @@ async def _call_tool(mcp_server, tool_name: str, arguments: dict, msg_id: int = 
     return dict(inner)
 
 
-def _extract_request_status(result: dict) -> str:
-    """Extract status string from a get_request_status tool result."""
-    requests = result.get("requests", [])
-    if requests and isinstance(requests[0], dict):
-        return requests[0].get("status", "unknown")
-    return result.get("status", "unknown")
-
-
-def _extract_machine_ids(result: dict) -> list[str]:
-    """Extract machine IDs from a get_request_status tool result."""
-    requests = result.get("requests", [])
-    if requests and isinstance(requests[0], dict):
-        machines = requests[0].get("machines", [])
-        return [
-            mid
-            for m in machines
-            for mid in [m.get("machineId") or m.get("machine_id")]
-            if mid
-        ]
-    return []
-
-
-def _extract_request_id(result: dict) -> str | None:
-    """Extract requestId from a request_machines or return_machines tool result."""
-    return result.get("requestId") or result.get("request_id")
-
+from tests.shared.response_helpers import extract_machine_ids as _extract_machine_ids
+from tests.shared.response_helpers import extract_request_id as _extract_request_id
+from tests.shared.response_helpers import extract_status as _extract_request_status
 
 # ---------------------------------------------------------------------------
 # Core test logic (shared by parametrised and single tests)

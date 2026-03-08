@@ -96,7 +96,7 @@ REST_TIMEOUTS = scenarios_rest_api.REST_API_TIMEOUTS
 REST_API_SERVER_CFG = scenarios_rest_api.REST_API_SERVER
 MAX_CONCURRENCY = int(os.environ.get("REST_API_MAX_CONCURRENCY", 2))
 LAUNCH_DELAY = float(os.environ.get("REST_API_LAUNCH_DELAY_SEC", 3.0))
-REQUEST_ID_RE = re.compile(r"^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+from tests.shared.constants import REQUEST_ID_RE
 WorkerResult = namedtuple("WorkerResult", "scenario status error traceback")
 
 
@@ -2055,6 +2055,6 @@ def test_rest_api_unknown_template_returns_error(setup_rest_api_environment):
             )
         except Exception as exc:
             # Any other exception is also acceptable — server rejected the request
-            assert "NonExistent" in str(exc) or "not found" in str(exc).lower() or True
+            assert "NonExistent" in str(exc) or "not found" in str(exc).lower()
     finally:
         server.stop()

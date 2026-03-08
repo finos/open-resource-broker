@@ -713,7 +713,7 @@ class AWSHandler(ABC):
             provider_config = self.config_port.get_provider_config()
             if provider_config and provider_config.provider_defaults:
                 defaults = provider_config.provider_defaults.get("aws")
-                if defaults and hasattr(defaults, 'cleanup') and defaults.cleanup is not None:
+                if defaults and defaults.cleanup is not None:
                     return defaults.cleanup
         except Exception:
             pass

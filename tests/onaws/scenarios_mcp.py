@@ -7,5 +7,5 @@ MCP_TIMEOUTS = {
     "poll_interval": 5,
 }
 
-# Feature flags — set to False to skip large parametrised suites during development
+# Feature flags for parametrised test suites
 MCP_RUN_DEFAULT_COMBINATIONS = True

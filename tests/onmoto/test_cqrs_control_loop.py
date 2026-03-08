@@ -30,7 +30,8 @@ SPOT_FLEET_ROLE = (
     "spotfleet.amazonaws.com/AWSServiceRoleForEC2SpotFleet"
 )
 
-REQUEST_ID_RE = re.compile(r"^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+from tests.shared.constants import REQUEST_ID_RE
+
 VALID_HF_STATUSES = {"running", "complete", "complete_with_error"}
 
 
