@@ -188,8 +188,8 @@ def setup_mcp_test(request, test_session_id):
         from orb.infrastructure.di import reset_container
 
         reset_container()
-    except Exception:
-        pass
+    except Exception as e:
+        log.warning("reset_container failed during teardown: %s", e)
 
     processor.cleanup_test_templates(test_name)
 

@@ -71,7 +71,7 @@ def _run_orb_cli(args: list[str]) -> dict:  # type: ignore[return]
             try:
                 asyncio.run(main())
             except SystemExit:
-                pass
+                pass  # CLI uses sys.exit(); suppressed intentionally in tests
     finally:
         sys.argv = original_argv
         if original_console is None:
