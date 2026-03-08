@@ -2649,7 +2649,7 @@ wheels = [
 
 [[package]]
 name = "orb-py"
-version = "1.2.0"
+version = "1.2.2"
 source = { editable = "." }
 dependencies = [
     { name = "boto3" },
@@ -2948,7 +2948,7 @@ requires-dist = [
     { name = "mkdocs-material", marker = "extra == 'ci'", specifier = ">=9.1.0,<10.0.0" },
     { name = "mkdocs-section-index", marker = "extra == 'ci'", specifier = ">=0.3.0,<1.0.0" },
     { name = "mkdocstrings", marker = "extra == 'ci'", specifier = ">=0.22.0,<2.0.0" },
-    { name = "mkdocstrings-python", marker = "extra == 'ci'", specifier = ">=1.1.0,<2.0.0" },
+    { name = "mkdocstrings-python", marker = "extra == 'ci'", specifier = ">=1.1.0,<3.0.0" },
     { name = "moto", extras = ["all"], marker = "extra == 'ci'", specifier = ">=5.1.19,<6.0.0" },
     { name = "mypy", marker = "extra == 'ci'", specifier = ">=1.6.1,<2.0.0" },
     { name = "nltk", marker = "extra == 'ci'", specifier = ">=3.9.3" },
@@ -3025,7 +3025,7 @@ ci = [
     { name = "mkdocs-material", specifier = ">=9.1.0,<10.0.0" },
     { name = "mkdocs-section-index", specifier = ">=0.3.0,<1.0.0" },
     { name = "mkdocstrings", specifier = ">=0.22.0,<2.0.0" },
-    { name = "mkdocstrings-python", specifier = ">=1.1.0,<2.0.0" },
+    { name = "mkdocstrings-python", specifier = ">=1.1.0,<3.0.0" },
     { name = "moto", extras = ["all"], specifier = ">=5.1.19,<6.0.0" },
     { name = "mypy", specifier = ">=1.6.1,<2.0.0" },
     { name = "nltk", specifier = ">=3.9.3" },
@@ -3077,7 +3077,7 @@ dev = [
     { name = "mkdocs-material", specifier = ">=9.1.0,<10.0.0" },
     { name = "mkdocs-section-index", specifier = ">=0.3.0,<1.0.0" },
     { name = "mkdocstrings", specifier = ">=0.22.0,<2.0.0" },
-    { name = "mkdocstrings-python", specifier = ">=1.1.0,<2.0.0" },
+    { name = "mkdocstrings-python", specifier = ">=1.1.0,<3.0.0" },
     { name = "moto", extras = ["all"], specifier = ">=5.1.19,<6.0.0" },
     { name = "mypy", specifier = ">=1.6.1,<2.0.0" },
     { name = "nltk", specifier = ">=3.9.3" },
