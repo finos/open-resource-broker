@@ -429,7 +429,6 @@ class TestAWSProviderConfigBaseSettings:
             "aws_max_retries": 3,
             "aws_read_timeout": 30,
             "service_role_spot_fleet": "AWSServiceRoleForEC2SpotFleet",
-            "ssm_parameter_prefix": "/hostfactory/templates/",
             "aws_connect_timeout": 10,
         }
 

@@ -544,8 +544,7 @@ This section configures default values for VM templates:
     "company": "abc",
     "project": "awscloud",
     "team": "xyz"
-  },
-  "ssm_parameter_prefix": "/hostfactory/templates/"
+  }
 }
 ```
 
@@ -557,7 +556,6 @@ This section configures default values for VM templates:
 - `default_max_number`: Default maximum number of instances per template
 - `default_attributes`: Default attributes for templates (used by Host Factory)
 - `default_instance_tags`: Default tags to apply to instances
-- `ssm_parameter_prefix`: Prefix for SSM parameters containing template overrides
 
 ### Templates File
 
@@ -611,7 +609,7 @@ Example templates file:
 
 ### SSM Parameter Integration
 
-Templates can be overridden or extended using AWS SSM Parameters. The application will check for parameters with the prefix specified in `ssm_parameter_prefix` (default: `/hostfactory/templates/`).
+Templates can be overridden or extended using AWS SSM Parameters. The application will check for parameters under the `/hostfactory/templates/` path.
 
 For example, if you have a template with ID `OnDemand-Minimal-Template-VM`, you can override its properties by creating SSM parameters:
 

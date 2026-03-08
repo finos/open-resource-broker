@@ -125,10 +125,6 @@ class AWSProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
     service_role_spot_fleet: str = Field(
         "AWSServiceRoleForEC2SpotFleet", description="Service role for Spot Fleet"
     )
-    ssm_parameter_prefix: str = Field(
-        "/hostfactory/templates/", description="SSM parameter prefix for templates"
-    )
-
     # Handler configuration
     handlers: HandlersConfig = Field(default_factory=lambda: HandlersConfig())  # type: ignore[call-arg]
 

@@ -86,7 +86,6 @@ class ProviderConfigBuilder:
             "aws_max_retries": "ORB_AWS_MAX_RETRIES",
             "aws_read_timeout": "ORB_AWS_READ_TIMEOUT",
             "service_role_spot_fleet": "ORB_AWS_SERVICE_ROLE_SPOT_FLEET",
-            "ssm_parameter_prefix": "ORB_AWS_SSM_PARAMETER_PREFIX",
             "credential_file": "ORB_AWS_CREDENTIAL_FILE",
             "key_file": "ORB_AWS_KEY_FILE",
             "proxy_host": "ORB_AWS_PROXY_HOST",
