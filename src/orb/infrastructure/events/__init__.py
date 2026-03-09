@@ -95,7 +95,9 @@ def get_event_bus():
         # Final fallback to legacy system
         from orb.infrastructure.logging.logger import get_logger
 
-        get_logger(__name__).warning("EventBus unavailable, falling back to legacy publisher: %s", e)
+        get_logger(__name__).warning(
+            "EventBus unavailable, falling back to legacy publisher: %s", e
+        )
         return get_event_publisher()
 
 

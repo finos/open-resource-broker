@@ -76,7 +76,9 @@ def _register_template_services(container: DIContainer):
             register_aws_template_factory(factory, c.get(LoggingPort))
         except ImportError:
             logger = c.get(LoggingPort)
-            logger.debug("AWS provider module not available; AWS-specific templates will not be registered.")
+            logger.debug(
+                "AWS provider module not available; AWS-specific templates will not be registered."
+            )
         return factory
 
     from orb.domain.template.factory import TemplateFactory
