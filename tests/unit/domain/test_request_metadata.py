@@ -53,7 +53,6 @@ class TestRequestTimeout:
         assert t.seconds == 120
 
 
-
 class TestMachineCount:
     def test_valid_count(self):
         mc = MachineCount(value=5)
