@@ -94,7 +94,6 @@ export ORB_AWS_LAUNCH_TEMPLATE__CREATE_PER_REQUEST=false
     "aws_max_retries": {"type": "integer", "default": 3, "minimum": 0, "maximum": 10},
     "aws_read_timeout": {"type": "integer", "default": 30, "minimum": 1, "maximum": 300},
     "service_role_spot_fleet": {"type": "string", "default": "AWSServiceRoleForEC2SpotFleet"},
-    "ssm_parameter_prefix": {"type": "string", "default": "/hostfactory/templates/"},
     "handlers": {
       "type": "object",
       "properties": {

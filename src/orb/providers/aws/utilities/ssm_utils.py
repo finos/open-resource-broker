@@ -125,22 +125,6 @@ def resolve_ssm_parameter(parameter_path: str, aws_client: Any = None) -> str:
         )
 
 
-def _get_ssm_parameter_value(ssm_client: Any, parameter_path: str) -> str:
-    """
-    Get SSM parameter value.
-
-    Args:
-        ssm_client: SSM client
-        parameter_path: Parameter path
-
-    Returns:
-        Parameter value
-    """
-    response = ssm_client.get_parameter(Name=parameter_path, WithDecryption=True)
-
-    return response["Parameter"]["Value"]
-
-
 def resolve_ssm_parameters_in_dict(
     data: dict[str, Any],
     aws_client: Any = None,
@@ -222,67 +206,3 @@ def resolve_ssm_parameters(
         return resolve_ssm_parameters_in_list(data, aws_client)
     else:
         return data
-
-
-def get_ssm_parameters_by_path(
-    path: str,
-    recursive: bool = True,
-    aws_client: Any = None,
-) -> dict[str, str]:
-    """
-    Get all SSM parameters under a path.
-
-    Args:
-        path: Path to get parameters from
-        recursive: Whether to get parameters recursively
-        aws_client: AWS client to use
-
-
-    Returns:
-        Dictionary of parameter names to values
-
-    Raises:
-        InfrastructureError: If parameters cannot be retrieved
-    """
-    try:
-        # Require AWSClient for consistent configuration
-        if not aws_client:
-            raise ValueError("AWSClient is required for SSM operations")
-        ssm_client = aws_client.ssm_client
-
-        # Use retry-enabled helper function
-        return _get_parameters_by_path(ssm_client, path, recursive)
-
-    except ClientError as e:
-        error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        error_message = e.response.get("Error", {}).get("Message", str(e))
-
-        logger.error(
-            "Failed to get SSM parameters by path %s: %s - %s",
-            path,
-            error_code,
-            error_message,
-            extra={
-                "path": path,
-                "error_code": error_code,
-                "error_message": error_message,
-            },
-        )
-
-        raise InfrastructureError(
-            "AWS.SSM",
-            f"Failed to get SSM parameters by path {path}: {error_code} - {error_message}",
-        )
-
-
-@retry(strategy="exponential", max_attempts=3, base_delay=1.0, service="ssm")
-def _get_parameters_by_path(ssm_client: Any, path: str, recursive: bool = True) -> dict[str, str]:
-    """Get SSM parameters by path with retry."""
-    paginator = ssm_client.get_paginator("get_parameters_by_path")
-    parameters = {}
-
-    for page in paginator.paginate(Path=path, Recursive=recursive, WithDecryption=True):
-        for param in page["Parameters"]:
-            parameters[param["Name"]] = param["Value"]
-
-    return parameters

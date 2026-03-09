@@ -89,8 +89,7 @@
         "extensions": {
           "ami_resolution": {
             "enabled": true,
-            "fallback_on_failure": true,
-            "ssm_parameter_prefix": "/hostfactory/templates/"
+            "fallback_on_failure": true
           },
           "native_spec": {
             "spec_file_base_path": "config/specs/aws"

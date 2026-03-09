@@ -10,9 +10,6 @@ class AMIResolutionConfig(BaseModel):
 
     enabled: bool = Field(True, description="Enable AMI resolution from SSM parameters")
     fallback_on_failure: bool = Field(True, description="Return SSM parameter if resolution fails")
-    ssm_parameter_prefix: str = Field(
-        "/hostfactory/templates/", description="SSM parameter prefix for templates"
-    )
 
 
 class AWSTemplateExtensionConfig(BaseModel):

@@ -77,7 +77,6 @@ class TestAWSProviderEnvironmentVariables:
                     "ORB_AWS_PROFILE": "test-profile",
                     "ORB_AWS_ENDPOINT_URL": "https://custom.amazonaws.com",
                     "ORB_AWS_SERVICE_ROLE_SPOT_FLEET": "CustomSpotFleetRole",
-                    "ORB_AWS_SSM_PARAMETER_PREFIX": "/custom/templates/",
                     "ORB_AWS_AWS_READ_TIMEOUT": "60",
                     "ORB_AWS_AWS_CONNECT_TIMEOUT": "20",
                 },
@@ -86,7 +85,6 @@ class TestAWSProviderEnvironmentVariables:
 
                 assert config.endpoint_url == "https://custom.amazonaws.com"
                 assert config.service_role_spot_fleet == "CustomSpotFleetRole"
-                assert config.ssm_parameter_prefix == "/custom/templates/"
                 assert config.aws_read_timeout == 60
                 assert config.aws_connect_timeout == 20
 

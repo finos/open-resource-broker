@@ -268,8 +268,7 @@ Note: symAinst-requestor.log is visible only if plugin successfully started and 
           "region": "us-east-1",
           "profile": "default",
           "max_retries": 3,
-          "timeout": 30,
-          "ssm_parameter_prefix": "/hostfactory/templates/"
+          "timeout": 30
         }
       }
     ],

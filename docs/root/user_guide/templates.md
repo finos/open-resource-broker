@@ -317,13 +317,6 @@ aws ssm put-parameter \
   --name "/hostfactory/templates/my-template" \
   --type "String" \
   --value '{"template_id": "my-template", ...}'
-
-# Configure SSM prefix in config.json
-{
-  "template": {
-    "ssm_parameter_prefix": "/hostfactory/templates/"
-  }
-}
 ```
 
 ### Validating Templates
