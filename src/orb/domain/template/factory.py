@@ -200,4 +200,3 @@ class TemplateFactory(BaseTemplateFactory):
             merged_data = {**extension_defaults, **merged_data}
 
         return self.create_template(merged_data, provider_type)
-

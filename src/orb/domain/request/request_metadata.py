@@ -68,7 +68,6 @@ class RequestTimeout(ValueObject):
         return cls(seconds=seconds)
 
 
-
 class MachineCount(ValueObject):
     """
     Value object representing a machine count.
