@@ -6,7 +6,6 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .base_config import BaseCircuitBreakerConfig
-from .cleanup_schema import CleanupConfig
 
 
 class HandlerConfig(BaseModel):
@@ -41,7 +40,7 @@ class ProviderDefaults(BaseModel):
     extensions: Optional[dict[str, Any]] = Field(
         default=None, description="Provider-specific extensions configuration"
     )
-    cleanup: Optional[CleanupConfig] = Field(default=None)
+    cleanup: Optional[dict[str, Any]] = Field(default=None)
 
 
 class ProviderMode(str, Enum):

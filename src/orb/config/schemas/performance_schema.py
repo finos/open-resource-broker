@@ -196,7 +196,22 @@ class PerformanceConfig(BaseModel):
         default_factory=lambda: LazyLoadingConfig()  # type: ignore[call-arg]
     )
     enable_batching: bool = Field(True, description="Whether to enable batching of API calls")
-    batch_sizes: BatchSizesConfig = Field(default_factory=lambda: BatchSizesConfig())  # type: ignore[call-arg]
+    batch_sizes: dict[str, int] = Field(
+        default_factory=lambda: {
+            "terminate_instances": 25,
+            "create_tags": 20,
+            "describe_instances": 25,
+            "run_instances": 10,
+            "describe_spot_fleet_instances": 20,
+            "describe_auto_scaling_groups": 20,
+            "describe_launch_templates": 20,
+            "describe_spot_fleet_requests": 20,
+            "describe_ec2_fleet_instances": 20,
+            "describe_images": 15,
+            "describe_security_groups": 25,
+            "describe_subnets": 25,
+        }
+    )
     enable_parallel: bool = Field(True, description="Whether to enable parallel processing")
     max_workers: int = Field(
         10, description="Maximum number of worker threads for parallel processing"

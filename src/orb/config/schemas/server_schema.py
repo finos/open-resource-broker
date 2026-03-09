@@ -21,14 +21,6 @@ class AuthConfig(BaseModel):
         None, description="Bearer token strategy configuration"
     )
 
-    # AWS IAM configuration
-    iam: Optional[dict[str, Any]] = Field(None, description="AWS IAM strategy configuration")
-
-    # AWS Cognito configuration
-    cognito: Optional[dict[str, Any]] = Field(
-        None, description="AWS Cognito strategy configuration"
-    )
-
     # OAuth configuration
     oauth: Optional[dict[str, Any]] = Field(None, description="OAuth strategy configuration")
 

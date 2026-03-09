@@ -718,7 +718,7 @@ class AWSHandler(ABC):
             if provider_config and provider_config.provider_defaults:
                 defaults = provider_config.provider_defaults.get("aws")
                 if defaults and defaults.cleanup is not None:
-                    return defaults.cleanup
+                    return CleanupConfig.model_validate(defaults.cleanup)
         except Exception as e:
             self._logger.warning("Failed to read cleanup config, using defaults: %s", e)
         return CleanupConfig()

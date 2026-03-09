@@ -242,7 +242,7 @@ def _create_auth_strategy(auth_config: Any) -> Any:
             )
 
         elif strategy_name == "iam":
-            iam_config = auth_config.iam or {}
+            iam_config = (auth_config.provider_auth or {}).get("iam") or {}
             # Register AWS IAM strategy if not already registered
             try:
                 from orb.providers.aws.auth.iam_strategy import IAMAuthStrategy
@@ -261,7 +261,7 @@ def _create_auth_strategy(auth_config: Any) -> Any:
             )
 
         elif strategy_name == "cognito":
-            cognito_config = auth_config.cognito or {}
+            cognito_config = (auth_config.provider_auth or {}).get("cognito") or {}
             # Register AWS Cognito strategy if not already registered
             try:
                 from orb.providers.aws.auth.cognito_strategy import CognitoAuthStrategy
