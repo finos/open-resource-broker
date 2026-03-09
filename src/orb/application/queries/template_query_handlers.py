@@ -17,7 +17,7 @@ from orb.application.ports.template_dto_port import TemplateDTOPort
 from orb.domain.base.exceptions import EntityNotFoundError
 from orb.domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
 from orb.domain.services.generic_filter_service import GenericFilterService
-from orb.domain.template.factory import TemplateFactory, get_default_template_factory
+from orb.domain.template.factory import TemplateFactory
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.template.dtos import TemplateDTO
 
@@ -31,9 +31,11 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, TemplateDTOPort]):
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
         container: ContainerPort,
+        template_factory: TemplateFactory,
     ) -> None:
         super().__init__(logger, error_handler)
         self._container = container
+        self._template_factory = template_factory
 
     async def execute_query(self, query: GetTemplateQuery) -> Template:  # type: ignore[override]
         """Execute get template query."""
@@ -64,12 +66,7 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, TemplateDTOPort]):
             else:
                 resolved_data = template_data
 
-            if self._container.has(TemplateFactory):
-                template_factory = self._container.get(TemplateFactory)
-            else:
-                template_factory = get_default_template_factory()
-
-            resolved_template = template_factory.create_template(resolved_data)
+            resolved_template = self._template_factory.create_template(resolved_data)
 
             self.logger.info("Retrieved template: %s", query.template_id)
             return TemplateDTO.from_domain(resolved_template)  # type: ignore[return-value]

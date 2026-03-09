@@ -64,23 +64,6 @@ class TemplateFactory(BaseTemplateFactory):
         # Registry of provider-specific template classes
         self._provider_template_classes: dict[str, type] = {}
 
-        # Register built-in provider template classes
-        self._register_builtin_providers()
-
-    def _register_builtin_providers(self) -> None:
-        """Register built-in provider template classes."""
-        try:
-            # Register AWS template class
-            from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-
-            self._provider_template_classes["aws"] = AWSTemplate
-
-            if self._logger:
-                self._logger.debug("Registered AWS template class")
-        except ImportError:
-            if self._logger:
-                self._logger.warning("AWS template class not available for registration")
-
     def register_provider_template_class(self, provider_type: str, template_class: type) -> None:
         """Register a provider-specific template class.
 
@@ -184,28 +167,6 @@ class TemplateFactory(BaseTemplateFactory):
             if isinstance(provider_name, str) and "-" in provider_name:
                 return provider_name.split("-")[0]
 
-        # Check for provider-specific fields to infer type
-        aws_specific_fields = {
-            "provider_api",
-            "fleet_type",
-            "fleet_role",
-            "spot_fleet_request_expiry",
-            "allocation_strategy",
-            "volume_type",
-            "iops",
-            "ami_resolution",
-        }
-
-        if any(field in template_data for field in aws_specific_fields):
-            return "aws"
-
-        # Could add similar logic for other providers
-        # section-start
-        # provider1_specific_fields = {'vm_size', 'os_disk_type', ...}
-        # if any(field in template_data for field in provider1_specific_fields):
-        #     return 'provider1'
-        # section-end
-
         return None
 
     def create_template_with_extensions(
@@ -240,45 +201,3 @@ class TemplateFactory(BaseTemplateFactory):
 
         return self.create_template(merged_data, provider_type)
 
-
-# Factory instance for dependency injection
-def create_template_factory(
-    extension_registry: Optional[TemplateExtensionRegistry] = None,
-    logger: Optional[LoggingPort] = None,
-) -> TemplateFactory:
-    """Create a template factory instance.
-
-    Args:
-        extension_registry: Optional extension registry
-        logger: Optional logger port
-
-    Returns:
-        Configured template factory instance
-    """
-    return TemplateFactory(extension_registry, logger)
-
-
-# Default factory instance
-_default_factory: Optional[TemplateFactory] = None
-
-
-def get_default_template_factory() -> TemplateFactory:
-    """Get the default template factory instance.
-
-    Returns:
-        Default template factory instance
-    """
-    global _default_factory
-    if _default_factory is None:
-        _default_factory = TemplateFactory()
-    return _default_factory
-
-
-def set_default_template_factory(factory: TemplateFactory) -> None:
-    """Set the default template factory instance.
-
-    Args:
-        factory: Template factory to set as default
-    """
-    global _default_factory
-    _default_factory = factory
