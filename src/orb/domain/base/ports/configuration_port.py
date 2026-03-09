@@ -72,11 +72,11 @@ class ConfigurationPort(ProviderConfigPort):
         """Override the provider credential profile for this session."""
 
     @abstractmethod
-    def get_effective_region(self, default_region: str = "us-east-1") -> str:
+    def get_effective_region(self, default_region: str = "") -> str:
         """Get effective provider region (override or configured)."""
 
     @abstractmethod
-    def get_effective_profile(self, default_profile: str = "default") -> str:
+    def get_effective_profile(self, default_profile: str = "") -> str:
         """Get effective provider credential profile (override or configured)."""
 
     # get_provider_instance_config inherited from ProviderConfigPort
