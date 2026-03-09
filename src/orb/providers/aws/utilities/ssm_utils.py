@@ -206,5 +206,3 @@ def resolve_ssm_parameters(
         return resolve_ssm_parameters_in_list(data, aws_client)
     else:
         return data
-
-
