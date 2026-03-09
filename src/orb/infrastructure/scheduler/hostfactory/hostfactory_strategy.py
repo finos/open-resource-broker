@@ -905,31 +905,21 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         """Format RequestDTO for display using HostFactory field mapper."""
         return self.field_mapper.map_output_fields(request.to_dict(), copy_unmapped=False)
 
-    # Fallback alias table used when no provider strategy is available via DI.
-    # The canonical source of truth is AWSProviderStrategy._API_ALIASES.
-    _FALLBACK_API_ALIASES: dict[str, str] = {
-        "AutoScalingGroup": "ASG",
-        "autoscalinggroup": "ASG",
-        "asg": "ASG",
-    }
-
     def _resolve_api_alias(self, raw_api: str) -> str:
         """Resolve a provider API name to its canonical form.
 
         Delegates to the active provider strategy when the registry is available;
-        falls back to a local alias table otherwise.
+        returns raw_api unchanged if the registry is unavailable or the call fails.
         """
         try:
             if self._provider_registry_service is not None:
                 selection = self._provider_registry_service.select_active_provider()
-                strategy = self._provider_registry_service._registry.get_or_create_strategy(
-                    selection.provider_name
+                return self._provider_registry_service.resolve_api_alias(
+                    selection.provider_name, raw_api
                 )
-                if strategy is not None:
-                    return strategy.resolve_api_alias(raw_api)
         except Exception as e:
             self.logger.debug("Could not resolve API alias via provider strategy: %s", e)
-        return self._FALLBACK_API_ALIASES.get(raw_api, raw_api)
+        return raw_api
 
     def _transform_machine_types_input(self, hf_data: dict) -> dict:
         """Transform HF vmType/vmTypes to internal machine_types."""

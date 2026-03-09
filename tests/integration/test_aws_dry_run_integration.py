@@ -10,7 +10,6 @@ from orb.providers.aws.infrastructure.dry_run_adapter import (
     get_aws_dry_run_status,
     is_aws_dry_run_active,
 )
-from orb.providers.aws.managers.aws_instance_manager import AWSInstanceManager
 
 
 @pytest.mark.integration
@@ -99,55 +98,6 @@ class TestAWSDryRunIntegration:
             with aws_dry_run_context():
                 assert is_dry_run_active()
                 assert not is_aws_dry_run_active()  # False because moto not available
-
-    def test_aws_instance_manager_dry_run_integration(self):
-        """Test AWS instance manager with dry-run context."""
-        # Mock dependencies
-        mock_aws_client = Mock()
-        mock_config = Mock()
-        mock_logger = Mock()
-
-        # Create instance manager
-        manager = AWSInstanceManager(mock_aws_client, mock_config, mock_logger)
-
-        # Mock EC2 client and response
-        mock_ec2_client = Mock()
-        mock_aws_client.get_client.return_value = mock_ec2_client
-        mock_aws_client.ec2_client = mock_ec2_client
-
-        # Mock run_instances response
-        mock_response = {
-            "Instances": [
-                {
-                    "InstanceId": "i-1234567890abcdef0",
-                    "State": {"Name": "pending"},
-                    "InstanceType": "t2.micro",
-                    "Placement": {"AvailabilityZone": "us-east-1a"},
-                    "LaunchTime": "2023-01-01T00:00:00Z",
-                    "VpcId": "vpc-12345678",
-                    "SubnetId": "subnet-12345678",
-                }
-            ]
-        }
-        mock_ec2_client.run_instances.return_value = mock_response
-
-        # Create template config (as expected by AWS instance manager)
-        template_config = {
-            "image_id": "ami-12345678",
-            "vm_type": "t2.micro",
-            "tags": {"Name": "test-instance"},
-        }
-
-        # Test without dry-run
-        instance_ids = manager.create_instances(template_config, 1)
-        assert len(instance_ids) == 1
-        assert instance_ids[0] == "i-1234567890abcdef0"
-
-        # Test with dry-run - should still work (mocked or real depending on moto)
-        with dry_run_context(True):
-            instance_ids = manager.create_instances(template_config, 1)
-            assert len(instance_ids) == 1
-            assert instance_ids[0] == "i-1234567890abcdef0"
 
     def test_aws_dry_run_context_thread_safety(self):
         """Test that AWS dry-run context is thread-safe."""

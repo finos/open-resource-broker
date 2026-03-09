@@ -280,12 +280,36 @@ def test_hf_parse_template_config_maps_camelcase_to_dto():
 
 
 def test_hf_parse_template_config_provider_api_alias_normalisation():
-    """AutoScalingGroup and asg aliases are normalised to ASG."""
+    """Alias normalisation delegates to the provider strategy via the registry.
+
+    When no registry is wired the raw value passes through unchanged.
+    When a registry is wired it delegates to the provider strategy's resolve_api_alias.
+    """
+    from unittest.mock import MagicMock
+
+    # No registry — passthrough
     strategy = make_hf_strategy()
     for alias in ("AutoScalingGroup", "asg", "autoscalinggroup"):
         raw = {"templateId": "t1", "providerApi": alias}
         dto = strategy.parse_template_config(raw)
-        assert dto.provider_api == "ASG", f"alias '{alias}' not normalised to 'ASG'"
+        assert dto.provider_api == alias, (
+            f"without registry, alias '{alias}' should pass through unchanged"
+        )
+
+    # With registry wired — delegates to provider strategy
+    mock_registry_service = MagicMock()
+    mock_registry_service.select_active_provider.return_value = MagicMock(provider_name="aws")
+    mock_registry_service.resolve_api_alias.side_effect = lambda provider_id, raw: (
+        "ASG" if raw.lower() in ("autoscalinggroup", "asg") else raw
+    )
+    strategy_with_registry = make_hf_strategy()
+    strategy_with_registry._provider_registry_service = mock_registry_service
+    for alias in ("AutoScalingGroup", "asg", "autoscalinggroup"):
+        raw = {"templateId": "t1", "providerApi": alias}
+        dto = strategy_with_registry.parse_template_config(raw)
+        assert dto.provider_api == "ASG", (
+            f"with registry, alias '{alias}' should be normalised to 'ASG'"
+        )
 
 
 # ---------------------------------------------------------------------------

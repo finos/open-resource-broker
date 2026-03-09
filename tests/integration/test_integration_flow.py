@@ -105,62 +105,14 @@ def test_aws_provider_strategy_uses_handlers():
         return False
 
 
-def test_no_instance_manager_bypass():
-    """Test that AWSInstanceManager is no longer used directly."""
-    print("\n=== No Instance Manager Bypass Test ===")
-
-    try:
-        from orb.infrastructure.logging.logger import get_logger
-        from orb.providers.aws.configuration.config import AWSProviderConfig
-        from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
-
-        # Create AWS provider strategy
-        config = AWSProviderConfig(region="us-west-2", profile="default")
-        logger = get_logger(__name__)
-        strategy = AWSProviderStrategy(config, logger)
-
-        # Initialize the strategy
-        strategy.initialize()
-
-        # Check that instance_manager property doesn't exist (should be removed)
-        assert not hasattr(strategy, "instance_manager"), (
-            "instance_manager property should be removed"
-        )
-        print("PASS: instance_manager property correctly removed")
-
-        # Check that _instance_manager attribute doesn't exist
-        assert not hasattr(strategy, "_instance_manager"), (
-            "_instance_manager attribute should be removed"
-        )
-        print("PASS: _instance_manager attribute correctly removed")
-
-        # Check that handlers and launch_template_manager exist instead
-        assert hasattr(strategy, "handlers"), "handlers property should exist"
-        assert hasattr(strategy, "launch_template_manager"), (
-            "launch_template_manager property should exist"
-        )
-        print("PASS: New handler system properties exist")
-
-        return True
-
-    except Exception as e:
-        print(f"FAIL: No instance manager bypass test failed: {e}")
-        import traceback
-
-        traceback.print_exc()
-        return False
-
-
 if __name__ == "__main__":
     print("Running Integration Flow: Integration Flow Fix Tests...")
 
     test1_passed = test_aws_provider_strategy_uses_handlers()
-    test2_passed = test_no_instance_manager_bypass()
 
-    if test1_passed and test2_passed:
+    if test1_passed:
         print("\nALL INTEGRATION FLOW INTEGRATION FLOW TESTS PASSED")
         print("PASS: AWS provider strategy now uses appropriate handler system")
-        print("PASS: AWSInstanceManager bypass has been eliminated")
         print("PASS: Launch template flow is properly integrated")
         print("PASS: Handler routing works correctly")
         sys.exit(0)

@@ -62,6 +62,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
         from orb.application.services.request_status_management_service import (
             RequestStatusManagementService,
         )
+        from orb.infrastructure.resilience.strategy.circuit_breaker import CircuitBreakerStrategy
 
         self._request_creation_service = RequestCreationService(logger)
         self._provisioning_service = ProvisioningOrchestrationService(
@@ -70,6 +71,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
             provider_selection_port,
             provider_config_port,
             config_port=container.get(ConfigurationPort),
+            circuit_breaker_factory=CircuitBreakerStrategy,
         )
         self._status_service = RequestStatusManagementService(uow_factory, logger)
         self._provider_validation_service = ProviderValidationService(

@@ -2,10 +2,11 @@
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 if TYPE_CHECKING:
     from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
+    from orb.infrastructure.resilience.strategy.circuit_breaker import CircuitBreakerStrategy
 
 from orb.domain.base.exceptions import QuotaError
 from orb.domain.base.ports import ConfigurationPort, ContainerPort, LoggingPort, ProviderConfigPort
@@ -14,7 +15,6 @@ from orb.domain.request.aggregate import Request
 from orb.domain.request.request_types import RequestStatus
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.resilience.exceptions import CircuitBreakerOpenError
-from orb.infrastructure.resilience.strategy.circuit_breaker import CircuitBreakerStrategy
 
 
 @dataclass
@@ -41,12 +41,14 @@ class ProvisioningOrchestrationService:
         provider_selection_port: "ProviderSelectionPort",
         provider_config_port: ProviderConfigPort,
         config_port: ConfigurationPort | None = None,
+        circuit_breaker_factory: Optional[Callable[[str], "CircuitBreakerStrategy"]] = None,
     ):
         self._container = container
         self._logger = logger
         self._provider_selection_port = provider_selection_port
         self._provider_config_port = provider_config_port
         self._config_port = config_port
+        self._circuit_breaker_factory = circuit_breaker_factory
 
     async def execute_provisioning(
         self, template: Template, request: Request, selection_result: ProviderSelectionResult
@@ -197,10 +199,12 @@ class ProvisioningOrchestrationService:
 
     def _record_provider_success(self, provider_name: str) -> None:
         """Reset circuit breaker failure count after a successful dispatch."""
+        if self._circuit_breaker_factory is None:
+            return
         cb_key = f"provider:{provider_name}"
         try:
-            if CircuitBreakerStrategy.has_state(cb_key):
-                cb = CircuitBreakerStrategy(cb_key)
+            cb = self._circuit_breaker_factory(cb_key)
+            if cb.has_state(cb_key):
                 cb.record_success()
         except Exception as e:
             self._logger.warning(
@@ -211,11 +215,13 @@ class ProvisioningOrchestrationService:
         """Increment circuit breaker failure count and open circuit if threshold is reached."""
         import time
 
+        if self._circuit_breaker_factory is None:
+            return
         cb_key = f"provider:{provider_name}"
         try:
-            if not CircuitBreakerStrategy.has_state(cb_key):
+            cb = self._circuit_breaker_factory(cb_key)
+            if not cb.has_state(cb_key):
                 return
-            cb = CircuitBreakerStrategy(cb_key)
             cb.record_failure(time.time())
         except Exception as e:
             self._logger.warning(

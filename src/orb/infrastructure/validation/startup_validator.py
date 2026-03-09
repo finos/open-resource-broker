@@ -88,8 +88,8 @@ class StartupValidator:
             print_info("Templates file not found")
             print_command("  Run: orb templates generate")
 
-        # 3. AWS credentials configured
-        if not self._check_aws_credentials():
+        # 3. Provider credentials configured
+        if not self._check_provider_credentials():
             print_warning("AWS credentials not configured")
             print_command("  Configure with: aws configure")
             print_info("  Or set environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY")
@@ -137,15 +137,15 @@ class StartupValidator:
 
         return resolved_path is not None and Path(resolved_path).exists()
 
-    def _check_aws_credentials(self) -> bool:
-        """Check if AWS credentials are configured."""
+    def _check_provider_credentials(self) -> bool:
+        """Check if provider credentials are configured."""
         if not self.app_config:
             return False
 
         try:
             providers = self.app_config.provider.providers
             if not providers:
-                return True  # No AWS providers configured
+                return True  # No providers configured
 
             aws_provider = next((p for p in providers if p.type == "aws"), None)
             if not aws_provider:
@@ -155,13 +155,11 @@ class StartupValidator:
 
             registry = get_provider_registry()
             registry.ensure_provider_type_registered("aws")
-            strategy = registry.get_or_create_strategy("aws")
+            strategy = registry.get_or_create_strategy("aws", aws_provider.config)
             if strategy is None:
                 return True  # Cannot determine — don't block startup
 
-            profile = aws_provider.config.get("profile", "default")
-            region = aws_provider.config.get("region", "us-east-1")
-            result = strategy.test_credentials(profile, region=region)
+            result = strategy.test_credentials()
             return result.get("success", False)
 
         except (NoCredentialsError, ClientError):
