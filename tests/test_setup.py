@@ -31,37 +31,42 @@ def test_python_path_setup():
 @pytest.mark.unit
 def test_imports_work():
     """Test that basic imports work."""
-    try:
-        # Test domain imports
-        # Test application imports - using CQRS handlers
-        pass
+    from orb.domain.machine.aggregate import Machine
+    from orb.domain.request.aggregate import Request
+    from orb.domain.template.template_aggregate import Template
+    from orb.infrastructure.di.buses import CommandBus, QueryBus
 
-        # Test infrastructure imports
-
-        # If we get here, imports work
-        assert True
-    except ImportError as e:
-        pytest.fail(f"Import failed: {e}")
+    assert Machine is not None
+    assert Request is not None
+    assert Template is not None
+    assert CommandBus is not None
+    assert QueryBus is not None
 
 
 @pytest.mark.unit
 def test_pytest_markers():
     """Test that pytest markers are working."""
-    # This test itself uses the unit marker
-    # If it runs, markers are working
-    assert True
+    import pytest as _pytest
+
+    assert hasattr(_pytest.mark, "unit")
+    assert hasattr(_pytest.mark, "integration")
+    assert hasattr(_pytest.mark, "e2e")
 
 
 @pytest.mark.integration
 def test_integration_marker():
-    """Test integration marker."""
-    assert True
+    """Test integration marker is registered."""
+    import pytest as _pytest
+
+    assert hasattr(_pytest.mark, "integration")
 
 
 @pytest.mark.e2e
 def test_e2e_marker():
-    """Test e2e marker."""
-    assert True
+    """Test e2e marker is registered."""
+    import pytest as _pytest
+
+    assert hasattr(_pytest.mark, "e2e")
 
 
 @pytest.mark.slow
@@ -69,11 +74,14 @@ def test_slow_marker():
     """Test slow marker."""
     import time
 
-    time.sleep(0.1)  # Small delay to simulate slow test
-    assert True
+    start = time.monotonic()
+    time.sleep(0.1)
+    assert time.monotonic() - start >= 0.1
 
 
 @pytest.mark.aws
 def test_aws_marker():
-    """Test AWS marker."""
-    assert True
+    """Test AWS marker is registered."""
+    import pytest as _pytest
+
+    assert hasattr(_pytest.mark, "aws")
