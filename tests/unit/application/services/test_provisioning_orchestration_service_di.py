@@ -66,13 +66,9 @@ class TestDIWiringCircuitBreakerFactory:
         This avoids spinning up the full DI container while still asserting the
         actual wiring code rather than a mock.
         """
-        import importlib.util
-        import pathlib
+        import orb.infrastructure.di.infrastructure_services as _infra_svc_mod
 
-        src = pathlib.Path(
-            "/Users/flamurg/src/aws/symphony/open-resource-broker"
-            "/src/orb/infrastructure/di/infrastructure_services.py"
-        ).read_text()
+        src = inspect.getsource(_infra_svc_mod)
 
         tree = ast.parse(src)
 
