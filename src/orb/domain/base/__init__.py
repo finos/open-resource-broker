@@ -1,5 +1,7 @@
 """Base domain layer - shared kernel for all bounded contexts."""
 
+from orb.infrastructure.base.exceptions import InfrastructureError
+
 from .domain_interfaces import (
     AggregateRepository,
     Repository,
@@ -8,7 +10,7 @@ from .domain_interfaces import (
     UnitOfWorkFactory,
 )
 from .entity import AggregateRoot, Entity
-from .events import (  # Request Events; Machine Events; Template Events; Infrastructure Events
+from .events import (  # Request Events; Machine Events; Template Events
     DomainEvent,
     EventPublisher,
     InfrastructureEvent,
@@ -18,20 +20,12 @@ from .events import (  # Request Events; Machine Events; Template Events; Infras
     MachineProvisionedEvent,
     MachineStatusChangedEvent,
     MachineTerminatedEvent,
-    OperationCompletedEvent,
-    OperationFailedEvent,
-    OperationStartedEvent,
     RequestCompletedEvent,
     RequestCreatedEvent,
     RequestEvent,
     RequestFailedEvent,
     RequestStatusChangedEvent,
     RequestTimeoutEvent,
-    ResourceCreatedEvent,
-    ResourceDeletedEvent,
-    ResourceErrorEvent,
-    ResourceEvent,
-    ResourceUpdatedEvent,
     TemplateCreatedEvent,
     TemplateDeletedEvent,
     TemplateEvent,
@@ -44,7 +38,6 @@ from .exceptions import (
     ConfigurationError,
     DomainException,
     EntityNotFoundError,
-    InfrastructureError,
     InvariantViolationError,
     ValidationError,
 )
@@ -74,20 +67,12 @@ __all__: list[str] = [
     "MachineProvisionedEvent",
     "MachineStatusChangedEvent",
     "MachineTerminatedEvent",
-    "OperationCompletedEvent",
-    "OperationFailedEvent",
-    "OperationStartedEvent",
     "RequestCompletedEvent",
     "RequestCreatedEvent",
     "RequestEvent",
     "RequestFailedEvent",
     "RequestStatusChangedEvent",
     "RequestTimeoutEvent",
-    "ResourceCreatedEvent",
-    "ResourceDeletedEvent",
-    "ResourceErrorEvent",
-    "ResourceEvent",
-    "ResourceUpdatedEvent",
     "TemplateCreatedEvent",
     "TemplateDeletedEvent",
     "TemplateEvent",
@@ -101,7 +86,6 @@ __all__: list[str] = [
     "EventPublisher",
     "IPAddress",
     "InfrastructureError",
-    "InfrastructureEvent",
     "InstanceType",
     "InvariantViolationError",
     "PriceType",

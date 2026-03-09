@@ -4,7 +4,12 @@ from typing import Any, Optional
 
 from pydantic import Field
 
-from .base_events import ErrorEvent, InfrastructureEvent, PerformanceEvent, TimedEvent
+from orb.domain.base.events.base_events import (
+    ErrorEvent,
+    InfrastructureEvent,
+    PerformanceEvent,
+    TimedEvent,
+)
 
 # =============================================================================
 # SYSTEM-WIDE EVENTS

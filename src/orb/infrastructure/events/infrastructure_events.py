@@ -5,7 +5,7 @@ from typing import Any, Optional
 
 from pydantic import Field
 
-from .base_events import InfrastructureEvent
+from orb.domain.base.events.base_events import InfrastructureEvent
 
 # =============================================================================
 # INFRASTRUCTURE EVENTS

@@ -12,9 +12,9 @@ from orb.domain.base.exceptions import (
     BusinessRuleViolationError,
     ConfigurationError,
     EntityNotFoundError,
-    InfrastructureError,
     ValidationError,
 )
+from orb.infrastructure.base.exceptions import InfrastructureError
 from orb.domain.machine.exceptions import (
     MachineNotFoundError,
     MachineValidationError,

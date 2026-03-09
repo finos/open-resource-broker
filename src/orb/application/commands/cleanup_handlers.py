@@ -11,10 +11,10 @@ from orb.application.dto.commands import (
     CleanupOldRequestsCommand,
 )
 from orb.domain.base import UnitOfWorkFactory
-from orb.domain.base.events.infrastructure_events import ResourcesCleanedEvent
 from orb.domain.base.ports import ErrorHandlingPort, EventPublisherPort, LoggingPort
 from orb.domain.machine.repository import MachineRepository
 from orb.domain.request.repository import RequestRepository
+from orb.infrastructure.events.infrastructure_events import ResourcesCleanedEvent
 
 
 @command_handler(CleanupOldRequestsCommand)  # type: ignore[arg-type]

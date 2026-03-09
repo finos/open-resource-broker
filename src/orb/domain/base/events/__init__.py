@@ -33,18 +33,6 @@ from .domain_events import (  # Request Events; Machine Events; Template Events
     TemplateValidatedEvent,
 )
 
-# Infrastructure events (Provider resources and operations)
-from .infrastructure_events import (
-    OperationCompletedEvent,
-    OperationFailedEvent,
-    OperationStartedEvent,
-    ResourceCreatedEvent,
-    ResourceDeletedEvent,
-    ResourceErrorEvent,
-    ResourceEvent,
-    ResourceUpdatedEvent,
-)
-
 # Provider events (Provider-agnostic)
 from .provider_events import (
     ProviderConfigurationEvent,
@@ -57,80 +45,44 @@ from .provider_events import (
 
 # Storage events moved to infrastructure.events.storage_events
 # These are infrastructure monitoring events, not domain events
-# System events (Configuration, lifecycle, security, performance)
-from .system_events import (  # System base; Configuration events; Application lifecycle events; Security and audit events; Performance and monitoring events
-    ApplicationErrorEvent,
-    ApplicationShutdownEvent,
-    ApplicationStartedEvent,
-    AuditTrailEvent,
-    ComplianceEvent,
-    ConfigurationChangedEvent,
-    ConfigurationErrorEvent,
-    ConfigurationLoadedEvent,
-    HealthCheckEvent,
-    PerformanceMetricEvent,
-    SecurityEvent,
-    SystemEvent,
-)
+# infrastructure_events and system_events moved to orb.infrastructure.events
 
 # Export all events
 __all__: list[str] = [
-    "ApplicationErrorEvent",
-    "ApplicationShutdownEvent",
-    "ApplicationStartedEvent",
-    "AuditTrailEvent",
-    "ComplianceEvent",
-    "ConfigurationChangedEvent",
-    "ConfigurationErrorEvent",
-    "ConfigurationLoadedEvent",
     # Base classes and protocols
     "DomainEvent",
     "ErrorEvent",
     "EventPublisher",
-    "HealthCheckEvent",
     "InfrastructureEvent",
-    "MachineCreatedEvent",
+    "OperationEvent",
+    "PerformanceEvent",
+    "StatusChangeEvent",
+    "TimedEvent",
     # Machine Events
+    "MachineCreatedEvent",
     "MachineEvent",
     "MachineHealthCheckEvent",
     "MachineProvisionedEvent",
     "MachineStatusChangedEvent",
     "MachineTerminatedEvent",
-    "OperationCompletedEvent",
-    "OperationEvent",
-    "OperationFailedEvent",
-    "OperationStartedEvent",
-    "PerformanceEvent",
-    "PerformanceMetricEvent",
+    # Provider Events (Provider-agnostic)
     "ProviderConfigurationEvent",
     "ProviderCredentialsEvent",
     "ProviderHealthCheckEvent",
-    # Provider Events (Provider-agnostic)
     "ProviderOperationEvent",
     "ProviderRateLimitEvent",
     "ProviderResourceStateChangedEvent",
+    # Request Events
     "RequestCompletedEvent",
     "RequestCreatedEvent",
-    # Request Events
     "RequestEvent",
     "RequestFailedEvent",
     "RequestStatusChangedEvent",
     "RequestTimeoutEvent",
-    "ResourceCreatedEvent",
-    "ResourceDeletedEvent",
-    "ResourceErrorEvent",
-    # Infrastructure Events
-    "ResourceEvent",
-    "ResourceUpdatedEvent",
-    "SecurityEvent",
-    "StatusChangeEvent",
-    # System Events
-    "SystemEvent",
+    # Template Events
     "TemplateCreatedEvent",
     "TemplateDeletedEvent",
-    # Template Events
     "TemplateEvent",
     "TemplateUpdatedEvent",
     "TemplateValidatedEvent",
-    "TimedEvent",
 ]
