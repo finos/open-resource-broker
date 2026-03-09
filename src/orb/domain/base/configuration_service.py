@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from orb.domain.ports import ConfigurationPort  # type: ignore[import]
+from orb.domain.base.ports.configuration_port import ConfigurationPort
 
 
 class DomainConfigurationService:
