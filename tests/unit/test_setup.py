@@ -22,7 +22,7 @@ def test_environment_setup():
 def test_python_path_setup():
     """Test that Python path is properly configured."""
     # Check that src is in Python path
-    project_root = Path(__file__).parent.parent
+    project_root = Path(__file__).parent.parent.parent
     src_path = str(project_root / "src")
 
     assert src_path in sys.path
