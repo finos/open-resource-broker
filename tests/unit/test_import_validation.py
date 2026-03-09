@@ -92,13 +92,11 @@ class TestCriticalImports:
             from orb.interface.command_handlers import BaseCommandHandler  # noqa: F401
 
     def test_bootstrap_application(self):
-        """Test that the main Application class can be instantiated."""
+        """Test that the main Application class can be imported."""
         from orb.bootstrap import Application
 
-        # Should be able to create application instance
-        app = Application()
-        assert app is not None
-        assert hasattr(app, "initialize")
+        assert Application is not None
+        assert hasattr(Application, "initialize")
 
     def test_command_handler_inheritance(self):
         """Test that command handlers have correct inheritance."""

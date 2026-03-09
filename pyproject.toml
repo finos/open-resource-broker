@@ -297,6 +297,13 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --cov --cov-report=term-missing --cov-report=html"
 markers = [
+    "unit: marks unit tests",
+    "integration: marks integration tests",
+    "e2e: marks end-to-end tests",
+    "slow: marks slow tests",
+    "db: marks tests requiring a database",
+    "api: marks API tests",
+    "security: marks security tests",
     "aws: marks tests that require real AWS credentials",
     "manual_aws: marks tests that must be run manually against AWS",
     "rest_api: marks REST API integration tests",
@@ -304,6 +311,14 @@ markers = [
     "provider_contract: part of the provider contract test suite",
     "simulator_limitation: assertion weakened due to known simulator gap",
     "requires_real_provider: skipped unless --run-real-provider flag passed",
+    "asyncio: marks async tests",
+    "benchmark: marks benchmark/performance tests",
+    "architecture: marks architecture compliance tests",
+    "domain: marks domain layer tests",
+    "application: marks application layer tests",
+    "infrastructure: marks infrastructure layer tests",
+    "providers: marks provider tests",
+    "patterns: marks design pattern tests",
     "moto: marks tests that use moto-mocked AWS",
     "cli: marks CLI integration tests",
 ]

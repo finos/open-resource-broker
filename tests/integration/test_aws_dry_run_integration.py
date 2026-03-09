@@ -198,7 +198,6 @@ class TestAWSDryRunWithMoto:
     @pytest.fixture(autouse=True)
     def setup_moto(self):
         """Setup moto for testing."""
-        pytest.importorskip("moto", reason="moto not available")
 
     def test_aws_dry_run_with_real_moto(self):
         """Test AWS dry-run with actual moto integration."""

@@ -241,7 +241,10 @@ class MetricsCollector:
                 for trace in traces_to_write:
                     f.write(json.dumps(trace) + "\n")
 
-            logger.debug("Flushed %d traces to %s", len(traces_to_write), trace_file)
+            try:
+                logger.debug("Flushed %d traces to %s", len(traces_to_write), trace_file)
+            except ValueError:
+                pass  # logging stream closed during interpreter shutdown
 
         except Exception as e:
             logger.error("Failed to flush traces: %s", e, exc_info=True)

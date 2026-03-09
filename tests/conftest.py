@@ -2,11 +2,6 @@
 
 import pytest
 
-# Files with broken imports that cannot be collected — exclude from default run.
-collect_ignore = [
-    "integration/test_machine_status_cqrs_migration.py",
-]
-
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -49,8 +44,6 @@ from unittest.mock import Mock
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-# Import test environment fixtures
-
 # Import moto for AWS mocking
 try:
     from moto import mock_aws
@@ -69,100 +62,18 @@ except ImportError:
 
 import boto3
 
-# Import application components - with error handling
-try:
-    from orb.config.manager import ConfigurationManager
-    from orb.config.schemas.app_schema import AppConfig
-    from orb.domain.base.value_objects import InstanceId, ResourceId
-    from orb.domain.machine.aggregate import Machine
-    from orb.domain.request.aggregate import Request
-    from orb.domain.template.template_aggregate import Template
-    from orb.infrastructure.di.buses import CommandBus, QueryBus
-    from orb.infrastructure.di.container import DIContainer
-    from orb.infrastructure.template.services.template_storage_service import (
-        TemplateStorageService as TemplatePersistenceService,
-    )
-    from orb.providers.aws.configuration.config import AWSProviderConfig as AWSConfig
-
-    IMPORTS_AVAILABLE = True
-except ImportError as e:
-    # If imports fail, create mock classes to prevent test failures
-    print(f"Warning: Could not import application components: {e}")
-    IMPORTS_AVAILABLE = False
-
-    class ConfigurationManager:
-        def __init__(self):
-            self._config = {}
-
-        def load_from_file(self, path):
-            pass
-
-        def get(self, key, default=None):
-            return default
-
-    class AppConfig:
-        def __init__(self, **kwargs):
-            pass
-
-    class TemplateService:
-        pass
-
-    class CommandBus:
-        def __init__(self, **kwargs):
-            pass
-
-        def execute(self, command):
-            return {"success": True}
-
-    class QueryBus:
-        def __init__(self, **kwargs):
-            pass
-
-        def execute(self, query):
-            return {"success": True}
-
-    class DIContainer:
-        pass
-
-    class Template:
-        def __init__(self, **kwargs):
-            for k, v in kwargs.items():
-                setattr(self, k, v)
-
-    class Request:
-        @classmethod
-        def create_new_request(cls, **kwargs):
-            return cls(**kwargs)
-
-        def __init__(self, **kwargs):
-            for k, v in kwargs.items():
-                setattr(self, k, v)
-
-    class Machine:
-        def __init__(self, **kwargs):
-            for k, v in kwargs.items():
-                setattr(self, k, v)
-
-    class InstanceId:
-        def __init__(self, value):
-            self.value = value
-
-    class InstanceType:
-        def __init__(self, value):
-            self.value = value
-
-    class ResourceId:
-        def __init__(self, value):
-            self.value = value
-
-    class AWSProvider:
-        def __init__(self, **kwargs):
-            pass
-
-    class AWSConfig:
-        def __init__(self, **kwargs):
-            pass
-
+from orb.config.manager import ConfigurationManager
+from orb.config.schemas.app_schema import AppConfig
+from orb.domain.base.value_objects import InstanceId
+from orb.domain.machine.aggregate import Machine
+from orb.domain.request.aggregate import Request
+from orb.domain.template.template_aggregate import Template
+from orb.infrastructure.di.buses import CommandBus, QueryBus
+from orb.infrastructure.di.container import DIContainer
+from orb.infrastructure.template.services.template_storage_service import (
+    TemplateStorageService as TemplatePersistenceService,
+)
+from orb.providers.aws.configuration.config import AWSProviderConfig as AWSConfig
 
 # Test utilities
 from tests.utilities.reset_singletons import reset_all_singletons
@@ -280,42 +191,33 @@ def test_config_file(temp_dir: Path, test_config_dict: dict[str, Any]) -> Path:
 def config_manager(test_config_dict: dict[str, Any]) -> ConfigurationManager:
     """Create a test configuration manager."""
     manager = ConfigurationManager()
-    if IMPORTS_AVAILABLE:
-        manager._config = test_config_dict
+    manager._config = test_config_dict
     return manager
 
 
 @pytest.fixture
 def app_config(test_config_dict: dict[str, Any]) -> AppConfig:
     """Create a test app configuration."""
-    if IMPORTS_AVAILABLE:
-        return AppConfig(**test_config_dict)
-    else:
-        return AppConfig()
+    return AppConfig(**test_config_dict)
 
 
 @pytest.fixture
 def aws_config() -> AWSConfig:
     """Create a test AWS configuration."""
-    if IMPORTS_AVAILABLE:
-        return AWSConfig(
-            region="us-east-1",
-            profile="default",
-            access_key_id="testing",
-            secret_access_key="testing",
-        )
-    else:
-        return AWSConfig()
+    return AWSConfig(
+        region="us-east-1",
+        profile="default",
+        access_key_id="testing",
+        secret_access_key="testing",
+    )
 
 
 @pytest.fixture
 def aws_mocks():
     """Set up comprehensive AWS service mocks."""
-    if MOTO_AVAILABLE:
-        with mock_aws():
-            yield
-    else:
-        # Fallback if moto is not available
+    if not MOTO_AVAILABLE:
+        pytest.skip("moto not installed")
+    with mock_aws():
         yield
 
 
@@ -370,68 +272,53 @@ def mock_ec2_resources(ec2_client):
 @pytest.fixture
 def sample_template() -> Template:
     """Create a sample template for testing."""
-    if IMPORTS_AVAILABLE:
-        return Template(
-            id="template-001",
-            template_id="template-001",
-            name="test-template",
-            provider_api="ec2_fleet",
-            image_id="ami-12345678",
-            machine_types={"t2.micro": 1},  # Use string instead of InstanceType object
-            max_instances=10,  # Add max_instances field
-            subnet_ids=["subnet-12345678"],
-            security_group_ids=["sg-12345678"],
-            key_name="test-key",
-            user_data="#!/bin/bash\necho 'Hello World'",
-            tags={"Environment": "test", "Project": "hostfactory"},
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
-        )
-    else:
-        return Template(id="template-001", name="test-template", provider_api="ec2_fleet")
+    return Template(
+        id="template-001",
+        template_id="template-001",
+        name="test-template",
+        provider_api="ec2_fleet",
+        image_id="ami-12345678",
+        machine_types={"t2.micro": 1},
+        max_instances=10,
+        subnet_ids=["subnet-12345678"],
+        security_group_ids=["sg-12345678"],
+        key_name="test-key",
+        user_data="#!/bin/bash\necho 'Hello World'",
+        tags={"Environment": "test", "Project": "hostfactory"},
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
 
 
 @pytest.fixture
 def sample_request() -> Request:
     """Create a sample request for testing."""
-    if IMPORTS_AVAILABLE:
-        return Request.create_new_request(
-            template_id="template-001",
-            machine_count=2,
-            requester_id="test-user",
-            priority=1,
-            tags={"Environment": "test"},
-        )
-    else:
-        return Request(template_id="template-001", machine_count=2, requester_id="test-user")
+    return Request.create_new_request(
+        template_id="template-001",
+        machine_count=2,
+        requester_id="test-user",
+        priority=1,
+        tags={"Environment": "test"},
+    )
 
 
 @pytest.fixture
 def sample_machine() -> Machine:
     """Create a sample machine for testing."""
-    if IMPORTS_AVAILABLE:
-        return Machine(
-            id="machine-001",
-            instance_id=InstanceId("i-1234567890abcdef0"),
-            template_id="template-001",
-            request_id="request-001",
-            status="running",
-            machine_types={"t2.micro": 1},
-            availability_zone="us-east-1a",
-            private_ip="10.0.1.100",
-            public_ip="54.123.45.67",
-            tags={"Environment": "test"},
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
-        )
-    else:
-        return Machine(
-            id="machine-001",
-            instance_id="i-1234567890abcdef0",
-            template_id="template-001",
-            request_id="request-001",
-            status="running",
-        )
+    return Machine(
+        id="machine-001",
+        instance_id=InstanceId("i-1234567890abcdef0"),
+        template_id="template-001",
+        request_id="request-001",
+        status="running",
+        machine_types={"t2.micro": 1},
+        availability_zone="us-east-1a",
+        private_ip="10.0.1.100",
+        public_ip="54.123.45.67",
+        tags={"Environment": "test"},
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
 
 
 @pytest.fixture
@@ -552,17 +439,6 @@ def generate_request_id() -> str:
 def generate_template_id() -> str:
     """Generate a unique template ID."""
     return f"tpl-{uuid.uuid4().hex[:8]}"
-
-
-# Test markers
-pytest.mark.unit = pytest.mark.unit
-pytest.mark.integration = pytest.mark.integration
-pytest.mark.e2e = pytest.mark.e2e
-pytest.mark.slow = pytest.mark.slow
-pytest.mark.aws = pytest.mark.aws
-pytest.mark.db = pytest.mark.db
-pytest.mark.api = pytest.mark.api
-pytest.mark.security = pytest.mark.security
 
 
 # Custom assertions
