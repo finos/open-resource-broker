@@ -32,11 +32,6 @@ def test_no_aws_client_param_in_healthcheck_init():
     )
 
 
-def test_aws_health_module_exists():
-    path = Path(__file__).parent.parent.parent / "src/orb/providers/aws/health.py"
-    assert path.exists(), "src/orb/providers/aws/health.py must exist"
-
-
 def test_register_aws_health_checks_callable():
     from orb.providers.aws.health import register_aws_health_checks
 
