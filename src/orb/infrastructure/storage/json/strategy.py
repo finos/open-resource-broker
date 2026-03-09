@@ -356,7 +356,10 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 else:
                     full_data = {}
             except Exception as e:
-                self.logger.error('Cannot read existing storage file before save, aborting to prevent data loss: %s', e)
+                self.logger.error(
+                    "Cannot read existing storage file before save, aborting to prevent data loss: %s",
+                    e,
+                )
                 raise
 
             # Ensure full_data is a dictionary

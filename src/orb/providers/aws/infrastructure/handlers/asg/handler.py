@@ -305,7 +305,9 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             return asg_mapping
 
         except Exception as e:
-            logging.warning('Failed to detect ASG membership for instances, skipping capacity reduction: %s', e)
+            logging.warning(
+                "Failed to detect ASG membership for instances, skipping capacity reduction: %s", e
+            )
             return {}
 
     def reduce_capacity_for_instance_ids(self, instance_ids: list[str]) -> None:

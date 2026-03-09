@@ -108,7 +108,9 @@ class AWSHandlerFactory:
                     config_port=config_port,
                 )
             except Exception as e:
-                self._logger.warning('AWSNativeSpecService unavailable, native spec enrichment disabled: %s', e)
+                self._logger.warning(
+                    "AWSNativeSpecService unavailable, native spec enrichment disabled: %s", e
+                )
 
         machine_adapter = AWSMachineAdapter(
             aws_client=self._aws_client,

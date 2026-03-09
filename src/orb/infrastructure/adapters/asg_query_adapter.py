@@ -24,10 +24,10 @@ class ASGQueryAdapter(ASGQueryPort):
             groups = response.get("AutoScalingGroups", [])
             return groups[0] if groups else {}
         except ClientError as e:
-            if e.response['Error']['Code'] in ('ValidationError',):
+            if e.response["Error"]["Code"] in ("ValidationError",):
                 return {}
-            self._logger.warning('AWS API error querying ASG %s: %s', asg_name, e)
+            self._logger.warning("AWS API error querying ASG %s: %s", asg_name, e)
             raise
         except Exception as e:
-            self._logger.error('Unexpected error querying ASG %s: %s', asg_name, e)
+            self._logger.error("Unexpected error querying ASG %s: %s", asg_name, e)
             raise
