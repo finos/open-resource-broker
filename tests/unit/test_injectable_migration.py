@@ -164,6 +164,10 @@ class MockConfigurationPort(ConfigurationPort):
         """Get per-API handler capabilities."""
         return {}
 
+    def get_cleanup_config(self) -> dict[str, Any]:
+        """Get cleanup configuration."""
+        return {}
+
 
 class TestInjectableMigration(unittest.TestCase):
     """Test case for verifying the injectable decorator migration."""
