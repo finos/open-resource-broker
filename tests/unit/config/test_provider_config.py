@@ -740,7 +740,7 @@ class TestAWSProviderConfigBaseSettings:
         # Integer fields that should be converted from strings
         int_fields = ["aws_max_retries", "aws_read_timeout", "proxy_port", "aws_connect_timeout"]
 
-        for _field in int_fields:
+        for _ in int_fields:
             # Should be convertible from string
             test_value = "123"
             converted = int(test_value)
