@@ -38,3 +38,24 @@ def test_register_aws_health_checks_callable():
     assert callable(register_aws_health_checks), (
         "register_aws_health_checks must be a callable in orb.providers.aws.health"
     )
+
+
+# --- task 1719: register_aws_health_checks registers checks on HealthCheck ---
+
+
+def test_register_aws_health_checks_registers_checks():
+    """register_aws_health_checks must add aws, ec2, and dynamodb checks."""
+    from unittest.mock import MagicMock
+
+    from orb.providers.aws.health import register_aws_health_checks
+
+    health_check = MagicMock()
+    aws_client = MagicMock()
+
+    register_aws_health_checks(health_check, aws_client)
+
+    registered_names = {call.args[0] for call in health_check.register_check.call_args_list}
+    assert "aws" in registered_names
+    assert "ec2" in registered_names
+    assert "dynamodb" in registered_names
+    assert health_check.register_check.call_count == 3

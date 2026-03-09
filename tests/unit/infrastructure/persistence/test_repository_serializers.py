@@ -1,9 +1,12 @@
 """Tests for storage repository serializer constants and legacy provider_type handling."""
 
-import ast
 import inspect
 
 import pytest
+
+import orb.infrastructure.storage.constants as _constants_mod
+import orb.infrastructure.storage.repositories.machine_repository as _machine_repo_mod
+import orb.infrastructure.storage.repositories.request_repository as _request_repo_mod
 
 
 @pytest.mark.unit
@@ -13,52 +16,38 @@ class TestLegacyDefaultProviderTypeConstant:
 
     def test_constant_exists_in_storage_constants(self):
         """LEGACY_DEFAULT_PROVIDER_TYPE must be defined in storage constants module."""
-        from orb.infrastructure.storage.constants import LEGACY_DEFAULT_PROVIDER_TYPE
-
-        assert LEGACY_DEFAULT_PROVIDER_TYPE == "aws"
+        assert _constants_mod.LEGACY_DEFAULT_PROVIDER_TYPE == "aws"
 
     def test_constant_is_named_not_bare_string(self):
         """The constant must be a module-level name, not an inline literal."""
-        import orb.infrastructure.storage.constants as mod
-
-        assert hasattr(mod, "LEGACY_DEFAULT_PROVIDER_TYPE")
+        assert hasattr(_constants_mod, "LEGACY_DEFAULT_PROVIDER_TYPE")
 
     def test_machine_repository_uses_constant_not_bare_string(self):
         """machine_repository.py must not contain a bare 'aws' string as a default."""
-        import orb.infrastructure.storage.repositories.machine_repository as mod
-
-        source = inspect.getsource(mod)
+        source = inspect.getsource(_machine_repo_mod)
         # The bare literal default pattern must not appear
         assert "data.get('provider_type', 'aws')" not in source
         assert 'data.get("provider_type", "aws")' not in source
 
     def test_request_repository_uses_constant_not_bare_string(self):
         """request_repository.py must not contain a bare 'aws' string as a default."""
-        import orb.infrastructure.storage.repositories.request_repository as mod
-
-        source = inspect.getsource(mod)
+        source = inspect.getsource(_request_repo_mod)
         assert "data.get('provider_type', 'aws')" not in source
         assert 'data.get("provider_type", "aws")' not in source
 
     def test_machine_repository_imports_constant(self):
         """machine_repository must import LEGACY_DEFAULT_PROVIDER_TYPE."""
-        import orb.infrastructure.storage.repositories.machine_repository as mod
-
-        source = inspect.getsource(mod)
+        source = inspect.getsource(_machine_repo_mod)
         assert "LEGACY_DEFAULT_PROVIDER_TYPE" in source
 
     def test_request_repository_imports_constant(self):
         """request_repository must import LEGACY_DEFAULT_PROVIDER_TYPE."""
-        import orb.infrastructure.storage.repositories.request_repository as mod
-
-        source = inspect.getsource(mod)
+        source = inspect.getsource(_request_repo_mod)
         assert "LEGACY_DEFAULT_PROVIDER_TYPE" in source
 
     def test_constant_has_explanatory_comment(self):
         """The constants module must contain a comment explaining the legacy default."""
-        import orb.infrastructure.storage.constants as mod
-
-        source = inspect.getsource(mod)
+        source = inspect.getsource(_constants_mod)
         assert "legacy" in source.lower() or "Legacy" in source
 
 
@@ -82,20 +71,16 @@ class TestMachineSerializerLegacyProviderType:
 
     def test_from_dict_uses_legacy_default_when_provider_type_absent(self):
         """Records without provider_type deserialize to 'aws' via the constant."""
-        from orb.infrastructure.storage.repositories.machine_repository import MachineSerializer
-
         data = self._make_minimal_machine_data()
         assert "provider_type" not in data
 
-        machine = MachineSerializer().from_dict(data)
+        machine = _machine_repo_mod.MachineSerializer().from_dict(data)
         assert machine.provider_type == "aws"
 
     def test_from_dict_preserves_explicit_provider_type(self):
         """Records with an explicit provider_type are not overridden."""
-        from orb.infrastructure.storage.repositories.machine_repository import MachineSerializer
-
         data = self._make_minimal_machine_data(provider_type="gcp")
-        machine = MachineSerializer().from_dict(data)
+        machine = _machine_repo_mod.MachineSerializer().from_dict(data)
         assert machine.provider_type == "gcp"
 
 
@@ -120,18 +105,14 @@ class TestRequestSerializerLegacyProviderType:
 
     def test_from_dict_uses_legacy_default_when_provider_type_absent(self):
         """Records without provider_type deserialize to 'aws' via the constant."""
-        from orb.infrastructure.storage.repositories.request_repository import RequestSerializer
-
         data = self._make_minimal_request_data()
         assert "provider_type" not in data
 
-        request = RequestSerializer().from_dict(data)
+        request = _request_repo_mod.RequestSerializer().from_dict(data)
         assert request.provider_type == "aws"
 
     def test_from_dict_preserves_explicit_provider_type(self):
         """Records with an explicit provider_type are not overridden."""
-        from orb.infrastructure.storage.repositories.request_repository import RequestSerializer
-
         data = self._make_minimal_request_data(provider_type="azure")
-        request = RequestSerializer().from_dict(data)
+        request = _request_repo_mod.RequestSerializer().from_dict(data)
         assert request.provider_type == "azure"

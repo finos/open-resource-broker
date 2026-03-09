@@ -915,7 +915,12 @@ class BaseAWSHandler(BaseProviderHandler[TRequest, TResponse]):
                 else:
                     break
 
-        raise last_exception  # type: ignore[misc]
+        if last_exception is None:
+            raise RuntimeError(
+                "execute_with_retry completed without attempting any requests "
+                f"(max_retries={self.max_retries})"
+            )
+        raise last_exception
 
     @abstractmethod
     async def execute_aws_request(self, request: TRequest) -> TResponse:

@@ -5,13 +5,14 @@ import inspect
 
 import pytest
 
+import orb.infrastructure.di.scheduler_services as svc_module
+import orb.infrastructure.scheduler.registry as registry_module
+
 
 class TestNoIfElifInGetStrategyClass:
     """AST scan: get_strategy_class must not contain if/elif dispatch."""
 
     def test_no_if_elif_dispatch(self):
-        import orb.infrastructure.scheduler.registry as registry_module
-
         source = inspect.getsource(registry_module)
         tree = ast.parse(source)
 
@@ -42,9 +43,7 @@ class TestSchedulerRegistrationHasStrategyClass:
     """SchedulerRegistration must carry a strategy_class field."""
 
     def test_strategy_class_field_exists(self):
-        from orb.infrastructure.scheduler.registry import SchedulerRegistration
-
-        reg = SchedulerRegistration(
+        reg = registry_module.SchedulerRegistration(
             scheduler_type="default",
             strategy_factory=lambda c: None,
             config_factory=lambda d: d,
@@ -53,10 +52,8 @@ class TestSchedulerRegistrationHasStrategyClass:
         assert hasattr(reg, "strategy_class")
 
     def test_strategy_class_stored(self):
-        from orb.infrastructure.scheduler.registry import SchedulerRegistration
-
         sentinel = object
-        reg = SchedulerRegistration(
+        reg = registry_module.SchedulerRegistration(
             scheduler_type="default",
             strategy_factory=lambda c: None,
             config_factory=lambda d: d,
@@ -65,9 +62,7 @@ class TestSchedulerRegistrationHasStrategyClass:
         assert reg.strategy_class is sentinel
 
     def test_strategy_class_defaults_to_none(self):
-        from orb.infrastructure.scheduler.registry import SchedulerRegistration
-
-        reg = SchedulerRegistration(
+        reg = registry_module.SchedulerRegistration(
             scheduler_type="default",
             strategy_factory=lambda c: None,
             config_factory=lambda d: d,
@@ -81,9 +76,7 @@ class TestGetStrategyClassRegistryLookup:
     @pytest.fixture(autouse=True)
     def fresh_registry(self):
         """Each test gets a clean registry state."""
-        from orb.infrastructure.scheduler.registry import get_scheduler_registry
-
-        registry = get_scheduler_registry()
+        registry = registry_module.get_scheduler_registry()
         registry.clear_registrations()
         yield registry
         registry.clear_registrations()
@@ -144,10 +137,6 @@ class TestSchedulerServicesNoStaleAssertion:
     """scheduler_services.py must not call ensure_type_registered('default')."""
 
     def test_no_stale_ensure_type_registered_call(self):
-        import inspect
-
-        import orb.infrastructure.di.scheduler_services as svc_module
-
         source = inspect.getsource(svc_module)
         assert "ensure_type_registered" not in source, (
             "scheduler_services.py must not call ensure_type_registered — "
@@ -158,8 +147,6 @@ class TestSchedulerServicesNoStaleAssertion:
         """register_scheduler_services must not raise even with empty registry."""
         from unittest.mock import MagicMock
 
-        from orb.infrastructure.di.scheduler_services import register_scheduler_services
-
         container = MagicMock()
         # Should not raise
-        register_scheduler_services(container)
+        svc_module.register_scheduler_services(container)

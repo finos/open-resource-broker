@@ -1,8 +1,13 @@
 """Unit tests for ConfigValidator — provider-registry-driven validation."""
 
+import inspect
+
 import pytest
 
-from orb.config.validators.config_validator import ConfigValidator, ValidationResult
+import orb.config.validators.config_validator as config_validator_module
+
+ConfigValidator = config_validator_module.ConfigValidator
+ValidationResult = config_validator_module.ValidationResult
 
 
 @pytest.mark.unit
@@ -11,20 +16,14 @@ class TestConfigValidatorNoAwsHardcoding:
 
     def test_source_has_no_provider_type_equals_aws(self):
         """config_validator.py must not contain provider_type == 'aws'."""
-        import inspect
-        import orb.config.validators.config_validator as mod
-
-        source = inspect.getsource(mod)
-        assert 'provider_type == "aws"' not in source
+        source = inspect.getsource(config_validator_module)
+        assert "provider_type == \"aws\"" not in source
         assert "provider_type == 'aws'" not in source
 
     def test_source_has_no_provider_type_equals_aws_in_business_rules(self):
         """_validate_business_rules must not gate on provider.type == 'aws'."""
-        import inspect
-        import orb.config.validators.config_validator as mod
-
-        source = inspect.getsource(mod)
-        assert 'provider.type == "aws"' not in source
+        source = inspect.getsource(config_validator_module)
+        assert "provider.type == \"aws\"" not in source
         assert "provider.type == 'aws'" not in source
 
 

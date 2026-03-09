@@ -1,3 +1,4 @@
+from orb.config.schemas.metrics_schema import MetricsConfig
 from orb.infrastructure.adapters.configuration_adapter import ConfigurationAdapter
 
 
@@ -78,3 +79,20 @@ def test_metrics_config_partial_overrides_preserve_defaults():
     assert aws_cfg["monitored_services"] == []
     assert aws_cfg["monitored_operations"] == []
     assert aws_cfg["track_payload_sizes"] is False
+
+
+# --- task 1718: backward-compatibility aliases on MetricsConfig ---
+
+
+def test_metrics_config_old_aws_metrics_key_populates_provider_metrics():
+    """aws_metrics alias (old name) must populate provider_metrics field."""
+    cfg = MetricsConfig.model_validate({"aws_metrics": {"aws_metrics_enabled": True}})
+    assert cfg.provider_metrics.provider_metrics_enabled is True
+
+
+def test_metrics_config_new_provider_metrics_key_works():
+    """provider_metrics (new name) must also be accepted directly."""
+    cfg = MetricsConfig.model_validate(
+        {"provider_metrics": {"provider_metrics_enabled": True}}
+    )
+    assert cfg.provider_metrics.provider_metrics_enabled is True

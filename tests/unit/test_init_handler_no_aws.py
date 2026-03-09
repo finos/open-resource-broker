@@ -267,3 +267,47 @@ def test_scheduler_registry_get_extra_config_for_hf_alias():
     registry = SchedulerRegistry()
     extra = registry.get_extra_config_for_type("hf")
     assert extra == {"config_root": "$ORB_CONFIG_DIR"}
+
+
+def test_interactive_setup_raises_when_no_providers_registered():
+    """_interactive_setup raises ValueError when provider registry returns no providers."""
+    from unittest.mock import patch
+
+    from orb.interface.init_command_handler import _interactive_setup
+
+    with (
+        patch(
+            "orb.interface.init_command_handler._get_available_schedulers",
+            return_value=[{"type": "default", "display_name": "default", "description": "Standalone usage"}],
+        ),
+        patch(
+            "orb.interface.init_command_handler._get_available_providers",
+            return_value=[],
+        ),
+        patch("builtins.input", return_value="1"),
+    ):
+        try:
+            _interactive_setup()
+            assert False, "Expected ValueError was not raised"
+        except ValueError as exc:
+            assert "No providers registered" in str(exc)
+
+
+def test_get_default_config_raises_when_no_providers_and_no_provider_arg():
+    """_get_default_config raises ValueError when registry is empty and args.provider is None."""
+    from unittest.mock import MagicMock, patch
+
+    from orb.interface.init_command_handler import _get_default_config
+
+    args = MagicMock()
+    args.provider = None
+
+    with patch(
+        "orb.interface.init_command_handler._get_available_providers",
+        return_value=[],
+    ):
+        try:
+            _get_default_config(args)
+            assert False, "Expected ValueError was not raised"
+        except ValueError as exc:
+            assert "No providers registered" in str(exc)
