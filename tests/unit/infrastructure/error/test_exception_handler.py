@@ -15,9 +15,9 @@ from orb.domain.base.exceptions import (
     ConfigurationError,
     ValidationError,
 )
-from orb.infrastructure.base.exceptions import InfrastructureError
 from orb.domain.request.exceptions import RequestValidationError
 from orb.domain.template.exceptions import TemplateNotFoundError
+from orb.infrastructure.base.exceptions import InfrastructureError
 from orb.infrastructure.error.decorators import (
     handle_application_exceptions,
     handle_domain_exceptions,

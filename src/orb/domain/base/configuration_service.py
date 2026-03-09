@@ -56,7 +56,7 @@ class DomainConfigurationService:
 
     def get_default_instance_tags(self, provider_type: str) -> dict[str, str]:
         """Get default instance tags for the specified provider."""
-        provider_config = self._config_port.get_provider_config(provider_type)
+        provider_config = self._config_port.get_provider_instance_config(provider_type)
         tags = provider_config.get("default_instance_tags", {})
         return {str(k): str(v) for k, v in tags.items()}
 
