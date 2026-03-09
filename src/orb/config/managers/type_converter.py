@@ -94,9 +94,15 @@ class ConfigTypeConverter:
             if class_name == "AppConfig":
                 return config_class(**self._raw_config)
 
-            # Special handling for AWSProviderConfig - resolve from provider strategy
-            if class_name == "AWSProviderConfig":
-                return self._get_aws_provider_config(config_class)
+            # For provider-specific config classes registered in ProviderSettingsRegistry,
+            # resolve from the active provider config rather than a top-level section.
+            from orb.config.schemas.provider_settings_registry import ProviderSettingsRegistry
+
+            for provider_type, registered_cls in ProviderSettingsRegistry._settings_classes.items():
+                if registered_cls is config_class or (
+                    isinstance(config_class, type) and issubclass(config_class, registered_cls)
+                ):
+                    return self._get_provider_config_for_type(provider_type, config_class)
 
             # Other config classes use their respective sections
             section_name = class_name.replace("Config", "").lower()
@@ -110,8 +116,8 @@ class ConfigTypeConverter:
             )
             raise ConfigurationError(f"Invalid configuration for {config_class.__name__}: {e}")
 
-    def _get_aws_provider_config(self, config_class: type[T]) -> T:
-        """Get AWS provider configuration from provider strategy system."""
+    def _get_provider_config_for_type(self, provider_type: str, config_class: type[T]) -> T:
+        """Get provider configuration for the given provider type from the provider strategy system."""
         try:
             # Get provider configuration
             provider_config = self.get_dict("provider", {})
@@ -120,36 +126,46 @@ class ConfigTypeConverter:
             providers = provider_config.get("providers", [])
             active_provider = provider_config.get("active_provider")
 
-            # Find the active AWS provider or first enabled AWS provider
-            aws_provider_config = None
+            # Find the active provider of the requested type, or first enabled one
+            matched_config = None
 
             # First, try to find the active provider if specified
             if active_provider:
                 for provider in providers:
                     if (
                         provider.get("name") == active_provider
-                        and provider.get("type") == "aws"
+                        and provider.get("type") == provider_type
                         and provider.get("enabled", True)
                     ):
-                        aws_provider_config = provider.get("config", {})
-                        logger.debug("Using AWS config from active provider: %s", active_provider)
+                        matched_config = provider.get("config", {})
+                        logger.debug(
+                            "Using %s config from active provider: %s",
+                            provider_type,
+                            active_provider,
+                        )
                         break
 
-            # If no active provider found, use first enabled AWS provider
-            if not aws_provider_config:
+            # If no active provider found, use first enabled provider of the requested type
+            if not matched_config:
                 for provider in providers:
-                    if provider.get("type") == "aws" and provider.get("enabled", True):
-                        aws_provider_config = provider.get("config", {})
-                        logger.debug("Using AWS config from provider: %s", provider.get("name"))
+                    if provider.get("type") == provider_type and provider.get("enabled", True):
+                        matched_config = provider.get("config", {})
+                        logger.debug(
+                            "Using %s config from provider: %s",
+                            provider_type,
+                            provider.get("name"),
+                        )
                         break
 
-            if aws_provider_config:
-                return config_class(**aws_provider_config)
+            if matched_config is not None:
+                return config_class(**matched_config)
             else:
-                raise ValueError("No enabled AWS provider found in configuration")
+                raise ValueError(f"No enabled {provider_type} provider found in configuration")
 
         except Exception as e:
-            logger.error("Failed to resolve AWS provider config: %s", e, exc_info=True)
+            logger.error(
+                "Failed to resolve %s provider config: %s", provider_type, e, exc_info=True
+            )
             raise
 
     def set(self, key: str, value: Any) -> None:

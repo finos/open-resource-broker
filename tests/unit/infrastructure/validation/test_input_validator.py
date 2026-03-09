@@ -6,11 +6,11 @@ from orb.infrastructure.validation import (
     ValidationError,
     sanitize_input,
     validate_alphanumeric,
-    validate_aws_region,
     validate_choice,
     validate_integer,
     validate_length,
 )
+from orb.providers.aws.validation.region_validator import validate_aws_region
 
 
 def test_sanitize_input_valid():

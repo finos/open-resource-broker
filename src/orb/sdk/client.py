@@ -37,7 +37,7 @@ class ORBClient:
 
     def __init__(
         self,
-        provider: str = "aws",
+        provider: Optional[str] = None,
         config: Optional[dict[str, Any]] = None,
         config_path: Optional[str] = None,
         app_config: Optional[dict[str, Any]] = None,
@@ -47,7 +47,7 @@ class ORBClient:
         Initialize the Open Resource Broker SDK.
 
         Args:
-            provider: Cloud provider type (aws, mock, etc.)
+            provider: Cloud provider type (aws, mock, etc.). Defaults to value from config/env.
             config: SDK configuration dictionary (timeout, log_level, etc.)
             config_path: Path to configuration file
             app_config: Application config dict — replaces config.json on disk.
@@ -63,7 +63,7 @@ class ORBClient:
             self._config = SDKConfig.from_env()
 
         # Override with explicit parameters
-        if provider != "aws":  # Only override if explicitly set
+        if provider is not None:
             self._config.provider = provider
         if config_path:
             self._config.config_path = config_path

@@ -422,13 +422,14 @@ class OpenResourceBrokerMCPServer:
 
     def _generate_provision_prompt(self, arguments: dict[str, Any]) -> str:
         """Generate infrastructure provisioning prompt."""
-        template_type = arguments.get("template_type", "ec2")
+        template_type = arguments.get("template_type")
+        type_label = template_type if template_type else "compute"
         instance_count = arguments.get("instance_count", 1)
 
-        return f"""I need to provision {instance_count} {template_type} instance(s) using the Open Resource Broker.
+        return f"""I need to provision {instance_count} {type_label} instance(s) using the Open Resource Broker.
 
 Please help me:
-1. List available templates for {template_type}
+1. List available templates for {type_label}
 2. Select the most appropriate template
 3. Create a provisioning request
 4. Monitor the request status

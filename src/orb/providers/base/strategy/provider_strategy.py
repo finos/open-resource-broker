@@ -323,6 +323,30 @@ class ProviderStrategy(ABC):
         """
         return []
 
+    def get_default_region(self) -> str:
+        """Return the default region string for CLI prompts.
+
+        Override in provider-specific strategies.
+        """
+        return ""
+
+    def get_cli_extra_config_keys(self) -> set[str]:
+        """Return the set of infrastructure_defaults keys that belong in provider
+        config rather than template_defaults.
+
+        Override in provider-specific strategies.
+        Default is empty — no keys are config-only.
+        """
+        return set()
+
+    def get_cli_infrastructure_defaults(self, args: Any) -> dict[str, Any]:
+        """Extract provider-specific infrastructure defaults from parsed CLI args.
+
+        Override in provider-specific strategies.
+        Default returns empty dict.
+        """
+        return {}
+
     def resolve_api_alias(self, raw_api: str) -> str:
         """Resolve a provider API name to its canonical form.
 

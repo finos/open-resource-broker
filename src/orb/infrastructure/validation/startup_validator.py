@@ -6,7 +6,6 @@ import sys
 from pathlib import Path
 from typing import Any, Optional, cast
 
-from botocore.exceptions import ClientError, NoCredentialsError
 from pydantic import ValidationError
 
 from orb._package import DOCS_URL
@@ -90,9 +89,8 @@ class StartupValidator:
 
         # 3. Provider credentials configured
         if not self._check_provider_credentials():
-            print_warning("AWS credentials not configured")
-            print_command("  Configure with: aws configure")
-            print_info("  Or set environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY")
+            print_warning("Provider credentials not configured")
+            print_info("  Check your provider configuration and credentials")
 
     def _find_config_file(self) -> bool:
         """Find config file using discovery hierarchy."""
@@ -138,7 +136,7 @@ class StartupValidator:
         return resolved_path is not None and Path(resolved_path).exists()
 
     def _check_provider_credentials(self) -> bool:
-        """Check if provider credentials are configured."""
+        """Check if provider credentials are configured for all configured providers."""
         if not self.app_config:
             return False
 
@@ -147,23 +145,19 @@ class StartupValidator:
             if not providers:
                 return True  # No providers configured
 
-            aws_provider = next((p for p in providers if p.type == "aws"), None)
-            if not aws_provider:
-                return True  # No AWS providers
-
             from orb.providers.registry import get_provider_registry
 
             registry = get_provider_registry()
-            registry.ensure_provider_type_registered("aws")
-            strategy = registry.get_or_create_strategy("aws", aws_provider.config)
-            if strategy is None:
-                return True  # Cannot determine — don't block startup
+            for provider in providers:
+                strategy = registry.get_or_create_strategy(provider.type, provider.config)
+                if strategy is None:
+                    continue  # Cannot determine — don't block startup
+                result = strategy.test_credentials()
+                if not result.get("success", False):
+                    return False
 
-            result = strategy.test_credentials()
-            return result.get("success", False)
+            return True
 
-        except (NoCredentialsError, ClientError):
-            return False
         except Exception:
             return True  # Don't fail on unexpected errors
 

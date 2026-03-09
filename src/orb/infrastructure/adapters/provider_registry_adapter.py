@@ -68,66 +68,42 @@ class ProviderRegistryAdapter(ProviderPort):
             return None
 
     def discover_infrastructure(self, provider_config: dict[str, Any]) -> dict[str, Any]:
-        """Discover infrastructure using Provider Registry."""
-        provider_type = provider_config.get("type", "aws")
-
-        # Ensure provider type is registered
+        """Discover infrastructure by delegating to the provider strategy."""
+        provider_type = provider_config.get("type", "")
+        if not provider_type:
+            return {}
         if not self.registry.ensure_provider_type_registered(provider_type):
             return {}
-
-        if provider_type == "aws":
-            return self._get_aws_infrastructure_service(provider_config).discover_infrastructure(
-                provider_config
-            )
-
-        # For other provider types, return empty dict
-        return {}
+        strategy = self.registry.get_or_create_strategy(provider_type, {})
+        if strategy is None or not hasattr(strategy, "discover_infrastructure"):
+            return {}
+        return strategy.discover_infrastructure(provider_config)
 
     def discover_infrastructure_interactive(
         self, provider_config: dict[str, Any]
     ) -> dict[str, Any]:
-        """Discover infrastructure interactively using Provider Registry."""
-        provider_type = provider_config.get("type", "aws")
-
-        # Ensure provider type is registered
+        """Discover infrastructure interactively by delegating to the provider strategy."""
+        provider_type = provider_config.get("type", "")
+        if not provider_type:
+            return {}
         if not self.registry.ensure_provider_type_registered(provider_type):
             return {}
-
-        if provider_type == "aws":
-            return self._get_aws_infrastructure_service(
-                provider_config
-            ).discover_infrastructure_interactive(provider_config)
-
-        # For other provider types, return empty dict
-        return {}
+        strategy = self.registry.get_or_create_strategy(provider_type, {})
+        if strategy is None or not hasattr(strategy, "discover_infrastructure_interactive"):
+            return {}
+        return strategy.discover_infrastructure_interactive(provider_config)
 
     def validate_infrastructure(self, provider_config: dict[str, Any]) -> dict[str, Any]:
-        """Validate infrastructure using Provider Registry."""
-        provider_type = provider_config.get("type", "aws")
-
-        # Ensure provider type is registered
+        """Validate infrastructure by delegating to the provider strategy."""
+        provider_type = provider_config.get("type", "")
+        if not provider_type:
+            return {}
         if not self.registry.ensure_provider_type_registered(provider_type):
             return {}
-
-        if provider_type == "aws":
-            return self._get_aws_infrastructure_service(provider_config).validate_infrastructure(
-                provider_config
-            )
-
-        # For other provider types, return empty dict
-        return {}
-
-    def _get_aws_infrastructure_service(self, provider_config: dict[str, Any]):
-        """Get AWS infrastructure discovery service."""
-        from orb.providers.aws.services.infrastructure_discovery_service import (
-            AWSInfrastructureDiscoveryService,
-        )
-
-        config = provider_config.get("config", {})
-        region = config.get("region", "us-east-1")
-        profile = config.get("profile", "default")
-
-        return AWSInfrastructureDiscoveryService(region=region, profile=profile)
+        strategy = self.registry.get_or_create_strategy(provider_type, {})
+        if strategy is None or not hasattr(strategy, "validate_infrastructure"):
+            return {}
+        return strategy.validate_infrastructure(provider_config)
 
     def execute_with_strategy(self, *args, **kwargs):
         """Execute with strategy using Provider Registry."""

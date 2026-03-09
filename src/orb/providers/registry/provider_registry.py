@@ -806,9 +806,14 @@ class ProviderRegistry(BaseRegistry):
         if provider.capabilities and api in provider.capabilities:
             return True
 
-        if provider.type == "aws":
-            aws_apis = ["EC2Fleet", "SpotFleet", "RunInstances", "ASG"]
-            return api in aws_apis
+        strategy = self.get_strategy(provider.name)
+        if strategy is not None and hasattr(strategy, "get_capabilities"):
+            try:
+                caps = strategy.get_capabilities()
+                if caps.supported_apis:
+                    return api in caps.supported_apis
+            except Exception:
+                pass
 
         return True
 

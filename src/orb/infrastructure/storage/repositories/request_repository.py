@@ -21,6 +21,7 @@ from orb.infrastructure.storage.base.repository_mixin import StorageRepositoryMi
 from orb.infrastructure.storage.base.strategy import BaseStorageStrategy
 from orb.infrastructure.storage.components.entity_serializer import BaseEntitySerializer
 from orb.infrastructure.storage.components.generic_serializer import GenericEntitySerializer
+from orb.infrastructure.storage.constants import LEGACY_DEFAULT_PROVIDER_TYPE
 
 
 def _id_str(value_obj: Any) -> str:
@@ -127,7 +128,9 @@ class RequestSerializer(BaseEntitySerializer):
                 # Provider tracking fields
                 "provider_name": data.get("provider_name"),
                 "provider_api": data.get("provider_api"),
-                "provider_type": data.get("provider_type", "aws"),
+                # Legacy records written before provider_type was persisted default to 'aws'.
+                # Do not change this default without a data migration.
+                "provider_type": data.get("provider_type", LEGACY_DEFAULT_PROVIDER_TYPE),
                 # Resource tracking fields
                 "resource_ids": data.get("resource_ids", []),
                 "machine_ids": [

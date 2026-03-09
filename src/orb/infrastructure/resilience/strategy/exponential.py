@@ -17,7 +17,6 @@ class ExponentialBackoffStrategy:
         base_delay: float = 1.0,
         max_delay: float = 60.0,
         jitter: bool = True,
-        service: str = "ec2",
     ) -> None:
         """
         Initialize exponential backoff strategy.
@@ -27,13 +26,11 @@ class ExponentialBackoffStrategy:
             base_delay: Base delay in seconds
             max_delay: Maximum delay in seconds
             jitter: Whether to add jitter to delays
-            service: AWS service name for error classification
         """
         self.max_attempts = max_attempts
         self.base_delay = base_delay
         self.max_delay = max_delay
         self.jitter = jitter
-        self.service = service
 
     def should_retry(self, attempt: int, exception: Exception) -> bool:
         """

@@ -14,7 +14,7 @@ from orb.config.schemas.provider_strategy_schema import ProviderInstanceConfig
 from orb.domain.base.exceptions import ConfigurationError
 from orb.domain.base.ports import ConfigurationPort, LoggingPort
 from orb.infrastructure.error.decorators import handle_infrastructure_exceptions
-from orb.providers.aws.config_builder import ProviderConfigBuilder
+from orb.providers.config_builder import ProviderConfigBuilder
 from orb.providers.base.strategy.provider_strategy import ProviderStrategy
 from orb.providers.config_validator import ProviderConfigValidator
 from orb.providers.registry import (

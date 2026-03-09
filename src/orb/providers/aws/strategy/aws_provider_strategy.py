@@ -498,6 +498,25 @@ class AWSProviderStrategy(ProviderStrategy):
             ("sa-east-1", "São Paulo"),
         ]
 
+    def get_default_region(self) -> str:
+        """Return the default AWS region for CLI prompts."""
+        return "us-east-1"
+
+    def get_cli_extra_config_keys(self) -> set[str]:
+        """Return AWS keys that belong in provider config, not template_defaults."""
+        return {"fleet_role"}
+
+    def get_cli_infrastructure_defaults(self, args: Any) -> dict[str, Any]:
+        """Extract AWS-specific infrastructure defaults from parsed CLI args."""
+        result: dict[str, Any] = {}
+        if getattr(args, "subnet_ids", None):
+            result["subnet_ids"] = [s.strip() for s in args.subnet_ids.split(",")]
+        if getattr(args, "security_group_ids", None):
+            result["security_group_ids"] = [s.strip() for s in args.security_group_ids.split(",")]
+        if getattr(args, "fleet_role", None):
+            result["fleet_role"] = args.fleet_role
+        return result
+
     def cleanup(self) -> None:
         """Clean up AWS provider resources."""
         try:

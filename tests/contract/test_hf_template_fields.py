@@ -6,7 +6,7 @@ against the current implementation and should be made green by fixing the field 
 
 import pytest
 
-from orb.application.dto.template_dto import TemplateDTO
+from orb.infrastructure.template.dtos import TemplateDTO
 
 # Fields that must never appear in ondemand templates
 ONDEMAND_FORBIDDEN = {
@@ -33,8 +33,16 @@ SPOT_REQUIRED = {"maxSpotPrice"}
 HETEROGENEOUS_REQUIRED = {"maxSpotPrice", "percentOnDemand"}
 
 
+_AWS_METADATA_KEYS = {"fleet_role", "fleet_type", "percent_on_demand", "abis_instance_requirements"}
+
+
 def _make_template(**kwargs) -> TemplateDTO:
-    """Build a minimal TemplateDTO with sensible defaults, overridden by kwargs."""
+    """Build a minimal TemplateDTO with sensible defaults, overridden by kwargs.
+
+    AWS-specific fields (fleet_role, fleet_type, percent_on_demand,
+    abis_instance_requirements) are routed into the metadata dict because
+    TemplateDTO no longer declares them as top-level attributes.
+    """
     defaults = dict(
         template_id="tpl-test",
         name="Test Template",
@@ -46,6 +54,13 @@ def _make_template(**kwargs) -> TemplateDTO:
         security_group_ids=["sg-bbb"],
     )
     defaults.update(kwargs)
+
+    # Extract AWS-specific fields and pack them into metadata
+    aws_vals = {k: defaults.pop(k) for k in _AWS_METADATA_KEYS if k in defaults}
+    if aws_vals:
+        existing_meta = defaults.get("metadata", {})
+        defaults["metadata"] = {**existing_meta, **aws_vals}
+
     return TemplateDTO(**defaults)
 
 

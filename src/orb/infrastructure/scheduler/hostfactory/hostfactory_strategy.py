@@ -450,6 +450,13 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "provider_api_spec_file": raw_data.get("provider_api_spec_file"),
         }
 
+        # Move AWS-specific keys out of the flat dict and into metadata,
+        # since TemplateDTO no longer declares them as top-level fields.
+        _aws_keys = {"fleet_type", "fleet_role", "percent_on_demand", "abis_instance_requirements"}
+        aws_vals = {k: domain_data.pop(k) for k in _aws_keys if k in domain_data}
+        if aws_vals:
+            domain_data.setdefault("metadata", {}).update(aws_vals)
+
         # Create TemplateDTO object with validation
         return cast(TemplateDTO, TemplateDTO.from_dict(domain_data))
 
@@ -565,11 +572,19 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
 
     def format_templates_for_generation(self, templates: list[dict]) -> list[dict]:
         """Convert internal templates to HostFactory format without applying defaults."""
+        _aws_keys = {"fleet_type", "fleet_role", "percent_on_demand", "abis_instance_requirements"}
         processed_templates = []
 
         for template in templates:
+            # Promote AWS-specific fields from metadata to the top level so the
+            # field mapper can translate them to their HF camelCase names.
+            metadata = template.get("metadata", {})
+            promoted = dict(template)
+            for key in _aws_keys:
+                if key in metadata and key not in promoted:
+                    promoted[key] = metadata[key]
             # Convert to HostFactory format for file storage WITHOUT applying defaults
-            hf_template = self.field_mapper.format_for_generation([template])[0]
+            hf_template = self.field_mapper.format_for_generation([promoted])[0]
             processed_templates.append(hf_template)
 
         return processed_templates
@@ -891,6 +906,13 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
     def format_template_for_display(self, template: TemplateDTO) -> dict[str, Any]:
         """Format TemplateDTO for display using HostFactory field mapper."""
         internal_dict = template.to_dict()
+        # Promote AWS-specific fields from metadata to the top level so the
+        # field mapper can translate them to their HF camelCase names.
+        _aws_keys = {"fleet_type", "fleet_role", "percent_on_demand", "abis_instance_requirements"}
+        metadata = internal_dict.get("metadata", {})
+        for key in _aws_keys:
+            if key in metadata and key not in internal_dict:
+                internal_dict = {**internal_dict, key: metadata[key]}
         return self.field_mapper.map_output_fields(internal_dict, copy_unmapped=False)
 
     def format_template_for_provider(self, template: TemplateDTO) -> dict[str, Any]:

@@ -1,7 +1,5 @@
 """Performance configuration schemas."""
 
-from typing import Any
-
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .base_config import BaseCircuitBreakerConfig
@@ -226,59 +224,4 @@ class PerformanceConfig(BaseModel):
 
 
 class CircuitBreakerConfig(BaseCircuitBreakerConfig):
-    """Performance-focused circuit breaker configuration with service-specific settings."""
-
-    # Service-specific configurations
-    service_configs: dict[str, dict[str, Any]] = Field(
-        default_factory=lambda: {
-            "ec2": {
-                "failure_threshold": 3,
-                "recovery_timeout": 30,
-                "backoff": {
-                    "strategy_type": "exponential",
-                    "max_retries": 3,
-                    "base_delay": 1.0,
-                    "max_delay": 30.0,
-                },
-            },
-            "dynamodb": {
-                "failure_threshold": 5,
-                "reset_timeout": 60,
-                "backoff": {
-                    "strategy_type": "exponential",
-                    "max_retries": 5,
-                    "base_delay": 0.5,
-                    "max_delay": 20.0,
-                },
-            },
-            "s3": {
-                "failure_threshold": 3,
-                "reset_timeout": 30,
-                "backoff": {
-                    "strategy_type": "exponential",
-                    "max_retries": 4,
-                    "base_delay": 0.5,
-                    "max_delay": 15.0,
-                },
-            },
-        },
-        description="Service-specific circuit breaker configurations",
-    )
-
-    # Retryable exceptions by service
-    retryable_exceptions: dict[str, list[str]] = Field(
-        default_factory=lambda: {
-            "ec2": [
-                "RequestLimitExceeded",
-                "InsufficientInstanceCapacity",
-                "InternalError",
-            ],
-            "dynamodb": [
-                "ProvisionedThroughputExceededException",
-                "ThrottlingException",
-                "RequestLimitExceeded",
-            ],
-            "s3": ["SlowDown", "ServiceUnavailable", "InternalError"],
-        },
-        description="Retryable exceptions by service",
-    )
+    """Performance-focused circuit breaker configuration."""

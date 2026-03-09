@@ -110,20 +110,14 @@ def _get_available_schedulers() -> list[dict[str, str]]:
     registry = get_scheduler_registry()
     scheduler_types = registry.get_available_types_with_registration(register_all_scheduler_types)
 
+    seen: set[str] = set()
     schedulers = []
     for scheduler_type in scheduler_types:
-        if scheduler_type == "default":
-            schedulers.append(
-                {"type": "default", "display_name": "default", "description": "Standalone usage"}
-            )
-        elif scheduler_type == "hostfactory":
-            schedulers.append(
-                {
-                    "type": "hostfactory",
-                    "display_name": "hostfactory",
-                    "description": "IBM Spectrum Symphony integration",
-                }
-            )
+        meta = registry.get_display_metadata(scheduler_type)
+        display_name = meta["display_name"]
+        if display_name not in seen:
+            seen.add(display_name)
+            schedulers.append({"type": scheduler_type, **meta})
 
     return schedulers
 
@@ -144,15 +138,9 @@ def _get_available_providers() -> list[dict[str, str]]:
                 {"type": provider_type, "display_name": display_name, "description": description}
             )
 
-        # Fallback to AWS if no providers registered (for backward compatibility)
-        return (
-            providers
-            if providers
-            else [{"type": "aws", "display_name": "aws", "description": "Amazon Web Services"}]
-        )
+        return providers
     except Exception:
-        # Fallback to AWS if registry unavailable
-        return [{"type": "aws", "display_name": "aws", "description": "Amazon Web Services"}]
+        return []
 
 
 def _interactive_setup() -> Dict[str, Any]:
@@ -197,7 +185,7 @@ def _interactive_setup() -> Dict[str, Any]:
         except (ValueError, IndexError):
             # Use first available provider as default
             providers = _get_available_providers()
-            provider_type = providers[0]["type"] if providers else "aws"
+            provider_type = providers[0]["type"] if providers else ""
 
         print_newline()
         print_separator(char="-", color="cyan")
@@ -213,11 +201,12 @@ def _interactive_setup() -> Dict[str, Any]:
         # Collect required parameters first (e.g., region)
         strategy = _get_provider_strategy(provider_type)
         regions = strategy.get_available_regions() if strategy is not None else []
+        default_region = strategy.get_default_region() if strategy is not None else ""
         provider_config = {"type": provider_type}
         for param, info in requirements.items():
             if info.get("required"):
                 if param == "region":
-                    provider_config[param] = _pick_region(regions)
+                    provider_config[param] = _pick_region(regions, default_region)
                 else:
                     prompt = f"  {info['description']}: "
                     provider_config[param] = input(prompt).strip()
@@ -252,7 +241,7 @@ def _interactive_setup() -> Dict[str, Any]:
             return {}
 
         # Extract final values for backward compatibility
-        region = provider_config.get("region", "us-east-1")
+        region = provider_config.get("region") or default_region
         profile = provider_config.get("profile") or None
 
         print_newline()
@@ -262,7 +251,7 @@ def _interactive_setup() -> Dict[str, Any]:
         print_info("")
         print_info("[4/4] Infrastructure Discovery")
         print_separator(char="-", color="cyan")
-        print_info("  Discover AWS infrastructure for template defaults?")
+        print_info("  Discover infrastructure for template defaults?")
         print_info("  This will help create generic templates that work across regions/accounts.")
         print_info("")
         discover_choice = input("  Discover infrastructure? (y/N): ").strip().lower()
@@ -351,7 +340,7 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
         try:
             provider_type = providers[int(provider_choice) - 1]["type"]
         except (ValueError, IndexError):
-            provider_type = providers[0]["type"] if providers else "aws"
+            provider_type = providers[0]["type"] if providers else ""
 
         # Provider configuration
         print_info("")
@@ -363,11 +352,12 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
 
         strategy = _get_provider_strategy(provider_type)
         regions = strategy.get_available_regions() if strategy is not None else []
+        default_region = strategy.get_default_region() if strategy is not None else ""
         provider_config = {"type": provider_type}
         for param, info in requirements.items():
             if info.get("required"):
                 if param == "region":
-                    provider_config[param] = _pick_region(regions)
+                    provider_config[param] = _pick_region(regions, default_region)
                 else:
                     prompt = f"  {info['description']}: "
                     provider_config[param] = input(prompt).strip()
@@ -408,14 +398,14 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
 
         infrastructure_defaults = {}
         if discover_choice in ["y", "yes"]:
-            region = provider_config.get("region", "us-east-1")
+            region = provider_config.get("region") or default_region
             profile = provider_config.get("profile") or None
             infrastructure_defaults = _discover_infrastructure(provider_type, region, profile)
 
         return {
             "type": provider_type,
             "profile": provider_config.get("profile") or None,
-            "region": provider_config.get("region", "us-east-1"),
+            "region": provider_config.get("region") or default_region,
             "infrastructure_defaults": infrastructure_defaults,
         }
 
@@ -439,7 +429,7 @@ def _get_provider_strategy(provider_type: str) -> Optional[Any]:
         return None
 
 
-def _pick_region(regions: list[tuple[str, str]]) -> str:
+def _pick_region(regions: list[tuple[str, str]], default_region: str = "") -> str:
     """Prompt user to select a region.
 
     If regions is non-empty, show a numbered list with an 'Other' option.
@@ -448,7 +438,7 @@ def _pick_region(regions: list[tuple[str, str]]) -> str:
     print_info("")
     if not regions:
         custom = input("  Enter region: ").strip()
-        return custom if custom else "us-east-1"
+        return custom if custom else default_region
 
     print_info("  Select region:")
     for i, (region_id, region_name) in enumerate(regions, 1):
@@ -464,11 +454,11 @@ def _pick_region(regions: list[tuple[str, str]]) -> str:
             return regions[idx][0]
         elif idx == len(regions):
             custom = input("  Enter custom region: ").strip()
-            return custom if custom else "us-east-1"
+            return custom if custom else default_region
         else:
-            return "us-east-1"
+            return default_region
     except ValueError:
-        return "us-east-1"
+        return default_region
 
 
 def _get_available_credential_sources(provider_type: str) -> list[dict]:
@@ -549,25 +539,19 @@ def _get_default_config(args) -> Dict[str, Any]:
     """Get default configuration from args."""
     # Get first available provider as default
     providers = _get_available_providers()
-    default_provider = providers[0]["type"] if providers else "aws"
+    default_provider = providers[0]["type"] if providers else ""
 
-    # Build infrastructure_defaults from CLI flags if provided.
-    # These args (subnet_ids, security_group_ids, fleet_role) are AWS-specific;
-    # other providers would contribute their own CLI args here.
-    infrastructure_defaults: Dict[str, Any] = {}
-    if getattr(args, "subnet_ids", None):
-        infrastructure_defaults["subnet_ids"] = [s.strip() for s in args.subnet_ids.split(",")]
-    if getattr(args, "security_group_ids", None):
-        infrastructure_defaults["security_group_ids"] = [
-            s.strip() for s in args.security_group_ids.split(",")
-        ]
-    if getattr(args, "fleet_role", None):
-        infrastructure_defaults["fleet_role"] = args.fleet_role
+    provider_type = args.provider or default_provider
+    strategy = _get_provider_strategy(provider_type)
+    default_region = strategy.get_default_region() if strategy is not None else ""
+    infrastructure_defaults = (
+        strategy.get_cli_infrastructure_defaults(args) if strategy is not None else {}
+    )
 
     first_provider = {
-        "type": args.provider or default_provider,
+        "type": provider_type,
         "profile": args.profile or None,
-        "region": args.region or "us-east-1",
+        "region": args.region or default_region,
         "infrastructure_defaults": infrastructure_defaults,
     }
 
@@ -618,7 +602,8 @@ def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
         provider_config = {"profile": provider_data["profile"], "region": provider_data["region"]}
         provider_type = provider_data["type"]
 
-        # Generate provider name
+        # Generate provider name and get strategy for config key routing
+        strategy = None
         try:
             from orb.infrastructure.di.container import get_container
             from orb.providers.factory import ProviderStrategyFactory
@@ -651,19 +636,18 @@ def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
 
         # Add template_defaults if infrastructure was discovered.
         # Promote all infrastructure_defaults to template_defaults except for keys
-        # that belong in provider config (e.g. fleet_role) — those are handled separately.
-        _CONFIG_ONLY_KEYS = {"fleet_role"}
+        # that belong in provider config — determined by the provider strategy.
         infrastructure_defaults = provider_data.get("infrastructure_defaults", {})
         if infrastructure_defaults:
+            config_only_keys = strategy.get_cli_extra_config_keys() if strategy is not None else set()
             template_level = {
-                k: v for k, v in infrastructure_defaults.items() if k not in _CONFIG_ONLY_KEYS
+                k: v for k, v in infrastructure_defaults.items() if k not in config_only_keys
             }
             if template_level:
                 provider_instance["template_defaults"] = template_level
-            if "fleet_role" in infrastructure_defaults:
-                provider_instance.setdefault("config", {})["fleet_role"] = infrastructure_defaults[
-                    "fleet_role"
-                ]
+            for key in config_only_keys:
+                if key in infrastructure_defaults:
+                    provider_instance.setdefault("config", {})[key] = infrastructure_defaults[key]
 
         providers_list.append(provider_instance)
 
@@ -672,8 +656,11 @@ def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
         "provider": {"providers": providers_list},
     }
 
-    if user_config["scheduler_type"] == "hostfactory":
-        config["scheduler"]["config_root"] = "$ORB_CONFIG_DIR"
+    from orb.infrastructure.scheduler.registry import get_scheduler_registry
+
+    registry = get_scheduler_registry()
+    extra = registry.get_extra_config_for_type(user_config["scheduler_type"])
+    config["scheduler"].update(extra)
 
     with open(config_file, "w") as f:
         json.dump(config, f, indent=2)

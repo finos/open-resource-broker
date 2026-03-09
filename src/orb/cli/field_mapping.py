@@ -62,6 +62,7 @@ def get_template_field_mapping() -> dict[str, list[str]]:
         "max_spot_price": ["max_spot_price", "maxSpotPrice"],
         "allocation_strategy": ["allocation_strategy", "allocationStrategy"],
         "fleet_type": ["fleet_type", "fleetType"],
+        # AWS SpotFleet-specific; present on TemplateDTO as optional — non-AWS providers will show N/A
         "fleet_role": ["fleet_role", "fleetRole"],
         "created_at": ["created_at", "createdAt"],
         "updated_at": ["updated_at", "updatedAt"],

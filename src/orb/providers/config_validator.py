@@ -8,7 +8,7 @@ from typing import Any
 
 from orb.config.schemas.provider_strategy_schema import ProviderMode
 from orb.domain.base.ports import ConfigurationPort, LoggingPort
-from orb.providers.aws.config_builder import ProviderConfigBuilder
+from orb.providers.config_builder import ProviderConfigBuilder
 from orb.providers.registry import get_provider_registry
 
 
