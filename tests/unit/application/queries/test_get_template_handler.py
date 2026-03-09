@@ -68,7 +68,10 @@ async def test_get_template_handler_retains_existing_launch_template():
     container = _FakeContainer(services)
 
     handler = GetTemplateHandler(
-        logger=Mock(), error_handler=Mock(spec=ErrorHandlingPort), container=container, template_factory=TemplateFactory()
+        logger=Mock(),
+        error_handler=Mock(spec=ErrorHandlingPort),
+        container=container,
+        template_factory=TemplateFactory(),
     )
     query = GetTemplateQuery(template_id="EC2FleetInstantTemplate")
 
