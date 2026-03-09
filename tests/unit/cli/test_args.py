@@ -51,7 +51,9 @@ class TestMachinesRequest:
         assert ns.scheduler == "hf"
 
     def test_scheduler_invalid_choice_raises(self):
-        with patch.object(sys, "argv", ["orb", "machines", "request", "t", "1", "--scheduler", "bad"]):
+        with patch.object(
+            sys, "argv", ["orb", "machines", "request", "t", "1", "--scheduler", "bad"]
+        ):
             with pytest.raises(SystemExit) as exc_info:
                 parse_args()
         assert exc_info.value.code == 2
@@ -104,7 +106,9 @@ class TestFilterFlag:
         assert ns.filter == ["status=running"]
 
     def test_multiple_filters_accumulate(self):
-        ns = _parse(["machines", "list", "--filter", "status=running", "--filter", "template_id=t1"])
+        ns = _parse(
+            ["machines", "list", "--filter", "status=running", "--filter", "template_id=t1"]
+        )
         assert ns.filter == ["status=running", "template_id=t1"]
 
     def test_no_filter_is_none(self):
