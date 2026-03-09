@@ -15,9 +15,9 @@ import pytest
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../..")))
 
+from orb.domain.base.exceptions import InfrastructureError
 from orb.domain.request.aggregate import Request
 from orb.domain.request.value_objects import RequestId, RequestType
-from orb.infrastructure.base.exceptions import InfrastructureError
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,

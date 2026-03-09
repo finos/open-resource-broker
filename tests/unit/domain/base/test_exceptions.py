@@ -3,11 +3,11 @@
 import uuid
 
 from orb.domain.base.exceptions import (
+    ApplicationError,
     DomainException,
     EntityNotFoundError,
     ValidationError,
 )
-from orb.infrastructure.base.exceptions import ApplicationError
 
 
 class TestDomainException:
