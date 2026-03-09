@@ -50,7 +50,9 @@ class ConfigurationAdapter(ConfigurationPort):
                 },
                 "prefixes": {
                     "request": (
-                        config.prefixes.request if hasattr(config.prefixes, "request") else REQUEST_ID_PREFIX_ACQUIRE
+                        config.prefixes.request
+                        if hasattr(config.prefixes, "request")
+                        else REQUEST_ID_PREFIX_ACQUIRE
                     ),
                     "return": (
                         config.prefixes.return_prefix
@@ -68,7 +70,10 @@ class ConfigurationAdapter(ConfigurationPort):
                     "instance_type": r"^[a-z0-9]+\.[a-z0-9]+$",
                     "cidr_block": r"^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$",
                 },
-                "prefixes": {"request": REQUEST_ID_PREFIX_ACQUIRE, "return": REQUEST_ID_PREFIX_RETURN},
+                "prefixes": {
+                    "request": REQUEST_ID_PREFIX_ACQUIRE,
+                    "return": REQUEST_ID_PREFIX_RETURN,
+                },
             }
 
     def get_provider_config(self):

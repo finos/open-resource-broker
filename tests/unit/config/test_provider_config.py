@@ -47,27 +47,61 @@ class TestProviderInstanceConfig:
         valid_names = ["aws-primary", "aws_backup", "provider1", "test-provider"]
         for name in valid_names:
             config = ProviderInstanceConfig(
-                name=name, type="aws", enabled=True, priority=0, weight=100,
-                handlers=None, handler_overrides=None, template_defaults=None,
-                extensions=None, capabilities=None,
+                name=name,
+                type="aws",
+                enabled=True,
+                priority=0,
+                weight=100,
+                handlers=None,
+                handler_overrides=None,
+                template_defaults=None,
+                extensions=None,
+                capabilities=None,
             )
             assert config.name == name
 
         # Invalid names
         with pytest.raises(ValueError, match="Provider name cannot be empty"):
-            ProviderInstanceConfig(name="", type="aws", enabled=True, priority=0, weight=100,
-                handlers=None, handler_overrides=None, template_defaults=None,
-                extensions=None, capabilities=None)
+            ProviderInstanceConfig(
+                name="",
+                type="aws",
+                enabled=True,
+                priority=0,
+                weight=100,
+                handlers=None,
+                handler_overrides=None,
+                template_defaults=None,
+                extensions=None,
+                capabilities=None,
+            )
 
         with pytest.raises(ValueError, match="Provider name cannot be empty"):
-            ProviderInstanceConfig(name="   ", type="aws", enabled=True, priority=0, weight=100,
-                handlers=None, handler_overrides=None, template_defaults=None,
-                extensions=None, capabilities=None)
+            ProviderInstanceConfig(
+                name="   ",
+                type="aws",
+                enabled=True,
+                priority=0,
+                weight=100,
+                handlers=None,
+                handler_overrides=None,
+                template_defaults=None,
+                extensions=None,
+                capabilities=None,
+            )
 
         with pytest.raises(ValueError, match="must contain only alphanumeric"):
-            ProviderInstanceConfig(name="aws@primary", type="aws", enabled=True, priority=0,
-                weight=100, handlers=None, handler_overrides=None, template_defaults=None,
-                extensions=None, capabilities=None)
+            ProviderInstanceConfig(
+                name="aws@primary",
+                type="aws",
+                enabled=True,
+                priority=0,
+                weight=100,
+                handlers=None,
+                handler_overrides=None,
+                template_defaults=None,
+                extensions=None,
+                capabilities=None,
+            )
 
     def test_provider_type_validation(self):
         """Test provider type validation."""
@@ -84,35 +118,80 @@ class TestProviderInstanceConfig:
             )
 
         # Only registered provider types are valid; aws is the registered type
-        config = ProviderInstanceConfig(name="test", type="aws", enabled=True, priority=0,
-            weight=100, handlers=None, handler_overrides=None, template_defaults=None,
-            extensions=None, capabilities=None)
+        config = ProviderInstanceConfig(
+            name="test",
+            type="aws",
+            enabled=True,
+            priority=0,
+            weight=100,
+            handlers=None,
+            handler_overrides=None,
+            template_defaults=None,
+            extensions=None,
+            capabilities=None,
+        )
         assert config.type == "aws"
 
         # Unregistered types raise ValueError
         with pytest.raises(ValueError, match="is not registered"):
-            ProviderInstanceConfig(name="test", type="invalid_unregistered_type", enabled=True,
-                priority=0, weight=100, handlers=None, handler_overrides=None,
-                template_defaults=None, extensions=None, capabilities=None)
+            ProviderInstanceConfig(
+                name="test",
+                type="invalid_unregistered_type",
+                enabled=True,
+                priority=0,
+                weight=100,
+                handlers=None,
+                handler_overrides=None,
+                template_defaults=None,
+                extensions=None,
+                capabilities=None,
+            )
 
     def test_weight_validation(self):
         """Test provider weight validation."""
         # Valid weight
-        config = ProviderInstanceConfig(name="test", type="aws", enabled=True, priority=0,
-            weight=50, handlers=None, handler_overrides=None, template_defaults=None,
-            extensions=None, capabilities=None)
+        config = ProviderInstanceConfig(
+            name="test",
+            type="aws",
+            enabled=True,
+            priority=0,
+            weight=50,
+            handlers=None,
+            handler_overrides=None,
+            template_defaults=None,
+            extensions=None,
+            capabilities=None,
+        )
         assert config.weight == 50
 
         # Invalid weight
         with pytest.raises(ValueError, match="Provider weight must be positive"):
-            ProviderInstanceConfig(name="test", type="aws", enabled=True, priority=0, weight=0,
-                handlers=None, handler_overrides=None, template_defaults=None,
-                extensions=None, capabilities=None)
+            ProviderInstanceConfig(
+                name="test",
+                type="aws",
+                enabled=True,
+                priority=0,
+                weight=0,
+                handlers=None,
+                handler_overrides=None,
+                template_defaults=None,
+                extensions=None,
+                capabilities=None,
+            )
 
         with pytest.raises(ValueError, match="Provider weight must be positive"):
-            ProviderInstanceConfig(name="test", type="aws", enabled=True, priority=0, weight=-10,
-                handlers=None, handler_overrides=None, template_defaults=None,
-                extensions=None, capabilities=None)
+            ProviderInstanceConfig(
+                name="test",
+                type="aws",
+                enabled=True,
+                priority=0,
+                weight=-10,
+                handlers=None,
+                handler_overrides=None,
+                template_defaults=None,
+                extensions=None,
+                capabilities=None,
+            )
 
 
 class TestHealthCheckConfig:
@@ -185,11 +264,15 @@ class TestCircuitBreakerConfig:
         """Test circuit breaker configuration validation."""
         # Invalid failure threshold
         with pytest.raises(ValueError, match="Failure threshold must be positive"):
-            CircuitBreakerConfig(enabled=True, failure_threshold=0, recovery_timeout=60, half_open_max_calls=3)
+            CircuitBreakerConfig(
+                enabled=True, failure_threshold=0, recovery_timeout=60, half_open_max_calls=3
+            )
 
         # Invalid recovery timeout
         with pytest.raises(ValueError, match="Recovery timeout must be positive"):
-            CircuitBreakerConfig(enabled=True, failure_threshold=5, recovery_timeout=-60, half_open_max_calls=3)
+            CircuitBreakerConfig(
+                enabled=True, failure_threshold=5, recovery_timeout=-60, half_open_max_calls=3
+            )
 
 
 class TestProviderConfig:
@@ -204,12 +287,30 @@ class TestProviderConfig:
             default_provider_instance=None,
             health_check_interval=300,
             providers=[
-                ProviderInstanceConfig(name="aws-primary", type="aws", enabled=True, priority=0,
-                    weight=100, handlers=None, handler_overrides=None, template_defaults=None,
-                    extensions=None, capabilities=None),
-                ProviderInstanceConfig(name="aws-backup", type="aws", enabled=False, priority=0,
-                    weight=100, handlers=None, handler_overrides=None, template_defaults=None,
-                    extensions=None, capabilities=None),
+                ProviderInstanceConfig(
+                    name="aws-primary",
+                    type="aws",
+                    enabled=True,
+                    priority=0,
+                    weight=100,
+                    handlers=None,
+                    handler_overrides=None,
+                    template_defaults=None,
+                    extensions=None,
+                    capabilities=None,
+                ),
+                ProviderInstanceConfig(
+                    name="aws-backup",
+                    type="aws",
+                    enabled=False,
+                    priority=0,
+                    weight=100,
+                    handlers=None,
+                    handler_overrides=None,
+                    template_defaults=None,
+                    extensions=None,
+                    capabilities=None,
+                ),
             ],
         )
 
@@ -229,12 +330,30 @@ class TestProviderConfig:
             default_provider_instance=None,
             health_check_interval=300,
             providers=[
-                ProviderInstanceConfig(name="aws-primary", type="aws", enabled=True, priority=0,
-                    weight=100, handlers=None, handler_overrides=None, template_defaults=None,
-                    extensions=None, capabilities=None),
-                ProviderInstanceConfig(name="aws-backup", type="aws", enabled=True, priority=0,
-                    weight=100, handlers=None, handler_overrides=None, template_defaults=None,
-                    extensions=None, capabilities=None),
+                ProviderInstanceConfig(
+                    name="aws-primary",
+                    type="aws",
+                    enabled=True,
+                    priority=0,
+                    weight=100,
+                    handlers=None,
+                    handler_overrides=None,
+                    template_defaults=None,
+                    extensions=None,
+                    capabilities=None,
+                ),
+                ProviderInstanceConfig(
+                    name="aws-backup",
+                    type="aws",
+                    enabled=True,
+                    priority=0,
+                    weight=100,
+                    handlers=None,
+                    handler_overrides=None,
+                    template_defaults=None,
+                    extensions=None,
+                    capabilities=None,
+                ),
             ],
         )
 
@@ -254,9 +373,18 @@ class TestProviderConfig:
             default_provider_instance=None,
             health_check_interval=300,
             providers=[
-                ProviderInstanceConfig(name="aws-only", type="aws", enabled=True, priority=0,
-                    weight=100, handlers=None, handler_overrides=None, template_defaults=None,
-                    extensions=None, capabilities=None),
+                ProviderInstanceConfig(
+                    name="aws-only",
+                    type="aws",
+                    enabled=True,
+                    priority=0,
+                    weight=100,
+                    handlers=None,
+                    handler_overrides=None,
+                    template_defaults=None,
+                    extensions=None,
+                    capabilities=None,
+                ),
             ],
         )
 
@@ -311,9 +439,18 @@ class TestProviderConfig:
         ]
 
         # Create a dummy provider for validation
-        dummy_provider = ProviderInstanceConfig(name="test", type="aws", enabled=True, priority=0,
-            weight=100, handlers=None, handler_overrides=None, template_defaults=None,
-            extensions=None, capabilities=None)
+        dummy_provider = ProviderInstanceConfig(
+            name="test",
+            type="aws",
+            enabled=True,
+            priority=0,
+            weight=100,
+            handlers=None,
+            handler_overrides=None,
+            template_defaults=None,
+            extensions=None,
+            capabilities=None,
+        )
 
         for policy in valid_policies:
             config = ProviderConfig(
@@ -347,12 +484,30 @@ class TestProviderConfig:
                 default_provider_instance=None,
                 health_check_interval=300,
                 providers=[
-                    ProviderInstanceConfig(name="aws-primary", type="aws", enabled=True,
-                        priority=0, weight=100, handlers=None, handler_overrides=None,
-                        template_defaults=None, extensions=None, capabilities=None),
-                    ProviderInstanceConfig(name="aws-primary", type="aws", enabled=True,
-                        priority=0, weight=100, handlers=None, handler_overrides=None,
-                        template_defaults=None, extensions=None, capabilities=None),  # Duplicate name
+                    ProviderInstanceConfig(
+                        name="aws-primary",
+                        type="aws",
+                        enabled=True,
+                        priority=0,
+                        weight=100,
+                        handlers=None,
+                        handler_overrides=None,
+                        template_defaults=None,
+                        extensions=None,
+                        capabilities=None,
+                    ),
+                    ProviderInstanceConfig(
+                        name="aws-primary",
+                        type="aws",
+                        enabled=True,
+                        priority=0,
+                        weight=100,
+                        handlers=None,
+                        handler_overrides=None,
+                        template_defaults=None,
+                        extensions=None,
+                        capabilities=None,
+                    ),  # Duplicate name
                 ],
             )
 
@@ -366,9 +521,18 @@ class TestProviderConfig:
                 default_provider_instance=None,
                 health_check_interval=300,
                 providers=[
-                    ProviderInstanceConfig(name="aws-primary", type="aws", enabled=True,
-                        priority=0, weight=100, handlers=None, handler_overrides=None,
-                        template_defaults=None, extensions=None, capabilities=None),
+                    ProviderInstanceConfig(
+                        name="aws-primary",
+                        type="aws",
+                        enabled=True,
+                        priority=0,
+                        weight=100,
+                        handlers=None,
+                        handler_overrides=None,
+                        template_defaults=None,
+                        extensions=None,
+                        capabilities=None,
+                    ),
                 ],
             )
 
@@ -381,12 +545,30 @@ class TestProviderConfig:
             default_provider_instance=None,
             health_check_interval=300,
             providers=[
-                ProviderInstanceConfig(name="aws-primary", type="aws", enabled=True, priority=0,
-                    weight=100, handlers=None, handler_overrides=None, template_defaults=None,
-                    extensions=None, capabilities=None),
-                ProviderInstanceConfig(name="aws-backup", type="aws", enabled=True, priority=0,
-                    weight=100, handlers=None, handler_overrides=None, template_defaults=None,
-                    extensions=None, capabilities=None),
+                ProviderInstanceConfig(
+                    name="aws-primary",
+                    type="aws",
+                    enabled=True,
+                    priority=0,
+                    weight=100,
+                    handlers=None,
+                    handler_overrides=None,
+                    template_defaults=None,
+                    extensions=None,
+                    capabilities=None,
+                ),
+                ProviderInstanceConfig(
+                    name="aws-backup",
+                    type="aws",
+                    enabled=True,
+                    priority=0,
+                    weight=100,
+                    handlers=None,
+                    handler_overrides=None,
+                    template_defaults=None,
+                    extensions=None,
+                    capabilities=None,
+                ),
             ],
         )
 
@@ -402,9 +584,18 @@ class TestProviderConfig:
     def test_health_check_interval_validation(self):
         """Test health check interval validation."""
         # Create a dummy provider for validation
-        dummy_provider = ProviderInstanceConfig(name="test", type="aws", enabled=True, priority=0,
-            weight=100, handlers=None, handler_overrides=None, template_defaults=None,
-            extensions=None, capabilities=None)
+        dummy_provider = ProviderInstanceConfig(
+            name="test",
+            type="aws",
+            enabled=True,
+            priority=0,
+            weight=100,
+            handlers=None,
+            handler_overrides=None,
+            template_defaults=None,
+            extensions=None,
+            capabilities=None,
+        )
 
         # Valid interval
         config = ProviderConfig(

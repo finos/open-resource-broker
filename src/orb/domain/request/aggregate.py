@@ -364,11 +364,19 @@ class Request(AggregateRoot):
         if request_id:
             # If request_id doesn't have prefix, add it based on request_type
             if not request_id.startswith((REQUEST_ID_PREFIX_ACQUIRE, REQUEST_ID_PREFIX_RETURN)):
-                prefix = REQUEST_ID_PREFIX_ACQUIRE if request_type == RequestType.ACQUIRE else REQUEST_ID_PREFIX_RETURN
+                prefix = (
+                    REQUEST_ID_PREFIX_ACQUIRE
+                    if request_type == RequestType.ACQUIRE
+                    else REQUEST_ID_PREFIX_RETURN
+                )
                 request_id_obj = RequestId(value=f"{prefix}{request_id}")
             else:
                 # Validate that existing prefix matches request_type
-                expected_prefix = REQUEST_ID_PREFIX_ACQUIRE if request_type == RequestType.ACQUIRE else REQUEST_ID_PREFIX_RETURN
+                expected_prefix = (
+                    REQUEST_ID_PREFIX_ACQUIRE
+                    if request_type == RequestType.ACQUIRE
+                    else REQUEST_ID_PREFIX_RETURN
+                )
                 if not request_id.startswith(expected_prefix):
                     raise RequestValidationError(
                         f"Request ID prefix mismatch: ID '{request_id}' has wrong prefix for "

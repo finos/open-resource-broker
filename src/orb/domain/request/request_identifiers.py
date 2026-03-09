@@ -54,7 +54,11 @@ class RequestId(ValueObject):
     @property
     def request_type(self) -> RequestType:
         """Get the request type from the ID prefix."""
-        return RequestType.ACQUIRE if self.value.startswith(REQUEST_ID_PREFIX_ACQUIRE) else RequestType.RETURN
+        return (
+            RequestType.ACQUIRE
+            if self.value.startswith(REQUEST_ID_PREFIX_ACQUIRE)
+            else RequestType.RETURN
+        )
 
     @classmethod
     def generate(cls, request_type: RequestType, prefix: Optional[str] = None) -> RequestId:
@@ -69,7 +73,11 @@ class RequestId(ValueObject):
             New RequestId instance
         """
         if prefix is None:
-            prefix = REQUEST_ID_PREFIX_ACQUIRE if request_type == RequestType.ACQUIRE else REQUEST_ID_PREFIX_RETURN
+            prefix = (
+                REQUEST_ID_PREFIX_ACQUIRE
+                if request_type == RequestType.ACQUIRE
+                else REQUEST_ID_PREFIX_RETURN
+            )
         return cls(value=f"{prefix}{uuid.uuid4()!s}")
 
     @staticmethod
