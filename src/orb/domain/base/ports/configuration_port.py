@@ -94,14 +94,6 @@ class ConfigurationPort(ProviderConfigPort):
         """Get resource naming prefix for the given resource type."""
 
     @abstractmethod
-    def get_validation_config(self) -> dict[str, Any]:
-        """Get validation configuration."""
-
-    @abstractmethod
-    def get_cleanup_config(self) -> dict[str, Any]:
-        """Get cleanup configuration."""
-
-    @abstractmethod
     def get_config_file_path(self) -> str:
         """Get the config file path."""
 

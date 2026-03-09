@@ -70,16 +70,6 @@ class ConfigurationAdapter(ConfigurationPort):
                 "prefixes": {"request": "req-", "return": "ret-"},
             }
 
-    def get_cleanup_config(self) -> dict[str, Any]:
-        """Get cleanup configuration."""
-        try:
-            raw = self._config_manager._ensure_raw_config()  # type: ignore[attr-defined]
-            cleanup_config = raw.get("cleanup", {}) if isinstance(raw, dict) else {}
-            return cleanup_config if isinstance(cleanup_config, dict) else {}
-        except Exception as e:
-            _logger.warning("Failed to load cleanup config, using defaults: %s", e)
-            return {}
-
     def get_validation_config(self) -> dict[str, Any]:
         """Get validation configuration for domain layer."""
         try:
