@@ -251,7 +251,7 @@ class ConfigurationAdapter(ConfigurationPort):
         """Get scheduler strategy - delegate to ConfigurationManager."""
         return self._config_manager.get_scheduler_strategy()
 
-    def get_typed(self, key, expected_type=None, default=None):  # type: ignore[override]
+    def get_typed(self, key, _expected_type=None, _default=None):  # type: ignore[override]
         """Get typed configuration for compatibility with ConfigurationManager."""
         return self._config_manager.get_typed(key)  # type: ignore[arg-type]
 

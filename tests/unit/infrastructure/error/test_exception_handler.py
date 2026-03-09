@@ -294,7 +294,7 @@ class TestExceptionDecorators:
             layer="application",
             additional_context={"service": "test_service"},
         )
-        def test_function(param1: str, param2: int = 42):
+        def test_function(_param1: str, _param2: int = 42):
             raise ValueError("test error")
 
         with pytest.raises(ValidationError):
@@ -652,7 +652,7 @@ class TestPythonBuiltinExceptionWrapping:
         # JSON decode error with config context gets wrapped to ConfigurationError
         json_error = json.JSONDecodeError("Invalid JSON", '{"test": }', 10)
 
-        result = handler.handle(json_error, context="config_test")
+        result = handler.handle(json_error, context=ExceptionContext("config_test"))
 
         assert isinstance(result, ConfigurationError)
         assert "Invalid JSON format" in str(result)
