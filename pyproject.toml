@@ -311,6 +311,14 @@ markers = [
     "provider_contract: part of the provider contract test suite",
     "simulator_limitation: assertion weakened due to known simulator gap",
     "requires_real_provider: skipped unless --run-real-provider flag passed",
+    "asyncio: marks async tests",
+    "benchmark: marks benchmark/performance tests",
+    "architecture: marks architecture compliance tests",
+    "domain: marks domain layer tests",
+    "application: marks application layer tests",
+    "infrastructure: marks infrastructure layer tests",
+    "providers: marks provider tests",
+    "patterns: marks design pattern tests",
 ]
 env = [
     "AWS_DEFAULT_REGION=us-east-1",
