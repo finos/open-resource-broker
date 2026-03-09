@@ -63,6 +63,7 @@ class TestGetTypedProviderConfig:
 
     def test_get_typed_uses_generic_fallback_for_unregistered_class(self):
         """get_typed falls back to section-name lookup for classes not in registry."""
+
         # A config class not registered in ProviderSettingsRegistry
         class PerformanceConfig:
             def __init__(self, max_workers: int = 4, **kwargs):
