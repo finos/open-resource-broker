@@ -191,7 +191,11 @@ async def handle_stop_machines(args: "argparse.Namespace") -> dict[str, Any]:
     provider_result = await provider_selection_port.execute_operation(
         selection.provider_name, operation
     )
-    stop_results: dict[str, bool] = provider_result.data.get("results", {}) if provider_result.success else {mid: False for mid in machine_ids}
+    stop_results: dict[str, bool] = (
+        provider_result.data.get("results", {})
+        if provider_result.success
+        else {mid: False for mid in machine_ids}
+    )
 
     # Update machine status to "stopping" for successfully stopped machines
     from orb.application.machine.commands import UpdateMachineStatusCommand
@@ -281,7 +285,11 @@ async def handle_start_machines(args: "argparse.Namespace") -> dict[str, Any]:
     provider_result = await provider_selection_port.execute_operation(
         selection.provider_name, operation
     )
-    start_results: dict[str, bool] = provider_result.data.get("results", {}) if provider_result.success else {mid: False for mid in machine_ids}
+    start_results: dict[str, bool] = (
+        provider_result.data.get("results", {})
+        if provider_result.success
+        else {mid: False for mid in machine_ids}
+    )
 
     # Update machine status to "pending" for successfully started machines
     from orb.application.machine.commands import UpdateMachineStatusCommand

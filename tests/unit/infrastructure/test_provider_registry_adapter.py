@@ -11,8 +11,7 @@ from orb.infrastructure.adapters.provider_registry_adapter import ProviderRegist
 
 
 SOURCE_PATH = (
-    Path(__file__).parents[3]
-    / "src/orb/infrastructure/adapters/provider_registry_adapter.py"
+    Path(__file__).parents[3] / "src/orb/infrastructure/adapters/provider_registry_adapter.py"
 )
 
 

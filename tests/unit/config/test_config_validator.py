@@ -15,7 +15,7 @@ class TestConfigValidatorNoAwsHardcoding:
         import orb.config.validators.config_validator as mod
 
         source = inspect.getsource(mod)
-        assert "provider_type == \"aws\"" not in source
+        assert 'provider_type == "aws"' not in source
         assert "provider_type == 'aws'" not in source
 
     def test_source_has_no_provider_type_equals_aws_in_business_rules(self):
@@ -24,7 +24,7 @@ class TestConfigValidatorNoAwsHardcoding:
         import orb.config.validators.config_validator as mod
 
         source = inspect.getsource(mod)
-        assert "provider.type == \"aws\"" not in source
+        assert 'provider.type == "aws"' not in source
         assert "provider.type == 'aws'" not in source
 
 
@@ -84,5 +84,7 @@ class TestValidateBusinessRulesNoAwsBlock:
             }
         ]
         result = validator.validate_config(config_data)
-        aws_warnings = [w for w in result.warnings if "aws_max_retries" in w or "aws_read_timeout" in w]
+        aws_warnings = [
+            w for w in result.warnings if "aws_max_retries" in w or "aws_read_timeout" in w
+        ]
         assert aws_warnings == [], f"Unexpected AWS warnings: {aws_warnings}"

@@ -193,7 +193,11 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             capacity_constrained = any(
                 e.get("error_code") in capacity_error_codes for e in fleet_errors
             )
-            fleet_type_value = aws_template.fleet_type.value if aws_template.fleet_type is not None else aws_template.fleet_type
+            fleet_type_value = (
+                aws_template.fleet_type.value
+                if aws_template.fleet_type is not None
+                else aws_template.fleet_type
+            )
             return {
                 "success": True,
                 "resource_ids": [fleet_id],

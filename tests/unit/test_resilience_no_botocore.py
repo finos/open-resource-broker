@@ -1,4 +1,5 @@
 """Verify resilience strategies have no botocore dependency."""
+
 import ast
 import pathlib
 
@@ -10,10 +11,10 @@ def _get_imports(filepath: pathlib.Path) -> set[str]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                imports.add(alias.name.split('.')[0])
+                imports.add(alias.name.split(".")[0])
         elif isinstance(node, ast.ImportFrom):
             if node.module:
-                imports.add(node.module.split('.')[0])
+                imports.add(node.module.split(".")[0])
     return imports
 
 
@@ -56,6 +57,7 @@ RESILIENCE_FILES = [
     pathlib.Path("src/orb/infrastructure/resilience/config.py"),
 ]
 
+
 def _get_string_literals(filepath: pathlib.Path) -> set[str]:
     """Extract all string literal values from a Python file via AST."""
     tree = ast.parse(filepath.read_text())
@@ -71,9 +73,7 @@ def test_resilience_files_no_aws_service_string_literals():
     for path in RESILIENCE_FILES:
         literals = _get_string_literals(path)
         for svc in AWS_SERVICE_NAMES:
-            assert svc not in literals, (
-                f"{path} still contains AWS service name literal '{svc}'"
-            )
+            assert svc not in literals, f"{path} still contains AWS service name literal '{svc}'"
 
 
 def test_performance_schema_no_aws_service_string_literals():
@@ -129,9 +129,7 @@ def test_storage_schema_no_service_configs_field():
     """RetryConfig in storage_schema.py must not have a service_configs field."""
     path = pathlib.Path("src/orb/config/schemas/storage_schema.py")
     source = path.read_text()
-    assert "service_configs" not in source, (
-        "storage_schema.py still defines service_configs field"
-    )
+    assert "service_configs" not in source, "storage_schema.py still defines service_configs field"
 
 
 def test_performance_schema_no_service_configs_field():

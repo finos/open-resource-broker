@@ -50,15 +50,19 @@ class TestProviderSupportsApiNoHardcode:
     def test_no_hardcoded_aws_api_list_in_source(self):
         """The source of _provider_supports_api must not contain the hardcoded AWS API list."""
         import inspect
+
         source = inspect.getsource(ProviderRegistry._provider_supports_api)
         assert "EC2Fleet" not in source, "Hardcoded 'EC2Fleet' found in _provider_supports_api"
         assert "SpotFleet" not in source, "Hardcoded 'SpotFleet' found in _provider_supports_api"
-        assert "RunInstances" not in source, "Hardcoded 'RunInstances' found in _provider_supports_api"
+        assert "RunInstances" not in source, (
+            "Hardcoded 'RunInstances' found in _provider_supports_api"
+        )
         assert "ASG" not in source, "Hardcoded 'ASG' found in _provider_supports_api"
 
     def test_no_provider_type_aws_check_in_source(self):
         """The source must not contain 'provider.type == \"aws\"'."""
         import inspect
+
         source = inspect.getsource(ProviderRegistry._provider_supports_api)
         assert 'provider.type == "aws"' not in source
         assert "provider.type == 'aws'" not in source

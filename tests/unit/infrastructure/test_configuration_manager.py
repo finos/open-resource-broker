@@ -256,7 +256,8 @@ class TestConfigurationManager:
         config_file.write_text(json.dumps({}))
         manager = ConfigurationManager(config_file=str(config_file))
         aws_methods = [
-            name for name in dir(manager)
+            name
+            for name in dir(manager)
             if (
                 "aws_region" in name
                 or "aws_profile" in name
@@ -264,7 +265,9 @@ class TestConfigurationManager:
                 or name.startswith("get_aws_")
             )
         ]
-        assert aws_methods == [], f"Found AWS-specific methods that should be renamed: {aws_methods}"
+        assert aws_methods == [], (
+            f"Found AWS-specific methods that should be renamed: {aws_methods}"
+        )
 
     def test_override_provider_instance(self, tmp_path):
         """Test overriding provider instance."""

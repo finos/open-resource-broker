@@ -386,10 +386,13 @@ class AWSClient:
             # Get metrics configuration from ConfigurationPort
             metrics_config = self._config_manager.get_metrics_config()
             aws_cfg = (
-                metrics_config.get("provider_metrics", {}) if isinstance(metrics_config, dict) else {}
+                metrics_config.get("provider_metrics", {})
+                if isinstance(metrics_config, dict)
+                else {}
             )
             aws_metrics_enabled = aws_cfg.get(
-                "provider_metrics_enabled", aws_cfg.get("aws_metrics_enabled", metrics_config.get("aws_metrics_enabled", True))
+                "provider_metrics_enabled",
+                aws_cfg.get("aws_metrics_enabled", metrics_config.get("aws_metrics_enabled", True)),
             )
             self._logger.debug("provider_metrics_enabled flag value: %s", aws_metrics_enabled)
             return aws_metrics_enabled

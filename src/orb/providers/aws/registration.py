@@ -80,6 +80,7 @@ def create_aws_strategy(provider_config: Any) -> Any:
             from orb.infrastructure.di.container import get_container
             from orb.monitoring.health import HealthCheck
             from orb.providers.aws.health import register_aws_health_checks
+
             if strategy.aws_client is not None:
                 health_check = get_container().get(HealthCheck)
                 register_aws_health_checks(health_check, strategy.aws_client)
@@ -489,7 +490,9 @@ def register_aws_services_with_di(container) -> None:
         from orb.config.managers.configuration_manager import ConfigurationManager
         from orb.monitoring.health import HealthCheck
 
-        container.register_singleton(HealthCheck, lambda c: HealthCheck(config=c.get(ConfigurationManager)))
+        container.register_singleton(
+            HealthCheck, lambda c: HealthCheck(config=c.get(ConfigurationManager))
+        )
         logger.debug("HealthCheck registered with DI container")
 
         logger.debug("AWS utility services registered with DI container")

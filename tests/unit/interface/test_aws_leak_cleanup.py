@@ -44,7 +44,7 @@ class TestInfrastructureCommandHandlerNoAWSLeaks:
     def test_no_aws_type_guard_in_overrides(self):
         source = self._source()
         # The type == 'aws' guard that restricted override logic to AWS only must be gone.
-        assert "== \"aws\"" not in source and "== 'aws'" not in source, (
+        assert '== "aws"' not in source and "== 'aws'" not in source, (
             "_get_active_providers_with_overrides must not guard on provider type 'aws'"
         )
 
@@ -106,9 +106,7 @@ class TestMCPServerCoreNoEC2Default:
         server = OpenResourceBrokerMCPServer()
         # Call with no template_type argument — must not produce 'ec2' in output
         prompt = server._generate_provision_prompt({})
-        assert "ec2" not in prompt, (
-            "Provision prompt with no template_type must not mention 'ec2'"
-        )
+        assert "ec2" not in prompt, "Provision prompt with no template_type must not mention 'ec2'"
 
     def test_provision_prompt_uses_provided_type(self):
         from orb.interface.mcp.server.core import OpenResourceBrokerMCPServer

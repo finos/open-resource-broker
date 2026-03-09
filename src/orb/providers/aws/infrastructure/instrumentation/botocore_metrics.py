@@ -42,7 +42,9 @@ class BotocoreMetricsHandler:
         self.logger = logger
 
         cfg = aws_metrics_config or {}
-        self.enabled = bool(cfg.get("provider_metrics_enabled", cfg.get("aws_metrics_enabled", False)))
+        self.enabled = bool(
+            cfg.get("provider_metrics_enabled", cfg.get("aws_metrics_enabled", False))
+        )
         self.sample_rate = float(cfg.get("sample_rate", 1.0) or 1.0)
         self.monitored_services = set(cfg.get("monitored_services", []) or [])
         self.monitored_operations = set(cfg.get("monitored_operations", []) or [])

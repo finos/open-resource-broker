@@ -1,4 +1,5 @@
 """Verify machine_command_handlers has no AWS-specific imports."""
+
 import ast
 import pathlib
 
@@ -22,5 +23,6 @@ def test_no_aws_provider_imports():
 def test_operation_type_has_start_stop():
     """ProviderOperationType must have START_INSTANCES and STOP_INSTANCES."""
     from orb.providers.base.strategy.provider_strategy import ProviderOperationType
+
     assert hasattr(ProviderOperationType, "START_INSTANCES"), "Missing START_INSTANCES"
     assert hasattr(ProviderOperationType, "STOP_INSTANCES"), "Missing STOP_INSTANCES"

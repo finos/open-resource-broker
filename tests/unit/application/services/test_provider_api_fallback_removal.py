@@ -26,6 +26,7 @@ _FILES = [
 # Static analysis: no AWS API name literals in application services
 # ---------------------------------------------------------------------------
 
+
 class TestNoAwsApiLiteralsInApplicationServices:
     """Scan source files for forbidden AWS API name string literals."""
 
@@ -34,17 +35,13 @@ class TestNoAwsApiLiteralsInApplicationServices:
         source = service_file.read_text()
         # Match the string literal in any quote style
         matches = re.findall(r"""['"]RunInstances['"]""", source)
-        assert matches == [], (
-            f"{service_file.name} contains 'RunInstances' literal(s): {matches}"
-        )
+        assert matches == [], f"{service_file.name} contains 'RunInstances' literal(s): {matches}"
 
     @pytest.mark.parametrize("service_file", _FILES, ids=[f.name for f in _FILES])
     def test_no_ec2fleet_literal(self, service_file: Path):
         source = service_file.read_text()
         matches = re.findall(r"""['"]EC2Fleet['"]""", source)
-        assert matches == [], (
-            f"{service_file.name} contains 'EC2Fleet' literal(s): {matches}"
-        )
+        assert matches == [], f"{service_file.name} contains 'EC2Fleet' literal(s): {matches}"
 
     @pytest.mark.parametrize("service_file", _FILES, ids=[f.name for f in _FILES])
     def test_files_are_valid_python(self, service_file: Path):
@@ -56,6 +53,7 @@ class TestNoAwsApiLiteralsInApplicationServices:
 # ---------------------------------------------------------------------------
 # RequestCreationService: raises ValueError when template.provider_api is None
 # ---------------------------------------------------------------------------
+
 
 class TestRequestCreationServiceRaisesOnMissingProviderApi:
     def setup_method(self):
@@ -133,6 +131,7 @@ class TestRequestCreationServiceRaisesOnMissingProviderApi:
 # MachineGroupingService: warns and skips machines with no provider_api
 # ---------------------------------------------------------------------------
 
+
 class TestMachineGroupingServiceSkipsMissingProviderApi:
     def setup_method(self):
         from orb.application.services.machine_grouping_service import MachineGroupingService
@@ -206,6 +205,7 @@ class TestMachineGroupingServiceSkipsMissingProviderApi:
 # TemplateDefaultsService: raises ValueError instead of returning 'EC2Fleet'
 # ---------------------------------------------------------------------------
 
+
 class TestTemplateDefaultsServiceRaisesOnMissingProviderApi:
     def setup_method(self):
         from orb.application.services.template_defaults_service import TemplateDefaultsService
@@ -217,9 +217,7 @@ class TestTemplateDefaultsServiceRaisesOnMissingProviderApi:
         self.config_manager.get_provider_config.return_value = MagicMock(
             providers=[], provider_defaults={}
         )
-        self.svc = TemplateDefaultsService(
-            config_manager=self.config_manager, logger=self.logger
-        )
+        self.svc = TemplateDefaultsService(config_manager=self.config_manager, logger=self.logger)
 
     def test_raises_value_error_when_no_provider_api_configured(self):
         with pytest.raises(ValueError, match="provider_api"):

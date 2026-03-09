@@ -25,7 +25,7 @@ class TestTypeConverterNoAwsHardcoding:
         import orb.config.managers.type_converter as mod
 
         source = inspect.getsource(mod)
-        assert "== \"aws\"" not in source
+        assert '== "aws"' not in source
         assert "== 'aws'" not in source
 
     def test_no_get_aws_provider_config_method(self):
@@ -56,6 +56,7 @@ class TestGetTypedProviderConfig:
         """get_typed(AWSProviderConfig) resolves through ProviderSettingsRegistry."""
         # Ensure AWS is registered
         from orb.providers.aws.registration import register_aws_provider_settings
+
         register_aws_provider_settings()
 
         from orb.providers.aws.configuration.config import AWSProviderConfig
@@ -83,6 +84,7 @@ class TestGetTypedProviderConfig:
         converter = ConfigTypeConverter(self._raw_config_with_aws())
         # Call the renamed method directly with provider_type='aws'
         from orb.providers.aws.configuration.config import AWSProviderConfig
+
         result = converter._get_provider_config_for_type("aws", AWSProviderConfig)
         assert isinstance(result, AWSProviderConfig)
 
@@ -98,5 +100,6 @@ class TestGetTypedProviderConfig:
         }
         converter = ConfigTypeConverter(raw)
         from orb.providers.aws.configuration.config import AWSProviderConfig
+
         with pytest.raises(Exception, match="gcp"):
             converter._get_provider_config_for_type("gcp", AWSProviderConfig)

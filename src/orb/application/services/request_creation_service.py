@@ -56,9 +56,7 @@ class RequestCreationService:
 
         # Store provider API in domain field
         if not template.provider_api:
-            raise ValueError(
-                f"Template {template.template_id} has no provider_api configured"
-            )
+            raise ValueError(f"Template {template.template_id} has no provider_api configured")
         request.provider_api = template.provider_api
 
         self._logger.info(

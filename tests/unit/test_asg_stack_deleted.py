@@ -1,4 +1,5 @@
 """Verify the dead ASG query stack has been fully removed."""
+
 import pytest
 
 
@@ -25,5 +26,8 @@ def test_sync_request_handler_has_no_asg_query_port_param():
     import inspect
 
     from orb.application.commands.request_sync_handlers import SyncRequestHandler
+
     sig = inspect.signature(SyncRequestHandler.__init__)
-    assert "asg_query_port" not in sig.parameters, "SyncRequestHandler still has asg_query_port parameter"
+    assert "asg_query_port" not in sig.parameters, (
+        "SyncRequestHandler still has asg_query_port parameter"
+    )

@@ -229,5 +229,6 @@ class TestInjectableMigration(unittest.TestCase):
         provider_strategy = self.container.get(AWSProviderStrategy)
         self.assertIsNotNone(provider_strategy)
 
+
 if __name__ == "__main__":
     unittest.main()

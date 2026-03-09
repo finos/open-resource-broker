@@ -34,8 +34,7 @@ def _get_template_dto_field_names() -> set[str]:
             return {
                 target.id
                 for stmt in node.body
-                if isinstance(stmt, ast.AnnAssign)
-                and isinstance(stmt.target, ast.Name)
+                if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name)
                 for target in [stmt.target]
             }
     return set()
@@ -78,6 +77,7 @@ class TestTemplateDTONoAWSFields:
 # from_domain() packs AWS fields into metadata
 # ---------------------------------------------------------------------------
 
+
 def _make_aws_template(**kwargs) -> AWSTemplate:
     defaults = dict(
         template_id="tpl-1",
@@ -107,9 +107,7 @@ class TestFromDomainPacksAWSFieldsIntoMetadata:
         assert dto.metadata.get("fleet_role") == "arn:aws:iam::123:role/MyRole"
 
     def test_percent_on_demand_in_metadata(self):
-        template = _make_aws_template(
-            price_type="heterogeneous", percent_on_demand=40
-        )
+        template = _make_aws_template(price_type="heterogeneous", percent_on_demand=40)
         dto = TemplateDTO.from_domain(template)
         assert dto.metadata.get("percent_on_demand") == 40
 
@@ -148,6 +146,7 @@ class TestFromDomainPacksAWSFieldsIntoMetadata:
 # ---------------------------------------------------------------------------
 # AWSTemplate round-trip via TemplateDTO
 # ---------------------------------------------------------------------------
+
 
 class TestAWSTemplateRoundTrip:
     """AWSTemplate → TemplateDTO → AWSTemplate must preserve AWS fields."""

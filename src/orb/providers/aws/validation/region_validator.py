@@ -21,7 +21,5 @@ def validate_aws_region(value: str) -> str:
         ValidationError: If region format is invalid
     """
     if not AWS_REGION.match(value):
-        raise ValidationError(
-            "Invalid AWS region format (expected: us-east-1, eu-west-1, etc.)"
-        )
+        raise ValidationError("Invalid AWS region format (expected: us-east-1, eu-west-1, etc.)")
     return value

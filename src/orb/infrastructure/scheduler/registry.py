@@ -117,7 +117,9 @@ class SchedulerRegistry(BaseRegistry):
     ) -> BaseRegistration:
         """Create scheduler-specific registration."""
         strategy_class = additional_factories.pop("strategy_class", None)
-        return SchedulerRegistration(type_name, strategy_factory, config_factory, strategy_class=strategy_class)
+        return SchedulerRegistration(
+            type_name, strategy_factory, config_factory, strategy_class=strategy_class
+        )
 
 
 # Global singleton instance

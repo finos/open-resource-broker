@@ -164,6 +164,7 @@ class InputValidator:
                 raise ValidationError(f"Input must be one of: {', '.join(choices)}")
             return value
 
+
 # Convenience functions
 def sanitize_input(value: str, max_length: int = 1000) -> str:
     """Sanitize user input."""

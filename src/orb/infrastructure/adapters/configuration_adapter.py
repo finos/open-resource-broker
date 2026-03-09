@@ -155,10 +155,16 @@ class ConfigurationAdapter(ConfigurationPort):
 
             if isinstance(metrics_config, dict):
                 result.update(
-                    {k: metrics_config.get(k, v) for k, v in defaults.items() if k != "provider_metrics"}
+                    {
+                        k: metrics_config.get(k, v)
+                        for k, v in defaults.items()
+                        if k != "provider_metrics"
+                    }
                 )
                 # Accept both "provider_metrics" (new) and "aws_metrics" (legacy JSON key)
-                raw_nested = metrics_config.get("provider_metrics") or metrics_config.get("aws_metrics")
+                raw_nested = metrics_config.get("provider_metrics") or metrics_config.get(
+                    "aws_metrics"
+                )
                 if raw_nested and isinstance(raw_nested, dict):
                     result["provider_metrics"].update(raw_nested)
 

@@ -328,9 +328,7 @@ async def handle_provider_show(args) -> int:
         return 1
 
 
-def _test_provider_credentials(
-    provider_type: str, credential_config: dict
-) -> tuple[bool, str]:
+def _test_provider_credentials(provider_type: str, credential_config: dict) -> tuple[bool, str]:
     """Test provider credentials via the provider strategy."""
     try:
         from orb.providers.registry import get_provider_registry

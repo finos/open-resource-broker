@@ -4,8 +4,7 @@ import ast
 from pathlib import Path
 
 VALIDATOR_PATH = (
-    Path(__file__).parent.parent.parent
-    / "src/orb/infrastructure/validation/startup_validator.py"
+    Path(__file__).parent.parent.parent / "src/orb/infrastructure/validation/startup_validator.py"
 )
 
 

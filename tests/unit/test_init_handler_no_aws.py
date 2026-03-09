@@ -1,4 +1,5 @@
 """Verify init_command_handler has no AWS-specific code."""
+
 import ast
 import pathlib
 

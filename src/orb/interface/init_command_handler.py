@@ -643,7 +643,9 @@ def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
         # that belong in provider config — determined by the provider strategy.
         infrastructure_defaults = provider_data.get("infrastructure_defaults", {})
         if infrastructure_defaults:
-            config_only_keys = strategy.get_cli_extra_config_keys() if strategy is not None else set()
+            config_only_keys = (
+                strategy.get_cli_extra_config_keys() if strategy is not None else set()
+            )
             template_level = {
                 k: v for k, v in infrastructure_defaults.items() if k not in config_only_keys
             }

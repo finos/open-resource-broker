@@ -43,9 +43,7 @@ def register_aws_health_checks(health_check: HealthCheck, aws_client: "AWSClient
     def _check_ec2_health() -> HealthStatus:
         try:
             response = aws_client.ec2_client.describe_instances(MaxResults=5)
-            instance_count = sum(
-                len(r["Instances"]) for r in response.get("Reservations", [])
-            )
+            instance_count = sum(len(r["Instances"]) for r in response.get("Reservations", []))
             return HealthStatus(
                 name="ec2",
                 status="healthy",
@@ -66,13 +64,9 @@ def register_aws_health_checks(health_check: HealthCheck, aws_client: "AWSClient
             table_prefix = repo_config["table_prefix"]
             tables = aws_client.session.client(
                 "dynamodb",
-                config=Config(
-                    connect_timeout=10, read_timeout=30, retries={"max_attempts": 3}
-                ),
+                config=Config(connect_timeout=10, read_timeout=30, retries={"max_attempts": 3}),
             ).list_tables()
-            project_tables = [
-                t for t in tables["TableNames"] if t.startswith(table_prefix)
-            ]
+            project_tables = [t for t in tables["TableNames"] if t.startswith(table_prefix)]
             return HealthStatus(
                 name="database",
                 status="healthy",

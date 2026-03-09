@@ -177,7 +177,9 @@ def _register_provisioning_orchestration_service(container: DIContainer) -> None
     )
     from orb.infrastructure.resilience.strategy.circuit_breaker import CircuitBreakerStrategy
 
-    def create_provisioning_orchestration_service(c: DIContainer) -> ProvisioningOrchestrationService:
+    def create_provisioning_orchestration_service(
+        c: DIContainer,
+    ) -> ProvisioningOrchestrationService:
         return ProvisioningOrchestrationService(
             container=c.get(ContainerPort),
             logger=c.get(LoggingPort),
