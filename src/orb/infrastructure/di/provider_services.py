@@ -19,14 +19,17 @@ def _register_application_services(container: DIContainer) -> None:
     from orb.application.services.machine_sync_service import MachineSyncService
     from orb.application.services.provider_registry_service import ProviderRegistryService
     from orb.domain.base.ports.logging_port import LoggingPort
+    from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
     from orb.domain.services.template_validation_domain_service import (
         TemplateValidationDomainService,
     )
     from orb.infrastructure.di.buses import CommandBus
     from orb.providers.registry import get_provider_registry
 
+    container.register_singleton(ProviderRegistryPort, lambda c: get_provider_registry())
+
     def create_provider_registry_service(c):
-        registry = get_provider_registry()
+        registry = c.get(ProviderRegistryPort)
         validation_service = c.get(TemplateValidationDomainService)
         logger = c.get(LoggingPort)
         return ProviderRegistryService(registry, validation_service, logger)

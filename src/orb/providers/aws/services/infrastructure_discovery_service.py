@@ -219,7 +219,7 @@ class AWSInfrastructureDiscoveryService:
             try:
                 self.iam_client.get_role(RoleName="AWSServiceRoleForEC2SpotFleet")
             except Exception:
-                pass  # noqa: S110 — intentional best-effort check
+                pass  # intentional best-effort check
             return arn
         except Exception:
             return None

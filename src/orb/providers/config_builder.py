@@ -41,12 +41,16 @@ class ProviderConfigBuilder:
 
             registry = get_provider_registry()
             if registry.is_provider_registered(instance_config.type):
-                registration = registry._get_type_registration(instance_config.type)
-                if registration and getattr(registration, "config_factory", None):
-                    return registration.config_factory(instance_config)
-        except Exception:
+                config_factory = registry.get_config_factory(instance_config.type)
+                if config_factory:
+                    return config_factory(instance_config)
+        except Exception as exc:
             # Registry not yet populated (e.g. early bootstrap) — fall through to legacy path
-            pass
+            self._logger.warning(
+                "Failed to build provider config via registry for type '%s': %s",
+                instance_config.type,
+                exc,
+            )
 
         # Fallback: AWS-specific builder kept for backward compatibility when
         # the registry is not yet populated (e.g. during early bootstrap).

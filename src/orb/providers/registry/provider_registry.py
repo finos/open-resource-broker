@@ -440,6 +440,14 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         """
         return self.get_registered_instances()
 
+    def get_config_factory(self, provider_type: str) -> Optional[Any]:
+        """Return the config_factory callable for the given provider type, or None if not registered."""
+        try:
+            registration = self._get_type_registration(provider_type)
+            return getattr(registration, "config_factory", None)
+        except (ValueError, KeyError):
+            return None
+
     def get_provider_instance_registration(
         self, instance_name: str
     ) -> Optional[ProviderRegistration]:

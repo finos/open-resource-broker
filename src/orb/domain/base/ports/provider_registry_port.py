@@ -53,3 +53,8 @@ class ProviderRegistryPort(ABC):
     def update_provider_health(self, provider_name: str, health_data: dict) -> None:
         """Persist health state for a provider."""
         pass
+
+    @abstractmethod
+    def get_config_factory(self, provider_type: str) -> Optional[Any]:
+        """Return the config_factory callable for the given provider type, or None if not registered."""
+        pass

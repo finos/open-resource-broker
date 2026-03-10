@@ -22,11 +22,11 @@ class NativeSpecServiceProtocol(Protocol):
     spec_renderer: Any
     logger: Any
 
-    def is_native_spec_enabled(self) -> bool:
-        ...
+    def is_native_spec_enabled(self) -> bool:  # pyright: ignore[reportReturnType]
+        pass  # type: ignore[empty-body]
 
-    def render_spec(self, spec: dict, context: dict) -> dict:
-        ...
+    def render_spec(self, spec: dict, context: dict) -> dict:  # pyright: ignore[reportReturnType]
+        pass  # type: ignore[empty-body]
 
 
 @injectable
