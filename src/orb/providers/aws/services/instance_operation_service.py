@@ -211,3 +211,49 @@ class AWSInstanceOperationService:
             return ProviderResult.error_result(
                 f"Failed to get instance status: {e}", "GET_INSTANCE_STATUS_ERROR"
             )
+
+    def start_instances(self, operation: ProviderOperation) -> ProviderResult:
+        """Handle instance start operation."""
+        try:
+            instance_ids = operation.parameters.get("instance_ids", [])
+            if not instance_ids:
+                return ProviderResult.error_result(
+                    "Instance IDs are required for start operation", "MISSING_INSTANCE_IDS"
+                )
+            response = self._aws_client.ec2_client.start_instances(InstanceIds=instance_ids)
+            results = {}
+            for instance in response.get("StartingInstances", []):
+                instance_id = instance["InstanceId"]
+                current_state = instance["CurrentState"]["Name"]
+                results[instance_id] = current_state in ["pending", "running"]
+            return ProviderResult.success_result(
+                {"results": results},
+                {"operation": "start_instances"},
+            )
+        except Exception as e:
+            return ProviderResult.error_result(
+                f"Failed to start instances: {e}", "START_INSTANCES_ERROR"
+            )
+
+    def stop_instances(self, operation: ProviderOperation) -> ProviderResult:
+        """Handle instance stop operation."""
+        try:
+            instance_ids = operation.parameters.get("instance_ids", [])
+            if not instance_ids:
+                return ProviderResult.error_result(
+                    "Instance IDs are required for stop operation", "MISSING_INSTANCE_IDS"
+                )
+            response = self._aws_client.ec2_client.stop_instances(InstanceIds=instance_ids)
+            results = {}
+            for instance in response.get("StoppingInstances", []):
+                instance_id = instance["InstanceId"]
+                current_state = instance["CurrentState"]["Name"]
+                results[instance_id] = current_state in ["stopping", "stopped"]
+            return ProviderResult.success_result(
+                {"results": results},
+                {"operation": "stop_instances"},
+            )
+        except Exception as e:
+            return ProviderResult.error_result(
+                f"Failed to stop instances: {e}", "STOP_INSTANCES_ERROR"
+            )

@@ -16,7 +16,6 @@ class InputValidator:
     # Character whitelists
     ALPHANUMERIC = re.compile(r"^[a-zA-Z0-9]+$")
     ALPHANUMERIC_DASH = re.compile(r"^[a-zA-Z0-9\-_]+$")
-    AWS_REGION = re.compile(r"^[a-z]{2}-[a-z]+-\d+$")
     INTEGER = re.compile(r"^-?\d+$")
 
     # Dangerous characters that could indicate injection attacks
@@ -165,27 +164,6 @@ class InputValidator:
                 raise ValidationError(f"Input must be one of: {', '.join(choices)}")
             return value
 
-    @staticmethod
-    def validate_aws_region(value: str) -> str:
-        """
-        Validate AWS region format.
-
-        Args:
-            value: Region string
-
-        Returns:
-            Validated region
-
-        Raises:
-            ValidationError: If region format is invalid
-        """
-        if not InputValidator.AWS_REGION.match(value):
-            raise ValidationError(
-                "Invalid AWS region format (expected: us-east-1, eu-west-1, etc.)"
-            )
-
-        return value
-
 
 # Convenience functions
 def sanitize_input(value: str, max_length: int = 1000) -> str:
@@ -213,8 +191,3 @@ def validate_integer(
 def validate_choice(value: str, choices: list[str], case_sensitive: bool = False) -> str:
     """Validate choice input."""
     return InputValidator.validate_choice(value, choices, case_sensitive)
-
-
-def validate_aws_region(value: str) -> str:
-    """Validate AWS region."""
-    return InputValidator.validate_aws_region(value)

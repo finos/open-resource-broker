@@ -229,15 +229,6 @@ class TestInjectableMigration(unittest.TestCase):
         provider_strategy = self.container.get(AWSProviderStrategy)
         self.assertIsNotNone(provider_strategy)
 
-    def test_aws_manager_classes(self):
-        """Test that AWS manager classes are properly registered and injectable."""
-        # Register and test AWSInstanceManager
-        from orb.providers.aws.managers.aws_instance_manager import AWSInstanceManager
-
-        self.container.register_singleton(AWSInstanceManager)
-        instance_manager = self.container.get(AWSInstanceManager)
-        self.assertIsNotNone(instance_manager)
-
 
 if __name__ == "__main__":
     unittest.main()

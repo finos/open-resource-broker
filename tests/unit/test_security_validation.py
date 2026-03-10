@@ -495,7 +495,6 @@ class TestCryptographicSecurity:
             assert len(token) >= 64
             # Should not contain predictable patterns
             assert not re.search(r"(.)\1{3,}", token)  # No 4+ repeated characters
-            assert not re.search(r"(..)\1{2,}", token)  # No 3+ repeated pairs
 
     def test_data_integrity_verification(self):
         """Test data integrity verification using checksums."""

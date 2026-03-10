@@ -156,6 +156,8 @@ class TestCommandQuerySeparation:
         mock_provider_port = Mock()
         mock_provider_port.available_strategies = ["test-strategy"]
 
+        mock_provisioning_service = Mock()
+
         handler = CreateRequestHandler(
             uow_factory=mock_uow_factory,
             logger=mock_logger,
@@ -164,7 +166,7 @@ class TestCommandQuerySeparation:
             error_handler=mock_error_handler,
             query_bus=mock_query_bus,
             provider_selection_port=mock_provider_selection,
-            provider_config_port=mock_provider_capability,
+            provisioning_service=mock_provisioning_service,
         )
 
         # Execute command with dry_run to avoid provisioning
@@ -455,7 +457,6 @@ class TestCommandHandlerImplementation:
 
         mock_query_bus = AsyncMock()
         mock_provider_selection = Mock()
-        mock_provider_capability = Mock()
         mock_provider_port = Mock()
         mock_provider_port.available_strategies = ["test-strategy"]
 
@@ -467,7 +468,7 @@ class TestCommandHandlerImplementation:
             error_handler=mock_error_handler,
             query_bus=mock_query_bus,
             provider_selection_port=mock_provider_selection,
-            provider_config_port=mock_provider_capability,
+            provisioning_service=Mock(),
         )
 
         # Valid command
@@ -496,6 +497,7 @@ class TestCommandHandlerImplementation:
             mock_provider_validation_result
         )
 
+        mock_provider_capability = Mock()
         mock_validation_result = Mock()
         mock_validation_result.is_valid = True
         mock_validation_result.supported_features = []
@@ -580,7 +582,7 @@ class TestCommandHandlerImplementation:
             error_handler=mock_error_handler,
             query_bus=mock_query_bus,
             provider_selection_port=mock_provider_selection,
-            provider_config_port=mock_provider_capability,
+            provisioning_service=Mock(),
         )
 
         # Execute command with dry_run to avoid provisioning
@@ -610,7 +612,6 @@ class TestCommandHandlerImplementation:
 
         mock_query_bus = AsyncMock()
         mock_provider_selection = Mock()
-        mock_provider_capability = Mock()
         mock_provider_port = Mock()
         mock_provider_port.available_strategies = ["test-strategy"]
 
@@ -622,7 +623,7 @@ class TestCommandHandlerImplementation:
             error_handler=mock_error_handler,
             query_bus=mock_query_bus,
             provider_selection_port=mock_provider_selection,
-            provider_config_port=mock_provider_capability,
+            provisioning_service=Mock(),
         )
 
         # Should have event publisher

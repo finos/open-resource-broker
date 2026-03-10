@@ -17,7 +17,6 @@ from orb.domain.base.ports import (
     LoggingPort,
     ProviderSelectionPort,
 )
-from orb.domain.base.ports.asg_query_port import ASGQueryPort
 
 
 @command_handler(PopulateMachineIdsCommand)  # type: ignore[arg-type]
@@ -123,15 +122,10 @@ class SyncRequestHandler(BaseCommandHandler[SyncRequestCommand, None]):  # type:
         container: ContainerPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
-        asg_query_port: ASGQueryPort,
     ) -> None:
         super().__init__(logger, event_publisher, error_handler)
         self.uow_factory = uow_factory
         self._container = container
-
-        from orb.application.services.asg_metadata_service import ASGMetadataService
-
-        self._asg_metadata_service = ASGMetadataService(uow_factory, asg_query_port, logger)
 
     async def execute_command(self, command: SyncRequestCommand) -> None:
         """Execute sync request command."""
@@ -173,11 +167,6 @@ class SyncRequestHandler(BaseCommandHandler[SyncRequestCommand, None]):  # type:
             if new_status:
                 await status_service.update_request_status(
                     request, new_status, status_message or ""
-                )
-
-            if request.metadata.get("provider_api") == "ASG":
-                await self._asg_metadata_service.update_asg_metadata_if_needed(
-                    request, synced_machines
                 )
 
             self.logger.info("Successfully synced request: %s", command.request_id)

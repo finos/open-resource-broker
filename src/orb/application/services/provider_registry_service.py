@@ -65,3 +65,13 @@ class ProviderRegistryService:
     def update_provider_health(self, provider_name: str, health_data: dict) -> None:
         """Persist health state for a provider into the registry."""
         self._registry.update_provider_health(provider_name, health_data)
+
+    def resolve_api_alias(self, provider_id: str, raw_api: str) -> str:
+        """Resolve a provider API name to its canonical form via the named strategy.
+
+        Returns raw_api unchanged if the strategy is not found.
+        """
+        strategy = self._registry.get_or_create_strategy(provider_id)
+        if strategy is None:
+            return raw_api
+        return strategy.resolve_api_alias(raw_api)

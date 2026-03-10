@@ -14,31 +14,32 @@ async def test_machines_start_specific_ids():
     args.machine_ids = ["i-123", "i-456"]
     args.all = False
 
-    # Mock the dependencies
     with patch("orb.interface.machine_command_handlers.get_container") as mock_get_container:
-        # Setup mocks
         mock_container = Mock()
         mock_get_container.return_value = mock_container
 
-        mock_instance_manager = Mock()
-        mock_instance_manager.start_instances.return_value = {"i-123": True, "i-456": True}
+        mock_provider_port = Mock()
+        mock_provider_port.select_active_provider.return_value = Mock(provider_name="aws-default")
+        mock_provider_port.execute_operation = AsyncMock(
+            return_value=Mock(success=True, data={"results": {"i-123": True, "i-456": True}})
+        )
 
         mock_command_bus = AsyncMock()
 
         def mock_get(service_type):
-            if hasattr(service_type, "__name__") and service_type.__name__ == "CommandBus":
+            name = getattr(service_type, "__name__", "")
+            if name == "CommandBus":
                 return mock_command_bus
-            else:
-                return mock_instance_manager
+            if name == "ProviderSelectionPort":
+                return mock_provider_port
+            return Mock()
 
         mock_container.get.side_effect = mock_get
 
-        # Act
         from orb.interface.machine_command_handlers import handle_start_machines
 
         result = await handle_start_machines(args)
 
-        # Assert
         assert result["success"] is True
         assert "i-123" in result["started_machines"]
         assert "i-456" in result["started_machines"]
@@ -52,9 +53,7 @@ async def test_machines_start_all():
     args.machine_ids = []
     args.all = True
 
-    # Mock the dependencies
     with patch("orb.interface.machine_command_handlers.get_container") as mock_get_container:
-        # Setup mocks
         mock_container = Mock()
         mock_get_container.return_value = mock_container
 
@@ -64,30 +63,33 @@ async def test_machines_start_all():
             {"machine_id": "i-stopped2"},
         ]
 
-        mock_instance_manager = Mock()
-        mock_instance_manager.start_instances.return_value = {
-            "i-stopped1": True,
-            "i-stopped2": True,
-        }
+        mock_provider_port = Mock()
+        mock_provider_port.select_active_provider.return_value = Mock(provider_name="aws-default")
+        mock_provider_port.execute_operation = AsyncMock(
+            return_value=Mock(
+                success=True,
+                data={"results": {"i-stopped1": True, "i-stopped2": True}},
+            )
+        )
 
         mock_command_bus = AsyncMock()
 
         def mock_get(service_type):
-            if service_type.__name__ == "QueryBus":
+            name = getattr(service_type, "__name__", "")
+            if name == "QueryBus":
                 return mock_query_bus
-            elif service_type.__name__ == "CommandBus":
+            if name == "CommandBus":
                 return mock_command_bus
-            else:
-                return mock_instance_manager
+            if name == "ProviderSelectionPort":
+                return mock_provider_port
+            return Mock()
 
         mock_container.get.side_effect = mock_get
 
-        # Act
         from orb.interface.machine_command_handlers import handle_start_machines
 
         result = await handle_start_machines(args)
 
-        # Assert
         assert result["success"] is True
 
 

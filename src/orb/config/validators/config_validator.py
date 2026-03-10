@@ -1,5 +1,6 @@
 """Main configuration validator orchestrator."""
 
+from collections.abc import Callable
 from typing import Any, Optional
 
 from orb.config.schemas import AppConfig, validate_config
@@ -64,26 +65,6 @@ class ConfigValidator:
             config: Validated configuration object
             result: Validation result to update
         """
-        # Validate provider instances
-        if hasattr(config.provider, "providers") and config.provider.providers:
-            for provider in config.provider.providers:
-                if provider.type == "aws" and hasattr(provider, "config"):
-                    aws_config = provider.config
-
-                    # Validate AWS-specific business rules
-                    if hasattr(aws_config, "aws_max_retries") and aws_config.aws_max_retries > 10:  # type: ignore[union-attr]
-                        result.add_warning(
-                            f"AWS provider '{provider.name}' aws_max_retries is very high, consider reducing for better performance"
-                        )
-
-                    if (
-                        hasattr(aws_config, "aws_read_timeout")
-                        and aws_config.aws_read_timeout > 300  # type: ignore[union-attr]
-                    ):
-                        result.add_warning(
-                            f"AWS provider '{provider.name}' aws_read_timeout is very high, consider reducing to avoid long waits"
-                        )
-
         # Validate performance settings
         if config.performance.max_workers > 50:
             result.add_warning("High number of max_workers may cause resource contention")
@@ -95,7 +76,10 @@ class ConfigValidator:
                 result.add_warning("Large SQL connection pool size may consume excessive resources")
 
     def validate_provider_config(
-        self, provider_type: str, provider_config: dict[str, Any]
+        self,
+        provider_type: str,
+        provider_config: dict[str, Any],
+        is_provider_registered: Callable[[str], bool],
     ) -> ValidationResult:
         """
         Validate provider-specific configuration.
@@ -103,17 +87,14 @@ class ConfigValidator:
         Args:
             provider_type: Type of provider (e.g., 'aws')
             provider_config: Provider configuration data
+            is_provider_registered: Callable to check if a provider type is registered
 
         Returns:
             ValidationResult with provider-specific validation
         """
         result = ValidationResult()
 
-        if provider_type == "aws":
-            # AWS-specific validation logic would go here
-            # For now, rely on Pydantic schema validation
-            pass
-        else:
+        if not is_provider_registered(provider_type):
             result.add_error(f"Unsupported provider type: {provider_type}")
 
         return result

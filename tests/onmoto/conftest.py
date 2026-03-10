@@ -257,7 +257,7 @@ def _make_config_port(prefix: str = ""):
 
     config_port = MagicMock()
     config_port.get_resource_prefix.return_value = prefix
-    provider_defaults = ProviderDefaults(cleanup=CleanupConfig(enabled=False))
+    provider_defaults = ProviderDefaults(cleanup=CleanupConfig(enabled=False).model_dump())
     provider_config = MagicMock()
     provider_config.provider_defaults = {"aws": provider_defaults}
     config_port.get_provider_config.return_value = provider_config

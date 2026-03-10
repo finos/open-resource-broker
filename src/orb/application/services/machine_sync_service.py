@@ -76,7 +76,7 @@ class MachineSyncService:
                 operation_type = ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES
                 parameters = {
                     "resource_ids": request.resource_ids,
-                    "provider_api": request.provider_api or "RunInstances",
+                    "provider_api": request.provider_api,
                     "template_id": request.template_id,
                 }
             # Fallback to instance-level discovery for requests without resource tracking
@@ -122,7 +122,6 @@ class MachineSyncService:
                         processed_data = {
                             **instance_data,
                             "request_id": str(request.request_id),
-                            "provider_api": request.provider_api or "RunInstances",
                             "resource_id": request.resource_ids[0] if request.resource_ids else "",
                         }
                         machine = self._create_machine_from_processed_data(processed_data, request)

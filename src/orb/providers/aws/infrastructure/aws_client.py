@@ -112,7 +112,7 @@ class AWSClient:
             self._metrics_handler: Optional[BotocoreMetricsHandler] = None
             if metrics and self._should_enable_aws_metrics():
                 aws_metrics_cfg = (
-                    metrics.config.get("aws_metrics", {}) if hasattr(metrics, "config") else {}
+                    metrics.config.get("provider_metrics", {}) if hasattr(metrics, "config") else {}
                 )
                 self._metrics_handler = BotocoreMetricsHandler(metrics, logger, aws_metrics_cfg)
                 self._metrics_handler.register_events(self.session)
@@ -304,12 +304,7 @@ class AWSClient:
                 self._logger.debug("Loaded performance configuration from ConfigurationManager")
                 return {
                     "enable_batching": perf_config.enable_batching,
-                    "batch_sizes": {
-                        "terminate_instances": perf_config.batch_sizes.terminate_instances,
-                        "create_tags": perf_config.batch_sizes.create_tags,
-                        "describe_instances": perf_config.batch_sizes.describe_instances,
-                        "run_instances": perf_config.batch_sizes.run_instances,
-                    },
+                    "batch_sizes": dict(perf_config.batch_sizes),
                     "enable_parallel": perf_config.enable_parallel,
                     "max_workers": perf_config.max_workers,
                     "enable_caching": perf_config.enable_caching,
@@ -391,15 +386,18 @@ class AWSClient:
             # Get metrics configuration from ConfigurationPort
             metrics_config = self._config_manager.get_metrics_config()
             aws_cfg = (
-                metrics_config.get("aws_metrics", {}) if isinstance(metrics_config, dict) else {}
+                metrics_config.get("provider_metrics", {})
+                if isinstance(metrics_config, dict)
+                else {}
             )
             aws_metrics_enabled = aws_cfg.get(
-                "aws_metrics_enabled", metrics_config.get("aws_metrics_enabled", True)
+                "provider_metrics_enabled",
+                aws_cfg.get("aws_metrics_enabled", metrics_config.get("aws_metrics_enabled", True)),
             )
-            self._logger.debug("aws_metrics_enabled flag value: %s", aws_metrics_enabled)
+            self._logger.debug("provider_metrics_enabled flag value: %s", aws_metrics_enabled)
             return aws_metrics_enabled
         except Exception as e:
-            self._logger.debug("Could not check aws_metrics_enabled flag: %s", e)
+            self._logger.debug("Could not check provider_metrics_enabled flag: %s", e)
             return True  # Default to enabled
 
     def get_metrics_stats(self) -> dict:

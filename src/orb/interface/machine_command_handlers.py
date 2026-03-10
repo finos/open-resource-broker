@@ -178,11 +178,24 @@ async def handle_stop_machines(args: "argparse.Namespace") -> dict[str, Any]:
             "stopped_machines": [],
         }
 
-    # Stop machines using AWS instance manager
-    from orb.providers.aws.managers.aws_instance_manager import AWSInstanceManager
+    # Stop machines via provider strategy dispatch
+    from orb.domain.base.ports import ProviderSelectionPort
+    from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
 
-    instance_manager = container.get(AWSInstanceManager)
-    stop_results = instance_manager.stop_instances(machine_ids)
+    provider_selection_port = container.get(ProviderSelectionPort)
+    selection = provider_selection_port.select_active_provider()
+    operation = ProviderOperation(
+        operation_type=ProviderOperationType.STOP_INSTANCES,
+        parameters={"instance_ids": machine_ids},
+    )
+    provider_result = await provider_selection_port.execute_operation(
+        selection.provider_name, operation
+    )
+    stop_results: dict[str, bool] = (
+        provider_result.data.get("results", {})
+        if provider_result.success
+        else {mid: False for mid in machine_ids}
+    )
 
     # Update machine status to "stopping" for successfully stopped machines
     from orb.application.machine.commands import UpdateMachineStatusCommand
@@ -259,11 +272,24 @@ async def handle_start_machines(args: "argparse.Namespace") -> dict[str, Any]:
             "started_machines": [],
         }
 
-    # Start machines using AWS instance manager
-    from orb.providers.aws.managers.aws_instance_manager import AWSInstanceManager
+    # Start machines via provider strategy dispatch
+    from orb.domain.base.ports import ProviderSelectionPort
+    from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
 
-    instance_manager = container.get(AWSInstanceManager)
-    start_results = instance_manager.start_instances(machine_ids)
+    provider_selection_port = container.get(ProviderSelectionPort)
+    selection = provider_selection_port.select_active_provider()
+    operation = ProviderOperation(
+        operation_type=ProviderOperationType.START_INSTANCES,
+        parameters={"instance_ids": machine_ids},
+    )
+    provider_result = await provider_selection_port.execute_operation(
+        selection.provider_name, operation
+    )
+    start_results: dict[str, bool] = (
+        provider_result.data.get("results", {})
+        if provider_result.success
+        else {mid: False for mid in machine_ids}
+    )
 
     # Update machine status to "pending" for successfully started machines
     from orb.application.machine.commands import UpdateMachineStatusCommand

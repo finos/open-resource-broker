@@ -184,19 +184,30 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                         },
                     )
 
+            fleet_errors = fleet_result.get("metadata_updates", {}).get("fleet_errors", [])
+            capacity_error_codes = {
+                "InsufficientInstanceCapacity",
+                "SpotMaxPriceTooLow",
+                "MaxSpotInstanceCountExceeded",
+            }
+            capacity_constrained = any(
+                e.get("error_code") in capacity_error_codes for e in fleet_errors
+            )
+            fleet_type_value = (
+                aws_template.fleet_type.value
+                if aws_template.fleet_type is not None
+                else aws_template.fleet_type
+            )
             return {
                 "success": True,
                 "resource_ids": [fleet_id],
                 "instances": instances,
                 "provider_data": {
                     "resource_type": "ec2_fleet",
-                    "fleet_type": aws_template.fleet_type.value  # type: ignore[union-attr]
-                    if hasattr(aws_template.fleet_type, "value")
-                    else aws_template.fleet_type,
-                    "fleet_errors": fleet_result.get("metadata_updates", {}).get(
-                        "fleet_errors", []
-                    ),
+                    "fleet_type": fleet_type_value,
+                    "fleet_errors": fleet_errors,
                     "fulfillment_final": fleet_type is not AWSFleetType.INSTANT,
+                    "capacity_constrained": capacity_constrained,
                 },
             }
         except Exception as e:

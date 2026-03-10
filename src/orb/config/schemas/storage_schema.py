@@ -129,16 +129,6 @@ class RetryConfig(BaseModel):
     max_delay: float = Field(60.0, description="Maximum delay in seconds")
     jitter: bool = Field(True, description="Add jitter to delays")
 
-    # Service-specific settings
-    service_configs: dict[str, dict[str, Any]] = Field(
-        default_factory=lambda: {
-            "ec2": {"max_attempts": 3, "base_delay": 1.0, "max_delay": 30.0},
-            "dynamodb": {"max_attempts": 5, "base_delay": 0.5, "max_delay": 20.0},
-            "s3": {"max_attempts": 4, "base_delay": 0.5, "max_delay": 15.0},
-        },
-        description="Service-specific retry configurations",
-    )
-
     @field_validator("max_attempts")
     @classmethod
     def validate_max_attempts(cls, v: int) -> int:

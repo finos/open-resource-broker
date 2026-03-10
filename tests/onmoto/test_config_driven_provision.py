@@ -426,7 +426,7 @@ class TestTemplateDefaultsConfig:
         from orb.config.schemas.cleanup_schema import CleanupConfig
         from orb.config.schemas.provider_strategy_schema import ProviderDefaults
 
-        provider_defaults = ProviderDefaults(cleanup=CleanupConfig(enabled=False))
+        provider_defaults = ProviderDefaults(cleanup=CleanupConfig(enabled=False).model_dump())
         provider_config = MagicMock()
         provider_config.provider_defaults = {"aws": provider_defaults}
         config_port.get_provider_config.return_value = provider_config

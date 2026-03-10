@@ -27,11 +27,8 @@ except ImportError:
     Histogram = None
     generate_latest = None
 
-from botocore.exceptions import ClientError
-
 from orb.config.managers.configuration_manager import ConfigurationManager
 from orb.infrastructure.logging.logger import get_logger
-from orb.providers.aws.infrastructure.aws_client import AWSClient
 
 logger = get_logger(__name__)
 
@@ -60,12 +57,9 @@ class HealthStatus:
 class HealthCheck:
     """Health check implementation."""
 
-    def __init__(
-        self, config: ConfigurationManager, aws_client: Optional[AWSClient] = None
-    ) -> None:
+    def __init__(self, config: ConfigurationManager) -> None:
         """Initialize health check."""
         self.config = config.get_raw_config()
-        self.aws_client = aws_client
         self.checks: dict[str, Callable[[], HealthStatus]] = {}
         self.status_history: dict[str, list[HealthStatus]] = {}
         self._lock = threading.Lock()
@@ -86,11 +80,6 @@ class HealthCheck:
         # System health checks
         self.register_check("system", self._check_system_health)
         self.register_check("disk", self._check_disk_health)
-
-        # AWS health checks
-        if self.aws_client:
-            self.register_check("aws", self._check_aws_health)
-            self.register_check("ec2", self._check_ec2_health)
 
         # Database health checks
         self.register_check("database", self._check_database_health)
@@ -280,68 +269,6 @@ class HealthCheck:
                 dependencies=["os"],
             )
 
-    def _check_aws_health(self) -> HealthStatus:
-        """Check AWS health."""
-        if not self.aws_client:
-            return HealthStatus(
-                name="aws",
-                status="unknown",
-                details={"error": "AWS client not configured"},
-                dependencies=["aws"],
-            )
-
-        try:
-            # Check AWS credentials
-            response = self.aws_client.sts_client.get_caller_identity()
-
-            return HealthStatus(
-                name="aws",
-                status="healthy",
-                details={
-                    "account_id": response["Account"],
-                    "user_id": response["UserId"],
-                    "arn": response["Arn"],
-                },
-                dependencies=["aws"],
-            )
-        except Exception as e:
-            return HealthStatus(
-                name="aws",
-                status="unhealthy",
-                details={"error": str(e)},
-                dependencies=["aws"],
-            )
-
-    def _check_ec2_health(self) -> HealthStatus:
-        """Check EC2 service health."""
-        if not self.aws_client:
-            return HealthStatus(
-                name="ec2",
-                status="unknown",
-                details={"error": "AWS client not configured"},
-                dependencies=["aws", "ec2"],
-            )
-
-        try:
-            # Check EC2 service
-            response = self.aws_client.ec2_client.describe_instances(MaxResults=5)
-
-            instance_count = sum(len(r["Instances"]) for r in response.get("Reservations", []))
-
-            return HealthStatus(
-                name="ec2",
-                status="healthy",
-                details={"instance_count": instance_count, "api_status": "available"},
-                dependencies=["aws", "ec2"],
-            )
-        except ClientError as e:
-            return HealthStatus(
-                name="ec2",
-                status="unhealthy",
-                details={"error": str(e)},
-                dependencies=["aws", "ec2"],
-            )
-
     def _check_database_health(self) -> HealthStatus:
         """Check database health."""
         repo_config = self.config.get("REPOSITORY_CONFIG", {})
@@ -351,8 +278,6 @@ class HealthCheck:
             return self._check_json_db_health()
         elif repo_type == "sqlite":
             return self._check_sqlite_db_health()
-        elif repo_type == "dynamodb":
-            return self._check_dynamodb_health()
         else:
             return HealthStatus(
                 name="database",
@@ -428,47 +353,6 @@ class HealthCheck:
                 status="unhealthy",
                 details={"error": str(e)},
                 dependencies=["database", "sqlite"],
-            )
-
-    def _check_dynamodb_health(self) -> HealthStatus:
-        """Check DynamoDB health."""
-        if not self.aws_client:
-            return HealthStatus(
-                name="database",
-                status="unknown",
-                details={"error": "AWS client not configured"},
-                dependencies=["database", "dynamodb"],
-            )
-
-        try:
-            repo_config = self.config["REPOSITORY_CONFIG"]["dynamodb"]
-            table_prefix = repo_config["table_prefix"]
-
-            # List tables
-            from botocore.config import Config
-
-            tables = self.aws_client.session.client(
-                "dynamodb",
-                config=Config(connect_timeout=10, read_timeout=30, retries={"max_attempts": 3}),
-            ).list_tables()
-            project_tables = [t for t in tables["TableNames"] if t.startswith(table_prefix)]
-
-            return HealthStatus(
-                name="database",
-                status="healthy",
-                details={
-                    "type": "dynamodb",
-                    "table_count": len(project_tables),
-                    "tables": project_tables,
-                },
-                dependencies=["database", "dynamodb"],
-            )
-        except Exception as e:
-            return HealthStatus(
-                name="database",
-                status="unhealthy",
-                details={"error": str(e)},
-                dependencies=["database", "dynamodb"],
             )
 
     def _check_application_health(self) -> HealthStatus:

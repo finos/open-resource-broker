@@ -2,7 +2,7 @@
 
 import json
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from orb.cli.console import print_error, print_info, print_success
 from orb.config.platform_dirs import get_config_location
@@ -33,7 +33,9 @@ async def handle_provider_add(args) -> int:
 
         # Test credentials
         print_info("Testing credentials...")
-        success, error = _test_provider_credentials("aws", args.aws_profile, region=args.aws_region)
+        success, error = _test_provider_credentials(
+            "aws", {"profile": args.aws_profile, "region": args.aws_region}
+        )
         if not success:
             print_error(f"Credential test failed: {error}")
             return 1
@@ -167,9 +169,7 @@ async def handle_provider_update(args) -> int:
 
         # Test updated credentials
         print_info("Testing updated credentials...")
-        success, error = _test_provider_credentials(
-            provider["type"], provider_config.get("profile"), region=provider_config.get("region")
-        )
+        success, error = _test_provider_credentials(provider["type"], provider_config)
         if not success:
             print_error(f"Credential test failed: {error}")
             return 1
@@ -328,24 +328,27 @@ async def handle_provider_show(args) -> int:
         return 1
 
 
-def _test_provider_credentials(
-    provider_type: str, profile: Optional[str], **kwargs
-) -> tuple[bool, str]:
-    """Test provider credentials."""
-    if provider_type == "aws":
-        try:
-            from orb.providers.aws.session_factory import AWSSessionFactory
+def _test_provider_credentials(provider_type: str, credential_config: dict) -> tuple[bool, str]:
+    """Test provider credentials via the provider strategy."""
+    try:
+        from orb.providers.registry import get_provider_registry
 
-            region = kwargs.get("region")
-            result = AWSSessionFactory.discover_credentials(profile, region)
-            if result.get("success", False):
-                return True, ""
-            else:
-                return False, result.get("error", "Unknown error")
-        except Exception as e:
-            return False, str(e)
-    else:
-        return False, "Provider type not supported"
+        registry = get_provider_registry()
+
+        if not registry.ensure_provider_type_registered(provider_type):
+            return False, f"Provider type not supported: {provider_type}"
+
+        strategy = registry.get_or_create_strategy(provider_type, credential_config)
+
+        if strategy is None:
+            return False, f"Failed to create strategy for provider type: {provider_type}"
+
+        result = strategy.test_credentials()
+        if result.get("success", False):
+            return True, ""
+        return False, result.get("error", "Unknown error")
+    except Exception as e:
+        return False, str(e)
 
 
 def _discover_infrastructure(provider_type: str, region: str, profile: str) -> Dict[str, Any]:

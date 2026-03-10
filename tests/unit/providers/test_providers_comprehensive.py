@@ -536,20 +536,6 @@ class TestAWSProviderComprehensive:
 
         assert len(utility_modules) > 0, "At least one AWS utility should exist"
 
-    def test_aws_managers_exist(self):
-        """Test that AWS managers exist."""
-        manager_modules = []
-        manager_files = ["aws_instance_manager"]
-
-        for manager_file in manager_files:
-            try:
-                module = importlib.import_module(f"orb.providers.aws.managers.{manager_file}")
-                manager_modules.append((manager_file, module))
-            except ImportError:
-                continue
-
-        assert len(manager_modules) > 0, "At least one AWS manager should exist"
-
 
 @pytest.mark.unit
 @pytest.mark.providers

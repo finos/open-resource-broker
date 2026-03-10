@@ -276,6 +276,25 @@ class AWSTemplate(Template):
             # Use simple default without configuration dependency
             object.__setattr__(self, "fleet_type", AWSFleetType.REQUEST)
 
+        # Promote AWS-specific fields from metadata when not set directly.
+        metadata = self.metadata or {}
+        if not self.fleet_role:
+            fleet_role_val = metadata.get("fleet_role")
+            if fleet_role_val:
+                object.__setattr__(self, "fleet_role", fleet_role_val)
+        if self.percent_on_demand is None:
+            pod_val = metadata.get("percent_on_demand")
+            if pod_val is not None:
+                object.__setattr__(self, "percent_on_demand", int(pod_val))
+        if self.abis_instance_requirements is None:
+            abis_val = metadata.get("abis_instance_requirements")
+            if abis_val is not None:
+                object.__setattr__(
+                    self,
+                    "abis_instance_requirements",
+                    ABISInstanceRequirements.model_validate(abis_val),
+                )
+
         # Validate spot configuration
         if self.percent_on_demand is not None and not (0 <= self.percent_on_demand <= 100):
             raise ValueError("percent_on_demand must be between 0 and 100")

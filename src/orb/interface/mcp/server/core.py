@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Any, Callable, Optional, Union
 
 from orb._package import PACKAGE_NAME, __version__
+from orb.domain.constants import PROVIDER_TYPE_AWS
 from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.utilities.json_utils import JSONParseError, safe_json_dumps, safe_json_loads
 
@@ -422,13 +423,14 @@ class OpenResourceBrokerMCPServer:
 
     def _generate_provision_prompt(self, arguments: dict[str, Any]) -> str:
         """Generate infrastructure provisioning prompt."""
-        template_type = arguments.get("template_type", "ec2")
+        template_type = arguments.get("template_type")
+        type_label = template_type if template_type else "compute"
         instance_count = arguments.get("instance_count", 1)
 
-        return f"""I need to provision {instance_count} {template_type} instance(s) using the Open Resource Broker.
+        return f"""I need to provision {instance_count} {type_label} instance(s) using the Open Resource Broker.
 
 Please help me:
-1. List available templates for {template_type}
+1. List available templates for {type_label}
 2. Select the most appropriate template
 3. Create a provisioning request
 4. Monitor the request status
@@ -452,7 +454,7 @@ Use the available MCP tools to diagnose the issue."""
     def _generate_best_practices_prompt(self, arguments: dict[str, Any]) -> str:
         """Generate best practices prompt."""
         # Get first available provider as default
-        default_provider = "aws"  # Keep as fallback
+        default_provider = PROVIDER_TYPE_AWS  # Keep as fallback
         try:
             from orb.providers.registry import get_provider_registry
 

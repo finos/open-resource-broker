@@ -26,6 +26,8 @@ class ProviderOperationType(str, Enum):
     GET_AVAILABLE_TEMPLATES = "get_available_templates"
     HEALTH_CHECK = "health_check"
     RESOLVE_IMAGE = "resolve_image"
+    START_INSTANCES = "start_instances"
+    STOP_INSTANCES = "stop_instances"
 
 
 @dataclass
@@ -311,6 +313,53 @@ class ProviderStrategy(ABC):
             Default implementation returns empty dict.
         """
         return {}
+
+    def get_available_regions(self) -> list[tuple[str, str]]:
+        """Get available regions as (region_id, display_name) tuples.
+
+        Returns:
+            List of (region_id, display_name) tuples.
+            Empty list means the provider accepts free-text region input.
+        """
+        return []
+
+    def get_default_region(self) -> str:
+        """Return the default region string for CLI prompts.
+
+        Override in provider-specific strategies.
+        """
+        return ""
+
+    def get_cli_extra_config_keys(self) -> set[str]:
+        """Return the set of infrastructure_defaults keys that belong in provider
+        config rather than template_defaults.
+
+        Override in provider-specific strategies.
+        Default is empty — no keys are config-only.
+        """
+        return set()
+
+    def get_cli_infrastructure_defaults(self, args: Any) -> dict[str, Any]:
+        """Extract provider-specific infrastructure defaults from parsed CLI args.
+
+        Override in provider-specific strategies.
+        Default returns empty dict.
+        """
+        return {}
+
+    def resolve_api_alias(self, raw_api: str) -> str:
+        """Resolve a provider API name to its canonical form.
+
+        Default implementation is a passthrough — subclasses override to map
+        legacy or alternate names to the canonical registry key.
+
+        Args:
+            raw_api: Raw API name from template or request data.
+
+        Returns:
+            Canonical API name for this provider.
+        """
+        return raw_api
 
     @abstractmethod
     def cleanup(self) -> None:

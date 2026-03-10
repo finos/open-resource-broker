@@ -12,6 +12,7 @@ from orb.infrastructure.storage.base.repository_mixin import StorageRepositoryMi
 from orb.infrastructure.storage.base.strategy import BaseStorageStrategy
 from orb.infrastructure.storage.components.entity_serializer import BaseEntitySerializer
 from orb.infrastructure.storage.components.generic_serializer import GenericEntitySerializer
+from orb.infrastructure.storage.constants import LEGACY_DEFAULT_PROVIDER_TYPE
 
 
 class MachineSerializer(BaseEntitySerializer):
@@ -88,7 +89,9 @@ class MachineSerializer(BaseEntitySerializer):
                 "template_id": data["template_id"],
                 "request_id": data.get("request_id"),
                 "return_request_id": data.get("return_request_id"),
-                "provider_type": data.get("provider_type", "aws"),
+                # Legacy records written before provider_type was persisted default to 'aws'.
+                # Do not change this default without a data migration.
+                "provider_type": data.get("provider_type", LEGACY_DEFAULT_PROVIDER_TYPE),
                 "provider_name": data.get("provider_name"),
                 "provider_api": data.get("provider_api"),
                 "resource_id": data.get("resource_id"),

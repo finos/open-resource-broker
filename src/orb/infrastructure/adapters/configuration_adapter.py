@@ -128,7 +128,7 @@ class ConfigurationAdapter(ConfigurationPort):
     def get_metrics_config(self) -> dict[str, Any]:
         """Get metrics configuration."""
 
-        # Defaults with nested aws_metrics
+        # Defaults with nested provider_metrics
         defaults: dict[str, Any] = {
             "metrics_enabled": False,
             "metrics_dir": "./metrics",
@@ -136,8 +136,8 @@ class ConfigurationAdapter(ConfigurationPort):
             "trace_enabled": False,
             "trace_buffer_size": 1000,
             "trace_file_max_size_mb": 10,
-            "aws_metrics": {
-                "aws_metrics_enabled": False,
+            "provider_metrics": {
+                "provider_metrics_enabled": False,
                 "sample_rate": 1.0,
                 "monitored_services": [],
                 "monitored_operations": [],
@@ -151,16 +151,22 @@ class ConfigurationAdapter(ConfigurationPort):
             metrics_config = raw.get("metrics", {}) if isinstance(raw, dict) else {}
 
             result: dict[str, Any] = defaults.copy()
-            result["aws_metrics"] = defaults["aws_metrics"].copy()
+            result["provider_metrics"] = defaults["provider_metrics"].copy()
 
             if isinstance(metrics_config, dict):
                 result.update(
-                    {k: metrics_config.get(k, v) for k, v in defaults.items() if k != "aws_metrics"}
+                    {
+                        k: metrics_config.get(k, v)
+                        for k, v in defaults.items()
+                        if k != "provider_metrics"
+                    }
                 )
-                if "aws_metrics" in metrics_config and isinstance(
-                    metrics_config["aws_metrics"], dict
-                ):
-                    result["aws_metrics"].update(metrics_config["aws_metrics"])
+                # Accept both "provider_metrics" (new) and "aws_metrics" (legacy JSON key)
+                raw_nested = metrics_config.get("provider_metrics") or metrics_config.get(
+                    "aws_metrics"
+                )
+                if raw_nested and isinstance(raw_nested, dict):
+                    result["provider_metrics"].update(raw_nested)
 
             return result
         except Exception as e:
@@ -298,19 +304,19 @@ class ConfigurationAdapter(ConfigurationPort):
 
     def override_provider_region(self, region: str) -> None:
         """Override provider region - delegate to ConfigurationManager."""
-        self._config_manager.override_aws_region(region)
+        self._config_manager.override_provider_region(region)
 
     def override_provider_profile(self, profile: str) -> None:
         """Override provider credential profile - delegate to ConfigurationManager."""
-        self._config_manager.override_aws_profile(profile)
+        self._config_manager.override_provider_profile(profile)
 
-    def get_effective_region(self, default_region: str = "us-east-1") -> str:
+    def get_effective_region(self, default_region: str = "") -> str:
         """Get effective provider region - delegate to ConfigurationManager."""
-        return self._config_manager.get_effective_aws_region(default_region)
+        return self._config_manager.get_effective_region(default_region)
 
-    def get_effective_profile(self, default_profile: str = "default") -> str:
+    def get_effective_profile(self, default_profile: str = "") -> str:
         """Get effective provider credential profile - delegate to ConfigurationManager."""
-        return self._config_manager.get_effective_aws_profile(default_profile)
+        return self._config_manager.get_effective_profile(default_profile)
 
     def get_resource_prefix(self, resource_type: str) -> str:
         """Get resource naming prefix for the given resource type."""

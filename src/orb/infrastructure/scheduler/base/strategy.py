@@ -12,6 +12,7 @@ from orb.application.request.dto import RequestDTO
 
 # Import from Application layer (correct Clean Architecture)
 from orb.domain.base.ports.scheduler_port import SchedulerPort
+from orb.domain.constants import PROVIDER_TYPE_AWS
 from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
 from orb.infrastructure.template.dtos import TemplateDTO
 
@@ -72,14 +73,14 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
         """Get the active provider type."""
         try:
             if self._provider_registry_service is None:
-                return "aws"
+                return PROVIDER_TYPE_AWS
             selection_result = self._provider_registry_service.select_active_provider()
             provider_type = selection_result.provider_type
             self.logger.debug("Active provider type: %s", provider_type)
             return provider_type
         except Exception as e:
             self.logger.warning("Failed to get active provider type, defaulting to 'aws': %s", e)
-            return "aws"
+            return PROVIDER_TYPE_AWS
 
     def _load_single_file(self, template_path: str) -> list[dict[str, Any]]:
         """Load templates from a single file."""

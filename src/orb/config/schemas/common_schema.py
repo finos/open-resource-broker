@@ -129,15 +129,6 @@ class NamingConfig(BaseModel):
         },
         description="Table names for SQL databases",
     )
-    handler_types: dict[str, str] = Field(
-        default_factory=lambda: {
-            "ec2_fleet": "EC2Fleet",
-            "spot_fleet": "SpotFleet",
-            "asg": "ASG",
-            "run_instances": "RunInstances",
-        },
-        description="Handler types for different AWS resources",
-    )
     fleet_types: dict[str, str] = Field(
         default_factory=lambda: {
             "instant": "instant",
@@ -161,6 +152,9 @@ class NamingConfig(BaseModel):
             "spot_fleet": r"^sfr-[a-f0-9]+$",
             "ec2_fleet": r"^fleet-[a-f0-9]+$",
             "asg": r"^[a-zA-Z0-9_-]+$",
+            # NOTE: ami_id and arn are AWS-specific patterns. Known debt: move to
+            # providers/aws/configuration/ once NamingConfig supports provider-specific
+            # pattern extensions rather than a single flat dict.
             "ami_id": r"^(ami-[a-f0-9]{8,17}|/aws/service/.+)$",
             "subnet": r"^subnet-[a-f0-9]{8,17}$",
             "security_group": r"^sg-[a-f0-9]{8,17}$",

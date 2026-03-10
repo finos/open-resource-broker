@@ -2,10 +2,11 @@
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
     from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
+    from orb.infrastructure.resilience.strategy.circuit_breaker import CircuitBreakerStrategy
 
 from orb.domain.base.exceptions import QuotaError
 from orb.domain.base.ports import ConfigurationPort, ContainerPort, LoggingPort, ProviderConfigPort
@@ -14,7 +15,6 @@ from orb.domain.request.aggregate import Request
 from orb.domain.request.request_types import RequestStatus
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.resilience.exceptions import CircuitBreakerOpenError
-from orb.infrastructure.resilience.strategy.circuit_breaker import CircuitBreakerStrategy
 
 
 @dataclass
@@ -40,33 +40,27 @@ class ProvisioningOrchestrationService:
         logger: LoggingPort,
         provider_selection_port: "ProviderSelectionPort",
         provider_config_port: ProviderConfigPort,
-        config_port: ConfigurationPort | None = None,
+        config_port: ConfigurationPort,
+        circuit_breaker_factory: Callable[[str], "CircuitBreakerStrategy"],
     ):
         self._container = container
         self._logger = logger
         self._provider_selection_port = provider_selection_port
         self._provider_config_port = provider_config_port
         self._config_port = config_port
+        self._circuit_breaker_factory = circuit_breaker_factory
 
     async def execute_provisioning(
         self, template: Template, request: Request, selection_result: ProviderSelectionResult
     ) -> ProvisioningResult:
         """Execute provisioning with capacity top-up retry loop."""
-        if self._config_port is not None:
-            request_config = self._config_port.get_request_config()
-            default_config: dict[str, Any] = {
-                "max_retries": request_config.get("fulfillment_max_retries", 3),
-                "timeout_seconds": request_config.get("fulfillment_timeout_seconds", 300),
-                "batch_size": request_config.get("fulfillment_batch_size", 1000),
-                "fallback_template_id": request_config.get("fulfillment_fallback_template_id"),
-            }
-        else:
-            default_config = {
-                "max_retries": 3,
-                "timeout_seconds": 300,
-                "batch_size": 1000,
-                "fallback_template_id": None,
-            }
+        request_config = self._config_port.get_request_config()
+        default_config: dict[str, Any] = {
+            "max_retries": request_config.get("fulfillment_max_retries", 3),
+            "timeout_seconds": request_config.get("fulfillment_timeout_seconds", 300),
+            "batch_size": request_config.get("fulfillment_batch_size", 1000),
+            "fallback_template_id": request_config.get("fulfillment_fallback_template_id"),
+        }
         config = {**default_config, **request.metadata.get("fulfillment_config", {})}
         max_retries: int = int(config["max_retries"])
         timeout_seconds: float = float(config["timeout_seconds"])
@@ -197,10 +191,11 @@ class ProvisioningOrchestrationService:
 
     def _record_provider_success(self, provider_name: str) -> None:
         """Reset circuit breaker failure count after a successful dispatch."""
+        cb_key = f"provider:{provider_name}"
         try:
-            state = CircuitBreakerStrategy._circuit_states.get(provider_name)
-            if state is not None:
-                state["failure_count"] = 0
+            cb = self._circuit_breaker_factory(cb_key)
+            if cb.has_state(cb_key):
+                cb.record_success()
         except Exception as e:
             self._logger.warning(
                 "Failed to reset circuit breaker state for %s: %s", provider_name, e
@@ -210,27 +205,12 @@ class ProvisioningOrchestrationService:
         """Increment circuit breaker failure count and open circuit if threshold is reached."""
         import time
 
-        from orb.infrastructure.resilience.strategy.circuit_breaker import CircuitState
-
         cb_key = f"provider:{provider_name}"
         try:
-            state = CircuitBreakerStrategy._circuit_states.get(cb_key)
-            if state is None:
+            cb = self._circuit_breaker_factory(cb_key)
+            if not cb.has_state(cb_key):
                 return
-            state["failure_count"] += 1
-            state["last_failure_time"] = time.time()
-            # Use the default failure_threshold (5) — same default as CircuitBreakerStrategy
-            failure_threshold = 5
-            if (
-                state["state"] == CircuitState.CLOSED
-                and state["failure_count"] >= failure_threshold
-            ):
-                state["state"] = CircuitState.OPEN
-                self._logger.warning(
-                    "Circuit breaker opened for provider %s after %d failures",
-                    provider_name,
-                    state["failure_count"],
-                )
+            cb.record_failure(time.time())
         except Exception as e:
             self._logger.warning(
                 "Failed to record circuit breaker failure for %s: %s", provider_name, e
@@ -284,16 +264,8 @@ class ProvisioningOrchestrationService:
                 provider_data = result.data.get("provider_data", None) or (
                     result.metadata or {}
                 ).get("provider_data", {})
-                fleet_errors = provider_data.get("fleet_errors") or []
                 fulfillment_final = provider_data.get("fulfillment_final", False)
-                capacity_error_codes = {
-                    "InsufficientInstanceCapacity",
-                    "SpotMaxPriceTooLow",
-                    "MaxSpotInstanceCountExceeded",
-                }
-                has_capacity_error = any(
-                    e.get("error_code") in capacity_error_codes for e in fleet_errors
-                )
+                has_capacity_error = provider_data.get("capacity_constrained", False)
 
                 self._record_provider_success(selection_result.provider_name)
                 return ProvisioningResult(

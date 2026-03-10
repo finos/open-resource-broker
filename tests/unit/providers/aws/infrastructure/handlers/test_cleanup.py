@@ -28,7 +28,7 @@ def _make_config_port(
         dry_run=dry_run,
         resources=CleanupResourcesConfig(asg=asg, ec2_fleet=ec2_fleet, spot_fleet=spot_fleet),
     )
-    provider_defaults = ProviderDefaults(cleanup=cleanup)
+    provider_defaults = ProviderDefaults(cleanup=cleanup.model_dump())
     provider_config = MagicMock()
     provider_config.provider_defaults = {"aws": provider_defaults}
     port.get_provider_config.return_value = provider_config

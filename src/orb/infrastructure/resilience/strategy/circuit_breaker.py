@@ -5,20 +5,8 @@ import time
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-from botocore.exceptions import ClientError
-
 if TYPE_CHECKING:
     pass
-
-NON_RETRYABLE_CODES = {
-    "AlreadyExists",
-    "InvalidParameterValue",
-    "ValidationError",
-    "UnauthorizedOperation",
-    "AccessDenied",
-    "InvalidClientTokenId",
-    "OptInRequired",
-}
 
 from orb.domain.base.exceptions import QuotaError
 from orb.infrastructure.logging.logger import get_logger
@@ -107,6 +95,11 @@ class CircuitBreakerStrategy(RetryStrategy):
             },
         )
 
+    @classmethod
+    def has_state(cls, service_name: str) -> bool:
+        """Return True if a circuit state entry exists for service_name."""
+        return service_name in cls._circuit_states
+
     def _force_open(self, service_name: str) -> None:
         """Force the circuit to OPEN immediately, bypassing the failure threshold."""
         circuit_state = self._circuit_states[service_name]
@@ -134,17 +127,11 @@ class CircuitBreakerStrategy(RetryStrategy):
             self._force_open(self.service_name)
             return False
 
-        # Never retry non-idempotent errors
-        if isinstance(exception, ClientError):
-            code = exception.response.get("Error", {}).get("Code", "")
-            if code in NON_RETRYABLE_CODES:
-                return False
-
         current_time = time.time()
         circuit_state = self._circuit_states[self.service_name]
 
         # Update failure count and state
-        self._record_failure(current_time)
+        self.record_failure(current_time)
 
         # Check circuit state
         state = self._get_current_state(current_time)
@@ -259,7 +246,7 @@ class CircuitBreakerStrategy(RetryStrategy):
                 },
             )
 
-    def _record_failure(self, current_time: float) -> None:
+    def record_failure(self, current_time: float) -> None:
         """Record a failure and update circuit state."""
         circuit_state = self._circuit_states[self.service_name]
 

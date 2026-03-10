@@ -6,7 +6,6 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .base_config import BaseCircuitBreakerConfig
-from .cleanup_schema import CleanupConfig
 
 
 class HandlerConfig(BaseModel):
@@ -41,7 +40,7 @@ class ProviderDefaults(BaseModel):
     extensions: Optional[dict[str, Any]] = Field(
         default=None, description="Provider-specific extensions configuration"
     )
-    cleanup: Optional[CleanupConfig] = Field(default=None)
+    cleanup: Optional[dict[str, Any]] = Field(default=None)
 
 
 class ProviderMode(str, Enum):
@@ -181,20 +180,14 @@ class ProviderInstanceConfig(BaseModel):
     @field_validator("type")
     @classmethod
     def validate_type(cls, v: str) -> str:
-        """Validate provider type against registered providers."""
-        # Import here to avoid circular imports
-        from orb.providers.registry import get_provider_registry
-
-        registry = get_provider_registry()
-        registered_types = registry.get_registered_providers()
-
-        # If no providers registered, allow any type (graceful degradation)
-        if registered_types and v not in registered_types:
+        """Validate provider type string format."""
+        if not v or not v.strip():
+            raise ValueError("Provider type cannot be empty")
+        if not v.replace("-", "").replace("_", "").isalnum():
             raise ValueError(
-                f"Provider type '{v}' is not registered. Available types: {registered_types}"
+                "Provider type must contain only alphanumeric characters, hyphens, and underscores"
             )
-
-        return v
+        return v.strip()
 
     @field_validator("weight")
     @classmethod

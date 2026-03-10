@@ -285,8 +285,8 @@
   },
   "metrics": {
     "metrics_enabled": true,
-    "aws_metrics": {
-      "aws_metrics_enabled": true,
+    "provider_metrics": {
+      "provider_metrics_enabled": true,
       "sample_rate": 1.0,
       "monitored_services": [],
       "monitored_operations": [],
@@ -346,19 +346,21 @@
         "algorithm": "HS256",
         "token_expiry": 3600
       },
-      "iam": {
-        "region": "us-east-1",
-        "profile": null,
-        "required_actions": [
-          "ec2:DescribeInstances",
-          "ec2:RunInstances",
-          "ec2:TerminateInstances"
-        ]
-      },
-      "cognito": {
-        "user_pool_id": "us-east-1_XXXXXXXXX",
-        "client_id": "your-cognito-client-id",
-        "region": "us-east-1"
+      "provider_auth": {
+        "iam": {
+          "region": "us-east-1",
+          "profile": null,
+          "required_actions": [
+            "ec2:DescribeInstances",
+            "ec2:RunInstances",
+            "ec2:TerminateInstances"
+          ]
+        },
+        "cognito": {
+          "user_pool_id": "us-east-1_XXXXXXXXX",
+          "client_id": "your-cognito-client-id",
+          "region": "us-east-1"
+        }
       }
     },
     "cors": {

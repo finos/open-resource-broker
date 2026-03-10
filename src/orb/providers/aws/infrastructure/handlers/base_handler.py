@@ -6,6 +6,7 @@ AWSHandler and BaseAWSHandler patterns while maintaining clean architecture prin
 and clean integration with our DI/CQRS system.
 """
 
+import asyncio
 import json
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -13,6 +14,7 @@ from typing import Any, Callable, Optional, TypeVar
 
 from botocore.exceptions import ClientError
 
+from orb.application.base.provider_handlers import BaseProviderHandler
 from orb.config.schemas.cleanup_schema import CleanupConfig
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.exceptions import InfrastructureError
@@ -35,6 +37,8 @@ from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.infrastructure.tags import build_resource_tags
 
 T = TypeVar("T")
+TRequest = TypeVar("TRequest")
+TResponse = TypeVar("TResponse")
 
 
 @injectable
@@ -714,7 +718,7 @@ class AWSHandler(ABC):
             if provider_config and provider_config.provider_defaults:
                 defaults = provider_config.provider_defaults.get("aws")
                 if defaults and defaults.cleanup is not None:
-                    return defaults.cleanup
+                    return CleanupConfig.model_validate(defaults.cleanup)
         except Exception as e:
             self._logger.warning("Failed to read cleanup config, using defaults: %s", e)
         return CleanupConfig()
@@ -843,3 +847,100 @@ class AWSHandler(ABC):
                 request_id,
                 e,
             )
+
+
+class BaseAWSHandler(BaseProviderHandler[TRequest, TResponse]):
+    """
+    Base AWS handler specialized for AWS cloud provider operations.
+
+    Extends BaseProviderHandler with AWS-specific client management,
+    retry logic, and error handling.
+    """
+
+    def __init__(
+        self,
+        aws_client,  # Type hint avoided to prevent circular imports
+        logger: Optional[LoggingPort] = None,
+        error_handler: Optional[ErrorHandlingPort] = None,
+        region: Optional[str] = None,
+    ) -> None:
+        """Initialize base AWS handler."""
+        super().__init__("aws", logger, error_handler)
+        self.aws_client = aws_client
+        self.region = region or "us-east-1"
+        self.max_retries = 3
+        self.base_delay = 1  # seconds
+        self.max_delay = 10  # seconds
+
+    async def validate_provider_request(self, request: TRequest) -> None:
+        """Validate AWS request with additional AWS-specific checks."""
+        await super().validate_provider_request(request)
+        await self.validate_aws_request(request)
+
+    async def validate_aws_request(self, request: TRequest) -> None:
+        """
+        Validate AWS-specific request properties.
+
+        Override to implement AWS-specific validation.
+        """
+
+    async def execute_provider_request(self, request: TRequest) -> TResponse:
+        """Execute AWS request with retry logic and error handling."""
+        return await self.execute_with_retry(request)
+
+    async def execute_with_retry(self, request: TRequest) -> TResponse:
+        """Execute AWS request with exponential backoff retry logic."""
+        last_exception = None
+
+        for attempt in range(self.max_retries + 1):
+            try:
+                return await self.execute_aws_request(request)
+            except Exception as e:
+                last_exception = e
+
+                if attempt < self.max_retries and self.should_retry(e):
+                    delay = min(self.base_delay * (2**attempt), self.max_delay)
+
+                    if self.logger:
+                        self.logger.warning(
+                            "AWS request failed (attempt %s/%s), retrying in %ss: %s",
+                            attempt + 1,
+                            self.max_retries + 1,
+                            delay,
+                            str(e),
+                        )
+
+                    await asyncio.sleep(delay)
+                    continue
+                else:
+                    break
+
+        if last_exception is None:
+            raise RuntimeError(
+                "execute_with_retry completed without attempting any requests "
+                f"(max_retries={self.max_retries})"
+            )
+        raise last_exception
+
+    @abstractmethod
+    async def execute_aws_request(self, request: TRequest) -> TResponse:
+        """
+        Execute core AWS request logic.
+
+        Concrete AWS handlers must implement this method.
+        """
+
+    def should_retry(self, exception: Exception) -> bool:
+        """Determine if an exception should trigger a retry."""
+        if hasattr(exception, "response"):
+            error_code = exception.response.get("Error", {}).get("Code", "")  # type: ignore[union-attr]
+            retry_codes = [
+                "Throttling",
+                "ThrottlingException",
+                "RequestLimitExceeded",
+                "ServiceUnavailable",
+                "InternalError",
+                "InternalFailure",
+            ]
+            return error_code in retry_codes
+        return False

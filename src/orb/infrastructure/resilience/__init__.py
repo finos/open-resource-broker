@@ -8,7 +8,7 @@ from .exceptions import (
     RetryConfigurationError,
     RetryError,
 )
-from .retry_decorator import get_retry_config_for_service, retry
+from .retry_decorator import retry
 from .strategy import (
     CircuitBreakerStrategy,
     CircuitState,
@@ -30,7 +30,6 @@ __all__: list[str] = [
     "RetryError",
     # Strategies
     "RetryStrategy",
-    "get_retry_config_for_service",
     # Main retry decorator
     "retry",
 ]

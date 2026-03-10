@@ -18,6 +18,9 @@ def register_infrastructure_services(container: DIContainer) -> None:
     # Register repository services
     _register_repository_services(container)
 
+    # Register provisioning orchestration service
+    _register_provisioning_orchestration_service(container)
+
     # Register caching services
     _register_caching_services(container)
 
@@ -74,10 +77,10 @@ def _register_template_services(container: DIContainer):
             from orb.providers.aws.registration import register_aws_template_factory
 
             register_aws_template_factory(factory, c.get(LoggingPort))
-        except ImportError:
-            logger = c.get(LoggingPort)
-            logger.debug(
-                "AWS provider module not available; AWS-specific templates will not be registered."
+        except ImportError as exc:
+            c.get(LoggingPort).debug(
+                "AWS provider module not available; AWS-specific templates will not be registered: %s",
+                exc,
             )
         return factory
 
@@ -158,6 +161,37 @@ def _register_repository_services(container: DIContainer) -> None:
 
     # Register with appropriate factory functions
     container.register_singleton(TemplateRepository, create_template_repository)
+
+
+def _register_provisioning_orchestration_service(container: DIContainer) -> None:
+    """Register ProvisioningOrchestrationService with CircuitBreakerStrategy wired in."""
+    from orb.application.services.provisioning_orchestration_service import (
+        ProvisioningOrchestrationService,
+    )
+    from orb.domain.base.ports import (
+        ConfigurationPort,
+        ContainerPort,
+        LoggingPort,
+        ProviderConfigPort,
+        ProviderSelectionPort,
+    )
+    from orb.infrastructure.resilience.strategy.circuit_breaker import CircuitBreakerStrategy
+
+    def create_provisioning_orchestration_service(
+        c: DIContainer,
+    ) -> ProvisioningOrchestrationService:
+        return ProvisioningOrchestrationService(
+            container=c.get(ContainerPort),
+            logger=c.get(LoggingPort),
+            provider_selection_port=c.get(ProviderSelectionPort),
+            provider_config_port=c.get(ProviderConfigPort),
+            config_port=c.get(ConfigurationPort),
+            circuit_breaker_factory=CircuitBreakerStrategy,
+        )
+
+    container.register_singleton(
+        ProvisioningOrchestrationService, create_provisioning_orchestration_service
+    )
 
 
 def _register_caching_services(container: DIContainer) -> None:

@@ -60,7 +60,6 @@ def retry(
                 base_delay=base_delay,
                 max_delay=max_delay,
                 jitter=jitter,
-                service=service,
             )
         elif strategy == "circuit_breaker":
             retry_strategy = CircuitBreakerStrategy(
@@ -141,35 +140,3 @@ def retry(
         return wrapper
 
     return decorator
-
-
-def get_retry_config_for_service(service: str) -> dict:
-    """
-    Get default retry configuration for a specific AWS service.
-
-    Args:
-        service: AWS service name
-
-    Returns:
-        Dictionary with retry configuration parameters
-    """
-    service_configs = {
-        "ec2": {
-            "max_attempts": 3,
-            "base_delay": 1.0,
-            "max_delay": 30.0,
-            "jitter": True,
-        },
-        "dynamodb": {
-            "max_attempts": 5,
-            "base_delay": 0.5,
-            "max_delay": 20.0,
-            "jitter": True,
-        },
-        "s3": {"max_attempts": 4, "base_delay": 0.5, "max_delay": 15.0, "jitter": True},
-    }
-
-    return service_configs.get(
-        service,
-        {"max_attempts": 3, "base_delay": 1.0, "max_delay": 60.0, "jitter": True},
-    )

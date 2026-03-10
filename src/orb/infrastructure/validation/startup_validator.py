@@ -3,10 +3,10 @@
 import json
 import os
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Optional, cast
 
-from botocore.exceptions import ClientError, NoCredentialsError
 from pydantic import ValidationError
 
 from orb._package import DOCS_URL
@@ -17,10 +17,15 @@ from orb.config.schemas.app_schema import AppConfig
 class StartupValidator:
     """Validates ORB startup requirements with fail-fast behavior."""
 
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(
+        self,
+        config_path: Optional[str] = None,
+        credentials_checker: Optional[Callable[[list], bool]] = None,
+    ):
         self.config_path = config_path
         self.config_data: Optional[dict] = None
         self.app_config: Optional[AppConfig] = None
+        self._credentials_checker = credentials_checker
 
     def validate_startup(self) -> None:
         """Validate startup requirements. Exit on critical failures."""
@@ -88,11 +93,10 @@ class StartupValidator:
             print_info("Templates file not found")
             print_command("  Run: orb templates generate")
 
-        # 3. AWS credentials configured
-        if not self._check_aws_credentials():
-            print_warning("AWS credentials not configured")
-            print_command("  Configure with: aws configure")
-            print_info("  Or set environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY")
+        # 3. Provider credentials configured
+        if not self._check_provider_credentials():
+            print_warning("Provider credentials not configured")
+            print_info("  Check your provider configuration and credentials")
 
     def _find_config_file(self) -> bool:
         """Find config file using discovery hierarchy."""
@@ -137,38 +141,21 @@ class StartupValidator:
 
         return resolved_path is not None and Path(resolved_path).exists()
 
-    def _check_aws_credentials(self) -> bool:
-        """Check if AWS credentials are configured."""
+    def _check_provider_credentials(self) -> bool:
+        """Check if provider credentials are configured for all configured providers."""
         if not self.app_config:
             return False
 
+        if self._credentials_checker is None:
+            return True  # No checker provided — skip credential validation
+
         try:
-            # Get AWS config from first provider
             providers = self.app_config.provider.providers
             if not providers:
-                return True  # No AWS providers configured
+                return True  # No providers configured
 
-            aws_provider = next((p for p in providers if p.type == "aws"), None)
-            if not aws_provider:
-                return True  # No AWS providers
+            return self._credentials_checker(providers)
 
-            # Try to get AWS credentials
-            profile = aws_provider.config.get("profile", "default")
-            region = aws_provider.config.get("region", "us-east-1")
-
-            from botocore.config import Config
-
-            from orb.providers.aws.session_factory import AWSSessionFactory
-
-            session = AWSSessionFactory.create_session(profile, region)
-            session.client(
-                "sts",
-                config=Config(connect_timeout=10, read_timeout=30, retries={"max_attempts": 3}),
-            ).get_caller_identity()
-            return True
-
-        except (NoCredentialsError, ClientError):
-            return False
         except Exception:
             return True  # Don't fail on unexpected errors
 

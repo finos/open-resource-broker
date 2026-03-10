@@ -1,14 +1,17 @@
 """Performance configuration schemas."""
 
-from typing import Any
-
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .base_config import BaseCircuitBreakerConfig
 
 
 class BatchSizesConfig(BaseModel):
-    """Batch sizes for different operations."""
+    """Batch sizes for different operations.
+
+    NOTE: All fields here are AWS EC2 API operation names and are AWS-specific.
+    Known debt: move to providers/aws/configuration/ once PerformanceConfig is
+    decoupled from AppConfig or a provider-extension mechanism exists.
+    """
 
     terminate_instances: int = Field(
         25, description="Batch size for terminate_instances operations"
@@ -193,7 +196,22 @@ class PerformanceConfig(BaseModel):
         default_factory=lambda: LazyLoadingConfig()  # type: ignore[call-arg]
     )
     enable_batching: bool = Field(True, description="Whether to enable batching of API calls")
-    batch_sizes: BatchSizesConfig = Field(default_factory=lambda: BatchSizesConfig())  # type: ignore[call-arg]
+    batch_sizes: dict[str, int] = Field(
+        default_factory=lambda: {
+            "terminate_instances": 25,
+            "create_tags": 20,
+            "describe_instances": 25,
+            "run_instances": 10,
+            "describe_spot_fleet_instances": 20,
+            "describe_auto_scaling_groups": 20,
+            "describe_launch_templates": 20,
+            "describe_spot_fleet_requests": 20,
+            "describe_ec2_fleet_instances": 20,
+            "describe_images": 15,
+            "describe_security_groups": 25,
+            "describe_subnets": 25,
+        }
+    )
     enable_parallel: bool = Field(True, description="Whether to enable parallel processing")
     max_workers: int = Field(
         10, description="Maximum number of worker threads for parallel processing"
@@ -226,59 +244,4 @@ class PerformanceConfig(BaseModel):
 
 
 class CircuitBreakerConfig(BaseCircuitBreakerConfig):
-    """Performance-focused circuit breaker configuration with service-specific settings."""
-
-    # Service-specific configurations
-    service_configs: dict[str, dict[str, Any]] = Field(
-        default_factory=lambda: {
-            "ec2": {
-                "failure_threshold": 3,
-                "recovery_timeout": 30,
-                "backoff": {
-                    "strategy_type": "exponential",
-                    "max_retries": 3,
-                    "base_delay": 1.0,
-                    "max_delay": 30.0,
-                },
-            },
-            "dynamodb": {
-                "failure_threshold": 5,
-                "reset_timeout": 60,
-                "backoff": {
-                    "strategy_type": "exponential",
-                    "max_retries": 5,
-                    "base_delay": 0.5,
-                    "max_delay": 20.0,
-                },
-            },
-            "s3": {
-                "failure_threshold": 3,
-                "reset_timeout": 30,
-                "backoff": {
-                    "strategy_type": "exponential",
-                    "max_retries": 4,
-                    "base_delay": 0.5,
-                    "max_delay": 15.0,
-                },
-            },
-        },
-        description="Service-specific circuit breaker configurations",
-    )
-
-    # Retryable exceptions by service
-    retryable_exceptions: dict[str, list[str]] = Field(
-        default_factory=lambda: {
-            "ec2": [
-                "RequestLimitExceeded",
-                "InsufficientInstanceCapacity",
-                "InternalError",
-            ],
-            "dynamodb": [
-                "ProvisionedThroughputExceededException",
-                "ThrottlingException",
-                "RequestLimitExceeded",
-            ],
-            "s3": ["SlowDown", "ServiceUnavailable", "InternalError"],
-        },
-        description="Retryable exceptions by service",
-    )
+    """Performance-focused circuit breaker configuration."""

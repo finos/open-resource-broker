@@ -178,9 +178,10 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             self.logger.debug("Using provider_api from global defaults: %s", provider_api)
             return provider_api
 
-        # 5. Final fallback (should be configured, not hardcoded)
-        self.logger.warning("No provider_api configured anywhere, using fallback 'EC2Fleet'")
-        return "EC2Fleet"
+        # 5. No provider_api configured — raise to surface misconfiguration
+        raise ValueError(
+            "No provider_api configured — set provider_api in template file or provider defaults"
+        )
 
     def get_effective_template_defaults(
         self, provider_instance_name: Optional[str] = None

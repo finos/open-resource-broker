@@ -104,20 +104,8 @@ class TestProviderInstanceConfig:
             )
 
     def test_provider_type_validation(self):
-        """Test provider type validation."""
-        from orb.providers.registry import get_provider_registry
-
-        registry = get_provider_registry()
-
-        # Register aws type so the validator has entries to check against
-        if "aws" not in registry.get_registered_providers():
-            registry.register_provider(
-                "aws",
-                strategy_factory=lambda cfg: None,
-                config_factory=lambda: None,
-            )
-
-        # Only registered provider types are valid; aws is the registered type
+        """Test provider type string format validation."""
+        # Any valid identifier string is accepted; registry checks happen in ProviderConfigValidator
         config = ProviderInstanceConfig(
             name="test",
             type="aws",
@@ -132,11 +120,41 @@ class TestProviderInstanceConfig:
         )
         assert config.type == "aws"
 
-        # Unregistered types raise ValueError
-        with pytest.raises(ValueError, match="is not registered"):
+        # Unregistered but format-valid types are accepted at schema level
+        config2 = ProviderInstanceConfig(
+            name="test",
+            type="custom_provider",
+            enabled=True,
+            priority=0,
+            weight=100,
+            handlers=None,
+            handler_overrides=None,
+            template_defaults=None,
+            extensions=None,
+            capabilities=None,
+        )
+        assert config2.type == "custom_provider"
+
+        # Empty type is rejected
+        with pytest.raises(ValueError, match="cannot be empty"):
             ProviderInstanceConfig(
                 name="test",
-                type="invalid_unregistered_type",
+                type="",
+                enabled=True,
+                priority=0,
+                weight=100,
+                handlers=None,
+                handler_overrides=None,
+                template_defaults=None,
+                extensions=None,
+                capabilities=None,
+            )
+
+        # Type with invalid characters is rejected
+        with pytest.raises(ValueError, match="alphanumeric"):
+            ProviderInstanceConfig(
+                name="test",
+                type="invalid type!",
                 enabled=True,
                 priority=0,
                 weight=100,

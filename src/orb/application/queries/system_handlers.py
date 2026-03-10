@@ -22,6 +22,7 @@ from orb.application.queries.system import (
 )
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
+from orb.domain.constants import PROVIDER_TYPE_AWS
 from orb.domain.services.timestamp_service import TimestampService
 
 # Use TYPE_CHECKING to avoid direct infrastructure imports
@@ -155,7 +156,7 @@ class GetProviderConfigHandler(BaseQueryHandler[GetProviderConfigQuery, Provider
                 # Fallback for legacy configuration
                 return ProviderConfigDTO(
                     provider_mode="legacy",
-                    active_providers=["aws"],
+                    active_providers=[PROVIDER_TYPE_AWS],
                     provider_count=1,
                     default_provider=None,
                     configuration_source="legacy",

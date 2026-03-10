@@ -2,18 +2,6 @@
 
 import secrets
 
-from botocore.exceptions import ClientError
-
-NON_RETRYABLE_CODES = {
-    "AlreadyExists",
-    "InvalidParameterValue",
-    "ValidationError",
-    "UnauthorizedOperation",
-    "AccessDenied",
-    "InvalidClientTokenId",
-    "OptInRequired",
-}
-
 
 class ExponentialBackoffStrategy:
     """
@@ -29,7 +17,6 @@ class ExponentialBackoffStrategy:
         base_delay: float = 1.0,
         max_delay: float = 60.0,
         jitter: bool = True,
-        service: str = "ec2",
     ) -> None:
         """
         Initialize exponential backoff strategy.
@@ -39,13 +26,11 @@ class ExponentialBackoffStrategy:
             base_delay: Base delay in seconds
             max_delay: Maximum delay in seconds
             jitter: Whether to add jitter to delays
-            service: AWS service name for error classification
         """
         self.max_attempts = max_attempts
         self.base_delay = base_delay
         self.max_delay = max_delay
         self.jitter = jitter
-        self.service = service
 
     def should_retry(self, attempt: int, exception: Exception) -> bool:
         """
@@ -58,12 +43,6 @@ class ExponentialBackoffStrategy:
         Returns:
             True if operation should be retried, False otherwise
         """
-        # Never retry non-idempotent errors
-        if isinstance(exception, ClientError):
-            code = exception.response.get("Error", {}).get("Code", "")
-            if code in NON_RETRYABLE_CODES:
-                return False
-
         # Check if we've exceeded max attempts
         if attempt >= self.max_attempts:
             return False

@@ -28,8 +28,8 @@ REST_API_METRICS_CONFIG: dict[str, Any] | None = {
     "trace_enabled": True,
     "trace_buffer_size": 1000,
     "trace_file_max_size_mb": 10,
-    "aws_metrics": {
-        "aws_metrics_enabled": True,
+    "provider_metrics": {
+        "provider_metrics_enabled": True,
         "sample_rate": 1.0,
         "monitored_services": [],
         "monitored_operations": [],

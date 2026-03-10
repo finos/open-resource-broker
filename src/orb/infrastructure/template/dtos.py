@@ -79,12 +79,6 @@ class TemplateDTO(BaseDTO):
     # Legacy fields
     version: Optional[str] = None
 
-    # AWS-specific fields
-    fleet_role: Optional[str] = None
-    fleet_type: Optional[str] = None
-    percent_on_demand: Optional[int] = None
-    abis_instance_requirements: Optional[dict[str, Any]] = None
-
     @model_validator(mode="before")
     @classmethod
     def _set_defaults(cls, data: Any) -> Any:
@@ -97,6 +91,7 @@ class TemplateDTO(BaseDTO):
     @classmethod
     def from_domain(cls, template) -> "TemplateDTO":
         """Convert domain template to DTO."""
+        # Pack AWS-specific fields into metadata.
         _fleet_type = getattr(template, "fleet_type", None)
         _fleet_type_str: Optional[str] = (
             str(_fleet_type.value)
@@ -104,6 +99,21 @@ class TemplateDTO(BaseDTO):
             else (_fleet_type if _fleet_type is None else str(_fleet_type))
         )
         _abis = getattr(template, "abis_instance_requirements", None)
+        _fleet_role = getattr(template, "fleet_role", None)
+        _percent_on_demand = getattr(template, "percent_on_demand", None)
+
+        aws_extras: dict[str, Any] = {}
+        if _fleet_type_str is not None:
+            aws_extras["fleet_type"] = _fleet_type_str
+        if _fleet_role is not None:
+            aws_extras["fleet_role"] = _fleet_role
+        if _percent_on_demand is not None:
+            aws_extras["percent_on_demand"] = _percent_on_demand
+        if _abis is not None:
+            aws_extras["abis_instance_requirements"] = _abis.to_aws_dict()
+
+        metadata = {**getattr(template, "metadata", {}), **aws_extras}
+
         return cls(
             # Core fields
             template_id=template.template_id,
@@ -141,7 +151,7 @@ class TemplateDTO(BaseDTO):
             monitoring_enabled=getattr(template, "monitoring_enabled", None),
             # Tags and metadata
             tags=getattr(template, "tags", {}),
-            metadata=getattr(template, "metadata", {}),
+            metadata=metadata,
             # Provider configuration
             provider_type=getattr(template, "provider_type", None),
             provider_name=getattr(template, "provider_name", None),
@@ -153,11 +163,6 @@ class TemplateDTO(BaseDTO):
             is_active=getattr(template, "is_active", True),
             # Legacy fields
             version=getattr(template, "version", None),
-            # AWS-specific fields
-            fleet_role=getattr(template, "fleet_role", None),
-            fleet_type=_fleet_type_str,
-            percent_on_demand=getattr(template, "percent_on_demand", None),
-            abis_instance_requirements=_abis.to_aws_dict() if _abis is not None else None,
         )
 
 

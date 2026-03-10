@@ -83,9 +83,15 @@ class MachineGroupingService:
                         raise ValueError(f"Machine not found: {machine_id}")
 
                     # Use machine's actual provider context
+                    if not machine.provider_api:
+                        self.logger.warning(
+                            "Machine %s has no provider_api — skipping",
+                            machine_id,
+                        )
+                        continue
                     group_key = (
                         machine.provider_name,
-                        machine.provider_api or "RunInstances",  # Fallback for old machines
+                        machine.provider_api,
                         machine.resource_id,
                     )
                     resource_groups[group_key].append(machine)

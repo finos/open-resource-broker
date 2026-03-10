@@ -76,6 +76,15 @@ def create_aws_strategy(provider_config: Any) -> Any:
         if not strategy.initialize():
             raise RuntimeError("Failed to initialize AWS provider strategy")
 
+        with suppress(Exception):
+            from orb.infrastructure.di.container import get_container
+            from orb.monitoring.health import HealthCheck
+            from orb.providers.aws.health import register_aws_health_checks
+
+            if strategy.aws_client is not None:
+                health_check = get_container().get(HealthCheck)
+                register_aws_health_checks(health_check, strategy.aws_client)
+
         # Set provider name for identification
         if hasattr(strategy, "name") and provider_name:
             strategy.name = provider_name  # type: ignore[misc]
@@ -463,7 +472,7 @@ def register_aws_services_with_di(container) -> None:
         from orb.domain.base.ports.template_example_generator_port import (
             TemplateExampleGeneratorPort,
         )
-        from orb.infrastructure.adapters.template_example_generator_adapter import (
+        from orb.providers.aws.adapters.template_example_generator_adapter import (
             AWSTemplateExampleGeneratorAdapter,
         )
         from orb.providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
@@ -476,6 +485,15 @@ def register_aws_services_with_di(container) -> None:
             TemplateExampleGeneratorPort, create_template_example_generator
         )
         logger.debug("TemplateExampleGeneratorPort registered with DI container")
+
+        # Register HealthCheck singleton
+        from orb.config.managers.configuration_manager import ConfigurationManager
+        from orb.monitoring.health import HealthCheck
+
+        container.register_singleton(
+            HealthCheck, lambda c: HealthCheck(config=c.get(ConfigurationManager))
+        )
+        logger.debug("HealthCheck registered with DI container")
 
         logger.debug("AWS utility services registered with DI container")
 

@@ -65,11 +65,16 @@ def register_symphony_hostfactory_scheduler(
 
         registry = get_scheduler_registry()
 
+    from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+        HostFactorySchedulerStrategy,
+    )
+
     # Registry handles idempotent registration
     registry.register(
         type_name="hostfactory",
         strategy_factory=create_symphony_hostfactory_strategy,
         config_factory=create_hostfactory_config,
+        strategy_class=HostFactorySchedulerStrategy,
     )
 
     # Also register with 'hf' alias
@@ -77,6 +82,7 @@ def register_symphony_hostfactory_scheduler(
         type_name="hf",
         strategy_factory=create_symphony_hostfactory_strategy,
         config_factory=create_hostfactory_config,
+        strategy_class=HostFactorySchedulerStrategy,
     )
 
 
@@ -127,11 +133,14 @@ def register_default_scheduler(registry: "SchedulerRegistry | None" = None) -> N
 
         registry = get_scheduler_registry()
 
+    from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+
     # Registry handles idempotent registration
     registry.register(
         type_name="default",
         strategy_factory=create_default_strategy,
         config_factory=create_default_config,
+        strategy_class=DefaultSchedulerStrategy,
     )
 
 

@@ -11,16 +11,17 @@ from orb.application.dto.commands import (
     CreateReturnRequestCommand,
 )
 from orb.application.ports.query_bus_port import QueryBusPort
+from orb.application.services.provisioning_orchestration_service import (
+    ProvisioningOrchestrationService,
+)
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.configuration_service import DomainConfigurationService
 from orb.domain.base.exceptions import ApplicationError, EntityNotFoundError
 from orb.domain.base.ports import (
-    ConfigurationPort,
     ContainerPort,
     ErrorHandlingPort,
     EventPublisherPort,
     LoggingPort,
-    ProviderConfigPort,
     ProviderSelectionPort,
 )
 from orb.domain.request.request_identifiers import RequestId
@@ -44,33 +45,24 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
         error_handler: ErrorHandlingPort,
         query_bus: QueryBusPort,  # QueryBus is required for template lookup
         provider_selection_port: ProviderSelectionPort,
-        provider_config_port: ProviderConfigPort,
+        provisioning_service: ProvisioningOrchestrationService,
     ) -> None:
         """Initialize the instance."""
         super().__init__(logger, event_publisher, error_handler)
-        self.uow_factory = uow_factory  # Use UoW factory pattern
+        self.uow_factory = uow_factory
         self._container = container
         self._query_bus = query_bus
         self._provider_selection_port = provider_selection_port
 
         # Initialize services
         from orb.application.services.provider_validation_service import ProviderValidationService
-        from orb.application.services.provisioning_orchestration_service import (
-            ProvisioningOrchestrationService,
-        )
         from orb.application.services.request_creation_service import RequestCreationService
         from orb.application.services.request_status_management_service import (
             RequestStatusManagementService,
         )
 
         self._request_creation_service = RequestCreationService(logger)
-        self._provisioning_service = ProvisioningOrchestrationService(
-            container,
-            logger,
-            provider_selection_port,
-            provider_config_port,
-            config_port=container.get(ConfigurationPort),
-        )
+        self._provisioning_service = provisioning_service
         self._status_service = RequestStatusManagementService(uow_factory, logger)
         self._provider_validation_service = ProviderValidationService(
             container, logger, provider_selection_port

@@ -171,7 +171,6 @@ def _get_active_providers() -> List[Dict[str, Any]]:
             {
                 "name": "default",
                 "type": default_type,
-                "config": {"region": "us-east-1", "profile": "default"},
             }
         ]
 
@@ -197,7 +196,6 @@ def _get_active_providers() -> List[Dict[str, Any]]:
             {
                 "name": "default",
                 "type": default_type,
-                "config": {"region": "us-east-1", "profile": "default"},
             }
         ]
 
@@ -217,21 +215,19 @@ def _get_active_providers_with_overrides() -> List[Dict[str, Any]]:
         config = container.get(ConfigurationPort)
 
         for provider in providers:
-            if provider.get("type") == "aws":
-                provider_config = provider.get("config", {})
+            provider_config = provider.get("config", {})
 
-                # Apply region override
-                effective_region = config.get_effective_region(
-                    provider_config.get("region", "us-east-1")
-                )
-                provider_config["region"] = effective_region
+            # Apply region override if present in config
+            region = provider_config.get("region")
+            if region is not None:
+                provider_config["region"] = config.get_effective_region(region)
 
-                # Apply profile override
-                effective_profile = config.get_effective_profile(
-                    provider_config.get("profile", "default")
-                )
-                provider_config["profile"] = effective_profile
+            # Apply profile override if present in config
+            profile = provider_config.get("profile")
+            if profile is not None:
+                provider_config["profile"] = config.get_effective_profile(profile)
 
+            if provider_config:
                 provider["config"] = provider_config
     except Exception as e:
         # Fallback to original providers if override fails
