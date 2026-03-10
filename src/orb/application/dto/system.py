@@ -128,7 +128,8 @@ class ConfigurationSectionResponse(BaseDTO):
         default_factory=list, description="List of providers that failed validation"
     )
     validation_timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc), description="When validation was performed"
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="When validation was performed",
     )
 
 
@@ -146,7 +147,8 @@ class SystemStatusDTO(BaseDTO):
     cpu_usage_percent: float = Field(description="CPU usage percentage")
     disk_usage_percent: float = Field(description="Disk usage percentage")
     last_health_check: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc), description="Last health check timestamp"
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Last health check timestamp",
     )
     components: dict[str, str] = Field(
         default_factory=dict, description="Status of individual components"
@@ -167,7 +169,8 @@ class ProviderMetricsDTO(BaseDTO):
     uptime_percent: float = Field(description="Provider uptime percentage")
     health_status: str = Field(description="Current health status")
     metrics_timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc), description="When metrics were collected"
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="When metrics were collected",
     )
 
 
@@ -214,7 +217,8 @@ class ProviderStrategyConfigDTO(BaseDTO):
     retry_attempts: int = Field(description="Number of retry attempts")
     timeout_seconds: int = Field(description="Timeout in seconds")
     last_modified: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc), description="Last modification timestamp"
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Last modification timestamp",
     )
 
 
@@ -228,6 +232,7 @@ class ValidationDTO(BaseDTO):
     warnings: list[str] = Field(default_factory=list, description="List of validation warnings")
     template_id: str = Field(description="ID of the validated template")
     validation_timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc), description="When validation was performed"
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="When validation was performed",
     )
     schema_version: str = Field(description="Schema version used for validation")

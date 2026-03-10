@@ -18,6 +18,7 @@ from orb.infrastructure.di.container import DIContainer
 from orb.infrastructure.services.iso_timestamp_service import ISOTimestampService
 from orb.infrastructure.services.machine_filter_service import MachineFilterService
 
+
 def register_domain_services(container: DIContainer) -> None:
     """Register domain services in the DI container."""
 
