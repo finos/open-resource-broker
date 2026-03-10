@@ -256,6 +256,7 @@ junit-*.xml
 
 # Metrics files (runtime generated)
 metrics/
+health/
 *.metrics
 metrics.json
 metrics.prom
