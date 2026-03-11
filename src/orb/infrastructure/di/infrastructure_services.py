@@ -84,9 +84,10 @@ def _register_template_services(container: DIContainer):
             )
         return factory
 
-    from orb.domain.template.factory import TemplateFactory
+    from orb.domain.template.factory import TemplateFactory, TemplateFactoryPort
 
     container.register_singleton(TemplateFactory, create_template_factory)
+    container.register_singleton(TemplateFactoryPort, lambda c: c.get(TemplateFactory))
 
     # Register template configuration manager with factory function
     def create_template_configuration_manager(

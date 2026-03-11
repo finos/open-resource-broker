@@ -99,7 +99,7 @@ class ProvisioningOrchestrationService:
             )
 
             # Stamp attempt number so provider-level idempotency tokens are unique per attempt
-            request.metadata["provisioning_attempt"] = attempt_number
+            request = request.update_metadata({"provisioning_attempt": attempt_number})
 
             try:
                 last_result = await self._dispatch_single_attempt(
@@ -134,9 +134,9 @@ class ProvisioningOrchestrationService:
                 "started_at": attempt_started.isoformat(),
                 "completed_at": attempt_completed.isoformat(),
             }
-            if "fulfillment_attempts" not in request.metadata:
-                request.metadata["fulfillment_attempts"] = []
-            request.metadata["fulfillment_attempts"].append(attempt_record)
+            existing_attempts = list(request.metadata.get("fulfillment_attempts", []))
+            existing_attempts.append(attempt_record)
+            request = request.update_metadata({"fulfillment_attempts": existing_attempts})
 
             if not last_result.success:
                 self._logger.warning(

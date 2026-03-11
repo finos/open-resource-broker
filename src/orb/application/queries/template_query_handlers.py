@@ -17,7 +17,7 @@ from orb.application.ports.template_dto_port import TemplateDTOPort
 from orb.domain.base.exceptions import EntityNotFoundError
 from orb.domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
 from orb.domain.services.generic_filter_service import GenericFilterService
-from orb.domain.template.factory import TemplateFactory
+from orb.domain.template.factory import TemplateFactoryPort
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.template.dtos import TemplateDTO
 
@@ -31,7 +31,7 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, TemplateDTOPort]):
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
         container: ContainerPort,
-        template_factory: TemplateFactory,
+        template_factory: TemplateFactoryPort,
     ) -> None:
         super().__init__(logger, error_handler)
         self._container = container

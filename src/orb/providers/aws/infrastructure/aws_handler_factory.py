@@ -123,8 +123,8 @@ class AWSHandlerFactory:
                 else:
                     # Attempt lazy resolution via container as last resort
                     try:
-                        from orb.infrastructure.di.container import get_container
                         from orb.application.services.native_spec_service import NativeSpecService
+                        from orb.infrastructure.di.container import get_container
 
                         container = get_container()
                         aws_native_spec_service = AWSNativeSpecService(

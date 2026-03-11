@@ -1,9 +1,9 @@
 """Unit tests for ORB launch template cleanup after full machine return."""
 
-import pytest
 from typing import cast
 from unittest.mock import MagicMock, patch
 
+import pytest
 from botocore.exceptions import ClientError
 
 from orb.config.schemas.cleanup_schema import CleanupConfig, CleanupResourcesConfig
