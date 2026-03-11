@@ -1,8 +1,7 @@
 {
   "version": "2.0.0",
   "scheduler": {
-    "type": "hostfactory",
-    "config_root": "$HF_PROVIDER_CONFDIR"
+    "type": "default"
   },
   "provider": {
     "providers": [

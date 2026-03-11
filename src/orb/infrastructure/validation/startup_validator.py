@@ -135,11 +135,11 @@ class StartupValidator:
         """Check if default_config.json template exists."""
         from orb.config.loader import ConfigurationLoader
 
-        resolved_path = ConfigurationLoader._resolve_file_path(
-            "template", "default_config.json", explicit_path=None, config_manager=None
+        resolved_path = ConfigurationLoader._get_path_resolution_service().resolve_file_path(
+            "template", "default_config.json"
         )
 
-        return resolved_path is not None and Path(resolved_path).exists()
+        return Path(resolved_path).exists()
 
     def _check_provider_credentials(self) -> bool:
         """Check if provider credentials are configured for all configured providers."""
@@ -166,14 +166,14 @@ class StartupValidator:
         print_info("")
         print_info("Configuration not found in:")
 
-        default_resolved = ConfigurationLoader._resolve_file_path(
-            "template", "default_config.json", explicit_path=None, config_manager=None
+        default_resolved = ConfigurationLoader._get_path_resolution_service().resolve_file_path(
+            "template", "default_config.json"
         )
         if default_resolved:
             print_info(f"  - {default_resolved}")
 
-        config_resolved = ConfigurationLoader._resolve_file_path(
-            "conf", "config.json", explicit_path=None, config_manager=None
+        config_resolved = ConfigurationLoader._get_path_resolution_service().resolve_file_path(
+            "conf", "config.json"
         )
         if config_resolved:
             print_info(f"  - {config_resolved}")

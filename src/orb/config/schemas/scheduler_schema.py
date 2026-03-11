@@ -1,14 +1,18 @@
 """Scheduler configuration schema."""
 
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
+
+from orb.config.platform_dirs import get_config_location
 
 
 class SchedulerConfig(BaseModel):
     """Scheduler configuration - single scheduler like storage strategy."""
 
-    type: str = Field("hostfactory", description="Scheduler type (hostfactory, hf)")
+    type: Literal["default", "hostfactory"] = Field(
+        "default", description="Scheduler type (default, hostfactory)"
+    )
     config_root: Optional[str] = Field(
         None, description="Root path for configs (supports $ENV_VAR expansion)"
     )
@@ -26,4 +30,4 @@ class SchedulerConfig(BaseModel):
         if self.config_root:
             return self.config_root
 
-        return "config"
+        return str(get_config_location())

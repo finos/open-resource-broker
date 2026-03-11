@@ -97,14 +97,9 @@ $ orb scheduler list
       "active": true,
       "registered": true
     },
-    {
-      "name": "hf",
-      "active": false,
-      "registered": true
-    }
   ],
   "current_strategy": "hostfactory",
-  "total_count": 3
+  "total_count": 2
 }
 
 # Show current configuration

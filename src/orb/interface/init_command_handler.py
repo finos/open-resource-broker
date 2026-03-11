@@ -102,6 +102,25 @@ async def handle_init(args) -> int:
         return 1
 
 
+def _get_default_scheduler_type() -> str:
+    """Get the default scheduler type from the registry.
+
+    Returns the first registered type, falling back to 'default' only if the
+    registry is empty or unavailable.
+    """
+    try:
+        from orb.infrastructure.scheduler.registration import register_all_scheduler_types
+        from orb.infrastructure.scheduler.registry import get_scheduler_registry
+
+        registry = get_scheduler_registry()
+        types = registry.get_available_types_with_registration(register_all_scheduler_types)
+        if types:
+            return types[0]
+    except Exception as e:
+        logger.debug("Could not determine default scheduler type: %s", e)
+    return "default"
+
+
 def _get_available_schedulers() -> list[dict[str, str]]:
     """Get available schedulers from registry."""
     from orb.infrastructure.scheduler.registration import register_all_scheduler_types
@@ -139,7 +158,8 @@ def _get_available_providers() -> list[dict[str, str]]:
             )
 
         return providers
-    except Exception:
+    except Exception as e:
+        logger.debug("Could not retrieve available providers: %s", e)
         return []
 
 
@@ -560,7 +580,7 @@ def _get_default_config(args) -> Dict[str, Any]:
     }
 
     return {
-        "scheduler_type": args.scheduler or "default",
+        "scheduler_type": args.scheduler or _get_default_scheduler_type(),
         "providers": [first_provider],
     }
 

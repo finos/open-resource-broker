@@ -46,10 +46,6 @@ class TestMachinesRequest:
         ns = _parse(["machines", "request", "template-id", "5", "--scheduler", "hostfactory"])
         assert ns.scheduler == "hostfactory"
 
-    def test_scheduler_override_hf_alias(self):
-        ns = _parse(["machines", "request", "template-id", "5", "--scheduler", "hf"])
-        assert ns.scheduler == "hf"
-
     def test_scheduler_invalid_choice_raises(self):
         with patch.object(
             sys, "argv", ["orb", "machines", "request", "t", "1", "--scheduler", "bad"]

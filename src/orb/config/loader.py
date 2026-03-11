@@ -247,9 +247,10 @@ class ConfigurationLoader:
             explicit_path,
         )
 
-        # Resolve the file path using centralized logic
-        # In practice, this would be refactored to use a static method or utility
-        resolved_path = cls._resolve_file_path(file_type, filename, explicit_path, config_manager)
+        # Resolve the file path using PathResolutionService
+        resolved_path = cls._get_path_resolution_service(config_manager).resolve_file_path(
+            file_type, filename, explicit_path
+        )
 
         if resolved_path:
             get_config_logger().info("Loading %s configuration from: %s", file_type, resolved_path)
@@ -266,74 +267,22 @@ class ConfigurationLoader:
             return None
 
     @classmethod
-    def _resolve_file_path(
-        cls,
-        file_type: str,
-        filename: str,
-        explicit_path: Optional[str] = None,
-        config_manager: Optional[ConfigurationManager] = None,
-    ) -> Optional[str]:
+    def _get_path_resolution_service(cls, config_manager: Optional[ConfigurationManager] = None):
         """
-        Resolve file path using centralized logic (static version of ConfigurationManager.resolve_file).
+        Create a PathResolutionService wired to the given config_manager.
 
         Args:
-            file_type: Type of file ('conf', 'template', 'legacy', 'log', 'work', 'events', 'snapshots')
-            filename: Name of the file
-            explicit_path: Explicit path provided by user (optional)
             config_manager: Configuration manager for scheduler directory resolution (optional)
 
         Returns:
-            Resolved file path or None if not found
+            PathResolutionService instance
         """
-        get_config_logger().debug(
-            "Resolving file path: type=%s, filename=%s, explicit_path=%s",
-            file_type,
-            filename,
-            explicit_path,
+        from orb.config.services.path_resolution_service import PathResolutionService
+
+        scheduler_directory_provider = (
+            config_manager.get_scheduler_directory if config_manager is not None else None
         )
-
-        # 1. If explicit path provided and contains directory, use it directly
-        if explicit_path and os.path.dirname(explicit_path):
-            get_config_logger().debug("Using explicit path with directory: %s", explicit_path)
-            return explicit_path if os.path.exists(explicit_path) else None
-
-        # If explicit_path is just a filename, use it as the filename
-        if explicit_path and not os.path.dirname(explicit_path):
-            filename = explicit_path
-            get_config_logger().debug("Using explicit filename: %s", filename)
-
-        # 2. Try scheduler-provided directory + filename
-        try:
-            scheduler_dir = cls._get_scheduler_directory(file_type, config_manager)
-            if scheduler_dir:
-                scheduler_path = os.path.join(scheduler_dir, filename)
-                get_config_logger().debug("Using scheduler directory path: %s", scheduler_path)
-                return scheduler_path
-        except Exception as e:
-            get_config_logger().debug("Failed to get scheduler directory: %s", e)
-
-        # 3. Fall back to default directory + filename
-        default_dirs = {
-            "conf": "config",
-            "template": "config",
-            "legacy": "config",
-            "log": "logs",
-            "work": "data",
-            "events": "events",
-            "snapshots": "snapshots",
-        }
-
-        default_dir = default_dirs.get(file_type, "config")
-
-        # Build path relative to working directory (not package location)
-        project_root = os.getcwd()
-        fallback_path = os.path.join(project_root, default_dir, filename)
-
-        # Always return the fallback path, even if file doesn't exist
-        # This allows the caller to decide whether to create the file or handle
-        # the missing file
-        get_config_logger().debug("Using fallback path: %s", fallback_path)
-        return fallback_path
+        return PathResolutionService(scheduler_directory_provider)
 
     @classmethod
     def _load_from_env(
@@ -389,8 +338,9 @@ class ConfigurationLoader:
         """
         # Get directories from scheduler
         try:
-            scheduler_dir = cls._get_scheduler_directory("work", config_manager)
-            logs_dir = cls._get_scheduler_directory("log", config_manager)
+            svc = cls._get_path_resolution_service(config_manager)
+            scheduler_dir = svc.resolve_directory("work")
+            logs_dir = svc.resolve_directory("log")
 
             # Set up logging path
             if logs_dir:
@@ -409,13 +359,13 @@ class ConfigurationLoader:
                     json_strategy["base_path"] = scheduler_dir
                     get_config_logger().debug("Set JSON storage base_path to %s", scheduler_dir)
 
-                # Update SQL storage strategy if using SQLite
+                # Update SQL storage strategy database path from scheduler directory.
+                # Applied unconditionally — non-SQLite engines ignore the name field.
                 sql_strategy = storage.setdefault("sql_strategy", {})
-                if sql_strategy.get("type", "sqlite") == "sqlite":
-                    sql_strategy["name"] = os.path.join(scheduler_dir, "database.db")
-                    get_config_logger().debug(
-                        "Set SQLite database path to %s", os.path.join(scheduler_dir, "database.db")
-                    )
+                sql_strategy["name"] = os.path.join(scheduler_dir, "database.db")
+                get_config_logger().debug(
+                    "Set SQL storage name to %s", os.path.join(scheduler_dir, "database.db")
+                )
         except Exception as e:
             get_config_logger().debug("Could not get scheduler directories: %s", e)
 
@@ -485,35 +435,3 @@ class ConfigurationLoader:
         json_str = safe_json_dumps(obj, raise_on_error=True, context="Deep copy serialization")
         return safe_json_loads(json_str, raise_on_error=True, context="Deep copy deserialization")
 
-    @classmethod
-    def _get_scheduler_directory(
-        cls, file_type: str, config_manager: Optional[ConfigurationManager] = None
-    ) -> Optional[str]:
-        """
-        Get directory path from scheduler port for the given file type.
-
-        Args:
-            file_type: Type of file ('conf', 'work', 'log', etc.)
-            config_manager: Configuration manager with scheduler access (optional)
-
-        Returns:
-            Directory path from scheduler or None if not available
-        """
-        if config_manager:
-            return config_manager._get_scheduler_directory(file_type)
-
-        # During bootstrap, use platform_dirs for consistent directory resolution
-        from orb.config.platform_dirs import (
-            get_config_location,
-            get_logs_location,
-            get_work_location,
-        )
-
-        if file_type in ["conf", "template", "legacy"]:
-            return str(get_config_location())
-        elif file_type == "log":
-            return str(get_logs_location())
-        elif file_type in ["work", "data"]:
-            return str(get_work_location())
-
-        return None

@@ -41,7 +41,7 @@ def add_global_arguments(parser):
     parser.add_argument("--region", help="AWS region override")
     parser.add_argument("--profile", help="AWS profile override")
     parser.add_argument(
-        "--scheduler", choices=["default", "hostfactory", "hf"], help="Override scheduler strategy"
+        "--scheduler", choices=["default", "hostfactory"], help="Override scheduler strategy"
     )
     parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
     parser.add_argument("--yes", "-y", action="store_true", help="Assume yes to all prompts")

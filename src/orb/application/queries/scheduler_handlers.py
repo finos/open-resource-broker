@@ -103,7 +103,6 @@ class ListSchedulerStrategiesHandler(
         descriptions = {
             "default": "Default scheduler using native domain fields without conversion",
             "hostfactory": "Symphony HostFactory scheduler with field mapping and conversion",
-            "hf": "Alias for Symphony HostFactory scheduler",
         }
         return descriptions.get(scheduler_type, f"Scheduler strategy: {scheduler_type}")
 
@@ -120,7 +119,6 @@ class ListSchedulerStrategiesHandler(
                 "format_conversion",
                 "legacy_compatibility",
             ],
-            "hf": ["field_mapping", "format_conversion", "legacy_compatibility"],
         }
         return capabilities.get(scheduler_type, [])
 

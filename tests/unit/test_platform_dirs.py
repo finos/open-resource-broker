@@ -1,6 +1,7 @@
 """Comprehensive tests for platform_dirs.py - all functions and edge cases."""
 
 import os
+import site
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -56,6 +57,17 @@ class TestInVirtualenv:
         ):
             assert in_virtualenv() is True
 
+    def test_mise_does_not_trigger_symlink_venv_branch(self):
+        """Mise executable outside prefix but not in .venv — should return False."""
+        mise_exe = str(Path.home() / ".local/share/mise/installs/python/3.12/bin/python")
+        with (
+            patch.object(sys, "prefix", str(Path.home() / ".local/share/mise/installs/python/3.12")),
+            patch.object(sys, "base_prefix", str(Path.home() / ".local/share/mise/installs/python/3.12")),
+            patch.object(sys, "executable", mise_exe),
+        ):
+            # prefix == base_prefix, and executable has no .venv component
+            assert in_virtualenv() is False
+
 
 class TestIsUserInstall:
     """Test user installation detection."""
@@ -63,37 +75,42 @@ class TestIsUserInstall:
     def test_is_user_install_true(self):
         """Test detection when installed with --user."""
         with (
-            patch("pathlib.Path.home") as mock_home,
+            patch.object(site, "USER_BASE", "/home/user/.local"),
             patch.object(sys, "prefix", "/home/user/.local"),
         ):
-            mock_home.return_value = Path("/home/user")
             assert is_user_install() is True
 
     def test_is_user_install_false_system(self):
         """Test detection when system install."""
         with (
-            patch("pathlib.Path.home") as mock_home,
+            patch.object(site, "USER_BASE", "/home/user/.local"),
             patch.object(sys, "prefix", "/usr/local"),
         ):
-            mock_home.return_value = Path("/home/user")
             assert is_user_install() is False
 
     def test_is_user_install_false_venv(self):
         """Test detection when in virtual environment."""
         with (
-            patch("pathlib.Path.home") as mock_home,
+            patch.object(site, "USER_BASE", "/home/user/.local"),
             patch.object(sys, "prefix", "/project/.venv"),
         ):
-            mock_home.return_value = Path("/home/user")
             assert is_user_install() is False
+
+    def test_is_user_install_with_site_user_base(self):
+        """sys.prefix matching site.USER_BASE returns True."""
+        fake_user_base = "/home/user/.local"
+        with (
+            patch.object(site, "USER_BASE", fake_user_base),
+            patch.object(sys, "prefix", "/home/user/.local"),
+        ):
+            assert is_user_install() is True
 
     def test_is_user_install_windows(self):
         """Test detection on Windows user install."""
         with (
-            patch("pathlib.Path.home") as mock_home,
+            patch.object(site, "USER_BASE", r"C:\Users\user\AppData\Roaming\Python"),
             patch.object(sys, "prefix", r"C:\Users\user\AppData\Roaming\Python"),
         ):
-            mock_home.return_value = Path(r"C:\Users\user")
             assert is_user_install() is True
 
 
@@ -187,6 +204,7 @@ class TestGetConfigLocation:
             patch("pathlib.Path.cwd") as mock_cwd,
             patch("pathlib.Path.exists") as mock_exists,
             patch("pathlib.Path.home") as mock_home,
+            patch.object(site, "USER_BASE", "/home/user/.local"),
             patch.object(sys, "prefix", "/home/user/.local"),
             patch.object(sys, "base_prefix", "/home/user/.local"),
             patch.object(sys, "executable", "/home/user/.local/bin/python"),
@@ -251,6 +269,20 @@ class TestGetConfigLocation:
 
             result = get_config_location()
             assert result == Path("/project/config")
+
+    def test_uv_tool_install(self):
+        """uv tool install: prefix under ~/.local/share/uv/tools/ returns ~/.local/orb/config."""
+        uv_prefix = str(Path.home() / ".local/share/uv/tools/orb")
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch("pathlib.Path.home") as mock_home,
+            patch.object(sys, "prefix", uv_prefix),
+            patch.object(sys, "base_prefix", "/usr/local"),
+            patch.object(sys, "executable", uv_prefix + "/bin/python"),
+        ):
+            mock_home.return_value = Path("/home/user")
+            result = get_config_location()
+            assert result == Path("/home/user/.local/orb/config")
 
     def test_fallback(self):
         """Test fallback to current directory."""

@@ -1,6 +1,7 @@
 """Platform-specific directory detection for ORB configuration."""
 
 import os
+import site
 import sys
 from pathlib import Path
 
@@ -15,7 +16,7 @@ def in_virtualenv() -> bool:
     if sys.prefix != sys.base_prefix:
         return True
 
-    # Symlink venv detection (uv, mise, etc.)
+    # Symlink venv detection (project-local .venv only)
     # Don't resolve symlinks - we want to check the actual executable location
     executable_path = Path(sys.executable)  # Don't resolve!
     prefix_path = Path(sys.prefix)
@@ -25,13 +26,20 @@ def in_virtualenv() -> bool:
         executable_path.relative_to(prefix_path)
         return False  # Executable is under prefix, not a venv
     except ValueError:
-        # Executable is outside prefix, it's a symlink venv
-        return True
+        # Executable is outside prefix — only treat as symlink-venv if the
+        # executable path actually contains a .venv directory component.
+        # This excludes mise (~/.local/share/mise/...) and similar tools.
+        if ".venv" in executable_path.parts:
+            return True
+        return False
 
 
 def is_user_install() -> bool:
     """Check if this is a user install (pip install --user)."""
-    return sys.prefix.startswith(str(Path.home()))
+    user_base = getattr(site, "USER_BASE", None)
+    if user_base and str(sys.prefix).startswith(user_base):
+        return True
+    return False
 
 
 def is_system_install() -> bool:
@@ -45,9 +53,15 @@ def get_config_location() -> Path:
     if env_dir := os.environ.get("ORB_CONFIG_DIR"):
         return Path(env_dir)
 
-    # 2. Virtual environment (check BEFORE user install)
+    # 2. uv tool install: ~/.local/share/uv/tools/<name>/
+    #    Standard venv branch would fire (prefix != base_prefix) and return
+    #    ~/.local/share/uv/tools/config/ — wrong. Intercept before venv check.
+    if "/.local/share/uv/tools/" in str(sys.prefix):
+        return Path.home() / ".local" / "orb" / "config"
+
+    # 3. Virtual environment (check BEFORE user install)
     if in_virtualenv():
-        # For symlink venvs (uv/mise), use executable's grandparent's sibling
+        # For symlink venvs (project .venv), use executable's grandparent's sibling
         # For standard venvs, use sys.prefix parent
         if sys.prefix != sys.base_prefix:
             # Standard venv: sys.prefix is the venv directory
