@@ -1,11 +1,5 @@
 """Storage strategy components package with consistent naming."""
 
-# Base interfaces
-# DynamoDB-specific components (clearly prefixed)
-from .dynamodb_client_manager import DynamoDBClientManager
-from .dynamodb_converter import DynamoDBConverter
-from .dynamodb_transaction_manager import DynamoDBTransactionManager
-
 # Repository components (extracted from repositories)
 from .entity_cache import EntityCache, MemoryEntityCache, NoOpEntityCache
 from .entity_serializer import BaseEntitySerializer, EntitySerializer
@@ -37,10 +31,6 @@ __all__: list[str] = [
     # Repository components
     "BaseEntitySerializer",
     "DataConverter",
-    # DynamoDB components
-    "DynamoDBClientManager",
-    "DynamoDBConverter",
-    "DynamoDBTransactionManager",
     "EntityCache",
     "EntitySerializer",
     "EventPublisher",

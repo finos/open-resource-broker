@@ -11,13 +11,21 @@ implementations and storage strategies:
 import json
 import os
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
-from orb.domain.base.domain_interfaces import Repository
+from orb.config.constants import (
+    STORAGE_BACKEND_DYNAMODB,
+    STORAGE_BACKEND_JSON,
+    STORAGE_BACKEND_SQL,
+)
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.template.repository import TemplateRepository as TemplateRepositoryInterface
 from orb.infrastructure.di.container import DIContainer
 from orb.infrastructure.logging.logger import get_logger
+from orb.infrastructure.storage.registry import get_storage_registry
+
+if TYPE_CHECKING:
+    from orb.domain.base.domain_interfaces import Repository
 
 logger = get_logger(__name__)
 
@@ -43,7 +51,6 @@ class RepositoryMigrator:
         self.collections = ["templates", "requests", "machines"]
 
         # Get configuration manager from container
-
         self.config_manager = self.container.get(ConfigurationPort)
 
     def migrate(
@@ -118,110 +125,69 @@ class RepositoryMigrator:
 
         return stats
 
-    def _create_repositories_for_storage_type(self, storage_type: str) -> dict[str, Repository]:
+    def _create_repositories_for_storage_type(self, storage_type: str) -> dict[str, Any]:
         """
-        Create repositories for a specific storage type.
+        Create repositories for a specific storage type via the storage registry.
 
         Args:
-            storage_type: Storage type (json, sqlite, dynamodb)
+            storage_type: Storage type constant (STORAGE_BACKEND_* from config.constants)
 
         Returns:
-            Dictionary of repositories
+            Dictionary of repositories keyed by collection name
         """
-        # We'll pass the storage_type directly to the repository creation methods
-        # instead of trying to update the config
+        # Always get template repository from DI container
+        template_repo = self.container.get(TemplateRepositoryInterface)
 
-        try:
-            # For templates, always use template repository from DI container
-            # Get template repository from DI container
-            template_repo = self.container.get(TemplateRepositoryInterface)
+        registry = get_storage_registry()
 
-            # For other repositories, create based on storage type
-            if storage_type == "dynamodb":
-                from orb.providers.aws.storage.dynamodb import (  # type: ignore[import]
-                    DynamoDBMachineRepository,
-                    DynamoDBRequestRepository,
+        if storage_type == STORAGE_BACKEND_DYNAMODB:
+            uow = registry.create_unit_of_work(STORAGE_BACKEND_DYNAMODB, self.config_manager)
+            if uow is None:
+                raise ValueError(
+                    f"Storage type '{STORAGE_BACKEND_DYNAMODB}' has no unit-of-work factory"
                 )
+            machine_repo = uow.machines
+            request_repo = uow.requests
 
-                # Get DynamoDB config
-                dynamodb_config = self.config_manager.get("dynamodb", {})
-                region = dynamodb_config.get("region", "us-east-1")
-                profile = dynamodb_config.get("profile")
-
-                machine_repo = DynamoDBMachineRepository(
-                    table_name=dynamodb_config.get("machine_table", "machines"),
-                    region=region,
-                    profile=profile,
+        elif storage_type == STORAGE_BACKEND_SQL:
+            uow = registry.create_unit_of_work(STORAGE_BACKEND_SQL, self.config_manager)
+            if uow is None:
+                raise ValueError(
+                    f"Storage type '{STORAGE_BACKEND_SQL}' has no unit-of-work factory"
                 )
+            machine_repo = uow.machines
+            request_repo = uow.requests
 
-                request_repo = DynamoDBRequestRepository(
-                    table_name=dynamodb_config.get("request_table", "requests"),
-                    region=region,
-                    profile=profile,
-                )
+        elif storage_type == STORAGE_BACKEND_JSON:
+            uow = registry.create_unit_of_work(STORAGE_BACKEND_JSON, self.config_manager)
+            if uow is None:
+                # JSON UoW is optional; fall back to direct strategy-based repos
+                json_config = self.config_manager.get(STORAGE_BACKEND_JSON, {})
+                data_dir = json_config.get("data_dir", "data")
 
-            elif storage_type == "sql":
-                from sqlalchemy import create_engine
-                from sqlalchemy.orm import sessionmaker
-
-                from orb.infrastructure.storage.sql import (  # type: ignore[import]
-                    MachineModel,  # type: ignore[no-redef]
-                    RequestModel,  # type: ignore[no-redef]
-                    SQLMachineRepository,  # type: ignore[no-redef]
-                    SQLRequestRepository,  # type: ignore[no-redef]
-                )
-
-                # Get SQL config
-                sql_config = self.config_manager.get("sql", {})
-                connection_string = sql_config.get("connection_string", "sqlite:///data.db")
-
-                # Create engine and session
-                engine = create_engine(connection_string)
-                session_factory = sessionmaker(bind=engine)
-                session = session_factory()
-
-                # Import domain entities
-                from orb.domain.machine.aggregate import Machine
-                from orb.domain.request.aggregate import Request
-
-                machine_repo = SQLMachineRepository(
-                    entity_class=Machine, model_class=MachineModel, session=session
-                )
-
-                request_repo = SQLRequestRepository(
-                    entity_class=Request, model_class=RequestModel, session=session
-                )
-
-            else:  # Default to JSON
                 from orb.infrastructure.storage.json import (  # type: ignore[import]
                     JSONMachineRepository,  # type: ignore[no-redef]
                     JSONRequestRepository,  # type: ignore[no-redef]
                 )
 
-                # Get JSON config
-                json_config = self.config_manager.get("json", {})
-                data_dir = json_config.get("data_dir", "data")
-
                 machine_repo = JSONMachineRepository(
                     file_path=os.path.join(data_dir, "machines.json"), create_dirs=True
                 )
-
                 request_repo = JSONRequestRepository(
                     file_path=os.path.join(data_dir, "requests.json"), create_dirs=True
                 )
+            else:
+                machine_repo = uow.machines
+                request_repo = uow.requests
 
-            # Create repository dictionary
-            repositories = {
-                "machines": machine_repo,
-                "requests": request_repo,
-                "templates": template_repo,
-            }
+        else:
+            raise ValueError(f"Unsupported storage type for migration: '{storage_type}'")
 
-            return repositories
-
-        finally:
-            # No need to restore config since we didn't modify it
-            pass
+        return {
+            "machines": machine_repo,
+            "requests": request_repo,
+            "templates": template_repo,
+        }
 
     def _create_backup(self, repos: dict[str, Repository]) -> str:
         """
@@ -233,7 +199,6 @@ class RepositoryMigrator:
         Returns:
             Path to backup directory
         """
-        from orb.config.managers.configuration_manager import ConfigurationManager
         from orb.domain.base.ports.scheduler_port import SchedulerPort
 
         # Get work directory from scheduler strategy (via DI container)
@@ -242,8 +207,8 @@ class RepositoryMigrator:
             work_dir = scheduler.get_working_directory()
         except Exception:
             # Fallback to config manager if scheduler not available
-            config_manager = self.container.get(ConfigurationManager)
-            work_dir = config_manager.get_work_dir()
+            config_manager = self.container.get(ConfigurationPort)
+            work_dir = config_manager.get_cache_dir()
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_dir = os.path.join(work_dir, "backups", f"repository_backup_{timestamp}")

@@ -29,7 +29,6 @@ from .provider_strategy_schema import (
 from .server_schema import AuthConfig, CORSConfig, ServerConfig
 from .storage_schema import (
     BackoffConfig,
-    DynamodbStrategyConfig,
     JsonStrategyConfig,
     RetryConfig,
     SqlStrategyConfig,
@@ -47,7 +46,6 @@ __all__: list[str] = [
     "CORSConfig",
     "CircuitBreakerConfig",
     "DatabaseConfig",
-    "DynamodbStrategyConfig",
     "EventsConfig",
     "HealthCheckConfig",
     "JsonStrategyConfig",

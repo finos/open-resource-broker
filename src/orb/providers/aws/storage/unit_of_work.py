@@ -6,7 +6,7 @@ from orb.domain.base.dependency_injection import injectable
 from orb.infrastructure.storage.base.unit_of_work import BaseUnitOfWork
 
 # Import DynamoDB storage strategy
-from orb.infrastructure.storage.dynamodb.strategy import DynamoDBStorageStrategy
+from orb.providers.aws.storage.strategy import DynamoDBStorageStrategy
 
 # Import new simplified repositories
 from orb.infrastructure.storage.repositories.machine_repository import (
@@ -28,7 +28,7 @@ class DynamoDBUnitOfWork(BaseUnitOfWork):
         self,
         aws_client,
         logger,
-        region: str,
+        region: Optional[str] = None,
         profile: Optional[str] = None,
         machine_table: str = "machines",
         request_table: str = "requests",

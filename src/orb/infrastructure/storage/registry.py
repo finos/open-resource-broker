@@ -4,7 +4,10 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, Optional
 
 from orb.domain.base.exceptions import ConfigurationError
+from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.registry.base_registry import BaseRegistration, BaseRegistry, RegistryMode
+
+_logger = get_logger(__name__)
 
 
 class UnsupportedStorageError(Exception):
@@ -89,6 +92,12 @@ class StorageRegistry(BaseRegistry):
         Raises:
             ConfigurationError: If storage type is already registered
         """
+        if self.is_registered(storage_type):
+            _logger.warning(
+                "Storage type '%s' is already registered; skipping re-registration.",
+                storage_type,
+            )
+            return
         try:
             self.register(
                 storage_type,
@@ -197,7 +206,5 @@ def get_storage_registry() -> "StorageRegistry":
 
 def reset_storage_registry() -> None:
     """Reset the storage registry for testing purposes."""
-    # Since StorageRegistry inherits from BaseRegistry, we can reset it
     registry = get_storage_registry()
-    registry._type_registrations.clear()
-    registry._instance_registrations.clear()
+    registry.clear_registrations()

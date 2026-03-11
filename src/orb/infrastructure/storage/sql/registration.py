@@ -72,12 +72,6 @@ def _build_connection_string(sql_config: Any) -> str:
         return f"postgresql://{sql_config.username}:{sql_config.password}@{sql_config.host}:{sql_config.port}/{sql_config.name}"
     elif db_type == "mysql":
         return f"mysql://{sql_config.username}:{sql_config.password}@{sql_config.host}:{sql_config.port}/{sql_config.name}"
-    elif db_type == "aurora":
-        if sql_config.cluster_endpoint:
-            host = sql_config.cluster_endpoint
-        else:
-            host = sql_config.host
-        return f"mysql://{sql_config.username}:{sql_config.password}@{host}:{sql_config.port}/{sql_config.name}"
     else:
         raise ValueError(f"Unsupported database type: {db_type}")
 

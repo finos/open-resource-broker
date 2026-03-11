@@ -5,7 +5,10 @@ from typing import Any, Callable, Optional
 
 from botocore.exceptions import ClientError
 
-from .transaction_manager import TransactionManager, TransactionState
+from orb.infrastructure.storage.components.transaction_manager import (
+    TransactionManager,
+    TransactionState,
+)
 
 
 class DynamoDBTransactionManager(TransactionManager):

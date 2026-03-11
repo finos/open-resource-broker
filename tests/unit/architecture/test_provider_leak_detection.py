@@ -50,13 +50,9 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
         ("application/services/provider_registry_service.py", "orb.providers.registry"),
         ("infrastructure/template/configuration_manager.py", "orb.providers.base.strategy"),
         ("infrastructure/template/configuration_manager.py", "orb.providers.registry"),
-        ("infrastructure/storage/repository_migrator.py", "orb.providers.aws.storage.dynamodb"),
         ("infrastructure/adapters/provider_registry_adapter.py", "orb.providers.registry"),
-        ("infrastructure/storage/dynamodb/registration.py", "orb.providers.aws.session_factory"),
-        (
-            "infrastructure/storage/components/dynamodb_client_manager.py",
-            "orb.providers.aws.session_factory",
-        ),
+        # DI wiring — intentional: storage registration must wire AWS provider
+        ("infrastructure/storage/registration.py", "orb.providers.aws.storage.registration"),
     }
 )
 

@@ -8,13 +8,15 @@ from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.storage.base.strategy import BaseStorageStrategy
 
-# Import components
-from orb.infrastructure.storage.components import (
+# Import AWS-specific components
+from orb.providers.aws.storage.components import (
     DynamoDBClientManager,
     DynamoDBConverter,
     DynamoDBTransactionManager,
-    LockManager,
 )
+
+# Import generic components
+from orb.infrastructure.storage.components import LockManager
 from orb.infrastructure.storage.exceptions import StorageError
 
 
@@ -31,7 +33,7 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
         self,
         logger: LoggingPort,
         aws_client,
-        region: str,
+        region: Optional[str],
         table_name: str,
         profile: Optional[str] = None,
     ) -> None:

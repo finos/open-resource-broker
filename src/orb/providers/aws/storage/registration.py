@@ -24,7 +24,7 @@ def create_dynamodb_strategy(config: Any) -> Any:
     Returns:
         DynamoDBStorageStrategy instance
     """
-    from orb.infrastructure.storage.dynamodb.strategy import DynamoDBStorageStrategy
+    from orb.providers.aws.storage.strategy import DynamoDBStorageStrategy
 
     # Extract configuration parameters
     if hasattr(config, "dynamodb_strategy"):
@@ -39,14 +39,14 @@ def create_dynamodb_strategy(config: Any) -> Any:
         profile = getattr(aws_config, "profile", "default")
         table_prefix = "hostfactory"
     else:
-        # Default values
-        region = getattr(config, "region", "us-east-1")
+        # Default values - no region default; caller must supply via config
+        region = getattr(config, "region", None)
         profile = getattr(config, "profile", "default")
         table_prefix = "hostfactory"
 
     # Create AWS client (this will be handled by the strategy)
     return DynamoDBStorageStrategy(
-        logger=None,  # type: ignore[arg-type]  # Strategy will use its own logger
+        logger=get_logger(__name__),  # type: ignore[arg-type]
         aws_client=None,  # Strategy will create its own client
         region=region,
         table_name=f"{table_prefix}-generic",
@@ -64,7 +64,7 @@ def create_dynamodb_config(data: dict[str, Any]) -> Any:
     Returns:
         DynamoDB configuration object
     """
-    from orb.config.schemas.storage_schema import DynamodbStrategyConfig
+    from orb.providers.aws.storage.config import DynamodbStrategyConfig
 
     return DynamodbStrategyConfig(**data)
 
@@ -86,17 +86,17 @@ def create_dynamodb_unit_of_work(config: Any) -> Any:
     boto_config = Config(connect_timeout=10, read_timeout=30, retries={"max_attempts": 3})
 
     from orb.config.manager import ConfigurationManager
-    from orb.config.schemas.storage_schema import StorageConfig
     from orb.infrastructure.logging.logger import get_logger
-    from orb.infrastructure.storage.dynamodb.unit_of_work import DynamoDBUnitOfWork
+    from orb.providers.aws.storage.config import DynamodbStrategyConfig
+    from orb.providers.aws.storage.unit_of_work import DynamoDBUnitOfWork
 
     _logger = get_logger(__name__)
 
     # Handle different config types
     if isinstance(config, ConfigurationManager):
-        # Extract DynamoDB-specific configuration through StorageConfig
-        storage_config = config.get_typed(StorageConfig)
-        dynamodb_config = storage_config.dynamodb_strategy
+        # Extract DynamoDB-specific configuration from raw config
+        raw = config.get_raw_config().get("storage", {}).get("dynamodb_strategy", {})
+        dynamodb_config = DynamodbStrategyConfig(**raw)
 
         session = AWSSessionFactory.create_session(
             profile=dynamodb_config.profile if dynamodb_config.profile else None,
@@ -115,7 +115,7 @@ def create_dynamodb_unit_of_work(config: Any) -> Any:
         )
     else:
         # For testing or other scenarios - assume it's a dict with AWS config
-        region = config.get("region", "us-east-1")
+        region = config.get("region") or None
         profile = config.get("profile")
         table_prefix = config.get("table_prefix", "hostfactory")
 

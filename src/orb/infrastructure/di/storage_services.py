@@ -2,6 +2,7 @@
 
 from typing import TYPE_CHECKING
 
+from orb.config.constants import STORAGE_BACKEND_JSON
 from orb.domain.base.ports import ConfigurationPort
 from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.storage.factory import StorageStrategyFactory
@@ -42,7 +43,7 @@ def register_storage_services(container: "DIContainer") -> None:
     from orb.infrastructure.storage.registry import get_storage_registry
 
     registry = get_storage_registry()
-    registry.ensure_type_registered("json")
+    registry.ensure_type_registered(STORAGE_BACKEND_JSON)
 
     # Respect lazy loading configuration for other types
     lazy_config = container.get_lazy_config()
@@ -105,7 +106,7 @@ def _register_configured_storage_strategy(container: "DIContainer") -> None:
     from orb.infrastructure.storage.registry import get_storage_registry
 
     registry = get_storage_registry()
-    registry.ensure_type_registered("json")
+    registry.ensure_type_registered(STORAGE_BACKEND_JSON)
 
     logger = get_logger(__name__)
-    logger.info("Registered fallback storage strategy: json")
+    logger.info("Registered fallback storage strategy: %s", STORAGE_BACKEND_JSON)

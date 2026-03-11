@@ -5,20 +5,24 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
+def _default_filenames() -> dict[str, Any]:
+    return {
+        "single_file": "request_database.json",
+        "split_files": {
+            "requests": "requests.json",
+            "templates": "templates.json",
+            "machines": "machines.json",
+        },
+    }
+
+
 class JsonStrategyConfig(BaseModel):
     """JSON storage strategy configuration."""
 
     storage_type: str = Field("single_file", description="Storage type (single_file, split_files)")
     base_path: str = Field("data", description="Base path for JSON files")
     filenames: dict[str, Any] = Field(
-        default_factory=lambda: {
-            "single_file": "request_database.json",
-            "split_files": {
-                "requests": "requests.json",
-                "templates": "templates.json",
-                "machines": "machines.json",
-            },
-        },
+        default_factory=_default_filenames,
         description="Filenames for JSON storage",
     )
     backup_enabled: bool = Field(True, description="Enable automatic backups")
@@ -36,9 +40,9 @@ class JsonStrategyConfig(BaseModel):
 
 
 class SqlStrategyConfig(BaseModel):
-    """SQL storage strategy configuration."""
+    """Generic SQL storage strategy configuration (sqlite, postgresql, mysql)."""
 
-    type: str = Field("sqlite", description="SQL database type (sqlite, postgresql, mysql, aurora)")
+    type: str = Field("sqlite", description="SQL database type (sqlite, postgresql, mysql)")
     host: str = Field("", description="Database host")
     port: int = Field(0, description="Database port")
     name: str = Field("database.db", description="Database name")
@@ -47,15 +51,12 @@ class SqlStrategyConfig(BaseModel):
     pool_size: int = Field(5, description="Connection pool size")
     max_overflow: int = Field(10, description="Maximum connection overflow")
     timeout: int = Field(30, description="Connection timeout in seconds")
-    ssl_ca: Optional[str] = Field(None, description="SSL CA certificate path (for Aurora)")
-    ssl_verify: bool = Field(True, description="Verify SSL certificate (for Aurora)")
-    cluster_endpoint: Optional[str] = Field(None, description="Aurora cluster endpoint")
 
     @field_validator("type")
     @classmethod
     def validate_type(cls, v: str) -> str:
         """Validate database type."""
-        valid_types = ["sqlite", "postgresql", "mysql", "aurora"]
+        valid_types = ["sqlite", "postgresql", "mysql"]
         if v not in valid_types:
             raise ValueError(f"Database type must be one of {valid_types}")
         return v
@@ -78,23 +79,8 @@ class SqlStrategyConfig(BaseModel):
                 raise ValueError(f"Port is required for {db_type}")
             if not name:
                 raise ValueError(f"Database name is required for {db_type}")
-        elif db_type == "aurora":
-            if not self.cluster_endpoint and not host:
-                raise ValueError("Either cluster_endpoint or host is required for Aurora")
-            if not port:
-                raise ValueError("Port is required for Aurora")
-            if not name:
-                raise ValueError("Database name is required for Aurora")
 
         return self
-
-
-class DynamodbStrategyConfig(BaseModel):
-    """DynamoDB storage strategy configuration."""
-
-    region: str = Field("us-east-1", description="AWS region")
-    profile: str = Field("default", description="AWS profile")
-    table_prefix: str = Field("hostfactory", description="Table prefix")
 
 
 class BackoffConfig(BaseModel):
@@ -141,18 +127,15 @@ class RetryConfig(BaseModel):
 class StorageConfig(BaseModel):
     """Storage configuration."""
 
-    strategy: str = Field("json", description="Storage strategy (json, sql, dynamodb)")
+    strategy: str = Field("json", description="Storage strategy (json, sql)")
     json_strategy: JsonStrategyConfig = Field(default_factory=lambda: JsonStrategyConfig())  # type: ignore[call-arg]
     sql_strategy: SqlStrategyConfig = Field(default_factory=lambda: SqlStrategyConfig())  # type: ignore[call-arg]
-    dynamodb_strategy: DynamodbStrategyConfig = Field(
-        default_factory=lambda: DynamodbStrategyConfig()  # type: ignore[call-arg]
-    )
 
     @field_validator("strategy")
     @classmethod
     def validate_strategy(cls, v: str) -> str:
         """Validate storage strategy."""
-        valid_strategies = ["json", "sql", "dynamodb"]
+        valid_strategies = ["json", "sql"]
         if v not in valid_strategies:
             raise ValueError(f"Storage strategy must be one of {valid_strategies}")
         return v
@@ -170,9 +153,4 @@ class StorageConfig(BaseModel):
             sql_strategy = self.sql_strategy
             if not sql_strategy.name:
                 raise ValueError("SQL strategy database name is required")
-        elif strategy == "dynamodb":
-            dynamodb_strategy = self.dynamodb_strategy
-            if not dynamodb_strategy.region:
-                raise ValueError("DynamoDB strategy region is required")
-
         return self

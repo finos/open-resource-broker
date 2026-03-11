@@ -5,7 +5,9 @@ from typing import Any, Optional
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
-from .resource_manager import StorageResourceManager as ResourceManager
+from orb.infrastructure.storage.components.resource_manager import (
+    StorageResourceManager as ResourceManager,
+)
 
 _DEFAULT_CONFIG = Config(
     connect_timeout=10,
@@ -22,7 +24,7 @@ class DynamoDBClientManager(ResourceManager):
     """
 
     def __init__(
-        self, aws_client=None, region: str = "us-east-1", profile: Optional[str] = None
+        self, aws_client=None, region: Optional[str] = None, profile: Optional[str] = None
     ) -> None:
         """
         Initialize DynamoDB client manager.

@@ -22,7 +22,7 @@ def register_all_storage_types() -> None:
 
     register_sql_storage()
 
-    from orb.infrastructure.storage.dynamodb.registration import register_dynamodb_storage
+    from orb.providers.aws.storage.registration import register_dynamodb_storage
 
     register_dynamodb_storage()
 

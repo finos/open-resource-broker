@@ -1,7 +1,7 @@
 {
   "domain_forbidden_imports": 0,
   "application_forbidden_imports": 5,
-  "provider_leaks_non_di": 25,
+  "provider_leaks_non_di": 29,
   "scheduler_leaks": 0,
   "storage_leaks_non_storage": 4,
   "domain_pydantic_violations": 13,

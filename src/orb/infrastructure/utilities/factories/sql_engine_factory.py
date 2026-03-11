@@ -140,41 +140,6 @@ class SQLEngineFactory:
                 }
             )
 
-        elif db_type == "aurora":
-            # Aurora can use either the cluster endpoint or a specific host
-            host = config.cluster_endpoint or config.host
-            port = config.port
-            username = config.username or ""
-            password = config.password or ""
-            database = config.name
-
-            # Build connection string
-            connection_string = f"mysql+pymysql://{username}:{password}@{host}:{port}/{database}"
-            logger.debug(
-                "Creating Aurora engine with connection to %s:%s/%s",
-                host,
-                port,
-                database,
-            )
-
-            # Add pooling configuration
-            engine_kwargs.update(
-                {
-                    "poolclass": QueuePool,
-                    "pool_size": config.pool_size,
-                    "max_overflow": config.max_overflow,
-                    "pool_timeout": config.timeout,
-                    "pool_recycle": 3600,  # Recycle connections after 1 hour
-                }
-            )
-
-            # Add SSL options if provided
-            if config.ssl_ca:
-                engine_kwargs["connect_args"] = {
-                    "ssl": {"ca": config.ssl_ca, "check_hostname": config.ssl_verify}
-                }
-                logger.debug("Using SSL with CA certificate: %s", config.ssl_ca)
-
         else:
             error_msg = f"Unsupported database type: {db_type}"
             logger.error(error_msg)
