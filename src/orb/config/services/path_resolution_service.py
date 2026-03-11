@@ -116,16 +116,45 @@ class PathResolutionService:
     def _get_default_path(self, file_type: str, filename: str) -> str:
         """Get default path for file type.
 
+        Uses XDG/platform-scoped directories rather than the process working
+        directory so that paths are stable regardless of where the process was
+        launched from.
+
         Args:
             file_type: Type of file
             filename: Name of the file
 
         Returns:
-            Default path (relative to working directory)
+            Default path resolved via platform dirs
         """
-        default_dir = self.DEFAULT_DIRS.get(file_type, "config")
-        project_root = os.getcwd()
-        return os.path.join(project_root, default_dir, filename)
+        base_dir = self._get_platform_dir(file_type)
+        return os.path.join(base_dir, filename)
+
+    @staticmethod
+    def _get_platform_dir(file_type: str) -> str:
+        """Resolve the platform-scoped base directory for a file type.
+
+        Args:
+            file_type: One of 'conf', 'template', 'legacy', 'log', 'work',
+                       'events', 'snapshots'
+
+        Returns:
+            Absolute directory path from platform_dirs
+        """
+        from orb.config.platform_dirs import (
+            get_config_location,
+            get_logs_location,
+            get_work_location,
+        )
+
+        if file_type in ("conf", "template", "legacy"):
+            return str(get_config_location())
+        if file_type == "log":
+            return str(get_logs_location())
+        if file_type in ("work", "data", "events", "snapshots"):
+            return str(get_work_location())
+        # Unknown type — fall back to config location
+        return str(get_config_location())
 
     def resolve_directory(self, file_type: str) -> str:
         """Resolve directory for file type.
@@ -145,10 +174,8 @@ class PathResolutionService:
             except Exception as e:
                 logger.debug("Failed to get scheduler directory: %s", e)
 
-        # Fall back to default directory
-        default_dir = self.DEFAULT_DIRS.get(file_type, "config")
-        project_root = os.getcwd()
-        return os.path.join(project_root, default_dir)
+        # Fall back to platform-scoped directory
+        return self._get_platform_dir(file_type)
 
     def find_file_with_fallbacks(
         self,

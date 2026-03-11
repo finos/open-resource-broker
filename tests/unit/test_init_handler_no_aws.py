@@ -157,7 +157,7 @@ def _make_aws_strategy():
     from orb.providers.aws.configuration.config import AWSProviderConfig
     from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
-    config = AWSProviderConfig(region="us-east-1")
+    config = AWSProviderConfig(region="us-east-1")  # type: ignore[call-arg]
     logger = MagicMock()
     return AWSProviderStrategy(config=config, logger=logger)
 
@@ -206,9 +206,11 @@ def test_aws_provider_strategy_get_cli_infrastructure_defaults_all_fields():
 
 def test_scheduler_registry_get_display_metadata_known_type():
     """SchedulerRegistry.get_display_metadata returns correct metadata for known types."""
+    from typing import cast
+
     from orb.infrastructure.scheduler.registry import SchedulerRegistry
 
-    registry = SchedulerRegistry()
+    registry = cast(SchedulerRegistry, SchedulerRegistry())
     meta = registry.get_display_metadata("default")
     assert meta["display_name"] == "default"
     assert meta["description"] == "Standalone usage"
@@ -216,57 +218,47 @@ def test_scheduler_registry_get_display_metadata_known_type():
 
 def test_scheduler_registry_get_display_metadata_hostfactory():
     """SchedulerRegistry.get_display_metadata returns hostfactory metadata."""
+    from typing import cast
+
     from orb.infrastructure.scheduler.registry import SchedulerRegistry
 
-    registry = SchedulerRegistry()
+    registry = cast(SchedulerRegistry, SchedulerRegistry())
     meta = registry.get_display_metadata("hostfactory")
     assert meta["display_name"] == "hostfactory"
     assert "Symphony" in meta["description"]
 
 
-def test_scheduler_registry_get_display_metadata_hf_alias():
-    """SchedulerRegistry.get_display_metadata resolves 'hf' alias to hostfactory display_name."""
-    from orb.infrastructure.scheduler.registry import SchedulerRegistry
-
-    registry = SchedulerRegistry()
-    meta = registry.get_display_metadata("hf")
-    assert meta["display_name"] == "hostfactory"
-
-
 def test_scheduler_registry_get_display_metadata_unknown_type():
     """SchedulerRegistry.get_display_metadata falls back gracefully for unknown types."""
+    from typing import cast
+
     from orb.infrastructure.scheduler.registry import SchedulerRegistry
 
-    registry = SchedulerRegistry()
+    registry = cast(SchedulerRegistry, SchedulerRegistry())
     meta = registry.get_display_metadata("unknown_scheduler")
     assert meta["display_name"] == "unknown_scheduler"
 
 
 def test_scheduler_registry_get_extra_config_for_hostfactory():
     """SchedulerRegistry.get_extra_config_for_type returns config_root for hostfactory."""
+    from typing import cast
+
     from orb.infrastructure.scheduler.registry import SchedulerRegistry
 
-    registry = SchedulerRegistry()
+    registry = cast(SchedulerRegistry, SchedulerRegistry())
     extra = registry.get_extra_config_for_type("hostfactory")
     assert extra == {"config_root": "$ORB_CONFIG_DIR"}
 
 
 def test_scheduler_registry_get_extra_config_for_default():
     """SchedulerRegistry.get_extra_config_for_type returns empty dict for default."""
+    from typing import cast
+
     from orb.infrastructure.scheduler.registry import SchedulerRegistry
 
-    registry = SchedulerRegistry()
+    registry = cast(SchedulerRegistry, SchedulerRegistry())
     extra = registry.get_extra_config_for_type("default")
     assert extra == {}
-
-
-def test_scheduler_registry_get_extra_config_for_hf_alias():
-    """SchedulerRegistry.get_extra_config_for_type resolves 'hf' alias."""
-    from orb.infrastructure.scheduler.registry import SchedulerRegistry
-
-    registry = SchedulerRegistry()
-    extra = registry.get_extra_config_for_type("hf")
-    assert extra == {"config_root": "$ORB_CONFIG_DIR"}
 
 
 def test_interactive_setup_raises_when_no_providers_registered():
@@ -313,3 +305,84 @@ def test_get_default_config_raises_when_no_providers_and_no_provider_arg():
             assert False, "Expected ValueError was not raised"
         except ValueError as exc:
             assert "No providers registered" in str(exc)
+
+
+def test_get_default_scheduler_type_empty_registry_returns_default():
+    """_get_default_scheduler_type returns 'default' when registry has no types."""
+    from unittest.mock import MagicMock, patch
+
+    from orb.interface.init_command_handler import _get_default_scheduler_type
+
+    mock_registry = MagicMock()
+    mock_registry.get_available_types_with_registration.return_value = []
+
+    with patch(
+        "orb.infrastructure.scheduler.registry.get_scheduler_registry",
+        return_value=mock_registry,
+    ):
+        result = _get_default_scheduler_type()
+
+    assert result == "default"
+
+
+def test_get_default_scheduler_type_returns_first_registered_type():
+    """_get_default_scheduler_type returns the first type from the registry."""
+    from unittest.mock import MagicMock, patch
+
+    from orb.interface.init_command_handler import _get_default_scheduler_type
+
+    mock_registry = MagicMock()
+    mock_registry.get_available_types_with_registration.return_value = ["default", "hostfactory"]
+
+    with patch(
+        "orb.infrastructure.scheduler.registry.get_scheduler_registry",
+        return_value=mock_registry,
+    ):
+        result = _get_default_scheduler_type()
+
+    assert result == "default"
+
+
+def test_get_default_scheduler_type_exception_returns_default():
+    """_get_default_scheduler_type returns 'default' when registry raises."""
+    from unittest.mock import patch
+
+    from orb.interface.init_command_handler import _get_default_scheduler_type
+
+    with patch(
+        "orb.infrastructure.scheduler.registry.get_scheduler_registry",
+        side_effect=RuntimeError("registry unavailable"),
+    ):
+        result = _get_default_scheduler_type()
+
+    assert result == "default"
+
+
+def test_get_available_schedulers_no_duplicates():
+    """_get_available_schedulers deduplicates entries with the same display_name."""
+    from unittest.mock import MagicMock, patch
+
+    from orb.interface.init_command_handler import _get_available_schedulers
+
+    mock_registry = MagicMock()
+    mock_registry.get_available_types_with_registration.return_value = [
+        "hostfactory",
+        "hf",
+        "default",
+    ]
+    mock_registry.get_display_metadata.side_effect = lambda t: {
+        "hostfactory": {"display_name": "hostfactory", "description": "Symphony"},
+        "hf": {"display_name": "hostfactory", "description": "Symphony"},
+        "default": {"display_name": "default", "description": "Standalone usage"},
+    }[t]
+
+    with patch(
+        "orb.infrastructure.scheduler.registry.get_scheduler_registry",
+        return_value=mock_registry,
+    ):
+        result = _get_available_schedulers()
+
+    display_names = [s["display_name"] for s in result]
+    assert display_names.count("hostfactory") == 1
+    assert display_names.count("default") == 1
+    assert len(result) == 2

@@ -5,9 +5,6 @@ from typing import Optional
 from orb.domain.base.dependency_injection import injectable
 from orb.infrastructure.storage.base.unit_of_work import BaseUnitOfWork
 
-# Import DynamoDB storage strategy
-from orb.providers.aws.storage.strategy import DynamoDBStorageStrategy
-
 # Import new simplified repositories
 from orb.infrastructure.storage.repositories.machine_repository import (
     MachineRepositoryImpl as MachineRepository,
@@ -18,6 +15,9 @@ from orb.infrastructure.storage.repositories.request_repository import (
 from orb.infrastructure.storage.repositories.template_repository import (
     TemplateRepositoryImpl as TemplateRepository,
 )
+
+# Import DynamoDB storage strategy
+from orb.providers.aws.storage.strategy import DynamoDBStorageStrategy
 
 
 @injectable

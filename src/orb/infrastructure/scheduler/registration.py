@@ -77,14 +77,6 @@ def register_symphony_hostfactory_scheduler(
         strategy_class=HostFactorySchedulerStrategy,
     )
 
-    # Also register with 'hf' alias
-    registry.register(
-        type_name="hf",
-        strategy_factory=create_symphony_hostfactory_strategy,
-        config_factory=create_hostfactory_config,
-        strategy_class=HostFactorySchedulerStrategy,
-    )
-
 
 def create_default_strategy(config: Any) -> "SchedulerPort":
     """Create default scheduler strategy.
@@ -152,10 +144,13 @@ def register_all_scheduler_types() -> None:
 
 def register_active_scheduler_only(scheduler_type: str = "default") -> bool:
     """
-    Register only the active scheduler type for faster startup .
+    Register only the active scheduler type for faster startup.
+
+    Uses the registry to look up and invoke the correct registration function,
+    avoiding hardcoded if/elif dispatch.
 
     Args:
-        scheduler_type: Type of scheduler to register ("hostfactory", "hf", or "default")
+        scheduler_type: Type of scheduler to register ("hostfactory" or "default")
 
     Returns:
         True if registration was successful, False otherwise
@@ -164,12 +159,16 @@ def register_active_scheduler_only(scheduler_type: str = "default") -> bool:
 
     logger = get_logger(__name__)
 
+    # Registry mapping: type name -> registration function
+    registration_functions: dict[str, Any] = {
+        "hostfactory": register_symphony_hostfactory_scheduler,
+        "default": register_default_scheduler,
+    }
+
     try:
-        if scheduler_type in ["hostfactory", "hf"]:
-            register_symphony_hostfactory_scheduler()
-            logger.info("Registered active scheduler: %s", scheduler_type)
-        elif scheduler_type == "default":
-            register_default_scheduler()
+        register_fn = registration_functions.get(scheduler_type)
+        if register_fn is not None:
+            register_fn()
             logger.info("Registered active scheduler: %s", scheduler_type)
         else:
             logger.warning("Unknown scheduler type: %s, falling back to default", scheduler_type)

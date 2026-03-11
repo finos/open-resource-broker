@@ -47,9 +47,13 @@ class ConfigurationPort(ProviderConfigPort):
     def get_logging_config(self) -> dict[str, Any]:
         """Get logging configuration."""
 
-    @abstractmethod
     def get_native_spec_config(self) -> dict[str, Any]:
-        """Get native spec configuration."""
+        """Get native spec configuration.
+
+        Not a domain concern — provider-specific implementations override this.
+        Default returns empty config (native spec disabled).
+        """
+        return {}
 
     @abstractmethod
     def get_metrics_config(self) -> dict[str, Any]:
@@ -63,21 +67,31 @@ class ConfigurationPort(ProviderConfigPort):
     def override_provider_instance(self, provider_name: str) -> None:
         """Override the active provider instance."""
 
-    @abstractmethod
     def override_provider_region(self, region: str) -> None:
-        """Override the provider region for this session."""
+        """Override the provider region for this session.
 
-    @abstractmethod
+        Provider-specific concern — concrete adapters override this.
+        """
+
     def override_provider_profile(self, profile: str) -> None:
-        """Override the provider credential profile for this session."""
+        """Override the provider credential profile for this session.
 
-    @abstractmethod
+        Provider-specific concern — concrete adapters override this.
+        """
+
     def get_effective_region(self, default_region: str = "") -> str:
-        """Get effective provider region (override or configured)."""
+        """Get effective provider region (override or configured).
 
-    @abstractmethod
+        Provider-specific concern — concrete adapters override this.
+        """
+        return default_region
+
     def get_effective_profile(self, default_profile: str = "") -> str:
-        """Get effective provider credential profile (override or configured)."""
+        """Get effective provider credential profile (override or configured).
+
+        Provider-specific concern — concrete adapters override this.
+        """
+        return default_profile
 
     # get_provider_instance_config inherited from ProviderConfigPort
 

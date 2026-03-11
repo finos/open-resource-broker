@@ -40,15 +40,10 @@ class SchedulerRegistry(BaseRegistry):
             "display_name": "hostfactory",
             "description": "IBM Spectrum Symphony integration",
         },
-        "hf": {
-            "display_name": "hostfactory",
-            "description": "IBM Spectrum Symphony integration",
-        },
     }
 
     _SCHEDULER_EXTRA_CONFIG: ClassVar[dict[str, dict[str, str]]] = {
         "hostfactory": {"config_root": "$ORB_CONFIG_DIR"},
-        "hf": {"config_root": "$ORB_CONFIG_DIR"},
     }
 
     def __init__(self) -> None:

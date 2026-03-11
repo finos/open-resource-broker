@@ -3,6 +3,10 @@
 import os
 from unittest.mock import patch
 
+import pytest
+from pydantic import ValidationError
+
+from orb.config.platform_dirs import get_config_location
 from orb.config.schemas.app_schema import AppConfig
 from orb.config.schemas.scheduler_schema import SchedulerConfig
 
@@ -13,14 +17,14 @@ class TestSchedulerConfig:
     def test_default_scheduler_config(self):
         """Test default scheduler configuration."""
         config = SchedulerConfig()
-        assert config.type == "hostfactory"
+        assert config.type == "default"
         assert config.config_root is None
-        assert config.get_config_root() == "config"
+        assert config.get_config_root() == str(get_config_location())
 
     def test_custom_scheduler_config(self):
         """Test custom scheduler configuration."""
-        config = SchedulerConfig(type="hf", config_root="/custom/path")
-        assert config.type == "hf"
+        config = SchedulerConfig(type="hostfactory", config_root="/custom/path")
+        assert config.type == "hostfactory"
         assert config.config_root == "/custom/path"
         assert config.get_config_root() == "/custom/path"
 
@@ -30,6 +34,16 @@ class TestSchedulerConfig:
             config = SchedulerConfig(config_root="$HF_PROVIDER_CONFDIR")
             # Note: Environment expansion happens at the loader level
             assert config.config_root == "$HF_PROVIDER_CONFDIR"
+
+    def test_invalid_type_raises_validation_error(self):
+        """Test that an invalid scheduler type raises ValidationError."""
+        with pytest.raises(ValidationError):
+            SchedulerConfig(type="invalid")
+
+    def test_hostfactory_type_is_valid(self):
+        """Test that hostfactory is a valid scheduler type."""
+        config = SchedulerConfig(type="hostfactory")
+        assert config.type == "hostfactory"
 
 
 class TestAppConfigWithScheduler:
@@ -52,8 +66,8 @@ class TestAppConfigWithScheduler:
             },
         }
         app_config = AppConfig(**config_data)
-        assert app_config.scheduler.type == "hostfactory"
-        assert app_config.scheduler.get_config_root() == "config"
+        assert app_config.scheduler.type == "default"
+        assert app_config.scheduler.get_config_root() == str(get_config_location())
 
     def test_app_config_path_generation(self):
         """Test AppConfig path generation for different providers."""

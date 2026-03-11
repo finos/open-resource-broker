@@ -37,7 +37,6 @@ class TestListSchedulerStrategiesHandler:
         mock_scheduler_service.get_available_schedulers.return_value = [
             "default",
             "hostfactory",
-            "hf",
         ]
         mock_filter_service = Mock(spec=GenericFilterService)
         mock_filter_service.apply_filters.side_effect = lambda items, **kwargs: items
@@ -55,7 +54,7 @@ class TestListSchedulerStrategiesHandler:
     def mock_registry(self):
         """Mock scheduler registry."""
         registry = Mock()
-        registry.get_registered_types.return_value = ["default", "hostfactory", "hf"]
+        registry.get_registered_types.return_value = ["default", "hostfactory"]
         return registry
 
     @pytest.fixture
@@ -83,9 +82,9 @@ class TestListSchedulerStrategiesHandler:
             response = await handler.execute_query(query)
 
             assert isinstance(response, SchedulerStrategyListResponse)
-            assert response.total_count == 3
+            assert response.total_count == 2
             assert response.current_strategy == "hostfactory"
-            assert len(response.strategies) == 3
+            assert len(response.strategies) == 2
 
             # Check that hostfactory is marked as active
             active_strategies = [s for s in response.strategies if s.active]
@@ -128,7 +127,7 @@ class TestListSchedulerStrategiesHandler:
             response = await handler.execute_query(query)
 
             assert response.current_strategy == "unknown"
-            assert response.total_count == 3
+            assert response.total_count == 2
 
 
 class TestGetSchedulerConfigurationHandler:
@@ -146,10 +145,9 @@ class TestGetSchedulerConfigurationHandler:
         mock_scheduler_service.get_available_schedulers.return_value = [
             "default",
             "hostfactory",
-            "hf",
         ]
         mock_scheduler_service.is_scheduler_registered.side_effect = lambda name: (
-            name in ["default", "hostfactory", "hf"]
+            name in ["default", "hostfactory"]
         )
         mock_config_port = Mock(spec=ConfigurationPort)
         mock_config_port.get_scheduler_strategy.return_value = "hostfactory"
@@ -183,7 +181,7 @@ class TestGetSchedulerConfigurationHandler:
     def mock_registry(self):
         """Mock scheduler registry."""
         registry = Mock()
-        registry.get_registered_types.return_value = ["default", "hostfactory", "hf"]
+        registry.get_registered_types.return_value = ["default", "hostfactory"]
         return registry
 
     @pytest.mark.asyncio
@@ -271,7 +269,6 @@ class TestValidateSchedulerConfigurationHandler:
         mock_scheduler_service.get_available_schedulers.return_value = [
             "default",
             "hostfactory",
-            "hf",
         ]
         mock_scheduler_service.create_scheduler_strategy.return_value = Mock()
         mock_config_port = Mock(spec=ConfigurationPort)
@@ -300,7 +297,7 @@ class TestValidateSchedulerConfigurationHandler:
     def mock_registry(self):
         """Mock scheduler registry."""
         registry = Mock()
-        registry.get_registered_types.return_value = ["default", "hostfactory", "hf"]
+        registry.get_registered_types.return_value = ["default", "hostfactory"]
         registry.create_strategy.return_value = Mock()  # Mock strategy instance
         return registry
 

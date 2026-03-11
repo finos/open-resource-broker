@@ -168,7 +168,7 @@ def register_storage_type_on_demand(storage_type):
 ```python
 def register_active_scheduler_only(scheduler_type="default"):
     """Register only the active scheduler type."""
-    if scheduler_type in ["hostfactory", "hf"]:
+    if scheduler_type == "hostfactory":
         register_symphony_hostfactory_scheduler()
     elif scheduler_type == "default":
         register_default_scheduler()

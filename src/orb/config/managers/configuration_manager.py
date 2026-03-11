@@ -409,6 +409,13 @@ class ConfigurationManager:
         fallback_path = os.path.join(default_dir, filename)
         return fallback_path
 
+    def get_scheduler_directory(self, file_type: str) -> Optional[str]:
+        """Get directory path for the given file type using platform detection.
+
+        Uses platform_dirs for consistent directory resolution during bootstrap.
+        """
+        return self._get_scheduler_directory(file_type)
+
     def _get_scheduler_directory(self, file_type: str) -> Optional[str]:
         """Get directory path for the given file type using platform detection.
 

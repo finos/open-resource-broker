@@ -94,19 +94,6 @@ class TestGetStrategyClassRegistryLookup:
         result = fresh_registry.get_strategy_class("hostfactory")
         assert result is HostFactorySchedulerStrategy
 
-    def test_get_strategy_class_hf_alias(self, fresh_registry):
-        from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
-            HostFactorySchedulerStrategy,
-        )
-        from orb.infrastructure.scheduler.registration import (
-            register_symphony_hostfactory_scheduler,
-        )
-
-        register_symphony_hostfactory_scheduler(fresh_registry)
-
-        result = fresh_registry.get_strategy_class("hf")
-        assert result is HostFactorySchedulerStrategy
-
     def test_get_strategy_class_default(self, fresh_registry):
         from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
         from orb.infrastructure.scheduler.registration import register_default_scheduler
@@ -131,6 +118,67 @@ class TestGetStrategyClassRegistryLookup:
     def test_get_strategy_class_raises_when_not_registered(self, fresh_registry):
         with pytest.raises((ValueError, Exception)):
             fresh_registry.get_strategy_class("nonexistent")
+
+
+class TestRegisterActiveSchedulerOnly:
+    """register_active_scheduler_only registers the correct scheduler type."""
+
+    @pytest.fixture(autouse=True)
+    def fresh_registry(self):
+        """Each test gets a clean registry state."""
+        registry = registry_module.get_scheduler_registry()
+        registry.clear_registrations()
+        yield registry
+        registry.clear_registrations()
+
+    def test_register_active_scheduler_only_hostfactory_returns_true(self, fresh_registry):
+        from orb.infrastructure.scheduler.registration import register_active_scheduler_only
+
+        result = register_active_scheduler_only("hostfactory")
+
+        assert result is True
+        assert fresh_registry.is_registered("hostfactory")
+
+    def test_register_active_scheduler_only_default_returns_true(self, fresh_registry):
+        from orb.infrastructure.scheduler.registration import register_active_scheduler_only
+
+        result = register_active_scheduler_only("default")
+
+        assert result is True
+        assert fresh_registry.is_registered("default")
+
+    def test_register_active_scheduler_only_unknown_type_falls_back_to_default(
+        self, fresh_registry
+    ):
+        from orb.infrastructure.scheduler.registration import register_active_scheduler_only
+
+        result = register_active_scheduler_only("nonexistent_type")
+
+        assert result is True
+        assert fresh_registry.is_registered("default")
+
+    def test_register_active_scheduler_only_factory_exception_returns_false(self, fresh_registry):
+        from unittest.mock import patch
+
+        from orb.infrastructure.scheduler.registration import register_active_scheduler_only
+
+        with patch(
+            "orb.infrastructure.scheduler.registration.register_default_scheduler",
+            side_effect=RuntimeError("boom"),
+        ):
+            result = register_active_scheduler_only("default")
+
+        assert result is False
+
+    def test_register_active_scheduler_only_idempotent(self, fresh_registry):
+        from orb.infrastructure.scheduler.registration import register_active_scheduler_only
+
+        result1 = register_active_scheduler_only("hostfactory")
+        result2 = register_active_scheduler_only("hostfactory")
+
+        assert result1 is True
+        assert result2 is True
+        assert fresh_registry.is_registered("hostfactory")
 
 
 class TestSchedulerServicesNoStaleAssertion:
