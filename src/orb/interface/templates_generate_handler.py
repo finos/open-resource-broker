@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 from orb.application.dto.template_generation_dto import TemplateGenerationRequest
 from orb.application.services.template_generation_service import TemplateGenerationService
-from orb.cli.console import print_info, print_success
+from orb.domain.base.ports.console_port import ConsolePort
 from orb.infrastructure.di.container import get_container
 
 
@@ -68,27 +68,26 @@ def _print_generation_results(result) -> None:
     if result.status == "error":
         return
 
+    console = get_container().get(ConsolePort)
     skipped_providers = [p for p in result.providers if p.status == "skipped"]
     created_providers = [p for p in result.providers if p.status == "created"]
 
-    # Print skipped files
     if skipped_providers:
-        print_info(f"Skipped {len(skipped_providers)} existing files (use --force to overwrite):")
+        console.info(f"Skipped {len(skipped_providers)} existing files (use --force to overwrite):")
         for provider_result in skipped_providers:
-            print_info(f"  - {provider_result.filename}")
-        print_info("")
+            console.info(f"  - {provider_result.filename}")
+        console.info("")
 
-    # Print created results
     if created_providers:
-        print_success(result.message)
-        print_info(f"Total templates: {result.total_templates}")
-        print_info("")
+        console.success(result.message)
+        console.info(f"Total templates: {result.total_templates}")
+        console.info("")
 
         for provider_result in created_providers:
-            print_info(f"Provider: {provider_result.provider}")
-            print_info(f"  File: {provider_result.filename}")
-            print_info(f"  Templates: {provider_result.templates_count}")
+            console.info(f"Provider: {provider_result.provider}")
+            console.info(f"  File: {provider_result.filename}")
+            console.info(f"  Templates: {provider_result.templates_count}")
     elif skipped_providers:
-        print_info("No new templates generated (all files already exist)")
+        console.info("No new templates generated (all files already exist)")
     else:
-        print_info("No templates generated")
+        console.info("No templates generated")

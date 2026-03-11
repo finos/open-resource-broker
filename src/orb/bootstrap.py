@@ -31,9 +31,10 @@ class Application:
 
         # Skip validation for commands that don't need it (templates, init, help)
         if not skip_validation:
+            from orb.infrastructure.adapters.console_adapter import RichConsoleAdapter
             from orb.infrastructure.validation.startup_validator import StartupValidator
 
-            validator = StartupValidator(config_path)
+            validator = StartupValidator(config_path, console=RichConsoleAdapter())
             validator.validate_startup()
 
         # Defer heavy initialization until first use

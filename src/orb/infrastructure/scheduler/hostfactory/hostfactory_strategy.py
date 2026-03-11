@@ -555,9 +555,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
 
     def _build_hf_attributes(self, instance_type: str) -> dict[str, list[str]]:
         """Build IBM HF attributes dict from an instance type string."""
-        from orb.infrastructure.scheduler.hostfactory.instance_utils import (
-            derive_cpu_ram_from_instance_type,
-        )
+        from orb.providers.aws.utilities.ec2.instances import derive_cpu_ram_from_instance_type
 
         ncpus, nram = derive_cpu_ram_from_instance_type(instance_type)
         return {

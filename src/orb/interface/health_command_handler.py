@@ -3,8 +3,8 @@
 from pathlib import Path
 from typing import Any, cast
 
-from orb.cli.console import print_error, print_info, print_success, print_warning
 from orb.domain.base.ports.configuration_port import ConfigurationPort
+from orb.domain.base.ports.console_port import ConsolePort
 from orb.domain.base.ports.scheduler_port import SchedulerPort
 from orb.infrastructure.di.container import get_container
 
@@ -159,19 +159,20 @@ def handle_health_check(args) -> int:
             pass
         else:
             # Default mode: show human-readable output
-            print_info("ORB Health Check:")
+            console = get_container().get(ConsolePort)
+            console.info("ORB Health Check:")
             for check in checks:
                 status_text = check["status"].upper()
                 name = check["name"].replace("_", " ").title()
                 if check["status"] == "pass":
-                    print_success(f"  {status_text}: {name}")
+                    console.success(f"  {status_text}: {name}")
                 elif check["status"] == "warn":
-                    print_warning(f"  {status_text}: {name} - {check.get('error', 'Warning')}")
+                    console.warning(f"  {status_text}: {name} - {check.get('error', 'Warning')}")
                 else:
-                    print_error(f"  {status_text}: {name} - {check.get('error', 'Failed')}")
+                    console.error(f"  {status_text}: {name} - {check.get('error', 'Failed')}")
 
             summary = response["summary"]
-            print_info(f"\nSummary: {summary['passed']}/{summary['total']} checks passed")
+            console.info(f"\nSummary: {summary['passed']}/{summary['total']} checks passed")
 
         # Always output JSON
         import json
@@ -181,5 +182,5 @@ def handle_health_check(args) -> int:
         return 0 if response["success"] else 1
 
     except Exception as e:
-        print_error(f"Health check failed: {e}")
+        get_container().get(ConsolePort).error(f"Health check failed: {e}")
         return 1

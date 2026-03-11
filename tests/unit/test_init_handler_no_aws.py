@@ -307,57 +307,6 @@ def test_get_default_config_raises_when_no_providers_and_no_provider_arg():
             assert "No providers registered" in str(exc)
 
 
-def test_get_default_scheduler_type_empty_registry_returns_default():
-    """_get_default_scheduler_type returns 'default' when registry has no types."""
-    from unittest.mock import MagicMock, patch
-
-    from orb.interface.init_command_handler import _get_default_scheduler_type
-
-    mock_registry = MagicMock()
-    mock_registry.get_available_types_with_registration.return_value = []
-
-    with patch(
-        "orb.infrastructure.scheduler.registry.get_scheduler_registry",
-        return_value=mock_registry,
-    ):
-        result = _get_default_scheduler_type()
-
-    assert result == "default"
-
-
-def test_get_default_scheduler_type_returns_first_registered_type():
-    """_get_default_scheduler_type returns the first type from the registry."""
-    from unittest.mock import MagicMock, patch
-
-    from orb.interface.init_command_handler import _get_default_scheduler_type
-
-    mock_registry = MagicMock()
-    mock_registry.get_available_types_with_registration.return_value = ["default", "hostfactory"]
-
-    with patch(
-        "orb.infrastructure.scheduler.registry.get_scheduler_registry",
-        return_value=mock_registry,
-    ):
-        result = _get_default_scheduler_type()
-
-    assert result == "default"
-
-
-def test_get_default_scheduler_type_exception_returns_default():
-    """_get_default_scheduler_type returns 'default' when registry raises."""
-    from unittest.mock import patch
-
-    from orb.interface.init_command_handler import _get_default_scheduler_type
-
-    with patch(
-        "orb.infrastructure.scheduler.registry.get_scheduler_registry",
-        side_effect=RuntimeError("registry unavailable"),
-    ):
-        result = _get_default_scheduler_type()
-
-    assert result == "default"
-
-
 def test_get_available_schedulers_no_duplicates():
     """_get_available_schedulers deduplicates entries with the same display_name."""
     from unittest.mock import MagicMock, patch

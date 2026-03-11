@@ -1,9 +1,12 @@
 """AWS Infrastructure Discovery Service - Handles infrastructure discovery operations."""
 
+import logging
 from dataclasses import dataclass
 from typing import Any, Optional
 
 from orb.domain.base.ports import LoggingPort
+from orb.domain.base.ports.console_port import ConsolePort
+from orb.infrastructure.adapters.null_console_adapter import NullConsoleAdapter
 
 
 @dataclass
@@ -53,10 +56,17 @@ class SecurityGroupInfo:
 class AWSInfrastructureDiscoveryService:
     """Service for AWS infrastructure discovery."""
 
-    def __init__(self, region: str, profile: Optional[str], logger: Optional[LoggingPort] = None):
+    def __init__(
+        self,
+        region: str,
+        profile: Optional[str],
+        logger: Optional[LoggingPort] = None,
+        console: Optional[ConsolePort] = None,
+    ):
         self.region = region
         self.profile = profile
-        self._logger = logger
+        self._logger = logger or logging.getLogger(__name__)
+        self._console = console or NullConsoleAdapter()
 
         # Create AWS session and clients
         from botocore.config import Config
@@ -89,8 +99,7 @@ class AWSInfrastructureDiscoveryService:
             return sorted(vpcs, key=lambda v: (not v.is_default, v.name))
 
         except Exception as e:
-            if self._logger:
-                self._logger.error("Failed to discover VPCs: %s", e)
+            self._logger.error("Failed to discover VPCs: %s", e)
             return []
 
     def discover_subnets(self, vpc_id: str) -> list[SubnetInfo]:
@@ -134,8 +143,7 @@ class AWSInfrastructureDiscoveryService:
             return sorted(subnets, key=lambda s: (s.availability_zone, not s.is_public))
 
         except Exception as e:
-            if self._logger:
-                self._logger.error("Failed to discover subnets: %s", e)
+            self._logger.error("Failed to discover subnets: %s", e)
             return []
 
     def discover_security_groups(self, vpc_id: str) -> list[SecurityGroupInfo]:
@@ -162,8 +170,7 @@ class AWSInfrastructureDiscoveryService:
             return sorted(security_groups, key=lambda sg: sg.name)
 
         except Exception as e:
-            if self._logger:
-                self._logger.error("Failed to discover security groups: %s", e)
+            self._logger.error("Failed to discover security groups: %s", e)
             return []
 
     def _get_name_tag(self, tags: list) -> Optional[str]:
@@ -239,10 +246,8 @@ class AWSInfrastructureDiscoveryService:
             show_all = False
             if cli_args and hasattr(cli_args, "show") and cli_args.show is not None:
                 if not cli_args.show.strip():
-                    from orb.cli.console import print_error, print_info
-
-                    print_error("--show flag requires resource types")
-                    print_info("Available resources: vpcs, subnets, security-groups (or sg), all")
+                    self._console.error("--show flag requires resource types")
+                    self._console.info("Available resources: vpcs, subnets, security-groups (or sg), all")
                     return {
                         "provider": provider_config.get("name", "unknown"),
                         "error": "Invalid --show argument",
@@ -260,44 +265,42 @@ class AWSInfrastructureDiscoveryService:
                 show_all = True
 
             vpcs = self.discover_vpcs()
-            from orb.cli.console import print_info, print_separator
-
-            print_info(f"\nProvider: {provider_config.get('name', 'unknown')}")
-            print_info(f"Region: {config.get('region', 'us-east-1')}")
-            print_separator(width=50, char="-")
+            self._console.info(f"\nProvider: {provider_config.get('name', 'unknown')}")
+            self._console.info(f"Region: {config.get('region', 'us-east-1')}")
+            self._console.separator(width=50, char="-")
 
             if not vpcs:
-                print_info("No VPCs found")
+                self._console.info("No VPCs found")
                 return {"provider": provider_config.get("name", "unknown"), "vpcs": 0}
 
-            print_info(f"Found {len(vpcs)} VPCs:")
+            self._console.info(f"Found {len(vpcs)} VPCs:")
             total_subnets = 0
             total_sgs = 0
 
             for vpc in vpcs:
-                print_info(f"  {vpc}")
+                self._console.info(f"  {vpc}")
 
                 if not show_filter or "subnets" in show_filter:
                     subnets = self.discover_subnets(vpc.id)
                     total_subnets += len(subnets)
                     if subnets:
-                        print_info(f"    Subnets ({len(subnets)}):")
+                        self._console.info(f"    Subnets ({len(subnets)}):")
                         display_count = len(subnets) if show_all else min(3, len(subnets))
                         for subnet in subnets[:display_count]:
-                            print_info(f"      {subnet}")
+                            self._console.info(f"      {subnet}")
                         if not show_all and len(subnets) > 3:
-                            print_info(f"      ... and {len(subnets) - 3} more")
+                            self._console.info(f"      ... and {len(subnets) - 3} more")
 
                 if not show_filter or "security-groups" in show_filter:
                     sgs = self.discover_security_groups(vpc.id)
                     total_sgs += len(sgs)
                     if sgs:
-                        print_info(f"    Security Groups ({len(sgs)}):")
+                        self._console.info(f"    Security Groups ({len(sgs)}):")
                         display_count = len(sgs) if show_all else min(2, len(sgs))
                         for sg in sgs[:display_count]:
-                            print_info(f"      {sg}")
+                            self._console.info(f"      {sg}")
                         if not show_all and len(sgs) > 2:
-                            print_info(f"      ... and {len(sgs) - 2} more")
+                            self._console.info(f"      ... and {len(sgs) - 2} more")
 
             return {
                 "provider": provider_config.get("name", "unknown"),
@@ -307,33 +310,29 @@ class AWSInfrastructureDiscoveryService:
             }
 
         except Exception as e:
-            from orb.cli.console import print_error
-
-            print_error(f"Failed to discover infrastructure: {e}")
+            self._console.error(f"Failed to discover infrastructure: {e}")
             return {"provider": provider_config.get("name", "unknown"), "error": str(e)}
 
     def _discover_infrastructure_summary(self, provider_config: dict[str, Any]) -> dict[str, Any]:
         """Discover infrastructure summary (counts only)."""
-        from orb.cli.console import print_info, print_separator
-
         config = provider_config.get("config", {})
         vpcs = self.discover_vpcs()
 
-        print_info(f"\nProvider: {provider_config.get('name', 'unknown')}")
-        print_info(f"Region: {config.get('region', 'us-east-1')}")
-        print_separator(width=50, char="-")
+        self._console.info(f"\nProvider: {provider_config.get('name', 'unknown')}")
+        self._console.info(f"Region: {config.get('region', 'us-east-1')}")
+        self._console.separator(width=50, char="-")
 
         if not vpcs:
-            print_info("No infrastructure found")
+            self._console.info("No infrastructure found")
             return {"provider": provider_config.get("name", "unknown"), "vpcs": 0}
 
         total_subnets = sum(len(self.discover_subnets(vpc.id)) for vpc in vpcs)
         total_sgs = sum(len(self.discover_security_groups(vpc.id)) for vpc in vpcs)
 
-        print_info("Infrastructure Summary:")
-        print_info(f"  VPCs: {len(vpcs)}")
-        print_info(f"  Subnets: {total_subnets}")
-        print_info(f"  Security Groups: {total_sgs}")
+        self._console.info("Infrastructure Summary:")
+        self._console.info(f"  VPCs: {len(vpcs)}")
+        self._console.info(f"  Subnets: {total_subnets}")
+        self._console.info(f"  Security Groups: {total_sgs}")
 
         return {
             "provider": provider_config.get("name", "unknown"),
@@ -347,39 +346,37 @@ class AWSInfrastructureDiscoveryService:
     ) -> dict[str, Any]:
         """Discover AWS infrastructure interactively."""
         try:
-            from orb.cli.console import print_error, print_info, print_success
-
             provider_config.get("config", {})  # config extracted but not used
 
-            print_info("Discovering infrastructure...")
+            self._console.info("Discovering infrastructure...")
             discovered = {}
 
             # Discover VPCs
             vpcs = self.discover_vpcs()
             if not vpcs:
-                print_info("No VPCs found, skipping infrastructure discovery")
+                self._console.info("No VPCs found, skipping infrastructure discovery")
                 return {}
 
-            print_info("")
-            print_info("Found VPCs:")
+            self._console.info("")
+            self._console.info("Found VPCs:")
             for i, vpc in enumerate(vpcs, 1):
-                print_info(f"  ({i}) {vpc}")
+                self._console.info(f"  ({i}) {vpc}")
 
             vpc_choice = input("\nSelect VPC (1): ").strip() or "1"
             try:
                 selected_vpc = vpcs[int(vpc_choice) - 1]
             except (ValueError, IndexError):
-                print_error("Invalid VPC selection, skipping infrastructure discovery")
+                self._console.error("Invalid VPC selection, skipping infrastructure discovery")
                 return {}
 
             # Discover subnets
             subnets = self.discover_subnets(selected_vpc.id)
             if subnets:
-                print_info("")
-                print_info(f"Found subnets in {selected_vpc.id}:")
+                self._console.info("")
+                self._console.info(f"Found subnets in {selected_vpc.id}:")
                 for i, subnet in enumerate(subnets, 1):
-                    print_info(f"  ({i}) {subnet}")
-                print_info("  (s) Skip subnet selection")
+                    self._console.info(f"  ({i}) {subnet}")
+                self._console.info("  (s) Skip subnet selection")
 
                 subnet_choice = input("\nSelect subnets (comma-separated) (1,2): ").strip()
                 if subnet_choice.lower() != "s":
@@ -394,16 +391,16 @@ class AWSInfrastructureDiscoveryService:
                         if selected_subnets:
                             discovered["subnet_ids"] = [s.id for s in selected_subnets]
                     except (ValueError, IndexError):
-                        print_error("Invalid subnet selection, skipping subnets")
+                        self._console.error("Invalid subnet selection, skipping subnets")
 
             # Discover security groups
             sgs = self.discover_security_groups(selected_vpc.id)
             if sgs:
-                print_info("")
-                print_info(f"Found security groups in {selected_vpc.id}:")
+                self._console.info("")
+                self._console.info(f"Found security groups in {selected_vpc.id}:")
                 for i, sg in enumerate(sgs, 1):
-                    print_info(f"  ({i}) {sg}")
-                print_info("  (s) Skip security group selection")
+                    self._console.info(f"  ({i}) {sg}")
+                self._console.info("  (s) Skip security group selection")
 
                 sg_choice = input("\nSelect security groups (1): ").strip() or "1"
                 if sg_choice.lower() != "s":
@@ -413,14 +410,16 @@ class AWSInfrastructureDiscoveryService:
                         if selected_sgs:
                             discovered["security_group_ids"] = [sg.id for sg in selected_sgs]
                     except (ValueError, IndexError):
-                        print_error("Invalid security group selection, skipping security groups")
+                        self._console.error(
+                            "Invalid security group selection, skipping security groups"
+                        )
 
             # Discover fleet role interactively
-            print_info("")
+            self._console.info("")
             auto_fleet_role: Optional[str] = self._discover_spotfleet_role()
 
             if auto_fleet_role:
-                print_info(f"  Found Spot Fleet service-linked role: {auto_fleet_role}")
+                self._console.info(f"  Found Spot Fleet service-linked role: {auto_fleet_role}")
                 confirm = input("  Use this role? (Y/n): ").strip().lower()
                 if confirm in ("", "y", "yes"):
                     discovered["fleet_role"] = auto_fleet_role
@@ -431,7 +430,9 @@ class AWSInfrastructureDiscoveryService:
                     if override:
                         discovered["fleet_role"] = override
             else:
-                print_info("  Could not determine Spot Fleet service-linked role automatically.")
+                self._console.info(
+                    "  Could not determine Spot Fleet service-linked role automatically."
+                )
                 manual = input(
                     "  Enter Spot Fleet IAM role ARN (optional, press Enter to skip): "
                 ).strip()
@@ -439,30 +440,26 @@ class AWSInfrastructureDiscoveryService:
                     discovered["fleet_role"] = manual
 
             if discovered:
-                print_info("")
-                print_success("Infrastructure discovered and configured!")
+                self._console.info("")
+                self._console.success("Infrastructure discovered and configured!")
             else:
-                print_info("No infrastructure selected")
+                self._console.info("No infrastructure selected")
 
             return discovered
 
         except Exception as e:
-            from orb.cli.console import print_error
-
-            print_error(f"Failed to discover infrastructure: {e}")
-            print_info("Continuing without infrastructure discovery...")  # type: ignore[possibly-undefined]
+            self._console.error(f"Failed to discover infrastructure: {e}")
+            self._console.info("Continuing without infrastructure discovery...")
             return {}
 
     def validate_infrastructure(self, provider_config: dict[str, Any]) -> dict[str, Any]:
         """Validate AWS infrastructure configuration."""
         try:
-            from orb.cli.console import print_error, print_info, print_success
-
             provider_config.get("config", {})  # config extracted but not used
             template_defaults = provider_config.get("template_defaults", {})
 
             if not template_defaults:
-                print_info(
+                self._console.info(
                     f"Provider {provider_config.get('name', 'unknown')}: No infrastructure defaults configured"
                 )
                 return {
@@ -483,13 +480,13 @@ class AWSInfrastructureDiscoveryService:
                     response = self.ec2_client.describe_subnets(
                         SubnetIds=template_defaults["subnet_ids"]
                     )
-                    print_success(
+                    self._console.success(
                         f"Provider {provider_config.get('name', 'unknown')}: All {len(response['Subnets'])} subnets are valid"
                     )
                 except Exception as e:
                     validation_results["valid"] = False
                     validation_results["issues"].append(f"Invalid subnets: {e}")
-                    print_error(
+                    self._console.error(
                         f"Provider {provider_config.get('name', 'unknown')}: Subnet validation failed: {e}"
                     )
 
@@ -499,13 +496,13 @@ class AWSInfrastructureDiscoveryService:
                     response = self.ec2_client.describe_security_groups(
                         GroupIds=template_defaults["security_group_ids"]
                     )
-                    print_success(
+                    self._console.success(
                         f"Provider {provider_config.get('name', 'unknown')}: All {len(response['SecurityGroups'])} security groups are valid"
                     )
                 except Exception as e:
                     validation_results["valid"] = False
                     validation_results["issues"].append(f"Invalid security groups: {e}")
-                    print_error(
+                    self._console.error(
                         f"Provider {provider_config.get('name', 'unknown')}: Security group validation failed: {e}"
                     )
 
@@ -519,20 +516,18 @@ class AWSInfrastructureDiscoveryService:
                     fleet_role_arn = template_defaults["fleet_role"]
                     role_name = fleet_role_arn.split("/")[-1]
                     self.iam_client.get_role(RoleName=role_name)
-                    print_success(
+                    self._console.success(
                         f"Provider {provider_config.get('name', 'unknown')}: Fleet role '{role_name}' is valid"
                     )
                 except Exception as e:
                     validation_results["valid"] = False
                     validation_results["issues"].append(f"Invalid fleet_role: {e}")
-                    print_error(
+                    self._console.error(
                         f"Provider {provider_config.get('name', 'unknown')}: Fleet role validation failed: {e}"
                     )
 
             return validation_results
 
         except Exception as e:
-            from orb.cli.console import print_error
-
-            print_error(f"Failed to validate infrastructure: {e}")
+            self._console.error(f"Failed to validate infrastructure: {e}")
             return {"provider": provider_config.get("name", "unknown"), "error": str(e)}

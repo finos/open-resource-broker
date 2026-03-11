@@ -148,14 +148,21 @@ class TestHandleInfrastructureDiscover:
 class TestHandleInfrastructureShow:
     @pytest.mark.asyncio
     async def test_single_provider_returns_success(self, tmp_path):
-        # TODO: CQRS violation — reads config.json directly
+        # TODO: CQRS violation — reads config.json directly and uses service-locator get_container()
         from orb.interface.infrastructure_command_handler import handle_infrastructure_show
 
         _two_provider_config(tmp_path)
+        mock_container = _mock_container_with_provider_port()
 
-        with patch(
-            "orb.interface.infrastructure_command_handler.get_config_location",
-            return_value=tmp_path,
+        with (
+            patch(
+                "orb.interface.infrastructure_command_handler.get_config_location",
+                return_value=tmp_path,
+            ),
+            patch(
+                "orb.interface.infrastructure_command_handler.get_container",
+                return_value=mock_container,
+            ),
         ):
             args = _ns(provider="aws-a")
             result = await handle_infrastructure_show(args)
@@ -164,14 +171,21 @@ class TestHandleInfrastructureShow:
 
     @pytest.mark.asyncio
     async def test_all_providers_returns_success(self, tmp_path):
-        # TODO: CQRS violation — reads config.json directly
+        # TODO: CQRS violation — reads config.json directly and uses service-locator get_container()
         from orb.interface.infrastructure_command_handler import handle_infrastructure_show
 
         _two_provider_config(tmp_path)
+        mock_container = _mock_container_with_provider_port()
 
-        with patch(
-            "orb.interface.infrastructure_command_handler.get_config_location",
-            return_value=tmp_path,
+        with (
+            patch(
+                "orb.interface.infrastructure_command_handler.get_config_location",
+                return_value=tmp_path,
+            ),
+            patch(
+                "orb.interface.infrastructure_command_handler.get_container",
+                return_value=mock_container,
+            ),
         ):
             args = _ns(provider=None, all_providers=True)
             result = await handle_infrastructure_show(args)

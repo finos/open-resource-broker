@@ -142,9 +142,7 @@ class HostFactoryFieldMapper(SchedulerFieldMapper):
 
     def _create_hf_attributes(self, instance_type: str) -> Dict[str, List[str]]:
         """Create HostFactory attributes from instance type."""
-        from orb.infrastructure.scheduler.hostfactory.instance_utils import (
-            derive_cpu_ram_from_instance_type,
-        )
+        from orb.providers.aws.utilities.ec2.instances import derive_cpu_ram_from_instance_type
 
         ncpus, nram = derive_cpu_ram_from_instance_type(instance_type)
 

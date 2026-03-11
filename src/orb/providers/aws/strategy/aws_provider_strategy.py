@@ -65,6 +65,7 @@ class AWSProviderStrategy(ProviderStrategy):
         provider_name: Optional[str] = None,
         provider_instance_config: Optional[Any] = None,
         config_port: Optional[ConfigurationPort] = None,
+        console: Optional[Any] = None,
     ) -> None:
         """Initialize AWS provider strategy with focused services."""
         if not isinstance(config, AWSProviderConfig):
@@ -73,6 +74,7 @@ class AWSProviderStrategy(ProviderStrategy):
         super().__init__(config)
         self._logger = logger
         self._aws_config = config
+        self._console = console
         self._provider_instance_config = provider_instance_config
         self._aws_client: Optional[AWSClient] = None
         self._aws_client_resolver = aws_client_resolver
@@ -352,6 +354,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 region=self._aws_config.region,
                 profile=self._aws_config.profile or None,
                 logger=self._logger,
+                console=self._console,
             )
         return self._infrastructure_service
 
@@ -460,7 +463,7 @@ class AWSProviderStrategy(ProviderStrategy):
         profile = config.get("profile", self._aws_config.profile)
 
         infrastructure_service = AWSInfrastructureDiscoveryService(
-            region=region, profile=profile, logger=self._logger
+            region=region, profile=profile, logger=self._logger, console=self._console
         )
         return infrastructure_service.discover_infrastructure_interactive(provider_config)
 

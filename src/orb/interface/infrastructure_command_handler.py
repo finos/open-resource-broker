@@ -3,8 +3,9 @@
 import json
 from typing import Any, Dict, List
 
-from orb.cli.console import print_error, print_info, print_separator
 from orb.config.platform_dirs import get_config_location
+from orb.domain.base.ports.console_port import ConsolePort
+from orb.infrastructure.di.container import get_container
 
 
 async def handle_infrastructure_discover(args) -> Dict[str, Any]:
@@ -97,39 +98,40 @@ async def _discover_provider_infrastructure(provider: Dict[str, Any], args) -> D
         return provider_strategy.discover_infrastructure(provider_with_args)
 
     except Exception as e:
-        print_error(f"Failed to discover infrastructure for {provider['name']}: {e}")
+        get_container().get(ConsolePort).error(f"Failed to discover infrastructure for {provider['name']}: {e}")
         return {"provider": provider["name"], "error": str(e)}
 
 
 def _show_provider_infrastructure(provider: Dict[str, Any]) -> None:
     """Show infrastructure configuration for a provider."""
-    print_info(f"\nProvider: {provider['name']}")
-    print_info(f"Type: {provider['type']}")
+    console = get_container().get(ConsolePort)
+    console.info(f"\nProvider: {provider['name']}")
+    console.info(f"Type: {provider['type']}")
 
     config = provider.get("config", {})
     if config:
-        print_info(f"Region: {config.get('region', 'N/A')}")
-        print_info(f"Profile: {config.get('profile', 'N/A')}")
+        console.info(f"Region: {config.get('region', 'N/A')}")
+        console.info(f"Profile: {config.get('profile', 'N/A')}")
 
     template_defaults = provider.get("template_defaults", {})
     if template_defaults:
-        print_info("\nInfrastructure Defaults:")
+        console.info("\nInfrastructure Defaults:")
         for key, value in template_defaults.items():
             label = key.replace("_", " ").title()
             if isinstance(value, list):
-                print_info(f"  {label} ({len(value)}):")
+                console.info(f"  {label} ({len(value)}):")
                 for item in value:
-                    print_info(f"    - {item}")
+                    console.info(f"    - {item}")
             else:
-                print_info(f"  {label}: {value}")
+                console.info(f"  {label}: {value}")
     else:
-        print_info("\nNo infrastructure defaults configured")
-        print_info("To configure infrastructure defaults:")
-        print_info("  1. Run: orb init --interactive")
-        print_info("  2. Or run: orb infra discover (to see available infrastructure)")
-        print_info("  3. Then manually add template_defaults to your provider config")
+        console.info("\nNo infrastructure defaults configured")
+        console.info("To configure infrastructure defaults:")
+        console.info("  1. Run: orb init --interactive")
+        console.info("  2. Or run: orb infra discover (to see available infrastructure)")
+        console.info("  3. Then manually add template_defaults to your provider config")
 
-    print_separator(char="-")
+    console.separator(char="-")
 
 
 async def _validate_provider_infrastructure(provider: Dict[str, Any]) -> Dict[str, Any]:
@@ -145,14 +147,14 @@ async def _validate_provider_infrastructure(provider: Dict[str, Any]) -> Dict[st
         if hasattr(provider_strategy, "validate_infrastructure"):
             return provider_strategy.validate_infrastructure(provider)
         else:
-            print_info(f"Infrastructure validation not supported for provider: {provider['name']}")
+            get_container().get(ConsolePort).info(f"Infrastructure validation not supported for provider: {provider['name']}")
             return {
                 "provider": provider["name"],
                 "error": "Infrastructure validation not supported",
             }
 
     except Exception as e:
-        print_error(f"Failed to validate infrastructure for {provider['name']}: {e}")
+        get_container().get(ConsolePort).error(f"Failed to validate infrastructure for {provider['name']}: {e}")
         return {"provider": provider["name"], "error": str(e)}
 
 

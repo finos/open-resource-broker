@@ -29,10 +29,6 @@ from orb.infrastructure.utilities.common.serialization import (
 )
 from orb.infrastructure.utilities.common.string_utils import (
     extract_provider_type,
-    mask_sensitive_data as sanitize_string,
-    to_camel_case as snake_to_camel,
-    to_snake_case as camel_to_snake,
-    truncate as truncate_string,
 )
 from orb.infrastructure.utilities.factories.api_handler_factory import APIHandlerFactory
 
@@ -48,9 +44,6 @@ __all__: list[str] = [
     "UnitOfWorkFactory",
     # String utilities
     "extract_provider_type",
-    "camel_to_snake",
-    # String utilities (aliases)
-    "camel_to_snake",
     "deserialize_enum",
     # File utilities
     "ensure_directory_exists",
@@ -65,15 +58,9 @@ __all__: list[str] = [
     "parse_datetime",
     "process_value_objects",
     "read_json_file",
-    "sanitize_string",
-    "sanitize_string",
     # Serialization
     "serialize_enum",
-    "snake_to_camel",
-    "snake_to_camel",
     "transform_list",
-    "truncate_string",
-    "truncate_string",
     "validate_collection",
     "write_json_file",
 ]

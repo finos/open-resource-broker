@@ -22,7 +22,7 @@ from orb.application.template.commands import (
     DeleteTemplateCommand,
     UpdateTemplateCommand,
 )
-from orb.cli.console import print_info
+from orb.domain.base.ports.console_port import ConsolePort
 from orb.domain.base.ports.scheduler_port import SchedulerPort
 from orb.infrastructure.di.buses import CommandBus, QueryBus
 from orb.infrastructure.di.container import get_container
@@ -96,9 +96,10 @@ async def handle_list_templates(args: argparse.Namespace) -> dict[str, Any]:
         if len(templates) == 0:
             from orb.cli.help_utils import print_getting_started_help
 
-            print_info("")  # Empty line
-            print_info("No templates found.")
-            print_info("")  # Empty line
+            console = container.get(ConsolePort)
+            console.info("")
+            console.info("No templates found.")
+            console.info("")
             print_getting_started_help()
 
         return result

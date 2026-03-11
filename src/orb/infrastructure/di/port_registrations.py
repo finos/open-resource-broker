@@ -109,3 +109,9 @@ def register_port_adapters(container):
     from orb.infrastructure.caching.in_memory_cache_service import InMemoryCacheService
 
     container.register_singleton(CacheServicePort, lambda _: InMemoryCacheService())
+
+    # Register console port adapter
+    from orb.domain.base.ports.console_port import ConsolePort
+    from orb.infrastructure.adapters.console_adapter import RichConsoleAdapter
+
+    container.register_singleton(ConsolePort, lambda c: RichConsoleAdapter())

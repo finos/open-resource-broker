@@ -1,6 +1,7 @@
 """Domain ports for infrastructure concerns."""
 
 from .configuration_port import ConfigurationPort
+from .console_port import ConsolePort
 from .container_port import ContainerPort
 from .error_handling_port import ErrorHandlingPort
 from .event_publisher_port import EventPublisherPort
@@ -15,6 +16,7 @@ from .template_configuration_port import TemplateConfigurationPort
 
 __all__: list[str] = [
     "ConfigurationPort",
+    "ConsolePort",
     "ContainerPort",
     "ErrorHandlingPort",
     "EventPublisherPort",

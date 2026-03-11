@@ -6,20 +6,14 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from orb.cli.console import (
-    print_command,
-    print_error,
-    print_info,
-    print_newline,
-    print_separator,
-    print_success,
-)
 from orb.config.platform_dirs import (
     get_config_location,
     get_logs_location,
     get_scripts_location,
     get_work_location,
 )
+from orb.domain.base.ports.console_port import ConsolePort
+from orb.infrastructure.di.container import get_container
 from orb.infrastructure.logging.logger import get_logger
 
 logger = get_logger(__name__)
@@ -27,6 +21,7 @@ logger = get_logger(__name__)
 
 async def handle_init(args) -> int:
     """Handle orb init command."""
+    console = get_container().get(ConsolePort)
     try:
         # Determine config directory
         if args.config_dir:
@@ -44,11 +39,11 @@ async def handle_init(args) -> int:
         # Check if already initialized
         config_file = config_dir / "config.json"
         if config_file.exists() and not args.force:
-            print_error(f"Configuration already exists at {config_dir}")
-            print_info("  Use --force to reinitialize")
-            print_info("")
-            print_info("To view current config:")
-            print_command("  orb config show")
+            console.error(f"Configuration already exists at {config_dir}")
+            console.info("  Use --force to reinitialize")
+            console.info("")
+            console.info("To view current config:")
+            console.command("  orb config show")
             return 1
 
         # Get configuration
@@ -71,54 +66,35 @@ async def handle_init(args) -> int:
         _copy_scripts(scripts_dir)
 
         # Success message with separator
-        print_separator(char="━", color="green")
-        print_success("  ORB initialized successfully")
-        print_separator(char="━", color="green")
-        print_info("")  # Empty line
-        print_info("Created:")
-        print_info(f"  Config:  {config_dir}")
-        print_info(f"  Work:    {work_dir}")
-        print_info(f"  Logs:    {logs_dir}")
-        print_info(f"  Scripts: {scripts_dir}")
-        print_info("")  # Empty line
-        print_info("Next Steps:")
-        print_command("  1. Generate templates: orb templates generate")
-        print_command("  2. List templates:     orb templates list")
-        print_command("  3. Show infrastructure: orb infrastructure show")
-        print_command("  3. Show config:        orb config show")
+        console.separator(char="━", color="green")
+        console.success("  ORB initialized successfully")
+        console.separator(char="━", color="green")
+        console.info("")  # Empty line
+        console.info("Created:")
+        console.info(f"  Config:  {config_dir}")
+        console.info(f"  Work:    {work_dir}")
+        console.info(f"  Logs:    {logs_dir}")
+        console.info(f"  Scripts: {scripts_dir}")
+        console.info("")  # Empty line
+        console.info("Next Steps:")
+        console.command("  1. Generate templates: orb templates generate")
+        console.command("  2. List templates:     orb templates list")
+        console.command("  3. Show infrastructure: orb infrastructure show")
+        console.command("  3. Show config:        orb config show")
 
         return 0
 
     except KeyboardInterrupt:
-        print_error("\nInitialization cancelled by user")
+        console.error("\nInitialization cancelled by user")
         return 1
     except Exception as e:
-        print_error("Failed to initialize ORB")
-        print_error(f"  {e}")
-        print_info("")
-        print_info("To retry:")
-        print_command("  orb init --force")
+        console.error("Failed to initialize ORB")
+        console.error(f"  {e}")
+        console.info("")
+        console.info("To retry:")
+        console.command("  orb init --force")
         logger.error("Failed to initialize ORB: %s", e, exc_info=True)
         return 1
-
-
-def _get_default_scheduler_type() -> str:
-    """Get the default scheduler type from the registry.
-
-    Returns the first registered type, falling back to 'default' only if the
-    registry is empty or unavailable.
-    """
-    try:
-        from orb.infrastructure.scheduler.registration import register_all_scheduler_types
-        from orb.infrastructure.scheduler.registry import get_scheduler_registry
-
-        registry = get_scheduler_registry()
-        types = registry.get_available_types_with_registration(register_all_scheduler_types)
-        if types:
-            return types[0]
-    except Exception as e:
-        logger.debug("Could not determine default scheduler type: %s", e)
-    return "default"
 
 
 def _get_available_schedulers() -> list[dict[str, str]]:
@@ -144,11 +120,10 @@ def _get_available_schedulers() -> list[dict[str, str]]:
 def _get_available_providers() -> list[dict[str, str]]:
     """Get available providers from provider registry."""
     try:
-        from orb.application.services.provider_registry_service import ProviderRegistryService
-        from orb.infrastructure.di.container import get_container
+        from orb.providers.registry import get_provider_registry
 
-        registry_service = get_container().get(ProviderRegistryService)
-        registered_types = registry_service.get_registered_provider_types()
+        registry = get_provider_registry()
+        registered_types = registry.get_registered_providers()
 
         providers = []
         for provider_type in sorted(registered_types):
@@ -159,62 +134,62 @@ def _get_available_providers() -> list[dict[str, str]]:
             )
 
         return providers
-    except Exception as e:
-        logger.debug("Could not retrieve available providers: %s", e)
+    except Exception:
         return []
 
 
 def _interactive_setup() -> Dict[str, Any]:
     """Interactive configuration setup."""
+    console = get_container().get(ConsolePort)
     try:
-        print_separator(char="=", color="cyan")
-        print_info("  ORB Configuration Setup")
-        print_separator(char="=", color="cyan")
+        console.separator(char="=", color="cyan")
+        console.info("  ORB Configuration Setup")
+        console.separator(char="=", color="cyan")
 
         # Scheduler type
-        print_info("")
-        print_info("[1/4] Scheduler Type")
-        print_separator(char="-", color="cyan")
+        console.info("")
+        console.info("[1/4] Scheduler Type")
+        console.separator(char="-", color="cyan")
 
         schedulers = _get_available_schedulers()
         for i, scheduler in enumerate(schedulers, 1):
-            print_info(f"  ({i}) {scheduler['display_name']} - {scheduler['description']}")
+            console.info(f"  ({i}) {scheduler['display_name']} - {scheduler['description']}")
 
-        print_info("")
+        console.info("")
         scheduler_choice = input("  Select scheduler (1): ").strip() or "1"
         try:
             scheduler_type = schedulers[int(scheduler_choice) - 1]["type"]
         except (ValueError, IndexError):
             scheduler_type = "default"
 
-        print_newline()
-        print_separator(char="-", color="cyan")
+        console.info("")
+        console.separator(char="-", color="cyan")
 
         # Provider type
-        print_info("")
-        print_info("[2/4] Cloud Provider")
-        print_separator(char="-", color="cyan")
+        console.info("")
+        console.info("[2/4] Cloud Provider")
+        console.separator(char="-", color="cyan")
 
         providers = _get_available_providers()
         if not providers:
             raise ValueError("No providers registered. Install a provider plugin to continue.")
         for i, provider in enumerate(providers, 1):
-            print_info(f"  ({i}) {provider['display_name']} - {provider['description']}")
+            console.info(f"  ({i}) {provider['display_name']} - {provider['description']}")
 
-        print_info("")
+        console.info("")
         provider_choice = input("  Select provider (1): ").strip() or "1"
         try:
             provider_type = providers[int(provider_choice) - 1]["type"]
         except (ValueError, IndexError):
             provider_type = providers[0]["type"]
 
-        print_newline()
-        print_separator(char="-", color="cyan")
+        console.info("")
+        console.separator(char="-", color="cyan")
 
         # Provider configuration
-        print_info("")
-        print_info("[3/4] Provider Configuration")
-        print_separator(char="-", color="cyan")
+        console.info("")
+        console.info("[3/4] Provider Configuration")
+        console.separator(char="-", color="cyan")
 
         # Get credential requirements
         requirements = _get_credential_requirements(provider_type)
@@ -235,10 +210,10 @@ def _interactive_setup() -> Dict[str, Any]:
         # Get available credential sources
         credential_sources = _get_available_credential_sources(provider_type)
 
-        print_info("")
-        print_info("Available credentials:")
+        console.info("")
+        console.info("Available credentials:")
         for i, source in enumerate(credential_sources, 1):
-            print_info(f"  ({i}) {source['description']}")
+            console.info(f"  ({i}) {source['description']}")
 
         choice = input("  Select credentials (1): ").strip() or "1"
         try:
@@ -247,34 +222,34 @@ def _interactive_setup() -> Dict[str, Any]:
             selected_source = None
 
         # Test credentials
-        print_info("")
-        print_info("Testing credentials...")
+        console.info("")
+        console.info("Testing credentials...")
         success, error_msg = _test_provider_credentials(
             provider_type, selected_source, **provider_config
         )
         if success:
-            print_success("Credentials verified successfully")
+            console.success("Credentials verified successfully")
             if selected_source:
                 provider_config["profile"] = selected_source
         else:
-            print_error("[bold red]ERROR[/bold red] Authentication failed:")
-            print_error(f"        {error_msg}")
+            console.error("[bold red]ERROR[/bold red] Authentication failed:")
+            console.error(f"        {error_msg}")
             return {}
 
         # Extract final values for backward compatibility
         region = provider_config.get("region") or default_region
         profile = provider_config.get("profile") or None
 
-        print_newline()
-        print_separator(char="-", color="cyan")
+        console.info("")
+        console.separator(char="-", color="cyan")
 
         # Infrastructure discovery
-        print_info("")
-        print_info("[4/4] Infrastructure Discovery")
-        print_separator(char="-", color="cyan")
-        print_info("  Discover infrastructure for template defaults?")
-        print_info("  This will help create generic templates that work across regions/accounts.")
-        print_info("")
+        console.info("")
+        console.info("[4/4] Infrastructure Discovery")
+        console.separator(char="-", color="cyan")
+        console.info("  Discover infrastructure for template defaults?")
+        console.info("  This will help create generic templates that work across regions/accounts.")
+        console.info("")
         discover_choice = input("  Discover infrastructure? (y/N): ").strip().lower()
 
         infrastructure_defaults = {}
@@ -292,10 +267,10 @@ def _interactive_setup() -> Dict[str, Any]:
         providers = [first_provider]
 
         # Multi-provider loop
-        print_info("")
-        print_separator(char="-", color="cyan")
+        console.info("")
+        console.separator(char="-", color="cyan")
         while True:
-            print_info("")
+            console.info("")
             add_another = input("  Add another provider? (y/N): ").strip().lower()
 
             if add_another not in ["y", "yes"]:
@@ -305,19 +280,19 @@ def _interactive_setup() -> Dict[str, Any]:
             if additional_provider:
                 providers.append(additional_provider)
 
-        print_info("")
+        console.info("")
 
         # Default provider selection (only when multiple providers configured)
         default_provider_index = 0
         if len(providers) > 1:
-            print_separator(char="-", color="cyan")
-            print_info("")
-            print_info("Default Provider Selection")
-            print_info("  Which provider should be used as the default?")
-            print_info("")
+            console.separator(char="-", color="cyan")
+            console.info("")
+            console.info("Default Provider Selection")
+            console.info("  Which provider should be used as the default?")
+            console.info("")
             for i, p in enumerate(providers, 1):
-                print_info(f"  ({i}) {p['type']} - {p['region']} ({p['profile']})")
-            print_info("")
+                console.info(f"  ({i}) {p['type']} - {p['region']} ({p['profile']})")
+            console.info("")
             default_choice = input("  Select default provider (1): ").strip() or "1"
             try:
                 default_provider_index = int(default_choice) - 1
@@ -325,7 +300,7 @@ def _interactive_setup() -> Dict[str, Any]:
                     default_provider_index = 0
             except ValueError:
                 default_provider_index = 0
-            print_info("")
+            console.info("")
 
         # Mark the default provider
         for i, p in enumerate(providers):
@@ -336,29 +311,30 @@ def _interactive_setup() -> Dict[str, Any]:
             "providers": providers,
         }
     except KeyboardInterrupt:
-        print_error("\n\nSetup cancelled by user")
+        console.error("\n\nSetup cancelled by user")
         raise
     except EOFError:
-        print_error("\n\nUnexpected end of input")
-        print_info("  Run with --non-interactive for automated setup")
+        console.error("\n\nUnexpected end of input")
+        console.info("  Run with --non-interactive for automated setup")
         raise
 
 
 def _configure_additional_provider() -> Optional[Dict[str, Any]]:
     """Configure an additional provider instance."""
+    console = get_container().get(ConsolePort)
     try:
-        print_info("")
-        print_info("Additional Provider Configuration")
-        print_separator(char="-", color="cyan")
+        console.info("")
+        console.info("Additional Provider Configuration")
+        console.separator(char="-", color="cyan")
 
         # Provider type
         providers = _get_available_providers()
         if not providers:
             raise ValueError("No providers registered. Install a provider plugin to continue.")
         for i, provider in enumerate(providers, 1):
-            print_info(f"  ({i}) {provider['display_name']} - {provider['description']}")
+            console.info(f"  ({i}) {provider['display_name']} - {provider['description']}")
 
-        print_info("")
+        console.info("")
         provider_choice = input("  Select provider (1): ").strip() or "1"
         try:
             provider_type = providers[int(provider_choice) - 1]["type"]
@@ -366,9 +342,9 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
             provider_type = providers[0]["type"]
 
         # Provider configuration
-        print_info("")
-        print_info("Provider Configuration")
-        print_separator(char="-", color="cyan")
+        console.info("")
+        console.info("Provider Configuration")
+        console.separator(char="-", color="cyan")
 
         # Get credential requirements
         requirements = _get_credential_requirements(provider_type)
@@ -388,10 +364,10 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
         # Get available credential sources
         credential_sources = _get_available_credential_sources(provider_type)
 
-        print_info("")
-        print_info("Available credentials:")
+        console.info("")
+        console.info("Available credentials:")
         for i, source in enumerate(credential_sources, 1):
-            print_info(f"  ({i}) {source['description']}")
+            console.info(f"  ({i}) {source['description']}")
 
         choice = input("  Select credentials (1): ").strip() or "1"
         try:
@@ -400,23 +376,23 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
             selected_source = None
 
         # Test credentials
-        print_info("")
-        print_info("Testing credentials...")
+        console.info("")
+        console.info("Testing credentials...")
         success, error_msg = _test_provider_credentials(
             provider_type, selected_source, **provider_config
         )
         if success:
-            print_success("Credentials verified successfully")
+            console.success("Credentials verified successfully")
             if selected_source:
                 provider_config["profile"] = selected_source
         else:
-            print_error(f"Authentication failed: {error_msg}")
+            console.error(f"Authentication failed: {error_msg}")
             return None
 
         # Infrastructure discovery
-        print_info("")
-        print_info("Infrastructure Discovery")
-        print_separator(char="-", color="cyan")
+        console.info("")
+        console.info("Infrastructure Discovery")
+        console.separator(char="-", color="cyan")
         discover_choice = input("  Discover infrastructure? (y/N): ").strip().lower()
 
         infrastructure_defaults = {}
@@ -433,22 +409,21 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
         }
 
     except KeyboardInterrupt:
-        print_error("\nProvider configuration cancelled")
+        console.error("\nProvider configuration cancelled")
         return None
     except Exception as e:
-        print_error(f"Failed to configure provider: {e}")
+        console.error(f"Failed to configure provider: {e}")
         return None
 
 
 def _get_provider_strategy(provider_type: str) -> Optional[Any]:
     """Get a lightweight provider strategy instance for credential/region queries."""
     try:
-        from orb.application.services.provider_registry_service import ProviderRegistryService
-        from orb.infrastructure.di.container import get_container
+        from orb.providers.registry import get_provider_registry
 
-        registry_service = get_container().get(ProviderRegistryService)
-        registry_service.ensure_provider_registered(provider_type)
-        return registry_service.get_or_create_strategy(provider_type)
+        registry = get_provider_registry()
+        registry.ensure_provider_type_registered(provider_type)
+        return registry.get_or_create_strategy(provider_type)
     except Exception:
         return None
 
@@ -459,17 +434,18 @@ def _pick_region(regions: list[tuple[str, str]], default_region: str = "") -> st
     If regions is non-empty, show a numbered list with an 'Other' option.
     If regions is empty, prompt for free-text input.
     """
-    print_info("")
+    console = get_container().get(ConsolePort)
+    console.info("")
     if not regions:
         custom = input("  Enter region: ").strip()
         return custom if custom else default_region
 
-    print_info("  Select region:")
+    console.info("  Select region:")
     for i, (region_id, region_name) in enumerate(regions, 1):
-        print_info(f"  ({i:2}) {region_id:<20} {region_name}")
+        console.info(f"  ({i:2}) {region_id:<20} {region_name}")
     other_num = len(regions) + 1
-    print_info(f"  ({other_num:2}) Other (type custom)")
-    print_info("")
+    console.info(f"  ({other_num:2}) Other (type custom)")
+    console.info("")
 
     choice = input("  Select region (1): ").strip() or "1"
     try:
@@ -529,29 +505,34 @@ def _discover_infrastructure(
     provider_type: str, region: str, profile: str | None
 ) -> Dict[str, Any]:
     """Discover infrastructure interactively using provider strategy."""
+    console = get_container().get(ConsolePort)
     try:
-        from orb.application.services.provider_registry_service import ProviderRegistryService
-        from orb.infrastructure.di.container import get_container
+        from orb.providers.registry import get_provider_registry
 
-        registry_service = get_container().get(ProviderRegistryService)
+        registry = get_provider_registry()
 
-        if not registry_service.ensure_provider_registered(provider_type):
-            print_error(f"Failed to register provider type: {provider_type}")
+        # Ensure provider type is registered
+        if not registry.ensure_provider_type_registered(provider_type):
+            console.error(f"Failed to register provider type: {provider_type}")
             return {}
 
+        # Create provider config for discovery
         provider_config = {"region": region, "profile": profile}
-        strategy = registry_service.get_or_create_strategy(provider_type, provider_config)
 
+        # Get strategy from registry
+        strategy = registry.get_or_create_strategy(provider_type, provider_config)
+
+        # Check if provider strategy supports infrastructure discovery
         if hasattr(strategy, "discover_infrastructure_interactive"):
             full_config = {"type": provider_type, "config": provider_config}
             return strategy.discover_infrastructure_interactive(full_config)  # type: ignore[union-attr]
         else:
-            print_info(f"Infrastructure discovery not supported for provider type: {provider_type}")
+            console.info(f"Infrastructure discovery not supported for provider type: {provider_type}")
             return {}
 
     except Exception as e:
-        print_error(f"Failed to discover infrastructure: {e}")
-        print_info("Continuing without infrastructure discovery...")
+        console.error(f"Failed to discover infrastructure: {e}")
+        console.info("Continuing without infrastructure discovery...")
         return {}
 
 
@@ -578,7 +559,7 @@ def _get_default_config(args) -> Dict[str, Any]:
     }
 
     return {
-        "scheduler_type": args.scheduler or _get_default_scheduler_type(),
+        "scheduler_type": args.scheduler or "default",
         "providers": [first_provider],
     }
 
@@ -627,12 +608,13 @@ def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
         # Generate provider name
         strategy = None
         try:
-            from orb.application.services.provider_registry_service import ProviderRegistryService
-            from orb.infrastructure.di.container import get_container
+            from orb.providers.factory import ProviderStrategyFactory
 
-            registry_service = get_container().get(ProviderRegistryService)
+            container = get_container()
+            factory = container.get(ProviderStrategyFactory)
+
             temp_config = {"type": provider_type, **provider_config}
-            strategy = registry_service.get_or_create_strategy(provider_type, temp_config)
+            strategy = factory.create_strategy(provider_type, temp_config)  # type: ignore[attr-defined]
             provider_name = strategy.generate_provider_name(provider_config)
         except Exception:
             # Fallback to simple name generation
