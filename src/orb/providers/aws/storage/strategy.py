@@ -8,16 +8,16 @@ from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.storage.base.strategy import BaseStorageStrategy
 
+# Import generic components
+from orb.infrastructure.storage.components import LockManager
+from orb.infrastructure.storage.exceptions import StorageError
+
 # Import AWS-specific components
 from orb.providers.aws.storage.components import (
     DynamoDBClientManager,
     DynamoDBConverter,
     DynamoDBTransactionManager,
 )
-
-# Import generic components
-from orb.infrastructure.storage.components import LockManager
-from orb.infrastructure.storage.exceptions import StorageError
 
 
 @injectable

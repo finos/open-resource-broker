@@ -8,6 +8,8 @@ CLEAN ARCHITECTURE: Only handles storage strategies, no repository knowledge.
 
 from typing import TYPE_CHECKING, Any, Optional
 
+from orb.infrastructure.logging.logger import get_logger
+
 # Use TYPE_CHECKING to avoid direct infrastructure import
 if TYPE_CHECKING:
     from orb.domain.base.ports import LoggingPort
