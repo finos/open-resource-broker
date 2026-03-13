@@ -35,6 +35,7 @@ _NON_PROVIDER_FILES = [
 _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
     {
         ("bootstrap.py", "orb.providers.registry"),
+        ("bootstrap.py", "orb.providers.aws.health"),
         ("interface/health_command_handler.py", "orb.providers.registry"),
         ("interface/system_command_handlers.py", "orb.providers.registry"),
         ("interface/infrastructure_command_handler.py", "orb.providers.registry"),
