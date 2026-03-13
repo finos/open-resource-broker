@@ -181,7 +181,11 @@ class Application:
             health_check = self._container.get(HealthCheck)
             for instance_name in self._provider_registry.get_registered_provider_instances():
                 strategy = self._provider_registry.get_strategy(instance_name)
-                if strategy is not None and hasattr(strategy, "aws_client") and strategy.aws_client is not None:
+                if (
+                    strategy is not None
+                    and hasattr(strategy, "aws_client")
+                    and strategy.aws_client is not None
+                ):
                     register_aws_health_checks(health_check, strategy.aws_client)
         except Exception as e:
             self.logger.debug("Could not register provider health checks: %s", e)
