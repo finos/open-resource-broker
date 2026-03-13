@@ -137,9 +137,6 @@ class Application:
                 self.logger.info("Lazy loading enabled - registering providers for discovery")
                 self._register_configured_providers()
 
-            # Register provider health checks now that strategies are initialized
-            self._register_provider_health_checks()
-
             # Pre-load templates into cache during initialization
             await self._preload_templates()
 
@@ -171,24 +168,6 @@ class Application:
                         )
         except Exception as e:
             self.logger.error("Failed to register configured providers: %s", e, exc_info=True)
-
-    def _register_provider_health_checks(self) -> None:
-        """Register provider health checks after strategies are initialized."""
-        try:
-            from orb.monitoring.health import HealthCheck
-            from orb.providers.aws.health import register_aws_health_checks
-
-            health_check = self._container.get(HealthCheck)
-            for instance_name in self._provider_registry.get_registered_provider_instances():
-                strategy = self._provider_registry.get_strategy(instance_name)
-                if (
-                    strategy is not None
-                    and hasattr(strategy, "aws_client")
-                    and strategy.aws_client is not None
-                ):
-                    register_aws_health_checks(health_check, strategy.aws_client)
-        except Exception as e:
-            self.logger.debug("Could not register provider health checks: %s", e)
 
     def _log_provider_configuration(self, config_manager) -> None:
         """Log provider configuration information during initialization."""

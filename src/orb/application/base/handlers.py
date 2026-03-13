@@ -136,7 +136,7 @@ class BaseHandler(ABC):
                     self._metrics[operation_id] = {
                         "duration": duration,
                         "status": "success",
-                        "timestamp": datetime.now(timezone.utc),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
                     }
 
                     return result
@@ -156,7 +156,7 @@ class BaseHandler(ABC):
                         "duration": duration,
                         "status": "error",
                         "error": str(e),
-                        "timestamp": datetime.now(timezone.utc),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
                     }
 
                     raise

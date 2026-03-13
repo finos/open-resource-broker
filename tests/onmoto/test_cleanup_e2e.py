@@ -79,7 +79,7 @@ def _make_cleanup_config_port(prefix: str = "") -> Any:
             enabled=True,
             delete_launch_template=True,
             dry_run=False,
-        )
+        ).model_dump()
     )
     provider_config = MagicMock()
     provider_config.provider_defaults = {"aws": provider_defaults}

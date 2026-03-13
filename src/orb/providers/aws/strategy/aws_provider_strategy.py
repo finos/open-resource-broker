@@ -29,6 +29,7 @@ from orb.providers.aws.services.instance_operation_service import AWSInstanceOpe
 from orb.providers.aws.services.template_validation_service import AWSTemplateValidationService
 
 if TYPE_CHECKING:
+    from orb.monitoring.health import HealthCheck
     from orb.providers.aws.infrastructure.adapters.aws_provisioning_adapter import (
         AWSProvisioningAdapter,
     )
@@ -519,6 +520,14 @@ class AWSProviderStrategy(ProviderStrategy):
         if getattr(args, "fleet_role", None):
             result["fleet_role"] = args.fleet_role
         return result
+
+    def register_health_checks(self, health_check: "HealthCheck") -> None:
+        """Register AWS-specific health checks if client is available."""
+        if self.aws_client is None:
+            return
+        from orb.providers.aws.health import register_aws_health_checks
+
+        register_aws_health_checks(health_check, self.aws_client)
 
     def cleanup(self) -> None:
         """Clean up AWS provider resources."""

@@ -63,15 +63,6 @@ def create_aws_strategy(provider_config: Any) -> Any:
         except Exception as e:
             logger.debug("Could not get config port from DI container: %s", e)
 
-        console = None
-        try:
-            from orb.domain.base.ports.console_port import ConsolePort
-            from orb.infrastructure.di.container import get_container
-
-            console = get_container().get(ConsolePort)
-        except Exception as e:
-            logger.debug("Could not get console port from DI container: %s", e)
-
         # Create AWS provider strategy
         strategy = AWSProviderStrategy(
             config=aws_config,
@@ -79,12 +70,20 @@ def create_aws_strategy(provider_config: Any) -> Any:
             provider_name=provider_name,
             provider_instance_config=provider_instance_config,
             config_port=config_port,
-            console=console,
         )
 
         # Initialize the strategy
         if not strategy.initialize():
             raise RuntimeError("Failed to initialize AWS provider strategy")
+
+        with suppress(Exception):
+            from orb.infrastructure.di.container import get_container
+            from orb.monitoring.health import HealthCheck
+            from orb.providers.aws.health import register_aws_health_checks
+
+            if strategy.aws_client is not None:
+                health_check = get_container().get(HealthCheck)
+                register_aws_health_checks(health_check, strategy.aws_client)
 
         # Set provider name for identification
         if hasattr(strategy, "name") and provider_name:

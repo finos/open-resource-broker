@@ -4,8 +4,6 @@ This module extracts configuration building logic from the Provider Strategy Fac
 following SRP and making the code more maintainable and testable.
 """
 
-import json
-import os
 from typing import Any
 
 from orb.config.schemas.provider_strategy_schema import ProviderInstanceConfig
@@ -13,7 +11,7 @@ from orb.domain.base.ports import LoggingPort
 
 
 class ProviderConfigBuilder:
-    """Builds provider configurations with environment variable override support."""
+    """Builds provider configurations via the provider registry."""
 
     def __init__(self, logger: LoggingPort) -> None:
         """Initialize config builder.
@@ -24,140 +22,34 @@ class ProviderConfigBuilder:
         self._logger = logger
 
     def build_config(self, instance_config: ProviderInstanceConfig) -> Any:
-        """Build provider configuration with automatic env var loading.
-
-        Delegates to a provider-registered config builder if available,
-        falling back to the raw config dict. This removes the hardcoded
-        provider_type == "aws" branch.
+        """Build provider configuration via the provider registry.
 
         Args:
             instance_config: Provider instance configuration
 
         Returns:
             Provider-specific configuration object
-        """
-        try:
-            from orb.providers.registry import get_provider_registry
 
-            registry = get_provider_registry()
-            if registry.is_provider_registered(instance_config.type):
-                config_factory = registry.get_config_factory(instance_config.type)
-                if config_factory:
-                    return config_factory(instance_config)
-        except Exception as exc:
-            # Registry not yet populated (e.g. early bootstrap) — fall through to legacy path
-            self._logger.warning(
-                "Failed to build provider config via registry for type '%s': %s",
-                instance_config.type,
-                exc,
+        Raises:
+            RuntimeError: If the registry is not populated or has no config factory
+                for the requested provider type. This indicates a bootstrap ordering
+                bug and must surface loudly rather than silently falling through.
+        """
+        from orb.providers.registry import get_provider_registry
+
+        registry = get_provider_registry()
+        if not registry.is_provider_registered(instance_config.type):
+            raise RuntimeError(
+                f"Provider type '{instance_config.type}' is not registered. "
+                "This indicates a bootstrap ordering bug: register_all_provider_types() "
+                "must run before ProviderConfigBuilder.build_config() is called."
             )
 
-        # Fallback: AWS-specific builder kept for backward compatibility when
-        # the registry is not yet populated (e.g. during early bootstrap).
-        if instance_config.type == "aws":
-            return self._build_aws_config(instance_config)
+        config_factory = registry.get_config_factory(instance_config.type)
+        if config_factory is None:
+            raise RuntimeError(
+                f"No config factory registered for provider type '{instance_config.type}'. "
+                "Each provider must register a config factory via the provider registry."
+            )
 
-        return instance_config.config
-
-    def _build_aws_config(self, instance_config: ProviderInstanceConfig) -> Any:
-        """Build AWS provider configuration.
-
-        Args:
-            instance_config: Provider instance configuration
-
-        Returns:
-            AWSProviderConfig instance
-        """
-        from orb.providers.aws.configuration.config import AWSProviderConfig
-
-        config_dict = instance_config.config.copy()
-
-        # Ensure minimal authentication
-        if not any(
-            key in config_dict
-            for key in ["profile", "role_arn", "access_key_id", "credential_file"]
-        ):
-            config_dict["profile"] = "default"
-
-        # Override with environment variables
-        self._apply_env_var_overrides(config_dict)
-
-        # Handle complex nested fields (JSON env vars)
-        self._apply_json_env_vars(config_dict)
-
-        return AWSProviderConfig(**config_dict)
-
-    def _apply_env_var_overrides(self, config_dict: dict[str, Any]) -> None:
-        """Apply environment variable overrides to config dictionary.
-
-        Args:
-            config_dict: Configuration dictionary to update in-place
-        """
-        # Map of config field names to their environment variable names
-        env_var_mapping = {
-            "region": "ORB_AWS_REGION",
-            "profile": "ORB_AWS_PROFILE",
-            "role_arn": "ORB_AWS_ROLE_ARN",
-            "access_key_id": "ORB_AWS_ACCESS_KEY_ID",
-            "secret_access_key": "ORB_AWS_SECRET_ACCESS_KEY",
-            "session_token": "ORB_AWS_SESSION_TOKEN",
-            "endpoint_url": "ORB_AWS_ENDPOINT_URL",
-            "aws_max_retries": "ORB_AWS_MAX_RETRIES",
-            "aws_read_timeout": "ORB_AWS_READ_TIMEOUT",
-            "service_role_spot_fleet": "ORB_AWS_SERVICE_ROLE_SPOT_FLEET",
-            "credential_file": "ORB_AWS_CREDENTIAL_FILE",
-            "key_file": "ORB_AWS_KEY_FILE",
-            "proxy_host": "ORB_AWS_PROXY_HOST",
-            "proxy_port": "ORB_AWS_PROXY_PORT",
-            "aws_connect_timeout": "ORB_AWS_CONNECT_TIMEOUT",
-            "request_retry_attempts": "ORB_AWS_REQUEST_RETRY_ATTEMPTS",
-            "instance_pending_timeout_sec": "ORB_AWS_INSTANCE_PENDING_TIMEOUT_SEC",
-            "describe_request_retry_attempts": "ORB_AWS_DESCRIBE_REQUEST_RETRY_ATTEMPTS",
-            "describe_request_interval": "ORB_AWS_DESCRIBE_REQUEST_INTERVAL",
-        }
-
-        # Integer fields that need type conversion
-        integer_fields = {
-            "aws_max_retries",
-            "aws_read_timeout",
-            "proxy_port",
-            "aws_connect_timeout",
-            "request_retry_attempts",
-            "instance_pending_timeout_sec",
-            "describe_request_retry_attempts",
-            "describe_request_interval",
-        }
-
-        # Override config_dict with environment variables where they exist
-        for field_name, env_var_name in env_var_mapping.items():
-            if env_var_name in os.environ:
-                env_value = os.environ[env_var_name]
-
-                # Convert to appropriate type
-                if field_name in integer_fields:
-                    try:
-                        config_dict[field_name] = int(env_value)
-                    except ValueError:
-                        self._logger.warning(
-                            "Failed to convert %s to integer: %s", env_var_name, env_value
-                        )
-                else:
-                    config_dict[field_name] = env_value
-
-    def _apply_json_env_vars(self, config_dict: dict[str, Any]) -> None:
-        """Apply JSON environment variables to config dictionary.
-
-        Args:
-            config_dict: Configuration dictionary to update in-place
-        """
-        json_env_vars = {
-            "ORB_AWS_HANDLERS": "handlers",
-            "ORB_AWS_LAUNCH_TEMPLATE": "launch_template",
-        }
-
-        for env_var_name, field_name in json_env_vars.items():
-            if env_var_name in os.environ:
-                try:
-                    config_dict[field_name] = json.loads(os.environ[env_var_name])
-                except (json.JSONDecodeError, ValueError) as e:
-                    self._logger.warning("Failed to parse JSON from %s: %s", env_var_name, e)
+        return config_factory(instance_config)
