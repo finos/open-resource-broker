@@ -8,7 +8,6 @@ from fastapi.testclient import TestClient
 
 from orb.monitoring.metrics import MetricsCollector
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

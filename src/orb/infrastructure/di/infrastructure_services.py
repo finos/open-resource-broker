@@ -132,6 +132,10 @@ def _register_ami_resolver_if_enabled(_container: DIContainer) -> None:
 
 def _register_repository_services(container: DIContainer) -> None:
     """Register repository services."""
+    # Storage strategies are now registered by storage_services.py
+    # No need to register them here anymore
+    # Register repository factory with singleton EventBus injected
+    from orb.application.events.bus.event_bus import EventBus
     from orb.infrastructure.template.configuration_manager import (
         TemplateConfigurationManager,
     )
@@ -139,11 +143,6 @@ def _register_repository_services(container: DIContainer) -> None:
         create_template_repository_impl,
     )
     from orb.infrastructure.utilities.factories.repository_factory import RepositoryFactory
-
-    # Storage strategies are now registered by storage_services.py
-    # No need to register them here anymore
-    # Register repository factory with singleton EventBus injected
-    from orb.application.events.bus.event_bus import EventBus
 
     container.register_singleton(
         RepositoryFactory,

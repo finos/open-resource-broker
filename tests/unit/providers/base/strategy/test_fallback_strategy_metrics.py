@@ -1,7 +1,8 @@
 """Unit tests for FallbackProviderStrategy metrics emission."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from orb.providers.base.strategy.fallback_strategy import (
     FallbackConfig,

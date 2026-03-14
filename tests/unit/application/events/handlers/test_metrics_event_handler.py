@@ -1,7 +1,8 @@
 """Unit tests for MetricsEventHandler."""
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from orb.application.events.handlers.metrics_event_handler import MetricsEventHandler
 from orb.domain.base.events.domain_events import (

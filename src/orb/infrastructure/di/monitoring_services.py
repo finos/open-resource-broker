@@ -4,8 +4,7 @@ import logging
 
 from orb.config.platform_dirs import get_health_location
 from orb.domain.base.ports.health_check_port import HealthCheckPort
-from orb.monitoring.health import HealthCheck
-from orb.monitoring.health import HealthCheckConfig
+from orb.monitoring.health import HealthCheck, HealthCheckConfig
 
 
 def register_monitoring_services(container) -> None:

@@ -1,9 +1,7 @@
 """Protocol and registry for provider CLI argument specifications."""
 
 import argparse
-from typing import Any
-from typing import Protocol
-from typing import runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable

@@ -10,12 +10,12 @@ from orb.infrastructure.storage.base.strategy import BaseStorageStrategy
 
 # Import components
 from orb.infrastructure.storage.components import LockManager
+from orb.infrastructure.storage.exceptions import StorageError
 from orb.providers.aws.storage.components import (
     DynamoDBClientManager,
     DynamoDBConverter,
     DynamoDBTransactionManager,
 )
-from orb.infrastructure.storage.exceptions import StorageError
 
 
 @injectable
