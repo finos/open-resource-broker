@@ -87,8 +87,10 @@ class HealthCheck:
         self.register_check("application", self._check_application_health)
 
     def register_check(self, name: str, check_func: Callable[[], HealthStatus]) -> None:
-        """Register a new health check."""
+        """Register a new health check (idempotent — first registration wins)."""
         with self._lock:
+            if name in self.checks:
+                return
             self.checks[name] = check_func
             self.status_history[name] = []
 
@@ -117,7 +119,7 @@ class HealthCheck:
     def run_all_checks(self) -> dict[str, HealthStatus]:
         """Run all registered health checks."""
         results = {}
-        for name in self.checks:
+        for name in list(self.checks):
             results[name] = self.run_check(name)
         return results
 
