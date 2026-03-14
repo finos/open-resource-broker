@@ -10,6 +10,7 @@ import pytest
 
 from orb.config.platform_dirs import (
     get_config_location,
+    get_health_location,
     get_logs_location,
     get_scripts_location,
     get_work_location,
@@ -554,3 +555,47 @@ class TestIntegration:
         assert isinstance(in_virtualenv(), bool)
         assert isinstance(is_user_install(), bool)
         assert isinstance(is_system_install(), bool)
+
+
+class TestGetHealthLocation:
+    """Test health directory location detection."""
+
+    def test_env_override_orb_health_dir(self):
+        """ORB_HEALTH_DIR takes precedence over everything."""
+        with patch.dict(os.environ, {"ORB_HEALTH_DIR": "/custom/health"}):
+            assert get_health_location() == Path("/custom/health")
+
+    def test_orb_health_dir_overrides_root_dir(self):
+        """ORB_HEALTH_DIR takes precedence even when ORB_ROOT_DIR is set."""
+        with patch.dict(
+            os.environ,
+            {"ORB_HEALTH_DIR": "/custom/health", "ORB_ROOT_DIR": "/myroot"},
+        ):
+            assert get_health_location() == Path("/custom/health")
+
+    def test_orb_root_dir_returns_work_health(self):
+        """ORB_ROOT_DIR=/myroot returns /myroot/work/health."""
+        with patch.dict(
+            os.environ, {"ORB_ROOT_DIR": "/myroot"}, clear=True
+        ):
+            assert get_health_location() == Path("/myroot/work/health")
+
+    def test_fallback_relative_to_work_location(self):
+        """Fallback uses get_work_location() / 'health'."""
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch("orb.config.platform_dirs.get_work_location") as mock_work,
+        ):
+            mock_work.return_value = Path("/base/work")
+            assert get_health_location() == Path("/base/work/health")
+
+    def test_fallback_ends_in_work_health(self):
+        """Fallback path always ends in work/health."""
+        with patch.dict(os.environ, {"ORB_CONFIG_DIR": "/some/config"}, clear=True):
+            result = get_health_location()
+            assert result.parts[-2:] == ("work", "health")
+
+    def test_returns_path_object(self):
+        """get_health_location() always returns a Path."""
+        with patch.dict(os.environ, {}, clear=True):
+            assert isinstance(get_health_location(), Path)
