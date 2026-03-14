@@ -286,6 +286,15 @@ class MetricsCollector:
         if self.trace_enabled and self._trace_buffer:
             self.flush_traces()
 
+    def to_prometheus_text(self) -> str:
+        """Serialise current metrics to Prometheus text format."""
+        metrics = self.get_metrics()
+        lines = []
+        for name, metric in metrics.items():
+            labels = ",".join(f'{k}="{v}"' for k, v in metric["labels"].items())
+            lines.append(f"{name}{{{labels}}} {metric['value']}")
+        return "\n".join(lines) + "\n" if lines else ""
+
     def flush(self) -> None:
         """Flush metrics to disk immediately."""
         try:
