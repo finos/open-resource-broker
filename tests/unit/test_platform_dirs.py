@@ -401,6 +401,36 @@ class TestGetLogsLocation:
             assert result == Path("/base/logs")
 
 
+class TestGetHealthLocation:
+    """Test health directory location detection."""
+
+    def test_orb_root_dir_returns_work_health(self):
+        """ORB_ROOT_DIR env var should produce root/work/health."""
+        with patch.dict(os.environ, {"ORB_ROOT_DIR": "/myroot"}, clear=False):
+            result = get_health_location()
+        assert result == Path("/myroot/work/health")
+
+    def test_fallback_uses_work_location(self):
+        """Without ORB_ROOT_DIR, health falls back to get_work_location()/health."""
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch("orb.config.platform_dirs.get_work_location") as mock_work,
+        ):
+            mock_work.return_value = Path("/base/work")
+            result = get_health_location()
+        assert result == Path("/base/work/health")
+
+    def test_env_override_empty_string_falls_back(self):
+        """Empty ORB_ROOT_DIR is ignored, falls back to work location."""
+        with (
+            patch.dict(os.environ, {"ORB_ROOT_DIR": ""}, clear=True),
+            patch("orb.config.platform_dirs.get_work_location") as mock_work,
+        ):
+            mock_work.return_value = Path("/base/work")
+            result = get_health_location()
+        assert result == Path("/base/work/health")
+
+
 class TestGetScriptsLocation:
     """Test scripts directory location detection."""
 
