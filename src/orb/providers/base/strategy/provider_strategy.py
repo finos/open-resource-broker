@@ -317,6 +317,14 @@ class ProviderStrategy(ABC):
         """
         return {}
 
+    def get_operational_requirements(self) -> dict:
+        """What's needed to operate after authentication (e.g. region, project).
+
+        Returns a dict of param_name -> {"required": bool, "description": str}.
+        Asked after credentials are tested successfully.
+        """
+        return {}
+
     def get_available_regions(self) -> list[tuple[str, str]]:
         """Get available regions as (region_id, display_name) tuples.
 

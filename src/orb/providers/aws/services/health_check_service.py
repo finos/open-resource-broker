@@ -88,3 +88,7 @@ class AWSHealthCheckService:
     def get_credential_requirements(self) -> dict:
         """AWS profiles are region-independent; region is collected separately."""
         return {}
+
+    def get_operational_requirements(self) -> dict:
+        """AWS requires a region to operate."""
+        return {"region": {"required": True, "description": "AWS region"}}

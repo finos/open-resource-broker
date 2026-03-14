@@ -191,9 +191,15 @@ def _interactive_setup() -> Dict[str, Any]:
         console.info("[3/4] Provider Configuration")
         console.separator(char="-", color="cyan")
 
+        # Step 1: pre-auth params (e.g. Azure tenant_id)
+        auth_requirements = _get_credential_requirements(provider_type)
         provider_config: Dict[str, Any] = {"type": provider_type}
+        for param, info in auth_requirements.items():
+            if info.get("required"):
+                prompt = f"  {info['description']}: "
+                provider_config[param] = input(prompt).strip()
 
-        # Step 1: credentials first
+        # Step 2: select credentials
         credential_sources = _get_available_credential_sources(provider_type)
 
         console.info("")
@@ -207,10 +213,10 @@ def _interactive_setup() -> Dict[str, Any]:
         except (ValueError, IndexError):
             selected_source = None
 
-        # Step 2: test credentials (region not needed yet)
+        # Step 3: test credentials (no region yet)
         console.info("")
         console.info("Testing credentials...")
-        success, error_msg = _test_provider_credentials(provider_type, selected_source)
+        success, error_msg = _test_provider_credentials(provider_type, selected_source, **provider_config)
         if success:
             console.success("Credentials verified successfully")
             if selected_source:
@@ -220,14 +226,22 @@ def _interactive_setup() -> Dict[str, Any]:
             console.error(f"        {error_msg}")
             return {}
 
-        profile = provider_config.get("profile") or None
-
-        # Step 3: ask for region
+        # Step 4: operational params (region for AWS)
+        op_requirements = _get_operational_requirements(provider_type)
         strategy = _get_provider_strategy(provider_type)
         regions = strategy.get_available_regions() if strategy is not None else []
         default_region = strategy.get_default_region() if strategy is not None else ""
-        region = _pick_region(regions, default_region)
-        provider_config["region"] = region
+        for param, info in op_requirements.items():
+            if info.get("required"):
+                if param == "region":
+                    provider_config[param] = _pick_region(regions, default_region)
+                else:
+                    prompt = f"  {info['description']}: "
+                    provider_config[param] = input(prompt).strip()
+
+        # Step 5: extract final values
+        region = provider_config.get("region") or default_region
+        profile = provider_config.get("profile") or None
 
         console.info("")
         console.separator(char="-", color="cyan")
@@ -335,9 +349,15 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
         console.info("Provider Configuration")
         console.separator(char="-", color="cyan")
 
+        # Step 1: pre-auth params (e.g. Azure tenant_id)
+        auth_requirements = _get_credential_requirements(provider_type)
         provider_config: Dict[str, Any] = {"type": provider_type}
+        for param, info in auth_requirements.items():
+            if info.get("required"):
+                prompt = f"  {info['description']}: "
+                provider_config[param] = input(prompt).strip()
 
-        # Step 1: credentials first
+        # Step 2: select credentials
         credential_sources = _get_available_credential_sources(provider_type)
 
         console.info("")
@@ -351,10 +371,10 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
         except (ValueError, IndexError):
             selected_source = None
 
-        # Step 2: test credentials (region not needed yet)
+        # Step 3: test credentials (no region yet)
         console.info("")
         console.info("Testing credentials...")
-        success, error_msg = _test_provider_credentials(provider_type, selected_source)
+        success, error_msg = _test_provider_credentials(provider_type, selected_source, **provider_config)
         if success:
             console.success("Credentials verified successfully")
             if selected_source:
@@ -363,13 +383,21 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
             console.error(f"Authentication failed: {error_msg}")
             return None
 
-        # Step 3: ask for region
+        # Step 4: operational params (region for AWS)
+        op_requirements = _get_operational_requirements(provider_type)
         strategy = _get_provider_strategy(provider_type)
         regions = strategy.get_available_regions() if strategy is not None else []
         default_region = strategy.get_default_region() if strategy is not None else ""
-        region = _pick_region(regions, default_region)
-        provider_config["region"] = region
+        for param, info in op_requirements.items():
+            if info.get("required"):
+                if param == "region":
+                    provider_config[param] = _pick_region(regions, default_region)
+                else:
+                    prompt = f"  {info['description']}: "
+                    provider_config[param] = input(prompt).strip()
 
+        # Step 5: extract final values
+        region = provider_config.get("region") or default_region
         profile = provider_config.get("profile") or None
 
         # Infrastructure discovery
@@ -479,6 +507,17 @@ def _get_credential_requirements(provider_type: str) -> dict:
             return strategy.get_credential_requirements()
         except Exception as e:
             logger.debug("Could not get provider auth config requirements from strategy: %s", e)
+    return {}
+
+
+def _get_operational_requirements(provider_type: str) -> dict:
+    """Get operational requirements for provider via strategy."""
+    strategy = _get_provider_strategy(provider_type)
+    if strategy is not None:
+        try:
+            return strategy.get_operational_requirements()
+        except Exception as e:
+            logger.debug("Could not get provider operational requirements from strategy: %s", e)
     return {}
 
 

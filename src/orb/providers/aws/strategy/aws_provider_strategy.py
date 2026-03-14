@@ -486,6 +486,10 @@ class AWSProviderStrategy(ProviderStrategy):
         """AWS requires region."""
         return self._get_health_service().get_credential_requirements()
 
+    def get_operational_requirements(self) -> dict:
+        """Get operational requirements for AWS."""
+        return self._get_health_service().get_operational_requirements()
+
     def get_available_regions(self) -> list[tuple[str, str]]:
         """Get common AWS regions as (region_id, display_name) tuples."""
         return [
