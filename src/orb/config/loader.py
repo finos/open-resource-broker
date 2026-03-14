@@ -147,24 +147,13 @@ class ConfigurationLoader:
         get_config_logger().debug("Loading default configuration")
 
         try:
-            # Use platform_dirs to get the correct config location
-            from orb.config.platform_dirs import get_config_location
+            import json
+            from importlib.resources import files
 
-            config_location = get_config_location()
-            default_config_path = config_location / cls.DEFAULT_CONFIG_FILENAME
-
-            if default_config_path.exists():
-                with open(default_config_path) as f:
-                    import json
-
-                    config_data = json.load(f)
-                    get_config_logger().info(
-                        "Loaded default configuration from %s", default_config_path
-                    )
-                    return config_data
-            else:
-                get_config_logger().warning(f"Default config not found: {default_config_path}")
-                return {}
+            text = files("orb.config").joinpath(cls.DEFAULT_CONFIG_FILENAME).read_text(encoding="utf-8")
+            config_data = json.loads(text)
+            get_config_logger().info("Loaded default configuration from package data")
+            return config_data
         except Exception as e:
             get_config_logger().warning(f"Failed to load default configuration: {e}")
             return {}
