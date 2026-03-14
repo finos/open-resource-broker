@@ -20,7 +20,9 @@ def _make_strategy(provider_type: str, success: bool) -> MagicMock:
     strategy = MagicMock()
     strategy.provider_type = provider_type
     strategy.is_initialized = True
-    result = ProviderResult.success_result({}) if success else ProviderResult.error_result("fail", "ERR")
+    result = (
+        ProviderResult.success_result({}) if success else ProviderResult.error_result("fail", "ERR")
+    )
     strategy.execute_operation = AsyncMock(return_value=result)
     return strategy
 
@@ -46,6 +48,7 @@ def _make_fallback_strategy(primary, fallbacks, metrics=None, mode=FallbackMode.
 # ---------------------------------------------------------------------------
 # provider_fallback_total
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_fallback_increments_provider_fallback_total():
@@ -91,6 +94,7 @@ async def test_no_metrics_injected_does_not_raise():
 # ---------------------------------------------------------------------------
 # circuit_breaker_opened_total / circuit_breaker_closed_total
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_circuit_breaker_opened_metric_emitted():

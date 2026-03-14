@@ -120,7 +120,9 @@ class TestMetricsEndpoint:
 
     def test_container_exception_returns_empty_body(self):
         app = _make_app()
-        with patch("orb.infrastructure.di.container.get_container", side_effect=RuntimeError("boom")):
+        with patch(
+            "orb.infrastructure.di.container.get_container", side_effect=RuntimeError("boom")
+        ):
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.get("/metrics")
         assert resp.status_code == 200

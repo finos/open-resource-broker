@@ -177,9 +177,7 @@ class Machine(AggregateRoot):
                     private_ip=str(updated_machine.private_ip)
                     if updated_machine.private_ip
                     else None,
-                    public_ip=str(updated_machine.public_ip)
-                    if updated_machine.public_ip
-                    else None,
+                    public_ip=str(updated_machine.public_ip) if updated_machine.public_ip else None,
                     provisioning_time=now,
                 )
                 updated_machine.add_domain_event(provisioned_event)
