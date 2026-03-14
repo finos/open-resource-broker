@@ -39,7 +39,10 @@ from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from orb.infrastructure.error.decorators import handle_infrastructure_exceptions
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from orb.providers.aws.exceptions.aws_exceptions import AWSConfigurationError, AWSInfrastructureError
+from orb.providers.aws.exceptions.aws_exceptions import (
+    AWSConfigurationError,
+    AWSInfrastructureError,
+)
 from orb.providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.infrastructure.handlers.asg.capacity_manager import ASGCapacityManager

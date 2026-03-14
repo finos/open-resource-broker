@@ -3,6 +3,7 @@
 import json
 import warnings
 
+
 class TestStorageDeprecationWarning:
     def test_old_format_emits_deprecation_warning(self, tmp_path):
         """Loading a config with storage.dynamodb_strategy emits DeprecationWarning."""
@@ -99,7 +100,11 @@ class TestStorageDeprecationWarning:
         config = {
             "storage": {
                 "strategy": "json",
-                "dynamodb_strategy": {"region": "us-east-1", "profile": "default", "table_prefix": "hf"},
+                "dynamodb_strategy": {
+                    "region": "us-east-1",
+                    "profile": "default",
+                    "table_prefix": "hf",
+                },
             }
         }
         config_file = tmp_path / "config.json"

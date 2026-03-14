@@ -80,9 +80,7 @@ def test_create_dynamodb_strategy_dict_path():
 
 
 def test_create_dynamodb_unit_of_work_uses_typed_config():
-    dynamodb_cfg = DynamodbStrategyConfig(
-        region="eu-west-1", profile="prod", table_prefix="myapp"
-    )
+    dynamodb_cfg = DynamodbStrategyConfig(region="eu-west-1", profile="prod", table_prefix="myapp")
     aws_cfg = AWSProviderConfig(  # type: ignore[call-arg]
         region="us-east-1",
         storage=AWSStorageConfig(dynamodb=dynamodb_cfg),  # type: ignore[call-arg]

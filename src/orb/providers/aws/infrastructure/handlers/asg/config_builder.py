@@ -221,7 +221,9 @@ class ASGConfigBuilder(BaseConfigBuilder):
     def _prepare_template_context(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
         """Build the template rendering context for native-spec processing."""
         if self._config_port is None:
-            raise AWSConfigurationError("config_port must be injected before calling _prepare_template_context")
+            raise AWSConfigurationError(
+                "config_port must be injected before calling _prepare_template_context"
+            )
 
         capacity = self._calculate_capacity_distribution(template, request.requested_count)
         on_demand_count = capacity["on_demand_count"]

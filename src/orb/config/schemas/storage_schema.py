@@ -79,7 +79,6 @@ class SqlStrategyConfig(BaseModel):
         return self
 
 
-
 class BackoffConfig(BaseModel):
     """Backoff strategy configuration."""
 

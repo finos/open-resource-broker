@@ -210,11 +210,15 @@ def create_aurora_strategy(config: Any) -> Any:
     if isinstance(config, ConfigurationManager):
         aws_cfg = config.get_typed(AWSProviderConfig)
         if aws_cfg.storage.aurora is None:
-            raise StorageError("Aurora storage selected but no aurora config found in provider config")
+            raise StorageError(
+                "Aurora storage selected but no aurora config found in provider config"
+            )
         sql_config = aws_cfg.storage.aurora
         connection_string = _build_aurora_connection_string(sql_config)
     else:
-        connection_string = getattr(config, "connection_string", None) or "mysql+pymysql://localhost/orb"
+        connection_string = (
+            getattr(config, "connection_string", None) or "mysql+pymysql://localhost/orb"
+        )
 
     return SQLStorageStrategy(
         config={"connection_string": connection_string},
@@ -257,7 +261,9 @@ def create_aurora_unit_of_work(config: Any) -> Any:
 
         aws_cfg = config.get_typed(AWSProviderConfig)
         if aws_cfg.storage.aurora is None:
-            raise StorageError("Aurora storage selected but no aurora config found in provider config")
+            raise StorageError(
+                "Aurora storage selected but no aurora config found in provider config"
+            )
         aurora_cfg = aws_cfg.storage.aurora
         connection_string = _build_aurora_connection_string(aurora_cfg)
         engine = create_engine(

@@ -202,7 +202,9 @@ class EC2FleetConfigBuilder(BaseConfigBuilder):
     def _prepare_template_context(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
         """Build the context dict used by the native spec renderer."""
         if self._config_port is None:
-            raise AWSConfigurationError("config_port must be injected before calling _prepare_template_context")
+            raise AWSConfigurationError(
+                "config_port must be injected before calling _prepare_template_context"
+            )
 
         instance_overrides = []
         if template.machine_types and template.subnet_ids:

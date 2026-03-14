@@ -160,9 +160,7 @@ class HealthCheck(HealthCheckPort):
             """Run health checks periodically in background thread."""
             while True:
                 try:
-                    results = {
-                        name: self._run_check_internal(name) for name in self.checks
-                    }
+                    results = {name: self._run_check_internal(name) for name in self.checks}
 
                     # Write results to file
                     health_file = self.health_dir / "health.json"
@@ -305,7 +303,10 @@ class HealthCheck(HealthCheckPort):
             }
 
             status_counts: dict[str, int] = {
-                "healthy": 0, "degraded": 0, "unhealthy": 0, "unknown": 0
+                "healthy": 0,
+                "degraded": 0,
+                "unhealthy": 0,
+                "unknown": 0,
             }
             for result in results.values():
                 status_counts[result.status] = status_counts.get(result.status, 0) + 1

@@ -69,7 +69,13 @@ class TestHandleProviderAdd:
             "orb.interface.provider_config_handler.get_config_location",
             return_value=tmp_path,
         ):
-            args = _ns(provider_type="aws", aws_profile="default", aws_region="us-east-1", name=None, discover=False)
+            args = _ns(
+                provider_type="aws",
+                aws_profile="default",
+                aws_region="us-east-1",
+                name=None,
+                discover=False,
+            )
             result = await handle_provider_add(args)
 
         assert result == 1
@@ -84,7 +90,13 @@ class TestHandleProviderAdd:
             "orb.interface.provider_config_handler.get_config_location",
             return_value=tmp_path,
         ):
-            args = _ns(provider_type="aws", aws_profile=None, aws_region="us-east-1", name=None, discover=False)
+            args = _ns(
+                provider_type="aws",
+                aws_profile=None,
+                aws_region="us-east-1",
+                name=None,
+                discover=False,
+            )
             result = await handle_provider_add(args)
 
         assert result == 1
@@ -99,7 +111,13 @@ class TestHandleProviderAdd:
             "orb.interface.provider_config_handler.get_config_location",
             return_value=tmp_path,
         ):
-            args = _ns(provider_type="aws", aws_profile="default", aws_region=None, name=None, discover=False)
+            args = _ns(
+                provider_type="aws",
+                aws_profile="default",
+                aws_region=None,
+                name=None,
+                discover=False,
+            )
             result = await handle_provider_add(args)
 
         assert result == 1

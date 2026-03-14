@@ -62,9 +62,7 @@ class TestFieldMappingIntegration:
         single_subnet = HostFactoryTransformations.transform_subnet_id("subnet-123")
         assert single_subnet == ["subnet-123"]
 
-        list_subnets = HostFactoryTransformations.transform_subnet_id(
-            ["subnet-123", "subnet-456"]
-        )
+        list_subnets = HostFactoryTransformations.transform_subnet_id(["subnet-123", "subnet-456"])
         assert list_subnets == ["subnet-123", "subnet-456"]
 
         # Test instance tags transformation

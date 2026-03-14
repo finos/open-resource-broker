@@ -39,7 +39,10 @@ from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from orb.infrastructure.error.decorators import handle_infrastructure_exceptions
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from orb.providers.aws.exceptions.aws_exceptions import AWSConfigurationError, AWSInfrastructureError
+from orb.providers.aws.exceptions.aws_exceptions import (
+    AWSConfigurationError,
+    AWSInfrastructureError,
+)
 from orb.providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.infrastructure.handlers.base_handler import AWSHandler
@@ -226,7 +229,9 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
         """Prepare RunInstances-specific context."""
 
         if self.config_port is None:
-            raise AWSConfigurationError("config_port must be injected before calling _prepare_runinstances_specific_context")
+            raise AWSConfigurationError(
+                "config_port must be injected before calling _prepare_runinstances_specific_context"
+            )
         return {
             # RunInstances-specific values
             "instance_name": f"{self.config_port.get_resource_prefix('instance')}{request.request_id}",
@@ -355,7 +360,9 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
 
         # Add additional tags for instances (beyond launch template)
         if self.config_port is None:
-            raise AWSConfigurationError("config_port must be injected before calling _build_run_instances_params")
+            raise AWSConfigurationError(
+                "config_port must be injected before calling _build_run_instances_params"
+            )
         instance_tags = merge_tags(
             [
                 {

@@ -703,7 +703,9 @@ class AWSHandler(ABC):
             Merged list of {"Key": k, "Value": v} dicts ready for AWS API calls.
         """
         if self.config_port is None:
-            raise AWSConfigurationError("config_port must be injected before calling _build_resource_tags")
+            raise AWSConfigurationError(
+                "config_port must be injected before calling _build_resource_tags"
+            )
         return build_resource_tags(
             config_port=self.config_port,
             request_id=request_id,

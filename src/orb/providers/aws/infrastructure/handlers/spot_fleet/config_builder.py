@@ -121,7 +121,9 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
         capacity = self._calculate_capacity_distribution(template, requested_count)
 
         if self._config_port is None:
-            raise AWSConfigurationError("config_port must be injected before calling _prepare_template_context")
+            raise AWSConfigurationError(
+                "config_port must be injected before calling _prepare_template_context"
+            )
         fleet_name = f"{self._config_port.get_resource_prefix('spot_fleet')}{request.request_id}"
 
         instance_overrides: list[dict[str, Any]] = []

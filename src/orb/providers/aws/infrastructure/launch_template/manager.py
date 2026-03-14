@@ -116,7 +116,9 @@ class AWSLaunchTemplateManager:
 
         # Get the launch template name
         if self.config_port is None:
-            raise AWSConfigurationError("config_port must be injected before calling _create_per_request_version")
+            raise AWSConfigurationError(
+                "config_port must be injected before calling _create_per_request_version"
+            )
         launch_template_name = (
             f"{self.config_port.get_resource_prefix('launch_template')}"
             f"{request.request_id}-{aws_template.template_id}"
@@ -282,7 +284,9 @@ class AWSLaunchTemplateManager:
 
         # Get instance name
         if self.config_port is None:
-            raise AWSConfigurationError("config_port must be injected before calling _prepare_template_context")
+            raise AWSConfigurationError(
+                "config_port must be injected before calling _prepare_template_context"
+            )
         instance_name = f"{self.config_port.get_resource_prefix('instance')}{request.request_id}"
 
         return {
@@ -530,7 +534,9 @@ class AWSLaunchTemplateManager:
         """
         # Get instance name
         if self.config_port is None:
-            raise AWSConfigurationError("config_port must be injected before calling _create_instance_tags")
+            raise AWSConfigurationError(
+                "config_port must be injected before calling _create_instance_tags"
+            )
         instance_name = f"{self.config_port.get_resource_prefix('instance')}{request.request_id}"
 
         user_tags: list[dict[str, str]] = [{"Key": "Name", "Value": instance_name}]
@@ -560,7 +566,9 @@ class AWSLaunchTemplateManager:
             List of tag dictionaries
         """
         if self.config_port is None:
-            raise AWSConfigurationError("config_port must be injected before calling _create_launch_template_tags")
+            raise AWSConfigurationError(
+                "config_port must be injected before calling _create_launch_template_tags"
+            )
         template_name = (
             f"{self.config_port.get_resource_prefix('launch_template')}"
             f"{request.request_id}-{aws_template.template_id}"
