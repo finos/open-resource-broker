@@ -8,6 +8,7 @@ from orb.config.platform_dirs import (
     get_config_location,
     get_health_location,
     get_logs_location,
+    get_root_location,
     get_scripts_location,
     get_work_location,
 )
@@ -142,3 +143,15 @@ def test_health_no_env_vars_returns_health_suffix(monkeypatch: pytest.MonkeyPatc
     result = get_health_location()
     # Must end with 'health' regardless of platform detection
     assert result.name == "health"
+
+
+def test_root_orb_root_dir(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ORB_ROOT_DIR", "/root")
+    monkeypatch.delenv("ORB_CONFIG_DIR", raising=False)
+    assert get_root_location() == Path("/root")
+
+
+def test_root_config_dir_infers_root(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ORB_ROOT_DIR", raising=False)
+    monkeypatch.setenv("ORB_CONFIG_DIR", "/some/config")
+    assert get_root_location() == Path("/some")

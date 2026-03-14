@@ -12,6 +12,7 @@ from orb.config.platform_dirs import (
     get_config_location,
     get_health_location,
     get_logs_location,
+    get_root_location,
     get_scripts_location,
     get_work_location,
     in_virtualenv,
@@ -347,12 +348,12 @@ class TestGetWorkLocation:
             assert result == Path("/custom/work")
 
     def test_relative_to_config(self):
-        """Test work location relative to config location."""
+        """Test work location relative to root location."""
         with (
             patch.dict(os.environ, {}, clear=True),
-            patch("orb.config.platform_dirs.get_config_location") as mock_config,
+            patch("orb.config.platform_dirs.get_root_location") as mock_root,
         ):
-            mock_config.return_value = Path("/base/config")
+            mock_root.return_value = Path("/base")
 
             result = get_work_location()
             assert result == Path("/base/work")
@@ -361,9 +362,9 @@ class TestGetWorkLocation:
         """Test empty ORB_WORK_DIR is ignored."""
         with (
             patch.dict(os.environ, {"ORB_WORK_DIR": ""}, clear=True),
-            patch("orb.config.platform_dirs.get_config_location") as mock_config,
+            patch("orb.config.platform_dirs.get_root_location") as mock_root,
         ):
-            mock_config.return_value = Path("/base/config")
+            mock_root.return_value = Path("/base")
 
             result = get_work_location()
             assert result == Path("/base/work")
@@ -379,12 +380,12 @@ class TestGetLogsLocation:
             assert result == Path("/custom/logs")
 
     def test_relative_to_config(self):
-        """Test logs location relative to config location."""
+        """Test logs location relative to root location."""
         with (
             patch.dict(os.environ, {}, clear=True),
-            patch("orb.config.platform_dirs.get_config_location") as mock_config,
+            patch("orb.config.platform_dirs.get_root_location") as mock_root,
         ):
-            mock_config.return_value = Path("/base/config")
+            mock_root.return_value = Path("/base")
 
             result = get_logs_location()
             assert result == Path("/base/logs")
@@ -393,9 +394,9 @@ class TestGetLogsLocation:
         """Test empty ORB_LOG_DIR is ignored."""
         with (
             patch.dict(os.environ, {"ORB_LOG_DIR": ""}, clear=True),
-            patch("orb.config.platform_dirs.get_config_location") as mock_config,
+            patch("orb.config.platform_dirs.get_root_location") as mock_root,
         ):
-            mock_config.return_value = Path("/base/config")
+            mock_root.return_value = Path("/base")
 
             result = get_logs_location()
             assert result == Path("/base/logs")
@@ -435,9 +436,12 @@ class TestGetScriptsLocation:
     """Test scripts directory location detection."""
 
     def test_relative_to_config(self):
-        """Test scripts location relative to config location."""
-        with patch("orb.config.platform_dirs.get_config_location") as mock_config:
-            mock_config.return_value = Path("/base/config")
+        """Test scripts location relative to root location."""
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch("orb.config.platform_dirs.get_root_location") as mock_root,
+        ):
+            mock_root.return_value = Path("/base")
 
             result = get_scripts_location()
             assert result == Path("/base/scripts")
@@ -627,3 +631,46 @@ class TestGetHealthLocation:
         """get_health_location() always returns a Path."""
         with patch.dict(os.environ, {}, clear=True):
             assert isinstance(get_health_location(), Path)
+
+
+class TestGetRootLocation:
+    """Test get_root_location() priority order."""
+
+    def test_orb_root_dir_env_var(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """ORB_ROOT_DIR=/myroot → get_root_location() == Path('/myroot')."""
+        monkeypatch.setenv("ORB_ROOT_DIR", "/myroot")
+        monkeypatch.delenv("ORB_CONFIG_DIR", raising=False)
+        assert get_root_location() == Path("/myroot")
+
+    def test_config_dir_infers_root(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """ORB_CONFIG_DIR=/some/config, no ORB_ROOT_DIR → root is /some."""
+        monkeypatch.delenv("ORB_ROOT_DIR", raising=False)
+        monkeypatch.setenv("ORB_CONFIG_DIR", "/some/config")
+        assert get_root_location() == Path("/some")
+
+    def test_root_dir_wins_over_config_dir(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Both set → ORB_ROOT_DIR takes precedence."""
+        monkeypatch.setenv("ORB_ROOT_DIR", "/myroot")
+        monkeypatch.setenv("ORB_CONFIG_DIR", "/some/config")
+        assert get_root_location() == Path("/myroot")
+
+    def test_all_siblings_derive_from_root(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Only ORB_ROOT_DIR set → all five functions return paths under it."""
+        monkeypatch.setenv("ORB_ROOT_DIR", "/myroot")
+        monkeypatch.delenv("ORB_CONFIG_DIR", raising=False)
+        monkeypatch.delenv("ORB_WORK_DIR", raising=False)
+        monkeypatch.delenv("ORB_LOG_DIR", raising=False)
+        monkeypatch.delenv("ORB_SCRIPTS_DIR", raising=False)
+        monkeypatch.delenv("ORB_HEALTH_DIR", raising=False)
+        assert get_config_location() == Path("/myroot/config")
+        assert get_work_location() == Path("/myroot/work")
+        assert get_logs_location() == Path("/myroot/logs")
+        assert get_scripts_location() == Path("/myroot/scripts")
+        assert get_health_location() == Path("/myroot/work/health")
+
+    def test_platform_fallback_returns_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """No env vars → returns a Path without raising."""
+        monkeypatch.delenv("ORB_ROOT_DIR", raising=False)
+        monkeypatch.delenv("ORB_CONFIG_DIR", raising=False)
+        result = get_root_location()
+        assert isinstance(result, Path)

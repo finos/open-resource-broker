@@ -150,9 +150,9 @@ def get_scripts_location() -> Path:
         except Exception:
             pass  # Best-effort: DI container may not be ready during installation detection
 
-        from orb.config.platform_dirs import get_config_location
+        from orb.config.platform_dirs import get_root_location
 
-        return get_config_location().parent / "scripts"
+        return get_root_location() / "scripts"
 
     elif mode == "editable":
         from orb._package import PACKAGE_ROOT
