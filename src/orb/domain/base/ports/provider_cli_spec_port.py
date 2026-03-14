@@ -10,27 +10,27 @@ class ProviderCLISpecPort(Protocol):
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         """Add provider-specific arguments to the given parser."""
-        ...
+        pass
 
-    def extract_config(self, args: argparse.Namespace) -> dict[str, Any]:
+    def extract_config(self, args: argparse.Namespace) -> dict[str, Any]:  # type: ignore[return]
         """Extract a full provider config dict from parsed args (add path)."""
-        ...
+        pass
 
-    def extract_partial_config(self, args: argparse.Namespace) -> dict[str, Any]:
+    def extract_partial_config(self, args: argparse.Namespace) -> dict[str, Any]:  # type: ignore[return]
         """Extract only the fields that were explicitly provided (update path)."""
-        ...
+        pass
 
-    def validate_add(self, args: argparse.Namespace) -> list[str]:
+    def validate_add(self, args: argparse.Namespace) -> list[str]:  # type: ignore[return]
         """Validate args for the add command. Returns list of error messages; empty = valid."""
-        ...
+        pass
 
-    def generate_name(self, args: argparse.Namespace) -> str:
+    def generate_name(self, args: argparse.Namespace) -> str:  # type: ignore[return]
         """Generate a provider instance name from parsed args."""
-        ...
+        pass
 
-    def format_display(self, config: dict[str, Any]) -> list[tuple[str, str]]:
+    def format_display(self, config: dict[str, Any]) -> list[tuple[str, str]]:  # type: ignore[return]
         """Return a list of (label, value) pairs for display."""
-        ...
+        pass
 
 
 class CLISpecRegistry:

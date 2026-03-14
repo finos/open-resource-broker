@@ -1,8 +1,11 @@
 """AWS-specific CLI argument specification."""
 
 import argparse
+import logging
 import re
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class AWSCLISpec:
@@ -52,7 +55,8 @@ class AWSCLISpec:
             if strategy is not None:
                 return strategy.generate_provider_name({"profile": profile, "region": region})
         except Exception:
-            pass
+            # Registry lookup failed (e.g. container not initialised) — fall back to static name
+            logger.debug("Failed to generate name via registry; using fallback", exc_info=True)
         sanitized_profile = re.sub(r"[^a-zA-Z0-9\-_]", "-", profile)
         return f"aws_{sanitized_profile}_{region}"
 
