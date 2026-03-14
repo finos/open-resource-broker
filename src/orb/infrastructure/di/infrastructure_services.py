@@ -1,5 +1,6 @@
 """Infrastructure service registrations for dependency injection."""
 
+from orb.config.managers.configuration_manager import ConfigurationManager
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.machine.repository import MachineRepository
@@ -141,8 +142,17 @@ def _register_repository_services(container: DIContainer) -> None:
 
     # Storage strategies are now registered by storage_services.py
     # No need to register them here anymore
-    # Register repository factory
-    container.register_singleton(RepositoryFactory)
+    # Register repository factory with singleton EventBus injected
+    from orb.application.events.bus.event_bus import EventBus
+
+    container.register_singleton(
+        RepositoryFactory,
+        lambda c: RepositoryFactory(
+            config_manager=c.get(ConfigurationManager),
+            logger=c.get(LoggingPort),
+            event_bus=c.get_optional(EventBus),
+        ),
+    )
 
     # Register repositories
     container.register_singleton(

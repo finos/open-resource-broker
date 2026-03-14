@@ -57,6 +57,11 @@ def register_core_services(container: DIContainer) -> None:
     # Register provider strategy
     container.register_factory(ProviderPort, lambda c: _create_provider_strategy(c))
 
+    # Register EventBus as singleton so all repositories and subscribers share one instance
+    from orb.application.events.bus.event_bus import EventBus
+
+    container.register_singleton(EventBus, lambda c: EventBus(logger=c.get(LoggingPort)))
+
     # Register event publisher
     from orb.infrastructure.events.publisher import ConfigurableEventPublisher
 
