@@ -131,6 +131,24 @@ class MetricsCollector:
             self.metrics[name] = gauge
             return gauge
 
+    def increment(self, name: str, labels: Optional[dict[str, str]] = None) -> None:
+        """Increment a counter by 1, creating it with the given labels if needed.
+
+        Each unique (name, labels) combination is tracked as a separate counter,
+        keyed by a composite string so label-differentiated counters don't collide.
+        """
+        effective_labels = labels or {}
+        # Build a stable composite key so label order doesn't matter
+        label_suffix = ",".join(f"{k}={v}" for k, v in sorted(effective_labels.items()))
+        key = f"{name}{{{label_suffix}}}" if label_suffix else name
+        with self._lock:
+            if key not in self.metrics:
+                counter = Counter(name, 0.0, labels=effective_labels)
+                self.metrics[key] = counter
+            metric = self.metrics[key]
+            if isinstance(metric, Counter):
+                metric.increment()
+
     def increment_counter(self, name: str, value: float = 1.0) -> None:
         """Increment a counter metric."""
         with self._lock:
