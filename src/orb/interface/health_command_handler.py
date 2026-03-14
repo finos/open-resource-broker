@@ -5,6 +5,7 @@ from typing import Any, cast
 
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.console_port import ConsolePort
+from orb.domain.base.ports.health_check_port import HealthCheckPort
 from orb.domain.base.ports.scheduler_port import SchedulerPort
 from orb.infrastructure.di.container import get_container
 
@@ -21,6 +22,29 @@ def handle_health_check(args) -> int:
         config_port = container.get(ConfigurationPort)
 
         checks = []
+
+        # 0. System/disk/database/application checks via HealthCheckPort
+        try:
+            health_port = container.get(HealthCheckPort)
+            hc_results = health_port.run_all_checks()
+            for name, result in hc_results.items():
+                hc_status = result.get("status", "unknown")
+                # Map HealthCheck statuses to CLI check statuses
+                if hc_status == "healthy":
+                    cli_status = "pass"
+                elif hc_status == "unknown":
+                    cli_status = "warn"
+                else:
+                    cli_status = "fail"
+                checks.append(
+                    {
+                        "name": name,
+                        "status": cli_status,
+                        "details": result.get("details", {}),
+                    }
+                )
+        except Exception as e:
+            checks.append({"name": "health_monitor", "status": "warn", "error": str(e)})
 
         # 1. Config file check
         config_path = config_port.get_config_file_path() or "./config/config.json"

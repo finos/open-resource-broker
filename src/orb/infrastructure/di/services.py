@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 from orb.infrastructure.di.core_services import register_core_services
 from orb.infrastructure.di.domain_services import register_domain_services
 from orb.infrastructure.di.infrastructure_services import register_infrastructure_services
+from orb.infrastructure.di.monitoring_services import register_monitoring_services
 from orb.infrastructure.di.provider_services import register_provider_services
 from orb.infrastructure.di.scheduler_services import register_scheduler_services
 from orb.infrastructure.di.server_services import register_server_services
@@ -146,6 +147,9 @@ def _register_services_lazy(container: "DIContainer") -> "DIContainer":
     # 9. Register infrastructure services immediately (needed for template system)
     register_infrastructure_services(container)
 
+    # 9a. Register monitoring services (cross-cutting concern, not provider-specific)
+    register_monitoring_services(container)
+
     # 10. Setup CQRS infrastructure (handlers must be registered before buses are used)
     setup_cqrs_infrastructure(container)
 
@@ -179,6 +183,7 @@ def _register_services_eager(container: "DIContainer") -> "DIContainer":
     setup_cqrs_infrastructure(container)
     register_provider_services(container)
     register_infrastructure_services(container)
+    register_monitoring_services(container)
     register_server_services(container)
 
     return container

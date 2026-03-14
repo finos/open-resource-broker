@@ -162,13 +162,19 @@ def create_fastapi_app(server_config: Any) -> Any:
 
     # Add health check endpoint
     @app.get("/health", tags=["System"])
-    async def health_check() -> dict[str, Any]:
+    async def health_check() -> Any:
         """Health check endpoint."""
-        return {
-            "status": "healthy",
-            "service": "open-resource-broker",
-            "version": __version__,
-        }
+        from orb.domain.base.ports.health_check_port import HealthCheckPort
+        from orb.infrastructure.di.container import get_container
+
+        try:
+            health_port = get_container().get(HealthCheckPort)
+            status = health_port.get_status()
+        except Exception:
+            status = {"status": "unknown"}
+
+        http_status = 503 if status.get("status") == "unhealthy" else 200
+        return JSONResponse(content=status, status_code=http_status)  # type: ignore[misc]
 
     # Add info endpoint
     @app.get("/info", tags=["System"])
