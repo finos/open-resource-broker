@@ -4,10 +4,6 @@ import argparse
 import re
 from typing import Any
 
-from orb.infrastructure.logging.logger import get_logger
-
-logger = get_logger(__name__)
-
 
 class AWSCLISpec:
     """CLI spec for the AWS provider."""
@@ -46,18 +42,6 @@ class AWSCLISpec:
         """Generate a provider instance name from AWS profile and region."""
         profile = getattr(args, "aws_profile", None) or ""
         region = getattr(args, "aws_region", None) or ""
-        try:
-            from orb.application.services.provider_registry_service import ProviderRegistryService
-            from orb.infrastructure.di.container import get_container
-
-            registry_service = get_container().get(ProviderRegistryService)
-            temp_config = {"type": "aws", "profile": profile, "region": region}
-            strategy = registry_service.get_or_create_strategy("aws", temp_config)
-            if strategy is not None:
-                return strategy.generate_provider_name({"profile": profile, "region": region})
-        except Exception:
-            # Registry lookup failed (e.g. container not initialised) — fall back to static name
-            logger.debug("Failed to generate name via registry; using fallback", exc_info=True)
         sanitized_profile = re.sub(r"[^a-zA-Z0-9\-_]", "-", profile)
         return f"aws_{sanitized_profile}_{region}"
 
