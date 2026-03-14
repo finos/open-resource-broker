@@ -136,3 +136,10 @@ def get_health_location() -> Path:
     if env_dir := os.environ.get("ORB_HEALTH_DIR"):
         return Path(env_dir)
     return get_work_location() / "health"
+
+
+def get_cache_location() -> Path:
+    """Get cache directory location."""
+    if env_dir := os.environ.get("ORB_CACHE_DIR"):
+        return Path(env_dir)
+    return get_work_location() / ".cache"

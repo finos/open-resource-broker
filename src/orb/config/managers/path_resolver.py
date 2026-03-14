@@ -4,6 +4,7 @@ import os
 from typing import Optional
 
 from orb.config.platform_dirs import (
+    get_cache_location,
     get_config_location,
     get_health_location,
     get_logs_location,
@@ -19,6 +20,7 @@ _PLATFORM_DIRS_ROUTING: dict[str, object] = {
     "log": get_logs_location,
     "logs": get_logs_location,
     "health": get_health_location,
+    "cache": get_cache_location,
 }
 
 
@@ -137,7 +139,7 @@ class ConfigPathResolver:
         self, default_path: Optional[str] = None, config_path: Optional[str] = None
     ) -> str:
         """Get cache directory path."""
-        default = default_path or os.path.join("work", ".cache")
+        default = default_path or str(get_cache_location())
         return self.resolve_path("cache", default, config_path)
 
     def get_snapshots_dir(
