@@ -249,30 +249,23 @@ class AutoRefreshTemplateCacheService(TTLTemplateCacheService):
                     if hasattr(result, "__await__"):
                         # Run async function in new event loop for background refresh
                         try:
-                            loop = asyncio.get_event_loop()
-                            if loop.is_running():
-                                # Create new thread for async operation if loop is running
-                                import threading
+                            asyncio.get_running_loop()
+                            # Loop is running — spin up a new thread with its own event loop
+                            import threading
 
-                                def async_refresh():
-                                    new_loop = asyncio.new_event_loop()
-                                    asyncio.set_event_loop(new_loop)
-                                    try:
-                                        templates = new_loop.run_until_complete(result)  # type: ignore[arg-type]
-                                        with self._lock:
-                                            self._cached_templates = templates
-                                            self._cache_time = datetime.now()
-                                    finally:
-                                        new_loop.close()
+                            def async_refresh():
+                                new_loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(new_loop)
+                                try:
+                                    templates = new_loop.run_until_complete(result)  # type: ignore[arg-type]
+                                    with self._lock:
+                                        self._cached_templates = templates
+                                        self._cache_time = datetime.now()
+                                finally:
+                                    new_loop.close()
 
-                                threading.Thread(target=async_refresh, daemon=True).start()
-                            else:
-                                templates = loop.run_until_complete(result)  # type: ignore[arg-type]
-                                with self._lock:
-                                    self._cached_templates = templates
-                                    self._cache_time = datetime.now()
+                            threading.Thread(target=async_refresh, daemon=True).start()
                         except RuntimeError:
-                            # No event loop, create one
                             templates = asyncio.run(result)  # type: ignore[arg-type]
                             with self._lock:
                                 self._cached_templates = templates

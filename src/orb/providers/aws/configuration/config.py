@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from orb.infrastructure.interfaces.provider import BaseProviderConfig
 from orb.providers.aws.domain.template.value_objects import ProviderApi
+from orb.providers.aws.storage.config import AWSStorageConfig
 
 
 class HandlerCapabilityConfig(BaseModel):
@@ -133,6 +134,12 @@ class AWSProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         default_factory=lambda: LaunchTemplateConfiguration()  # type: ignore[call-arg]
     )
 
+    # AWS storage backend configuration
+    storage: AWSStorageConfig = Field(
+        default_factory=lambda: AWSStorageConfig(),  # type: ignore[call-arg]
+        description="AWS storage backend configuration",
+    )
+
     # Symphony/Legacy configuration fields
     credential_file: Optional[str] = Field(None, description="Path to AWS credentials file")
     key_file: Optional[str] = Field(None, description="Path to directory containing key pair files")
@@ -160,6 +167,17 @@ class AWSProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
                 return json.loads(v)
             except json.JSONDecodeError:
                 return v
+        return v
+
+    @field_validator("storage", mode="before")
+    @classmethod
+    def parse_storage_json(cls, v: Any) -> Any:
+        """Parse storage configuration from JSON string if needed."""
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON for storage config: {e}") from e
         return v
 
     @field_validator("launch_template", mode="before")

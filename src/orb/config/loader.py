@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, TypeVar
 
@@ -114,6 +115,16 @@ class ConfigurationLoader:
                 get_config_logger().info("Loaded user configuration")
             else:
                 get_config_logger().warning("User configuration file not found: %s", config_path)
+
+        # Warn if deprecated storage.dynamodb_strategy key is present
+        if isinstance(config, dict) and "dynamodb_strategy" in config.get("storage", {}):
+            warnings.warn(
+                "storage.dynamodb_strategy in config root is deprecated since ORB 2.x. "
+                "Move it to provider.providers[N].config.storage.dynamodb. "
+                "This key will be removed in ORB 3.0.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
         # Override with environment variables (highest precedence)
         cls._load_from_env(config, config_manager)

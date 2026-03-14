@@ -47,7 +47,7 @@ class RepositoryMigrator:
             container: DI container
         """
         self.container = container
-        self.logger = get_logger(__name__)
+        self.logger = logger
         self.collections = ["templates", "requests", "machines"]
 
         # Get configuration manager from container

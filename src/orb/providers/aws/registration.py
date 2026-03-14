@@ -125,7 +125,7 @@ def register_aws_provider_settings() -> None:
         from orb.providers.aws.configuration.config import AWSProviderConfig
 
         # Register AWSProviderConfig as the settings class for AWS providers
-        ProviderSettingsRegistry._settings_classes["aws"] = AWSProviderConfig
+        ProviderSettingsRegistry.register_provider_settings("aws", AWSProviderConfig)
 
     except ImportError:
         # Registry not available, skip registration
@@ -420,6 +420,12 @@ def initialize_aws_provider(
         # Register AWS template factory if provided
         if template_factory:
             register_aws_template_factory(template_factory, logger)
+
+        # Register AWS CLI spec
+        from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
+        from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec
+
+        CLISpecRegistry.register("aws", AWSCLISpec())
 
         if logger:
             logger.info("AWS provider initialization completed successfully")

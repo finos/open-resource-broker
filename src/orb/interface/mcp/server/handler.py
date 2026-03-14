@@ -56,7 +56,7 @@ async def _run_stdio_server(mcp_server: OpenResourceBrokerMCPServer):
         while True:
             try:
                 # Read line from stdin
-                line = await asyncio.get_event_loop().run_in_executor(None, sys.stdin.readline)
+                line = await asyncio.get_running_loop().run_in_executor(None, sys.stdin.readline)
 
                 if not line:
                     break

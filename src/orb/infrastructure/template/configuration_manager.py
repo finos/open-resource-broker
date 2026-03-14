@@ -431,16 +431,10 @@ class TemplateConfigurationManager:
     def get_all_templates_sync(self) -> list[TemplateDTO]:
         """Get all templates synchronously for adapter compatibility."""
         try:
-            # Try to get existing event loop
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # If loop is running, we can't use run_until_complete
-                # Fall back to direct template loading via scheduler strategy
-                return self._load_templates_sync()
-            else:
-                return loop.run_until_complete(self.get_all_templates())
+            asyncio.get_running_loop()
+            # Loop is running — fall back to direct template loading
+            return self._load_templates_sync()
         except RuntimeError:
-            # No event loop, create new one
             return asyncio.run(self.get_all_templates())
 
     def _load_templates_sync(self) -> list[TemplateDTO]:
@@ -511,13 +505,10 @@ class TemplateConfigurationManager:
     def get_template(self, template_id: str) -> Optional[TemplateDTO]:
         """Get template by ID synchronously for compatibility."""
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # Loop already running — use sync fallback to avoid nested asyncio.run()
-                templates = self._load_templates_sync()
-                return next((t for t in templates if t.template_id == template_id), None)
-            else:
-                return loop.run_until_complete(self.get_template_by_id(template_id))
+            asyncio.get_running_loop()
+            # Loop already running — use sync fallback to avoid nested asyncio.run()
+            templates = self._load_templates_sync()
+            return next((t for t in templates if t.template_id == template_id), None)
         except RuntimeError:
             return asyncio.run(self.get_template_by_id(template_id))
 

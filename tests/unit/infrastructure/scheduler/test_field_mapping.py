@@ -168,22 +168,22 @@ def test_hf_map_output_vm_type_produces_attributes():
 
 
 def test_transform_subnet_id_string_single():
-    assert HostFactoryTransformations.transform_aws_subnet_id("subnet-abc") == ["subnet-abc"]
+    assert HostFactoryTransformations.transform_subnet_id("subnet-abc") == ["subnet-abc"]
 
 
 def test_transform_subnet_id_string_comma_delimited():
-    result = HostFactoryTransformations.transform_aws_subnet_id("subnet-a, subnet-b")
+    result = HostFactoryTransformations.transform_subnet_id("subnet-a, subnet-b")
     assert result == ["subnet-a", "subnet-b"]
 
 
 def test_transform_subnet_id_list_passthrough():
     lst = ["subnet-x", "subnet-y"]
-    assert HostFactoryTransformations.transform_aws_subnet_id(lst) == lst
+    assert HostFactoryTransformations.transform_subnet_id(lst) == lst
 
 
 def test_transform_subnet_id_other_type_returns_empty():
-    assert HostFactoryTransformations.transform_aws_subnet_id(None) == []
-    assert HostFactoryTransformations.transform_aws_subnet_id(42) == []
+    assert HostFactoryTransformations.transform_subnet_id(None) == []
+    assert HostFactoryTransformations.transform_subnet_id(42) == []
 
 
 def test_transform_instance_tags_string():

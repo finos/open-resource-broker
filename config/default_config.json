@@ -11,7 +11,14 @@
         "enabled": true,
         "config": {
           "region": "us-east-1",
-          "profile": "default"
+          "profile": "default",
+          "storage": {
+            "dynamodb": {
+              "region": "us-east-1",
+              "profile": "default",
+              "table_prefix": "hostfactory"
+            }
+          }
         }
       }
     ],
@@ -299,7 +306,6 @@
   },
   "storage": {
     "strategy": "json",
-    "default_storage_path": "data",
     "json_strategy": {
       "storage_type": "single_file",
       "base_path": "data",
@@ -320,11 +326,6 @@
       "pool_size": 5,
       "max_overflow": 10,
       "timeout": 30
-    },
-    "dynamodb_strategy": {
-      "region": "us-east-1",
-      "profile": "default",
-      "table_prefix": "hostfactory"
     }
   },
   "server": {
