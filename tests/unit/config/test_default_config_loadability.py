@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+
 def _get_default_config_path():
     """Resolve default_config.json using the same mechanism as ConfigurationLoader."""
     from orb.config.platform_dirs import get_config_location

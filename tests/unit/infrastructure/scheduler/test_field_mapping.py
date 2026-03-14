@@ -198,15 +198,18 @@ def test_transform_subnet_id_list_of_csv_strings():
 
 
 def test_transform_subnet_id_mixed_list():
-    assert HostFactoryTransformations.transform_subnet_id(
-        ["subnet-a", "subnet-b, subnet-c"]
-    ) == ["subnet-a", "subnet-b", "subnet-c"]
+    assert HostFactoryTransformations.transform_subnet_id(["subnet-a", "subnet-b, subnet-c"]) == [
+        "subnet-a",
+        "subnet-b",
+        "subnet-c",
+    ]
 
 
 def test_transform_subnet_id_list_filters_none_and_non_string():
-    assert HostFactoryTransformations.transform_subnet_id(
-        ["subnet-a", None, 42, "subnet-b"]
-    ) == ["subnet-a", "subnet-b"]
+    assert HostFactoryTransformations.transform_subnet_id(["subnet-a", None, 42, "subnet-b"]) == [
+        "subnet-a",
+        "subnet-b",
+    ]
 
 
 def test_transform_subnet_id_list_filters_empty_strings():

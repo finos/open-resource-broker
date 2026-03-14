@@ -575,9 +575,7 @@ class TestGetHealthLocation:
 
     def test_orb_root_dir_returns_work_health(self):
         """ORB_ROOT_DIR=/myroot returns /myroot/work/health."""
-        with patch.dict(
-            os.environ, {"ORB_ROOT_DIR": "/myroot"}, clear=True
-        ):
+        with patch.dict(os.environ, {"ORB_ROOT_DIR": "/myroot"}, clear=True):
             assert get_health_location() == Path("/myroot/work/health")
 
     def test_fallback_relative_to_work_location(self):

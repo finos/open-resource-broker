@@ -77,6 +77,7 @@ class HealthCheck(HealthCheckPort):
                 self.health_dir.mkdir(parents=True, exist_ok=True)
             except PermissionError:
                 import tempfile
+
                 if self._logger:
                     self._logger.warning(
                         "Permission denied creating health dir %s, falling back to tempdir",
