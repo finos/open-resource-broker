@@ -70,7 +70,9 @@ def detect_installation_mode(package_name: str = "orb-py") -> Tuple[str, Optiona
         return "development", None
 
 
-def detect_install_mode() -> Literal["development", "editable", "user", "uv_tool", "system", "venv"]:
+def detect_install_mode() -> Literal[
+    "development", "editable", "user", "uv_tool", "system", "venv"
+]:
     """Detect installation mode, returning a canonical literal.
 
     Checks uv tool install first (before venv detection would misclassify it),
