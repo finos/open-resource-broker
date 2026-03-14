@@ -248,7 +248,7 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
 
         workdir = self.get_working_directory()
 
-        if file_type in ["conf", "template", "legacy"]:
+        if file_type in ["config", "template", "legacy"]:
             return os.path.join(workdir, "config")
         elif file_type == "log":
             return os.path.join(workdir, "logs")

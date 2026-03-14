@@ -15,7 +15,6 @@ logger = get_logger(__name__)
 
 _PLATFORM_DIRS_ROUTING: dict[str, object] = {
     "work": get_work_location,
-    "conf": get_config_location,
     "config": get_config_location,
     "log": get_logs_location,
     "logs": get_logs_location,
@@ -113,12 +112,12 @@ class ConfigPathResolver:
         default = default_path or "work"
         return self.resolve_path("work", default, config_path)
 
-    def get_conf_dir(
+    def get_config_dir(
         self, default_path: Optional[str] = None, config_path: Optional[str] = None
     ) -> str:
         """Get configuration directory path."""
         default = default_path or "config"
-        return self.resolve_path("conf", default, config_path)
+        return self.resolve_path("config", default, config_path)
 
     def get_log_dir(
         self, default_path: Optional[str] = None, config_path: Optional[str] = None

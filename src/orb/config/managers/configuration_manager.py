@@ -240,11 +240,11 @@ class ConfigurationManager:
         """Get cache directory path."""
         return self._ensure_path_resolver().get_cache_dir(default_path, config_path)
 
-    def get_conf_dir(
+    def get_config_dir(
         self, default_path: Optional[str] = None, config_path: Optional[str] = None
     ) -> str:
         """Get configuration directory path."""
-        return self._ensure_path_resolver().get_conf_dir(default_path, config_path)
+        return self._ensure_path_resolver().get_config_dir(default_path, config_path)
 
     def get_log_dir(
         self, default_path: Optional[str] = None, config_path: Optional[str] = None
@@ -394,18 +394,18 @@ class ConfigurationManager:
         if default_dir is None:
             # Map file types to path types for resolve_path
             path_type_mapping = {
-                "conf": "conf",
-                "template": "conf",
-                "legacy": "conf",
+                "config": "config",
+                "template": "config",
+                "legacy": "config",
                 "log": "log",
                 "work": "work",
                 "events": "events",
                 "snapshots": "snapshots",
             }
 
-            path_type = path_type_mapping.get(file_type, "conf")
+            path_type = path_type_mapping.get(file_type, "config")
             default_dir = self.resolve_path(
-                path_type, "config" if path_type == "conf" else path_type
+                path_type, "config" if path_type == "config" else path_type
             )
 
         fallback_path = os.path.join(default_dir, filename)
@@ -431,7 +431,7 @@ class ConfigurationManager:
 
         logger.debug("[CONFIG_MGR] Getting directory for file_type=%s", file_type)
 
-        if file_type in ["conf", "template", "legacy"]:
+        if file_type in ["config", "template", "legacy"]:
             result = str(get_config_location())
         elif file_type == "log":
             result = str(get_logs_location())

@@ -11,7 +11,7 @@ class TestResolveFilePath:
     def test_resolve_file_path_explicit_path_with_directory_returns_it_directly(self):
         """Explicit path containing a directory component is returned as-is."""
         svc = PathResolutionService()
-        result = svc.resolve_file_path("conf", "config.json", explicit_path="/abs/dir/file.json")
+        result = svc.resolve_file_path("config", "config.json", explicit_path="/abs/dir/file.json")
         assert result == "/abs/dir/file.json"
 
     def test_resolve_file_path_explicit_path_bare_filename_overrides_filename(
@@ -22,14 +22,14 @@ class TestResolveFilePath:
             "orb.config.platform_dirs.get_config_location", lambda: tmp_path / "config"
         )
         svc = PathResolutionService()
-        result = svc.resolve_file_path("conf", "config.json", explicit_path="other.json")
+        result = svc.resolve_file_path("config", "config.json", explicit_path="other.json")
         assert result == str(tmp_path / "config" / "other.json")
 
     def test_resolve_file_path_no_explicit_uses_scheduler_dir_when_provider_set(self):
         """When scheduler_directory_provider returns a dir, it is used."""
         provider = lambda file_type: "/sched/conf"  # noqa: E731
         svc = PathResolutionService(scheduler_directory_provider=provider)
-        result = svc.resolve_file_path("conf", "config.json")
+        result = svc.resolve_file_path("config", "config.json")
         assert result == "/sched/conf/config.json"
 
     def test_resolve_file_path_scheduler_provider_returns_none_falls_back_to_platform_dir(
@@ -41,7 +41,7 @@ class TestResolveFilePath:
         )
         provider = lambda file_type: None  # noqa: E731
         svc = PathResolutionService(scheduler_directory_provider=provider)
-        result = svc.resolve_file_path("conf", "config.json")
+        result = svc.resolve_file_path("config", "config.json")
         assert result == str(tmp_path / "config" / "config.json")
 
     def test_resolve_file_path_scheduler_provider_raises_falls_back_to_platform_dir(
@@ -56,7 +56,7 @@ class TestResolveFilePath:
             raise RuntimeError("scheduler unavailable")
 
         svc = PathResolutionService(scheduler_directory_provider=bad_provider)
-        result = svc.resolve_file_path("conf", "config.json")
+        result = svc.resolve_file_path("config", "config.json")
         assert result == str(tmp_path / "config" / "config.json")
 
     def test_resolve_file_path_unknown_file_type_falls_back_to_config_location(
@@ -110,7 +110,7 @@ class TestResolveDirectory:
             "orb.config.platform_dirs.get_config_location", lambda: tmp_path / "config"
         )
         svc = PathResolutionService()
-        result = svc.resolve_directory("conf")
+        result = svc.resolve_directory("config")
         assert result == str(tmp_path / "config")
 
 
@@ -126,7 +126,7 @@ class TestFindFileWithFallbacks:
         present.write_text("{}")
 
         svc = PathResolutionService()
-        result = svc.find_file_with_fallbacks("conf", ["missing.json", "present.json"])
+        result = svc.find_file_with_fallbacks("config", ["missing.json", "present.json"])
         assert result == str(present)
 
     def test_find_file_with_fallbacks_returns_none_when_all_missing(self, monkeypatch, tmp_path):
@@ -135,7 +135,7 @@ class TestFindFileWithFallbacks:
         config_dir.mkdir()
         monkeypatch.setattr("orb.config.platform_dirs.get_config_location", lambda: config_dir)
         svc = PathResolutionService()
-        result = svc.find_file_with_fallbacks("conf", ["a.json", "b.json"])
+        result = svc.find_file_with_fallbacks("config", ["a.json", "b.json"])
         assert result is None
 
 
@@ -155,5 +155,5 @@ class TestRegressionGuards:
         monkeypatch.setattr(os, "getcwd", lambda: (_ for _ in ()).throw(RuntimeError("no cwd")))
 
         # Should not raise even though os.getcwd() would blow up
-        result = PathResolutionService._get_platform_dir("conf")
+        result = PathResolutionService._get_platform_dir("config")
         assert result == str(tmp_path / "config")

@@ -90,7 +90,7 @@ class ConfigurationLoader:
         # Load main config.json with correct precedence (scheduler config dir first,
         # then config/)
         main_config = cls._load_config_file(
-            "conf", "config.json", required=False, config_manager=config_manager
+            "config", "config.json", required=False, config_manager=config_manager
         )
         if main_config:
             cls._merge_config(config, main_config)
@@ -104,7 +104,7 @@ class ConfigurationLoader:
             filename = os.path.basename(config_path) if config_path else "config.json"
 
             file_config = cls._load_config_file(
-                "conf",
+                "config",
                 filename,
                 explicit_path=config_path,
                 required=False,

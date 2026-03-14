@@ -173,7 +173,7 @@ class StartupValidator:
         if default_resolved:
             self._console.info(f"  - {default_resolved}")
 
-        config_resolved = svc.resolve_file_path("conf", "config.json")
+        config_resolved = svc.resolve_file_path("config", "config.json")
         if config_resolved:
             self._console.info(f"  - {config_resolved}")
 

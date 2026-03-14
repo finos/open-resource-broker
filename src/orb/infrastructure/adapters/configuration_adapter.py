@@ -249,11 +249,11 @@ class ConfigurationAdapter(ConfigurationPort):
         """Get work directory - delegate to ConfigurationManager."""
         return self._config_manager.get_work_dir(default_path, config_path)
 
-    def get_conf_dir(
+    def get_config_dir(
         self, default_path: Optional[str] = None, config_path: Optional[str] = None
     ) -> str:
         """Get config directory - delegate to ConfigurationManager."""
-        return self._config_manager.get_conf_dir(default_path, config_path)
+        return self._config_manager.get_config_dir(default_path, config_path)
 
     def get_log_dir(
         self, default_path: Optional[str] = None, config_path: Optional[str] = None
@@ -351,7 +351,7 @@ class ConfigurationAdapter(ConfigurationPort):
         return {
             "config_file": actual_config_file,
             "template_file": template_file,
-            "config_dir": self.get_conf_dir(),
+            "config_dir": self.get_config_dir(),
             "work_dir": self.get_work_dir(),
             "primary_source": "config_file" if actual_config_file else "environment",
         }
