@@ -1,4 +1,5 @@
 """Unit tests for create_aws_strategy — console injection."""
+
 from unittest.mock import MagicMock, patch
 
 
@@ -32,7 +33,9 @@ def test_create_aws_strategy_handles_missing_console_gracefully():
     from orb.providers.aws.registration import create_aws_strategy
 
     # get_container is imported locally — patch at source
-    with patch("orb.infrastructure.di.container.get_container", side_effect=Exception("DI not ready")):
+    with patch(
+        "orb.infrastructure.di.container.get_container", side_effect=Exception("DI not ready")
+    ):
         strategy = create_aws_strategy({"region": "us-east-1"})
 
     assert strategy is not None

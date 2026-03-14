@@ -103,8 +103,10 @@ def test_discover_infrastructure_passes_correct_region_and_profile():
     mock_strategy.discover_infrastructure_interactive.return_value = {}
     mock_registry.create_strategy_by_type.return_value = mock_strategy
 
-    with patch("orb.providers.registry.get_provider_registry", return_value=mock_registry), \
-         patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()):
+    with (
+        patch("orb.providers.registry.get_provider_registry", return_value=mock_registry),
+        patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
+    ):
         _mod._discover_infrastructure("aws", "eu-west-2", "my-prod-profile")
 
     call_args = mock_registry.create_strategy_by_type.call_args
@@ -129,16 +131,34 @@ def test_interactive_setup_tests_credentials_before_asking_for_region():
     inputs = iter(["1", "1", "1", "N", "N"])
     strategy = _make_strategy()
 
-    with patch("builtins.input", side_effect=inputs), \
-         patch.object(_mod, "_test_provider_credentials", side_effect=mock_test_creds), \
-         patch.object(_mod, "_pick_region", side_effect=mock_pick_region), \
-         patch.object(_mod, "_get_available_schedulers", return_value=[{"type": "default", "display_name": "Default", "description": ""}]), \
-         patch.object(_mod, "_get_available_providers", return_value=[{"type": "aws", "display_name": "AWS", "description": ""}]), \
-         patch.object(_mod, "_get_provider_strategy", return_value=strategy), \
-         patch.object(_mod, "_get_credential_requirements", return_value={}), \
-         patch.object(_mod, "_get_available_credential_sources", return_value=[{"name": "default", "description": "Default"}]), \
-         patch.object(_mod, "_get_operational_requirements", return_value={"region": {"required": True, "description": "AWS region"}}), \
-         patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()):
+    with (
+        patch("builtins.input", side_effect=inputs),
+        patch.object(_mod, "_test_provider_credentials", side_effect=mock_test_creds),
+        patch.object(_mod, "_pick_region", side_effect=mock_pick_region),
+        patch.object(
+            _mod,
+            "_get_available_schedulers",
+            return_value=[{"type": "default", "display_name": "Default", "description": ""}],
+        ),
+        patch.object(
+            _mod,
+            "_get_available_providers",
+            return_value=[{"type": "aws", "display_name": "AWS", "description": ""}],
+        ),
+        patch.object(_mod, "_get_provider_strategy", return_value=strategy),
+        patch.object(_mod, "_get_credential_requirements", return_value={}),
+        patch.object(
+            _mod,
+            "_get_available_credential_sources",
+            return_value=[{"name": "default", "description": "Default"}],
+        ),
+        patch.object(
+            _mod,
+            "_get_operational_requirements",
+            return_value={"region": {"required": True, "description": "AWS region"}},
+        ),
+        patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
+    ):
         _mod._interactive_setup()
 
     assert "test_credentials" in call_order
@@ -151,14 +171,30 @@ def test_interactive_setup_returns_empty_on_credential_failure():
     inputs = iter(["1", "1", "1", "N"])
     strategy = _make_strategy()
 
-    with patch("builtins.input", side_effect=inputs), \
-         patch.object(_mod, "_test_provider_credentials", return_value=(False, "Invalid credentials")), \
-         patch.object(_mod, "_get_available_schedulers", return_value=[{"type": "default", "display_name": "Default", "description": ""}]), \
-         patch.object(_mod, "_get_available_providers", return_value=[{"type": "aws", "display_name": "AWS", "description": ""}]), \
-         patch.object(_mod, "_get_provider_strategy", return_value=strategy), \
-         patch.object(_mod, "_get_credential_requirements", return_value={}), \
-         patch.object(_mod, "_get_available_credential_sources", return_value=[{"name": "default", "description": "Default"}]), \
-         patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()):
+    with (
+        patch("builtins.input", side_effect=inputs),
+        patch.object(
+            _mod, "_test_provider_credentials", return_value=(False, "Invalid credentials")
+        ),
+        patch.object(
+            _mod,
+            "_get_available_schedulers",
+            return_value=[{"type": "default", "display_name": "Default", "description": ""}],
+        ),
+        patch.object(
+            _mod,
+            "_get_available_providers",
+            return_value=[{"type": "aws", "display_name": "AWS", "description": ""}],
+        ),
+        patch.object(_mod, "_get_provider_strategy", return_value=strategy),
+        patch.object(_mod, "_get_credential_requirements", return_value={}),
+        patch.object(
+            _mod,
+            "_get_available_credential_sources",
+            return_value=[{"name": "default", "description": "Default"}],
+        ),
+        patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
+    ):
         result = _mod._interactive_setup()
 
     assert result == {}
@@ -168,10 +204,16 @@ def test_interactive_setup_raises_on_no_providers():
     """When no providers are registered, _interactive_setup raises ValueError."""
     import pytest
 
-    with patch.object(_mod, "_get_available_schedulers", return_value=[{"type": "default", "display_name": "Default", "description": ""}]), \
-         patch.object(_mod, "_get_available_providers", return_value=[]), \
-         patch("builtins.input", return_value="1"), \
-         patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()):
+    with (
+        patch.object(
+            _mod,
+            "_get_available_schedulers",
+            return_value=[{"type": "default", "display_name": "Default", "description": ""}],
+        ),
+        patch.object(_mod, "_get_available_providers", return_value=[]),
+        patch("builtins.input", return_value="1"),
+        patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
+    ):
         with pytest.raises(ValueError, match="No providers registered"):
             _mod._interactive_setup()
 
@@ -222,9 +264,14 @@ def test_write_config_file_fleet_role_in_config_subnet_ids_in_template_defaults(
         def joinpath(self, name):
             return _FakeResource()
 
-    with patch("orb.interface.init_command_handler.get_container", return_value=mock_container), \
-         patch("orb.infrastructure.scheduler.registry.get_scheduler_registry", return_value=mock_scheduler_registry), \
-         patch("importlib.resources.files", return_value=_FakeFiles()):
+    with (
+        patch("orb.interface.init_command_handler.get_container", return_value=mock_container),
+        patch(
+            "orb.infrastructure.scheduler.registry.get_scheduler_registry",
+            return_value=mock_scheduler_registry,
+        ),
+        patch("importlib.resources.files", return_value=_FakeFiles()),
+    ):
         _mod._write_config_file(config_file, user_config)
 
     with open(config_file) as f:
@@ -235,11 +282,14 @@ def test_write_config_file_fleet_role_in_config_subnet_ids_in_template_defaults(
     p = providers[0]
 
     assert "fleet_role" in p["config"], "fleet_role should be in provider config"
-    assert p["config"]["fleet_role"] == "arn:aws:iam::123456789012:role/AWSServiceRoleForEC2SpotFleet"
+    assert (
+        p["config"]["fleet_role"] == "arn:aws:iam::123456789012:role/AWSServiceRoleForEC2SpotFleet"
+    )
 
     assert "template_defaults" in p, "template_defaults key should exist"
     assert "subnet_ids" in p["template_defaults"], "subnet_ids should be in template_defaults"
     assert p["template_defaults"]["subnet_ids"] == ["subnet-aaa", "subnet-bbb"]
 
-    assert "fleet_role" not in p.get("template_defaults", {}), \
+    assert "fleet_role" not in p.get("template_defaults", {}), (
         "fleet_role must not appear in template_defaults"
+    )

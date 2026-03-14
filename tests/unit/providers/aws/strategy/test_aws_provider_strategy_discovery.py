@@ -1,4 +1,5 @@
 """Unit tests for AWSProviderStrategy infrastructure discovery — console propagation."""
+
 from unittest.mock import MagicMock, patch
 
 

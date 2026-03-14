@@ -1,4 +1,5 @@
 """Moto integration tests for AWSInfrastructureDiscoveryService."""
+
 import pytest
 from unittest.mock import MagicMock, patch as _patch
 
@@ -29,7 +30,9 @@ def test_discover_vpcs_returns_empty_when_no_vpcs(moto_aws):
         AWSInfrastructureDiscoveryService,
     )
 
-    service = AWSInfrastructureDiscoveryService(region="eu-west-2", profile=None, console=MagicMock())
+    service = AWSInfrastructureDiscoveryService(
+        region="eu-west-2", profile=None, console=MagicMock()
+    )
     vpcs = service.discover_vpcs()
     # moto starts with a default VPC — filter to only non-default
     non_default = [v for v in vpcs if not v.is_default]
@@ -69,7 +72,9 @@ def test_discover_infrastructure_interactive_no_vpcs_returns_empty(moto_aws):
         AWSInfrastructureDiscoveryService,
     )
 
-    service = AWSInfrastructureDiscoveryService(region="eu-west-2", profile=None, console=MagicMock())
+    service = AWSInfrastructureDiscoveryService(
+        region="eu-west-2", profile=None, console=MagicMock()
+    )
 
     with _patch.object(service, "discover_vpcs", return_value=[]):
         result = service.discover_infrastructure_interactive({"type": "aws", "config": {}})
