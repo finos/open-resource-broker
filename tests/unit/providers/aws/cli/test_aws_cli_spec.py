@@ -26,7 +26,9 @@ def test_generate_name_basic(spec: AWSCLISpec) -> None:
 
 def test_generate_name_special_chars_sanitized(spec: AWSCLISpec) -> None:
     """Special characters in profile are replaced with hyphens."""
-    assert spec.generate_name(_args("my.profile@org", "eu-west-1")) == "aws_my-profile-org_eu-west-1"
+    assert (
+        spec.generate_name(_args("my.profile@org", "eu-west-1")) == "aws_my-profile-org_eu-west-1"
+    )
 
 
 def test_generate_name_none_profile(spec: AWSCLISpec) -> None:

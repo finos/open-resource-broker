@@ -25,7 +25,10 @@ def _make_container() -> DIContainer:
 def container() -> Generator[DIContainer, None, None]:
     with (
         patch.object(Path, "mkdir"),
-        patch("orb.infrastructure.di.monitoring_services.get_health_location", return_value=Path("/tmp/orb-health-test")),
+        patch(
+            "orb.infrastructure.di.monitoring_services.get_health_location",
+            return_value=Path("/tmp/orb-health-test"),
+        ),
     ):
         c = _make_container()
         register_monitoring_services(c)
@@ -36,17 +39,25 @@ def test_register_monitoring_services_registers_health_check_port(container: DIC
     """get(HealthCheckPort) returns a HealthCheck instance."""
     with (
         patch.object(Path, "mkdir"),
-        patch("orb.infrastructure.di.monitoring_services.get_health_location", return_value=Path("/tmp/orb-health-test")),
+        patch(
+            "orb.infrastructure.di.monitoring_services.get_health_location",
+            return_value=Path("/tmp/orb-health-test"),
+        ),
     ):
         instance = container.get(HealthCheckPort)
     assert isinstance(instance, HealthCheck)
 
 
-def test_register_monitoring_services_concrete_alias_is_same_instance(container: DIContainer) -> None:
+def test_register_monitoring_services_concrete_alias_is_same_instance(
+    container: DIContainer,
+) -> None:
     """get(HealthCheck) and get(HealthCheckPort) return the same instance."""
     with (
         patch.object(Path, "mkdir"),
-        patch("orb.infrastructure.di.monitoring_services.get_health_location", return_value=Path("/tmp/orb-health-test")),
+        patch(
+            "orb.infrastructure.di.monitoring_services.get_health_location",
+            return_value=Path("/tmp/orb-health-test"),
+        ),
     ):
         port_instance = container.get(HealthCheckPort)
         concrete_instance = container.get(HealthCheck)

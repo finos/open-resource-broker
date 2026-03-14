@@ -94,6 +94,7 @@ class MetricsCollector:
                 self.metrics_dir.mkdir(parents=True, exist_ok=True)
             except PermissionError:
                 import tempfile
+
                 if self._logger:
                     self._logger.warning(
                         "Permission denied creating metrics dir %s, falling back to tempdir",
