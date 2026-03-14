@@ -53,8 +53,8 @@ class LaunchTemplateConfiguration(BaseModel):
 class HandlersConfig(BaseModel):
     """Handlers configuration."""
 
-    capabilities: HandlerCapabilityConfig = Field(default_factory=lambda: HandlerCapabilityConfig())  # type: ignore[call-arg]
-    defaults: HandlerDefaultsConfig = Field(default_factory=lambda: HandlerDefaultsConfig())  # type: ignore[call-arg]
+    capabilities: HandlerCapabilityConfig = Field(default_factory=HandlerCapabilityConfig)  # type: ignore[call-arg]
+    defaults: HandlerDefaultsConfig = Field(default_factory=HandlerDefaultsConfig)  # type: ignore[call-arg]
 
     # Legacy fields for backward compatibility
     ec2_fleet: bool = Field(True, description="Enable EC2 Fleet handler (legacy)")
@@ -127,16 +127,16 @@ class AWSProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         "AWSServiceRoleForEC2SpotFleet", description="Service role for Spot Fleet"
     )
     # Handler configuration
-    handlers: HandlersConfig = Field(default_factory=lambda: HandlersConfig())  # type: ignore[call-arg]
+    handlers: HandlersConfig = Field(default_factory=HandlersConfig)  # type: ignore[call-arg]
 
     # Launch template configuration
     launch_template: LaunchTemplateConfiguration = Field(
-        default_factory=lambda: LaunchTemplateConfiguration()  # type: ignore[call-arg]
+        default_factory=LaunchTemplateConfiguration  # type: ignore[call-arg]
     )
 
     # AWS storage backend configuration
     storage: AWSStorageConfig = Field(
-        default_factory=lambda: AWSStorageConfig(),  # type: ignore[call-arg]
+        default_factory=AWSStorageConfig,  # type: ignore[call-arg]
         description="AWS storage backend configuration",
     )
 

@@ -6,7 +6,7 @@ import pytest
 
 from orb.config.manager import ConfigurationManager
 from orb.providers.aws.configuration.config import AWSProviderConfig
-from orb.providers.aws.storage.config import AWSStorageConfig, DynamodbStrategyConfig
+from orb.providers.aws.storage.config import AWSStorageConfig
 
 
 @pytest.fixture

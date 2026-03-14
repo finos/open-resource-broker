@@ -124,9 +124,9 @@ class StorageConfig(BaseModel):
     """Storage configuration."""
 
     strategy: str = Field("json", description="Storage strategy (json, sql)")
-    json_strategy: JsonStrategyConfig = Field(default_factory=lambda: JsonStrategyConfig())  # type: ignore[call-arg]
+    json_strategy: JsonStrategyConfig = Field(default_factory=JsonStrategyConfig)  # type: ignore[call-arg]
     sql_strategy: SqlStrategyConfig = Field(
-        default_factory=lambda: SqlStrategyConfig()  # type: ignore[call-arg]
+        default_factory=SqlStrategyConfig  # type: ignore[call-arg]
     )
 
     @field_validator("strategy")
