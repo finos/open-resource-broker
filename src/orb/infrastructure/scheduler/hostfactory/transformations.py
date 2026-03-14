@@ -12,13 +12,22 @@ class HostFactoryTransformations:
     def transform_subnet_id(value: Any) -> list[str]:
         """Transform AWS subnetId field to subnet_ids list.
 
-        Handles both single subnet and comma-delimited multiple subnets.
+        Handles all input shapes:
+        - plain string: "subnet-abc" → ["subnet-abc"]
+        - comma-separated string: "subnet-abc,subnet-def" → ["subnet-abc", "subnet-def"]
+        - list of strings: ["subnet-abc", "subnet-def"] → ["subnet-abc", "subnet-def"]
+        - list of comma-separated strings: ["subnet-abc,subnet-def"] → ["subnet-abc", "subnet-def"]
+        - items may have whitespace: " subnet-abc , subnet-def " → ["subnet-abc", "subnet-def"]
+        - None values and non-string items in lists are filtered out
         """
         if isinstance(value, str):
-            # Split comma-delimited string and strip whitespace
             return [s.strip() for s in value.split(",") if s.strip()]
         elif isinstance(value, list):
-            return value
+            result = []
+            for item in value:
+                if isinstance(item, str):
+                    result.extend(s.strip() for s in item.split(",") if s.strip())
+            return result
         else:
             return []
 

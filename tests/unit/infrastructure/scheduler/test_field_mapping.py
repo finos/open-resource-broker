@@ -177,8 +177,43 @@ def test_transform_subnet_id_string_comma_delimited():
 
 
 def test_transform_subnet_id_list_passthrough():
-    lst = ["subnet-x", "subnet-y"]
-    assert HostFactoryTransformations.transform_subnet_id(lst) == lst
+    assert HostFactoryTransformations.transform_subnet_id(["subnet-x", "subnet-y"]) == [
+        "subnet-x",
+        "subnet-y",
+    ]
+
+
+def test_transform_subnet_id_list_strips_whitespace():
+    assert HostFactoryTransformations.transform_subnet_id([" subnet-a ", " subnet-b "]) == [
+        "subnet-a",
+        "subnet-b",
+    ]
+
+
+def test_transform_subnet_id_list_of_csv_strings():
+    assert HostFactoryTransformations.transform_subnet_id(["subnet-a,subnet-b"]) == [
+        "subnet-a",
+        "subnet-b",
+    ]
+
+
+def test_transform_subnet_id_mixed_list():
+    assert HostFactoryTransformations.transform_subnet_id(
+        ["subnet-a", "subnet-b, subnet-c"]
+    ) == ["subnet-a", "subnet-b", "subnet-c"]
+
+
+def test_transform_subnet_id_list_filters_none_and_non_string():
+    assert HostFactoryTransformations.transform_subnet_id(
+        ["subnet-a", None, 42, "subnet-b"]
+    ) == ["subnet-a", "subnet-b"]
+
+
+def test_transform_subnet_id_list_filters_empty_strings():
+    assert HostFactoryTransformations.transform_subnet_id(["subnet-a", "", "  ", "subnet-b"]) == [
+        "subnet-a",
+        "subnet-b",
+    ]
 
 
 def test_transform_subnet_id_other_type_returns_empty():
