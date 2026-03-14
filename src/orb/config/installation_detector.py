@@ -115,34 +115,11 @@ def detect_install_mode() -> Literal[
 
 
 def get_template_location() -> Path:
-    """Get template file location based on installation mode."""
-    import sysconfig
+    """Get default_config.json path using importlib.resources."""
+    from importlib.resources import as_file, files
 
-    mode, base_path = detect_installation_mode()
-
-    if mode == "development":
-        # Use existing platform_dirs logic
-        from orb.config.platform_dirs import get_config_location
-
-        return get_config_location() / "default_config.json"
-
-    elif mode == "editable":
-        # Use source directory from PEP 610
-        return (base_path or Path.cwd()) / "config" / "default_config.json"
-
-    elif mode == "user":
-        # User install - use posix_user scheme
-        try:
-            scheme = "posix_user" if sys.platform != "win32" else "nt_user"
-            data_path = Path(sysconfig.get_path("data", scheme))
-        except Exception:
-            data_path = base_path if base_path else Path.home() / ".local"
-        return data_path / "orb_config" / "default_config.json"
-
-    else:  # system/venv
-        # Use default scheme
-        data_path = Path(sysconfig.get_path("data"))
-        return data_path / "orb_config" / "default_config.json"
+    with as_file(files("orb.config").joinpath("default_config.json")) as p:
+        return p
 
 
 def get_scripts_location() -> Path:
@@ -178,12 +155,7 @@ def get_scripts_location() -> Path:
         )
 
     elif mode == "user":
-        try:
-            scheme = "posix_user" if sys.platform != "win32" else "nt_user"
-            data_path = Path(sysconfig.get_path("data", scheme))
-        except Exception:
-            data_path = base_path if base_path else Path.home() / ".local"
-        return data_path / "orb_scripts"
+        return Path.home() / ".orb" / "scripts"
 
     else:  # system/venv
         data_path = Path(sysconfig.get_path("data"))

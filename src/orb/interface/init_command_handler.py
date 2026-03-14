@@ -582,17 +582,10 @@ def _create_directories(config_dir: Path, work_dir: Path, logs_dir: Path):
 
 def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
     """Write configuration file with multiple provider support."""
-    from orb.config.installation_detector import get_template_location
+    from importlib.resources import files
 
     try:
-        template_path = get_template_location()
-
-        if template_path.exists():
-            with open(template_path) as f:
-                full_config = json.load(f)
-        else:
-            raise FileNotFoundError(f"Template not found: {template_path}")
-
+        full_config = json.loads(files("orb.config").joinpath("default_config.json").read_text())
     except Exception as e:
         raise FileNotFoundError(f"Could not find default_config.json template: {e}")
 
