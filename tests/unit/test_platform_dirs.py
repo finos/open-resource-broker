@@ -277,7 +277,9 @@ class TestGetConfigLocation:
     def test_mise_install_routes_to_dotorb(self, monkeypatch):
         monkeypatch.delenv("ORB_CONFIG_DIR", raising=False)
         monkeypatch.delenv("ORB_ROOT_DIR", raising=False)
-        with patch.object(sys, "executable", "/home/user/.local/share/mise/installs/python/3.12.0/bin/python"):
+        with patch.object(
+            sys, "executable", "/home/user/.local/share/mise/installs/python/3.12.0/bin/python"
+        ):
             with patch("pathlib.Path.home", return_value=Path("/home/user")):
                 result = get_config_location()
         assert result == Path("/home/user/.orb/config")
