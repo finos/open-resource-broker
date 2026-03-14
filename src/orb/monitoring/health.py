@@ -83,8 +83,10 @@ class HealthCheck(HealthCheckPort):
     # --- HealthCheckPort implementation ---
 
     def register_check(self, name: str, check_fn: Any) -> None:
-        """Register a named health check function."""
+        """Register a named health check function (idempotent — first registration wins)."""
         with self._lock:
+            if name in self.checks:
+                return
             self.checks[name] = check_fn
             self.status_history[name] = []
 
@@ -95,7 +97,9 @@ class HealthCheck(HealthCheckPort):
 
     def run_all_checks(self) -> dict[str, Any]:
         """Run all registered health checks and return results as dicts."""
-        return {name: self._run_check_internal(name).to_dict() for name in self.checks}
+        with self._lock:
+            names = list(self.checks)
+        return {name: self._run_check_internal(name).to_dict() for name in names}
 
     def get_status(self) -> dict[str, Any]:
         """Get the current health status summary."""

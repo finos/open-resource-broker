@@ -2,9 +2,10 @@
 
 import threading
 import time
+from pathlib import Path
 from unittest.mock import patch
 
-from orb.monitoring.health import HealthCheck, HealthStatus
+from orb.monitoring.health import HealthCheck, HealthCheckConfig, HealthStatus
 
 
 def _make_check(name: str, status: str = "healthy") -> HealthStatus:
@@ -13,10 +14,12 @@ def _make_check(name: str, status: str = "healthy") -> HealthStatus:
 
 def _make_health_check() -> HealthCheck:
     """Create a HealthCheck with background checker disabled and no filesystem side effects."""
+    config = HealthCheckConfig(
+        health_dir=Path("/tmp/test-health"),
+        enabled=False,
+    )
     with patch("orb.monitoring.health.Path.mkdir"):
-        return HealthCheck(
-            config={"HEALTH_CHECK_ENABLED": False, "HEALTH_DIR": "/tmp/test-health"},
-        )
+        return HealthCheck(config=config)
 
 
 class TestRunAllChecksThreadSafety:
