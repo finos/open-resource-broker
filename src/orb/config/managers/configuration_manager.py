@@ -360,7 +360,7 @@ class ConfigurationManager:
         3. Default directory + filename
 
         Args:
-            file_type: Type of file ('conf', 'template', 'legacy', 'log', 'work', 'events', 'snapshots')
+            file_type: Type of file ('config', 'template', 'legacy', 'log', 'work', 'events', 'snapshots')
             filename: Name of the file
             default_dir: Default directory (optional, will use resolve_path if not provided)
             explicit_path: Explicit path provided by user (optional)

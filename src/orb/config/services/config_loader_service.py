@@ -46,7 +46,7 @@ class ConfigLoaderService:
         """Load configuration file with consistent priority.
 
         Args:
-            file_type: Type of file ('conf', 'template', 'legacy', etc.)
+            file_type: Type of file ('config', 'template', 'legacy', etc.)
             filename: Name of the file
             explicit_path: Explicit path provided by user (optional)
             required: Whether the file is required (affects logging level)
