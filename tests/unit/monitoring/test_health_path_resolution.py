@@ -13,7 +13,6 @@ def _make_health_check(health_dir: Path | None = None) -> HealthCheck:
     """Create a HealthCheck with background checker disabled and mkdir patched."""
     config = HealthCheckConfig(
         health_dir=health_dir or get_health_location(),
-        enabled=False,
     )
     with patch("pathlib.Path.mkdir"):
         return HealthCheck(config=config)
@@ -45,7 +44,7 @@ def test_orb_root_dir_flows_through_to_health_check(
     monkeypatch.setenv("ORB_ROOT_DIR", "/myroot")
     monkeypatch.delenv("ORB_HEALTH_DIR", raising=False)
     hc = _make_health_check()
-    assert hc.health_dir == Path("/myroot/work/health")
+    assert hc.health_dir == Path("/myroot/health")
 
 
 def test_orb_health_dir_flows_through_to_health_check(

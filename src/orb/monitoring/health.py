@@ -24,8 +24,6 @@ class HealthCheckConfig:
     """Typed configuration for HealthCheck."""
 
     health_dir: Path
-    enabled: bool = False
-    interval_seconds: int = 60
 
 
 @dataclass
@@ -89,8 +87,6 @@ class HealthCheck(HealthCheckPort):
         # Register default health checks
         self._register_default_checks()
 
-    # --- HealthCheckPort implementation ---
-
     def register_check(self, name: str, check_fn: Any) -> None:
         """Register a named health check function (idempotent — first registration wins)."""
         with self._lock:
@@ -131,10 +127,12 @@ class HealthCheck(HealthCheckPort):
 
         return {"status": overall, "checks": checks_status}
 
-    # --- Internal helpers ---
-
     def _run_check_internal(self, name: str) -> HealthStatus:
-        """Run a specific health check, returning a HealthStatus object."""
+        """Run a specific health check, returning a HealthStatus object.
+
+        Called by run_check and run_all_checks. Catches all exceptions so a
+        failing check never kills the caller.
+        """
         if name not in self.checks:
             raise ValueError(f"Unknown health check: {name}")
 
@@ -157,7 +155,7 @@ class HealthCheck(HealthCheckPort):
             )
 
     def _register_default_checks(self) -> None:
-        """Register default health checks."""
+        """Register default health checks. Called from __init__."""
         self.register_check("system", self._check_system_health)
         self.register_check("disk", self._check_disk_health)
         self.register_check("database", self._check_database_health)
@@ -242,9 +240,11 @@ class HealthCheck(HealthCheckPort):
             )
 
     def _check_database_health(self) -> HealthStatus:
-        """Check database health."""
-        # Without raw dict config, database type is unknown at this level.
-        # AWS-specific checks are registered via register_aws_health_checks().
+        """Check database health.
+
+        Without raw dict config, database type is unknown at this level.
+        AWS-specific checks are registered via register_aws_health_checks().
+        """
         return HealthStatus(
             name="database",
             status="unknown",

@@ -16,7 +16,6 @@ def _make_health_check() -> HealthCheck:
     """Create a HealthCheck with background checker disabled and no filesystem side effects."""
     config = HealthCheckConfig(
         health_dir=Path("/tmp/test-health"),
-        enabled=False,
     )
     with patch("orb.monitoring.health.Path.mkdir"):
         return HealthCheck(config=config)
