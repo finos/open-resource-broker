@@ -1,7 +1,8 @@
 """Configuration path resolution utilities."""
 
 import os
-from typing import Optional
+from pathlib import Path
+from typing import Callable, Optional
 
 from orb.config.platform_dirs import (
     get_cache_location,
@@ -14,7 +15,7 @@ from orb.infrastructure.logging.logger import get_logger
 
 logger = get_logger(__name__)
 
-_PLATFORM_DIRS_ROUTING: dict[str, object] = {
+_PLATFORM_DIRS_ROUTING: dict[str, Callable[[], Path]] = {
     "work": get_work_location,
     "config": get_config_location,
     "log": get_logs_location,
@@ -50,7 +51,7 @@ class ConfigPathResolver:
         elif path_type in _PLATFORM_DIRS_ROUTING:
             # Route known types through platform_dirs for ORB_ROOT_DIR support
             platform_fn = _PLATFORM_DIRS_ROUTING[path_type]
-            path = str(platform_fn())  # type: ignore[operator]
+            path = str(platform_fn())
         elif self._base_config_path:
             base_dir = os.path.dirname(os.path.dirname(self._base_config_path))
             path = os.path.join(base_dir, default_path)
