@@ -21,7 +21,7 @@ from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.exceptions import DomainException, EntityNotFoundError, ValidationError
 from orb.domain.base.ports.event_publisher_port import EventPublisherPort
 from orb.domain.base.ports.logging_port import LoggingPort
-from orb.domain.base.ports.scheduler_port import SchedulerPort
+from orb.application.ports.scheduler_port import SchedulerPort
 
 from .dtos import TemplateDTO
 from .services.template_storage_service import TemplateStorageService

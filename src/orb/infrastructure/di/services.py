@@ -218,7 +218,7 @@ def _register_lazy_service_factories(container: "DIContainer") -> None:
             logger.warning("Failed to load scheduler config, falling back to default: %s", e)
             register_active_scheduler_only("default")
 
-    from orb.domain.base.ports.scheduler_port import SchedulerPort
+    from orb.application.ports.scheduler_port import SchedulerPort
 
     container.register_on_demand(SchedulerPort, register_scheduler_lazy)
 

@@ -4,7 +4,7 @@ import time
 from typing import TYPE_CHECKING, Any, Union
 
 from orb.domain.base.configuration_service import DomainConfigurationService
-from orb.domain.base.ports.scheduler_port import SchedulerPort
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.domain.request.exceptions import RequestNotFoundError
 from orb.infrastructure.di.buses import CommandBus, QueryBus
 from orb.infrastructure.di.container import get_container

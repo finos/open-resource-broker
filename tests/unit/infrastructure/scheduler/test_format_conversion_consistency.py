@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from orb.domain.base.ports import SchedulerPort
+from orb.application.ports import SchedulerPort
 from orb.domain.template import Template
 from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (

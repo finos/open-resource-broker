@@ -357,7 +357,7 @@ def cqrs_buses(orb_config_dir, moto_aws, moto_vpc_resources):
 @pytest.fixture
 def hf_strategy(orb_config_dir):
     """Resolve SchedulerPort (HostFactorySchedulerStrategy) from the DI container."""
-    from orb.domain.base.ports.scheduler_port import SchedulerPort
+    from orb.application.ports.scheduler_port import SchedulerPort
     from orb.infrastructure.di.container import get_container
 
     return get_container().get(SchedulerPort)

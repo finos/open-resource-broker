@@ -199,7 +199,7 @@ class RepositoryMigrator:
         Returns:
             Path to backup directory
         """
-        from orb.domain.base.ports.scheduler_port import SchedulerPort
+        from orb.application.ports.scheduler_port import SchedulerPort
 
         # Get work directory from scheduler strategy (via DI container)
         try:

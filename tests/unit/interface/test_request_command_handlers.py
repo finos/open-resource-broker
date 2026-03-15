@@ -17,7 +17,7 @@ from orb.application.dto.queries import (
     ListReturnRequestsQuery,
 )
 from orb.domain.base.ports import LoggingPort
-from orb.domain.base.ports.scheduler_port import SchedulerPort
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.infrastructure.di.buses import CommandBus, QueryBus
 from orb.interface.request_command_handlers import (
     handle_cancel_request,

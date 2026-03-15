@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from orb.domain.base.ports import SchedulerPort
+from orb.application.ports import SchedulerPort
 from orb.infrastructure.di.buses import QueryBus
 from orb.infrastructure.di.container import DIContainer
 from orb.interface.request_command_handlers import handle_get_request_status

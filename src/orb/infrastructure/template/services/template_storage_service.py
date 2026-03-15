@@ -16,7 +16,7 @@ from orb.domain.base.events.domain_events import (
 )
 from orb.domain.base.ports.event_publisher_port import EventPublisherPort
 from orb.domain.base.ports.logging_port import LoggingPort
-from orb.domain.base.ports.scheduler_port import SchedulerPort
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.infrastructure.template.dtos import TemplateDTO
 
 

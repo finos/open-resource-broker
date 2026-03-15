@@ -231,7 +231,7 @@ class ProvisioningOrchestrationService:
                 Operation as ProviderOperation,
                 OperationType as ProviderOperationType,
             )
-            from orb.domain.base.ports.scheduler_port import SchedulerPort
+            from orb.application.ports.scheduler_port import SchedulerPort
 
             scheduler = self._container.get(SchedulerPort)
 

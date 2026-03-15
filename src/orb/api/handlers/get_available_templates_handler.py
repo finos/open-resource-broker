@@ -7,7 +7,7 @@ from orb.application.base.infrastructure_handlers import BaseAsyncAPIHandler as 
 from orb.application.dto.queries import ListTemplatesQuery
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
-from orb.domain.base.ports.scheduler_port import SchedulerPort
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.infrastructure.di.buses import CommandBus, QueryBus
 
 # Exception handling infrastructure

@@ -1,15 +1,8 @@
-"""Domain port for scheduler-specific operations."""
-
-from __future__ import annotations
+"""Application port for scheduler-specific operations."""
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    # Use forward references to avoid circular imports
-    # These types should be defined in domain layer or passed as Any
-    pass
+from typing import Any
 
 
 class SchedulerPort(ABC):

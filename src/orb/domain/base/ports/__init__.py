@@ -11,7 +11,6 @@ from .path_resolution_port import PathResolutionPort
 from .provider_config_port import ProviderConfigPort
 from .provider_port import ProviderPort
 from .provider_selection_port import ProviderSelectionPort
-from .scheduler_port import SchedulerPort
 from .storage_port import StoragePort
 from .template_configuration_port import TemplateConfigurationPort
 
@@ -27,7 +26,6 @@ __all__: list[str] = [
     "ProviderConfigPort",
     "ProviderPort",
     "ProviderSelectionPort",
-    "SchedulerPort",
     "StoragePort",
     "TemplateConfigurationPort",
 ]

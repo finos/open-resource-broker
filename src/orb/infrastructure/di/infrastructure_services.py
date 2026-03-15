@@ -53,7 +53,7 @@ def _register_template_services(container: DIContainer):
             TemplateGenerationService,
         )
         from orb.domain.base.ports.path_resolution_port import PathResolutionPort
-        from orb.domain.base.ports.scheduler_port import SchedulerPort
+        from orb.application.ports.scheduler_port import SchedulerPort
         from orb.domain.base.ports.template_example_generator_port import (
             TemplateExampleGeneratorPort,
         )
@@ -99,7 +99,7 @@ def _register_template_services(container: DIContainer):
         """Create TemplateConfigurationManager."""
         from orb.application.services.provider_registry_service import ProviderRegistryService
         from orb.config.managers.configuration_manager import ConfigurationManager
-        from orb.domain.base.ports.scheduler_port import SchedulerPort
+        from orb.application.ports.scheduler_port import SchedulerPort
         from orb.domain.template.factory import TemplateFactory
         from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
 

@@ -14,7 +14,7 @@ from orb.config.managers.configuration_manager import ConfigurationManager
 from orb.config.schemas.common_schema import RequestConfig
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
-from orb.domain.base.ports.scheduler_port import SchedulerPort
+from orb.application.ports.scheduler_port import SchedulerPort
 
 # Exception handling infrastructure
 from orb.infrastructure.error.decorators import handle_interface_exceptions

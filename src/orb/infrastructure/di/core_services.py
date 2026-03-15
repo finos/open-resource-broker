@@ -1,12 +1,12 @@
 """Core service registrations for dependency injection."""
 
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.config.managers.configuration_manager import ConfigurationManager
 from orb.domain.base.ports import (
     ConfigurationPort,
     EventPublisherPort,
     LoggingPort,
     ProviderPort,
-    SchedulerPort,
     StoragePort,
 )
 from orb.infrastructure.di.buses import CommandBus, QueryBus

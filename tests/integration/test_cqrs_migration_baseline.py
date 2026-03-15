@@ -52,7 +52,7 @@ class TestCQRSArchitectureIntegration:
         # Configure container.get to return appropriate mocks
         def get_mock(service_type):
             from orb.domain.base.ports.configuration_port import ConfigurationPort
-            from orb.domain.base.ports.scheduler_port import SchedulerPort
+            from orb.application.ports.scheduler_port import SchedulerPort
 
             if service_type == ConfigurationPort:
                 return mock_config_manager

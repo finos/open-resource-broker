@@ -139,7 +139,7 @@ def get_scripts_location() -> Path:
 
     if mode == "development":
         try:
-            from orb.domain.base.ports.scheduler_port import SchedulerPort
+            from orb.application.ports.scheduler_port import SchedulerPort
             from orb.infrastructure.di.container import get_container, is_container_ready
 
             if is_container_ready():

@@ -125,7 +125,7 @@ class StartupValidator:
         if not self.app_config:
             return False
 
-        from orb.domain.base.ports.scheduler_port import SchedulerPort
+        from orb.application.ports.scheduler_port import SchedulerPort
         from orb.infrastructure.di.container import get_container
 
         container = get_container()
