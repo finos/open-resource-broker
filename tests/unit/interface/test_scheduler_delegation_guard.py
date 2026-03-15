@@ -11,7 +11,7 @@ import importlib
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from orb.domain.base.ports.scheduler_port import SchedulerPort
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.infrastructure.di.buses import CommandBus, QueryBus
 
 

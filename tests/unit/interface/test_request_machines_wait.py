@@ -7,7 +7,7 @@ import pytest
 
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.ports.console_port import ConsolePort
-from orb.domain.base.ports.scheduler_port import SchedulerPort
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.infrastructure.di.buses import CommandBus, QueryBus
 
 

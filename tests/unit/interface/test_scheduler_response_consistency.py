@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from orb.application.request.dto import RequestDTO
-from orb.domain.base.ports.scheduler_port import SchedulerPort
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.infrastructure.di.buses import CommandBus, QueryBus
 
 
