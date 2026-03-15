@@ -48,12 +48,12 @@ def _register_template_services(container: DIContainer):
     # Register template generation service
     def create_template_generation_service(c):
         """Create template generation service with injected dependencies."""
+        from orb.application.ports.scheduler_port import SchedulerPort
         from orb.application.services.provider_registry_service import ProviderRegistryService
         from orb.application.services.template_generation_service import (
             TemplateGenerationService,
         )
         from orb.domain.base.ports.path_resolution_port import PathResolutionPort
-        from orb.application.ports.scheduler_port import SchedulerPort
         from orb.domain.base.ports.template_example_generator_port import (
             TemplateExampleGeneratorPort,
         )
@@ -97,9 +97,9 @@ def _register_template_services(container: DIContainer):
         c: DIContainer,
     ) -> TemplateConfigurationManager:
         """Create TemplateConfigurationManager."""
+        from orb.application.ports.scheduler_port import SchedulerPort
         from orb.application.services.provider_registry_service import ProviderRegistryService
         from orb.config.managers.configuration_manager import ConfigurationManager
-        from orb.application.ports.scheduler_port import SchedulerPort
         from orb.domain.template.factory import TemplateFactory
         from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
 

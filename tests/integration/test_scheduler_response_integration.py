@@ -5,8 +5,9 @@ through real strategy instances (no mocks on the strategies themselves).
 Marked with @pytest.mark.integration — excluded from fast unit test runs.
 """
 
-import pytest
 from datetime import datetime, timezone
+
+import pytest
 
 from orb.application.request.dto import RequestDTO
 from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
@@ -14,7 +15,6 @@ from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
     HostFactorySchedulerStrategy,
 )
 from orb.infrastructure.template.dtos import TemplateDTO
-
 
 HF_ALLOWED_STATUSES = {"running", "complete", "complete_with_error"}
 

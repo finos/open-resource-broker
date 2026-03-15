@@ -12,7 +12,6 @@ import pytest
 
 from orb.interface.template_command_handlers import handle_update_template
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

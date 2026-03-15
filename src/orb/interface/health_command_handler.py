@@ -3,9 +3,9 @@
 from pathlib import Path
 from typing import Any, cast
 
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.console_port import ConsolePort
-from orb.application.ports.scheduler_port import SchedulerPort
 from orb.domain.base.ports.health_check_port import HealthCheckPort
 from orb.infrastructure.di.container import get_container
 

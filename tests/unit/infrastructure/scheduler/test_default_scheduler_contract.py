@@ -7,13 +7,13 @@ These tests document the DefaultSchedulerStrategy output contract:
 - message field present
 """
 
-import pytest
 from datetime import datetime, timezone
+
+import pytest
 
 from orb.application.request.dto import RequestDTO
 from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 from orb.infrastructure.template.dtos import TemplateDTO
-
 
 FULL_DOMAIN_STATUSES = [
     "pending",

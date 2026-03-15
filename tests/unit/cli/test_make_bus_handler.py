@@ -3,8 +3,6 @@
 import argparse
 import inspect
 
-import pytest
-
 
 def _make_factory(param_name: str):
     """Return a simple factory function that accepts a single named parameter."""

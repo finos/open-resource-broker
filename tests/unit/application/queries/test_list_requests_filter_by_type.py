@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -10,7 +9,6 @@ import pytest
 
 from orb.application.request.queries import ListRequestsQuery
 from orb.domain.request.request_types import RequestType
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -144,9 +142,9 @@ def test_list_requests_no_filter_returns_all():
 
 @pytest.mark.unit
 def test_list_requests_invalid_type_not_accepted_by_cli():
-    from orb.cli.args import parse_args
-
     import sys
+
+    from orb.cli.args import parse_args
 
     original_argv = sys.argv
     try:
@@ -160,9 +158,9 @@ def test_list_requests_invalid_type_not_accepted_by_cli():
 
 @pytest.mark.unit
 def test_list_requests_cli_accepts_acquire():
-    from orb.cli.args import parse_args
-
     import sys
+
+    from orb.cli.args import parse_args
 
     original_argv = sys.argv
     try:
@@ -175,9 +173,9 @@ def test_list_requests_cli_accepts_acquire():
 
 @pytest.mark.unit
 def test_list_requests_cli_accepts_return():
-    from orb.cli.args import parse_args
-
     import sys
+
+    from orb.cli.args import parse_args
 
     original_argv = sys.argv
     try:

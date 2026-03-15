@@ -11,8 +11,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from orb.application.request.dto import RequestDTO
 from orb.application.ports.scheduler_port import SchedulerPort
+from orb.application.request.dto import RequestDTO
 from orb.infrastructure.di.buses import CommandBus, QueryBus
 
 
@@ -158,10 +158,10 @@ def test_default_scheduler_output_is_deterministic():
 
 def test_hf_and_default_produce_different_id_field_names():
     """HF uses requestId; default uses request_id. This divergence is intentional."""
+    from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
     from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
         HostFactorySchedulerStrategy,
     )
-    from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 
     dto = _make_request_dto("complete")
 
@@ -214,8 +214,7 @@ async def test_cli_request_machines_delegates_format_request_response():
         ),
     ):
         from orb.interface.request_command_handlers import handle_request_machines
-
-        result = await handle_request_machines(args)
+        await handle_request_machines(args)
 
     scheduler.format_request_response.assert_called_once()
     call_arg = scheduler.format_request_response.call_args[0][0]

@@ -2,9 +2,9 @@
 
 from typing import TypeVar
 
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.config.schemas.server_schema import ServerConfig
 from orb.domain.base.ports.configuration_port import ConfigurationPort
-from orb.application.ports.scheduler_port import SchedulerPort
 from orb.infrastructure.di.buses import CommandBus, QueryBus
 from orb.infrastructure.di.container import get_container
 

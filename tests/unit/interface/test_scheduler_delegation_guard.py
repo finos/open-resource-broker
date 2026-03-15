@@ -7,9 +7,9 @@ scheduler.format_request_status_response.
 
 import argparse
 import importlib
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from orb.application.ports.scheduler_port import SchedulerPort
 from orb.infrastructure.di.buses import CommandBus, QueryBus
@@ -85,9 +85,10 @@ async def test_handler_delegates_to_scheduler(handler_fn, args_factory, query_re
 @pytest.mark.asyncio
 async def test_get_request_status_single_id_delegates_to_scheduler():
     """handle_get_request_status with a single request_id must delegate to scheduler."""
-    from orb.interface.request_command_handlers import handle_get_request_status
-    from orb.application.request.dto import RequestDTO
     from datetime import datetime, timezone
+
+    from orb.application.request.dto import RequestDTO
+    from orb.interface.request_command_handlers import handle_get_request_status
 
     container, command_bus, query_bus, scheduler = _mock_container_with_scheduler()
     scheduler.parse_request_data.return_value = [{"request_id": "req-123"}]
@@ -147,7 +148,7 @@ async def test_request_machines_delegates_format_request_response():
             return_value=False,
         ),
     ):
-        result = await handle_request_machines(args)
+        await handle_request_machines(args)
 
     scheduler.format_request_response.assert_called_once()
 

@@ -16,7 +16,6 @@ from orb.domain.request.aggregate import Request
 from orb.domain.request.exceptions import RequestNotFoundError
 from orb.domain.request.value_objects import RequestId, RequestStatus, RequestType
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

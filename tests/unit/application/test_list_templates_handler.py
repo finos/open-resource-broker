@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -53,9 +52,6 @@ async def test_active_only_true_filters_inactive() -> None:
 async def test_active_only_false_returns_all() -> None:
     handler, active_dto = _make_handler()
     # Re-fetch inactive from the same mock setup
-    container_get = handler._container.get.return_value
-    all_dtos = await container_get.load_templates()
-
     query = ListTemplatesQuery(active_only=False)
     result = await handler.execute_query(query)
     assert len(result) == 2

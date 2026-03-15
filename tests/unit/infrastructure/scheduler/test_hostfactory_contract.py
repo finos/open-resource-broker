@@ -7,15 +7,15 @@ These tests must not be weakened. They document the IBM HF spec requirements:
 - Template attributes object with required keys
 """
 
-import pytest
 from datetime import datetime, timezone
+
+import pytest
 
 from orb.application.request.dto import RequestDTO
 from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
     HostFactorySchedulerStrategy,
 )
 from orb.infrastructure.template.dtos import TemplateDTO
-
 
 DOMAIN_STATUSES = [
     "pending",

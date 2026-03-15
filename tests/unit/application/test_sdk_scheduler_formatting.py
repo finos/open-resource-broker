@@ -10,10 +10,8 @@ import asyncio
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
-from orb.application.request.dto import RequestDTO
 from orb.application.ports.scheduler_port import SchedulerPort
+from orb.application.request.dto import RequestDTO
 
 
 def _make_dto(status: str = "complete") -> RequestDTO:

@@ -8,11 +8,11 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.application.request.dto import RequestDTO
 
 # Import from Application layer (correct Clean Architecture)
 from orb.domain.base.ports.path_resolution_port import PathResolutionPort
-from orb.application.ports.scheduler_port import SchedulerPort
 from orb.domain.constants import PROVIDER_TYPE_AWS
 from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
 from orb.infrastructure.template.dtos import TemplateDTO

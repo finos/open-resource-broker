@@ -1,7 +1,8 @@
 """Moto integration tests for AWSInfrastructureDiscoveryService."""
 
-import pytest
 from unittest.mock import MagicMock, patch as _patch
+
+import pytest
 
 
 @pytest.fixture

@@ -10,9 +10,9 @@ from orb.application.base.infrastructure_handlers import (
     RequestContext,
 )
 from orb.application.dto.queries import GetRequestQuery, ListActiveRequestsQuery
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
-from orb.application.ports.scheduler_port import SchedulerPort
 from orb.domain.request.exceptions import RequestNotFoundError
 from orb.domain.request.request_identifiers import RequestId
 from orb.infrastructure.di.buses import CommandBus, QueryBus

@@ -74,7 +74,6 @@ class TestWaitForRequestTimeout:
             import asyncio
 
             loop = asyncio.get_event_loop()
-            original_time = loop.time
             call_count = 0
 
             def advancing_time() -> float:

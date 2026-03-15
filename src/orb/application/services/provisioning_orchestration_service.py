@@ -227,11 +227,11 @@ class ProvisioningOrchestrationService:
     ) -> ProvisioningResult:
         """Dispatch a single provisioning attempt for `count` instances."""
         try:
+            from orb.application.ports.scheduler_port import SchedulerPort
             from orb.domain.base.operations import (
                 Operation as ProviderOperation,
                 OperationType as ProviderOperationType,
             )
-            from orb.application.ports.scheduler_port import SchedulerPort
 
             scheduler = self._container.get(SchedulerPort)
 

@@ -13,9 +13,9 @@ from orb.domain.base.exceptions import DomainException
 
 async def execute_command(args, app, resource_parsers) -> Union[str, tuple[str, int]]:
     """Execute command using flat registry dispatch."""
+    from orb.application.ports.scheduler_port import SchedulerPort
     from orb.cli.registry import build_registry, lookup
     from orb.cli.response_formatter import create_cli_formatter
-    from orb.application.ports.scheduler_port import SchedulerPort
     from orb.infrastructure.di.container import get_container
 
     build_registry()

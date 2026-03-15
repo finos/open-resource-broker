@@ -3,8 +3,8 @@
 import time
 from typing import TYPE_CHECKING, Any, Union
 
-from orb.domain.base.configuration_service import DomainConfigurationService
 from orb.application.ports.scheduler_port import SchedulerPort
+from orb.domain.base.configuration_service import DomainConfigurationService
 from orb.domain.request.exceptions import RequestNotFoundError
 from orb.infrastructure.di.buses import CommandBus, QueryBus
 from orb.infrastructure.di.container import get_container
@@ -12,6 +12,7 @@ from orb.infrastructure.error.decorators import handle_interface_exceptions
 
 if TYPE_CHECKING:
     import argparse
+
     from orb.domain.base.ports.console_port import ConsolePort
 
 _WAIT_POLL_INTERVAL: int = 10

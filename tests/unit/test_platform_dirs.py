@@ -591,7 +591,7 @@ class TestIntegration:
         assert isinstance(is_system_install(), bool)
 
 
-class TestGetHealthLocation:
+class TestGetHealthLocationEdgeCases:
     """Test health directory location detection."""
 
     def test_env_override_orb_health_dir(self):
