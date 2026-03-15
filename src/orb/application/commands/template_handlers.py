@@ -96,7 +96,8 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  #
             # Persist template through repository
             with self._uow_factory.create_unit_of_work() as uow:
                 # Check if template already exists
-                existing_template = uow.templates.get_by_id(command.template_id)
+                from orb.domain.template.value_objects import TemplateId
+                existing_template = uow.templates.get_by_id(TemplateId(value=command.template_id))
                 if existing_template:
                     raise BusinessRuleError(f"Template {command.template_id} already exists")
 
@@ -183,7 +184,8 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, None]):  #
             # Update template through repository
             with self._uow_factory.create_unit_of_work() as uow:
                 # Get existing template
-                template = uow.templates.get_by_id(command.template_id)
+                from orb.domain.template.value_objects import TemplateId
+                template = uow.templates.get_by_id(TemplateId(value=command.template_id))
                 if not template:
                     raise EntityNotFoundError("Template", command.template_id)
 
