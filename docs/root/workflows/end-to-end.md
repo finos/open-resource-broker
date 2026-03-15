@@ -103,8 +103,6 @@ The resulting config file looks like:
 orb config show                        # print current config
 orb config get provider                # get a single key
 orb config set scheduler.type default  # set a single key
-orb config validate                    # validate current config
-orb config validate --file /path/to/config.json  # validate a specific file
 ```
 
 ### SDK config modes
