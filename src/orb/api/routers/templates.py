@@ -1,6 +1,5 @@
 """Template management API routes."""
 
-from datetime import datetime
 from typing import Any, Optional
 
 try:
@@ -9,7 +8,7 @@ try:
 except ImportError:
     raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
 
-from orb.api.dependencies import get_command_bus, get_query_bus
+from orb.api.dependencies import get_command_bus, get_query_bus, get_scheduler_strategy
 from orb.api.models.base import APIRequest
 from orb.application.dto.queries import GetTemplateQuery, ListTemplatesQuery, ValidateTemplateQuery
 from orb.application.template.commands import (
@@ -24,28 +23,9 @@ router = APIRouter(prefix="/templates", tags=["Templates"])
 # Module-level dependency variables to avoid B008 warnings
 QUERY_BUS = Depends(get_query_bus)
 COMMAND_BUS = Depends(get_command_bus)
+SCHEDULER_STRATEGY = Depends(get_scheduler_strategy)
 PROVIDER_API_QUERY = Query(None, description="Filter by provider API")
 TEMPLATE_DATA_BODY = Body(...)
-
-
-def _serialize_datetime_fields(data: Any) -> Any:
-    """
-    Recursively convert datetime objects to ISO format strings for JSON serialization.
-
-    Args:
-        data: Data structure that may contain datetime objects
-
-    Returns:
-        Data structure with datetime objects converted to strings
-    """
-    if isinstance(data, datetime):
-        return data.isoformat()
-    elif isinstance(data, dict):
-        return {key: _serialize_datetime_fields(value) for key, value in data.items()}
-    elif isinstance(data, list):
-        return [_serialize_datetime_fields(item) for item in data]
-    else:
-        return data
 
 
 class TemplateCreateRequest(APIRequest):
@@ -90,6 +70,7 @@ class TemplateUpdateRequest(APIRequest):
 async def list_templates(
     provider_api: Optional[str] = PROVIDER_API_QUERY,
     query_bus=QUERY_BUS,
+    scheduler=SCHEDULER_STRATEGY,
 ) -> JSONResponse:
     """
     List all available templates.
@@ -99,27 +80,9 @@ async def list_templates(
     try:
         query = ListTemplatesQuery(provider_api=provider_api, active_only=True)
         templates = await query_bus.execute(query)
-
-        serializable_templates = []
-        for template in templates:
-            if hasattr(template, "to_dict"):
-                template_dict = template.to_dict()
-            elif hasattr(template, "model_dump"):
-                template_dict = template.model_dump(by_alias=True)
-            else:
-                template_dict = template
-            template_dict = _serialize_datetime_fields(template_dict)
-            serializable_templates.append(template_dict)
-
         return JSONResponse(
             status_code=200,
-            content={
-                "templates": serializable_templates,
-                "total_count": len(templates),
-                "message": f"Retrieved {len(templates)} templates successfully",
-                "success": True,
-                "timestamp": datetime.now().isoformat(),
-            },
+            content=scheduler.format_templates_response(templates),
         )
 
     except HTTPException:
@@ -133,6 +96,7 @@ async def list_templates(
 async def get_template(
     template_id: str,
     query_bus=QUERY_BUS,
+    scheduler=SCHEDULER_STRATEGY,
 ) -> JSONResponse:
     """
     Get a specific template by ID.
@@ -144,20 +108,9 @@ async def get_template(
         template = await query_bus.execute(query)
 
         if template:
-            if hasattr(template, "to_dict"):
-                template_dict = template.to_dict()
-            elif hasattr(template, "model_dump"):
-                template_dict = template.model_dump(by_alias=True)
-            else:
-                template_dict = template
-            template_dict = _serialize_datetime_fields(template_dict)
-
             return JSONResponse(
                 status_code=200,
-                content={
-                    "template": template_dict,
-                    "timestamp": datetime.now().isoformat(),
-                },
+                content={"template": scheduler.format_template_for_display(template)},
             )
         else:
             raise HTTPException(status_code=404, detail=f"Template {template_id} not found")
@@ -197,9 +150,8 @@ async def create_template(
         return JSONResponse(
             status_code=201,
             content={
-                "message": f"Template {template_dict['template_id']} created successfully",
-                "templateId": template_dict["template_id"],
-                "timestamp": datetime.now().isoformat(),
+                "template_id": template_dict["template_id"],
+                "status": "created",
             },
         )
 
@@ -239,9 +191,8 @@ async def update_template(
         return JSONResponse(
             status_code=200,
             content={
-                "message": f"Template {template_id} updated successfully",
-                "templateId": template_id,
-                "timestamp": datetime.now().isoformat(),
+                "template_id": template_id,
+                "status": "updated",
             },
         )
 
@@ -266,9 +217,8 @@ async def delete_template(template_id: str, command_bus=COMMAND_BUS) -> JSONResp
         return JSONResponse(
             status_code=200,
             content={
-                "message": f"Template {template_id} deleted successfully",
-                "templateId": template_id,
-                "timestamp": datetime.now().isoformat(),
+                "template_id": template_id,
+                "status": "deleted",
             },
         )
 
@@ -303,14 +253,13 @@ async def validate_template(
             status_code=200,
             content={
                 "valid": is_valid,
-                "templateId": template_data.get("template_id", "validation-template"),
-                "validationErrors": (
+                "template_id": template_data.get("template_id", "validation-template"),
+                "validation_errors": (
                     validation_result.errors if hasattr(validation_result, "errors") else []
                 ),
-                "validationWarnings": (
+                "validation_warnings": (
                     validation_result.warnings if hasattr(validation_result, "warnings") else []
                 ),
-                "timestamp": datetime.now().isoformat(),
             },
         )
 
@@ -322,23 +271,16 @@ async def validate_template(
 
 @router.post("/refresh", summary="Refresh Templates", description="Refresh template cache")
 @handle_rest_exceptions(endpoint="/api/v1/templates/refresh", method="POST")
-async def refresh_templates(query_bus=QUERY_BUS) -> JSONResponse:
+async def refresh_templates(query_bus=QUERY_BUS, scheduler=SCHEDULER_STRATEGY) -> JSONResponse:
     """
     Refresh template cache and reload from files.
     """
     try:
         query = ListTemplatesQuery(provider_api=None, active_only=True)
         templates = await query_bus.execute(query)
-        template_count = len(templates) if templates else 0
-
         return JSONResponse(
             status_code=200,
-            content={
-                "message": f"Templates refreshed successfully. Found {template_count} templates.",
-                "templateCount": template_count,
-                "cacheStats": {"refreshed": True},
-                "timestamp": datetime.now().isoformat(),
-            },
+            content=scheduler.format_templates_response(templates),
         )
 
     except HTTPException:

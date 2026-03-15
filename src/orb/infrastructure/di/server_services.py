@@ -90,6 +90,7 @@ def _register_api_handlers(container: DIContainer) -> None:
                 lambda c: RequestMachinesRESTHandler(
                     query_bus=c.get(QueryBus),
                     command_bus=c.get(CommandBus),
+                    scheduler_strategy=c.get(SchedulerPort),
                     logger=c.get(LoggingPort),
                     error_handler=(
                         c.get(ErrorHandlingPort) if c.is_registered(ErrorHandlingPort) else None

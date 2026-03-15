@@ -4,6 +4,7 @@ from typing import TypeVar
 
 from orb.config.schemas.server_schema import ServerConfig
 from orb.domain.base.ports.configuration_port import ConfigurationPort
+from orb.domain.base.ports.scheduler_port import SchedulerPort
 from orb.infrastructure.di.buses import CommandBus, QueryBus
 from orb.infrastructure.di.container import get_container
 
@@ -43,6 +44,12 @@ def get_command_bus() -> CommandBus:
     """Get CommandBus from DI container."""
     container = get_di_container()
     return container.get(CommandBus)
+
+
+def get_scheduler_strategy() -> SchedulerPort:
+    """Get SchedulerPort from DI container."""
+    container = get_di_container()
+    return container.get(SchedulerPort)
 
 
 def get_config_manager() -> ConfigurationPort:

@@ -4,7 +4,6 @@ from typing import Any, Optional
 
 try:
     from fastapi import APIRouter, Depends, Query
-    from fastapi.encoders import jsonable_encoder
     from fastapi.responses import JSONResponse
     from pydantic import AliasChoices, Field
 except ImportError:
@@ -14,6 +13,7 @@ from orb.api.dependencies import (
     get_query_bus,
     get_request_machines_handler,
     get_return_machines_handler,
+    get_scheduler_strategy,
 )
 from orb.api.models.base import APIRequest
 from orb.infrastructure.error.decorators import handle_rest_exceptions
@@ -24,6 +24,7 @@ router = APIRouter(prefix="/machines", tags=["Machines"])
 REQUEST_MACHINES_HANDLER = Depends(get_request_machines_handler)
 RETURN_MACHINES_HANDLER = Depends(get_return_machines_handler)
 QUERY_BUS = Depends(get_query_bus)
+SCHEDULER_STRATEGY = Depends(get_scheduler_strategy)
 STATUS_QUERY = Query(None, description="Filter by machine status")
 REQUEST_ID_QUERY = Query(None, description="Filter by request ID")
 LIMIT_QUERY = Query(None, description="Limit number of results")
@@ -79,22 +80,7 @@ async def request_machines(
     request_model = RequestMachinesModel(template=template_payload)
 
     result = await handler.handle(request_model)
-
-    # Serialize DTO to snake_case then convert to camelCase at the API boundary
-    if hasattr(result, "to_dict"):
-        dto_dict = result.to_dict()
-    elif hasattr(result, "model_dump"):
-        dto_dict = result.model_dump()
-    else:
-        dto_dict = result
-
-    # camelCase conversion at the REST serialization boundary
-    response_content = {
-        "requestId": dto_dict.get("request_id", dto_dict.get("requestId", "")),
-        "message": dto_dict.get("message", ""),
-    }
-
-    return JSONResponse(content=response_content, status_code=202)
+    return JSONResponse(content=result, status_code=202)
 
 
 @router.post("/return", summary="Return Machines", description="Return machines to the provider")
@@ -113,8 +99,7 @@ async def return_machines(
         "clean": False,
     }
     result = await handler.handle(api_request)
-
-    return JSONResponse(content=jsonable_encoder(result))
+    return JSONResponse(content=result)
 
 
 @router.get("/", summary="List Machines", description="List machines with optional filtering")
@@ -124,25 +109,21 @@ async def list_machines(
     request_id: Optional[str] = REQUEST_ID_QUERY,
     limit: int = Query(50),
     query_bus=QUERY_BUS,
+    scheduler=SCHEDULER_STRATEGY,
 ) -> JSONResponse:
     from orb.application.dto.queries import ListMachinesQuery
 
     query = ListMachinesQuery(status=status, request_id=request_id, limit=limit)
     results = await query_bus.execute(query)
-    serialized = (
-        [r.to_dict() if hasattr(r, "to_dict") else r for r in results]
-        if isinstance(results, list)
-        else results
-    )
-    return JSONResponse(content=jsonable_encoder(serialized))
+    return JSONResponse(content=scheduler.format_machine_status_response(results))
 
 
 @router.get("/{machine_id}", summary="Get Machine", description="Get specific machine details")
 @handle_rest_exceptions(endpoint="/api/v1/machines/{machine_id}", method="GET")
-async def get_machine(machine_id: str, query_bus=QUERY_BUS) -> JSONResponse:
+async def get_machine(machine_id: str, query_bus=QUERY_BUS, scheduler=SCHEDULER_STRATEGY) -> JSONResponse:
     from orb.application.dto.queries import GetMachineQuery
 
     query = GetMachineQuery(machine_id=machine_id)
     result = await query_bus.execute(query)
     data = result.to_dict() if hasattr(result, "to_dict") else result
-    return JSONResponse(content=jsonable_encoder(data))
+    return JSONResponse(content=scheduler.format_machine_details_response(data))

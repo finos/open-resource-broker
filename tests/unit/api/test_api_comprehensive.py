@@ -8,7 +8,6 @@ import pytest
 
 from orb.api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
 from orb.application.dto.queries import GetRequestQuery, ListActiveRequestsQuery
-from orb.application.request.dto import RequestStatusResponse
 
 # Check if FastAPI is available
 try:
@@ -215,6 +214,9 @@ class TestRequestStatusHandlerBehaviour:
 
         # Scheduler strategy formats the response dict
         scheduler = Mock()
+        scheduler.format_request_status_response.return_value = {
+            "requests": [{"request_id": "req-12345678-1234-1234-1234-123456789012", "status": "complete"}]
+        }
         handler = GetRequestStatusRESTHandler(
             query_bus=query_bus,
             command_bus=command_bus,
@@ -232,12 +234,10 @@ class TestRequestStatusHandlerBehaviour:
 
         result = await handler.handle(api_request)
 
-        # post_process_response no longer calls format_request_response (correct — that was
-        # the wrong formatter for status responses). Verify the response is correctly structured.
-        result_dict = result.model_dump() if hasattr(result, "model_dump") else result
-        assert (
-            result_dict["requests"][0]["request_id"] == "req-12345678-1234-1234-1234-123456789012"
-        )
+        # handler now returns a plain dict from scheduler.format_request_status_response
+        assert isinstance(result, dict)
+        assert result["requests"][0]["request_id"] == "req-12345678-1234-1234-1234-123456789012"
+        scheduler.format_request_status_response.assert_called_once()
 
         # Ensure the correct query type was used
         query_bus.execute.assert_awaited_once()
@@ -253,9 +253,9 @@ class TestRequestStatusHandlerBehaviour:
         query_bus.execute = AsyncMock(return_value=[mock_req])
 
         scheduler = Mock()
-        scheduler.format_request_response = AsyncMock(
-            return_value={"requests": [{"request_id": "req-2", "status": "running"}]}
-        )
+        scheduler.format_request_status_response.return_value = {
+            "requests": [{"request_id": "req-2", "status": "running"}]
+        }
 
         handler = GetRequestStatusRESTHandler(
             query_bus=query_bus,
@@ -271,23 +271,21 @@ class TestRequestStatusHandlerBehaviour:
 
         query_bus.execute.assert_awaited_once()
         assert isinstance(query_bus.execute.call_args.args[0], ListActiveRequestsQuery)
-        result_dict = result.model_dump() if hasattr(result, "model_dump") else result
-        assert result_dict["requests"][0]["request_id"] == "req-2"
+        assert isinstance(result, dict)
+        assert result["requests"][0]["request_id"] == "req-2"
 
     @pytest.mark.asyncio
     async def test_long_requests_use_get_request_query(self):
         query_bus = Mock()
         command_bus = Mock()
         scheduler = Mock()
-        scheduler.format_request_response = AsyncMock(
-            return_value={
-                "requests": [
-                    {"request_id": "req-87654321-4321-4321-4321-210987654321", "status": "complete"}
-                ]
-            }
-        )
+        scheduler.format_request_status_response.return_value = {
+            "requests": [
+                {"request_id": "req-87654321-4321-4321-4321-210987654321", "status": "complete"}
+            ]
+        }
 
-        query_bus.execute = AsyncMock(return_value=RequestStatusResponse(requests=[]))
+        query_bus.execute = AsyncMock(return_value=Mock())
 
         handler = GetRequestStatusRESTHandler(
             query_bus=query_bus,
