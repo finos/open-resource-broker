@@ -192,16 +192,24 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, None]):  #
 
                 # Update template properties
                 if command.name is not None:
-                    template.update_name(command.name)
+                    template = template.update_name(command.name)
                     changes["name"] = command.name
 
                 if command.description is not None:
-                    template.update_description(command.description)
+                    template = template.update_description(command.description)
                     changes["description"] = command.description
 
                 if command.configuration:
-                    template.update_configuration(command.configuration)
+                    template = template.update_configuration(command.configuration)
                     changes["configuration"] = command.configuration
+
+                if command.instance_type is not None:
+                    template = template.update_instance_type(command.instance_type)
+                    changes["instance_type"] = command.instance_type
+
+                if command.image_id is not None:
+                    template = template.update_image_id(command.image_id)
+                    changes["image_id"] = command.image_id
 
                 # Save changes
                 uow.templates.update(template)

@@ -21,6 +21,7 @@ class Template(BaseModel):
     description: Optional[str] = None
 
     # Instance configuration
+    instance_type: Optional[str] = None
     image_id: Optional[str] = None
     max_instances: int = 1
 
@@ -171,6 +172,22 @@ class Template(BaseModel):
     def subnet_id(self) -> Optional[str]:
         """Convenience property for single subnet access."""
         return self.subnet_ids[0] if self.subnet_ids else None
+
+    def update_name(self, new_name: str) -> "Template":
+        """Update the name and return a new template instance."""
+        return self.model_copy(update={"name": new_name})
+
+    def update_description(self, new_description: str) -> "Template":
+        """Update the description and return a new template instance."""
+        return self.model_copy(update={"description": new_description})
+
+    def update_configuration(self, configuration: dict) -> "Template":
+        """Update configuration fields and return a new template instance."""
+        return self.model_copy(update=configuration)
+
+    def update_instance_type(self, new_instance_type: str) -> "Template":
+        """Update the instance type and return a new template instance."""
+        return self.model_copy(update={"instance_type": new_instance_type})
 
     def update_image_id(self, new_image_id: str) -> "Template":
         """Update the image ID and return a new template instance."""

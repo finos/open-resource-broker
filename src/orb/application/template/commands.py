@@ -36,6 +36,8 @@ class UpdateTemplateCommand(BaseCommand):
     template_id: str
     name: Optional[str] = None
     description: Optional[str] = None
+    instance_type: Optional[str] = None
+    image_id: Optional[str] = None
     configuration: dict[str, Any] = Field(default_factory=dict)
 
     # Mutable result fields for CQRS compliance
