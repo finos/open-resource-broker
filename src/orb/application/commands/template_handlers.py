@@ -286,7 +286,7 @@ class DeleteTemplateHandler(BaseCommandHandler[DeleteTemplateCommand, None]):  #
                 # Check if template is in use (business rule)
                 # This could be expanded to check for active requests using this
                 # template
-                if template.is_in_use():
+                if hasattr(template, "is_in_use") and template.is_in_use():
                     raise BusinessRuleError(
                         f"Cannot delete template {command.template_id}: template is in use"
                     )
