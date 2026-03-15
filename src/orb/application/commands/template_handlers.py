@@ -97,7 +97,6 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  #
                 subnet_ids=command.configuration.get("subnet_ids", []),
                 security_group_ids=command.configuration.get("security_group_ids", []),
                 tags=command.tags,
-                configuration=command.configuration,
             )
 
             # Persist template through repository
@@ -292,7 +291,7 @@ class DeleteTemplateHandler(BaseCommandHandler[DeleteTemplateCommand, None]):  #
                     )
 
                 # Delete template
-                uow.templates.delete(template)
+                uow.templates.delete(template_id)
 
                 self.logger.info("Template deleted successfully: %s", command.template_id)
 
