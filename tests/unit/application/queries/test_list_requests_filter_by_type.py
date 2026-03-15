@@ -92,9 +92,7 @@ def _run_handler_with_requests(all_requests, query):
     )
 
     # Patch RequestDTOFactory so we don't need full domain wiring
-    with patch(
-        "orb.application.factories.request_dto_factory.RequestDTOFactory"
-    ) as MockFactory:
+    with patch("orb.application.factories.request_dto_factory.RequestDTOFactory") as MockFactory:
         mock_dto_factory = MagicMock()
         MockFactory.return_value = mock_dto_factory
         mock_dto_factory.create_from_domain.side_effect = lambda req, machines: SimpleNamespace(
@@ -112,9 +110,7 @@ def test_list_requests_filter_by_acquire_type():
     acquire = _make_request(RequestType.ACQUIRE, "acq-1")
     ret = _make_request(RequestType.RETURN, "ret-1")
 
-    results = _run_handler_with_requests(
-        [acquire, ret], ListRequestsQuery(request_type="acquire")
-    )
+    results = _run_handler_with_requests([acquire, ret], ListRequestsQuery(request_type="acquire"))
 
     assert len(results) == 1
     assert results[0].request_type == "acquire"
@@ -125,9 +121,7 @@ def test_list_requests_filter_by_return_type():
     acquire = _make_request(RequestType.ACQUIRE, "acq-1")
     ret = _make_request(RequestType.RETURN, "ret-1")
 
-    results = _run_handler_with_requests(
-        [acquire, ret], ListRequestsQuery(request_type="return")
-    )
+    results = _run_handler_with_requests([acquire, ret], ListRequestsQuery(request_type="return"))
 
     assert len(results) == 1
     assert results[0].request_type == "return"

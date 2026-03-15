@@ -72,6 +72,7 @@ class TestWaitForRequestTimeout:
         with patch("asyncio.sleep", new_callable=AsyncMock):
             # Patch get_event_loop().time() to advance past deadline after first poll
             import asyncio
+
             loop = asyncio.get_event_loop()
             original_time = loop.time
             call_count = 0
@@ -98,6 +99,7 @@ class TestWaitForRequestTimeout:
         client.get_request = AsyncMock(return_value={"status": "in_progress"})  # type: ignore[attr-defined]
 
         import asyncio
+
         loop = asyncio.get_event_loop()
 
         # With timeout=0, deadline == start time, so remaining <= 0 after first poll
@@ -129,9 +131,7 @@ class TestWaitForReturnDelegates:
             new_callable=AsyncMock,
             return_value=expected,
         ) as mock_wait:
-            result = await client.wait_for_return(
-                "ret-1", timeout=120.0, poll_interval=5.0
-            )
+            result = await client.wait_for_return("ret-1", timeout=120.0, poll_interval=5.0)
 
         assert result == expected
         mock_wait.assert_called_once_with("ret-1", timeout=120.0, poll_interval=5.0)

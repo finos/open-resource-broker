@@ -22,8 +22,8 @@ from orb.domain.request.value_objects import RequestId, RequestStatus, RequestTy
 # ---------------------------------------------------------------------------
 
 _ID_FALLBACK = "req-00000000-0000-0000-0000-000000000001"
-_ID_SUCCESS  = "req-00000000-0000-0000-0000-000000000002"
-_ID_MISSING  = "req-00000000-0000-0000-0000-000000000003"
+_ID_SUCCESS = "req-00000000-0000-0000-0000-000000000002"
+_ID_MISSING = "req-00000000-0000-0000-0000-000000000003"
 
 
 def _make_request(request_id: str = "req-00000000-0000-0000-0000-000000000004") -> Request:
@@ -111,6 +111,7 @@ def _make_handler(
 # Tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_get_request_falls_back_to_stored_state_on_sync_error():
     """When sync raises, handler returns a DTO from the pre-sync request and does NOT write cache."""
@@ -158,9 +159,7 @@ async def test_get_request_raises_entity_not_found_when_missing():
     request = _make_request(_ID_MISSING)
 
     handler, mock_query_service, _ = _make_handler(request, sync_side_effect=None)
-    mock_query_service.get_request = AsyncMock(
-        side_effect=RequestNotFoundError(_ID_MISSING)
-    )
+    mock_query_service.get_request = AsyncMock(side_effect=RequestNotFoundError(_ID_MISSING))
 
     query = GetRequestQuery(request_id=_ID_MISSING)
     with pytest.raises(EntityNotFoundError):

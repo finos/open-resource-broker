@@ -102,9 +102,7 @@ class TestRequestMachinesWait:
         _setup_scheduler(scheduler)
         query_bus.execute.return_value = _make_dto("pending")
 
-        args = _make_namespace(
-            template_id="t1", machine_count=1, metadata={}, wait=True, timeout=0
-        )
+        args = _make_namespace(template_id="t1", machine_count=1, metadata={}, wait=True, timeout=0)
 
         p1, p2, p3 = _base_patches(container)
         with p1, p2, p3, patch("asyncio.sleep") as mock_sleep:
@@ -146,9 +144,9 @@ class TestRequestMachinesWait:
 
         # Sequence: initial fetch=pending, poll1=pending, poll2=pending, poll3=complete
         query_bus.execute.side_effect = [
-            _make_dto("pending"),   # initial fetch after command
-            _make_dto("pending"),   # poll 1
-            _make_dto("pending"),   # poll 2
+            _make_dto("pending"),  # initial fetch after command
+            _make_dto("pending"),  # poll 1
+            _make_dto("pending"),  # poll 2
             _make_dto("complete"),  # poll 3 — terminal
         ]
 
@@ -177,14 +175,16 @@ class TestRequestMachinesWait:
         # Always return pending
         query_bus.execute.return_value = _make_dto("pending")
 
-        args = _make_namespace(
-            template_id="t1", machine_count=1, metadata={}, wait=True, timeout=1
-        )
+        args = _make_namespace(template_id="t1", machine_count=1, metadata={}, wait=True, timeout=1)
 
         p1, p2, p3 = _base_patches(container)
         # Freeze time so deadline is immediately exceeded after first poll
-        with p1, p2, p3, patch("asyncio.sleep", new_callable=AsyncMock), patch(
-            "time.monotonic", side_effect=[0.0, 0.0, 2.0]
+        with (
+            p1,
+            p2,
+            p3,
+            patch("asyncio.sleep", new_callable=AsyncMock),
+            patch("time.monotonic", side_effect=[0.0, 0.0, 2.0]),
         ):
             from orb.interface.request_command_handlers import handle_request_machines
 

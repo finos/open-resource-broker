@@ -232,8 +232,8 @@ async def demo_wait_for_request(sdk, request_id: str) -> dict | None:
         # or timeout expires (raises TimeoutError).
         final = await sdk.wait_for_request(
             request_id,
-            timeout=300.0,      # 5 minutes
-            poll_interval=10.0, # check every 10 seconds
+            timeout=300.0,  # 5 minutes
+            poll_interval=10.0,  # check every 10 seconds
         )
         status = final.get("status", "<unknown>") if isinstance(final, dict) else final
         print(f"    Request completed with status: {status}")
@@ -423,7 +423,11 @@ async def main() -> int:
             machine_ids = []
             if final_request and isinstance(final_request, dict):
                 machines = final_request.get("machines", [])
-                machine_ids = [m.get("machine_id") or m.get("id") for m in machines if m.get("machine_id") or m.get("id")]
+                machine_ids = [
+                    m.get("machine_id") or m.get("id")
+                    for m in machines
+                    if m.get("machine_id") or m.get("id")
+                ]
                 print(f"\n    Extracted {len(machine_ids)} machine ID(s) from completed request")
 
             return_request_id = None

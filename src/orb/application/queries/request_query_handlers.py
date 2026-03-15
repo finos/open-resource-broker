@@ -182,7 +182,11 @@ class ListRequestsHandler(BaseQueryHandler[ListRequestsQuery, list[RequestDTO]])
                     requests = [r for r in requests if r.template_id == query.template_id]
 
                 if query.request_type:
-                    requests = [r for r in requests if getattr(r, "request_type", None) == query.request_type]
+                    requests = [
+                        r
+                        for r in requests
+                        if getattr(r, "request_type", None) == query.request_type
+                    ]
 
                 total_count = len(requests)
                 start_idx = query.offset or 0

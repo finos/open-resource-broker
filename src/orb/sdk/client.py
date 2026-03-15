@@ -530,7 +530,9 @@ class ORBClient:
         while True:
             result = await self.get_request(request_id=request_id)
             status_str = (
-                result.get("status", "") if isinstance(result, dict) else getattr(result, "status", "")
+                result.get("status", "")
+                if isinstance(result, dict)
+                else getattr(result, "status", "")
             )
             try:
                 if RequestStatus(status_str).is_terminal():

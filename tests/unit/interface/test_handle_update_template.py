@@ -17,6 +17,7 @@ from orb.interface.template_command_handlers import handle_update_template
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_args(**kwargs: Any) -> argparse.Namespace:
     defaults = {
         "template_id": None,
@@ -55,15 +56,20 @@ def _patch_dry_run(active: bool = False):
 # Tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_update_reads_name_from_file(tmp_path: Path) -> None:
     """JSON file fields are passed through to the command."""
     template_file = tmp_path / "tmpl.json"
-    template_file.write_text(json.dumps({
-        "name": "my-template",
-        "description": "a description",
-        "configuration": {"key": "value"},
-    }))
+    template_file.write_text(
+        json.dumps(
+            {
+                "name": "my-template",
+                "description": "a description",
+                "configuration": {"key": "value"},
+            }
+        )
+    )
 
     bus = _mock_command_bus()
     args = _make_args(template_id="tpl-1", file=str(template_file))
@@ -162,11 +168,15 @@ async def test_update_template_id_from_file_when_no_cli_arg(tmp_path: Path) -> N
 async def test_update_unknown_fields_ignored(tmp_path: Path) -> None:
     """Extra keys in the JSON file do not cause errors."""
     template_file = tmp_path / "tmpl.json"
-    template_file.write_text(json.dumps({
-        "name": "n",
-        "unknown_field": "should be ignored",
-        "another_extra": 42,
-    }))
+    template_file.write_text(
+        json.dumps(
+            {
+                "name": "n",
+                "unknown_field": "should be ignored",
+                "another_extra": 42,
+            }
+        )
+    )
 
     bus = _mock_command_bus()
     args = _make_args(template_id="tpl-1", file=str(template_file))
