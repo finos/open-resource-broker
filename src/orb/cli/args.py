@@ -155,6 +155,11 @@ def add_request_actions(subparsers):
         help="Filter by request status (specific filter)",
     )
     requests_list.add_argument("--template-id", help="Filter by template ID (specific filter)")
+    requests_list.add_argument(
+        "--request-type",
+        choices=["acquire", "return"],
+        help="Filter by request type (specific filter)",
+    )
 
     requests_show = subparsers.add_parser("show", help="Show request details")
     add_global_arguments(requests_show)

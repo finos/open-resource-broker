@@ -1,5 +1,6 @@
 """Request-related command handlers for the interface layer."""
 
+import time
 from typing import TYPE_CHECKING, Any, Union
 
 from orb.domain.base.configuration_service import DomainConfigurationService
@@ -11,6 +12,42 @@ from orb.infrastructure.error.decorators import handle_interface_exceptions
 
 if TYPE_CHECKING:
     import argparse
+    from orb.domain.base.ports.console_port import ConsolePort
+
+_WAIT_POLL_INTERVAL: int = 10
+
+
+async def _poll_until_terminal(
+    request_id: str,
+    timeout_seconds: int,
+    poll_interval: int,
+    query_bus: QueryBus,
+    console: "ConsolePort",
+) -> Any:
+    """Poll GetRequestQuery until the request reaches a terminal status or timeout."""
+    import asyncio
+
+    from orb.application.dto.queries import GetRequestQuery
+    from orb.domain.request.request_types import RequestStatus
+
+    deadline = time.monotonic() + timeout_seconds
+
+    while True:
+        query = GetRequestQuery(request_id=request_id)
+        request_dto = await query_bus.execute(query)
+        status_str = request_dto.status if request_dto else "pending"
+
+        if RequestStatus(status_str).is_terminal():
+            return request_dto
+
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            console.warning(
+                f"Timed out waiting for request {request_id} after {timeout_seconds} seconds"
+            )
+            raise SystemExit(1)
+
+        await asyncio.sleep(min(poll_interval, remaining))
 
 
 @handle_interface_exceptions(context="get_request_status", interface_type="cli")
@@ -265,6 +302,37 @@ async def handle_request_machines(
             "status": status,
             "status_message": error_msg,
         }
+
+        # --wait: poll until terminal status or timeout
+        wait = getattr(args, "wait", False)
+        timeout_seconds = getattr(args, "timeout", 300)
+        if wait and timeout_seconds > 0:
+            from orb.domain.base.ports.console_port import ConsolePort
+
+            console = container.get(ConsolePort)
+            request_dto = await _poll_until_terminal(
+                request_id=request_id,
+                timeout_seconds=timeout_seconds,
+                poll_interval=_WAIT_POLL_INTERVAL,
+                query_bus=query_bus,
+                console=console,
+            )
+            # Rebuild request_data from final polled state
+            resource_ids = getattr(request_dto, "resource_ids", []) if request_dto else []
+            status = request_dto.status if request_dto else status
+            error_msg = None
+            if request_dto and hasattr(request_dto, "metadata"):
+                if isinstance(request_dto.metadata, dict):
+                    error_msg = request_dto.metadata.get("error_message")
+                else:
+                    error_msg = getattr(request_dto.metadata, "error_message", None)
+            request_data = {
+                "request_id": request_id,
+                "resource_ids": resource_ids,
+                "template_id": template_id,
+                "status": status,
+                "status_message": error_msg,
+            }
 
         # Return success response using scheduler strategy formatting
         if scheduler_strategy:
