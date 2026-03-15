@@ -432,7 +432,7 @@ class ORBClient:
 
     # Template operations
     async def get_template(self, *, template_id: str, **kwargs: Any) -> Any: ...
-    async def list_templates(self, *, active_only: bool = True, **kwargs: Any) -> Any: ...
+    async def list_templates(self, *, active_only: bool = False, **kwargs: Any) -> Any: ...
     async def validate_template(self, *, template_id: str, **kwargs: Any) -> Any: ...
     async def get_configuration(self, **kwargs: Any) -> Any: ...
     async def create_template(self, *, template_id: str, **kwargs: Any) -> Any: ...
@@ -507,6 +507,58 @@ class ORBClient:
     async def validate_provider_state(self, **kwargs: Any) -> Any: ...
     async def reload_provider_config(self, **kwargs: Any) -> Any: ...
     async def set_configuration(self, **kwargs: Any) -> Any: ...
+
+    async def wait_for_request(
+        self,
+        request_id: str,
+        *,
+        timeout: float = 300.0,
+        poll_interval: float = 10.0,
+    ) -> dict[str, Any]:
+        """Poll until the request reaches a terminal status or timeout expires.
+
+        Raises:
+            SDKError: If the SDK is not initialized.
+            TimeoutError: If timeout expires before terminal status.
+        """
+        if not self._initialized:
+            raise SDKError("SDK not initialized. Use as async context manager.")
+
+        from orb.domain.request.request_types import RequestStatus
+
+        deadline = asyncio.get_event_loop().time() + timeout
+        while True:
+            result = await self.get_request(request_id=request_id)
+            status_str = (
+                result.get("status", "") if isinstance(result, dict) else getattr(result, "status", "")
+            )
+            try:
+                if RequestStatus(status_str).is_terminal():
+                    return result  # type: ignore[return-value]
+            except ValueError:
+                pass
+
+            remaining = deadline - asyncio.get_event_loop().time()
+            if remaining <= 0:
+                raise TimeoutError(
+                    f"Request {request_id!r} did not reach terminal status within {timeout}s. "
+                    f"Last status: {status_str!r}"
+                )
+            await asyncio.sleep(min(poll_interval, remaining))
+
+    async def wait_for_return(
+        self,
+        return_request_id: str,
+        *,
+        timeout: float = 300.0,
+        poll_interval: float = 10.0,
+    ) -> dict[str, Any]:
+        """Poll until the return request reaches a terminal status or timeout expires."""
+        return await self.wait_for_request(
+            return_request_id,
+            timeout=timeout,
+            poll_interval=poll_interval,
+        )
 
     def __repr__(self) -> str:
         """Return string representation of SDK instance."""

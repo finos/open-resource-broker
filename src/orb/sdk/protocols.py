@@ -49,6 +49,20 @@ class ORBClientProtocol(Protocol):
     async def complete_request(self, *, request_id: str, **kwargs: Any) -> None: ...
     async def sync_request(self, *, request_id: str, **kwargs: Any) -> None: ...
     async def populate_machine_ids(self, *, request_id: str, **kwargs: Any) -> None: ...
+    async def wait_for_request(
+        self,
+        request_id: str,
+        *,
+        timeout: float = 300.0,
+        poll_interval: float = 10.0,
+    ) -> dict[str, Any]: ...
+    async def wait_for_return(
+        self,
+        return_request_id: str,
+        *,
+        timeout: float = 300.0,
+        poll_interval: float = 10.0,
+    ) -> dict[str, Any]: ...
 
     # --- Machine operations ---
     async def get_machine(self, *, machine_id: str, **kwargs: Any) -> dict[str, Any]: ...
