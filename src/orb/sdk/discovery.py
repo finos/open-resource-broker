@@ -362,6 +362,9 @@ class SDKMethodDiscovery:
         ],
         "CleanupOldRequestsCommand": ["requests_cleaned", "request_ids_found"],
         "CleanupAllResourcesCommand": ["requests_cleaned", "machines_cleaned", "total_cleaned"],
+        "CreateTemplateCommand": ["created", "validation_errors"],
+        "UpdateTemplateCommand": ["updated", "validation_errors"],
+        "DeleteTemplateCommand": ["deleted"],
     }
 
     def _extract_command_output(self, command: Any) -> Any:
