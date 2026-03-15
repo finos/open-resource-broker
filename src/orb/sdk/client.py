@@ -150,8 +150,13 @@ class ORBClient:
             if not self._query_bus or not self._command_bus:
                 raise ConfigurationError("CQRS buses not available")
 
-            # Initialize method discovery
-            self._discovery = SDKMethodDiscovery()
+            # Resolve scheduler formatting from DI container (graceful fallback if not registered)
+            from orb.domain.base.ports.scheduler_port import SchedulerPort
+
+            scheduler_port = self._container.get_optional(SchedulerPort)
+
+            # Initialize method discovery with scheduler formatting
+            self._discovery = SDKMethodDiscovery(scheduler_port=scheduler_port)
 
             # Auto-discover all handler methods using CQRS buses
             self._methods = await self._discovery.discover_cqrs_methods(
