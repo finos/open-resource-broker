@@ -51,12 +51,12 @@ def _mock_container_with_scheduler():
         ),
         (
             "orb.interface.request_command_handlers.handle_list_requests",
-            lambda: _make_namespace(),
+            _make_namespace,
             [],
         ),
         (
             "orb.interface.request_command_handlers.handle_get_return_requests",
-            lambda: _make_namespace(),
+            _make_namespace,
             [],
         ),
     ],

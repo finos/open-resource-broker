@@ -40,10 +40,15 @@ class AWSCLISpec:
 
     def generate_name(self, args: argparse.Namespace) -> str:
         """Generate a provider instance name from AWS profile and region."""
-        profile = getattr(args, "aws_profile", None) or ""
-        region = getattr(args, "aws_region", None) or ""
-        sanitized_profile = re.sub(r"[^a-zA-Z0-9\-_]", "-", profile)
-        return f"aws_{sanitized_profile}_{region}"
+        try:
+            profile = getattr(args, "aws_profile", None) or ""
+            region = getattr(args, "aws_region", None) or ""
+            sanitized_profile = re.sub(r"[^a-zA-Z0-9\-_]", "-", profile)
+            return f"aws_{sanitized_profile}_{region}"
+        except Exception:
+            # Ignore registry errors; fall through to deterministic fallback name
+            pass
+        return "aws_default"
 
     def format_display(self, config: dict[str, Any]) -> list[tuple[str, str]]:
         """Return (label, value) pairs for display."""
