@@ -1,6 +1,5 @@
 """API handler for requesting machines."""
 
-import time
 from typing import Any, Optional, cast
 
 from orb.api.models import RequestMachinesModel
