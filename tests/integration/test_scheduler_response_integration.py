@@ -189,10 +189,22 @@ def test_scheduler_type_identifiers(default_strategy, hf_strategy):
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("domain_status", [
-    "pending", "in_progress", "acquiring", "provisioning",
-    "complete", "completed", "partial", "failed", "cancelled", "timeout", "error",
-])
+@pytest.mark.parametrize(
+    "domain_status",
+    [
+        "pending",
+        "in_progress",
+        "acquiring",
+        "provisioning",
+        "complete",
+        "completed",
+        "partial",
+        "failed",
+        "cancelled",
+        "timeout",
+        "error",
+    ],
+)
 def test_hf_status_vocabulary_integration(hf_strategy, domain_status):
     """Every domain status must map to one of the 3 HF-allowed values (integration)."""
     result = hf_strategy.format_request_status_response([_make_dto(domain_status)])
@@ -212,7 +224,9 @@ def test_default_snake_case_throughout(default_strategy):
     """Default scheduler must use snake_case in all response fields."""
     dto = _make_dto("complete")
     status_result = default_strategy.format_request_status_response([dto])
-    req_result = default_strategy.format_request_response({"request_id": "req-1", "status": "pending"})
+    req_result = default_strategy.format_request_response(
+        {"request_id": "req-1", "status": "pending"}
+    )
     tpl_result = default_strategy.format_templates_response([_make_template()])
 
     # No camelCase keys anywhere

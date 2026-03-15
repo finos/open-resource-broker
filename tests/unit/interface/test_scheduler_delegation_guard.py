@@ -197,6 +197,4 @@ async def test_scheduler_port_retrieved_from_container():
 
     # Verify SchedulerPort was requested from the container
     retrieved_types = [call.args[0] for call in container.get.call_args_list]
-    assert SchedulerPort in retrieved_types, (
-        "handler must retrieve SchedulerPort from DI container"
-    )
+    assert SchedulerPort in retrieved_types, "handler must retrieve SchedulerPort from DI container"

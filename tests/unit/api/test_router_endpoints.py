@@ -234,7 +234,10 @@ class TestRequestsRouter:
     ):
         mock_scheduler = MagicMock()
         mock_scheduler.format_request_status_response.return_value = {"requests": []}
-        mock_scheduler.format_request_response.return_value = {"request_id": "req-789", "status": "cancelled"}
+        mock_scheduler.format_request_response.return_value = {
+            "request_id": "req-789",
+            "status": "cancelled",
+        }
         app.dependency_overrides[get_scheduler_strategy] = lambda: mock_scheduler
         if mock_query_bus is not None:
             app.dependency_overrides[get_query_bus] = lambda: mock_query_bus
@@ -328,9 +331,9 @@ class TestRequestsRouter:
 
     def test_get_request_status(self, requests_app):
         handler = MagicMock()
-        handler.handle = AsyncMock(return_value={
-            "requests": [{"request_id": "req-123", "status": "running"}]
-        })
+        handler.handle = AsyncMock(
+            return_value={"requests": [{"request_id": "req-123", "status": "running"}]}
+        )
         client = self._make_client(requests_app, mock_status_handler=handler)
 
         resp = client.get("/requests/req-123/status")
@@ -364,9 +367,9 @@ class TestRequestsRouter:
 
     def test_get_request_details(self, requests_app):
         handler = MagicMock()
-        handler.handle = AsyncMock(return_value={
-            "requests": [{"request_id": "req-456", "status": "complete"}]
-        })
+        handler.handle = AsyncMock(
+            return_value={"requests": [{"request_id": "req-456", "status": "complete"}]}
+        )
         client = self._make_client(requests_app, mock_status_handler=handler)
 
         resp = client.get("/requests/req-456")

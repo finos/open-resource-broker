@@ -75,9 +75,7 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, dict[str, 
             raise
 
     @handle_interface_exceptions(context="request_machines", interface_type="api")
-    async def execute_api_request(
-        self, request: RequestMachinesModel, context
-    ) -> dict[str, Any]:
+    async def execute_api_request(self, request: RequestMachinesModel, context) -> dict[str, Any]:
         """
         Execute the core API logic for requesting machines.
 
@@ -148,9 +146,7 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, dict[str, 
 
             raise
 
-    async def post_process_response(
-        self, response: dict[str, Any], context
-    ) -> dict[str, Any]:
+    async def post_process_response(self, response: dict[str, Any], context) -> dict[str, Any]:
         """
         Post-process the request machines response.
 

@@ -62,6 +62,7 @@ async def test_cli_calls_format_request_status_response():
 
     with patch("orb.interface.request_command_handlers.get_container", return_value=container):
         from orb.interface.request_command_handlers import handle_get_request_status
+
         result = await handle_get_request_status(args)
 
     scheduler.format_request_status_response.assert_called_once()
@@ -79,6 +80,7 @@ async def test_cli_format_receives_dto_list():
 
     with patch("orb.interface.request_command_handlers.get_container", return_value=container):
         from orb.interface.request_command_handlers import handle_get_request_status
+
         await handle_get_request_status(args)
 
     call_args = scheduler.format_request_status_response.call_args[0][0]
@@ -97,6 +99,7 @@ async def test_cli_all_flag_delegates_to_scheduler():
 
     with patch("orb.interface.request_command_handlers.get_container", return_value=container):
         from orb.interface.request_command_handlers import handle_get_request_status
+
         result = await handle_get_request_status(args)
 
     scheduler.format_request_status_response.assert_called_once()
@@ -113,6 +116,7 @@ def test_cli_rest_same_output_for_same_scheduler():
     from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
         HostFactorySchedulerStrategy,
     )
+
     dto = _make_request_dto("complete")
     hf = HostFactorySchedulerStrategy()
 
@@ -128,6 +132,7 @@ def test_hf_scheduler_output_is_deterministic():
     from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
         HostFactorySchedulerStrategy,
     )
+
     hf = HostFactorySchedulerStrategy()
     dto = _make_request_dto("pending")
 
@@ -138,6 +143,7 @@ def test_hf_scheduler_output_is_deterministic():
 def test_default_scheduler_output_is_deterministic():
     """Default scheduler must produce identical output for identical input."""
     from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+
     default = DefaultSchedulerStrategy()
     dto = _make_request_dto("complete")
 
@@ -208,6 +214,7 @@ async def test_cli_request_machines_delegates_format_request_response():
         ),
     ):
         from orb.interface.request_command_handlers import handle_request_machines
+
         result = await handle_request_machines(args)
 
     scheduler.format_request_response.assert_called_once()
@@ -231,6 +238,7 @@ async def test_cli_passes_scheduler_return_value_through():
 
     with patch("orb.interface.request_command_handlers.get_container", return_value=container):
         from orb.interface.request_command_handlers import handle_get_request_status
+
         result = await handle_get_request_status(args)
 
     assert result == sentinel

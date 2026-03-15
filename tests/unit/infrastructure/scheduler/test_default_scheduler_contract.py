@@ -108,14 +108,18 @@ def test_default_status_response_message_field(default_strategy):
 
 def test_default_request_response_snake_case(default_strategy):
     """format_request_response must return request_id (snake_case) for default scheduler."""
-    result = default_strategy.format_request_response({"request_id": "req-abc", "status": "pending"})
+    result = default_strategy.format_request_response(
+        {"request_id": "req-abc", "status": "pending"}
+    )
     assert "request_id" in result, "default scheduler must use snake_case 'request_id'"
     assert "requestId" not in result, "default scheduler must not use camelCase"
 
 
 def test_default_request_response_complete(default_strategy):
     """format_request_response for complete status returns request_id and message."""
-    result = default_strategy.format_request_response({"request_id": "req-abc", "status": "complete"})
+    result = default_strategy.format_request_response(
+        {"request_id": "req-abc", "status": "complete"}
+    )
     assert "request_id" in result
     assert "message" in result
 
@@ -129,12 +133,16 @@ def test_default_request_response_failed(default_strategy):
 
 def test_default_request_response_cancelled(default_strategy):
     """format_request_response for cancelled status returns error key."""
-    result = default_strategy.format_request_response({"request_id": "req-abc", "status": "cancelled"})
+    result = default_strategy.format_request_response(
+        {"request_id": "req-abc", "status": "cancelled"}
+    )
     assert "request_id" in result
     assert "error" in result
 
 
-@pytest.mark.parametrize("status", ["pending", "in_progress", "complete", "failed", "cancelled", "timeout", "partial"])
+@pytest.mark.parametrize(
+    "status", ["pending", "in_progress", "complete", "failed", "cancelled", "timeout", "partial"]
+)
 def test_default_request_response_always_snake_case(default_strategy, status):
     """format_request_response must always use snake_case regardless of status."""
     result = default_strategy.format_request_response({"request_id": "req-1", "status": status})
@@ -167,8 +175,13 @@ def test_default_templates_response_shape(default_strategy):
 def test_default_templates_response_total_count_matches(default_strategy):
     """total_count must equal the number of templates returned."""
     templates = [
-        TemplateDTO(template_id=f"tpl-{i}", name=f"T{i}", image_id="ami-abc",
-                    max_instances=1, subnet_ids=["subnet-1"])
+        TemplateDTO(
+            template_id=f"tpl-{i}",
+            name=f"T{i}",
+            image_id="ami-abc",
+            max_instances=1,
+            subnet_ids=["subnet-1"],
+        )
         for i in range(3)
     ]
     result = default_strategy.format_templates_response(templates)

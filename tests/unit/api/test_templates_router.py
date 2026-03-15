@@ -30,6 +30,7 @@ class TestTemplatesRouter:
 
     def _make_scheduler_mock(self, templates=None):
         from unittest.mock import MagicMock
+
         scheduler = MagicMock()
         scheduler.format_templates_response.side_effect = lambda t: {
             "templates": [],

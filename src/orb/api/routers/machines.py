@@ -120,7 +120,9 @@ async def list_machines(
 
 @router.get("/{machine_id}", summary="Get Machine", description="Get specific machine details")
 @handle_rest_exceptions(endpoint="/api/v1/machines/{machine_id}", method="GET")
-async def get_machine(machine_id: str, query_bus=QUERY_BUS, scheduler=SCHEDULER_STRATEGY) -> JSONResponse:
+async def get_machine(
+    machine_id: str, query_bus=QUERY_BUS, scheduler=SCHEDULER_STRATEGY
+) -> JSONResponse:
     from orb.application.dto.queries import GetMachineQuery
 
     query = GetMachineQuery(machine_id=machine_id)

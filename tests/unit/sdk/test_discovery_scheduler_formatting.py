@@ -56,7 +56,9 @@ def _make_dto(class_name: str, dict_data: dict) -> MagicMock:
 # ---------------------------------------------------------------------------
 
 
-def test_request_dto_calls_format_request_for_display(discovery_with_scheduler, mock_scheduler_port):
+def test_request_dto_calls_format_request_for_display(
+    discovery_with_scheduler, mock_scheduler_port
+):
     dto = _make_dto("RequestDTO", {"request_id": "r-1", "status": "in_progress"})
 
     result = discovery_with_scheduler._standardize_return_type(dto)

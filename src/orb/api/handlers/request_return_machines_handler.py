@@ -19,9 +19,7 @@ from orb.monitoring.metrics import MetricsCollector
 
 
 @injectable
-class RequestReturnMachinesRESTHandler(
-    BaseAPIHandler[dict[str, Any], dict[str, Any]]
-):
+class RequestReturnMachinesRESTHandler(BaseAPIHandler[dict[str, Any], dict[str, Any]]):
     """API handler for returning machines."""
 
     def __init__(

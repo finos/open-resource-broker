@@ -165,9 +165,7 @@ async def cancel_request(
     command = CancelRequestCommand(request_id=request_id, reason=reason or "Cancelled via REST API")
     await command_bus.execute(command)
     return JSONResponse(
-        content=scheduler.format_request_response(
-            {"request_id": request_id, "status": "cancelled"}
-        )
+        content=scheduler.format_request_response({"request_id": request_id, "status": "cancelled"})
     )
 
 
@@ -192,5 +190,3 @@ async def get_request_details(request_id: str, handler=REQUEST_STATUS_HANDLER) -
     }
     result = await handler.handle(api_request)
     return JSONResponse(content=result)
-
-

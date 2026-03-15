@@ -37,9 +37,7 @@ def test_sdk_raw_response_bypasses_scheduler():
     but must remain uncalled when raw_response=True is in effect.
     """
     scheduler = MagicMock(spec=SchedulerPort)
-    scheduler.format_request_status_response.return_value = {
-        "requests": [{"requestId": "r1"}]
-    }
+    scheduler.format_request_status_response.return_value = {"requests": [{"requestId": "r1"}]}
 
     # Simulate the raw_response=True path: scheduler formatting is skipped.
     # The SDK should return the DTO directly without calling format_*.
@@ -97,6 +95,7 @@ def test_hf_scheduler_output_suitable_for_sdk():
     from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
         HostFactorySchedulerStrategy,
     )
+
     hf = HostFactorySchedulerStrategy()
     result = hf.format_request_status_response([_make_dto("complete")])
 
@@ -109,6 +108,7 @@ def test_hf_scheduler_output_suitable_for_sdk():
 def test_default_scheduler_output_suitable_for_sdk():
     """Default scheduler output must be a plain dict suitable for SDK serialisation."""
     from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+
     default = DefaultSchedulerStrategy()
     result = default.format_request_status_response([_make_dto("complete")])
 
@@ -127,6 +127,7 @@ def test_hf_format_request_response_sdk_shape():
     from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
         HostFactorySchedulerStrategy,
     )
+
     hf = HostFactorySchedulerStrategy()
     result = hf.format_request_response({"request_id": "req-1", "status": "pending"})
 
@@ -137,6 +138,7 @@ def test_hf_format_request_response_sdk_shape():
 def test_default_format_request_response_sdk_shape():
     """Default format_request_response must return a dict with request_id for SDK."""
     from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+
     default = DefaultSchedulerStrategy()
     result = default.format_request_response({"request_id": "req-1", "status": "pending"})
 
@@ -154,6 +156,7 @@ def test_hf_empty_request_list():
     from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
         HostFactorySchedulerStrategy,
     )
+
     hf = HostFactorySchedulerStrategy()
     result = hf.format_request_status_response([])
     assert result["requests"] == []
@@ -162,6 +165,7 @@ def test_hf_empty_request_list():
 def test_default_empty_request_list():
     """Default scheduler must handle empty request list gracefully."""
     from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+
     default = DefaultSchedulerStrategy()
     result = default.format_request_status_response([])
     assert result["requests"] == []

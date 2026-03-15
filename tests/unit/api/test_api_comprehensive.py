@@ -215,7 +215,9 @@ class TestRequestStatusHandlerBehaviour:
         # Scheduler strategy formats the response dict
         scheduler = Mock()
         scheduler.format_request_status_response.return_value = {
-            "requests": [{"request_id": "req-12345678-1234-1234-1234-123456789012", "status": "complete"}]
+            "requests": [
+                {"request_id": "req-12345678-1234-1234-1234-123456789012", "status": "complete"}
+            ]
         }
         handler = GetRequestStatusRESTHandler(
             query_bus=query_bus,

@@ -212,7 +212,9 @@ def test_hf_request_response_failed_status(hf_strategy):
     assert "message" in result
 
 
-@pytest.mark.parametrize("status", ["pending", "in_progress", "complete", "failed", "cancelled", "timeout", "partial"])
+@pytest.mark.parametrize(
+    "status", ["pending", "in_progress", "complete", "failed", "cancelled", "timeout", "partial"]
+)
 def test_hf_request_response_always_camel_case(hf_strategy, status):
     """format_request_response must always use camelCase regardless of status."""
     result = hf_strategy.format_request_response({"request_id": "req-1", "status": status})
