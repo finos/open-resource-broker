@@ -22,6 +22,10 @@ Welcome to the Open Resource Broker documentation. ORB lets you define what comp
 - **[Clean Architecture](architecture/clean_architecture.md)** — architectural principles and patterns
 - **[System Diagrams](architecture/system_diagrams.md)** — visual architecture representations
 
+## Workflows
+
+- **[End-to-End Workflow Guide](workflows/end-to-end.md)** — complete lifecycle across CLI, SDK, REST API, and MCP
+
 ## Developer Resources
 
 - **[Developer Guide](developer_guide/architecture.md)** — development-focused guidance

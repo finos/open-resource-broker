@@ -1,9 +1,18 @@
 """
 SDK usage example for Open Resource Broker.
 
-Covers the full lifecycle: initialize, list templates, request machines,
-check status, return machines, batch operations, middleware, and method
-discovery.
+Covers the full lifecycle:
+  1. list_templates        — browse available compute templates
+  2. create_request        — submit a provisioning request
+  3. wait_for_request      — poll until terminal status (fulfilled/failed/cancelled)
+  4. extract machine IDs   — read machine IDs from result["machines"]
+  5. create_return_request — submit a return request with those machine IDs
+  6. wait_for_return       — poll until return reaches terminal status
+  7. batch operations      — concurrent requests via sdk.batch()
+  8. serialization options — format="json"/"yaml", raw_response=True
+  9. health check          — sdk.health_check()
+
+See also: docs/root/workflows/end-to-end.md for CLI, REST, and MCP equivalents.
 
 Run with:
     python docs/root/examples/sdk_usage.py
@@ -214,9 +223,33 @@ async def demo_request_machines(sdk, template_id: str, count: int, dry_run: bool
         return None
 
 
+async def demo_wait_for_request(sdk, request_id: str) -> dict | None:
+    """Wait for request to reach terminal status and return final state."""
+    print(f"\n[3] Waiting for request '{request_id}' to complete...")
+    try:
+        # wait_for_request polls every poll_interval seconds until the request
+        # reaches a terminal status (fulfilled, partially_fulfilled, failed, cancelled)
+        # or timeout expires (raises TimeoutError).
+        final = await sdk.wait_for_request(
+            request_id,
+            timeout=300.0,      # 5 minutes
+            poll_interval=10.0, # check every 10 seconds
+        )
+        status = final.get("status", "<unknown>") if isinstance(final, dict) else final
+        print(f"    Request completed with status: {status}")
+        _print_json("Final request state", final)
+        return final
+    except TimeoutError as e:
+        print(f"    Timeout: {e}")
+        return None
+    except MethodExecutionError as e:
+        print(f"    Wait failed: {e.message}")
+        return None
+
+
 async def demo_check_status(sdk, request_id: str) -> None:
-    """Check the status of a request."""
-    print(f"\n[3] Checking status of request '{request_id}'...")
+    """Check the status of a request (single poll — no wait)."""
+    print(f"\n[3a] Checking status of request '{request_id}' (single poll)...")
     try:
         result = await sdk.get_request(request_id=request_id)
         if result:
@@ -227,21 +260,46 @@ async def demo_check_status(sdk, request_id: str) -> None:
         print(f"    Status check failed: {e.message}")
 
 
-async def demo_return_machines(sdk, machine_ids: list[str], dry_run: bool) -> None:
-    """Return machines by ID."""
+async def demo_return_machines(sdk, machine_ids: list[str], dry_run: bool) -> str | None:
+    """Return machines by ID and return the return_request_id."""
     print(f"\n[4] Returning {len(machine_ids)} machine(s)...")
     if dry_run:
         print("    [dry-run] Skipping actual return.")
-        return
+        return None
     if not machine_ids:
         print("    No machine IDs provided — skipping return step.")
-        return
+        return None
 
     try:
         result = await sdk.create_return_request(machine_ids=machine_ids)
-        print(f"    Return request result: {result}")
+        return_request_id = (
+            result.get("created_request_id") or result.get("request_id") or result.get("id")
+            if isinstance(result, dict)
+            else None
+        )
+        print(f"    Return request created: {return_request_id}")
+        return return_request_id
     except MethodExecutionError as e:
         print(f"    Return failed: {e.message}")
+        return None
+
+
+async def demo_wait_for_return(sdk, return_request_id: str) -> None:
+    """Wait for return request to complete."""
+    print(f"\n[5] Waiting for return request '{return_request_id}' to complete...")
+    try:
+        # wait_for_return is an alias for wait_for_request — both poll until terminal status.
+        final = await sdk.wait_for_return(
+            return_request_id,
+            timeout=300.0,
+            poll_interval=10.0,
+        )
+        status = final.get("status", "<unknown>") if isinstance(final, dict) else final
+        print(f"    Return completed with status: {status}")
+    except TimeoutError as e:
+        print(f"    Timeout: {e}")
+    except MethodExecutionError as e:
+        print(f"    Wait failed: {e.message}")
 
 
 async def demo_batch(sdk, template_id: str, dry_run: bool) -> None:
@@ -270,7 +328,7 @@ async def demo_batch(sdk, template_id: str, dry_run: bool) -> None:
 
 async def demo_serialization(sdk) -> None:
     """Demonstrate raw_response and format serialization options."""
-    print("\n[6] Serialization options...")
+    print("\n[7] Serialization options...")
     try:
         # JSON string output
         json_str = await sdk.list_templates(format="json")
@@ -291,7 +349,7 @@ async def demo_serialization(sdk) -> None:
 
 async def demo_health(sdk) -> None:
     """Check provider health using the convenience method."""
-    print("\n[7] Provider health check...")
+    print("\n[8] Provider health check...")
     try:
         # Convenience: health_check() -> get_provider_health()
         health = await sdk.health_check()
@@ -354,20 +412,38 @@ async def main() -> int:
             else:
                 print("\n[2] No template available — skipping machine request.")
 
-            # Step 3: check status
-            if request_id:
+            # Step 3: wait for request to complete (or single poll if dry-run)
+            final_request = None
+            if request_id and not args.dry_run:
+                final_request = await demo_wait_for_request(sdk, request_id)
+            elif request_id:
                 await demo_check_status(sdk, request_id)
 
-            # Step 4: return machines (no real IDs without a live request)
-            await demo_return_machines(sdk, [], args.dry_run)
+            # Step 4: extract machine IDs and return machines
+            machine_ids = []
+            if final_request and isinstance(final_request, dict):
+                machines = final_request.get("machines", [])
+                machine_ids = [m.get("machine_id") or m.get("id") for m in machines if m.get("machine_id") or m.get("id")]
+                print(f"\n    Extracted {len(machine_ids)} machine ID(s) from completed request")
 
-            # Step 5: batch operations
+            return_request_id = None
+            if machine_ids:
+                return_request_id = await demo_return_machines(sdk, machine_ids, args.dry_run)
+            else:
+                # Demo with empty list if no real machines
+                await demo_return_machines(sdk, [], args.dry_run)
+
+            # Step 5: wait for return to complete
+            if return_request_id and not args.dry_run:
+                await demo_wait_for_return(sdk, return_request_id)
+
+            # Step 6: batch operations
             await demo_batch(sdk, template_id or "", args.dry_run)
 
-            # Step 6: serialization options
+            # Step 7: serialization options
             await demo_serialization(sdk)
 
-            # Step 7: health check
+            # Step 8: health check
             await demo_health(sdk)
 
             print("\nDone.")
