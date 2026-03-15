@@ -80,10 +80,6 @@ class SchedulerPort(ABC):
         """Format template for provider operations using scheduler-specific field mapping."""
 
     @abstractmethod
-    def format_request_for_display(self, request: Any) -> dict[str, Any]:
-        """Format request for CLI/API display using scheduler-specific field mapping."""
-
-    @abstractmethod
     def get_exit_code_for_status(self, status: str) -> int:
         """Get appropriate exit code for request status."""
 
@@ -108,10 +104,6 @@ class SchedulerPort(ABC):
     @abstractmethod
     def should_log_to_console(self) -> bool:
         """Return True if log output should be written to the console."""
-
-    @abstractmethod
-    def format_error_response(self, error: Exception, context: dict[str, Any]) -> dict[str, Any]:
-        """Format an exception into a scheduler-specific error response dict."""
 
     @abstractmethod
     def format_health_response(self, checks: list[dict[str, Any]]) -> dict[str, Any]:
