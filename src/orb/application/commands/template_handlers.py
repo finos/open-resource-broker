@@ -111,7 +111,6 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  #
 
                 # Add new template
                 uow.templates.save(template)
-                uow.commit()
 
                 self.logger.info("Template created successfully: %s", command.template_id)
 
@@ -224,7 +223,6 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, None]):  #
 
                 # Save changes
                 uow.templates.save(template)
-                uow.commit()
 
                 self.logger.info("Template updated successfully: %s", command.template_id)
 
@@ -295,7 +293,6 @@ class DeleteTemplateHandler(BaseCommandHandler[DeleteTemplateCommand, None]):  #
 
                 # Delete template
                 uow.templates.delete(template)
-                uow.commit()
 
                 self.logger.info("Template deleted successfully: %s", command.template_id)
 
