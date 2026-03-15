@@ -28,37 +28,6 @@ STATUS_QUERY = Query(None, description="Filter by request status")
 LIMIT_QUERY = Query(50, description="Limit number of results")
 
 
-@router.get(
-    "/{request_id}/status",
-    summary="Get Request Status",
-    description="Get status of a specific request",
-)
-@handle_rest_exceptions(endpoint="/api/v1/requests/{request_id}/status", method="GET")
-async def get_request_status(
-    request_id: str,
-    request: Request,
-    long: bool = Query(True, description="Include detailed info and refresh provider state"),
-    handler=REQUEST_STATUS_HANDLER,
-) -> JSONResponse:
-    """
-    Get the status of a specific request.
-
-    - **request_id**: Request identifier
-    - **long**: Include detailed information about the request
-    """
-    api_request = {
-        "input_data": {"requests": [{"requestId": request_id}]},
-        "all_flag": False,
-        "long": long,
-        "client_ip": request.client.host if request.client else None,
-        "user_agent": request.headers.get("user-agent"),
-    }
-
-    result = await handler.handle(api_request)
-
-    return JSONResponse(content=jsonable_encoder(result))
-
-
 @router.get("/", summary="List Requests", description="List requests with optional filtering")
 @handle_rest_exceptions(endpoint="/api/v1/requests", method="GET")
 async def list_requests(
@@ -113,6 +82,37 @@ async def list_return_requests(
 
 
 _TERMINAL_STATUSES = {"complete", "completed", "failed", "error", "cancelled", "canceled"}
+
+
+@router.get(
+    "/{request_id}/status",
+    summary="Get Request Status",
+    description="Get status of a specific request",
+)
+@handle_rest_exceptions(endpoint="/api/v1/requests/{request_id}/status", method="GET")
+async def get_request_status(
+    request_id: str,
+    request: Request,
+    long: bool = Query(True, description="Include detailed info and refresh provider state"),
+    handler=REQUEST_STATUS_HANDLER,
+) -> JSONResponse:
+    """
+    Get the status of a specific request.
+
+    - **request_id**: Request identifier
+    - **long**: Include detailed information about the request
+    """
+    api_request = {
+        "input_data": {"requests": [{"requestId": request_id}]},
+        "all_flag": False,
+        "long": long,
+        "client_ip": request.client.host if request.client else None,
+        "user_agent": request.headers.get("user-agent"),
+    }
+
+    result = await handler.handle(api_request)
+
+    return JSONResponse(content=jsonable_encoder(result))
 
 
 @router.get(

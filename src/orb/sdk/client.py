@@ -31,7 +31,7 @@ class ORBClient:
     Usage:
         async with ORBClient(provider="aws") as sdk:
             templates = await sdk.list_templates(active_only=True)
-            request = await sdk.create_request(template_id="basic", machine_count=5)
+            request = await sdk.create_request(template_id="basic", count=5)
             status = await sdk.get_request_status(request_id=request.id)
     """
 
