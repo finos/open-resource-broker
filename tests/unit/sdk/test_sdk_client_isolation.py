@@ -209,7 +209,7 @@ class TestRegionProfileOverrideIsolation:
             app.get_command_bus.return_value = AsyncMock()
             return app
 
-        def make_disc():
+        def make_disc(**kwargs):
             disc = MagicMock()
             disc.discover_cqrs_methods = AsyncMock(return_value={})
             return disc

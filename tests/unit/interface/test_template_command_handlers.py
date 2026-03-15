@@ -64,7 +64,7 @@ class TestHandleCreateTemplateValidateOnly:
                 "orb.infrastructure.mocking.dry_run_context.is_dry_run_active",
                 return_value=False,
             ):
-                result = asyncio.get_event_loop().run_until_complete(handle_create_template(args))
+                result = asyncio.run(handle_create_template(args))
 
         command_bus.execute.assert_not_called()
         assert result["validate_only"] is True
@@ -92,7 +92,7 @@ class TestHandleCreateTemplateValidateOnly:
                 "orb.infrastructure.mocking.dry_run_context.is_dry_run_active",
                 return_value=False,
             ):
-                result = asyncio.get_event_loop().run_until_complete(handle_create_template(args))
+                result = asyncio.run(handle_create_template(args))
 
         command_bus.execute.assert_called_once()
         assert result["success"] is True

@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from orb.application.request.dto import RequestDTO
-from orb.domain.base.ports.scheduler_port import SchedulerPort
+from orb.application.ports.scheduler_port import SchedulerPort
 
 
 def _make_dto(status: str = "complete") -> RequestDTO:
@@ -182,7 +182,6 @@ def test_scheduler_port_mock_has_required_methods():
         "format_templates_response",
         "format_machine_status_response",
         "format_template_for_display",
-        "format_request_for_display",
         "get_scheduler_type",
         "get_exit_code_for_status",
         "parse_request_data",
