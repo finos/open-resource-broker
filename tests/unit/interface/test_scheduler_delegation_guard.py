@@ -68,7 +68,7 @@ async def test_handler_delegates_to_scheduler(handler_fn, args_factory, query_re
     module = importlib.import_module(module_path)
     handler = getattr(module, fn_name)
 
-    container, command_bus, query_bus, scheduler = _mock_container_with_scheduler()
+    container, _, query_bus, scheduler = _mock_container_with_scheduler()
     query_bus.execute.return_value = query_return
 
     with patch(f"{module_path}.get_container", return_value=container):
@@ -90,7 +90,7 @@ async def test_get_request_status_single_id_delegates_to_scheduler():
     from orb.application.request.dto import RequestDTO
     from orb.interface.request_command_handlers import handle_get_request_status
 
-    container, command_bus, query_bus, scheduler = _mock_container_with_scheduler()
+    container, _, query_bus, scheduler = _mock_container_with_scheduler()
     scheduler.parse_request_data.return_value = [{"request_id": "req-123"}]
     scheduler.format_request_status_response.return_value = {"requests": []}
 
@@ -121,7 +121,7 @@ async def test_request_machines_delegates_format_request_response():
     """handle_request_machines must call scheduler.format_request_response."""
     from orb.interface.request_command_handlers import handle_request_machines
 
-    container, command_bus, query_bus, scheduler = _mock_container_with_scheduler()
+    container, _, query_bus, scheduler = _mock_container_with_scheduler()
     scheduler.parse_request_data.return_value = {
         "template_id": "t1",
         "requested_count": 1,
@@ -163,7 +163,7 @@ async def test_cancel_request_delegates_format_request_response():
     """handle_cancel_request must call scheduler.format_request_response."""
     from orb.interface.request_command_handlers import handle_cancel_request
 
-    container, command_bus, query_bus, scheduler = _mock_container_with_scheduler()
+    container, _, _, scheduler = _mock_container_with_scheduler()
     scheduler.format_request_response.return_value = {
         "request_id": "req-123",
         "status": "cancelled",
@@ -188,7 +188,7 @@ async def test_scheduler_port_retrieved_from_container():
     """Container must be asked for SchedulerPort — not bypassed."""
     from orb.interface.request_command_handlers import handle_get_return_requests
 
-    container, command_bus, query_bus, scheduler = _mock_container_with_scheduler()
+    container, _, query_bus, _ = _mock_container_with_scheduler()
     query_bus.execute.return_value = []
 
     args = _make_namespace()
