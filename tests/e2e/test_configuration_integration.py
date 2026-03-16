@@ -263,7 +263,9 @@ class TestConfigurationIntegration:
         mock_logger = Mock()
         mock_registry = Mock()
         config_builder = ProviderConfigBuilder(mock_logger, mock_registry)
-        validator = ProviderConfigValidator(cast(ConfigurationPort, config_manager), config_builder, mock_logger, mock_registry)
+        validator = ProviderConfigValidator(
+            cast(ConfigurationPort, config_manager), config_builder, mock_logger, mock_registry
+        )
 
         validation_result = validator.validate_configuration()
 
@@ -422,7 +424,9 @@ class TestConfigurationIntegration:
         config_manager = ConfigurationManager(config_path)
         mock_logger = Mock()
 
-        defaults_service = TemplateDefaultsService(cast(ConfigurationPort, config_manager), mock_logger)
+        defaults_service = TemplateDefaultsService(
+            cast(ConfigurationPort, config_manager), mock_logger
+        )
 
         # Test hierarchical default resolution
         template_dict = {

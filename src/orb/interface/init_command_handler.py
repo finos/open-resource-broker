@@ -263,7 +263,9 @@ def _interactive_setup() -> Dict[str, Any]:
         infrastructure_defaults = {}
         if discover_choice in ["y", "yes"]:
             registry = get_container().get(ProviderRegistryPort)
-            infrastructure_defaults = _discover_infrastructure(provider_type, region, profile, registry)
+            infrastructure_defaults = _discover_infrastructure(
+                provider_type, region, profile, registry
+            )
 
         # Create first provider instance
         first_provider = {
@@ -418,7 +420,9 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
         infrastructure_defaults = {}
         if discover_choice in ["y", "yes"]:
             registry = get_container().get(ProviderRegistryPort)
-            infrastructure_defaults = _discover_infrastructure(provider_type, region, profile, registry)
+            infrastructure_defaults = _discover_infrastructure(
+                provider_type, region, profile, registry
+            )
 
         return {
             "type": provider_type,
@@ -538,7 +542,6 @@ def _discover_infrastructure(
     """Discover infrastructure interactively using provider strategy."""
     console = get_container().get(ConsolePort)
     try:
-
         # Ensure provider type is registered
         if not registry.ensure_provider_type_registered(provider_type):
             console.error(f"Failed to register provider type: {provider_type}")
