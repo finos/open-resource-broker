@@ -48,7 +48,7 @@ def test_discover_infrastructure_uses_fresh_strategy():
             return_value=_mock_container(),
         ),
     ):
-        result = _mod._discover_infrastructure("aws", "us-east-1", "my-profile")
+        result = _mod._discover_infrastructure("aws", "us-east-1", "my-profile", mock_registry)
 
     mock_registry.create_strategy_by_type.assert_called_once_with(
         "aws", {"region": "us-east-1", "profile": "my-profile"}
@@ -107,7 +107,7 @@ def test_discover_infrastructure_passes_correct_region_and_profile():
         patch("orb.providers.registry.get_provider_registry", return_value=mock_registry),
         patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
     ):
-        _mod._discover_infrastructure("aws", "eu-west-2", "my-prod-profile")
+        _mod._discover_infrastructure("aws", "eu-west-2", "my-prod-profile", mock_registry)
 
     call_args = mock_registry.create_strategy_by_type.call_args
     assert call_args[0][1]["region"] == "eu-west-2"
@@ -246,7 +246,7 @@ def test_write_config_file_fleet_role_in_config_subnet_ids_in_template_defaults(
     mock_strategy.generate_provider_name.return_value = "aws_instance-profile_us-east-1"
 
     mock_factory = MagicMock()
-    mock_factory.create_strategy.return_value = mock_strategy
+    mock_factory.create_strategy_by_type.return_value = mock_strategy
 
     mock_container = MagicMock()
     mock_container.get.return_value = mock_factory

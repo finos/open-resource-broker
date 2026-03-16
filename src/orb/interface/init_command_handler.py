@@ -13,6 +13,7 @@ from orb.config.platform_dirs import (
     get_work_location,
 )
 from orb.domain.base.ports.console_port import ConsolePort
+from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 from orb.infrastructure.di.container import get_container
 from orb.infrastructure.logging.logger import get_logger
 
@@ -261,7 +262,8 @@ def _interactive_setup() -> Dict[str, Any]:
 
         infrastructure_defaults = {}
         if discover_choice in ["y", "yes"]:
-            infrastructure_defaults = _discover_infrastructure(provider_type, region, profile)
+            registry = get_container().get(ProviderRegistryPort)
+            infrastructure_defaults = _discover_infrastructure(provider_type, region, profile, registry)
 
         # Create first provider instance
         first_provider = {
@@ -415,7 +417,8 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
 
         infrastructure_defaults = {}
         if discover_choice in ["y", "yes"]:
-            infrastructure_defaults = _discover_infrastructure(provider_type, region, profile)
+            registry = get_container().get(ProviderRegistryPort)
+            infrastructure_defaults = _discover_infrastructure(provider_type, region, profile, registry)
 
         return {
             "type": provider_type,
@@ -530,14 +533,11 @@ def _get_operational_requirements(provider_type: str) -> dict:
 
 
 def _discover_infrastructure(
-    provider_type: str, region: str, profile: str | None
+    provider_type: str, region: str, profile: str | None, registry: ProviderRegistryPort
 ) -> Dict[str, Any]:
     """Discover infrastructure interactively using provider strategy."""
     console = get_container().get(ConsolePort)
     try:
-        from orb.providers.registry import get_provider_registry
-
-        registry = get_provider_registry()
 
         # Ensure provider type is registered
         if not registry.ensure_provider_type_registered(provider_type):
@@ -652,12 +652,8 @@ def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
         # that belong in provider config — determined by the provider strategy.
         strategy = None
         try:
-            from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
-
-            _container = get_container()
-            _factory = _container.get(ProviderRegistryPort)
-            _temp_config = {"type": provider_type, **provider_config}
-            strategy = _factory.create_strategy(provider_type, _temp_config)  # type: ignore[attr-defined]
+            registry = get_container().get(ProviderRegistryPort)
+            strategy = registry.create_strategy_by_type(provider_type, provider_config)
         except Exception:
             pass
         infrastructure_defaults = provider_data.get("infrastructure_defaults", {})

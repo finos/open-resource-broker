@@ -14,8 +14,9 @@ from orb.providers.config_validator import ProviderConfigValidator
 def _make_validator(config_manager):
     """Create a ProviderConfigValidator with a mock logger."""
     mock_logger = Mock()
-    config_builder = ProviderConfigBuilder(mock_logger)
-    return ProviderConfigValidator(config_manager, config_builder, mock_logger)
+    mock_registry = Mock()
+    config_builder = ProviderConfigBuilder(mock_logger, mock_registry)
+    return ProviderConfigValidator(config_manager, config_builder, mock_logger, mock_registry)
 
 
 def _get_provider_info(config_manager):

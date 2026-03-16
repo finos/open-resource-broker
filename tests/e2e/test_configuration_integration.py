@@ -3,10 +3,12 @@
 import json
 import os
 import tempfile
+from typing import cast
 from unittest.mock import patch
 
 from orb.bootstrap import Application
 from orb.config.manager import ConfigurationManager
+from orb.domain.base.ports import ConfigurationPort
 
 
 class TestConfigurationIntegration:
@@ -188,11 +190,6 @@ class TestConfigurationIntegration:
 
     def test_provider_strategy_factory_integration(self):
         """Test provider config integration with configuration."""
-        from unittest.mock import Mock
-
-        from orb.providers.config_builder import ProviderConfigBuilder
-        from orb.providers.config_validator import ProviderConfigValidator
-
         # Create configuration
         config_data = {
             "provider": {
@@ -212,7 +209,6 @@ class TestConfigurationIntegration:
 
         # Test direct config integration
         config_manager = ConfigurationManager(config_path)
-        mock_logger = Mock()
 
         # get_provider_info equivalent
         try:
@@ -265,8 +261,9 @@ class TestConfigurationIntegration:
         config_path = self.create_config_file(valid_config)
         config_manager = ConfigurationManager(config_path)
         mock_logger = Mock()
-        config_builder = ProviderConfigBuilder(mock_logger)
-        validator = ProviderConfigValidator(config_manager, config_builder, mock_logger)
+        mock_registry = Mock()
+        config_builder = ProviderConfigBuilder(mock_logger, mock_registry)
+        validator = ProviderConfigValidator(cast(ConfigurationPort, config_manager), config_builder, mock_logger, mock_registry)
 
         validation_result = validator.validate_configuration()
 
@@ -425,7 +422,7 @@ class TestConfigurationIntegration:
         config_manager = ConfigurationManager(config_path)
         mock_logger = Mock()
 
-        defaults_service = TemplateDefaultsService(config_manager, mock_logger)
+        defaults_service = TemplateDefaultsService(cast(ConfigurationPort, config_manager), mock_logger)
 
         # Test hierarchical default resolution
         template_dict = {
