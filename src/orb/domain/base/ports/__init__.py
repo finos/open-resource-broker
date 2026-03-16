@@ -9,6 +9,7 @@ from .health_check_port import HealthCheckPort
 from .logging_port import LoggingPort
 from .path_resolution_port import PathResolutionPort
 from .provider_config_port import ProviderConfigPort
+from .provider_discovery_port import ProviderDiscoveryPort
 from .provider_port import ProviderPort
 from .provider_selection_port import ProviderSelectionPort
 from .storage_port import StoragePort
@@ -24,6 +25,7 @@ __all__: list[str] = [
     "LoggingPort",
     "PathResolutionPort",
     "ProviderConfigPort",
+    "ProviderDiscoveryPort",
     "ProviderPort",
     "ProviderSelectionPort",
     "StoragePort",

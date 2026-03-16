@@ -6,7 +6,7 @@ from orb.domain.base.ports import (
     ConfigurationPort,
     EventPublisherPort,
     LoggingPort,
-    ProviderPort,
+    ProviderDiscoveryPort,
     StoragePort,
 )
 from orb.infrastructure.di.buses import CommandBus, QueryBus
@@ -55,7 +55,7 @@ def register_core_services(container: DIContainer) -> None:
     container.register_factory(StoragePort, lambda c: _create_storage_strategy(c))
 
     # Register provider strategy
-    container.register_factory(ProviderPort, lambda c: _create_provider_strategy(c))
+    container.register_factory(ProviderDiscoveryPort, lambda c: _create_provider_strategy(c))
 
     # Register EventBus as singleton so all repositories and subscribers share one instance
     from orb.application.events.bus.event_bus import EventBus
@@ -128,7 +128,7 @@ def _create_storage_strategy(container: "DIContainer") -> StoragePort:
     return factory.create_strategy(storage_type, config)
 
 
-def _create_provider_strategy(container: "DIContainer") -> ProviderPort:
+def _create_provider_strategy(container: "DIContainer") -> ProviderDiscoveryPort:
     """Create provider strategy using registry pattern."""
     from orb.domain.base.ports.logging_port import LoggingPort
     from orb.infrastructure.adapters.provider_discovery_adapter import ProviderDiscoveryAdapter

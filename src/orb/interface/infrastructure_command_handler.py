@@ -85,11 +85,11 @@ async def handle_infrastructure_validate(args) -> Dict[str, Any]:
 async def _discover_provider_infrastructure(provider: Dict[str, Any], args) -> Dict[str, Any]:
     """Discover infrastructure for a provider using strategy pattern."""
     try:
-        from orb.domain.base.ports.provider_port import ProviderPort
+        from orb.domain.base.ports.provider_discovery_port import ProviderDiscoveryPort
         from orb.infrastructure.di.container import get_container
 
         container = get_container()
-        provider_strategy = container.get(ProviderPort)
+        provider_strategy = container.get(ProviderDiscoveryPort)
 
         # Pass CLI args to the provider strategy
         provider_with_args = {**provider, "cli_args": args}
@@ -139,11 +139,11 @@ def _show_provider_infrastructure(provider: Dict[str, Any]) -> None:
 async def _validate_provider_infrastructure(provider: Dict[str, Any]) -> Dict[str, Any]:
     """Validate infrastructure for a provider using strategy pattern."""
     try:
-        from orb.domain.base.ports.provider_port import ProviderPort
+        from orb.domain.base.ports.provider_discovery_port import ProviderDiscoveryPort
         from orb.infrastructure.di.container import get_container
 
         container = get_container()
-        provider_strategy = container.get(ProviderPort)
+        provider_strategy = container.get(ProviderDiscoveryPort)
 
         # Check if provider strategy supports infrastructure validation
         if hasattr(provider_strategy, "validate_infrastructure"):

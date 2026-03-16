@@ -3,10 +3,11 @@
 from typing import Any, Optional
 
 from orb.domain.base.ports.logging_port import LoggingPort
+from orb.domain.base.ports.provider_discovery_port import ProviderDiscoveryPort
 from orb.providers.registry import ProviderRegistry
 
 
-class ProviderDiscoveryAdapter:
+class ProviderDiscoveryAdapter(ProviderDiscoveryPort):
     """Adapter that wraps Provider Registry for discovery and registry operations."""
 
     def __init__(self, registry: ProviderRegistry, logger: Optional[LoggingPort] = None) -> None:
