@@ -88,8 +88,12 @@ def get_event_bus():
         if event_bus is not None:
             return event_bus
 
-        # Create EventBus if not in container
+        # EventBus not in container — warn so the misconfiguration is visible
         logger = get_logger(__name__)
+        logger.warning(
+            "EventBus not registered in DI container; creating a transient instance. "
+            "Events published to this instance will not reach subscribers."
+        )
         return create_event_bus(logger)  # type: ignore[misc]
     except Exception as e:
         # Final fallback to legacy system

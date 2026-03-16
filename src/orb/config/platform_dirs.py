@@ -47,68 +47,99 @@ def is_system_install() -> bool:
     return sys.prefix.startswith(("/usr", "/opt"))
 
 
-def get_config_location() -> Path:
-    """Get basic configuration directory location for bootstrap."""
-    # 1. Environment override
-    if env_dir := os.environ.get("ORB_CONFIG_DIR"):
-        return Path(env_dir)
+def get_root_location() -> Path:
+    """Single source of truth for platform root directory detection.
 
-    # 2. uv tool install: ~/.local/share/uv/tools/<name>/
-    #    Standard venv branch would fire (prefix != base_prefix) and return
-    #    ~/.local/share/uv/tools/config/ — wrong. Intercept before venv check.
+    Priority order:
+    1. ORB_ROOT_DIR env var
+    2. ORB_CONFIG_DIR env var → parent (infer root from config override)
+    3. uv tool install (~/.local/share/uv/tools/) → ~/.orb
+    4a. virtualenv + mise → ~/.orb
+    4b. virtualenv + standard venv (prefix != base_prefix) → sys.prefix parent
+    4c. virtualenv + symlink .venv → executable's grandparent's parent
+    5. pyproject.toml found in cwd or ancestor → that directory
+    6. user install → ~/.orb
+    7. system install → sys.prefix/orb
+    8. fallback → cwd
+    """
+    # 1. Explicit root dir override
+    if root_dir := os.environ.get("ORB_ROOT_DIR"):
+        return Path(root_dir)
+
+    # 2. Config dir override → infer root as its parent
+    if config_dir := os.environ.get("ORB_CONFIG_DIR"):
+        return Path(config_dir).parent
+
+    # 3. uv tool install: ~/.local/share/uv/tools/<name>/
     if "/.local/share/uv/tools/" in str(sys.prefix):
-        return Path.home() / ".local" / "orb" / "config"
+        return Path.home() / ".orb"
 
-    # 3. Virtual environment (check BEFORE user install)
+    # 4. Virtual environment (check BEFORE user install)
     if in_virtualenv():
-        # For symlink venvs (project .venv), use executable's grandparent's sibling
-        # For standard venvs, use sys.prefix parent
+        # 4a. mise-managed Python: executable under ~/.local/share/mise/
+        if "/.local/share/mise/" in str(Path(sys.executable)):
+            return Path.home() / ".orb"
+        # 4b. Standard venv: sys.prefix is the venv directory
         if sys.prefix != sys.base_prefix:
-            # Standard venv: sys.prefix is the venv directory
-            return Path(sys.prefix).parent / "config"
-        else:
-            # Symlink venv: executable is .venv/bin/python, we want .venv/../config
-            # .parent = .venv/bin, .parent = .venv, .parent = parent dir
-            return Path(sys.executable).parent.parent.parent / "config"
+            return Path(sys.prefix).parent
+        # 4c. Symlink venv: executable is .venv/bin/python, we want .venv/..
+        return Path(sys.executable).parent.parent.parent
 
-    # 3. Development mode
+    # 5. Development mode: find pyproject.toml
     cwd = Path.cwd()
     for parent in [cwd] + list(cwd.parents):
         if (parent / "pyproject.toml").exists():
-            return parent / "config"
+            return parent
 
-    # 4. User installation
+    # 6. User installation
     if is_user_install():
-        return Path.home() / ".local" / "orb" / "config"
+        return Path.home() / ".orb"
 
-    # 5. System installation
+    # 7. System installation
     if is_system_install():
-        return Path(sys.prefix) / "orb" / "config"
+        return Path(sys.prefix) / "orb"
 
-    # 6. Fallback
-    return cwd / "config"
+    # 8. Fallback
+    return cwd
+
+
+def get_config_location() -> Path:
+    """Get basic configuration directory location for bootstrap."""
+    if env_dir := os.environ.get("ORB_CONFIG_DIR"):
+        return Path(env_dir)
+    return get_root_location() / "config"
 
 
 def get_work_location() -> Path:
     """Get basic work directory location for bootstrap."""
-    # 1. Environment override
     if env_dir := os.environ.get("ORB_WORK_DIR"):
         return Path(env_dir)
-
-    # 2. Relative to config
-    return get_config_location().parent / "work"
+    return get_root_location() / "work"
 
 
 def get_logs_location() -> Path:
     """Get basic logs directory location for bootstrap."""
-    # 1. Environment override
     if env_dir := os.environ.get("ORB_LOG_DIR"):
         return Path(env_dir)
-
-    # 2. Relative to config
-    return get_config_location().parent / "logs"
+    return get_root_location() / "logs"
 
 
 def get_scripts_location() -> Path:
     """Get basic scripts directory location for bootstrap."""
-    return get_config_location().parent / "scripts"
+    if env_dir := os.environ.get("ORB_SCRIPTS_DIR"):
+        return Path(env_dir)
+    return get_root_location() / "scripts"
+
+
+def get_health_location() -> Path:
+    """Get health check directory location."""
+    if env_dir := os.environ.get("ORB_HEALTH_DIR"):
+        return Path(env_dir)
+    return get_work_location() / "health"
+
+
+def get_cache_location() -> Path:
+    """Get cache directory location."""
+    if env_dir := os.environ.get("ORB_CACHE_DIR"):
+        return Path(env_dir)
+    return get_work_location() / ".cache"

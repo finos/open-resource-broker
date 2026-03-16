@@ -67,8 +67,15 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  #
 
             template_port = self._container.get(TemplateConfigurationPort)
 
-            # Validate template configuration
-            validation_errors = template_port.validate_template_config(command.configuration)
+            # Validate template configuration — merge command fields with extra config
+            validation_errors = template_port.validate_template_config(
+                {
+                    "template_id": command.template_id,
+                    "provider_api": command.provider_api,
+                    "image_id": command.image_id,
+                    **command.configuration,
+                }
+            )
             if validation_errors:
                 self.logger.warning(
                     "Template validation failed for %s: %s",
@@ -90,19 +97,19 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  #
                 subnet_ids=command.configuration.get("subnet_ids", []),
                 security_group_ids=command.configuration.get("security_group_ids", []),
                 tags=command.tags,
-                configuration=command.configuration,
             )
 
             # Persist template through repository
             with self._uow_factory.create_unit_of_work() as uow:
                 # Check if template already exists
-                existing_template = uow.templates.get_by_id(command.template_id)
+                from orb.domain.template.value_objects import TemplateId
+
+                existing_template = uow.templates.get_by_id(TemplateId(value=command.template_id))
                 if existing_template:
                     raise BusinessRuleError(f"Template {command.template_id} already exists")
 
                 # Add new template
-                uow.templates.add(template)
-                uow.commit()
+                uow.templates.save(template)
 
                 self.logger.info("Template created successfully: %s", command.template_id)
 
@@ -183,7 +190,9 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, None]):  #
             # Update template through repository
             with self._uow_factory.create_unit_of_work() as uow:
                 # Get existing template
-                template = uow.templates.get_by_id(command.template_id)
+                from orb.domain.template.value_objects import TemplateId
+
+                template = uow.templates.get_by_id(TemplateId(value=command.template_id))
                 if not template:
                     raise EntityNotFoundError("Template", command.template_id)
 
@@ -192,20 +201,27 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, None]):  #
 
                 # Update template properties
                 if command.name is not None:
-                    template.update_name(command.name)
+                    template = template.update_name(command.name)
                     changes["name"] = command.name
 
                 if command.description is not None:
-                    template.update_description(command.description)
+                    template = template.update_description(command.description)
                     changes["description"] = command.description
 
                 if command.configuration:
-                    template.update_configuration(command.configuration)
+                    template = template.update_configuration(command.configuration)
                     changes["configuration"] = command.configuration
 
+                if command.instance_type is not None:
+                    template = template.update_instance_type(command.instance_type)
+                    changes["instance_type"] = command.instance_type
+
+                if command.image_id is not None:
+                    template = template.update_image_id(command.image_id)
+                    changes["image_id"] = command.image_id
+
                 # Save changes
-                uow.templates.update(template)
-                uow.commit()
+                uow.templates.save(template)
 
                 self.logger.info("Template updated successfully: %s", command.template_id)
 
@@ -269,14 +285,13 @@ class DeleteTemplateHandler(BaseCommandHandler[DeleteTemplateCommand, None]):  #
                 # Check if template is in use (business rule)
                 # This could be expanded to check for active requests using this
                 # template
-                if template.is_in_use():
+                if hasattr(template, "is_in_use") and template.is_in_use():
                     raise BusinessRuleError(
                         f"Cannot delete template {command.template_id}: template is in use"
                     )
 
                 # Delete template
-                uow.templates.remove(template)
-                uow.commit()
+                uow.templates.delete(template_id)
 
                 self.logger.info("Template deleted successfully: %s", command.template_id)
 

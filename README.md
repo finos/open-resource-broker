@@ -61,7 +61,7 @@ orb requests status <request-id>
 ### 4. Return machines when done
 
 ```bash
-orb machines return --request-id <request-id>
+orb machines return <machine-id-1> <machine-id-2> ...
 ```
 
 ## Setup
@@ -116,7 +116,11 @@ export ORB_CONFIG_DIR=/path/to/config
 
 | Variable | Description |
 |---|---|
-| `ORB_CONFIG_DIR` | Override config directory path |
+| `ORB_ROOT_DIR` | Set base directory for all subdirs (config, work, logs, health, scripts) |
+| `ORB_CONFIG_DIR` | Override config directory path (takes precedence over `ORB_ROOT_DIR`) |
+| `ORB_WORK_DIR` | Override work directory path (takes precedence over `ORB_ROOT_DIR`) |
+| `ORB_LOG_DIR` | Override logs directory path (takes precedence over `ORB_ROOT_DIR`) |
+| `ORB_HEALTH_DIR` | Override health directory path (takes precedence over `ORB_ROOT_DIR`) |
 | `ORB_LOG_LEVEL` | Logging level: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 
 See the [Configuration Guide](docs/root/user_guide/configuration.md) for path resolution details, environment variables, and REST API server setup.
@@ -168,7 +172,7 @@ All available commands and flags.
 | `orb templates validate --file <file>` | Validate a template file |
 | `orb machines request <template-id> <n>` | Request n machines |
 | `orb machines list` | List active machines |
-| `orb machines return --request-id <id>` | Return machines from a request |
+| `orb machines return <machine-id> [...]` | Return one or more machines |
 | `orb requests status <request-id>` | Check request status |
 | `orb requests list` | List all requests |
 | `orb infrastructure show` | Show configured infrastructure |

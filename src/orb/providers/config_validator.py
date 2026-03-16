@@ -8,8 +8,8 @@ from typing import Any
 
 from orb.config.schemas.provider_strategy_schema import ProviderMode
 from orb.domain.base.ports import ConfigurationPort, LoggingPort
+from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 from orb.providers.config_builder import ProviderConfigBuilder
-from orb.providers.registry import get_provider_registry
 
 
 class ProviderConfigValidator:
@@ -20,6 +20,7 @@ class ProviderConfigValidator:
         config_manager: ConfigurationPort,
         config_builder: ProviderConfigBuilder,
         logger: LoggingPort,
+        registry: ProviderRegistryPort,
     ) -> None:
         """Initialize validator.
 
@@ -27,10 +28,12 @@ class ProviderConfigValidator:
             config_manager: Configuration manager instance
             config_builder: Configuration builder instance
             logger: Logger instance
+            registry: Provider registry port
         """
         self._config_manager = config_manager
         self._config_builder = config_builder
         self._logger = logger
+        self._registry = registry
 
     def validate_configuration(self) -> dict[str, Any]:
         """Validate current provider configuration.
@@ -117,7 +120,7 @@ class ProviderConfigValidator:
             active_providers: List of active provider instances
             validation_result: Validation result dictionary to update
         """
-        registry = get_provider_registry()
+        registry = self._registry
 
         for provider_instance in active_providers:
             try:

@@ -379,15 +379,26 @@ def test_default_format_request_status_response_no_camelcase_in_machines():
 
 
 def test_default_format_request_status_response_status_values():
-    """Default strategy inherits base _map_status_to_hf — same three valid values."""
+    """Default strategy passes domain status values through unchanged."""
     strategy = make_default_strategy()
-    valid_hf_statuses = {"running", "complete", "complete_with_error"}
-    for domain_status in ("pending", "in_progress", "complete", "completed", "failed"):
+    domain_statuses = {
+        "pending",
+        "in_progress",
+        "complete",
+        "failed",
+        "cancelled",
+        "timeout",
+        "partial",
+    }
+    for domain_status in ("pending", "in_progress", "complete", "failed"):
         dto = _make_request_dto(status=domain_status)
         result = strategy.format_request_status_response([dto])
-        hf_status = result["requests"][0]["status"]
-        assert hf_status in valid_hf_statuses, (
-            f"Default: domain status '{domain_status}' → invalid '{hf_status}'"
+        returned_status = result["requests"][0]["status"]
+        assert returned_status in domain_statuses, (
+            f"Default: unexpected status '{returned_status}' for domain status '{domain_status}'"
+        )
+        assert returned_status == domain_status, (
+            f"Default: domain status '{domain_status}' should pass through unchanged, got '{returned_status}'"
         )
 
 

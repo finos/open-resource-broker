@@ -33,3 +33,18 @@ def test_unknown_command_returns_none():
 
     build_registry()
     assert lookup("nonexistent", "action") is None
+
+
+def test_storage_validate_is_registered():
+    from orb.cli.registry import _REGISTRY, build_registry
+
+    build_registry()
+    assert ("storage", "validate") in _REGISTRY
+
+
+def test_storage_validate_handler_is_correct():
+    from orb.cli.registry import _REGISTRY, build_registry
+    from orb.interface.storage_command_handlers import handle_validate_storage_config
+
+    build_registry()
+    assert _REGISTRY[("storage", "validate")] is handle_validate_storage_config

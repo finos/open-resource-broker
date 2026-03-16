@@ -5,6 +5,9 @@ from unittest.mock import Mock, patch
 import pytest
 
 from orb.infrastructure.adapters.configuration_adapter import ConfigurationAdapter
+from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
+
+_logger = LoggingAdapter(__name__)
 
 
 class TestConfigurationAdapterPackageInfo:
@@ -13,7 +16,7 @@ class TestConfigurationAdapterPackageInfo:
     def setup_method(self):
         """Set up test fixtures."""
         self.mock_config_manager = Mock()
-        self.adapter = ConfigurationAdapter(self.mock_config_manager)
+        self.adapter = ConfigurationAdapter(self.mock_config_manager, _logger)
 
     @patch("orb.infrastructure.adapters.configuration_adapter._package", create=True)
     def test_get_package_info_success(self, mock_package):
@@ -55,7 +58,7 @@ class TestConfigurationAdapterPackageInfo:
 
         # Setting sys.modules["orb._package"] = None forces ImportError on `from orb._package import ...`
         with patch.dict("sys.modules", {"orb._package": None}):
-            adapter = ConfigurationAdapter(self.mock_config_manager)
+            adapter = ConfigurationAdapter(self.mock_config_manager, _logger)
             with pytest.raises(ImportError):
                 adapter.get_package_info()
 

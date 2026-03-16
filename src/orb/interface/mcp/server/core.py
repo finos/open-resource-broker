@@ -273,7 +273,7 @@ class OpenResourceBrokerMCPServer:
 
         # Call the tool function
         tool_func = self.tools[tool_name]
-        result = await tool_func(args, self.app)
+        result = await tool_func(args)
 
         return {"content": [{"type": "text", "text": json.dumps(result, indent=2, default=str)}]}
 
@@ -395,13 +395,13 @@ class OpenResourceBrokerMCPServer:
         """Get templates resource data."""
         # Use the list_templates tool to get data
         args = type("Args", (), {})()
-        result = await self.tools["list_templates"](args, self.app)
+        result = await self.tools["list_templates"](args)
         return result
 
     async def _get_requests_resource(self, uri: str) -> dict[str, Any]:
         """Get requests resource data."""
         args = type("Args", (), {})()
-        result = await self.tools["list_return_requests"](args, self.app)
+        result = await self.tools["list_return_requests"](args)
         return result
 
     async def _get_machines_resource(self, uri: str) -> dict[str, Any]:
@@ -418,7 +418,7 @@ class OpenResourceBrokerMCPServer:
     async def _get_providers_resource(self, uri: str) -> dict[str, Any]:
         """Get providers resource data."""
         args = type("Args", (), {})()
-        result = await self.tools["list_providers"](args, self.app)
+        result = await self.tools["list_providers"](args)
         return result
 
     def _generate_provision_prompt(self, arguments: dict[str, Any]) -> str:

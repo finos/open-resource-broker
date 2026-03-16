@@ -119,6 +119,9 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[TemplateDTO
                 )
                 template_dtos = filtered_dicts  # type: ignore[assignment]
 
+            if query.active_only:
+                template_dtos = [t for t in template_dtos if getattr(t, "is_active", True)]
+
             total_count = len(template_dtos)
             limit = min(query.limit or 50, 1000)  # type: ignore[union-attr]
             offset = query.offset or 0  # type: ignore[union-attr]

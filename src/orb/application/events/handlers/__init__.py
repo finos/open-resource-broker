@@ -13,15 +13,19 @@ and can be discovered and instantiated by the EventBus.
 from . import (
     infrastructure_handlers,
     machine_handlers,
+    metrics_event_handler,
     request_handlers,
     system_handlers,
     template_handlers,
 )
+from .metrics_event_handler import MetricsEventHandler
 
 __all__: list[str] = [
     "infrastructure_handlers",
     "machine_handlers",
+    "metrics_event_handler",
     "request_handlers",
     "system_handlers",
     "template_handlers",
+    "MetricsEventHandler",
 ]

@@ -1,5 +1,6 @@
 """Storage strategy components package with consistent naming."""
 
+# Base interfaces
 # Repository components (extracted from repositories)
 from .entity_cache import EntityCache, MemoryEntityCache, NoOpEntityCache
 from .entity_serializer import BaseEntitySerializer, EntitySerializer

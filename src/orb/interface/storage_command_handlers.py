@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from orb.domain.base.ports.scheduler_port import SchedulerPort
 from orb.infrastructure.di.buses import QueryBus
 from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
@@ -15,7 +14,6 @@ async def handle_list_storage_strategies(args) -> dict[str, Any]:
     """Handle list storage strategies operations."""
     container = get_container()
     query_bus = container.get(QueryBus)
-    container.get(SchedulerPort)
 
     from orb.application.queries.storage import ListStorageStrategiesQuery
 

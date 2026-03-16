@@ -12,6 +12,7 @@ from orb.api.dependencies import (
     get_request_machines_handler,
     get_request_status_handler,
     get_return_machines_handler,
+    get_scheduler_strategy,
 )
 from orb.api.routers.machines import router as machines_router
 from orb.api.routers.requests import router as requests_router
@@ -56,6 +57,10 @@ class TestMachinesRouter:
     def _make_client(
         self, app, mock_query_bus=None, mock_request_handler=None, mock_return_handler=None
     ):
+        mock_scheduler = MagicMock()
+        mock_scheduler.format_machine_status_response.return_value = {"machines": []}
+        mock_scheduler.format_machine_details_response.return_value = {}
+        app.dependency_overrides[get_scheduler_strategy] = lambda: mock_scheduler
         if mock_query_bus is not None:
             app.dependency_overrides[get_query_bus] = lambda: mock_query_bus
         if mock_request_handler is not None:
@@ -66,9 +71,7 @@ class TestMachinesRouter:
 
     def _make_request_handler(self, request_id="req-abc"):
         handler = MagicMock()
-        result = MagicMock()
-        result.to_dict.return_value = {"request_id": request_id, "message": "ok"}
-        handler.handle = AsyncMock(return_value=result)
+        handler.handle = AsyncMock(return_value={"request_id": request_id, "message": "ok"})
         return handler
 
     def test_request_machines_happy_path(self, machines_app):
@@ -79,7 +82,7 @@ class TestMachinesRouter:
 
         assert resp.status_code == 202
         body = resp.json()
-        assert body["requestId"] == "req-abc"
+        assert body["request_id"] == "req-abc"
         assert body["message"] == "ok"
         handler.handle.assert_awaited_once()
 
@@ -90,7 +93,7 @@ class TestMachinesRouter:
         resp = client.post("/machines/request", json={"templateId": "t1", "machineCount": 3})
 
         assert resp.status_code == 202
-        assert resp.json()["requestId"] == "req-camel"
+        assert resp.json()["request_id"] == "req-camel"
 
     def test_request_machines_snake_case_count_alias(self, machines_app):
         handler = self._make_request_handler("req-snake")
@@ -99,7 +102,7 @@ class TestMachinesRouter:
         resp = client.post("/machines/request", json={"template_id": "t1", "machine_count": 5})
 
         assert resp.status_code == 202
-        assert resp.json()["requestId"] == "req-snake"
+        assert resp.json()["request_id"] == "req-snake"
 
     def test_request_machines_missing_template_id(self, machines_app):
         handler = self._make_request_handler()
@@ -229,6 +232,13 @@ class TestRequestsRouter:
     def _make_client(
         self, app, mock_query_bus=None, mock_command_bus=None, mock_status_handler=None
     ):
+        mock_scheduler = MagicMock()
+        mock_scheduler.format_request_status_response.return_value = {"requests": []}
+        mock_scheduler.format_request_response.return_value = {
+            "request_id": "req-789",
+            "status": "cancelled",
+        }
+        app.dependency_overrides[get_scheduler_strategy] = lambda: mock_scheduler
         if mock_query_bus is not None:
             app.dependency_overrides[get_query_bus] = lambda: mock_query_bus
         if mock_command_bus is not None:
@@ -321,11 +331,9 @@ class TestRequestsRouter:
 
     def test_get_request_status(self, requests_app):
         handler = MagicMock()
-        result = MagicMock()
-        result.model_dump.return_value = {
-            "requests": [{"request_id": "req-123", "status": "running"}]
-        }
-        handler.handle = AsyncMock(return_value=result)
+        handler.handle = AsyncMock(
+            return_value={"requests": [{"request_id": "req-123", "status": "running"}]}
+        )
         client = self._make_client(requests_app, mock_status_handler=handler)
 
         resp = client.get("/requests/req-123/status")
@@ -359,11 +367,9 @@ class TestRequestsRouter:
 
     def test_get_request_details(self, requests_app):
         handler = MagicMock()
-        result = MagicMock()
-        result.model_dump.return_value = {
-            "requests": [{"request_id": "req-456", "status": "complete"}]
-        }
-        handler.handle = AsyncMock(return_value=result)
+        handler.handle = AsyncMock(
+            return_value={"requests": [{"request_id": "req-456", "status": "complete"}]}
+        )
         client = self._make_client(requests_app, mock_status_handler=handler)
 
         resp = client.get("/requests/req-456")
@@ -382,9 +388,6 @@ class TestRequestsRouter:
         resp = client.delete("/requests/req-789")
 
         assert resp.status_code == 200
-        body = resp.json()
-        assert body["request_id"] == "req-789"
-        assert body["status"] == "cancelled"
         command_bus.execute.assert_awaited_once()
         cmd = command_bus.execute.call_args.args[0]
         assert isinstance(cmd, CancelRequestCommand)

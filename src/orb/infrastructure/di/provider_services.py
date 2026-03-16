@@ -26,7 +26,14 @@ def _register_application_services(container: DIContainer) -> None:
     from orb.infrastructure.di.buses import CommandBus
     from orb.providers.registry import get_provider_registry
 
-    container.register_singleton(ProviderRegistryPort, lambda c: get_provider_registry())
+    def _create_provider_registry(c):
+        from orb.domain.base.ports.configuration_port import ConfigurationPort
+
+        registry = get_provider_registry()
+        registry._config_port = c.get(ConfigurationPort)
+        return registry
+
+    container.register_singleton(ProviderRegistryPort, _create_provider_registry)
 
     def create_provider_registry_service(c):
         registry = c.get(ProviderRegistryPort)

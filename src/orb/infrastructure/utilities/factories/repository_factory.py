@@ -7,8 +7,9 @@ maintaining clean separation of concerns:
 - Clean Architecture: No repository knowledge in storage layer
 """
 
-from typing import Any
+from typing import Any, Optional
 
+from orb.application.events.bus.event_bus import EventBus
 from orb.config.manager import ConfigurationManager
 from orb.domain.base import UnitOfWorkFactory as AbstractUnitOfWorkFactory
 from orb.domain.base.dependency_injection import injectable
@@ -26,10 +27,16 @@ from orb.infrastructure.storage.registry import get_storage_registry
 class RepositoryFactory:
     """Factory for creating repositories using storage registry pattern."""
 
-    def __init__(self, config_manager: ConfigurationManager, logger: LoggingPort) -> None:
+    def __init__(
+        self,
+        config_manager: ConfigurationManager,
+        logger: LoggingPort,
+        event_bus: Optional[EventBus] = None,
+    ) -> None:
         """Initialize factory with configuration."""
         self.config_manager = config_manager
         self.logger = logger
+        self.event_bus = event_bus
         self._storage_registry = None
 
     @property
@@ -65,7 +72,7 @@ class RepositoryFactory:
             storage_type = self.config_manager.get_storage_strategy()
             config = self.config_manager.app_config.model_dump()
             storage_strategy = self.storage_registry.create_strategy(storage_type, config)
-            return RequestRepository(storage_strategy)
+            return RequestRepository(storage_strategy, event_publisher=self.event_bus)
 
         except Exception as e:
             self.logger.error("Failed to create request repository: %s", e)

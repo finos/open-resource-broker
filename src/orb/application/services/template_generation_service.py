@@ -11,7 +11,8 @@ from orb.application.dto.template_generation_dto import (
     TemplateGenerationRequest,
     TemplateGenerationResult,
 )
-from orb.domain.base.ports import ConfigurationPort, LoggingPort, SchedulerPort
+from orb.application.ports import SchedulerPort
+from orb.domain.base.ports import ConfigurationPort, LoggingPort
 from orb.domain.base.ports.path_resolution_port import PathResolutionPort
 from orb.domain.base.ports.template_example_generator_port import TemplateExampleGeneratorPort
 from orb.domain.base.utils import extract_provider_type

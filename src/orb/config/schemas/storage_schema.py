@@ -5,24 +5,20 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
-def _default_filenames() -> dict[str, Any]:
-    return {
-        "single_file": "request_database.json",
-        "split_files": {
-            "requests": "requests.json",
-            "templates": "templates.json",
-            "machines": "machines.json",
-        },
-    }
-
-
 class JsonStrategyConfig(BaseModel):
     """JSON storage strategy configuration."""
 
     storage_type: str = Field("single_file", description="Storage type (single_file, split_files)")
     base_path: str = Field("data", description="Base path for JSON files")
     filenames: dict[str, Any] = Field(
-        default_factory=_default_filenames,
+        default_factory=lambda: {
+            "single_file": "request_database.json",
+            "split_files": {
+                "requests": "requests.json",
+                "templates": "templates.json",
+                "machines": "machines.json",
+            },
+        },
         description="Filenames for JSON storage",
     )
     backup_enabled: bool = Field(True, description="Enable automatic backups")
@@ -128,8 +124,8 @@ class StorageConfig(BaseModel):
     """Storage configuration."""
 
     strategy: str = Field("json", description="Storage strategy (json, sql)")
-    json_strategy: JsonStrategyConfig = Field(default_factory=lambda: JsonStrategyConfig())  # type: ignore[call-arg]
-    sql_strategy: SqlStrategyConfig = Field(default_factory=lambda: SqlStrategyConfig())  # type: ignore[call-arg]
+    json_strategy: JsonStrategyConfig = Field(default_factory=JsonStrategyConfig)  # type: ignore[call-arg]
+    sql_strategy: SqlStrategyConfig = Field(default_factory=SqlStrategyConfig)  # type: ignore[call-arg]
 
     @field_validator("strategy")
     @classmethod

@@ -11,6 +11,7 @@ from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.request.aggregate import Request
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.domain.template.value_objects import AWSFleetType
+from orb.providers.aws.exceptions.aws_exceptions import AWSConfigurationError
 from orb.providers.aws.infrastructure.handlers.shared.base_config_builder import BaseConfigBuilder
 from orb.providers.aws.infrastructure.tags import build_resource_tags
 
@@ -112,7 +113,8 @@ class EC2FleetConfigBuilder(BaseConfigBuilder):
             "TagSpecifications": [],
         }
 
-        assert self._config_port is not None, "config_port must be injected"
+        if self._config_port is None:
+            raise AWSConfigurationError("config_port must be injected before calling build")
         fleet_tags = build_resource_tags(
             config_port=self._config_port,
             request_id=str(request.request_id),
@@ -199,7 +201,10 @@ class EC2FleetConfigBuilder(BaseConfigBuilder):
 
     def _prepare_template_context(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
         """Build the context dict used by the native spec renderer."""
-        assert self._config_port is not None, "config_port must be injected"
+        if self._config_port is None:
+            raise AWSConfigurationError(
+                "config_port must be injected before calling _prepare_template_context"
+            )
 
         instance_overrides = []
         if template.machine_types and template.subnet_ids:

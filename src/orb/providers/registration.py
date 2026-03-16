@@ -18,7 +18,7 @@ def register_all_provider_types() -> None:
 
 
 def register_fallback_provider(
-    primary_strategy, fallback_strategies, config=None, logger=None
+    primary_strategy, fallback_strategies, config=None, logger=None, metrics=None
 ) -> None:
     """Construct and register a FallbackProviderStrategy with the provider registry.
 
@@ -30,6 +30,7 @@ def register_fallback_provider(
         fallback_strategies: List of fallback ProviderStrategy instances.
         config: Optional FallbackConfig.
         logger: Optional LoggingPort.
+        metrics: Optional MetricsCollector for emitting fallback/circuit-breaker metrics.
     """
     from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
     from orb.providers.base.strategy.fallback_strategy import FallbackProviderStrategy
@@ -41,6 +42,7 @@ def register_fallback_provider(
         primary_strategy=primary_strategy,
         fallback_strategies=fallback_strategies,
         config=config,
+        metrics=metrics,
     )
     registry = get_provider_registry()
     registry.register_fallback_strategy(strategy)

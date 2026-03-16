@@ -11,6 +11,7 @@ from orb.domain.base.ports import LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.request.aggregate import Request
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.exceptions.aws_exceptions import AWSConfigurationError
 from orb.providers.aws.infrastructure.handlers.shared.base_config_builder import BaseConfigBuilder
 
 
@@ -219,7 +220,10 @@ class ASGConfigBuilder(BaseConfigBuilder):
 
     def _prepare_template_context(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
         """Build the template rendering context for native-spec processing."""
-        assert self._config_port is not None, "config_port must be injected"
+        if self._config_port is None:
+            raise AWSConfigurationError(
+                "config_port must be injected before calling _prepare_template_context"
+            )
 
         capacity = self._calculate_capacity_distribution(template, request.requested_count)
         on_demand_count = capacity["on_demand_count"]

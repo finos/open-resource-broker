@@ -11,10 +11,10 @@ Architecture:
 - Thread-safe and compatible with existing AWS client patterns
 """
 
-import logging
 from collections.abc import Generator
 from contextlib import contextmanager
 
+from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.mocking.dry_run_context import is_dry_run_active
 
 # Import moto for AWS mocking
@@ -26,7 +26,7 @@ except ImportError:
     MOTO_AVAILABLE = False
     mock_aws = None
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @contextmanager

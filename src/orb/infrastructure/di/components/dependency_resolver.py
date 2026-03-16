@@ -1,7 +1,6 @@
 """Dependency resolution engine for DI container."""
 
 import inspect
-import logging
 import threading
 import typing
 from contextlib import suppress
@@ -17,9 +16,10 @@ from orb.infrastructure.di.exceptions import (
     UnregisteredDependencyError,
     UntypedParameterError,
 )
+from orb.infrastructure.logging.logger import get_logger
 
 T = TypeVar("T")
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DependencyResolver:

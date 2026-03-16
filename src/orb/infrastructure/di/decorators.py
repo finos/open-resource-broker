@@ -6,14 +6,15 @@ from the DI container without requiring explicit factory functions.
 """
 
 import inspect
-import logging
 from functools import wraps
 from typing import Any, TypeVar, Union, get_args, get_origin, get_type_hints
+
+from orb.infrastructure.logging.logger import get_logger
 
 T = TypeVar("T")
 
 # Logger for decorator operations
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def injectable(cls: type[T]) -> type[T]:

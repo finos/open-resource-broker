@@ -13,6 +13,7 @@ from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.request.aggregate import Request
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.domain.template.value_objects import AWSFleetType
+from orb.providers.aws.exceptions.aws_exceptions import AWSConfigurationError
 from orb.providers.aws.infrastructure.handlers.shared.base_config_builder import BaseConfigBuilder
 from orb.providers.aws.infrastructure.tags import build_resource_tags
 
@@ -119,7 +120,10 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
         requested_count = int(getattr(request, "requested_count", 1) or 1)
         capacity = self._calculate_capacity_distribution(template, requested_count)
 
-        assert self._config_port is not None, "config_port must be injected"
+        if self._config_port is None:
+            raise AWSConfigurationError(
+                "config_port must be injected before calling _prepare_template_context"
+            )
         fleet_name = f"{self._config_port.get_resource_prefix('spot_fleet')}{request.request_id}"
 
         instance_overrides: list[dict[str, Any]] = []
@@ -224,7 +228,8 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
         target_capacity = capacity["target_capacity"]
         on_demand_capacity = capacity["on_demand_count"]
 
-        assert self._config_port is not None, "config_port must be injected"
+        if self._config_port is None:
+            raise AWSConfigurationError("config_port must be injected before calling build")
         common_tags = build_resource_tags(
             config_port=self._config_port,
             request_id=str(request.request_id),

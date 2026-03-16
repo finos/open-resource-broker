@@ -6,7 +6,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from orb.api.dependencies import get_command_bus, get_query_bus
+from orb.api.dependencies import get_command_bus, get_query_bus, get_scheduler_strategy
 from orb.api.routers.templates import router as templates_router
 from orb.application.dto.queries import ListTemplatesQuery, ValidateTemplateQuery
 from orb.application.template.commands import (
@@ -28,11 +28,26 @@ def templates_app():
 class TestTemplatesRouter:
     """Tests for the /templates router."""
 
-    def _make_client(self, app, mock_query_bus=None, mock_command_bus=None):
+    def _make_scheduler_mock(self, templates=None):
+        from unittest.mock import MagicMock
+
+        scheduler = MagicMock()
+        scheduler.format_templates_response.side_effect = lambda t: {
+            "templates": [],
+            "total_count": len(t),
+            "templateCount": len(t),
+            "cacheStats": {"refreshed": True},
+        }
+        return scheduler
+
+    def _make_client(self, app, mock_query_bus=None, mock_command_bus=None, mock_scheduler=None):
         if mock_query_bus is not None:
             app.dependency_overrides[get_query_bus] = lambda: mock_query_bus
         if mock_command_bus is not None:
             app.dependency_overrides[get_command_bus] = lambda: mock_command_bus
+        if mock_scheduler is None:
+            mock_scheduler = self._make_scheduler_mock()
+        app.dependency_overrides[get_scheduler_strategy] = lambda: mock_scheduler
         return TestClient(app, raise_server_exceptions=False)
 
     def _make_template_dict(self, template_id="tpl-1"):
@@ -53,7 +68,7 @@ class TestTemplatesRouter:
 
         assert resp.status_code == 201
         body = resp.json()
-        assert body["templateId"] == "tpl-new"
+        assert body["template_id"] == "tpl-new"
         command_bus.execute.assert_awaited_once()
         cmd = command_bus.execute.call_args.args[0]
         assert isinstance(cmd, CreateTemplateCommand)
@@ -90,7 +105,7 @@ class TestTemplatesRouter:
 
         assert resp.status_code == 200
         body = resp.json()
-        assert body["templateId"] == "tpl-1"
+        assert body["template_id"] == "tpl-1"
         command_bus.execute.assert_awaited_once()
         cmd = command_bus.execute.call_args.args[0]
         assert isinstance(cmd, UpdateTemplateCommand)
@@ -119,7 +134,7 @@ class TestTemplatesRouter:
 
         assert resp.status_code == 200
         body = resp.json()
-        assert body["templateId"] == "tpl-del"
+        assert body["template_id"] == "tpl-del"
         command_bus.execute.assert_awaited_once()
         cmd = command_bus.execute.call_args.args[0]
         assert isinstance(cmd, DeleteTemplateCommand)
@@ -145,7 +160,7 @@ class TestTemplatesRouter:
         assert resp.status_code == 200
         body = resp.json()
         assert body["valid"] is True
-        assert body["validationErrors"] == []
+        assert body["validation_errors"] == []
         query_bus.execute.assert_awaited_once()
         query = query_bus.execute.call_args.args[0]
         assert isinstance(query, ValidateTemplateQuery)
@@ -163,7 +178,7 @@ class TestTemplatesRouter:
         assert resp.status_code == 200
         body = resp.json()
         assert body["valid"] is False
-        assert "missing image_id" in body["validationErrors"]
+        assert "missing image_id" in body["validation_errors"]
 
     # ------------------------------------------------------------------
     # POST /templates/refresh — refresh

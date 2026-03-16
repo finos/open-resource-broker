@@ -1,6 +1,5 @@
 """Configuration adapter implementing domain ConfigurationPort."""
 
-import logging
 from typing import Any, Optional
 
 from orb.config.manager import ConfigurationManager
@@ -8,17 +7,17 @@ from orb.config.schemas.app_schema import AppConfig
 from orb.config.schemas.common_schema import NamingConfig, RequestConfig
 from orb.config.schemas.template_schema import TemplateConfig
 from orb.domain.base.ports import ConfigurationPort
+from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.constants import REQUEST_ID_PREFIX_ACQUIRE, REQUEST_ID_PREFIX_RETURN
-
-_logger = logging.getLogger(__name__)
 
 
 class ConfigurationAdapter(ConfigurationPort):
     """Infrastructure adapter implementing ConfigurationPort for domain layer."""
 
-    def __init__(self, config_manager: ConfigurationManager) -> None:
-        """Initialize with configuration manager."""
+    def __init__(self, config_manager: ConfigurationManager, logger: LoggingPort) -> None:
+        """Initialize with configuration manager and injected logger."""
         self._config_manager = config_manager
+        self._logger = logger
 
     def get_app_config(self) -> dict[str, Any]:
         """Get structured application configuration."""
@@ -62,7 +61,7 @@ class ConfigurationAdapter(ConfigurationPort):
                 },
             }
         except Exception as e:
-            _logger.warning("Failed to load naming config, using defaults: %s", e)
+            self._logger.warning("Failed to load naming config, using defaults: %s", e)
             return {
                 "patterns": {
                     "request_id": r"^(req-|ret-)[a-f0-9\-]{36}$",
@@ -101,7 +100,7 @@ class ConfigurationAdapter(ConfigurationPort):
                 "fulfillment_fallback_template_id": request_config.fulfillment_fallback_template_id,
             }
         except Exception as e:
-            _logger.warning("Failed to load request config, using defaults: %s", e)
+            self._logger.warning("Failed to load request config, using defaults: %s", e)
             return {
                 "max_machines_per_request": 100,
                 "default_timeout": 300,
@@ -120,9 +119,7 @@ class ConfigurationAdapter(ConfigurationPort):
             return template_config.model_dump(exclude_none=True)
         except Exception as e:
             # Fallback to empty config if loading fails
-            from orb.infrastructure.logging.logger import get_logger
-
-            get_logger(__name__).warning("Failed to get template config: %s", e)
+            self._logger.warning("Failed to get template config: %s", e)
             return {}
 
     def get_metrics_config(self) -> dict[str, Any]:
@@ -170,7 +167,7 @@ class ConfigurationAdapter(ConfigurationPort):
 
             return result
         except Exception as e:
-            _logger.warning("Failed to load metrics config, using defaults: %s", e)
+            self._logger.warning("Failed to load metrics config, using defaults: %s", e)
             return defaults
 
     def get_storage_config(self) -> dict[str, Any]:
@@ -183,7 +180,7 @@ class ConfigurationAdapter(ConfigurationPort):
                 "backup_enabled": storage_config.get("backup_enabled", True),
             }
         except Exception as e:
-            _logger.warning("Failed to load storage config, using defaults: %s", e)
+            self._logger.warning("Failed to load storage config, using defaults: %s", e)
             return {"type": "json", "path": "data", "backup_enabled": True}
 
     def get_events_config(self) -> dict[str, Any]:
@@ -196,7 +193,7 @@ class ConfigurationAdapter(ConfigurationPort):
                 "batch_size": events_config.get("batch_size", 10),
             }
         except Exception as e:
-            _logger.warning("Failed to load events config, using defaults: %s", e)
+            self._logger.warning("Failed to load events config, using defaults: %s", e)
             return {"enabled": True, "mode": "logging", "batch_size": 10}
 
     def get_logging_config(self) -> dict[str, Any]:
@@ -212,7 +209,7 @@ class ConfigurationAdapter(ConfigurationPort):
                 "console_enabled": logging_config.get("console_enabled", True),
             }
         except Exception as e:
-            _logger.warning("Failed to load logging config, using defaults: %s", e)
+            self._logger.warning("Failed to load logging config, using defaults: %s", e)
             return {
                 "level": "INFO",
                 "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -252,11 +249,11 @@ class ConfigurationAdapter(ConfigurationPort):
         """Get work directory - delegate to ConfigurationManager."""
         return self._config_manager.get_work_dir(default_path, config_path)
 
-    def get_conf_dir(
+    def get_config_dir(
         self, default_path: Optional[str] = None, config_path: Optional[str] = None
     ) -> str:
         """Get config directory - delegate to ConfigurationManager."""
-        return self._config_manager.get_conf_dir(default_path, config_path)
+        return self._config_manager.get_config_dir(default_path, config_path)
 
     def get_log_dir(
         self, default_path: Optional[str] = None, config_path: Optional[str] = None
@@ -276,7 +273,7 @@ class ConfigurationAdapter(ConfigurationPort):
             config = self._config_manager.get_typed(NativeSpecConfig)
             return {"enabled": config.enabled, "merge_mode": config.merge_mode}
         except Exception as e:
-            _logger.warning("Failed to load native spec config, using defaults: %s", e)
+            self._logger.warning("Failed to load native spec config, using defaults: %s", e)
             return {"enabled": False, "merge_mode": "merge"}
 
     def get_package_info(self) -> dict[str, Any]:
@@ -326,7 +323,7 @@ class ConfigurationAdapter(ConfigurationPort):
                 return getattr(resource_config.prefixes, resource_type)
             return resource_config.default_prefix
         except Exception as e:
-            _logger.warning(
+            self._logger.warning(
                 "Failed to get resource prefix for '%s', using empty prefix: %s", resource_type, e
             )
             return ""
@@ -354,7 +351,7 @@ class ConfigurationAdapter(ConfigurationPort):
         return {
             "config_file": actual_config_file,
             "template_file": template_file,
-            "config_dir": self.get_conf_dir(),
+            "config_dir": self.get_config_dir(),
             "work_dir": self.get_work_dir(),
             "primary_source": "config_file" if actual_config_file else "environment",
         }
@@ -376,5 +373,5 @@ class ConfigurationAdapter(ConfigurationPort):
                     return path
             return None
         except Exception as e:
-            _logger.debug("Could not determine active template file: %s", e)
+            self._logger.debug("Could not determine active template file: %s", e)
             return None

@@ -11,6 +11,7 @@ class ListRequestsQuery(BaseQuery):
     provider_name: Optional[str] = None
     status: Optional[str] = None
     template_id: Optional[str] = None
+    request_type: Optional[str] = None
     limit: int = 50
     offset: int = 0
     filter_expressions: list[str] = []

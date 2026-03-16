@@ -6,7 +6,6 @@ from typing import Optional
 
 try:
     from fastapi import APIRouter, Depends, Query, Request
-    from fastapi.encoders import jsonable_encoder
     from fastapi.responses import JSONResponse, StreamingResponse
 except ImportError:
     raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
@@ -15,6 +14,7 @@ from orb.api.dependencies import (
     get_command_bus,
     get_query_bus,
     get_request_status_handler,
+    get_scheduler_strategy,
 )
 from orb.infrastructure.error.decorators import handle_rest_exceptions
 
@@ -24,8 +24,57 @@ router = APIRouter(prefix="/requests", tags=["Requests"])
 REQUEST_STATUS_HANDLER = Depends(get_request_status_handler)
 QUERY_BUS = Depends(get_query_bus)
 COMMAND_BUS = Depends(get_command_bus)
+SCHEDULER_STRATEGY = Depends(get_scheduler_strategy)
 STATUS_QUERY = Query(None, description="Filter by request status")
 LIMIT_QUERY = Query(50, description="Limit number of results")
+
+
+@router.get("/", summary="List Requests", description="List requests with optional filtering")
+@handle_rest_exceptions(endpoint="/api/v1/requests", method="GET")
+async def list_requests(
+    status: Optional[str] = STATUS_QUERY,
+    limit: Optional[int] = LIMIT_QUERY,
+    sync: bool = Query(False, description="Sync with provider before returning results"),
+    query_bus=QUERY_BUS,
+    scheduler=SCHEDULER_STRATEGY,
+) -> JSONResponse:
+    """
+    List requests with optional filtering.
+
+    - **status**: Filter by request status (pending, running, complete, failed)
+    - **limit**: Limit number of results
+    - **sync**: Sync with provider before returning results
+    """
+    if sync:
+        from orb.application.dto.queries import ListActiveRequestsQuery
+
+        query = ListActiveRequestsQuery(limit=limit or 50, all_resources=True)
+        results = await query_bus.execute(query)
+        return JSONResponse(content=scheduler.format_request_status_response(results))
+
+    from orb.application.request.queries import ListRequestsQuery
+
+    query = ListRequestsQuery(status=status, limit=limit or 50)
+    results = await query_bus.execute(query)
+    return JSONResponse(content=scheduler.format_request_status_response(results))
+
+
+@router.get("/return", summary="List Return Requests", description="List requests pending return")
+@handle_rest_exceptions(endpoint="/api/v1/requests/return", method="GET")
+async def list_return_requests(
+    limit: int = LIMIT_QUERY,
+    query_bus=QUERY_BUS,
+    scheduler=SCHEDULER_STRATEGY,
+) -> JSONResponse:
+    """List requests that are pending return."""
+    from orb.application.dto.queries import ListReturnRequestsQuery
+
+    query = ListReturnRequestsQuery(limit=limit)
+    results = await query_bus.execute(query)
+    return JSONResponse(content=scheduler.format_request_status_response(results))
+
+
+_TERMINAL_STATUSES = {"complete", "completed", "failed", "error", "cancelled", "canceled"}
 
 
 @router.get(
@@ -56,63 +105,7 @@ async def get_request_status(
 
     result = await handler.handle(api_request)
 
-    return JSONResponse(content=jsonable_encoder(result))
-
-
-@router.get("/", summary="List Requests", description="List requests with optional filtering")
-@handle_rest_exceptions(endpoint="/api/v1/requests", method="GET")
-async def list_requests(
-    status: Optional[str] = STATUS_QUERY,
-    limit: Optional[int] = LIMIT_QUERY,
-    sync: bool = Query(False, description="Sync with provider before returning results"),
-    query_bus=QUERY_BUS,
-) -> JSONResponse:
-    """
-    List requests with optional filtering.
-
-    - **status**: Filter by request status (pending, running, complete, failed)
-    - **limit**: Limit number of results
-    - **sync**: Sync with provider before returning results
-    """
-    if sync:
-        from orb.application.dto.queries import ListActiveRequestsQuery
-
-        query = ListActiveRequestsQuery(limit=limit or 50, all_resources=True)
-        results = await query_bus.execute(query)
-        serialized = (
-            [r.to_dict() if hasattr(r, "to_dict") else r for r in results]
-            if isinstance(results, list)
-            else results
-        )
-        return JSONResponse(content=jsonable_encoder(serialized))
-
-    from orb.application.request.queries import ListRequestsQuery
-
-    query = ListRequestsQuery(status=status, limit=limit or 50)
-    results = await query_bus.execute(query)
-    return JSONResponse(content=jsonable_encoder([r.model_dump() for r in results]))
-
-
-@router.get("/return", summary="List Return Requests", description="List requests pending return")
-@handle_rest_exceptions(endpoint="/api/v1/requests/return", method="GET")
-async def list_return_requests(
-    limit: int = LIMIT_QUERY,
-    query_bus=QUERY_BUS,
-) -> JSONResponse:
-    """List requests that are pending return."""
-    from orb.application.dto.queries import ListReturnRequestsQuery
-
-    query = ListReturnRequestsQuery(limit=limit)
-    results = await query_bus.execute(query)
-    serialized = (
-        [r.to_dict() if hasattr(r, "to_dict") else r for r in results]
-        if isinstance(results, list)
-        else results
-    )
-    return JSONResponse(content=jsonable_encoder(serialized))
-
-
-_TERMINAL_STATUSES = {"complete", "completed", "failed", "error", "cancelled", "canceled"}
+    return JSONResponse(content=result)
 
 
 @router.get(
@@ -138,14 +131,9 @@ async def stream_request_status(
             }
             try:
                 result = await handler.handle(api_request)
-                if hasattr(result, "to_dict"):
-                    data = result.to_dict()
-                elif hasattr(result, "model_dump"):
-                    data = result.model_dump(by_alias=True)
-                else:
-                    data = result
-                yield f"data: {json.dumps(data)}\n\n"
-                requests_list = data.get("requests", [])
+                # handler now returns a plain dict from scheduler.format_request_status_response
+                yield f"data: {json.dumps(result)}\n\n"
+                requests_list = result.get("requests", [])
                 if requests_list:
                     status = requests_list[0].get("status", "")
                     if status.lower() in _TERMINAL_STATUSES:
@@ -170,12 +158,15 @@ async def cancel_request(
     request_id: str,
     reason: Optional[str] = Query(None, description="Cancellation reason"),
     command_bus=COMMAND_BUS,
+    scheduler=SCHEDULER_STRATEGY,
 ) -> JSONResponse:
     from orb.application.dto.commands import CancelRequestCommand
 
     command = CancelRequestCommand(request_id=request_id, reason=reason or "Cancelled via REST API")
     await command_bus.execute(command)
-    return JSONResponse(content=jsonable_encoder({"request_id": request_id, "status": "cancelled"}))
+    return JSONResponse(
+        content=scheduler.format_request_response({"request_id": request_id, "status": "cancelled"})
+    )
 
 
 @router.get(
@@ -198,5 +189,4 @@ async def get_request_details(request_id: str, handler=REQUEST_STATUS_HANDLER) -
         "context": {"endpoint": f"/requests/{request_id}", "method": "GET"},
     }
     result = await handler.handle(api_request)
-
-    return JSONResponse(content=jsonable_encoder(result))
+    return JSONResponse(content=result)

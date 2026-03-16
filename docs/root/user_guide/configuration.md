@@ -361,13 +361,30 @@ This will show:
 `orb init` creates configuration files in a directory determined by your install type. The resolution order is:
 
 1. **`ORB_CONFIG_DIR` environment variable** — always wins if set
-2. **Virtual environment** — `{venv_parent}/config/` (standard venvs and symlink venvs like uv/mise)
-3. **Development mode** — `{project_root}/config/` (detected by `pyproject.toml` in parent directories)
-4. **User install** (`pip install --user`) — `~/.local/orb/config/`
-5. **System install** — `{sys.prefix}/orb/config/`
-6. **Fallback** — `{cwd}/config/`
+2. **`ORB_ROOT_DIR` environment variable** — `{ORB_ROOT_DIR}/config/`
+3. **Virtual environment** — `{venv_parent}/config/` (standard venvs and symlink venvs like uv/mise)
+4. **Development mode** — `{project_root}/config/` (detected by `pyproject.toml` in parent directories)
+5. **User install** (`pip install --user`) — `~/.orb/config/`
+6. **System install** — `{sys.prefix}/orb/config/`
+7. **Fallback** — `{cwd}/config/`
 
-Work, logs, and scripts directories are siblings of the config directory (e.g. `{venv_parent}/work/`, `{venv_parent}/logs/`). Override individually with `ORB_WORK_DIR`, `ORB_LOG_DIR`.
+### Directory Layout and ORB_ROOT_DIR
+
+Set `ORB_ROOT_DIR` to anchor all subdirectories under a single root:
+
+```bash
+export ORB_ROOT_DIR=/opt/orb
+# Results in:
+#   config  → /opt/orb/config
+#   work    → /opt/orb/work
+#   logs    → /opt/orb/logs
+#   health  → /opt/orb/health
+#   scripts → /opt/orb/scripts
+```
+
+Per-directory overrides (`ORB_CONFIG_DIR`, `ORB_WORK_DIR`, `ORB_LOG_DIR`, `ORB_HEALTH_DIR`) always take precedence over `ORB_ROOT_DIR` for that subdirectory only.
+
+Without `ORB_ROOT_DIR`, work, logs, health, and scripts directories are siblings of the config directory (e.g. `{venv_parent}/work/`, `{venv_parent}/logs/`).
 
 ## AWS IAM Permissions
 
@@ -600,9 +617,12 @@ ORB_MAX_MACHINES_PER_REQUEST=200       # Maximum machines per single request (in
 
 #### Directory Configuration
 ```bash
-ORB_CONFIG_DIR=/opt/orb/config         # Configuration files directory
-ORB_WORK_DIR=/opt/orb/work             # Working directory for temporary files
-ORB_LOG_DIR=/opt/orb/logs              # Log files directory
+ORB_ROOT_DIR=/opt/orb                  # Base directory for all subdirectories
+ORB_CONFIG_DIR=/opt/orb/config         # Configuration files directory (overrides ORB_ROOT_DIR)
+ORB_WORK_DIR=/opt/orb/work             # Working directory for temporary files (overrides ORB_ROOT_DIR)
+ORB_LOG_DIR=/opt/orb/logs              # Log files directory (overrides ORB_ROOT_DIR)
+ORB_HEALTH_DIR=/opt/orb/health         # Health check output directory (overrides ORB_ROOT_DIR)
+ORB_SCRIPTS_DIR=/opt/orb/scripts       # Override scripts directory location (overrides ORB_ROOT_DIR)
 ```
 
 ### AWS Provider Variables

@@ -1,13 +1,13 @@
 """Service registration management for DI container."""
 
-import logging
 import threading
 from typing import Any, Callable, Optional, TypeVar
 
 from orb.domain.base.di_contracts import DependencyRegistration, DIScope
+from orb.infrastructure.logging.logger import get_logger
 
 T = TypeVar("T")
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ServiceRegistry:

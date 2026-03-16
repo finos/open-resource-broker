@@ -135,6 +135,12 @@ def orb_config_dir_default(tmp_path, moto_vpc_resources):
                     "enabled": True,
                     "default": True,
                     "config": {"region": REGION},
+                    "handlers": {
+                        "RunInstances": {"enabled": True, "handler_class": "RunInstancesHandler"},
+                        "EC2Fleet": {"enabled": True, "handler_class": "EC2FleetHandler"},
+                        "SpotFleet": {"enabled": True, "handler_class": "SpotFleetHandler"},
+                        "ASG": {"enabled": True, "handler_class": "ASGHandler"},
+                    },
                     "template_defaults": {
                         "subnet_ids": subnet_ids,
                         "security_group_ids": [sg_id],

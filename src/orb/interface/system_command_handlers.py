@@ -17,7 +17,7 @@ async def handle_system_health(args) -> dict[str, Any]:
     from orb.interface.health_command_handler import handle_health_check
 
     # Run sync health check in executor
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(None, handle_health_check, args)
 
     return {"status": "success" if result == 0 else "error"}

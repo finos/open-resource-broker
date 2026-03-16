@@ -10,10 +10,13 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 from threading import Lock
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.interfaces.provider import BaseProviderConfig
+
+if TYPE_CHECKING:
+    from orb.monitoring.metrics import MetricsCollector
 from orb.providers.base.strategy.provider_strategy import (
     ProviderCapabilities,
     ProviderHealthStatus,
@@ -124,6 +127,7 @@ class FallbackProviderStrategy(ProviderStrategy):
         primary_strategy: ProviderStrategy,
         fallback_strategies: list[ProviderStrategy],
         config: Optional[FallbackConfig] = None,
+        metrics: Optional["MetricsCollector"] = None,
     ) -> None:
         """
         Initialize fallback provider strategy.
@@ -151,6 +155,7 @@ class FallbackProviderStrategy(ProviderStrategy):
         self._fallback_strategies = fallback_strategies
         self._config = config or FallbackConfig()
         self._logger = logger
+        self._metrics = metrics
 
         # Circuit breaker state
         self._circuit_state = CircuitBreakerState()
@@ -361,10 +366,16 @@ class FallbackProviderStrategy(ProviderStrategy):
 
                 if result.success:
                     # Success - record and potentially close circuit
+                    was_half_open = self._circuit_state.state == CircuitState.HALF_OPEN
                     self._circuit_state.record_success()
-                    if self._circuit_state.state == CircuitState.HALF_OPEN:
+                    if was_half_open:
                         self._circuit_state.state = CircuitState.CLOSED
                         self._logger.info("Circuit breaker closed - primary strategy recovered")
+                        if self._metrics is not None:
+                            self._metrics.increment(
+                                "circuit_breaker_closed_total",
+                                labels={"provider": self._primary_strategy.provider_type},
+                            )
                     self._current_strategy = self._primary_strategy
                     return result
                 else:
@@ -376,6 +387,11 @@ class FallbackProviderStrategy(ProviderStrategy):
                             "Circuit breaker opened after %s failures",
                             self._circuit_state.failure_count,
                         )
+                        if self._metrics is not None:
+                            self._metrics.increment(
+                                "circuit_breaker_opened_total",
+                                labels={"provider": self._primary_strategy.provider_type},
+                            )
 
                     # Try fallback
                     return await self._execute_fallback_chain(operation)
@@ -386,6 +402,11 @@ class FallbackProviderStrategy(ProviderStrategy):
                 if self._circuit_state.failure_count >= self._config.circuit_breaker_threshold:
                     self._circuit_state.state = CircuitState.OPEN
                     self._logger.warning("Circuit breaker opened after exception: %s", e)
+                    if self._metrics is not None:
+                        self._metrics.increment(
+                            "circuit_breaker_opened_total",
+                            labels={"provider": self._primary_strategy.provider_type},
+                        )
 
                 return await self._execute_fallback_chain(operation)
 
@@ -483,6 +504,14 @@ class FallbackProviderStrategy(ProviderStrategy):
                         i + 1,
                         fallback_strategy.provider_type,
                     )
+                    if self._metrics is not None:
+                        self._metrics.increment(
+                            "provider_fallback_total",
+                            labels={
+                                "primary": self._primary_strategy.provider_type,
+                                "fallback": fallback_strategy.provider_type,
+                            },
+                        )
                     return result
                 else:
                     last_error = result.error_message

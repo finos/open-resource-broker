@@ -36,3 +36,18 @@ class DynamodbStrategyConfig(BaseModel):
     region: Optional[str] = Field(None, description="AWS region")
     profile: str = Field("default", description="AWS profile")
     table_prefix: str = Field("hostfactory", description="Table prefix")
+
+
+class AWSStorageConfig(BaseModel):
+    """AWS-specific storage backend configuration.
+
+    Holds optional sub-configs for each AWS storage backend.
+    Only the backend matching the top-level storage.strategy is used at runtime.
+    """
+
+    dynamodb: Optional[DynamodbStrategyConfig] = Field(
+        None, description="DynamoDB storage backend configuration"
+    )
+    aurora: Optional[AuroraSqlStrategyConfig] = Field(
+        None, description="Aurora SQL storage backend configuration"
+    )

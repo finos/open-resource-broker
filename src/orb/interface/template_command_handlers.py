@@ -10,6 +10,7 @@ following the same pattern as other entities in the system.
 from __future__ import annotations
 
 import argparse
+import json
 from typing import Any, cast
 
 from orb.application.dto.queries import (
@@ -17,13 +18,13 @@ from orb.application.dto.queries import (
     ListTemplatesQuery,
     ValidateTemplateQuery,
 )
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.application.template.commands import (
     CreateTemplateCommand,
     DeleteTemplateCommand,
     UpdateTemplateCommand,
 )
 from orb.domain.base.ports.console_port import ConsolePort
-from orb.domain.base.ports.scheduler_port import SchedulerPort
 from orb.infrastructure.di.buses import CommandBus, QueryBus
 from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
@@ -150,6 +151,10 @@ async def handle_get_template(args: argparse.Namespace) -> dict[str, Any]:
         template = await query_bus.execute(query)
 
         if template:
+            # Get scheduler strategy from DI container for format conversion
+            scheduler_strategy = container.get(SchedulerPort)
+            if scheduler_strategy:
+                return scheduler_strategy.format_template_for_display(template)
             return {
                 "success": True,
                 "template": (
@@ -239,6 +244,14 @@ async def handle_create_template(args: argparse.Namespace) -> dict[str, Any]:
             configuration=template_config,
         )
 
+        if getattr(args, "validate_only", False):
+            return {
+                "success": True,
+                "message": f"Template {template_id} is valid (not created)",
+                "template_id": template_id,
+                "validate_only": True,
+            }
+
         # Execute command through CQRS bus
         response = await command_bus.execute(cast(Any, command))
 
@@ -279,10 +292,8 @@ async def handle_update_template(args: argparse.Namespace) -> dict[str, Any]:
         if not command_bus:
             return {"success": False, "error": "CommandBus not available"}
 
-        # Extract template ID - merge positional and flag arguments
+        # Extract template ID - merge positional and flag arguments (file may also supply it)
         template_id = getattr(args, "template_id", None) or getattr(args, "flag_template_id", None)
-        if not template_id:
-            return {"success": False, "error": "Template ID is required"}
 
         # Check dry-run context
         from orb.infrastructure.mocking.dry_run_context import is_dry_run_active
@@ -295,17 +306,33 @@ async def handle_update_template(args: argparse.Namespace) -> dict[str, Any]:
                 "dry_run": True,
             }
 
-        # Build configuration from args
-        configuration = {}
-        if hasattr(args, "configuration"):
-            configuration = args.configuration
+        # Read template configuration from file
+        file_path = getattr(args, "file", None)
+        if not file_path:
+            return {"success": False, "error": "Template file is required"}
 
-        # Create command with update fields
+        try:
+            with open(file_path) as f:
+                template_config = json.load(f)
+        except FileNotFoundError:
+            return {"success": False, "error": f"Template file not found: {file_path}"}
+        except json.JSONDecodeError as e:
+            return {"success": False, "error": f"Invalid JSON in template file: {e}"}
+
+        if not isinstance(template_config, dict):
+            return {"success": False, "error": "Template file must contain a JSON object"}
+
+        # CLI template_id arg takes precedence over file's template_id
+        file_template_id = template_config.get("template_id") or template_config.get("templateId")
+        resolved_template_id = template_id or file_template_id
+        if not resolved_template_id:
+            return {"success": False, "error": "Template ID is required (via arg or file)"}
+
         command = UpdateTemplateCommand(
-            template_id=template_id,
-            name=getattr(args, "name", None),
-            description=getattr(args, "description", None),
-            configuration=configuration,
+            template_id=resolved_template_id,
+            name=template_config.get("name"),
+            description=template_config.get("description"),
+            configuration=template_config.get("configuration", {}),
         )
 
         # Execute command through CQRS bus

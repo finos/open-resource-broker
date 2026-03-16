@@ -10,7 +10,38 @@ from unittest.mock import Mock
 import pytest
 
 from orb.config.manager import ConfigurationManager
-from orb.providers.factory import ProviderStrategyFactory
+from orb.providers.config_builder import ProviderConfigBuilder
+from orb.providers.config_validator import ProviderConfigValidator
+
+
+def _make_validator(config_manager):
+    """Create a ProviderConfigValidator with a mock logger."""
+    mock_logger = Mock()
+    mock_registry = Mock()
+    config_builder = ProviderConfigBuilder(mock_logger, mock_registry)
+    return ProviderConfigValidator(config_manager, config_builder, mock_logger, mock_registry)
+
+
+def _get_provider_info(config_manager):
+    """Inline equivalent of ProviderStrategyFactory.get_provider_info()."""
+    try:
+        provider_config = config_manager.get_provider_config()
+        if not provider_config:
+            return {"mode": "error", "error": "Provider configuration not found"}
+        mode = provider_config.get_mode()
+        active_providers = provider_config.get_active_providers()
+        return {
+            "mode": mode.value,
+            "selection_policy": provider_config.selection_policy,
+            "active_provider": provider_config.active_provider,
+            "total_providers": len(provider_config.providers),
+            "active_providers": len(active_providers),
+            "provider_names": [p.name for p in active_providers],
+            "health_check_interval": provider_config.health_check_interval,
+            "circuit_breaker_enabled": provider_config.circuit_breaker.enabled,
+        }
+    except Exception as e:
+        return {"mode": "error", "error": str(e)}
 
 
 class TestPerformance:
@@ -92,7 +123,7 @@ class TestPerformance:
         print(f"Configuration loading performance: {loading_time:.3f}s for 50 providers")
 
     def test_provider_strategy_factory_performance(self):
-        """Test provider strategy factory performance."""
+        """Test provider validator construction performance."""
         # Create configuration with multiple providers
         config_data = {
             "provider": {
@@ -112,22 +143,22 @@ class TestPerformance:
         config_path = self.create_config_file(config_data)
         config_manager = ConfigurationManager(config_path)
 
-        # Measure factory creation time
+        # Measure validator creation time (same cost as factory construction)
         start_time = time.time()
 
-        factory = ProviderStrategyFactory(config_manager, Mock())
+        _make_validator(config_manager)
 
         end_time = time.time()
         creation_time = end_time - start_time
 
         # Performance assertion
-        assert creation_time < 0.1, f"Factory creation took {creation_time:.3f}s, expected < 0.1s"
+        assert creation_time < 0.1, f"Validator creation took {creation_time:.3f}s, expected < 0.1s"
 
         # Measure provider info retrieval time
         start_time = time.time()
 
         for _ in range(100):  # 100 iterations
-            factory.get_provider_info()
+            _get_provider_info(config_manager)
 
         end_time = time.time()
         retrieval_time = end_time - start_time
@@ -173,23 +204,21 @@ class TestPerformance:
 
         config_path = self.create_config_file(config_data)
         config_manager = ConfigurationManager(config_path)
-        factory = ProviderStrategyFactory(config_manager, Mock())
+        validator = _make_validator(config_manager)
 
         # Measure validation time
         start_time = time.time()
 
-        validation_result = factory.validate_configuration()
+        validation_result = validator.validate_configuration()
 
         end_time = time.time()
         validation_time = end_time - start_time
 
         # Verify validation worked (handle both success and error states)
         if validation_result["valid"] is False:
-            # Factory encountered an error during validation, test that it handles it gracefully
             assert validation_result["valid"] is False
             assert "errors" in validation_result
         else:
-            # Validation worked correctly
             assert validation_result["valid"] is True
             assert validation_result["provider_count"] == 20
 
@@ -218,11 +247,10 @@ class TestPerformance:
 
         config_path = self.create_config_file(config_data)
         config_manager = ConfigurationManager(config_path)
-        factory = ProviderStrategyFactory(config_manager, Mock())
 
         def access_provider_info():
             """Access provider info in thread."""
-            return factory.get_provider_info()
+            return _get_provider_info(config_manager)
 
         # Test concurrent access
         start_time = time.time()
@@ -238,10 +266,8 @@ class TestPerformance:
         assert len(results) == 50
         for result in results:
             if result["mode"] == "error":
-                # Factory encountered an error, test that it handles it gracefully
                 assert "error" in result
             else:
-                # Factory worked correctly
                 assert result["mode"] == "multi"
                 assert result["active_providers"] == 5
 
@@ -283,9 +309,9 @@ class TestPerformance:
 
         config_path = self.create_config_file(config_data)
 
-        # Load configuration and create factory
+        # Load configuration and create validator (same cost as factory)
         config_manager = ConfigurationManager(config_path)
-        ProviderStrategyFactory(config_manager, Mock())
+        _make_validator(config_manager)
 
         # Get memory usage after loading
         final_memory = process.memory_info().rss / 1024 / 1024  # MB
@@ -299,7 +325,7 @@ class TestPerformance:
         print(f"Memory usage performance: {memory_increase:.1f}MB increase for 100 providers")
 
     def test_provider_caching_performance(self):
-        """Test provider strategy caching performance."""
+        """Test provider info retrieval performance across repeated calls."""
         config_data = {
             "provider": {
                 "providers": [
@@ -315,34 +341,31 @@ class TestPerformance:
 
         config_path = self.create_config_file(config_data)
         config_manager = ConfigurationManager(config_path)
-        factory = ProviderStrategyFactory(config_manager, Mock())
 
-        # Measure first access (cache miss)
+        # Measure first access
         start_time = time.time()
-        factory.get_provider_info()
+        _get_provider_info(config_manager)
         first_access_time = time.time() - start_time
 
-        # Measure subsequent accesses (cache hits)
+        # Measure subsequent accesses
         start_time = time.time()
         for _ in range(100):
-            factory.get_provider_info()
+            _get_provider_info(config_manager)
         subsequent_access_time = time.time() - start_time
         avg_cached_time = subsequent_access_time / 100
 
-        # Cached access should be significantly faster (or at least not slower)
-        # Note: When operations are very fast (microseconds), the difference may not be significant
-        if first_access_time > 0.001:  # Only assert significant improvement for slower operations
+        # Subsequent access should not be significantly slower than first
+        if first_access_time > 0.001:
             assert avg_cached_time < first_access_time / 10, (
-                f"Cached access ({avg_cached_time:.6f}s) not significantly faster than first access ({first_access_time:.6f}s)"
+                f"Subsequent access ({avg_cached_time:.6f}s) not significantly faster than first access ({first_access_time:.6f}s)"
             )
         else:
-            # For very fast operations, just ensure cached access isn't slower
             assert avg_cached_time <= first_access_time * 2, (
-                f"Cached access ({avg_cached_time:.6f}s) is slower than first access ({first_access_time:.6f}s)"
+                f"Subsequent access ({avg_cached_time:.6f}s) is slower than first access ({first_access_time:.6f}s)"
             )
 
         print(
-            f"Caching performance: First access {first_access_time:.6f}s, cached average {avg_cached_time:.6f}s"
+            f"Caching performance: First access {first_access_time:.6f}s, subsequent average {avg_cached_time:.6f}s"
         )
 
     def test_configuration_reload_performance(self):
@@ -364,14 +387,12 @@ class TestPerformance:
 
         config_path = self.create_config_file(config_data)
         config_manager = ConfigurationManager(config_path)
-        factory = ProviderStrategyFactory(config_manager, Mock())
 
         # Get initial provider info (handle both success and error states)
-        initial_info = factory.get_provider_info()
+        initial_info = _get_provider_info(config_manager)
         if "selection_policy" in initial_info:
             assert initial_info["selection_policy"] == "FIRST_AVAILABLE"
         else:
-            # Factory may be in error state, test that it handles gracefully
             assert "mode" in initial_info
 
         # Update configuration file
@@ -382,19 +403,17 @@ class TestPerformance:
         # Measure reload time
         start_time = time.time()
 
-        # Simulate configuration reload (would normally be done by reload command)
+        # Simulate configuration reload
         new_config_manager = ConfigurationManager(config_path)
-        new_factory = ProviderStrategyFactory(new_config_manager, Mock())
 
         end_time = time.time()
         reload_time = end_time - start_time
 
         # Verify configuration was reloaded (handle both success and error states)
-        updated_info = new_factory.get_provider_info()
+        updated_info = _get_provider_info(new_config_manager)
         if "selection_policy" in updated_info:
             assert updated_info["selection_policy"] == "ROUND_ROBIN"
         else:
-            # Factory may be in error state, test that it handles gracefully
             assert "mode" in updated_info
 
         # Performance assertion
@@ -426,15 +445,15 @@ class TestPerformance:
 
         config_path = self.create_config_file(config_data)
         config_manager = ConfigurationManager(config_path)
-        factory = ProviderStrategyFactory(config_manager, Mock())
+        validator = _make_validator(config_manager)
 
-        # Benchmark provider info retrieval
+        # Benchmark provider info retrieval and validation
         iterations = 1000
         start_time = time.time()
 
         for _ in range(iterations):
-            factory.get_provider_info()
-            factory.validate_configuration()
+            _get_provider_info(config_manager)
+            validator.validate_configuration()
 
         end_time = time.time()
         total_time = end_time - start_time
@@ -472,15 +491,15 @@ class TestPerformance:
         def stress_operations():
             """Perform stress operations."""
             config_manager = ConfigurationManager(config_path)
-            factory = ProviderStrategyFactory(config_manager, Mock())
+            validator = _make_validator(config_manager)
 
             operations = 0
             start_time = time.time()
 
             # Run operations for 5 seconds
             while time.time() - start_time < 5.0:
-                factory.get_provider_info()
-                factory.validate_configuration()
+                _get_provider_info(config_manager)
+                validator.validate_configuration()
                 operations += 2
 
             return operations
@@ -536,10 +555,10 @@ class TestPerformance:
         config_path = self.create_config_file(config_data)
         config_manager = ConfigurationManager(config_path)
         provider_config = config_manager.get_provider_config()
-        factory = ProviderStrategyFactory(config_manager, Mock())
+        validator = _make_validator(config_manager)
 
-        provider_info = factory.get_provider_info()
-        validation_result = factory.validate_configuration()
+        provider_info = _get_provider_info(config_manager)
+        validation_result = validator.validate_configuration()
 
         end_time = time.time()
         processing_time = end_time - start_time
@@ -553,7 +572,7 @@ class TestPerformance:
             provider_data = config_manager.get("provider", {})
             assert len(provider_data.get("providers", [])) == 1000
 
-        # Verify factory results (handle both success and error states)
+        # Verify results (handle both success and error states)
         if provider_info.get("mode") != "error":
             assert provider_info["total_providers"] == 1000
             assert provider_info["active_providers"] == 500

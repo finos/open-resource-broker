@@ -4,7 +4,7 @@ import importlib.metadata
 import json
 import sys
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Literal, Optional, Tuple
 
 
 def detect_installation_mode(package_name: str = "orb-py") -> Tuple[str, Optional[Path]]:
@@ -70,35 +70,65 @@ def detect_installation_mode(package_name: str = "orb-py") -> Tuple[str, Optiona
         return "development", None
 
 
-def get_template_location() -> Path:
-    """Get template file location based on installation mode."""
-    import sysconfig
+def is_mise_install() -> bool:
+    """True if running under a mise-managed Python."""
+    return "/.local/share/mise/" in str(Path(sys.executable).resolve())
 
-    mode, base_path = detect_installation_mode()
+
+def detect_install_mode() -> Literal[
+    "development", "editable", "user", "uv_tool", "mise", "system", "venv"
+]:
+    """Detect installation mode, returning a canonical literal.
+
+    Checks uv tool install first (before venv detection would misclassify it),
+    then delegates to detect_installation_mode() for the remaining cases.
+
+    Returns one of: 'development', 'editable', 'user', 'uv_tool', 'mise', 'system', 'venv'
+    """
+    import site
+
+    # uv tool installs look like a venv (prefix != base_prefix) but live under
+    # ~/.local/share/uv/tools/ — intercept before the venv branch fires.
+    if "/.local/share/uv/tools/" in str(sys.prefix):
+        return "uv_tool"
+
+    # mise-managed Python: executable resolves through ~/.local/share/mise/
+    if is_mise_install():
+        return "mise"
+
+    # Standard venv: prefix differs from base_prefix.
+    if sys.prefix != sys.base_prefix:
+        return "venv"
+
+    # User install: sys.prefix starts with site.USER_BASE (mirrors is_user_install()).
+    # Check this before importlib.metadata so patched sys.prefix/USER_BASE is respected.
+    user_base = getattr(site, "USER_BASE", None)
+    if user_base and str(sys.prefix).startswith(user_base):
+        return "user"
+
+    # System install: prefix under /usr or /opt (mirrors is_system_install()).
+    # Check before importlib.metadata for the same reason.
+    if str(sys.prefix).startswith(("/usr", "/opt")):
+        return "system"
+
+    mode, _ = detect_installation_mode()
 
     if mode == "development":
-        # Use existing platform_dirs logic
-        from orb.config.platform_dirs import get_config_location
+        return "development"
+    if mode == "editable":
+        return "editable"
+    if mode == "user":
+        return "user"
 
-        return get_config_location() / "default_config.json"
+    return "system"
 
-    elif mode == "editable":
-        # Use source directory from PEP 610
-        return (base_path or Path.cwd()) / "config" / "default_config.json"
 
-    elif mode == "user":
-        # User install - use posix_user scheme
-        try:
-            scheme = "posix_user" if sys.platform != "win32" else "nt_user"
-            data_path = Path(sysconfig.get_path("data", scheme))
-        except Exception:
-            data_path = base_path if base_path else Path.home() / ".local"
-        return data_path / "orb_config" / "default_config.json"
+def get_template_location() -> Path:
+    """Get default_config.json path using importlib.resources."""
+    from importlib.resources import as_file, files
 
-    else:  # system/venv
-        # Use default scheme
-        data_path = Path(sysconfig.get_path("data"))
-        return data_path / "orb_config" / "default_config.json"
+    with as_file(files("orb.config").joinpath("default_config.json")) as p:
+        return p
 
 
 def get_scripts_location() -> Path:
@@ -109,7 +139,7 @@ def get_scripts_location() -> Path:
 
     if mode == "development":
         try:
-            from orb.domain.base.ports.scheduler_port import SchedulerPort
+            from orb.application.ports.scheduler_port import SchedulerPort
             from orb.infrastructure.di.container import get_container, is_container_ready
 
             if is_container_ready():
@@ -120,9 +150,9 @@ def get_scripts_location() -> Path:
         except Exception:
             pass  # Best-effort: DI container may not be ready during installation detection
 
-        from orb.config.platform_dirs import get_config_location
+        from orb.config.platform_dirs import get_root_location
 
-        return get_config_location().parent / "scripts"
+        return get_root_location() / "scripts"
 
     elif mode == "editable":
         from orb._package import PACKAGE_ROOT
@@ -134,12 +164,7 @@ def get_scripts_location() -> Path:
         )
 
     elif mode == "user":
-        try:
-            scheme = "posix_user" if sys.platform != "win32" else "nt_user"
-            data_path = Path(sysconfig.get_path("data", scheme))
-        except Exception:
-            data_path = base_path if base_path else Path.home() / ".local"
-        return data_path / "orb_scripts"
+        return Path.home() / ".orb" / "scripts"
 
     else:  # system/venv
         data_path = Path(sysconfig.get_path("data"))

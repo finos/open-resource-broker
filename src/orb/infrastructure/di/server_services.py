@@ -49,8 +49,9 @@ def _register_api_handlers(container: DIContainer) -> None:
     """Register API handlers with dependency injection."""
     # Import shared dependencies once at the top so they are always bound
     try:
+        from orb.application.ports.scheduler_port import SchedulerPort
         from orb.domain.base.configuration_service import DomainConfigurationService
-        from orb.domain.base.ports import ErrorHandlingPort, SchedulerPort
+        from orb.domain.base.ports import ErrorHandlingPort
         from orb.domain.base.ports.logging_port import LoggingPort
         from orb.infrastructure.di.buses import CommandBus, QueryBus
         from orb.monitoring.metrics import MetricsCollector
@@ -90,6 +91,7 @@ def _register_api_handlers(container: DIContainer) -> None:
                 lambda c: RequestMachinesRESTHandler(
                     query_bus=c.get(QueryBus),
                     command_bus=c.get(CommandBus),
+                    scheduler_strategy=c.get(SchedulerPort),
                     logger=c.get(LoggingPort),
                     error_handler=(
                         c.get(ErrorHandlingPort) if c.is_registered(ErrorHandlingPort) else None

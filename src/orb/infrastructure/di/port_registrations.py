@@ -28,7 +28,7 @@ def register_port_adapters(container):
         from orb.infrastructure.adapters.configuration_adapter import ConfigurationAdapter
 
         config_manager = container.get(ConfigurationManager)  # Use DI instance
-        return ConfigurationAdapter(config_manager)
+        return ConfigurationAdapter(config_manager, container.get(LoggingPort))
 
     container.register_singleton(ConfigurationPort, create_configuration_adapter)
 

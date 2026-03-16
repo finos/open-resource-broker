@@ -26,7 +26,6 @@ Note:
     based on demand and maintain high availability across multiple AZs.
 """
 
-import logging
 from typing import Any, Optional
 
 from botocore.exceptions import ClientError
@@ -38,8 +37,12 @@ from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from orb.infrastructure.error.decorators import handle_infrastructure_exceptions
+from orb.infrastructure.logging.logger import get_logger
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
+from orb.providers.aws.exceptions.aws_exceptions import (
+    AWSConfigurationError,
+    AWSInfrastructureError,
+)
 from orb.providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.infrastructure.handlers.asg.capacity_manager import ASGCapacityManager
@@ -161,7 +164,8 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         )
 
         # Generate ASG name
-        assert self.config_port is not None, "config_port must be injected"
+        if self.config_port is None:
+            raise AWSConfigurationError("config_port must be injected before calling _create_asg")
         asg_name = f"{self.config_port.get_resource_prefix('asg')}{request.request_id}"
 
         # Create ASG configuration
@@ -299,13 +303,13 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
                 except (ClientError, KeyError, ValueError) as e:
                     # Skip failed chunks and log the issue for debugging
-                    logging.warning("Failed to process instance chunk: %s", e)
+                    get_logger(__name__).warning("Failed to process instance chunk: %s", e)
                     continue
 
             return asg_mapping
 
         except Exception as e:
-            logging.warning(
+            get_logger(__name__).warning(
                 "Failed to detect ASG membership for instances, skipping capacity reduction: %s", e
             )
             return {}

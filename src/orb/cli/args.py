@@ -155,6 +155,11 @@ def add_request_actions(subparsers):
         help="Filter by request status (specific filter)",
     )
     requests_list.add_argument("--template-id", help="Filter by template ID (specific filter)")
+    requests_list.add_argument(
+        "--request-type",
+        choices=["acquire", "return"],
+        help="Filter by request type (specific filter)",
+    )
 
     requests_show = subparsers.add_parser("show", help="Show request details")
     add_global_arguments(requests_show)
@@ -229,6 +234,9 @@ def add_provider_actions(subparsers):
 
     providers_add = subparsers.add_parser("add", help="Add new provider")
     add_global_arguments(providers_add)
+    providers_add.add_argument(
+        "--provider-type", dest="provider_type", required=True, help="Provider type (e.g. aws)"
+    )
     providers_add.add_argument("--aws-profile", help="AWS profile name")
     providers_add.add_argument("--aws-region", help="AWS region")
     providers_add.add_argument("--name", help="Provider instance name")

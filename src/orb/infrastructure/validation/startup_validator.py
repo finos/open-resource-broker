@@ -125,7 +125,7 @@ class StartupValidator:
         if not self.app_config:
             return False
 
-        from orb.domain.base.ports.scheduler_port import SchedulerPort
+        from orb.application.ports.scheduler_port import SchedulerPort
         from orb.infrastructure.di.container import get_container
 
         container = get_container()
@@ -173,7 +173,7 @@ class StartupValidator:
         if default_resolved:
             self._console.info(f"  - {default_resolved}")
 
-        config_resolved = svc.resolve_file_path("conf", "config.json")
+        config_resolved = svc.resolve_file_path("config", "config.json")
         if config_resolved:
             self._console.info(f"  - {config_resolved}")
 

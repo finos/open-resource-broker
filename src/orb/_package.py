@@ -1,10 +1,11 @@
 """Package metadata - works in both development and production."""
 
-import logging
 from pathlib import Path
 from typing import Optional
 
-logger = logging.getLogger(__name__)
+from orb.infrastructure.logging.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def _get_from_project_yml() -> Optional[dict]:

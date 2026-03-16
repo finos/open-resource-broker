@@ -55,10 +55,17 @@ def _make_bus_handler(factory_method_name: str) -> Handler:
         if factory_fn is None:
             raise ValueError(f"No factory method for: {factory_method_name}")
 
-        # Build kwargs from args — pass only what the factory method accepts
+        # Build kwargs from args — pass only what the factory method accepts.
+        # For each parameter k, check args_dict[k] first (positional), then
+        # args_dict['flag_'+k] as fallback (e.g. --machine-id stored as flag_machine_id).
         sig = inspect.signature(factory_fn)
         args_dict = vars(args).copy()
-        kwargs = {k: args_dict.get(k) for k in sig.parameters if k in args_dict}
+        kwargs = {}
+        for k in sig.parameters:
+            if k in args_dict and args_dict[k] is not None:
+                kwargs[k] = args_dict[k]
+            elif f"flag_{k}" in args_dict and args_dict[f"flag_{k}"] is not None:
+                kwargs[k] = args_dict[f"flag_{k}"]
         cqrs_obj = factory_fn(**kwargs)
 
         container = get_container()
@@ -228,6 +235,7 @@ def build_registry() -> None:
         handle_storage_health,
         handle_storage_metrics,
         handle_test_storage,
+        handle_validate_storage_config,
     )
 
     register("storage", "list", handle_list_storage_strategies)
@@ -235,6 +243,7 @@ def build_registry() -> None:
     register("storage", "health", handle_storage_health)
     register("storage", "metrics", handle_storage_metrics)
     register("storage", "test", handle_test_storage)
+    register("storage", "validate", handle_validate_storage_config)
 
     # --- config ---
     register("config", "show", _make_bus_handler("get_provider_config"))

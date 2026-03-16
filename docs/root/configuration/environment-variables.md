@@ -30,10 +30,15 @@ ORB_LOG_LEVEL=INFO
 ORB_REQUEST_TIMEOUT=300
 ORB_MAX_MACHINES_PER_REQUEST=100
 
-# Directory overrides
+# Root directory — sets the base for all subdirectories (config, work, logs, health, scripts)
+# Per-directory overrides below take precedence over ORB_ROOT_DIR
+ORB_ROOT_DIR=/opt/orb
+
+# Directory overrides (each overrides ORB_ROOT_DIR for that subdirectory only)
 ORB_CONFIG_DIR=/opt/orb/config
 ORB_WORK_DIR=/opt/orb/work
 ORB_LOG_DIR=/opt/orb/logs
+ORB_HEALTH_DIR=/opt/orb/health
 ```
 
 ### Logging Configuration

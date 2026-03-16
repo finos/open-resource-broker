@@ -1,13 +1,14 @@
 """Runtime AMI cache for script execution with optional storage."""
 
 import json
-import logging
 import os
 import time
 from contextlib import suppress
 from typing import Optional
 
-logger = logging.getLogger(__name__)
+from orb.infrastructure.logging.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class RuntimeAMICache:

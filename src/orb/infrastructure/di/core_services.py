@@ -1,12 +1,12 @@
 """Core service registrations for dependency injection."""
 
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.config.managers.configuration_manager import ConfigurationManager
 from orb.domain.base.ports import (
     ConfigurationPort,
     EventPublisherPort,
     LoggingPort,
-    ProviderPort,
-    SchedulerPort,
+    ProviderDiscoveryPort,
     StoragePort,
 )
 from orb.infrastructure.di.buses import CommandBus, QueryBus
@@ -30,7 +30,7 @@ def register_core_services(container: DIContainer) -> None:
     def create_metrics_collector(c):
         config_port = c.get(ConfigurationPort)
         metrics_config = config_port.get_metrics_config()
-        return MetricsCollector(metrics_config)
+        return MetricsCollector(metrics_config, logger=c.get(LoggingPort))
 
     # Register as singleton so the same collector instance is shared
     container.register_singleton(MetricsCollector, create_metrics_collector)
@@ -49,13 +49,28 @@ def register_core_services(container: DIContainer) -> None:
     # Register template format converter
 
     # Register scheduler strategy
-    container.register_factory(SchedulerPort, lambda c: _create_scheduler_strategy(c))
+    container.register_factory(SchedulerPort, _create_scheduler_strategy)
 
     # Register storage strategy
-    container.register_factory(StoragePort, lambda c: _create_storage_strategy(c))
+    container.register_factory(StoragePort, _create_storage_strategy)
 
     # Register provider strategy
-    container.register_factory(ProviderPort, lambda c: _create_provider_strategy(c))
+    container.register_factory(ProviderDiscoveryPort, _create_provider_strategy)
+
+    # Register EventBus as singleton so all repositories and subscribers share one instance
+    from orb.application.events.bus.event_bus import EventBus
+    from orb.application.events.handlers.metrics_event_handler import MetricsEventHandler
+
+    def create_event_bus(c: DIContainer) -> EventBus:
+        bus = EventBus(logger=c.get(LoggingPort))
+        collector = c.get(MetricsCollector)
+        handler = MetricsEventHandler(collector=collector, logger=c.get(LoggingPort))
+        bus.register_handler("RequestCreatedEvent", handler)
+        bus.register_handler("RequestCompletedEvent", handler)
+        bus.register_handler("RequestFailedEvent", handler)
+        return bus
+
+    container.register_singleton(EventBus, create_event_bus)
 
     # Register event publisher
     from orb.infrastructure.events.publisher import ConfigurableEventPublisher
@@ -113,11 +128,11 @@ def _create_storage_strategy(container: "DIContainer") -> StoragePort:
     return factory.create_strategy(storage_type, config)
 
 
-def _create_provider_strategy(container: "DIContainer") -> ProviderPort:
+def _create_provider_strategy(container: "DIContainer") -> ProviderDiscoveryPort:
     """Create provider strategy using registry pattern."""
     from orb.domain.base.ports.logging_port import LoggingPort
-    from orb.infrastructure.adapters.provider_registry_adapter import ProviderRegistryAdapter
+    from orb.infrastructure.adapters.provider_discovery_adapter import ProviderDiscoveryAdapter
     from orb.providers.registry import get_provider_registry
 
     registry = get_provider_registry()
-    return ProviderRegistryAdapter(registry, logger=container.get(LoggingPort))
+    return ProviderDiscoveryAdapter(registry, logger=container.get(LoggingPort))

@@ -1,6 +1,5 @@
 """AWS-specific event handlers."""
 
-import logging
 from typing import Any
 
 from orb.domain.base.events import DomainEvent
@@ -32,8 +31,8 @@ def handle_aws_client_operation(event: DomainEvent) -> None:
         message_parts.append(f"RequestId: {request_id}")
     message = " | ".join(message_parts)
 
-    log_level = logging.INFO if success else logging.WARNING
-    _logger.log(log_level, message)
+    log_level = "info" if success else "warning"
+    getattr(_logger, log_level)(message)
 
 
 def handle_aws_rate_limit(event: DomainEvent) -> None:

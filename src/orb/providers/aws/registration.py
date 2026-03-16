@@ -63,6 +63,15 @@ def create_aws_strategy(provider_config: Any) -> Any:
         except Exception as e:
             logger.debug("Could not get config port from DI container: %s", e)
 
+        console_port = None
+        try:
+            from orb.domain.base.ports.console_port import ConsolePort
+            from orb.infrastructure.di.container import get_container
+
+            console_port = get_container().get(ConsolePort)
+        except Exception as e:
+            logger.debug("Could not get console port from DI container: %s", e)
+
         # Create AWS provider strategy
         strategy = AWSProviderStrategy(
             config=aws_config,
@@ -70,6 +79,7 @@ def create_aws_strategy(provider_config: Any) -> Any:
             provider_name=provider_name,
             provider_instance_config=provider_instance_config,
             config_port=config_port,
+            console=console_port,
         )
 
         # Initialize the strategy
@@ -77,12 +87,12 @@ def create_aws_strategy(provider_config: Any) -> Any:
             raise RuntimeError("Failed to initialize AWS provider strategy")
 
         with suppress(Exception):
+            from orb.domain.base.ports.health_check_port import HealthCheckPort
             from orb.infrastructure.di.container import get_container
-            from orb.monitoring.health import HealthCheck
             from orb.providers.aws.health import register_aws_health_checks
 
             if strategy.aws_client is not None:
-                health_check = get_container().get(HealthCheck)
+                health_check = get_container().get(HealthCheckPort)
                 register_aws_health_checks(health_check, strategy.aws_client)
 
         # Set provider name for identification
@@ -125,7 +135,7 @@ def register_aws_provider_settings() -> None:
         from orb.providers.aws.configuration.config import AWSProviderConfig
 
         # Register AWSProviderConfig as the settings class for AWS providers
-        ProviderSettingsRegistry._settings_classes["aws"] = AWSProviderConfig
+        ProviderSettingsRegistry.register_provider_settings("aws", AWSProviderConfig)
 
     except ImportError:
         # Registry not available, skip registration
@@ -421,6 +431,12 @@ def initialize_aws_provider(
         if template_factory:
             register_aws_template_factory(template_factory, logger)
 
+        # Register AWS CLI spec
+        from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
+        from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec
+
+        CLISpecRegistry.register("aws", AWSCLISpec())
+
         if logger:
             logger.info("AWS provider initialization completed successfully")
 
@@ -442,8 +458,6 @@ def is_aws_provider_registered() -> bool:
 
 def register_aws_services_with_di(container) -> None:
     """Register AWS utility services with DI container (not provider instances)."""
-    import logging
-
     from orb.domain.base.ports import LoggingPort
 
     logger = container.get(LoggingPort)
@@ -487,19 +501,6 @@ def register_aws_services_with_di(container) -> None:
             TemplateExampleGeneratorPort, create_template_example_generator
         )
         logger.debug("TemplateExampleGeneratorPort registered with DI container")
-
-        # Register HealthCheck singleton
-        from orb.config.managers.configuration_manager import ConfigurationManager
-        from orb.monitoring.health import HealthCheck
-
-        container.register_singleton(
-            HealthCheck,
-            lambda c: HealthCheck(
-                config=c.get(ConfigurationManager).get_raw_config(),
-                logger=logging.getLogger("orb.monitoring.health"),
-            ),
-        )
-        logger.debug("HealthCheck registered with DI container")
 
         logger.debug("AWS utility services registered with DI container")
 

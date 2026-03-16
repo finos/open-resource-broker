@@ -12,6 +12,18 @@ from unittest.mock import patch
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def register_aws_cli_spec():
+    """Register AWS CLI spec for all tests in this module."""
+    from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
+    from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec
+
+    CLISpecRegistry.register("aws", AWSCLISpec())
+    yield
+    # Clean up after test
+    CLISpecRegistry._specs.clear()
+
+
 def _ns(**kwargs) -> argparse.Namespace:
     ns = argparse.Namespace()
     for k, v in kwargs.items():
@@ -57,7 +69,13 @@ class TestHandleProviderAdd:
             "orb.interface.provider_config_handler.get_config_location",
             return_value=tmp_path,
         ):
-            args = _ns(aws_profile="default", aws_region="us-east-1", name=None, discover=False)
+            args = _ns(
+                provider_type="aws",
+                aws_profile="default",
+                aws_region="us-east-1",
+                name=None,
+                discover=False,
+            )
             result = await handle_provider_add(args)
 
         assert result == 1
@@ -72,7 +90,13 @@ class TestHandleProviderAdd:
             "orb.interface.provider_config_handler.get_config_location",
             return_value=tmp_path,
         ):
-            args = _ns(aws_profile=None, aws_region="us-east-1", name=None, discover=False)
+            args = _ns(
+                provider_type="aws",
+                aws_profile=None,
+                aws_region="us-east-1",
+                name=None,
+                discover=False,
+            )
             result = await handle_provider_add(args)
 
         assert result == 1
@@ -87,7 +111,13 @@ class TestHandleProviderAdd:
             "orb.interface.provider_config_handler.get_config_location",
             return_value=tmp_path,
         ):
-            args = _ns(aws_profile="default", aws_region=None, name=None, discover=False)
+            args = _ns(
+                provider_type="aws",
+                aws_profile="default",
+                aws_region=None,
+                name=None,
+                discover=False,
+            )
             result = await handle_provider_add(args)
 
         assert result == 1
@@ -109,6 +139,7 @@ class TestHandleProviderAdd:
             ),
         ):
             args = _ns(
+                provider_type="aws",
                 aws_profile="default",
                 aws_region="us-east-1",
                 name="aws-default",
@@ -135,6 +166,7 @@ class TestHandleProviderAdd:
             ),
         ):
             args = _ns(
+                provider_type="aws",
                 aws_profile="prod",
                 aws_region="eu-west-1",
                 name="aws-prod",
@@ -164,6 +196,7 @@ class TestHandleProviderAdd:
             ),
         ):
             args = _ns(
+                provider_type="aws",
                 aws_profile="bad",
                 aws_region="us-east-1",
                 name="aws-bad",

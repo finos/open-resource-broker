@@ -65,6 +65,37 @@ class TestExtractCommandOutput:
         result = self.discovery._extract_command_output(cmd)
         assert result == {"requests_cleaned": 5, "request_ids_found": ["r-1", "r-2"]}
 
+    def test_create_template_command_success_returns_created_true(self):
+        cmd = MagicMock()
+        cmd.__class__.__name__ = "CreateTemplateCommand"
+        cmd.created = True
+        cmd.validation_errors = None
+        result = self.discovery._extract_command_output(cmd)
+        assert result == {"created": True}
+
+    def test_create_template_command_validation_failure(self):
+        cmd = MagicMock()
+        cmd.__class__.__name__ = "CreateTemplateCommand"
+        cmd.created = False
+        cmd.validation_errors = ["bad config"]
+        result = self.discovery._extract_command_output(cmd)
+        assert result == {"created": False, "validation_errors": ["bad config"]}
+
+    def test_update_template_command_success(self):
+        cmd = MagicMock()
+        cmd.__class__.__name__ = "UpdateTemplateCommand"
+        cmd.updated = True
+        cmd.validation_errors = None
+        result = self.discovery._extract_command_output(cmd)
+        assert result == {"updated": True}
+
+    def test_delete_template_command_success(self):
+        cmd = MagicMock()
+        cmd.__class__.__name__ = "DeleteTemplateCommand"
+        cmd.deleted = True
+        result = self.discovery._extract_command_output(cmd)
+        assert result == {"deleted": True}
+
 
 # ---------------------------------------------------------------------------
 # _create_command_method_cqrs — integration with output extraction

@@ -44,7 +44,7 @@ def _safe_reset_class_instance(module_name: str, class_name: str) -> None:
             if hasattr(cls, "_instance"):
                 cls._instance = None
     except (ImportError, AttributeError):
-        pass
+        pass  # module or attribute absent in this environment; skip reset
 
 
 def _safe_reset_global_variable(module_name: str, variable_name: str) -> None:
@@ -60,7 +60,7 @@ def _safe_reset_global_variable(module_name: str, variable_name: str) -> None:
         if hasattr(module, variable_name):
             setattr(module, variable_name, None)
     except (ImportError, AttributeError):
-        pass
+        pass  # module or attribute absent in this environment; skip reset
 
 
 def _reset_circuit_breaker_states() -> None:
@@ -71,6 +71,18 @@ def _reset_circuit_breaker_states() -> None:
         CircuitBreakerStrategy._circuit_states.clear()
     except ImportError:
         pass
+
+
+def reset_provider_registry() -> None:
+    try:
+        from orb.infrastructure.registry.base_registry import BaseRegistry
+
+        BaseRegistry._instances.pop("ProviderRegistry", None)
+    except ImportError:
+        pass  # BaseRegistry not available; global variable reset below is sufficient
+    _safe_reset_global_variable(
+        "orb.providers.registry.provider_registry", "_provider_registry_instance"
+    )
 
 
 def reset_all_singletons() -> None:
@@ -84,6 +96,14 @@ def reset_all_singletons() -> None:
     registry = SingletonRegistry.get_instance()
     registry.reset()
 
+    # Reset the DI container so dependency_overrides work correctly in FastAPI tests
+    try:
+        from orb.infrastructure.di.container import reset_container
+
+        reset_container()
+    except ImportError:
+        pass  # DI container module may not be present in all test environments; skip reset
+
     # Reset circuit breaker shared state
     _reset_circuit_breaker_states()
 
@@ -96,9 +116,7 @@ def reset_all_singletons() -> None:
     _safe_reset_global_variable(
         "orb.infrastructure.aws.aws_client_singleton", "_aws_client_singleton_instance"
     )
-    _safe_reset_global_variable(
-        "orb.providers.registry.provider_registry", "_provider_registry_instance"
-    )
+    reset_provider_registry()
     _safe_reset_class_instance("orb.infrastructure.config.manager", "ConfigurationManager")
     _safe_reset_class_instance("orb.infrastructure.logging.logger_singleton", "LoggerSingleton")
 

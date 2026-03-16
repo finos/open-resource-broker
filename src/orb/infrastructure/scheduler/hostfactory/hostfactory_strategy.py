@@ -739,7 +739,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
     def get_directory(self, file_type: str) -> str | None:
         self.logger.debug("[HF_STRATEGY] get_directory called with file_type=%s", file_type)
 
-        if file_type in ["conf", "template", "legacy"]:
+        if file_type in ["config", "template", "legacy"]:
             confdir = os.environ.get("HF_PROVIDER_CONFDIR")
             workdir = os.environ.get("HF_PROVIDER_WORKDIR", os.getcwd())
             result = confdir if confdir else os.path.join(workdir, "config")

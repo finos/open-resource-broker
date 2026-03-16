@@ -421,6 +421,8 @@ class TestSpotFleetHandlerEdgeCases:
         return {"subnet_id": subnet["Subnet"]["SubnetId"], "sg_id": sg["GroupId"]}
 
     def test_acquire_fleet_missing_fleet_type_returns_failure(self, moto_aws, vpc):
+        from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
+
         h = _make_spot_handler_patched(moto_aws)
         bad_template = make_aws_template(
             subnet_id=vpc["subnet_id"],
@@ -431,9 +433,8 @@ class TestSpotFleetHandlerEdgeCases:
         bad_template = bad_template.model_copy(update={"fleet_type": None})
         request = make_request(request_id="req-spot-err-001")
 
-        result = h.acquire_hosts(request, bad_template)
-
-        assert result["success"] is False  # type: ignore[index]
+        with pytest.raises(AWSInfrastructureError, match="Fleet type is required"):
+            h.acquire_hosts(request, bad_template)
 
     def test_check_hosts_status_unknown_fleet_returns_empty(self, moto_aws):
         h = _make_spot_handler_patched(moto_aws)

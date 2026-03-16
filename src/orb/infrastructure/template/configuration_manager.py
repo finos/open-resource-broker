@@ -16,12 +16,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.config.managers.configuration_manager import ConfigurationManager
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.exceptions import DomainException, EntityNotFoundError, ValidationError
 from orb.domain.base.ports.event_publisher_port import EventPublisherPort
 from orb.domain.base.ports.logging_port import LoggingPort
-from orb.domain.base.ports.scheduler_port import SchedulerPort
 
 from .dtos import TemplateDTO
 from .services.template_storage_service import TemplateStorageService
@@ -85,6 +85,7 @@ class TemplateConfigurationManager:
         template_defaults_service: Optional["TemplateDefaultsService"] = None,
         provider_registry_service: Optional["ProviderRegistryService"] = None,
         template_factory: Optional["TemplateFactoryPort"] = None,
+        registry: Optional[Any] = None,
     ) -> None:
         """
         Initialize the template configuration manager.
@@ -99,6 +100,7 @@ class TemplateConfigurationManager:
             template_defaults_service: Optional service for template defaults
             provider_registry_service: Optional provider registry service for provider operations
             template_factory: Optional factory for creating provider-specific templates
+            registry: Optional provider registry port for template validation
         """
         self.config_manager = config_manager
         self.scheduler_strategy = scheduler_strategy
@@ -106,6 +108,7 @@ class TemplateConfigurationManager:
         self.event_publisher = event_publisher
         self.template_defaults_service = template_defaults_service
         self.provider_registry_service = provider_registry_service
+        self._registry = registry
         if template_factory is None:
             from orb.domain.template.factory import TemplateFactory
 
@@ -431,16 +434,10 @@ class TemplateConfigurationManager:
     def get_all_templates_sync(self) -> list[TemplateDTO]:
         """Get all templates synchronously for adapter compatibility."""
         try:
-            # Try to get existing event loop
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # If loop is running, we can't use run_until_complete
-                # Fall back to direct template loading via scheduler strategy
-                return self._load_templates_sync()
-            else:
-                return loop.run_until_complete(self.get_all_templates())
+            asyncio.get_running_loop()
+            # Loop is running — fall back to direct template loading
+            return self._load_templates_sync()
         except RuntimeError:
-            # No event loop, create new one
             return asyncio.run(self.get_all_templates())
 
     def _load_templates_sync(self) -> list[TemplateDTO]:
@@ -511,13 +508,10 @@ class TemplateConfigurationManager:
     def get_template(self, template_id: str) -> Optional[TemplateDTO]:
         """Get template by ID synchronously for compatibility."""
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # Loop already running — use sync fallback to avoid nested asyncio.run()
-                templates = self._load_templates_sync()
-                return next((t for t in templates if t.template_id == template_id), None)
-            else:
-                return loop.run_until_complete(self.get_template_by_id(template_id))
+            asyncio.get_running_loop()
+            # Loop already running — use sync fallback to avoid nested asyncio.run()
+            templates = self._load_templates_sync()
+            return next((t for t in templates if t.template_id == template_id), None)
         except RuntimeError:
             return asyncio.run(self.get_template_by_id(template_id))
 
@@ -610,9 +604,10 @@ class TemplateConfigurationManager:
             )
 
             # Use provider registry for validation
-            from orb.providers.registry import get_provider_registry
-
-            registry = get_provider_registry()
+            registry = self._registry
+            if registry is None:
+                result["warnings"].append("Provider registry not available for template validation")
+                return
             if not hasattr(registry, "validate_template_requirements"):
                 result["warnings"].append("Provider registry does not support template validation")
                 return

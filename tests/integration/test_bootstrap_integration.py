@@ -10,9 +10,10 @@ from orb.bootstrap import Application
 class TestBootstrapIntegration:
     """Test bootstrap integration with configuration-driven providers."""
 
-    def _make_mock_container(self, mock_config_manager):
+    def _make_mock_container(self, mock_config_manager, mock_registry=None):
         """Create a mock DI container that returns mock_config_manager for ConfigurationPort."""
         from orb.domain.base.ports.configuration_port import ConfigurationPort
+        from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 
         mock_container = Mock()
         mock_container.is_lazy_loading_enabled.return_value = False
@@ -20,6 +21,8 @@ class TestBootstrapIntegration:
         def _container_get(service_type):
             if service_type is ConfigurationPort:
                 return mock_config_manager
+            if service_type is ProviderRegistryPort and mock_registry is not None:
+                return mock_registry
             return Mock()
 
         mock_container.get.side_effect = _container_get
@@ -50,6 +53,11 @@ class TestBootstrapIntegration:
         """Test application initialization with integrated provider configuration."""
         mock_config_manager = self._make_mock_config_manager()
 
+        mock_registry = Mock()
+        mock_registry.get_registered_providers.return_value = ["aws"]
+        mock_registry.get_registered_provider_instances.return_value = ["aws-primary"]
+        mock_registry.is_provider_instance_registered.return_value = True
+
         with (
             patch("orb.infrastructure.di.container.get_container") as mock_get_container,
             patch.object(
@@ -57,16 +65,11 @@ class TestBootstrapIntegration:
                 "_preload_templates",
                 new_callable=lambda: lambda self: AsyncMock(return_value=None)(),
             ),
-            patch("orb.providers.registry.get_provider_registry") as mock_get_registry,
         ):
-            mock_container = self._make_mock_container(mock_config_manager)
+            mock_container = self._make_mock_container(
+                mock_config_manager, mock_registry=mock_registry
+            )
             mock_get_container.return_value = mock_container
-
-            mock_registry = Mock()
-            mock_registry.get_registered_providers.return_value = ["aws"]
-            mock_registry.get_registered_provider_instances.return_value = ["aws-primary"]
-            mock_registry.is_provider_instance_registered.return_value = True
-            mock_get_registry.return_value = mock_registry
 
             app = Application(config_path="/test/config.json", skip_validation=True)
             with patch.object(app, "_preload_templates", new=AsyncMock(return_value=None)):
@@ -83,18 +86,16 @@ class TestBootstrapIntegration:
         mock_config_manager.get_provider_config.side_effect = AttributeError("Method not available")
         mock_config_manager.is_provider_strategy_enabled.return_value = False
 
-        with (
-            patch("orb.infrastructure.di.container.get_container") as mock_get_container,
-            patch("orb.providers.registry.get_provider_registry") as mock_get_registry,
-        ):
-            mock_container = self._make_mock_container(mock_config_manager)
-            mock_get_container.return_value = mock_container
+        mock_registry = Mock()
+        mock_registry.get_registered_providers.return_value = ["aws"]
+        mock_registry.get_registered_provider_instances.return_value = ["aws"]
+        mock_registry.is_provider_instance_registered.return_value = True
 
-            mock_registry = Mock()
-            mock_registry.get_registered_providers.return_value = ["aws"]
-            mock_registry.get_registered_provider_instances.return_value = ["aws"]
-            mock_registry.is_provider_instance_registered.return_value = True
-            mock_get_registry.return_value = mock_registry
+        with patch("orb.infrastructure.di.container.get_container") as mock_get_container:
+            mock_container = self._make_mock_container(
+                mock_config_manager, mock_registry=mock_registry
+            )
+            mock_get_container.return_value = mock_container
 
             app = Application(config_path="/test/legacy_config.json", skip_validation=True)
             with patch.object(app, "_preload_templates", new=AsyncMock(return_value=None)):
@@ -124,21 +125,17 @@ class TestBootstrapIntegration:
         """Test provider info retrieval integration."""
         mock_config_manager = self._make_mock_config_manager()
 
-        with (
-            patch("orb.infrastructure.di.container.get_container") as mock_get_container,
-            patch("orb.providers.registry.get_provider_registry") as mock_get_registry,
-        ):
-            mock_container = self._make_mock_container(mock_config_manager)
-            mock_get_container.return_value = mock_container
+        mock_registry = Mock()
+        mock_registry.get_registered_providers.return_value = ["aws"]
+        mock_registry.get_registered_provider_instances.return_value = [
+            "aws-primary",
+            "aws-backup",
+        ]
+        mock_registry.is_provider_instance_registered.return_value = True
 
-            mock_registry = Mock()
-            mock_registry.get_registered_providers.return_value = ["aws"]
-            mock_registry.get_registered_provider_instances.return_value = [
-                "aws-primary",
-                "aws-backup",
-            ]
-            mock_registry.is_provider_instance_registered.return_value = True
-            mock_get_registry.return_value = mock_registry
+        with patch("orb.infrastructure.di.container.get_container") as mock_get_container:
+            mock_container = self._make_mock_container(mock_config_manager, mock_registry)
+            mock_get_container.return_value = mock_container
 
             app = Application(skip_validation=True)
             with patch.object(app, "_preload_templates", new=AsyncMock(return_value=None)):
@@ -164,18 +161,16 @@ class TestBootstrapIntegration:
         """Test application context manager integration."""
         mock_config_manager = self._make_mock_config_manager()
 
-        with (
-            patch("orb.infrastructure.di.container.get_container") as mock_get_container,
-            patch("orb.providers.registry.get_provider_registry") as mock_get_registry,
-        ):
-            mock_container = self._make_mock_container(mock_config_manager)
-            mock_get_container.return_value = mock_container
+        mock_registry = Mock()
+        mock_registry.get_registered_providers.return_value = ["aws"]
+        mock_registry.get_registered_provider_instances.return_value = ["aws"]
+        mock_registry.is_provider_instance_registered.return_value = True
 
-            mock_registry = Mock()
-            mock_registry.get_registered_providers.return_value = ["aws"]
-            mock_registry.get_registered_provider_instances.return_value = ["aws"]
-            mock_registry.is_provider_instance_registered.return_value = True
-            mock_get_registry.return_value = mock_registry
+        with patch("orb.infrastructure.di.container.get_container") as mock_get_container:
+            mock_container = self._make_mock_container(
+                mock_config_manager, mock_registry=mock_registry
+            )
+            mock_get_container.return_value = mock_container
 
             app = Application(skip_validation=True)
             with patch.object(app, "_preload_templates", new=AsyncMock(return_value=None)):

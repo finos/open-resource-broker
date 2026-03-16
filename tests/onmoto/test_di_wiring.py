@@ -33,7 +33,7 @@ def test_di_container_boots(orb_config_dir):
 
 def test_container_resolves_scheduler_port(orb_config_dir):
     """Container can resolve the configured scheduler strategy."""
-    from orb.domain.base.ports.scheduler_port import SchedulerPort
+    from orb.application.ports.scheduler_port import SchedulerPort
     from orb.infrastructure.di.container import get_container
 
     container = get_container()
@@ -65,7 +65,7 @@ def test_scheduler_strategy_has_template_defaults_service(orb_config_dir):
     """Scheduler strategy's _template_defaults_service is not None after DI boot."""
     from typing import Any
 
-    from orb.domain.base.ports.scheduler_port import SchedulerPort
+    from orb.application.ports.scheduler_port import SchedulerPort
     from orb.infrastructure.di.container import get_container
 
     container = get_container()
@@ -86,7 +86,7 @@ def test_template_defaults_service_resolves_defaults(orb_config_dir, moto_vpc_re
     """template_defaults_service.get_effective_template_defaults returns subnet/sg data."""
     from typing import Any
 
-    from orb.domain.base.ports.scheduler_port import SchedulerPort
+    from orb.application.ports.scheduler_port import SchedulerPort
     from orb.infrastructure.di.container import get_container
 
     container = get_container()

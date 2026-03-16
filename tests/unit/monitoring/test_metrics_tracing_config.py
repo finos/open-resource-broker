@@ -5,7 +5,10 @@ from pathlib import Path
 
 from orb.config.manager import ConfigurationManager
 from orb.infrastructure.adapters.configuration_adapter import ConfigurationAdapter
+from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
 from orb.monitoring.metrics import MetricsCollector
+
+_logger = LoggingAdapter(__name__)
 
 
 def test_default_config_includes_tracing_keys(tmp_path):
@@ -36,7 +39,7 @@ def test_configuration_adapter_includes_tracing_defaults(tmp_path):
     config_file.write_text(json.dumps({"metrics": {}}))
 
     config_manager = ConfigurationManager(config_file=str(config_file))
-    adapter = ConfigurationAdapter(config_manager)
+    adapter = ConfigurationAdapter(config_manager, _logger)
 
     metrics_config = adapter.get_metrics_config()
 
@@ -68,7 +71,7 @@ def test_configuration_adapter_respects_tracing_overrides(tmp_path):
     )
 
     config_manager = ConfigurationManager(config_file=str(config_file))
-    adapter = ConfigurationAdapter(config_manager)
+    adapter = ConfigurationAdapter(config_manager, _logger)
 
     metrics_config = adapter.get_metrics_config()
 
@@ -95,7 +98,7 @@ def test_metrics_collector_receives_tracing_config(tmp_path):
     )
 
     config_manager = ConfigurationManager(config_file=str(config_file))
-    adapter = ConfigurationAdapter(config_manager)
+    adapter = ConfigurationAdapter(config_manager, _logger)
 
     metrics_config = adapter.get_metrics_config()
     collector = MetricsCollector(metrics_config)
@@ -123,7 +126,7 @@ def test_end_to_end_tracing_via_config(tmp_path):
     )
 
     config_manager = ConfigurationManager(config_file=str(config_file))
-    adapter = ConfigurationAdapter(config_manager)
+    adapter = ConfigurationAdapter(config_manager, _logger)
 
     metrics_config = adapter.get_metrics_config()
     collector = MetricsCollector(metrics_config)

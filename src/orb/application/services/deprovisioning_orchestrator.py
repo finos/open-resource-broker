@@ -147,7 +147,7 @@ class DeprovisioningOrchestrator:
                 raise ValueError(f"Template not found: {template_id}")
 
             # Get scheduler for template formatting
-            from orb.domain.base.ports.scheduler_port import SchedulerPort
+            from orb.application.ports.scheduler_port import SchedulerPort
 
             scheduler = self._container.get(SchedulerPort)
             template_config = scheduler.format_template_for_provider(template)

@@ -26,6 +26,7 @@ from orb.infrastructure.resilience import retry
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.exceptions.aws_exceptions import (
     AuthorizationError,
+    AWSConfigurationError,
     AWSEntityNotFoundError,
     AWSValidationError,
     NetworkError,
@@ -701,7 +702,10 @@ class AWSHandler(ABC):
         Returns:
             Merged list of {"Key": k, "Value": v} dicts ready for AWS API calls.
         """
-        assert self.config_port is not None, "config_port must be injected"
+        if self.config_port is None:
+            raise AWSConfigurationError(
+                "config_port must be injected before calling _build_resource_tags"
+            )
         return build_resource_tags(
             config_port=self.config_port,
             request_id=request_id,

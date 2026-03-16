@@ -1,12 +1,12 @@
 """AWS Infrastructure Discovery Service - Handles infrastructure discovery operations."""
 
-import logging
 from dataclasses import dataclass
 from typing import Any, Optional
 
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.ports.console_port import ConsolePort
 from orb.infrastructure.adapters.null_console_adapter import NullConsoleAdapter
+from orb.infrastructure.logging.logger import get_logger
 
 
 @dataclass
@@ -65,7 +65,7 @@ class AWSInfrastructureDiscoveryService:
     ):
         self.region = region
         self.profile = profile
-        self._logger = logger or logging.getLogger(__name__)
+        self._logger = logger or get_logger(__name__)
         self._console = console or NullConsoleAdapter()
 
         # Create AWS session and clients

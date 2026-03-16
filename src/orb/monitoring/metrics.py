@@ -1,9 +1,6 @@
 """Application metrics collection and monitoring."""
 
 import json
-
-# stdlib logging used intentionally: LoggingPort would create a monitoring->domain->infrastructure->monitoring cycle.
-import logging
 import threading
 import time
 from collections import deque
@@ -11,6 +8,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
+
+from orb.domain.base.ports.logging_port import LoggingPort
 
 # Module-level constant to avoid B008 warning
 DEFAULT_MAX_AGE = timedelta(days=7)
@@ -72,17 +71,36 @@ class Timer:
 class MetricsCollector:
     """Collects and manages application metrics."""
 
-    def __init__(self, config: dict[str, Any], logger: logging.Logger | None = None) -> None:
+    def __init__(self, config: dict[str, Any], logger: LoggingPort | None = None) -> None:
         """Initialize metrics collector."""
-        self._logger = logger or logging.getLogger(__name__)
+        self._logger = logger
         self.config = config
         self.metrics: dict[str, Metric] = {}
         self.timers: dict[str, list[float]] = {}
-        self._lock = threading.RLock()  # Same thread can re-aquire the lock
+        self._lock = threading.RLock()  # Same thread can re-acquire the lock
 
-        # Create metrics directory
+        # Create metrics directory with PermissionError fallback
         self.metrics_dir = Path(config.get("metrics_dir", "./metrics"))
-        self.metrics_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self.metrics_dir.mkdir(parents=True, exist_ok=True)
+        except PermissionError:
+            if self._logger:
+                self._logger.warning(
+                    "Permission denied creating metrics dir %s, falling back to ~/.orb/work/metrics",
+                    self.metrics_dir,
+                )
+            self.metrics_dir = Path.home() / ".orb" / "work" / "metrics"
+            try:
+                self.metrics_dir.mkdir(parents=True, exist_ok=True)
+            except PermissionError:
+                import tempfile
+
+                if self._logger:
+                    self._logger.warning(
+                        "Permission denied creating metrics dir %s, falling back to tempdir",
+                        self.metrics_dir,
+                    )
+                self.metrics_dir = Path(tempfile.mkdtemp(prefix="orb-metrics-"))
 
         # Initialize tracing buffer
         self.trace_enabled = bool(config.get("trace_enabled", False))
@@ -131,6 +149,24 @@ class MetricsCollector:
             self.metrics[name] = gauge
             return gauge
 
+    def increment(self, name: str, labels: Optional[dict[str, str]] = None) -> None:
+        """Increment a counter by 1, creating it with the given labels if needed.
+
+        Each unique (name, labels) combination is tracked as a separate counter,
+        keyed by a composite string so label-differentiated counters don't collide.
+        """
+        effective_labels = labels or {}
+        # Build a stable composite key so label order doesn't matter
+        label_suffix = ",".join(f"{k}={v}" for k, v in sorted(effective_labels.items()))
+        key = f"{name}{{{label_suffix}}}" if label_suffix else name
+        with self._lock:
+            if key not in self.metrics:
+                counter = Counter(name, 0.0, labels=effective_labels)
+                self.metrics[key] = counter
+            metric = self.metrics[key]
+            if isinstance(metric, Counter):
+                metric.increment()
+
     def increment_counter(self, name: str, value: float = 1.0) -> None:
         """Increment a counter metric."""
         with self._lock:
@@ -148,6 +184,24 @@ class MetricsCollector:
             metric = self.metrics[name]
             if isinstance(metric, Gauge):
                 metric.set(value)
+
+    def increment_gauge(self, name: str, delta: float = 1.0) -> None:
+        """Increment a gauge metric by delta."""
+        with self._lock:
+            if name not in self.metrics:
+                self.register_gauge(name)
+            metric = self.metrics[name]
+            if isinstance(metric, Gauge):
+                metric.set(metric.value + delta)
+
+    def decrement_gauge(self, name: str, delta: float = 1.0) -> None:
+        """Decrement a gauge metric by delta."""
+        with self._lock:
+            if name not in self.metrics:
+                self.register_gauge(name)
+            metric = self.metrics[name]
+            if isinstance(metric, Gauge):
+                metric.set(metric.value - delta)
 
     def start_timer(self, name: str = "", labels: Optional[dict[str, str]] = None) -> Timer:
         """Start a new timer."""
@@ -187,7 +241,7 @@ class MetricsCollector:
         self.increment_counter(f"{operation}_success_total")
         self.record_time(f"{operation}_duration", duration)
 
-        if metadata:
+        if metadata and self._logger:
             self._logger.info(
                 "%s completed successfully",
                 operation,
@@ -205,7 +259,7 @@ class MetricsCollector:
         self.increment_counter(f"{operation}_error_total")
         self.record_time(f"{operation}_error_duration", duration)
 
-        if metadata:
+        if metadata and self._logger:
             self._logger.error(
                 "%s failed",
                 operation,
@@ -241,13 +295,15 @@ class MetricsCollector:
                 for trace in traces_to_write:
                     f.write(json.dumps(trace) + "\n")
 
-            try:
-                self._logger.debug("Flushed %d traces to %s", len(traces_to_write), trace_file)
-            except ValueError:
-                pass  # logging stream closed during interpreter shutdown
+            if self._logger:
+                try:
+                    self._logger.debug("Flushed %d traces to %s", len(traces_to_write), trace_file)
+                except ValueError:
+                    pass  # logging stream closed during interpreter shutdown
 
         except Exception as e:
-            self._logger.error("Failed to flush traces: %s", e, exc_info=True)
+            if self._logger:
+                self._logger.error("Failed to flush traces: %s", e, exc_info=True)
             # Don't re-raise - tracing failures shouldn't crash the application
 
     def _start_metrics_writer(self) -> None:
@@ -260,7 +316,8 @@ class MetricsCollector:
                     self._write_metrics_snapshot()
                     time.sleep(self.config.get("metrics_interval", 10))
                 except Exception as e:
-                    self._logger.error("Error writing metrics: %s", e, exc_info=True)
+                    if self._logger:
+                        self._logger.error("Error writing metrics: %s", e, exc_info=True)
                     time.sleep(5)  # Shorter sleep on error
 
         thread = threading.Thread(target=write_metrics, daemon=True)
@@ -286,12 +343,22 @@ class MetricsCollector:
         if self.trace_enabled and self._trace_buffer:
             self.flush_traces()
 
+    def to_prometheus_text(self) -> str:
+        """Serialise current metrics to Prometheus text format."""
+        metrics = self.get_metrics()
+        lines = []
+        for name, metric in metrics.items():
+            labels = ",".join(f'{k}="{v}"' for k, v in metric["labels"].items())
+            lines.append(f"{name}{{{labels}}} {metric['value']}")
+        return "\n".join(lines) + "\n" if lines else ""
+
     def flush(self) -> None:
         """Flush metrics to disk immediately."""
         try:
             self._write_metrics_snapshot()
         except Exception as e:
-            self._logger.error("Error flushing metrics: %s", e, exc_info=True)
+            if self._logger:
+                self._logger.error("Error flushing metrics: %s", e, exc_info=True)
 
     def __del__(self) -> None:
         """Best-effort flush on collector destruction."""
@@ -349,6 +416,7 @@ class MetricsCollector:
                     try:
                         file.unlink()
                     except Exception as e:
-                        self._logger.warning(
-                            "Failed to delete old metrics file %s: %s", file, e, exc_info=True
-                        )
+                        if self._logger:
+                            self._logger.warning(
+                                "Failed to delete old metrics file %s: %s", file, e, exc_info=True
+                            )

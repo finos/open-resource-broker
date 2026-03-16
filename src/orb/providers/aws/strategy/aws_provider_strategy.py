@@ -16,6 +16,7 @@ from orb.domain.base.ports.configuration_port import ConfigurationPort
 
 # Import AWS-specific components
 from orb.providers.aws.configuration.config import AWSProviderConfig
+from orb.providers.aws.exceptions.aws_exceptions import AWSConfigurationError
 from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.services.capability_service import AWSCapabilityService
 from orb.providers.aws.services.handler_registry import AWSHandlerRegistry
@@ -29,6 +30,7 @@ from orb.providers.aws.services.instance_operation_service import AWSInstanceOpe
 from orb.providers.aws.services.template_validation_service import AWSTemplateValidationService
 
 if TYPE_CHECKING:
+    from orb.monitoring.health import HealthCheck
     from orb.providers.aws.infrastructure.adapters.aws_provisioning_adapter import (
         AWSProvisioningAdapter,
     )
@@ -484,6 +486,10 @@ class AWSProviderStrategy(ProviderStrategy):
         """AWS requires region."""
         return self._get_health_service().get_credential_requirements()
 
+    def get_operational_requirements(self) -> dict:
+        """Get operational requirements for AWS."""
+        return self._get_health_service().get_operational_requirements()
+
     def get_available_regions(self) -> list[tuple[str, str]]:
         """Get common AWS regions as (region_id, display_name) tuples."""
         return [
@@ -520,6 +526,14 @@ class AWSProviderStrategy(ProviderStrategy):
             result["fleet_role"] = args.fleet_role
         return result
 
+    def register_health_checks(self, health_check: "HealthCheck") -> None:
+        """Register AWS-specific health checks if client is available."""
+        if self.aws_client is None:
+            return
+        from orb.providers.aws.health import register_aws_health_checks
+
+        register_aws_health_checks(health_check, self.aws_client)
+
     def cleanup(self) -> None:
         """Clean up AWS provider resources."""
         try:
@@ -553,7 +567,10 @@ class AWSProviderStrategy(ProviderStrategy):
 
     def _fetch_ec2_fleet_capacity(self, resource_id: str) -> Optional[dict[str, Any]]:
         """Fetch capacity fulfillment data for an EC2Fleet resource."""
-        assert self.aws_client is not None
+        if self.aws_client is None:
+            raise AWSConfigurationError(
+                "aws_client must be injected before calling _fetch_ec2_fleet_capacity"
+            )
         response = self.aws_client.ec2_client.describe_fleets(FleetIds=[resource_id])
         fleets = response.get("Fleets", [])
         if not fleets:
@@ -574,7 +591,10 @@ class AWSProviderStrategy(ProviderStrategy):
 
     def _fetch_spot_fleet_capacity(self, resource_id: str) -> Optional[dict[str, Any]]:
         """Fetch capacity fulfillment data for a SpotFleet resource."""
-        assert self.aws_client is not None
+        if self.aws_client is None:
+            raise AWSConfigurationError(
+                "aws_client must be injected before calling _fetch_spot_fleet_capacity"
+            )
         response = self.aws_client.ec2_client.describe_spot_fleet_requests(
             SpotFleetRequestIds=[resource_id]
         )
@@ -593,7 +613,10 @@ class AWSProviderStrategy(ProviderStrategy):
 
     def _fetch_asg_capacity(self, resource_id: str) -> Optional[dict[str, Any]]:
         """Fetch capacity fulfillment data for an Auto Scaling Group resource."""
-        assert self.aws_client is not None
+        if self.aws_client is None:
+            raise AWSConfigurationError(
+                "aws_client must be injected before calling _fetch_asg_capacity"
+            )
         response = self.aws_client.autoscaling_client.describe_auto_scaling_groups(
             AutoScalingGroupNames=[resource_id]
         )

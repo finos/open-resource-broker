@@ -98,7 +98,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     query.request_id,
                     sync_err,
                 )
-                raise
+                return self._dto_factory.create_from_domain(request, [])
 
             machine_objects = await self._query_service.get_machines_for_request(request)
             request_dto = self._dto_factory.create_from_domain(request, machine_objects)
@@ -180,6 +180,13 @@ class ListRequestsHandler(BaseQueryHandler[ListRequestsQuery, list[RequestDTO]])
 
                 if query.template_id:
                     requests = [r for r in requests if r.template_id == query.template_id]
+
+                if query.request_type:
+                    requests = [
+                        r
+                        for r in requests
+                        if getattr(r, "request_type", None) == query.request_type
+                    ]
 
                 total_count = len(requests)
                 start_idx = query.offset or 0

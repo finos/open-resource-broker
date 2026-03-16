@@ -268,7 +268,7 @@ def _build_request_dto_from_run_instances(
 @pytest.fixture
 def hf_strat(orb_config_dir):
     """Return the HostFactorySchedulerStrategy from the DI container."""
-    from orb.domain.base.ports.scheduler_port import SchedulerPort
+    from orb.application.ports.scheduler_port import SchedulerPort
     from orb.infrastructure.di.container import get_container
     from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
         HostFactorySchedulerStrategy,
@@ -285,7 +285,7 @@ def hf_strat(orb_config_dir):
 @pytest.fixture
 def default_strat(orb_config_dir):
     """Return a DefaultSchedulerStrategy sharing the same template_defaults_service."""
-    from orb.domain.base.ports.scheduler_port import SchedulerPort
+    from orb.application.ports.scheduler_port import SchedulerPort
     from orb.infrastructure.di.container import get_container
     from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -73,7 +73,7 @@ class ValidateTemplateQuery(Query, BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    template_config: dict
+    template_config: dict[str, Any] = {}
     template_id: Optional[str] = None  # For validating loaded templates
 
 

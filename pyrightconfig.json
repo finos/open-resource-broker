@@ -1,0 +1,15 @@
+{
+  "pythonVersion": "3.12",
+  "pythonPlatform": "Linux",
+  "include": ["src/orb"],
+  "exclude": [".venv", "build", "dist"],
+  "extraPaths": ["src"],
+  "typeCheckingMode": "basic",
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": false,
+  "reportUnusedVariable": true,
+  "reportUnusedImport": true,
+  "reportPrivateUsage": false,
+  "venvPath": ".",
+  "venv": ".venv"
+}

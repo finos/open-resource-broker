@@ -1,6 +1,5 @@
 """Provider configuration management."""
 
-import logging
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
@@ -11,8 +10,9 @@ if TYPE_CHECKING:
 
 from orb.config.schemas.provider_strategy_schema import ProviderMode
 from orb.domain.base.exceptions import ConfigurationError
+from orb.infrastructure.logging.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ProviderConfigManager:
@@ -43,9 +43,6 @@ class ProviderConfigManager:
             if registered_types:
                 default_provider = registered_types[0]
         except Exception as e:
-            from orb.infrastructure.logging.logger import get_logger
-
-            logger = get_logger(__name__)
             logger.debug(f"Failed to get default provider: {e}")  # Use fallback
 
         return self._get_nested_value("provider.type", default_provider)

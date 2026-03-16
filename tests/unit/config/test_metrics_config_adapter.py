@@ -1,5 +1,8 @@
 from orb.config.schemas.metrics_schema import MetricsConfig
 from orb.infrastructure.adapters.configuration_adapter import ConfigurationAdapter
+from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
+
+_logger = LoggingAdapter(__name__)
 
 
 class FakeConfigManager:
@@ -11,7 +14,7 @@ class FakeConfigManager:
 
 
 def test_metrics_config_defaults_when_missing_section():
-    adapter = ConfigurationAdapter(FakeConfigManager(raw={}))
+    adapter = ConfigurationAdapter(FakeConfigManager(raw={}), _logger)
 
     cfg = adapter.get_metrics_config()
 
@@ -40,7 +43,7 @@ def test_metrics_config_overrides_top_level_and_nested():
             },
         }
     }
-    adapter = ConfigurationAdapter(FakeConfigManager(raw=raw))
+    adapter = ConfigurationAdapter(FakeConfigManager(raw=raw), _logger)
 
     cfg = adapter.get_metrics_config()
 
@@ -65,7 +68,7 @@ def test_metrics_config_partial_overrides_preserve_defaults():
             },
         }
     }
-    adapter = ConfigurationAdapter(FakeConfigManager(raw=raw))
+    adapter = ConfigurationAdapter(FakeConfigManager(raw=raw), _logger)
 
     cfg = adapter.get_metrics_config()
 

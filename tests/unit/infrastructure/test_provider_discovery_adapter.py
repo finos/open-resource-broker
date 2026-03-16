@@ -1,12 +1,12 @@
-"""Tests for ProviderRegistryAdapter — no AWS branching."""
+"""Tests for ProviderDiscoveryAdapter — no AWS branching."""
 
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from orb.infrastructure.adapters.provider_registry_adapter import ProviderRegistryAdapter
+from orb.infrastructure.adapters.provider_discovery_adapter import ProviderDiscoveryAdapter
 
 SOURCE_PATH = (
-    Path(__file__).parents[3] / "src/orb/infrastructure/adapters/provider_registry_adapter.py"
+    Path(__file__).parents[3] / "src/orb/infrastructure/adapters/provider_discovery_adapter.py"
 )
 
 
@@ -24,25 +24,25 @@ class TestNoAWSBranchingInSource:
     def test_no_aws_string_comparison_double_quotes(self):
         source = self._source()
         assert 'provider_type == "aws"' not in source, (
-            'Found explicit provider_type == "aws" branch in provider_registry_adapter.py'
+            'Found explicit provider_type == "aws" branch in provider_discovery_adapter.py'
         )
 
     def test_no_aws_string_comparison_single_quotes(self):
         source = self._source()
         assert "provider_type == 'aws'" not in source, (
-            "Found explicit provider_type == 'aws' branch in provider_registry_adapter.py"
+            "Found explicit provider_type == 'aws' branch in provider_discovery_adapter.py"
         )
 
     def test_no_get_aws_infrastructure_service_method(self):
         source = self._source()
         assert "_get_aws_infrastructure_service" not in source, (
-            "_get_aws_infrastructure_service helper still present in provider_registry_adapter.py"
+            "_get_aws_infrastructure_service helper still present in provider_discovery_adapter.py"
         )
 
     def test_no_default_provider_type_aws(self):
         source = self._source()
         assert 'get("type", "aws")' not in source and "get('type', 'aws')" not in source, (
-            "Default provider_type='aws' fallback still present in provider_registry_adapter.py"
+            "Default provider_type='aws' fallback still present in provider_discovery_adapter.py"
         )
 
 
@@ -51,14 +51,14 @@ class TestNoAWSBranchingInSource:
 # ---------------------------------------------------------------------------
 
 
-class TestProviderRegistryAdapterDelegation:
+class TestProviderDiscoveryAdapterDelegation:
     """Adapter must delegate to strategy, not branch on provider type."""
 
     def _make_adapter(self, strategy=None):
         registry = MagicMock()
         registry.ensure_provider_type_registered.return_value = True
         registry.get_or_create_strategy.return_value = strategy
-        return ProviderRegistryAdapter(registry=registry)
+        return ProviderDiscoveryAdapter(registry=registry)
 
     # --- discover_infrastructure ---
 
@@ -91,7 +91,7 @@ class TestProviderRegistryAdapterDelegation:
     def test_discover_infrastructure_returns_empty_when_not_registered(self):
         registry = MagicMock()
         registry.ensure_provider_type_registered.return_value = False
-        adapter = ProviderRegistryAdapter(registry=registry)
+        adapter = ProviderDiscoveryAdapter(registry=registry)
         result = adapter.discover_infrastructure({"type": "aws"})
         assert result == {}
 

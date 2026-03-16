@@ -1,10 +1,11 @@
 """CQRS handler registration management for DI container."""
 
-import logging
 import threading
 from typing import Any, Optional
 
-logger = logging.getLogger(__name__)
+from orb.infrastructure.logging.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class CQRSHandlerRegistry:

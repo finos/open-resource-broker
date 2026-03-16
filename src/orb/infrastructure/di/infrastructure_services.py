@@ -1,5 +1,6 @@
 """Infrastructure service registrations for dependency injection."""
 
+from orb.config.managers.configuration_manager import ConfigurationManager
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.machine.repository import MachineRepository
@@ -47,12 +48,12 @@ def _register_template_services(container: DIContainer):
     # Register template generation service
     def create_template_generation_service(c):
         """Create template generation service with injected dependencies."""
+        from orb.application.ports.scheduler_port import SchedulerPort
         from orb.application.services.provider_registry_service import ProviderRegistryService
         from orb.application.services.template_generation_service import (
             TemplateGenerationService,
         )
         from orb.domain.base.ports.path_resolution_port import PathResolutionPort
-        from orb.domain.base.ports.scheduler_port import SchedulerPort
         from orb.domain.base.ports.template_example_generator_port import (
             TemplateExampleGeneratorPort,
         )
@@ -96,9 +97,10 @@ def _register_template_services(container: DIContainer):
         c: DIContainer,
     ) -> TemplateConfigurationManager:
         """Create TemplateConfigurationManager."""
+        from orb.application.ports.scheduler_port import SchedulerPort
         from orb.application.services.provider_registry_service import ProviderRegistryService
         from orb.config.managers.configuration_manager import ConfigurationManager
-        from orb.domain.base.ports.scheduler_port import SchedulerPort
+        from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
         from orb.domain.template.factory import TemplateFactory
         from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
 
@@ -110,6 +112,7 @@ def _register_template_services(container: DIContainer):
             template_defaults_service=c.get(TemplateDefaultsPort),  # type: ignore[arg-type]
             provider_registry_service=c.get(ProviderRegistryService),
             template_factory=c.get(TemplateFactory),
+            registry=c.get(ProviderRegistryPort),
         )
 
     container.register_singleton(
@@ -131,6 +134,10 @@ def _register_ami_resolver_if_enabled(_container: DIContainer) -> None:
 
 def _register_repository_services(container: DIContainer) -> None:
     """Register repository services."""
+    # Storage strategies are now registered by storage_services.py
+    # No need to register them here anymore
+    # Register repository factory with singleton EventBus injected
+    from orb.application.events.bus.event_bus import EventBus
     from orb.infrastructure.template.configuration_manager import (
         TemplateConfigurationManager,
     )
@@ -139,10 +146,14 @@ def _register_repository_services(container: DIContainer) -> None:
     )
     from orb.infrastructure.utilities.factories.repository_factory import RepositoryFactory
 
-    # Storage strategies are now registered by storage_services.py
-    # No need to register them here anymore
-    # Register repository factory
-    container.register_singleton(RepositoryFactory)
+    container.register_singleton(
+        RepositoryFactory,
+        lambda c: RepositoryFactory(
+            config_manager=c.get(ConfigurationManager),
+            logger=c.get(LoggingPort),
+            event_bus=c.get_optional(EventBus),
+        ),
+    )
 
     # Register repositories
     container.register_singleton(

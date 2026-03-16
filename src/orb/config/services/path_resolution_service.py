@@ -24,7 +24,7 @@ class PathResolutionService:
 
     # Default directory mappings
     DEFAULT_DIRS = {
-        "conf": "config",
+        "config": "config",
         "template": "config",
         "legacy": "config",
         "log": "logs",
@@ -56,7 +56,7 @@ class PathResolutionService:
         3. Default directory + filename (fallback)
 
         Args:
-            file_type: Type of file ('conf', 'template', 'legacy', 'log', 'work', 'events', 'snapshots')
+            file_type: Type of file ('config', 'template', 'legacy', 'log', 'work', 'events', 'snapshots')
             filename: Name of the file
             explicit_path: Explicit path provided by user (optional)
 
@@ -135,7 +135,7 @@ class PathResolutionService:
         """Resolve the platform-scoped base directory for a file type.
 
         Args:
-            file_type: One of 'conf', 'template', 'legacy', 'log', 'work',
+            file_type: One of 'config', 'template', 'legacy', 'log', 'work',
                        'events', 'snapshots'
 
         Returns:
@@ -147,7 +147,7 @@ class PathResolutionService:
             get_work_location,
         )
 
-        if file_type in ("conf", "template", "legacy"):
+        if file_type in ("config", "template", "legacy"):
             return str(get_config_location())
         if file_type == "log":
             return str(get_logs_location())

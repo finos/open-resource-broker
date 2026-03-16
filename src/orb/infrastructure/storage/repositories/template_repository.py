@@ -210,8 +210,9 @@ class TemplateRepositoryImpl(StorageRepositoryMixin, TemplateRepositoryInterface
 
             self.cache.put(template_id_str, template)
 
-            events = template.get_domain_events()  # type: ignore[attr-defined]
-            template.clear_domain_events()  # type: ignore[attr-defined]
+            events = template.get_domain_events() if hasattr(template, "get_domain_events") else []  # type: ignore[attr-defined]
+            if hasattr(template, "clear_domain_events"):
+                template.clear_domain_events()  # type: ignore[attr-defined]
 
             if events:
                 self.event_publisher.publish_events(events)

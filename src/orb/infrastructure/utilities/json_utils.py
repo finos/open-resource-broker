@@ -6,10 +6,11 @@ use these utilities to ensure consistent error handling across the codebase.
 """
 
 import json
-import logging
 from typing import Any, Optional, Union
 
-logger = logging.getLogger(__name__)
+from orb.infrastructure.logging.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class JSONParseError(Exception):

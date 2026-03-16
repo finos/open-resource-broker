@@ -1,13 +1,12 @@
 """API handler for requesting machines."""
 
-import time
 from typing import Any, Optional, cast
 
 from orb.api.models import RequestMachinesModel
 from orb.api.validation import ValidationException
 from orb.application.base.infrastructure_handlers import BaseAsyncAPIHandler as BaseAPIHandler
 from orb.application.dto.commands import CreateRequestCommand
-from orb.application.request.dto import RequestMachinesResponse
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.domain.base.configuration_service import DomainConfigurationService
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
@@ -18,13 +17,14 @@ from orb.monitoring.metrics import MetricsCollector
 
 
 @injectable
-class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMachinesResponse]):
+class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, dict[str, Any]]):
     """API handler for requesting machines."""
 
     def __init__(
         self,
         query_bus: QueryBus,
         command_bus: CommandBus,
+        scheduler_strategy: SchedulerPort,
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
         metrics: Optional[MetricsCollector] = None,
@@ -36,6 +36,7 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
         Args:
             query_bus: Query bus for CQRS queries
             command_bus: Command bus for CQRS commands
+            scheduler_strategy: Scheduler strategy for response formatting
             logger: Logging port for operation logging
             error_handler: Error handling port for exception management
             metrics: Optional metrics collector
@@ -44,6 +45,7 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
         super().__init__(logger, error_handler)
         self._query_bus = query_bus
         self._command_bus = command_bus
+        self._scheduler_strategy = scheduler_strategy
         self._metrics_collector = metrics
         self._domain_config = domain_config_service
 
@@ -73,9 +75,7 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
             raise
 
     @handle_interface_exceptions(context="request_machines", interface_type="api")
-    async def execute_api_request(
-        self, request: RequestMachinesModel, context
-    ) -> RequestMachinesResponse:
+    async def execute_api_request(self, request: RequestMachinesModel, context) -> dict[str, Any]:
         """
         Execute the core API logic for requesting machines.
 
@@ -115,12 +115,6 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
             # Execute command through CQRS command bus
             await self._command_bus.execute(cast(Any, command))
 
-            # Create response — use the pre-generated request_id since the CQRS command returns None
-            response = RequestMachinesResponse(
-                request_id=request_id,
-                metadata={"correlation_id": context.correlation_id, "submitted_at": time.time()},
-            )
-
             if self.logger:
                 self.logger.info(
                     "Successfully submitted machine request: %s - Correlation ID: %s",
@@ -134,7 +128,9 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
                     "request_machines", request.machine_count
                 )
 
-            return response
+            return self._scheduler_strategy.format_request_response(
+                {"request_id": request_id, "status": "pending"}
+            )
 
         except Exception as e:
             if self.logger:
@@ -150,9 +146,7 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
 
             raise
 
-    async def post_process_response(
-        self, response: RequestMachinesResponse, context
-    ) -> RequestMachinesResponse:
+    async def post_process_response(self, response: dict[str, Any], context) -> dict[str, Any]:
         """
         Post-process the request machines response.
 
@@ -163,5 +157,4 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
         Returns:
             Post-processed response
         """
-        # Response DTOs are frozen; return as-is or build a copy with additional metadata if needed.
         return response

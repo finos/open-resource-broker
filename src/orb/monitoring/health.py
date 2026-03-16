@@ -1,12 +1,10 @@
 """Health check monitoring for the application."""
 
-import json
 import threading
-import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 # Optional monitoring dependencies
 try:
@@ -17,18 +15,15 @@ except ImportError:
     PSUTIL_AVAILABLE = False
     psutil = None
 
-try:
-    from prometheus_client import Counter, Histogram, generate_latest  # type: ignore
+from orb.domain.base.ports.health_check_port import HealthCheckPort
+from orb.domain.base.ports.logging_port import LoggingPort
 
-    PROMETHEUS_AVAILABLE = True
-except ImportError:
-    PROMETHEUS_AVAILABLE = False
-    Counter = None
-    Histogram = None
-    generate_latest = None
 
-# stdlib logging used intentionally: LoggingPort would create a monitoring->domain->infrastructure->monitoring cycle.
-import logging
+@dataclass
+class HealthCheckConfig:
+    """Typed configuration for HealthCheck."""
+
+    health_dir: Path
 
 
 @dataclass
@@ -52,48 +47,93 @@ class HealthStatus:
         }
 
 
-class HealthCheck:
+class HealthCheck(HealthCheckPort):
     """Health check implementation."""
 
-    def __init__(self, config: dict[str, Any], logger: logging.Logger | None = None) -> None:
+    def __init__(
+        self,
+        config: HealthCheckConfig,
+        logger: LoggingPort | None = None,
+    ) -> None:
         """Initialize health check."""
-        self._logger = logger or logging.getLogger(__name__)
+        self._logger = logger
         self.config = config
         self.checks: dict[str, Callable[[], HealthStatus]] = {}
         self.status_history: dict[str, list[HealthStatus]] = {}
         self._lock = threading.Lock()
 
-        # Create health check directory
-        self.health_dir = Path(self.config.get("HEALTH_DIR", "./health"))
-        self.health_dir.mkdir(parents=True, exist_ok=True)
+        # Create health check directory with PermissionError fallbacks
+        self.health_dir = config.health_dir
+        try:
+            self.health_dir.mkdir(parents=True, exist_ok=True)
+        except PermissionError:
+            if self._logger:
+                self._logger.warning(
+                    "Permission denied creating health dir %s, falling back to ~/.orb/work/health",
+                    self.health_dir,
+                )
+            self.health_dir = Path.home() / ".orb" / "work" / "health"
+            try:
+                self.health_dir.mkdir(parents=True, exist_ok=True)
+            except PermissionError:
+                import tempfile
+
+                if self._logger:
+                    self._logger.warning(
+                        "Permission denied creating health dir %s, falling back to tempdir",
+                        self.health_dir,
+                    )
+                self.health_dir = Path(tempfile.mkdtemp(prefix="orb-health-"))
 
         # Register default health checks
         self._register_default_checks()
 
-        # Start background health checker if enabled
-        if self.config.get("HEALTH_CHECK_ENABLED", True):
-            self._start_health_checker()
-
-    def _register_default_checks(self) -> None:
-        """Register default health checks."""
-        # System health checks
-        self.register_check("system", self._check_system_health)
-        self.register_check("disk", self._check_disk_health)
-
-        # Database health checks
-        self.register_check("database", self._check_database_health)
-
-        # Application health checks
-        self.register_check("application", self._check_application_health)
-
-    def register_check(self, name: str, check_func: Callable[[], HealthStatus]) -> None:
-        """Register a new health check."""
+    def register_check(self, name: str, check_fn: Any) -> None:
+        """Register a named health check function (idempotent — first registration wins)."""
         with self._lock:
-            self.checks[name] = check_func
+            if name in self.checks:
+                return
+            self.checks[name] = check_fn
             self.status_history[name] = []
 
-    def run_check(self, name: str) -> HealthStatus:
-        """Run a specific health check."""
+    def run_check(self, name: str) -> dict[str, Any]:
+        """Run a specific health check by name and return its result as a dict."""
+        status = self._run_check_internal(name)
+        return status.to_dict()
+
+    def run_all_checks(self) -> dict[str, Any]:
+        """Run all registered health checks and return results as dicts."""
+        with self._lock:
+            names = list(self.checks)
+        return {name: self._run_check_internal(name).to_dict() for name in names}
+
+    def get_status(self) -> dict[str, Any]:
+        """Get the current health status summary."""
+        with self._lock:
+            checks_status = {
+                name: (history[-1].to_dict() if history else None)
+                for name, history in self.status_history.items()
+            }
+
+        # Derive overall status from latest per-check statuses
+        statuses = [v["status"] for v in checks_status.values() if v is not None]
+        if "unhealthy" in statuses:
+            overall = "unhealthy"
+        elif "degraded" in statuses:
+            overall = "degraded"
+        elif statuses:
+            overall = "healthy"
+        else:
+            overall = "unknown"
+
+        return {"status": overall, "checks": checks_status}
+
+    def _run_check_internal(self, name: str) -> HealthStatus:
+        """Run a specific health check, returning a HealthStatus object.
+
+        Called by run_check and run_all_checks. Catches all exceptions so a
+        failing check never kills the caller.
+        """
         if name not in self.checks:
             raise ValueError(f"Unknown health check: {name}")
 
@@ -106,7 +146,8 @@ class HealthCheck:
                     self.status_history[name].pop(0)
             return status
         except Exception as e:
-            self._logger.error("Health check %s failed: %s", name, e, exc_info=True)
+            if self._logger:
+                self._logger.error("Health check %s failed: %s", name, e, exc_info=True)
             return HealthStatus(
                 name=name,
                 status="unhealthy",
@@ -114,81 +155,12 @@ class HealthCheck:
                 dependencies=[],
             )
 
-    def run_all_checks(self) -> dict[str, HealthStatus]:
-        """Run all registered health checks."""
-        results = {}
-        for name in self.checks:
-            results[name] = self.run_check(name)
-        return results
-
-    def get_status(self, name: Optional[str] = None) -> dict[str, Any]:
-        """Get health check status."""
-        with self._lock:
-            if name:
-                if name not in self.status_history:
-                    raise ValueError(f"Unknown health check: {name}")
-                history = self.status_history[name]
-                return {
-                    "current": history[-1].to_dict() if history else None,
-                    "history": [s.to_dict() for s in history],
-                }
-            else:
-                return {
-                    name: history[-1].to_dict() if history else None
-                    for name, history in self.status_history.items()
-                }
-
-    def _start_health_checker(self) -> None:
-        """Start background health checker thread."""
-
-        def check_health() -> None:
-            """Run health checks periodically in background thread."""
-            while True:
-                try:
-                    results = self.run_all_checks()
-
-                    # Write results to file
-                    health_file = self.health_dir / "health.json"
-                    with health_file.open("w") as f:
-                        json.dump(
-                            {name: status.to_dict() for name, status in results.items()},
-                            f,
-                            indent=2,
-                        )
-
-                    # Check for alerts
-                    self._check_alerts(results)
-
-                    interval = self.config.get("HEALTH_CHECK_INTERVAL", 60)
-                    time.sleep(interval)
-
-                except Exception as e:
-                    self._logger.error("Health checker error: %s", e, exc_info=True)
-                    time.sleep(5)  # Shorter sleep on error
-
-        thread = threading.Thread(target=check_health, daemon=True)
-        thread.start()
-
-    def _check_alerts(self, results: dict[str, HealthStatus]) -> None:
-        """Check health status for alerts."""
-        alerts = []
-        for name, status in results.items():
-            if status.status == "unhealthy":
-                alerts.append(
-                    {
-                        "check": name,
-                        "status": status.status,
-                        "details": status.details,
-                        "timestamp": status.timestamp.isoformat(),
-                    }
-                )
-
-        if alerts:
-            alert_file = self.health_dir / "alerts.json"
-            with alert_file.open("w") as f:
-                json.dump(alerts, f, indent=2)
-
-            self._logger.error("Health check alerts", extra={"alerts": alerts})
+    def _register_default_checks(self) -> None:
+        """Register default health checks. Called from __init__."""
+        self.register_check("system", self._check_system_health)
+        self.register_check("disk", self._check_disk_health)
+        self.register_check("database", self._check_database_health)
+        self.register_check("application", self._check_application_health)
 
     def _check_system_health(self) -> HealthStatus:
         """Check system health."""
@@ -269,114 +241,46 @@ class HealthCheck:
             )
 
     def _check_database_health(self) -> HealthStatus:
-        """Check database health."""
-        repo_config = self.config.get("REPOSITORY_CONFIG", {})
-        repo_type = repo_config.get("type")
+        """Check database health.
 
-        if repo_type == "json":
-            return self._check_json_db_health()
-        elif repo_type == "sqlite":
-            return self._check_sqlite_db_health()
-        else:
-            return HealthStatus(
-                name="database",
-                status="unknown",
-                details={"error": f"Unknown repository type: {repo_type}"},
-                dependencies=["database"],
-            )
-
-    def _check_json_db_health(self) -> HealthStatus:
-        """Check JSON database health."""
-        try:
-            repo_config = self.config["REPOSITORY_CONFIG"]["json"]
-            base_path = Path(repo_config["base_path"])
-
-            if not base_path.exists():
-                return HealthStatus(
-                    name="database",
-                    status="unhealthy",
-                    details={"error": "Database directory does not exist"},
-                    dependencies=["database", "json"],
-                )
-
-            # Check write access
-            test_file = base_path / "test.json"
-            test_file.write_text("{}")
-            test_file.unlink()
-
-            return HealthStatus(
-                name="database",
-                status="healthy",
-                details={"type": "json", "path": str(base_path), "write_access": True},
-                dependencies=["database", "json"],
-            )
-        except Exception as e:
-            return HealthStatus(
-                name="database",
-                status="unhealthy",
-                details={"error": str(e)},
-                dependencies=["database", "json"],
-            )
-
-    def _check_sqlite_db_health(self) -> HealthStatus:
-        """Check SQLite database health."""
-        try:
-            import sqlite3
-
-            repo_config = self.config["REPOSITORY_CONFIG"]["sqlite"]
-            db_path = Path(repo_config["database_path"])
-
-            if not db_path.parent.exists():
-                db_path.parent.mkdir(parents=True)
-
-            # Verify database connectivity
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1")
-            cursor.close()
-            conn.close()
-
-            return HealthStatus(
-                name="database",
-                status="healthy",
-                details={
-                    "type": "sqlite",
-                    "path": str(db_path),
-                    "size_bytes": db_path.stat().st_size if db_path.exists() else 0,
-                },
-                dependencies=["database", "sqlite"],
-            )
-        except Exception as e:
-            return HealthStatus(
-                name="database",
-                status="unhealthy",
-                details={"error": str(e)},
-                dependencies=["database", "sqlite"],
-            )
+        Without raw dict config, database type is unknown at this level.
+        AWS-specific checks are registered via register_aws_health_checks().
+        """
+        return HealthStatus(
+            name="database",
+            status="unknown",
+            details={"reason": "No database check registered"},
+            dependencies=["database"],
+        )
 
     def _check_application_health(self) -> HealthStatus:
         """Check overall application health."""
         try:
-            # Run all other checks
-            results = {name: self.run_check(name) for name in self.checks if name != "application"}
+            results = {
+                name: self._run_check_internal(name)
+                for name in self.checks
+                if name != "application"
+            }
 
-            # Count status types
-            status_counts = {"healthy": 0, "degraded": 0, "unhealthy": 0, "unknown": 0}
-
+            status_counts: dict[str, int] = {
+                "healthy": 0,
+                "degraded": 0,
+                "unhealthy": 0,
+                "unknown": 0,
+            }
             for result in results.values():
-                status_counts[result.status] += 1
+                status_counts[result.status] = status_counts.get(result.status, 0) + 1
 
-            # Determine overall status
             if status_counts["unhealthy"] > 0:
-                status = "unhealthy"
+                overall = "unhealthy"
             elif status_counts["degraded"] > 0:
-                status = "degraded"
+                overall = "degraded"
             else:
-                status = "healthy"
+                overall = "healthy"
 
             return HealthStatus(
                 name="application",
-                status=status,
+                status=overall,
                 details={
                     "status_counts": status_counts,
                     "checks": {name: result.status for name, result in results.items()},

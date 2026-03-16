@@ -1,11 +1,12 @@
 """Configuration caching and reloading management."""
 
-import logging
 import threading
 from typing import Any, Optional, TypeVar
 
+from orb.infrastructure.logging.logger import get_logger
+
 T = TypeVar("T")
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ConfigCacheManager:

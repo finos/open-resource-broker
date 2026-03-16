@@ -164,6 +164,24 @@ class Machine(AggregateRoot):
             )
             updated_machine.add_domain_event(status_event)
 
+            # Fire MachineProvisionedEvent when machine becomes RUNNING with an IP
+            if new_status == MachineStatus.RUNNING and (
+                updated_machine.private_ip or updated_machine.public_ip
+            ):
+                from orb.domain.base.events.domain_events import MachineProvisionedEvent
+
+                provisioned_event = MachineProvisionedEvent(
+                    aggregate_id=str(self.machine_id),
+                    aggregate_type="Machine",
+                    machine_id=str(self.machine_id),
+                    private_ip=str(updated_machine.private_ip)
+                    if updated_machine.private_ip
+                    else None,
+                    public_ip=str(updated_machine.public_ip) if updated_machine.public_ip else None,
+                    provisioning_time=now,
+                )
+                updated_machine.add_domain_event(provisioned_event)
+
         return updated_machine
 
     def get_id(self) -> str:

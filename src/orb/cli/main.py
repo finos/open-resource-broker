@@ -72,6 +72,12 @@ async def main() -> None:
                 print(error_output.strip(), file=sys.stderr)
             raise
 
+        # Setup environment after arg parse — skip for init (it calls get_config_location() directly)
+        if args.resource != "init":
+            from orb.run import setup_environment
+
+            setup_environment()
+
         # Handle completion generation
         if args.completion:
             from orb.cli.completion import generate_bash_completion, generate_zsh_completion

@@ -8,6 +8,7 @@ from orb.domain.base.configuration_service import DomainConfigurationService
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.container_port import ContainerPort
 from orb.domain.base.ports.logging_port import LoggingPort
+from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
 from orb.domain.constants import PROVIDER_TYPE_AWS
 from orb.domain.services.filter_service import FilterService
@@ -69,11 +70,9 @@ def register_domain_services(container: DIContainer) -> None:
 
     # Provider validation service (SRP refactoring)
     def create_provider_validation_service(c):
-        from orb.providers.registry.provider_registry import get_provider_registry
-
         validator = None
         try:
-            validator = get_provider_registry().create_validator(PROVIDER_TYPE_AWS)
+            validator = c.get(ProviderRegistryPort).create_validator(PROVIDER_TYPE_AWS)
         except Exception as e:
             c.get(LoggingPort).debug("Could not create AWS provider validator: %s", e)
         return ProviderValidationService(

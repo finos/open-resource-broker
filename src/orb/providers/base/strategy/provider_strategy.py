@@ -8,7 +8,10 @@ clean separation of concerns and SOLID principles compliance.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from orb.monitoring.health import HealthCheck
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -227,7 +230,7 @@ class ProviderStrategy(ABC):
         import concurrent.futures
 
         # Run sync version in thread pool to avoid blocking event loop
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         with concurrent.futures.ThreadPoolExecutor() as executor:
             return await loop.run_in_executor(executor, self.execute_operation, operation)  # type: ignore[arg-type]
 
@@ -314,6 +317,14 @@ class ProviderStrategy(ABC):
         """
         return {}
 
+    def get_operational_requirements(self) -> dict:
+        """What's needed to operate after authentication (e.g. region, project).
+
+        Returns a dict of param_name -> {"required": bool, "description": str}.
+        Asked after credentials are tested successfully.
+        """
+        return {}
+
     def get_available_regions(self) -> list[tuple[str, str]]:
         """Get available regions as (region_id, display_name) tuples.
 
@@ -346,6 +357,16 @@ class ProviderStrategy(ABC):
         Default returns empty dict.
         """
         return {}
+
+    def register_health_checks(self, health_check: "HealthCheck") -> None:
+        """Register provider-specific health checks.
+
+        Default is a no-op. Override in provider-specific strategies.
+
+        Args:
+            health_check: HealthCheck instance
+        """
+        pass
 
     def resolve_api_alias(self, raw_api: str) -> str:
         """Resolve a provider API name to its canonical form.

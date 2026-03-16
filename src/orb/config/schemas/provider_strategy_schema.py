@@ -135,9 +135,18 @@ class ProviderInstanceConfig(BaseModel):
     ) -> dict[str, HandlerConfig]:
         """Get effective handlers after applying defaults and overrides."""
 
-        # If full handlers override is specified, use it directly
+        # If full handlers override is specified, merge each handler with its default
+        # so extra fields (supports_spot, supports_ondemand, etc.) are inherited
         if self.handlers:
-            return self.handlers
+            if not provider_defaults or not provider_defaults.handlers:
+                return self.handlers
+            merged = {}
+            for name, config in self.handlers.items():
+                if name in provider_defaults.handlers:
+                    merged[name] = provider_defaults.handlers[name].merge_with(config)
+                else:
+                    merged[name] = config
+            return merged
 
         # Start with provider type defaults
         effective_handlers = {}

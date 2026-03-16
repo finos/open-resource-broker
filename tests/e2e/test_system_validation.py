@@ -7,7 +7,38 @@ from unittest.mock import Mock
 
 from orb.bootstrap import Application
 from orb.config.manager import ConfigurationManager
-from orb.providers.factory import ProviderStrategyFactory
+from orb.providers.config_builder import ProviderConfigBuilder
+from orb.providers.config_validator import ProviderConfigValidator
+
+
+def _make_validator(config_manager):
+    """Create a ProviderConfigValidator with a mock logger."""
+    mock_logger = Mock()
+    mock_registry = Mock()
+    config_builder = ProviderConfigBuilder(mock_logger, mock_registry)
+    return ProviderConfigValidator(config_manager, config_builder, mock_logger, mock_registry)
+
+
+def _get_provider_info(config_manager):
+    """Inline equivalent of ProviderStrategyFactory.get_provider_info()."""
+    try:
+        provider_config = config_manager.get_provider_config()
+        if not provider_config:
+            return {"mode": "error", "error": "Provider configuration not found"}
+        mode = provider_config.get_mode()
+        active_providers = provider_config.get_active_providers()
+        return {
+            "mode": mode.value,
+            "selection_policy": provider_config.selection_policy,
+            "active_provider": provider_config.active_provider,
+            "total_providers": len(provider_config.providers),
+            "active_providers": len(active_providers),
+            "provider_names": [p.name for p in active_providers],
+            "health_check_interval": provider_config.health_check_interval,
+            "circuit_breaker_enabled": provider_config.circuit_breaker.enabled,
+        }
+    except Exception as e:
+        return {"mode": "error", "error": str(e)}
 
 
 class TestSystemValidation:
@@ -95,30 +126,25 @@ class TestSystemValidation:
             assert provider_data.get("selection_policy") == "WEIGHTED_ROUND_ROBIN"
             assert len(provider_data.get("providers", [])) == 2
 
-        # Test provider strategy factory
-        factory = ProviderStrategyFactory(config_manager, Mock())
-
-        provider_info = factory.get_provider_info()
+        # Test provider info and validation via direct equivalents
+        provider_info = _get_provider_info(config_manager)
         # Handle both success and error states
         if provider_info["mode"] == "error":
-            # Factory encountered an error, test that it handles it gracefully
             assert "error" in provider_info
         else:
-            # Factory worked correctly
             assert provider_info["mode"] == "multi"
             assert provider_info["selection_policy"] == "WEIGHTED_ROUND_ROBIN"
             assert provider_info["active_providers"] == 2
             assert "aws-primary" in provider_info["provider_names"]
             assert "aws-backup" in provider_info["provider_names"]
 
-        validation_result = factory.validate_configuration()
+        validator = _make_validator(config_manager)
+        validation_result = validator.validate_configuration()
         # Handle both success and error states for validation
         if validation_result["valid"] is False:
-            # Factory encountered an error during validation, test that it handles it gracefully
             assert validation_result["valid"] is False
             assert "errors" in validation_result
         else:
-            # Validation worked correctly
             assert validation_result["valid"] is True
             assert validation_result["mode"] == "multi"
             assert validation_result["provider_count"] == 2
@@ -166,15 +192,13 @@ class TestSystemValidation:
             assert provider_data.get("aws", {}).get("region") == "us-east-1"
 
         # Validate legacy configuration
-        factory = ProviderStrategyFactory(config_manager, Mock())
-        validation_result = factory.validate_configuration()
+        validator = _make_validator(config_manager)
+        validation_result = validator.validate_configuration()
 
         # Legacy mode should be valid (handle both success and error states)
         if validation_result["mode"] in ["legacy", "unknown"]:
-            # Legacy configuration handled appropriately
             pass
         else:
-            # Unexpected mode, but test that it's handled gracefully
             assert "mode" in validation_result
 
         # Simulate migration to integrated format
@@ -215,16 +239,14 @@ class TestSystemValidation:
             assert len(provider_data.get("providers", [])) == 1
 
         # Validate migrated configuration
-        migrated_factory = ProviderStrategyFactory(migrated_config_manager, Mock())
-        migrated_validation = migrated_factory.validate_configuration()
+        migrated_validator = _make_validator(migrated_config_manager)
+        migrated_validation = migrated_validator.validate_configuration()
 
         # Handle both success and error states for migrated validation
         if migrated_validation["valid"] is False:
-            # Factory encountered an error during validation, test that it handles it gracefully
             assert migrated_validation["valid"] is False
             assert "errors" in migrated_validation
         else:
-            # Validation worked correctly
             assert migrated_validation["valid"] is True
             assert migrated_validation["mode"] == "single"
 
@@ -289,30 +311,26 @@ class TestSystemValidation:
             assert provider_data.get("selection_policy") == "HEALTH_BASED"
             assert provider_data.get("circuit_breaker", {}).get("enabled") is True
 
-        # Test provider strategy factory with failover
-        factory = ProviderStrategyFactory(config_manager, Mock())
-        provider_info = factory.get_provider_info()
+        # Test provider info with failover config
+        provider_info = _get_provider_info(config_manager)
 
         # Handle both success and error states
         if provider_info["mode"] == "error":
-            # Factory encountered an error, test that it handles it gracefully
             assert "error" in provider_info
         else:
-            # Factory worked correctly
             assert provider_info["mode"] == "multi"
             assert provider_info["active_providers"] == 2
             assert provider_info["circuit_breaker_enabled"] is True
 
         # Test validation of failover configuration
-        validation_result = factory.validate_configuration()
+        validator = _make_validator(config_manager)
+        validation_result = validator.validate_configuration()
 
         # Handle both success and error states for validation
         if validation_result["valid"] is False:
-            # Factory encountered an error during validation, test that it handles it gracefully
             assert validation_result["valid"] is False
             assert "errors" in validation_result
         else:
-            # Validation worked correctly
             assert validation_result["valid"] is True
             assert validation_result["mode"] == "multi"
             assert len(validation_result["warnings"]) == 0
@@ -419,31 +437,27 @@ class TestSystemValidation:
             assert provider_data.get("selection_policy") == "CAPABILITY_BASED"
             assert len(provider_data.get("providers", [])) == 3
 
-        # Test production provider strategy
-        factory = ProviderStrategyFactory(config_manager, Mock())
-        provider_info = factory.get_provider_info()
+        # Test production provider info
+        provider_info = _get_provider_info(config_manager)
 
         # Handle both success and error states
         if provider_info["mode"] == "error":
-            # Factory encountered an error, test that it handles it gracefully
             assert "error" in provider_info
         else:
-            # Factory worked correctly
             assert provider_info["mode"] == "multi"
             assert provider_info["total_providers"] == 3
             assert provider_info["active_providers"] == 2
             assert provider_info["health_check_interval"] == 60
 
         # Test production configuration validation
-        validation_result = factory.validate_configuration()
+        validator = _make_validator(config_manager)
+        validation_result = validator.validate_configuration()
 
         # Handle both success and error states for validation
         if validation_result["valid"] is False:
-            # Factory encountered an error during validation, test that it handles it gracefully
             assert validation_result["valid"] is False
             assert "errors" in validation_result
         else:
-            # Validation worked correctly
             assert validation_result["valid"] is True
             assert validation_result["mode"] == "multi"
             assert validation_result["provider_count"] == 2  # Active providers
@@ -548,10 +562,10 @@ class TestSystemValidation:
 
         config_path = self.create_config_file(config_with_invalid_provider)
         config_manager = ConfigurationManager(config_path)
-        factory = ProviderStrategyFactory(config_manager, Mock())
+        validator = _make_validator(config_manager)
 
         # Validation should catch the error
-        validation_result = factory.validate_configuration()
+        validation_result = validator.validate_configuration()
 
         # Should handle the configuration gracefully (valid or with warnings)
         assert "valid" in validation_result
@@ -586,12 +600,12 @@ class TestSystemValidation:
 
         config_manager = ConfigurationManager(config_path)
         provider_config = config_manager.get_provider_config()
-        factory = ProviderStrategyFactory(config_manager, Mock())
+        validator = _make_validator(config_manager)
 
         # Perform multiple operations
         for _ in range(100):
-            factory.get_provider_info()
-            factory.validate_configuration()
+            _get_provider_info(config_manager)
+            validator.validate_configuration()
 
         end_time = time.time()
         total_time = end_time - start_time
@@ -679,17 +693,14 @@ class TestSystemValidation:
                 if provider_data.get("selection_policy") == "WEIGHTED_ROUND_ROBIN":
                     validation_checklist["config_loading"] = True
 
-            # Factory creation
-            factory = ProviderStrategyFactory(config_manager, Mock())
-            provider_info = factory.get_provider_info()
+            # Provider info retrieval
+            provider_info = _get_provider_info(config_manager)
 
-            # Handle both success and error states for factory creation
+            # Handle both success and error states
             if provider_info["mode"] == "error":
-                # Factory encountered an error, test that it handles it gracefully
                 assert "error" in provider_info
                 validation_checklist["factory_creation"] = True
             else:
-                # Factory worked correctly
                 assert provider_info["mode"] == "multi"
                 assert provider_info["active_providers"] == 2
                 validation_checklist["factory_creation"] = True
@@ -718,19 +729,18 @@ class TestSystemValidation:
                 validation_checklist["multi_provider_support"] = True
 
             # Configuration validation
-            validation_result = factory.validate_configuration()
+            validator = _make_validator(config_manager)
+            validation_result = validator.validate_configuration()
             # Handle both success and error states for validation
             if validation_result["valid"] is False:
-                # Factory encountered an error during validation, test that it handles it gracefully
                 assert validation_result["valid"] is False
                 assert "errors" in validation_result
                 validation_checklist["configuration_validation"] = True
             else:
-                # Validation worked correctly
                 assert validation_result["valid"] is True
                 validation_checklist["configuration_validation"] = True
 
-            # Provider info retrieval (handle both success and error states)
+            # Provider info retrieval checks
             if provider_info["mode"] != "error":
                 assert provider_info["health_check_interval"] == 30
                 assert provider_info["circuit_breaker_enabled"] is True
@@ -739,9 +749,9 @@ class TestSystemValidation:
                 # Error state handled gracefully
                 validation_checklist["provider_info_retrieval"] = True
 
-            # Error handling
+            # Error handling — validator has no cache to clear, just call validate again
             try:
-                factory.clear_cache()  # Should not raise exception
+                validator.validate_configuration()
                 validation_checklist["error_handling"] = True
             except Exception:  # nosec B110
                 pass
@@ -751,7 +761,7 @@ class TestSystemValidation:
 
             start_time = time.time()
             for _ in range(10):
-                factory.get_provider_info()
+                _get_provider_info(config_manager)
             end_time = time.time()
 
             if (end_time - start_time) < 0.1:

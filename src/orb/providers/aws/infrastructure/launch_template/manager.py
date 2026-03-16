@@ -17,6 +17,7 @@ from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.request.aggregate import Request
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.exceptions.aws_exceptions import (
+    AWSConfigurationError,
     AWSValidationError,
     InfrastructureError,
 )
@@ -114,7 +115,10 @@ class AWSLaunchTemplateManager:
         launch_template_data = self._create_launch_template_data(aws_template, request)
 
         # Get the launch template name
-        assert self.config_port is not None, "config_port must be injected"
+        if self.config_port is None:
+            raise AWSConfigurationError(
+                "config_port must be injected before calling _create_per_request_version"
+            )
         launch_template_name = (
             f"{self.config_port.get_resource_prefix('launch_template')}"
             f"{request.request_id}-{aws_template.template_id}"
@@ -279,7 +283,10 @@ class AWSLaunchTemplateManager:
             custom_tags = [{"key": k, "value": v} for k, v in template.tags.items()]
 
         # Get instance name
-        assert self.config_port is not None, "config_port must be injected"
+        if self.config_port is None:
+            raise AWSConfigurationError(
+                "config_port must be injected before calling _prepare_template_context"
+            )
         instance_name = f"{self.config_port.get_resource_prefix('instance')}{request.request_id}"
 
         return {
@@ -526,7 +533,10 @@ class AWSLaunchTemplateManager:
             List of tag dictionaries
         """
         # Get instance name
-        assert self.config_port is not None, "config_port must be injected"
+        if self.config_port is None:
+            raise AWSConfigurationError(
+                "config_port must be injected before calling _create_instance_tags"
+            )
         instance_name = f"{self.config_port.get_resource_prefix('instance')}{request.request_id}"
 
         user_tags: list[dict[str, str]] = [{"Key": "Name", "Value": instance_name}]
@@ -555,7 +565,10 @@ class AWSLaunchTemplateManager:
         Returns:
             List of tag dictionaries
         """
-        assert self.config_port is not None, "config_port must be injected"
+        if self.config_port is None:
+            raise AWSConfigurationError(
+                "config_port must be injected before calling _create_launch_template_tags"
+            )
         template_name = (
             f"{self.config_port.get_resource_prefix('launch_template')}"
             f"{request.request_id}-{aws_template.template_id}"

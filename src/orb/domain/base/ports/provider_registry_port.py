@@ -58,3 +58,28 @@ class ProviderRegistryPort(ABC):
     def get_config_factory(self, provider_type: str) -> Optional[Any]:
         """Return the config_factory callable for the given provider type, or None if not registered."""
         pass
+
+    @abstractmethod
+    def is_provider_registered(self, provider_type: str) -> bool:
+        """Check if a provider type is registered."""
+        pass  # type: ignore[return]
+
+    @abstractmethod
+    def is_provider_instance_registered(self, instance_name: str) -> bool:
+        """Check if a provider instance is registered."""
+        pass  # type: ignore[return]
+
+    @abstractmethod
+    def ensure_provider_instance_registered_from_config(self, provider_instance: Any) -> bool:
+        """Ensure provider instance is registered from config."""
+        pass  # type: ignore[return]
+
+    @abstractmethod
+    def create_strategy_by_type(self, provider_type: str, config: Any = None) -> Any:
+        """Create a provider strategy directly by type, bypassing the instance cache."""
+        pass  # type: ignore[return]
+
+    @abstractmethod
+    def create_validator(self, provider_type: str) -> Optional[Any]:
+        """Create a template validator using the registered factory for the given provider type."""
+        pass  # type: ignore[return]

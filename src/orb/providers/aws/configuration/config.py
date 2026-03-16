@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from orb.infrastructure.interfaces.provider import BaseProviderConfig
 from orb.providers.aws.domain.template.value_objects import ProviderApi
+from orb.providers.aws.storage.config import AWSStorageConfig
 
 
 class HandlerCapabilityConfig(BaseModel):
@@ -52,8 +53,8 @@ class LaunchTemplateConfiguration(BaseModel):
 class HandlersConfig(BaseModel):
     """Handlers configuration."""
 
-    capabilities: HandlerCapabilityConfig = Field(default_factory=lambda: HandlerCapabilityConfig())  # type: ignore[call-arg]
-    defaults: HandlerDefaultsConfig = Field(default_factory=lambda: HandlerDefaultsConfig())  # type: ignore[call-arg]
+    capabilities: HandlerCapabilityConfig = Field(default_factory=HandlerCapabilityConfig)  # type: ignore[call-arg]
+    defaults: HandlerDefaultsConfig = Field(default_factory=HandlerDefaultsConfig)  # type: ignore[call-arg]
 
     # Legacy fields for backward compatibility
     ec2_fleet: bool = Field(True, description="Enable EC2 Fleet handler (legacy)")
@@ -126,11 +127,17 @@ class AWSProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         "AWSServiceRoleForEC2SpotFleet", description="Service role for Spot Fleet"
     )
     # Handler configuration
-    handlers: HandlersConfig = Field(default_factory=lambda: HandlersConfig())  # type: ignore[call-arg]
+    handlers: HandlersConfig = Field(default_factory=HandlersConfig)  # type: ignore[call-arg]
 
     # Launch template configuration
     launch_template: LaunchTemplateConfiguration = Field(
-        default_factory=lambda: LaunchTemplateConfiguration()  # type: ignore[call-arg]
+        default_factory=LaunchTemplateConfiguration  # type: ignore[call-arg]
+    )
+
+    # AWS storage backend configuration
+    storage: AWSStorageConfig = Field(
+        default_factory=AWSStorageConfig,  # type: ignore[call-arg]
+        description="AWS storage backend configuration",
     )
 
     # Symphony/Legacy configuration fields
@@ -160,6 +167,17 @@ class AWSProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
                 return json.loads(v)
             except json.JSONDecodeError:
                 return v
+        return v
+
+    @field_validator("storage", mode="before")
+    @classmethod
+    def parse_storage_json(cls, v: Any) -> Any:
+        """Parse storage configuration from JSON string if needed."""
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON for storage config: {e}") from e
         return v
 
     @field_validator("launch_template", mode="before")

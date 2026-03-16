@@ -31,7 +31,7 @@ class ORBClient:
     Usage:
         async with ORBClient(provider="aws") as sdk:
             templates = await sdk.list_templates(active_only=True)
-            request = await sdk.create_request(template_id="basic", machine_count=5)
+            request = await sdk.create_request(template_id="basic", count=5)
             status = await sdk.get_request_status(request_id=request.id)
     """
 
@@ -150,8 +150,13 @@ class ORBClient:
             if not self._query_bus or not self._command_bus:
                 raise ConfigurationError("CQRS buses not available")
 
-            # Initialize method discovery
-            self._discovery = SDKMethodDiscovery()
+            # Resolve scheduler formatting from DI container (graceful fallback if not registered)
+            from orb.application.ports.scheduler_port import SchedulerPort
+
+            scheduler_port = self._container.get_optional(SchedulerPort)
+
+            # Initialize method discovery with scheduler formatting
+            self._discovery = SDKMethodDiscovery(scheduler_port=scheduler_port)
 
             # Auto-discover all handler methods using CQRS buses
             self._methods = await self._discovery.discover_cqrs_methods(
@@ -431,82 +436,248 @@ class ORBClient:
     # async callable wired to the CQRS bus.
 
     # Template operations
-    async def get_template(self, *, template_id: str, **kwargs: Any) -> Any: ...
-    async def list_templates(self, *, active_only: bool = False, **kwargs: Any) -> Any: ...
-    async def validate_template(self, *, template_id: str, **kwargs: Any) -> Any: ...
-    async def get_configuration(self, **kwargs: Any) -> Any: ...
-    async def create_template(self, *, template_id: str, **kwargs: Any) -> Any: ...
-    async def update_template(self, *, template_id: str, **kwargs: Any) -> Any: ...
-    async def delete_template(self, *, template_id: str, **kwargs: Any) -> Any: ...
-    async def refresh_templates(self, **kwargs: Any) -> Any: ...
+    async def get_template(self, *, template_id: str, **kwargs: Any) -> Any:
+        pass
+
+    async def list_templates(self, *, active_only: bool = False, **kwargs: Any) -> Any:
+        pass
+
+    async def validate_template(self, *, template_id: str, **kwargs: Any) -> Any:
+        pass
+
+    async def get_configuration(self, **kwargs: Any) -> Any:
+        pass
+
+    async def create_template(self, *, template_id: str, **kwargs: Any) -> Any:
+        pass
+
+    async def update_template(self, *, template_id: str, **kwargs: Any) -> Any:
+        pass
+
+    async def delete_template(self, *, template_id: str, **kwargs: Any) -> Any:
+        pass
+
+    async def refresh_templates(self, **kwargs: Any) -> Any:
+        pass
 
     # Request operations
-    async def get_request(self, *, request_id: str, **kwargs: Any) -> Any: ...
-    async def list_requests(self, **kwargs: Any) -> Any: ...
-    async def list_return_requests(self, **kwargs: Any) -> Any: ...
-    async def list_active_requests(self, **kwargs: Any) -> Any: ...
-    async def get_request_summary(self, *, request_id: str, **kwargs: Any) -> Any: ...
-    async def create_request(self, *, template_id: str, count: int = 1, **kwargs: Any) -> Any: ...
-    async def create_return_request(self, *, machine_ids: list[str], **kwargs: Any) -> Any: ...
-    async def update_request_status(self, *, request_id: str, **kwargs: Any) -> Any: ...
-    async def cancel_request(self, *, request_id: str, **kwargs: Any) -> Any: ...
-    async def complete_request(self, *, request_id: str, **kwargs: Any) -> Any: ...
-    async def sync_request(self, *, request_id: str, **kwargs: Any) -> Any: ...
-    async def populate_machine_ids(self, *, request_id: str, **kwargs: Any) -> Any: ...
+    async def get_request(self, *, request_id: str, **kwargs: Any) -> Any:
+        pass
+
+    async def list_requests(self, **kwargs: Any) -> Any:
+        pass
+
+    async def list_return_requests(self, **kwargs: Any) -> Any:
+        pass
+
+    async def list_active_requests(self, **kwargs: Any) -> Any:
+        pass
+
+    async def get_request_summary(self, *, request_id: str, **kwargs: Any) -> Any:
+        pass
+
+    async def create_request(self, *, template_id: str, count: int = 1, **kwargs: Any) -> Any:
+        pass
+
+    async def create_return_request(self, *, machine_ids: list[str], **kwargs: Any) -> Any:
+        pass
+
+    async def update_request_status(self, *, request_id: str, **kwargs: Any) -> Any:
+        pass
+
+    async def cancel_request(self, *, request_id: str, **kwargs: Any) -> Any:
+        pass
+
+    async def complete_request(self, *, request_id: str, **kwargs: Any) -> Any:
+        pass
+
+    async def sync_request(self, *, request_id: str, **kwargs: Any) -> Any:
+        pass
+
+    async def populate_machine_ids(self, *, request_id: str, **kwargs: Any) -> Any:
+        pass
 
     # Machine operations
-    async def get_machine(self, *, machine_id: str, **kwargs: Any) -> Any: ...
-    async def list_machines(self, **kwargs: Any) -> Any: ...
-    async def get_active_machine_count(self, **kwargs: Any) -> Any: ...
-    async def get_machine_health(self, **kwargs: Any) -> Any: ...
-    async def update_machine_status(self, *, machine_id: str, **kwargs: Any) -> Any: ...
-    async def convert_machine_status(self, **kwargs: Any) -> Any: ...
-    async def convert_batch_machine_status(self, **kwargs: Any) -> Any: ...
-    async def cleanup_machine_resources(self, **kwargs: Any) -> Any: ...
-    async def register_machine(self, **kwargs: Any) -> Any: ...
-    async def deregister_machine(self, *, machine_id: str, **kwargs: Any) -> Any: ...
+    async def get_machine(self, *, machine_id: str, **kwargs: Any) -> Any:
+        pass
+
+    async def list_machines(self, **kwargs: Any) -> Any:
+        pass
+
+    async def get_active_machine_count(self, **kwargs: Any) -> Any:
+        pass
+
+    async def get_machine_health(self, **kwargs: Any) -> Any:
+        pass
+
+    async def update_machine_status(self, *, machine_id: str, **kwargs: Any) -> Any:
+        pass
+
+    async def convert_machine_status(self, **kwargs: Any) -> Any:
+        pass
+
+    async def convert_batch_machine_status(self, **kwargs: Any) -> Any:
+        pass
+
+    async def cleanup_machine_resources(self, **kwargs: Any) -> Any:
+        pass
+
+    async def register_machine(self, **kwargs: Any) -> Any:
+        pass
+
+    async def deregister_machine(self, *, machine_id: str, **kwargs: Any) -> Any:
+        pass
 
     # Provider operations
-    async def get_provider_health(self, **kwargs: Any) -> Any: ...
-    async def list_available_providers(self, **kwargs: Any) -> Any: ...
-    async def get_provider_capabilities(self, **kwargs: Any) -> Any: ...
-    async def get_provider_metrics(self, **kwargs: Any) -> Any: ...
-    async def get_provider_strategy_config(self, **kwargs: Any) -> Any: ...
-    async def execute_provider_operation(self, **kwargs: Any) -> Any: ...
-    async def register_provider_strategy(self, **kwargs: Any) -> Any: ...
-    async def update_provider_health(self, **kwargs: Any) -> Any: ...
+    async def get_provider_health(self, **kwargs: Any) -> Any:
+        pass
+
+    async def list_available_providers(self, **kwargs: Any) -> Any:
+        pass
+
+    async def get_provider_capabilities(self, **kwargs: Any) -> Any:
+        pass
+
+    async def get_provider_metrics(self, **kwargs: Any) -> Any:
+        pass
+
+    async def get_provider_strategy_config(self, **kwargs: Any) -> Any:
+        pass
+
+    async def execute_provider_operation(self, **kwargs: Any) -> Any:
+        pass
+
+    async def register_provider_strategy(self, **kwargs: Any) -> Any:
+        pass
+
+    async def update_provider_health(self, **kwargs: Any) -> Any:
+        pass
 
     # Bulk operations
-    async def get_multiple_requests(self, *, request_ids: list[str], **kwargs: Any) -> Any: ...
-    async def get_multiple_templates(self, *, template_ids: list[str], **kwargs: Any) -> Any: ...
-    async def get_multiple_machines(self, *, machine_ids: list[str], **kwargs: Any) -> Any: ...
+    async def get_multiple_requests(self, *, request_ids: list[str], **kwargs: Any) -> Any:
+        pass
+
+    async def get_multiple_templates(self, *, template_ids: list[str], **kwargs: Any) -> Any:
+        pass
+
+    async def get_multiple_machines(self, *, machine_ids: list[str], **kwargs: Any) -> Any:
+        pass
 
     # Cleanup operations
-    async def list_cleanable_requests(self, **kwargs: Any) -> Any: ...
-    async def list_cleanable_resources(self, **kwargs: Any) -> Any: ...
-    async def cleanup_old_requests(self, **kwargs: Any) -> Any: ...
-    async def cleanup_all_resources(self, **kwargs: Any) -> Any: ...
+    async def list_cleanable_requests(self, **kwargs: Any) -> Any:
+        pass
+
+    async def list_cleanable_resources(self, **kwargs: Any) -> Any:
+        pass
+
+    async def cleanup_old_requests(self, **kwargs: Any) -> Any:
+        pass
+
+    async def cleanup_all_resources(self, **kwargs: Any) -> Any:
+        pass
 
     # Storage operations
-    async def list_storage_strategies(self, **kwargs: Any) -> Any: ...
-    async def get_storage_health(self, **kwargs: Any) -> Any: ...
-    async def get_storage_metrics(self, **kwargs: Any) -> Any: ...
+    async def list_storage_strategies(self, **kwargs: Any) -> Any:
+        pass
+
+    async def get_storage_health(self, **kwargs: Any) -> Any:
+        pass
+
+    async def get_storage_metrics(self, **kwargs: Any) -> Any:
+        pass
 
     # Scheduler operations
-    async def list_scheduler_strategies(self, **kwargs: Any) -> Any: ...
-    async def get_scheduler_configuration(self, **kwargs: Any) -> Any: ...
-    async def validate_scheduler_configuration(self, **kwargs: Any) -> Any: ...
+    async def list_scheduler_strategies(self, **kwargs: Any) -> Any:
+        pass
+
+    async def get_scheduler_configuration(self, **kwargs: Any) -> Any:
+        pass
+
+    async def validate_scheduler_configuration(self, **kwargs: Any) -> Any:
+        pass
 
     # System / config operations
-    async def get_configuration_section(self, *, section: str, **kwargs: Any) -> Any: ...
-    async def get_provider_config(self, **kwargs: Any) -> Any: ...
-    async def validate_provider_config(self, **kwargs: Any) -> Any: ...
-    async def get_system_status(self, **kwargs: Any) -> Any: ...
-    async def validate_storage(self, **kwargs: Any) -> Any: ...
-    async def validate_mcp(self, **kwargs: Any) -> Any: ...
-    async def validate_provider_state(self, **kwargs: Any) -> Any: ...
-    async def reload_provider_config(self, **kwargs: Any) -> Any: ...
-    async def set_configuration(self, **kwargs: Any) -> Any: ...
+    async def get_configuration_section(self, *, section: str, **kwargs: Any) -> Any:
+        pass
+
+    async def get_provider_config(self, **kwargs: Any) -> Any:
+        pass
+
+    async def validate_provider_config(self, **kwargs: Any) -> Any:
+        pass
+
+    async def get_system_status(self, **kwargs: Any) -> Any:
+        pass
+
+    async def validate_storage(self, **kwargs: Any) -> Any:
+        pass
+
+    async def validate_mcp(self, **kwargs: Any) -> Any:
+        pass
+
+    async def validate_provider_state(self, **kwargs: Any) -> Any:
+        pass
+
+    async def reload_provider_config(self, **kwargs: Any) -> Any:
+        pass
+
+    async def set_configuration(self, **kwargs: Any) -> Any:
+        pass
+
+    async def wait_for_request(
+        self,
+        request_id: str,
+        *,
+        timeout: float = 300.0,
+        poll_interval: float = 10.0,
+    ) -> dict[str, Any]:
+        """Poll until the request reaches a terminal status or timeout expires.
+
+        Raises:
+            SDKError: If the SDK is not initialized.
+            TimeoutError: If timeout expires before terminal status.
+        """
+        if not self._initialized:
+            raise SDKError("SDK not initialized. Use as async context manager.")
+
+        from orb.domain.request.request_types import RequestStatus
+
+        deadline = asyncio.get_event_loop().time() + timeout
+        while True:
+            result = await self.get_request(request_id=request_id)
+            status_str = (
+                result.get("status", "")
+                if isinstance(result, dict)
+                else getattr(result, "status", "")
+            )
+            try:
+                if RequestStatus(status_str).is_terminal():
+                    return result  # type: ignore[return-value]
+            except ValueError:
+                # Invalid or unknown status string; treat as non-terminal and continue polling.
+                pass
+
+            remaining = deadline - asyncio.get_event_loop().time()
+            if remaining <= 0:
+                raise TimeoutError(
+                    f"Request {request_id!r} did not reach terminal status within {timeout}s. "
+                    f"Last status: {status_str!r}"
+                )
+            await asyncio.sleep(min(poll_interval, remaining))
+
+    async def wait_for_return(
+        self,
+        return_request_id: str,
+        *,
+        timeout: float = 300.0,
+        poll_interval: float = 10.0,
+    ) -> dict[str, Any]:
+        """Poll until the return request reaches a terminal status or timeout expires."""
+        return await self.wait_for_request(
+            return_request_id,
+            timeout=timeout,
+            poll_interval=poll_interval,
+        )
 
     def __repr__(self) -> str:
         """Return string representation of SDK instance."""

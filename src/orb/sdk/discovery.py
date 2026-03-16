@@ -8,7 +8,10 @@ Follows the same patterns as the infrastructure handler discovery.
 
 import re
 from dataclasses import dataclass
-from typing import Any, Callable, Optional, get_type_hints
+from typing import TYPE_CHECKING, Any, Callable, Optional, get_type_hints
+
+if TYPE_CHECKING:
+    from orb.application.ports.scheduler_port import SchedulerPort
 
 from orb.application.decorators import (
     get_registered_command_handlers,
@@ -40,9 +43,29 @@ class SDKMethodDiscovery:
     but creates SDK method interfaces instead of DI registrations.
     """
 
-    def __init__(self) -> None:
-        """Initialize the instance."""
+    # Maps DTO class name -> (scheduler_port_method_name, expects_list)
+    # expects_list=True: pass list of original DTO objects to the formatter
+    # expects_list=False: pass the serialised dict of a single DTO
+    _SCHEDULER_FORMAT_DISPATCH: dict[str, tuple[str, bool]] = {
+        "RequestDTO": ("format_request_for_display", False),
+        "RequestStatusResponse": ("format_request_status_response", True),
+        "ReturnRequestResponse": ("format_request_status_response", True),
+        "RequestMachinesResponse": ("format_request_response", False),
+        "RequestReturnMachinesResponse": ("format_request_response", False),
+        "TemplateDTO": ("format_template_for_display", False),
+        "MachineDTO": ("format_machine_details_response", False),
+    }
+
+    def __init__(self, scheduler_port: "Optional[SchedulerPort]" = None) -> None:
+        """Initialize the instance.
+
+        Args:
+            scheduler_port: Optional scheduler port for response formatting.
+                When provided, format_* methods are applied after to_dict().
+                When None, raw to_dict() output is returned (backwards-compatible).
+        """
         self._method_info_cache: dict[str, MethodInfo] = {}
+        self._scheduler_port = scheduler_port
 
     async def discover_cqrs_methods(self, query_bus, command_bus) -> dict[str, Callable]:
         """
@@ -145,21 +168,73 @@ class SDKMethodDiscovery:
             result: Raw result from CQRS handler (DTO, list of DTOs, or primitive)
 
         Returns:
-            Standardized result (dict, list of dicts, or primitive) with JSON-serializable values
+            Standardized result (dict, list of dicts, or primitive) with JSON-serializable values.
+            When a scheduler_port is set, applies the appropriate format_* method as a
+            post-processing step based on the DTO class name.
         """
         if result is None:
             return None
 
         # Single DTO with to_dict method
         if hasattr(result, "to_dict"):
-            return self._make_json_serializable(result.to_dict())
+            raw = self._make_json_serializable(result.to_dict())
+            return self._apply_scheduler_format(result, raw)
 
         # List of DTOs
         if isinstance(result, list) and result and hasattr(result[0], "to_dict"):
-            return [self._make_json_serializable(item.to_dict()) for item in result]
+            items = [self._make_json_serializable(item.to_dict()) for item in result]
+            return self._apply_scheduler_format_list(result, items)
 
         # Already a dict or primitive type
         return self._make_json_serializable(result) if isinstance(result, dict) else result
+
+    def _apply_scheduler_format(self, original: Any, raw: dict) -> Any:
+        """Apply scheduler formatting to a single serialised DTO.
+
+        Falls back to raw dict if no scheduler port, no dispatch entry, no method,
+        or if the formatter raises.
+        """
+        if self._scheduler_port is None:
+            return raw
+        class_name = type(original).__name__
+        dispatch = self._SCHEDULER_FORMAT_DISPATCH.get(class_name)
+        if dispatch is None:
+            return raw
+        method_name, expects_list = dispatch
+        formatter = getattr(self._scheduler_port, method_name, None)
+        if formatter is None:
+            return raw
+        try:
+            if expects_list:
+                return formatter([original])
+            return formatter(raw)
+        except Exception:
+            return raw
+
+    def _apply_scheduler_format_list(self, originals: list, raws: list) -> Any:
+        """Apply scheduler formatting to a list of serialised DTOs.
+
+        Falls back to raws list if no scheduler port, no dispatch entry, no method,
+        or if the formatter raises.
+        """
+        if self._scheduler_port is None:
+            return raws
+        if not originals:
+            return raws
+        class_name = type(originals[0]).__name__
+        dispatch = self._SCHEDULER_FORMAT_DISPATCH.get(class_name)
+        if dispatch is None:
+            return raws
+        method_name, expects_list = dispatch
+        formatter = getattr(self._scheduler_port, method_name, None)
+        if formatter is None:
+            return raws
+        try:
+            if expects_list:
+                return formatter(originals)
+            return [formatter(r) for r in raws]
+        except Exception:
+            return raws
 
     def _make_json_serializable(self, data: dict) -> dict:
         """
@@ -362,6 +437,9 @@ class SDKMethodDiscovery:
         ],
         "CleanupOldRequestsCommand": ["requests_cleaned", "request_ids_found"],
         "CleanupAllResourcesCommand": ["requests_cleaned", "machines_cleaned", "total_cleaned"],
+        "CreateTemplateCommand": ["created", "validation_errors"],
+        "UpdateTemplateCommand": ["updated", "validation_errors"],
+        "DeleteTemplateCommand": ["deleted"],
     }
 
     def _extract_command_output(self, command: Any) -> Any:

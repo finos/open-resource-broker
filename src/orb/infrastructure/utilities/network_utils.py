@@ -4,7 +4,6 @@ This module provides utilities for network operations with proper timeout
 configuration and error handling.
 """
 
-import logging
 from typing import Any, Optional
 
 from orb.infrastructure.constants import (
@@ -12,8 +11,9 @@ from orb.infrastructure.constants import (
     DEFAULT_REQUEST_TIMEOUT_SECONDS,
     MAX_REQUEST_TIMEOUT_SECONDS,
 )
+from orb.infrastructure.logging.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Default timeout values (in seconds) - using constants
 DEFAULT_CONNECT_TIMEOUT = DEFAULT_CONNECT_TIMEOUT_SECONDS

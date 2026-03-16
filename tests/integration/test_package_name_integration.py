@@ -14,8 +14,12 @@ class TestPackageNameIntegration:
 
     def setup_method(self):
         """Set up test fixtures."""
+        from unittest.mock import Mock
+
+        from orb.domain.base.ports.logging_port import LoggingPort
+
         self.config_manager = ConfigurationManager()
-        self.config_adapter = ConfigurationAdapter(self.config_manager)
+        self.config_adapter = ConfigurationAdapter(self.config_manager, Mock(spec=LoggingPort))
 
     def test_end_to_end_package_name_flow(self):
         """Test complete package name flow from configuration to template rendering."""

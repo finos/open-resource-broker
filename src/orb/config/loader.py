@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, TypeVar
 
@@ -89,7 +90,7 @@ class ConfigurationLoader:
         # Load main config.json with correct precedence (scheduler config dir first,
         # then config/)
         main_config = cls._load_config_file(
-            "conf", "config.json", required=False, config_manager=config_manager
+            "config", "config.json", required=False, config_manager=config_manager
         )
         if main_config:
             cls._merge_config(config, main_config)
@@ -103,7 +104,7 @@ class ConfigurationLoader:
             filename = os.path.basename(config_path) if config_path else "config.json"
 
             file_config = cls._load_config_file(
-                "conf",
+                "config",
                 filename,
                 explicit_path=config_path,
                 required=False,
@@ -114,6 +115,16 @@ class ConfigurationLoader:
                 get_config_logger().info("Loaded user configuration")
             else:
                 get_config_logger().warning("User configuration file not found: %s", config_path)
+
+        # Warn if deprecated storage.dynamodb_strategy key is present
+        if isinstance(config, dict) and "dynamodb_strategy" in config.get("storage", {}):
+            warnings.warn(
+                "storage.dynamodb_strategy in config root is deprecated since ORB 2.x. "
+                "Move it to provider.providers[N].config.storage.dynamodb. "
+                "This key will be removed in ORB 3.0.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
         # Override with environment variables (highest precedence)
         cls._load_from_env(config, config_manager)
@@ -136,24 +147,16 @@ class ConfigurationLoader:
         get_config_logger().debug("Loading default configuration")
 
         try:
-            # Use platform_dirs to get the correct config location
-            from orb.config.platform_dirs import get_config_location
+            from importlib.resources import files
 
-            config_location = get_config_location()
-            default_config_path = config_location / cls.DEFAULT_CONFIG_FILENAME
-
-            if default_config_path.exists():
-                with open(default_config_path) as f:
-                    import json
-
-                    config_data = json.load(f)
-                    get_config_logger().info(
-                        "Loaded default configuration from %s", default_config_path
-                    )
-                    return config_data
-            else:
-                get_config_logger().warning(f"Default config not found: {default_config_path}")
-                return {}
+            text = (
+                files("orb.config")
+                .joinpath(cls.DEFAULT_CONFIG_FILENAME)
+                .read_text(encoding="utf-8")
+            )
+            config_data = json.loads(text)
+            get_config_logger().info("Loaded default configuration from package data")
+            return config_data
         except Exception as e:
             get_config_logger().warning(f"Failed to load default configuration: {e}")
             return {}

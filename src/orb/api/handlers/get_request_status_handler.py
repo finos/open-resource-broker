@@ -10,10 +10,9 @@ from orb.application.base.infrastructure_handlers import (
     RequestContext,
 )
 from orb.application.dto.queries import GetRequestQuery, ListActiveRequestsQuery
-from orb.application.request.dto import RequestStatusResponse
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
-from orb.domain.base.ports.scheduler_port import SchedulerPort
 from orb.domain.request.exceptions import RequestNotFoundError
 from orb.domain.request.request_identifiers import RequestId
 from orb.infrastructure.di.buses import CommandBus, QueryBus
@@ -22,7 +21,7 @@ from orb.monitoring.metrics import MetricsCollector
 
 
 @injectable
-class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusResponse]):
+class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], dict[str, Any]]):
     """API handler for checking request status."""
 
     def __init__(
@@ -88,7 +87,7 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
     @handle_interface_exceptions(context="get_request_status_api", interface_type="api")
     async def execute_api_request(
         self, request: dict[str, Any], context: RequestContext
-    ) -> RequestStatusResponse:
+    ) -> dict[str, Any]:
         """
         Execute the core API logic for checking request status.
 
@@ -123,19 +122,7 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
                 # Get all active requests using CQRS query
                 query = ListActiveRequestsQuery()
                 requests = await self._query_bus.execute(query)
-
-                # Create response DTO
-                response = RequestStatusResponse(
-                    requests=[
-                        req.to_dict() if hasattr(req, "to_dict") else req for req in requests
-                    ],
-                    metadata={
-                        "correlation_id": correlation_id,
-                        "timestamp": request.get("timestamp"),
-                        "request_count": len(requests),
-                        "error_count": 0,
-                    },
-                )
+                response = self._scheduler_strategy.format_request_status_response(requests)
             else:
                 # Get validated data from context
                 validated_data = context.metadata.get("validated_data")
@@ -197,17 +184,8 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
 
                         errors.append({"request_id": request_id, "error": str(e)})
 
-                # Create response DTO
-                response = RequestStatusResponse(
-                    requests=requests,
-                    errors=errors if errors else None,
-                    metadata={
-                        "correlation_id": correlation_id,
-                        "timestamp": request.get("timestamp"),
-                        "request_count": len(requests),
-                        "error_count": len(errors),
-                    },
-                )
+                # Create response using scheduler strategy
+                response = self._scheduler_strategy.format_request_status_response(requests)
 
             # Record metrics if available
             if self._metrics_collector and start_time is not None:
@@ -236,8 +214,8 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
             raise
 
     async def post_process_response(
-        self, response: RequestStatusResponse, context: RequestContext
-    ) -> RequestStatusResponse:
+        self, response: dict[str, Any], context: RequestContext
+    ) -> dict[str, Any]:
         """
         Post-process the request status response.
 
@@ -248,11 +226,6 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
         Returns:
             Post-processed response
         """
-        # Add processing metadata
-        if hasattr(response, "metadata") and response.metadata:
-            response.metadata["processed_at"] = time.time()
-            response.metadata["processing_duration"] = time.time() - context.start_time
-
         return response
 
     def _normalize_request_payload(self, request_data: Any, request_id: str) -> dict[str, Any]:

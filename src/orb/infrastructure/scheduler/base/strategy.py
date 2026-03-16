@@ -8,11 +8,11 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.application.request.dto import RequestDTO
 
 # Import from Application layer (correct Clean Architecture)
 from orb.domain.base.ports.path_resolution_port import PathResolutionPort
-from orb.domain.base.ports.scheduler_port import SchedulerPort
 from orb.domain.constants import PROVIDER_TYPE_AWS
 from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
 from orb.infrastructure.template.dtos import TemplateDTO
@@ -130,38 +130,16 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
             template_dict, provider_name
         )
 
-    # IBM HF spec allows only these three status values in responses.
-    _HF_STATUS_MAP: dict[str, str] = {
-        "pending": "running",
-        "in_progress": "running",
-        "acquiring": "running",
-        "provisioning": "running",
-        "complete": "complete",
-        "completed": "complete",
-        "partial": "complete_with_error",
-        "failed": "complete_with_error",
-        "cancelled": "complete_with_error",
-        "timeout": "complete_with_error",
-        "error": "complete_with_error",
-    }
-
-    def _map_status_to_hf(self, domain_status: str) -> str:
-        """Map a domain request status to the IBM HF spec vocabulary."""
-        return self._HF_STATUS_MAP.get(domain_status.lower(), "running")
-
     def format_request_status_response(self, requests: list[RequestDTO]) -> dict[str, Any]:
-        """Format RequestDTOs mapping domain statuses to IBM HF spec values.
+        """Format RequestDTOs passing domain status values through unchanged.
 
-        IBM HF spec allows only: 'running', 'complete', 'complete_with_error'.
-        Protocol-specific strategies (e.g. HostFactory) may override this method
-        to apply additional format transformations.
+        Domain statuses: pending, in_progress, complete, failed, cancelled, timeout, partial.
+        Protocol-specific strategies (e.g. HostFactory) override this method to apply
+        their own status vocabulary mapping.
         """
         formatted = []
         for request in requests:
-            req_dict = request.to_dict()
-            if "status" in req_dict:
-                req_dict["status"] = self._map_status_to_hf(req_dict["status"] or "pending")
-            formatted.append(req_dict)
+            formatted.append(request.to_dict())
         return {
             "requests": formatted,
             "message": "Request status retrieved successfully",
@@ -318,10 +296,6 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
     def format_template_for_provider(self, template: TemplateDTO) -> dict[str, Any]:
         """Default implementation - clean to_dict without scheduler-specific formatting."""
         return template.to_dict()
-
-    def format_request_for_display(self, request: RequestDTO) -> dict[str, Any]:
-        """Default implementation - clean to_dict without scheduler-specific formatting."""
-        return request.to_dict()
 
     @staticmethod
     def _unwrap_request_id(value: Any) -> str | None:

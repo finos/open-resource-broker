@@ -12,7 +12,7 @@ ERROR: Configuration file not found
   No configuration found in:
     - /current/dir/config/config.json
     - ~/.config/orb/config.json
-    - ~/.local/orb/config/config.json
+    - ~/.orb/config/config.json
 
 Run 'orb init' to create configuration
 ```
@@ -104,7 +104,7 @@ ORB looks for configuration in different locations depending on how it was insta
 
 ### User Install (pip install --user)
 ```
-~/.local/orb/
+~/.orb/
 ├── config/
 │   ├── config.json
 │   └── templates/

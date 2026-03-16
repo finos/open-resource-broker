@@ -177,11 +177,10 @@ class StrategyBasedRepository(Repository[T], Generic[T]):
                 if hasattr(event_bus, "publish") and asyncio.iscoroutinefunction(event_bus.publish):
                     for event in events:
                         try:
-                            loop = asyncio.get_event_loop()
-                            if loop.is_running():
-                                _ = asyncio.create_task(event_bus.publish(event))
-                            else:
-                                loop.run_until_complete(event_bus.publish(event))
+                            asyncio.get_running_loop()
+                            _ = asyncio.create_task(event_bus.publish(event))
+                        except RuntimeError:
+                            asyncio.run(event_bus.publish(event))
                         except Exception as publish_error:
                             self.logger.error(
                                 "Failed to publish event %s: %s",

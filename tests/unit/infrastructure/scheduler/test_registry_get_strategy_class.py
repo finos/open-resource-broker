@@ -5,7 +5,6 @@ import inspect
 
 import pytest
 
-import orb.infrastructure.di.scheduler_services as svc_module
 import orb.infrastructure.scheduler.registry as registry_module
 
 
@@ -179,22 +178,3 @@ class TestRegisterActiveSchedulerOnly:
         assert result1 is True
         assert result2 is True
         assert fresh_registry.is_registered("hostfactory")
-
-
-class TestSchedulerServicesNoStaleAssertion:
-    """scheduler_services.py must not call ensure_type_registered('default')."""
-
-    def test_no_stale_ensure_type_registered_call(self):
-        source = inspect.getsource(svc_module)
-        assert "ensure_type_registered" not in source, (
-            "scheduler_services.py must not call ensure_type_registered — "
-            "it fires before any scheduler is registered"
-        )
-
-    def test_register_scheduler_services_does_not_raise(self):
-        """register_scheduler_services must not raise even with empty registry."""
-        from unittest.mock import MagicMock
-
-        container = MagicMock()
-        # Should not raise
-        svc_module.register_scheduler_services(container)

@@ -1,12 +1,12 @@
 """Base context mixin for AWS handlers."""
 
-import logging
 from datetime import datetime, timezone
 from typing import Any
 
+from orb.infrastructure.logging.logger import get_logger
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 class BaseContextMixin:

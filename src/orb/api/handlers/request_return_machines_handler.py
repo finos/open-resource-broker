@@ -8,13 +8,9 @@ from orb.application.base.infrastructure_handlers import (
     RequestContext,
 )
 from orb.application.dto.commands import CreateReturnRequestCommand
-from orb.application.dto.responses import (
-    CleanupResourcesResponse,
-    RequestReturnMachinesResponse,
-)
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
-from orb.domain.base.ports.scheduler_port import SchedulerPort
 from orb.infrastructure.di.buses import CommandBus, QueryBus
 
 # Exception handling infrastructure
@@ -23,9 +19,7 @@ from orb.monitoring.metrics import MetricsCollector
 
 
 @injectable
-class RequestReturnMachinesRESTHandler(
-    BaseAPIHandler[dict[str, Any], RequestReturnMachinesResponse]
-):
+class RequestReturnMachinesRESTHandler(BaseAPIHandler[dict[str, Any], dict[str, Any]]):
     """API handler for returning machines."""
 
     def __init__(
@@ -111,7 +105,7 @@ class RequestReturnMachinesRESTHandler(
     @handle_interface_exceptions(context="request_return_machines_api", interface_type="api")
     async def execute_api_request(
         self, request: dict[str, Any], context: RequestContext
-    ) -> RequestReturnMachinesResponse:
+    ) -> dict[str, Any]:
         """
         Execute the core API logic for returning machines.
 
@@ -137,11 +131,8 @@ class RequestReturnMachinesRESTHandler(
                         "Cleaning up all resources",
                         extra={"correlation_id": correlation_id},
                     )
-
-                # Create response DTO
-                return cast(
-                    RequestReturnMachinesResponse,
-                    CleanupResourcesResponse(metadata={"correlation_id": correlation_id}),
+                return self._scheduler_strategy.format_request_response(
+                    {"request_id": None, "status": "cleaned"}
                 )
 
             if all_flag:
@@ -171,13 +162,8 @@ class RequestReturnMachinesRESTHandler(
                         },
                     )
 
-                return RequestReturnMachinesResponse(
-                    request_id=request_id,
-                    message="Return request created for all machines",
-                    metadata={
-                        "correlation_id": correlation_id,
-                        "timestamp": request.get("timestamp", time.time()),
-                    },
+                return self._scheduler_strategy.format_request_response(
+                    {"request_id": request_id, "status": "pending"}
                 )
             else:
                 # Get machine IDs from context or extract them
@@ -189,11 +175,8 @@ class RequestReturnMachinesRESTHandler(
                         machine_ids = self._extract_machine_ids(input_data["machines"])
 
                 if not machine_ids:
-                    # Create response for no machines to return
-                    return RequestReturnMachinesResponse(
-                        request_id=None,
-                        message="No machines to return",
-                        metadata={"correlation_id": correlation_id, "machine_count": 0},
+                    return self._scheduler_strategy.format_request_response(
+                        {"request_id": None, "status": "no_machines"}
                     )
 
                 # Log request
@@ -232,15 +215,8 @@ class RequestReturnMachinesRESTHandler(
                         },
                     )
 
-                # Create response DTO
-                return RequestReturnMachinesResponse(
-                    request_id=request_id,
-                    message="Delete VM success.",
-                    metadata={
-                        "correlation_id": correlation_id,
-                        "machine_count": len(machine_ids),
-                        "timestamp": request.get("timestamp", time.time()),
-                    },
+                return self._scheduler_strategy.format_request_response(
+                    {"request_id": request_id, "status": "pending"}
                 )
 
         except Exception as e:
@@ -256,8 +232,8 @@ class RequestReturnMachinesRESTHandler(
             raise
 
     async def post_process_response(
-        self, response: RequestReturnMachinesResponse, context: RequestContext
-    ) -> RequestReturnMachinesResponse:
+        self, response: dict[str, Any], context: RequestContext
+    ) -> dict[str, Any]:
         """
         Post-process the request return machines response.
 
@@ -268,20 +244,6 @@ class RequestReturnMachinesRESTHandler(
         Returns:
             Post-processed response
         """
-        # Add processing metadata
-        if hasattr(response, "metadata") and response.metadata:
-            response.metadata["processed_at"] = time.time()
-            response.metadata["processing_duration"] = time.time() - context.start_time
-
-        # Apply scheduler strategy for format conversion if needed
-        if self._scheduler_strategy and hasattr(
-            self._scheduler_strategy, "format_return_request_response"
-        ):
-            formatted_response = await self._scheduler_strategy.format_return_request_response(  # type: ignore[attr-defined]
-                response
-            )
-            return formatted_response
-
         return response
 
     def _extract_machine_ids(self, machines_data: list[dict[str, Any]]) -> list[str]:

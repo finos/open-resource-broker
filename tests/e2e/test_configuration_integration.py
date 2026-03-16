@@ -3,10 +3,12 @@
 import json
 import os
 import tempfile
+from typing import cast
 from unittest.mock import patch
 
 from orb.bootstrap import Application
 from orb.config.manager import ConfigurationManager
+from orb.domain.base.ports import ConfigurationPort
 
 
 class TestConfigurationIntegration:
@@ -187,11 +189,7 @@ class TestConfigurationIntegration:
         assert provider_data.get("aws", {}).get("region") == "us-east-1"
 
     def test_provider_strategy_factory_integration(self):
-        """Test provider strategy factory integration with configuration."""
-        from unittest.mock import Mock
-
-        from orb.providers.factory import ProviderStrategyFactory
-
+        """Test provider config integration with configuration."""
         # Create configuration
         config_data = {
             "provider": {
@@ -209,22 +207,31 @@ class TestConfigurationIntegration:
 
         config_path = self.create_config_file(config_data)
 
-        # Test factory integration
+        # Test direct config integration
         config_manager = ConfigurationManager(config_path)
-        mock_logger = Mock()
 
-        factory = ProviderStrategyFactory(config_manager, mock_logger)
-
-        # Test provider info retrieval
-        provider_info = factory.get_provider_info()
+        # get_provider_info equivalent
+        try:
+            provider_config = config_manager.get_provider_config()
+            if not provider_config:
+                provider_info = {"mode": "error", "error": "Provider configuration not found"}
+            else:
+                mode = provider_config.get_mode()
+                active_providers = provider_config.get_active_providers()
+                provider_info = {
+                    "mode": mode.value,
+                    "selection_policy": provider_config.selection_policy,
+                    "total_providers": len(provider_config.providers),
+                    "active_providers": len(active_providers),
+                }
+        except Exception as e:
+            provider_info = {"mode": "error", "error": str(e)}
 
         # Handle both success and error states gracefully
         if provider_info["mode"] == "error":
-            # Factory encountered an error, test that it handles it gracefully
             assert "error" in provider_info
             assert provider_info["mode"] == "error"
         else:
-            # Factory worked correctly
             assert provider_info["mode"] == "single"
             assert provider_info["selection_policy"] == "ROUND_ROBIN"
             assert provider_info["total_providers"] == 1
@@ -234,7 +241,8 @@ class TestConfigurationIntegration:
         """Test end-to-end configuration validation."""
         from unittest.mock import Mock
 
-        from orb.providers.factory import ProviderStrategyFactory
+        from orb.providers.config_builder import ProviderConfigBuilder
+        from orb.providers.config_validator import ProviderConfigValidator
 
         # Test valid configuration
         valid_config = {
@@ -252,17 +260,20 @@ class TestConfigurationIntegration:
 
         config_path = self.create_config_file(valid_config)
         config_manager = ConfigurationManager(config_path)
-        factory = ProviderStrategyFactory(config_manager, Mock())
+        mock_logger = Mock()
+        mock_registry = Mock()
+        config_builder = ProviderConfigBuilder(mock_logger, mock_registry)
+        validator = ProviderConfigValidator(
+            cast(ConfigurationPort, config_manager), config_builder, mock_logger, mock_registry
+        )
 
-        validation_result = factory.validate_configuration()
+        validation_result = validator.validate_configuration()
 
         # Handle both success and error states gracefully
         if validation_result["valid"] is False:
-            # Factory encountered an error during validation, test that it handles it gracefully
             assert validation_result["valid"] is False
             assert "errors" in validation_result
         else:
-            # Validation worked correctly
             assert validation_result["valid"] is True
             assert validation_result["mode"] == "single"
             assert validation_result["provider_count"] == 1
@@ -413,7 +424,9 @@ class TestConfigurationIntegration:
         config_manager = ConfigurationManager(config_path)
         mock_logger = Mock()
 
-        defaults_service = TemplateDefaultsService(config_manager, mock_logger)
+        defaults_service = TemplateDefaultsService(
+            cast(ConfigurationPort, config_manager), mock_logger
+        )
 
         # Test hierarchical default resolution
         template_dict = {

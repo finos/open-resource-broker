@@ -275,6 +275,68 @@ class TestMachineAggregate:
         events = machine.get_domain_events()
         assert len(events) == 0
 
+    def test_machine_provisioned_event_fired_when_running_with_ip(self):
+        """MachineProvisionedEvent appears in domain events after transitioning to RUNNING with an IP."""
+        from orb.domain.base.events.domain_events import MachineProvisionedEvent
+
+        machine = _make_machine(status=MachineStatus.LAUNCHING, private_ip="10.0.0.1")
+        machine.clear_domain_events()
+
+        machine = machine.update_status(MachineStatus.RUNNING)
+
+        events = machine.get_domain_events()
+        provisioned = [e for e in events if isinstance(e, MachineProvisionedEvent)]
+        assert len(provisioned) == 1
+        assert provisioned[0].machine_id == "i-1234567890abcdef0"
+        assert provisioned[0].private_ip == "10.0.0.1"
+        assert provisioned[0].public_ip is None
+        assert provisioned[0].provisioning_time is not None
+
+    def test_machine_provisioned_event_includes_public_ip(self):
+        """MachineProvisionedEvent captures public IP when present."""
+        from orb.domain.base.events.domain_events import MachineProvisionedEvent
+
+        machine = _make_machine(
+            status=MachineStatus.LAUNCHING,
+            private_ip="10.0.0.2",
+            public_ip="54.1.2.3",
+        )
+        machine.clear_domain_events()
+
+        machine = machine.update_status(MachineStatus.RUNNING)
+
+        events = machine.get_domain_events()
+        provisioned = [e for e in events if isinstance(e, MachineProvisionedEvent)]
+        assert len(provisioned) == 1
+        assert provisioned[0].private_ip == "10.0.0.2"
+        assert provisioned[0].public_ip == "54.1.2.3"
+
+    def test_machine_provisioned_event_not_fired_without_ip(self):
+        """MachineProvisionedEvent is NOT fired when machine has no IP assigned."""
+        from orb.domain.base.events.domain_events import MachineProvisionedEvent
+
+        machine = _make_machine(status=MachineStatus.LAUNCHING)
+        machine.clear_domain_events()
+
+        machine = machine.update_status(MachineStatus.RUNNING)
+
+        events = machine.get_domain_events()
+        provisioned = [e for e in events if isinstance(e, MachineProvisionedEvent)]
+        assert len(provisioned) == 0
+
+    def test_machine_provisioned_event_not_fired_for_non_running_transitions(self):
+        """MachineProvisionedEvent is NOT fired for transitions that are not RUNNING."""
+        from orb.domain.base.events.domain_events import MachineProvisionedEvent
+
+        machine = _make_machine(status=MachineStatus.RUNNING, private_ip="10.0.0.3")
+        machine.clear_domain_events()
+
+        machine = machine.update_status(MachineStatus.SHUTTING_DOWN)
+
+        events = machine.get_domain_events()
+        provisioned = [e for e in events if isinstance(e, MachineProvisionedEvent)]
+        assert len(provisioned) == 0
+
 
 @pytest.mark.unit
 class TestMachineValueObjects:

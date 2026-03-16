@@ -50,7 +50,7 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
         ("application/services/provider_registry_service.py", "orb.providers.registry"),
         ("infrastructure/template/configuration_manager.py", "orb.providers.base.strategy"),
         ("infrastructure/template/configuration_manager.py", "orb.providers.registry"),
-        ("infrastructure/adapters/provider_registry_adapter.py", "orb.providers.registry"),
+        ("infrastructure/adapters/provider_discovery_adapter.py", "orb.providers.registry"),
         # DI wiring — intentional: storage registration must wire AWS provider
         ("infrastructure/storage/registration.py", "orb.providers.aws.storage.registration"),
         # hostfactory is inherently AWS/HPC-specific — provider import is expected

@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import json
-import logging
 import time
 from typing import TYPE_CHECKING, Any, Dict, Optional, TypeVar
 
 # Import config classes for runtime use
 from orb.config.schemas import AppConfig
 from orb.domain.base.exceptions import ConfigurationError
+from orb.infrastructure.logging.logger import get_logger
 
 from .cache_manager import ConfigCacheManager
 from .path_resolver import ConfigPathResolver
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from orb.config.schemas.provider_strategy_schema import ProviderConfig
 
 T = TypeVar("T")
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ConfigurationManager:
@@ -108,7 +108,13 @@ class ConfigurationManager:
         """Ensure raw configuration is loaded."""
         if self._raw_config is None:
             if self._config_dict is not None:
-                self._raw_config = self._config_dict
+                # Merge provided dict on top of package defaults so that
+                # provider_defaults (supports_spot etc.) are always present.
+                from orb.config.loader import ConfigurationLoader
+
+                base = ConfigurationLoader._load_default_config()
+                ConfigurationLoader._merge_config(base, self._config_dict)
+                self._raw_config = base
             else:
                 self._raw_config = self.loader.load(self._config_file, config_manager=self)
         return self._raw_config
@@ -240,11 +246,11 @@ class ConfigurationManager:
         """Get cache directory path."""
         return self._ensure_path_resolver().get_cache_dir(default_path, config_path)
 
-    def get_conf_dir(
+    def get_config_dir(
         self, default_path: Optional[str] = None, config_path: Optional[str] = None
     ) -> str:
         """Get configuration directory path."""
-        return self._ensure_path_resolver().get_conf_dir(default_path, config_path)
+        return self._ensure_path_resolver().get_config_dir(default_path, config_path)
 
     def get_log_dir(
         self, default_path: Optional[str] = None, config_path: Optional[str] = None
@@ -305,17 +311,19 @@ class ConfigurationManager:
 
     def get_loaded_config_file(self) -> str | None:
         """Get the actual config file that was loaded."""
-        # Check standard locations that exist
-        import os
+        # If a config file path is already stored (set in __init__ or reload), use it
+        if self._config_file is not None:
+            from pathlib import Path
 
-        # Get current working directory and check relative paths
-        candidates = [
-            "config/config.json",  # Relative to project root
-            "conf/config.json",  # Alternative location
-        ]
-        for path in candidates:
-            if os.path.exists(path):
-                return os.path.abspath(path)
+            if Path(self._config_file).exists():
+                return self._config_file
+
+        # Fall back to platform-resolved location
+        from orb.config.platform_dirs import get_config_location
+
+        candidate = get_config_location() / "config.json"
+        if candidate.exists():
+            return str(candidate)
         return None
 
     def get_provider_type(self) -> str:
@@ -358,7 +366,7 @@ class ConfigurationManager:
         3. Default directory + filename
 
         Args:
-            file_type: Type of file ('conf', 'template', 'legacy', 'log', 'work', 'events', 'snapshots')
+            file_type: Type of file ('config', 'template', 'legacy', 'log', 'work', 'events', 'snapshots')
             filename: Name of the file
             default_dir: Default directory (optional, will use resolve_path if not provided)
             explicit_path: Explicit path provided by user (optional)
@@ -392,18 +400,18 @@ class ConfigurationManager:
         if default_dir is None:
             # Map file types to path types for resolve_path
             path_type_mapping = {
-                "conf": "conf",
-                "template": "conf",
-                "legacy": "conf",
+                "config": "config",
+                "template": "config",
+                "legacy": "config",
                 "log": "log",
                 "work": "work",
                 "events": "events",
                 "snapshots": "snapshots",
             }
 
-            path_type = path_type_mapping.get(file_type, "conf")
+            path_type = path_type_mapping.get(file_type, "config")
             default_dir = self.resolve_path(
-                path_type, "config" if path_type == "conf" else path_type
+                path_type, "config" if path_type == "config" else path_type
             )
 
         fallback_path = os.path.join(default_dir, filename)
@@ -429,7 +437,7 @@ class ConfigurationManager:
 
         logger.debug("[CONFIG_MGR] Getting directory for file_type=%s", file_type)
 
-        if file_type in ["conf", "template", "legacy"]:
+        if file_type in ["config", "template", "legacy"]:
             result = str(get_config_location())
         elif file_type == "log":
             result = str(get_logs_location())

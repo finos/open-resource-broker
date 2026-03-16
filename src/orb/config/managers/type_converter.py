@@ -1,12 +1,12 @@
 """Configuration type conversion utilities."""
 
-import logging
 from typing import Any, Optional, TypeVar
 
 from orb.domain.base.exceptions import ConfigurationError
+from orb.infrastructure.logging.logger import get_logger
 
 T = TypeVar("T")
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ConfigTypeConverter:

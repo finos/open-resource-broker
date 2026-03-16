@@ -4,6 +4,7 @@ import time
 from typing import Any, Optional
 
 from orb.domain.base.ports import ConfigurationPort, LoggingPort
+from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 from orb.monitoring.metrics import MetricsCollector
 from orb.providers.base.strategy import (
     ProviderCapabilities,
@@ -12,7 +13,6 @@ from orb.providers.base.strategy import (
     ProviderResult,
     ProviderStrategy,
 )
-from orb.providers.registry import get_provider_registry
 
 
 class ProviderExecutionService:
@@ -26,12 +26,13 @@ class ProviderExecutionService:
         self,
         logger: LoggingPort,
         config_port: ConfigurationPort,
+        registry: ProviderRegistryPort,
         metrics: Optional[MetricsCollector] = None,
     ) -> None:
         """Initialize the provider execution service."""
         self._logger = logger
         self._config_port = config_port
-        self._registry = get_provider_registry()
+        self._registry = registry
         self._metrics = metrics or MetricsCollector(config={"METRICS_ENABLED": True})
 
     async def execute_operation(

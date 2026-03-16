@@ -209,9 +209,13 @@ expected_request_status_schema_default = {
                     "status": {
                         "type": "string",
                         "enum": [
-                            "running",
+                            "pending",
+                            "in_progress",
                             "complete",
-                            "complete_with_error",
+                            "failed",
+                            "cancelled",
+                            "timeout",
+                            "partial",
                         ],
                     },
                     "machines": {
