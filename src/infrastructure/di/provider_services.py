@@ -605,6 +605,21 @@ def _register_provider_specific_services(container: DIContainer) -> None:
     except Exception as e:
         logger.warning("Faild to register AWS services: %s", str(e))
 
+    # Register Azure services if available - delegate to Azure provider
+    try:
+        import importlib.util
+
+        if importlib.util.find_spec("src.providers.azure"):
+            from providers.azure.registration import register_azure_services_with_di
+
+            register_azure_services_with_di(container)
+        else:
+            logger.debug("Azure provider not available, skipping Azure service registration")
+    except ImportError:
+        logger.debug("Azure provider not available, skipping Azure service registration")
+    except Exception as e:
+        logger.warning("Failed to register Azure services: %s", str(e))
+
 
 def _register_aws_services(container: DIContainer) -> None:
     """Register AWS-specific services."""

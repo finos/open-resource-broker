@@ -15,6 +15,7 @@ from typing import Any, Optional
 
 from domain.base.dependency_injection import injectable
 from domain.request.aggregate import Request
+from infrastructure.di.container import get_container
 from providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from providers.azure.domain.template.value_objects import AzureProviderApi
 from providers.azure.exceptions.azure_exceptions import (
@@ -77,6 +78,18 @@ class VMSSHandler(AzureHandler):
     ``provider_api = "VMSS"`` or ``"VMSSUniform"``
     """
 
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        container = get_container()
+        try:
+            from providers.azure.infrastructure.services.azure_native_spec_service import (
+                AzureNativeSpecService,
+            )
+
+            self.azure_native_spec_service = container.get(AzureNativeSpecService)
+        except Exception:
+            self.azure_native_spec_service = None
+
     # ------------------------------------------------------------------
     # acquire_hosts
     # ------------------------------------------------------------------
@@ -130,7 +143,18 @@ class VMSSHandler(AzureHandler):
 
             arm_payload = template.to_azure_api_format()
 
+            if self.azure_native_spec_service:
+                merged_payload = self.azure_native_spec_service.process_provider_api_spec_with_merge(
+                    template=template,
+                    request=request,
+                    default_payload=arm_payload,
+                    extra_context={"vmss_name": vmss_name},
+                )
+                if merged_payload:
+                    arm_payload = merged_payload
+
             # Override capacity with the requested count
+            arm_payload.setdefault("sku", {})
             arm_payload["sku"]["capacity"] = request.requested_count
             arm_payload["name"] = vmss_name
 

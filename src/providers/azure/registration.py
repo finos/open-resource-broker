@@ -277,6 +277,34 @@ def is_azure_provider_registered() -> bool:
     return TemplateExtensionRegistry.has_extension("azure")
 
 
+def register_azure_services_with_di(container) -> None:
+    """Register Azure services with the DI container."""
+    from domain.base.ports import LoggingPort
+
+    logger = container.get(LoggingPort)
+
+    try:
+        from providers.azure.infrastructure.services.azure_native_spec_service import (
+            AzureNativeSpecService,
+        )
+
+        if not container.is_registered(AzureNativeSpecService):
+
+            def create_azure_native_spec_service(c):
+                from application.services.native_spec_service import NativeSpecService
+                from domain.base.ports.configuration_port import ConfigurationPort
+
+                return AzureNativeSpecService(
+                    native_spec_service=c.get(NativeSpecService),
+                    config_port=c.get(ConfigurationPort),
+                )
+
+            container.register_factory(AzureNativeSpecService, create_azure_native_spec_service)
+            logger.debug("Azure Native Spec Service registered with DI container")
+    except Exception as exc:
+        logger.warning("Failed to register Azure services with DI container: %s", exc)
+
+
 # ------------------------------------------------------------------
 # Auto-register extensions on import
 # ------------------------------------------------------------------

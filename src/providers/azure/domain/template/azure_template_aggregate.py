@@ -313,6 +313,16 @@ class AzureTemplate(Template):
     # ------------------------------------------------------------------
     # Freeform pass-through
     # ------------------------------------------------------------------
+    provider_api_spec: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="Optional raw Azure provider request payload override/overlay.",
+        validation_alias=AliasChoices("provider_api_spec", "providerApiSpec"),
+    )
+    provider_api_spec_file: Optional[str] = Field(
+        default=None,
+        description="Path to a JSON native spec file for Azure provider request payloads.",
+        validation_alias=AliasChoices("provider_api_spec_file", "providerApiSpecFile"),
+    )
     node_attributes: dict[str, Any] = Field(
         default_factory=dict,
         description="Freeform pass-through properties appended to the VMSS ARM payload.",
@@ -460,6 +470,13 @@ class AzureTemplate(Template):
                     "Specify the name of an existing CycleCloud cluster."
                 )
 
+        return self
+
+    @model_validator(mode="after")
+    def validate_native_spec_mutual_exclusion(self) -> "AzureTemplate":
+        """Validate mutual exclusion of inline and file-based provider specs."""
+        if self.provider_api_spec and self.provider_api_spec_file:
+            raise ValueError("Cannot specify both provider_api_spec and provider_api_spec_file")
         return self
 
     # ------------------------------------------------------------------

@@ -106,6 +106,14 @@ class TestAzureTemplateConstruction:
         t = AzureTemplate.from_azure_format(data)
         assert t.vm_size == "Standard_D2s_v5"
 
+    def test_rejects_both_provider_api_spec_and_file(self):
+        with pytest.raises(ValueError, match="provider_api_spec and provider_api_spec_file"):
+            AzureTemplate(
+                **_BASE_FIELDS,
+                provider_api_spec={"location": "eastus2"},
+                provider_api_spec_file="vmss.json",
+            )
+
 
 # ---------------------------------------------------------------------------
 # Spot / priority validation

@@ -12,6 +12,7 @@ from typing import Any, Optional
 
 from domain.base.dependency_injection import injectable
 from domain.request.aggregate import Request
+from infrastructure.di.container import get_container
 from providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from providers.azure.domain.template.value_objects import AzureProviderApi
 from providers.azure.exceptions.azure_exceptions import (
@@ -49,6 +50,18 @@ class SingleVMHandler(AzureHandler):
 
     ``provider_api = "SingleVM"``
     """
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        container = get_container()
+        try:
+            from providers.azure.infrastructure.services.azure_native_spec_service import (
+                AzureNativeSpecService,
+            )
+
+            self.azure_native_spec_service = container.get(AzureNativeSpecService)
+        except Exception:
+            self.azure_native_spec_service = None
 
     def acquire_hosts(
         self, request: Request, template: AzureTemplate
@@ -136,6 +149,21 @@ class SingleVMHandler(AzureHandler):
                             nic_id,
                             vm_size_override=candidate_vm_size,
                         )
+                        if self.azure_native_spec_service:
+                            merged_params = (
+                                self.azure_native_spec_service.process_provider_api_spec_with_merge(
+                                    template=template,
+                                    request=request,
+                                    default_payload=vm_params,
+                                    extra_context={
+                                        "vm_name": vm_name,
+                                        "nic_id": nic_id,
+                                        "vm_size": candidate_vm_size,
+                                    },
+                                )
+                            )
+                            if merged_params:
+                                vm_params = merged_params
                         poller = compute.virtual_machines.begin_create_or_update(
                             resource_group_name=resource_group,
                             vm_name=vm_name,
