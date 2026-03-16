@@ -156,6 +156,12 @@ def orb_config_dir(tmp_path, moto_vpc_resources):
                         "subnet_ids": subnet_ids,
                         "security_group_ids": [sg_id],
                     },
+                    "handlers": {
+                        "RunInstances": {"enabled": True, "handler_class": "RunInstancesHandler"},
+                        "EC2Fleet": {"enabled": True, "handler_class": "EC2FleetHandler"},
+                        "SpotFleet": {"enabled": True, "handler_class": "SpotFleetHandler"},
+                        "ASG": {"enabled": True, "handler_class": "ASGHandler"},
+                    },
                 }
             ]
         },
@@ -342,6 +348,7 @@ def _inject_moto_factory(aws_client: AWSClient, logger, config_port) -> None:
 
     container = get_container()
     cfg_port = container.get(ConfigurationPort)
+    registry._config_port = cfg_port
     provider_config = cfg_port.get_provider_config()
     if provider_config:
         for pi in provider_config.get_active_providers():

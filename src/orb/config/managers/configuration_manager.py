@@ -108,7 +108,13 @@ class ConfigurationManager:
         """Ensure raw configuration is loaded."""
         if self._raw_config is None:
             if self._config_dict is not None:
-                self._raw_config = self._config_dict
+                # Merge provided dict on top of package defaults so that
+                # provider_defaults (supports_spot etc.) are always present.
+                from orb.config.loader import ConfigurationLoader
+
+                base = ConfigurationLoader._load_default_config()
+                ConfigurationLoader._merge_config(base, self._config_dict)
+                self._raw_config = base
             else:
                 self._raw_config = self.loader.load(self._config_file, config_manager=self)
         return self._raw_config

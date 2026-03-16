@@ -6,7 +6,7 @@ command and query handlers, ensuring appropriate integration between
 application services, domain aggregates, and infrastructure.
 """
 
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -91,8 +91,6 @@ class TestCQRSArchitectureIntegration:
     @pytest.fixture
     def mock_query_bus(self):
         """Create mock query bus."""
-        from unittest.mock import AsyncMock
-
         bus = Mock(spec=QueryBus)
 
         # Mock template query response
@@ -116,8 +114,6 @@ class TestCQRSArchitectureIntegration:
     @pytest.fixture
     def mock_provider_selection_port(self):
         """Create mock provider selection port."""
-        from unittest.mock import AsyncMock
-
         port = Mock(spec=ProviderSelectionPort)
 
         # Mock selection result
@@ -193,7 +189,20 @@ class TestCQRSArchitectureIntegration:
         mock_provider_selection_port,
     ):
         """Create CreateMachineRequestHandler for testing."""
-        mock_provider_config_port = Mock()
+        from orb.application.services.provisioning_orchestration_service import ProvisioningResult
+
+        mock_provisioning_service = AsyncMock()
+        mock_provisioning_service.execute_provisioning = AsyncMock(
+            return_value=ProvisioningResult(
+                success=True,
+                resource_ids=["fleet-12345"],
+                machine_ids=["i-1234567890abcdef0"],
+                instances=[{"instance_id": "i-1234567890abcdef0", "state": "running"}],
+                provider_data={"provider": "aws", "region": "us-east-1"},
+                fulfilled_count=1,
+                is_final=True,
+            )
+        )
         return CreateMachineRequestHandler(
             uow_factory=mock_uow_factory,
             logger=mock_logger,
@@ -202,7 +211,7 @@ class TestCQRSArchitectureIntegration:
             error_handler=mock_error_handler,
             query_bus=mock_query_bus,
             provider_selection_port=mock_provider_selection_port,
-            provider_config_port=mock_provider_config_port,
+            provisioning_service=mock_provisioning_service,
         )
 
     @pytest.fixture
@@ -235,7 +244,7 @@ class TestCQRSArchitectureIntegration:
         # Verify handler interactions
         create_request_handler._query_bus.execute.assert_called_once()
         create_request_handler._provider_selection_port.select_provider_for_template.assert_called_once()
-        create_request_handler._provider_selection_port.execute_operation.assert_called_once()
+        create_request_handler._provisioning_service.execute_provisioning.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_command_bus_integration(self, command_bus):
@@ -309,8 +318,6 @@ class TestCQRSArchitectureIntegration:
     @pytest.mark.asyncio
     async def test_provider_operation_integration(self, mock_provider_selection_port):
         """Test provider operation integration."""
-        from unittest.mock import AsyncMock
-
         from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
         from orb.providers.base.strategy.provider_strategy import ProviderResult
 
@@ -363,8 +370,6 @@ class TestCQRSArchitectureIntegration:
     async def test_error_handling_provider_failure(self, create_request_handler):
         """Test error handling for provider failures."""
         # Mock provider selection port to return failure
-        from unittest.mock import AsyncMock
-
         from orb.providers.base.strategy.provider_strategy import ProviderResult
 
         failure_result = ProviderResult(
