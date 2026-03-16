@@ -8,18 +8,21 @@ from typing import Any
 
 from orb.config.schemas.provider_strategy_schema import ProviderInstanceConfig
 from orb.domain.base.ports import LoggingPort
+from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 
 
 class ProviderConfigBuilder:
     """Builds provider configurations via the provider registry."""
 
-    def __init__(self, logger: LoggingPort) -> None:
+    def __init__(self, logger: LoggingPort, registry: ProviderRegistryPort) -> None:
         """Initialize config builder.
 
         Args:
             logger: Logger instance for logging config operations
+            registry: Provider registry port
         """
         self._logger = logger
+        self._registry = registry
 
     def build_config(self, instance_config: ProviderInstanceConfig) -> Any:
         """Build provider configuration via the provider registry.
@@ -35,9 +38,7 @@ class ProviderConfigBuilder:
                 for the requested provider type. This indicates a bootstrap ordering
                 bug and must surface loudly rather than silently falling through.
         """
-        from orb.providers.registry import get_provider_registry
-
-        registry = get_provider_registry()
+        registry = self._registry
         if not registry.is_provider_registered(instance_config.type):
             raise RuntimeError(
                 f"Provider type '{instance_config.type}' is not registered. "

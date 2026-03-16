@@ -100,6 +100,7 @@ def _register_template_services(container: DIContainer):
         from orb.application.ports.scheduler_port import SchedulerPort
         from orb.application.services.provider_registry_service import ProviderRegistryService
         from orb.config.managers.configuration_manager import ConfigurationManager
+        from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
         from orb.domain.template.factory import TemplateFactory
         from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
 
@@ -111,6 +112,7 @@ def _register_template_services(container: DIContainer):
             template_defaults_service=c.get(TemplateDefaultsPort),  # type: ignore[arg-type]
             provider_registry_service=c.get(ProviderRegistryService),
             template_factory=c.get(TemplateFactory),
+            registry=c.get(ProviderRegistryPort),
         )
 
     container.register_singleton(

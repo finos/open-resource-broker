@@ -122,10 +122,10 @@ class Application:
                 self._dry_run_context = dry_run_context(True)
                 self._dry_run_context.__enter__()
 
-            # Initialize provider registry directly
-            from orb.providers.registry import get_provider_registry
+            # Initialize provider registry from DI container
+            from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 
-            self._provider_registry = get_provider_registry()
+            self._provider_registry = self._container.get(ProviderRegistryPort)
 
             # Initialize provider registry based on loading mode
             if not self._container.is_lazy_loading_enabled():

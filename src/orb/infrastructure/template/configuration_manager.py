@@ -85,6 +85,7 @@ class TemplateConfigurationManager:
         template_defaults_service: Optional["TemplateDefaultsService"] = None,
         provider_registry_service: Optional["ProviderRegistryService"] = None,
         template_factory: Optional["TemplateFactoryPort"] = None,
+        registry: Optional[Any] = None,
     ) -> None:
         """
         Initialize the template configuration manager.
@@ -99,6 +100,7 @@ class TemplateConfigurationManager:
             template_defaults_service: Optional service for template defaults
             provider_registry_service: Optional provider registry service for provider operations
             template_factory: Optional factory for creating provider-specific templates
+            registry: Optional provider registry port for template validation
         """
         self.config_manager = config_manager
         self.scheduler_strategy = scheduler_strategy
@@ -106,6 +108,7 @@ class TemplateConfigurationManager:
         self.event_publisher = event_publisher
         self.template_defaults_service = template_defaults_service
         self.provider_registry_service = provider_registry_service
+        self._registry = registry
         if template_factory is None:
             from orb.domain.template.factory import TemplateFactory
 
@@ -601,9 +604,10 @@ class TemplateConfigurationManager:
             )
 
             # Use provider registry for validation
-            from orb.providers.registry import get_provider_registry
-
-            registry = get_provider_registry()
+            registry = self._registry
+            if registry is None:
+                result["warnings"].append("Provider registry not available for template validation")
+                return
             if not hasattr(registry, "validate_template_requirements"):
                 result["warnings"].append("Provider registry does not support template validation")
                 return
