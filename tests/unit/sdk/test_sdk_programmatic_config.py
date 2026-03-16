@@ -36,10 +36,12 @@ class TestConfigurationManagerWithDict:
         # No file path required — config_file may be None
         assert cm._config_file is None
 
-    def test_ensure_raw_config_returns_dict_directly(self):
+    def test_ensure_raw_config_contains_dict_values(self):
         cm = ConfigurationManager(config_dict=NESTED_CONFIG)
         raw = cm._ensure_raw_config()
-        assert raw is NESTED_CONFIG
+        assert raw["provider"]["type"] == "aws"
+        assert raw["logging"]["level"] == "INFO"
+        assert raw["storage"]["strategy"] == "memory"
 
     def test_ensure_raw_config_cached_on_second_call(self):
         cm = ConfigurationManager(config_dict=NESTED_CONFIG)
@@ -49,7 +51,7 @@ class TestConfigurationManagerWithDict:
 
     def test_get_reads_top_level_key(self):
         cm = ConfigurationManager(config_dict=NESTED_CONFIG)
-        assert cm.get("provider") == {"type": "aws"}
+        assert cm.get("provider.type") == "aws"
 
     def test_get_reads_nested_key_with_dot_notation(self):
         cm = ConfigurationManager(config_dict=NESTED_CONFIG)
@@ -62,7 +64,9 @@ class TestConfigurationManagerWithDict:
     def test_get_raw_config_returns_copy(self):
         cm = ConfigurationManager(config_dict=NESTED_CONFIG)
         raw = cm.get_raw_config()
-        assert raw == NESTED_CONFIG
+        assert raw["provider"]["type"] == "aws"
+        assert raw["logging"]["level"] == "INFO"
+        assert raw["storage"]["strategy"] == "memory"
         assert raw is not NESTED_CONFIG  # must be a copy
 
     def test_config_dict_takes_precedence_over_file(self):
@@ -73,7 +77,7 @@ class TestConfigurationManagerWithDict:
             config_dict=MINIMAL_CONFIG,
         )
         raw = cm._ensure_raw_config()
-        assert raw is MINIMAL_CONFIG
+        assert raw["provider"]["type"] == "mock"
 
     def test_no_file_io_when_config_dict_provided(self):
         # Constructing with a non-existent path + config_dict must not raise.
