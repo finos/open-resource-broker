@@ -125,6 +125,10 @@ class CycleCloudConfig(BaseModel):
     """CycleCloud connection configuration."""
 
     url: Optional[str] = Field(None, description="CycleCloud REST API base URL")
+    credential_path: Optional[str] = Field(
+        None,
+        description="Path to a JSON file containing CycleCloud credentials and optional auth overrides",
+    )
     username: Optional[str] = Field(None, description="CycleCloud API username")
     password: Optional[str] = Field(None, description="CycleCloud API password")
     verify_ssl: bool = Field(True, description="Verify CycleCloud TLS certs")

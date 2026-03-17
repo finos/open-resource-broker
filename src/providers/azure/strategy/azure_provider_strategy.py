@@ -646,6 +646,7 @@ class AzureProviderStrategy(ProviderStrategy):
             operation_context = operation.context or {}
             for key in (
                 "cyclecloud_url",
+                "cyclecloud_credential_path",
                 "cyclecloud_username",
                 "cyclecloud_password",
                 "cyclecloud_verify_ssl",

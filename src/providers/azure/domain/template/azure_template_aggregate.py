@@ -347,6 +347,11 @@ class AzureTemplate(Template):
         description="CycleCloud REST API base URL, e.g. 'https://cyclecloud.example.com'.",
         validation_alias=AliasChoices("cyclecloud_url", "cyclecloudUrl"),
     )
+    cyclecloud_credential_path: Optional[str] = Field(
+        default=None,
+        description="Path to a JSON file containing CycleCloud credentials and optional auth overrides.",
+        validation_alias=AliasChoices("cyclecloud_credential_path", "cyclecloudCredentialPath"),
+    )
     cyclecloud_username: Optional[str] = Field(
         default=None,
         description="CycleCloud API username.",

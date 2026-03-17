@@ -16,6 +16,8 @@ Key CycleCloud concepts:
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any, Optional
 
 from urllib.parse import urlparse
@@ -137,6 +139,43 @@ class CycleCloudHandler(AzureHandler):
 
         return None
 
+    def _load_cc_credential_file(self, credential_path: str) -> dict[str, Any]:
+        path = Path(credential_path).expanduser()
+        try:
+            with path.open(encoding="utf-8") as handle:
+                data = json.load(handle)
+        except FileNotFoundError as exc:
+            raise CycleCloudConnectionError(
+                f"CycleCloud credential file not found: {path}",
+                url=None,
+            ) from exc
+        except json.JSONDecodeError as exc:
+            raise CycleCloudConnectionError(
+                f"CycleCloud credential file is not valid JSON: {path}",
+                url=None,
+            ) from exc
+        except OSError as exc:
+            raise CycleCloudConnectionError(
+                f"Failed to read CycleCloud credential file {path}: {exc}",
+                url=None,
+            ) from exc
+
+        if not isinstance(data, dict):
+            raise CycleCloudConnectionError(
+                f"CycleCloud credential file must contain a JSON object: {path}",
+                url=None,
+            )
+
+        return data
+
+    @staticmethod
+    def _credential_file_value(data: dict[str, Any], *keys: str) -> Any:
+        for key in keys:
+            value = data.get(key)
+            if value not in (None, ""):
+                return value
+        return None
+
     def _build_cc_session(
         self,
         *,
@@ -149,6 +188,19 @@ class CycleCloudHandler(AzureHandler):
         context: Optional[dict[str, Any]] = None,
     ) -> tuple[requests.Session, str]:
         provider_cfg = self._get_provider_cyclecloud_config()
+        credential_path = self._resolve_cc_config_value(
+            template=template,
+            metadata=metadata,
+            context=context,
+            provider_cfg=provider_cfg,
+            template_attr="cyclecloud_credential_path",
+            metadata_key="cyclecloud_credential_path",
+            context_key="cyclecloud_credential_path",
+            provider_path=("cyclecloud", "credential_path"),
+        )
+        credential_file_data: dict[str, Any] = {}
+        if credential_path:
+            credential_file_data = self._load_cc_credential_file(str(credential_path))
 
         cc_url = cc_url or self._resolve_cc_config_value(
             template=template,
@@ -160,6 +212,7 @@ class CycleCloudHandler(AzureHandler):
             context_key="cyclecloud_url",
             provider_path=("cyclecloud", "url"),
         )
+        cc_url = cc_url or self._credential_file_value(credential_file_data, "cyclecloud_url", "url")
         cc_user = cc_user or self._resolve_cc_config_value(
             template=template,
             metadata=metadata,
@@ -170,6 +223,11 @@ class CycleCloudHandler(AzureHandler):
             context_key="cyclecloud_username",
             provider_path=("cyclecloud", "username"),
         )
+        cc_user = cc_user or self._credential_file_value(
+            credential_file_data,
+            "cyclecloud_username",
+            "username",
+        )
         cc_pass = cc_pass or self._resolve_cc_config_value(
             template=template,
             metadata=metadata,
@@ -179,6 +237,11 @@ class CycleCloudHandler(AzureHandler):
             metadata_key="cyclecloud_password",
             context_key="cyclecloud_password",
             provider_path=("cyclecloud", "password"),
+        )
+        cc_pass = cc_pass or self._credential_file_value(
+            credential_file_data,
+            "cyclecloud_password",
+            "password",
         )
 
         if verify_ssl is None:
@@ -191,8 +254,15 @@ class CycleCloudHandler(AzureHandler):
                 metadata_key="cyclecloud_verify_ssl",
                 context_key="cyclecloud_verify_ssl",
                 provider_path=("cyclecloud", "verify_ssl"),
-                default=True,
             )
+            if verify_resolved in (None, ""):
+                verify_resolved = self._credential_file_value(
+                    credential_file_data,
+                    "cyclecloud_verify_ssl",
+                    "verify_ssl",
+                )
+            if verify_resolved in (None, ""):
+                verify_resolved = True
             verify_ssl = bool(verify_resolved)
 
         if not cc_url:
@@ -219,6 +289,11 @@ class CycleCloudHandler(AzureHandler):
             context_key="cyclecloud_auth_mode",
             provider_path=("cyclecloud", "auth_mode"),
         )
+        auth_mode = auth_mode or self._credential_file_value(
+            credential_file_data,
+            "cyclecloud_auth_mode",
+            "auth_mode",
+        )
         auth_mode = str(auth_mode).strip().lower() if auth_mode else None
 
         explicit_bearer = self._resolve_cc_config_value(
@@ -231,6 +306,11 @@ class CycleCloudHandler(AzureHandler):
             context_key="cyclecloud_bearer_token",
             provider_path=("cyclecloud", "bearer_token"),
         )
+        explicit_bearer = explicit_bearer or self._credential_file_value(
+            credential_file_data,
+            "cyclecloud_bearer_token",
+            "bearer_token",
+        )
 
         aad_scope = self._resolve_cc_config_value(
             template=template,
@@ -241,6 +321,11 @@ class CycleCloudHandler(AzureHandler):
             metadata_key="cyclecloud_aad_scope",
             context_key="cyclecloud_aad_scope",
             provider_path=("cyclecloud", "aad_scope"),
+        )
+        aad_scope = aad_scope or self._credential_file_value(
+            credential_file_data,
+            "cyclecloud_aad_scope",
+            "aad_scope",
         )
 
         if auth_mode == "ssh":
@@ -617,6 +702,7 @@ class CycleCloudHandler(AzureHandler):
                 "location": template.location,
                 "fleet_errors": fleet_errors,
                 "cyclecloud_url": base_url,
+                "cyclecloud_credential_path": getattr(template, "cyclecloud_credential_path", None),
                 "cyclecloud_verify_ssl": bool(session.verify),
                 "cyclecloud_auth_mode": session.__dict__.get("_cyclecloud_auth_mode"),
                 "cyclecloud_aad_scope": getattr(template, "cyclecloud_aad_scope", None),
