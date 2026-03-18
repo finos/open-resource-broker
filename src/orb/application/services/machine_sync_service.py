@@ -10,6 +10,7 @@ from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.machine.aggregate import Machine
+from orb.domain.machine.machine_status import MachineStatus
 from orb.domain.request.aggregate import Request
 
 
@@ -119,6 +120,7 @@ class MachineSyncService:
                 # happens once in the infrastructure layer). No re-conversion needed here.
                 domain_machines = []
                 returned_ids = set()
+                db_machines_by_id = {str(m.machine_id.value): m for m in db_machines}
                 for instance_data in instances:
                     try:
                         processed_data = {
@@ -126,7 +128,15 @@ class MachineSyncService:
                             "request_id": str(request.request_id),
                             "resource_id": request.resource_ids[0] if request.resource_ids else "",
                         }
-                        machine = self._create_machine_from_processed_data(processed_data, request)
+                        terminal_states = {"shutting-down", "terminated", "stopping", "stopped"}
+                        instance_status = processed_data.get("status", "")
+                        existing = db_machines_by_id.get(processed_data.get("instance_id", ""))
+                        if instance_status in terminal_states and existing:
+                            machine = self._create_machine_with_status(
+                                existing, MachineStatus(instance_status)
+                            )
+                        else:
+                            machine = self._create_machine_from_processed_data(processed_data, request)
                         domain_machines.append(machine)
                         returned_ids.add(processed_data["instance_id"])
                     except Exception as e:
@@ -201,6 +211,13 @@ class MachineSyncService:
 
         machine_data = existing.model_dump()
         machine_data["status"] = MachineStatus.TERMINATED
+        machine_data["version"] = existing.version + 1
+        return Machine.model_validate(machine_data)
+
+    def _create_machine_with_status(self, existing: Machine, status: "MachineStatus") -> Machine:
+        """Return a copy of an existing DB machine with only the status updated."""
+        machine_data = existing.model_dump()
+        machine_data["status"] = status
         machine_data["version"] = existing.version + 1
         return Machine.model_validate(machine_data)
 
