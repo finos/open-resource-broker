@@ -7,7 +7,6 @@ The Open Resource Broker includes a comprehensive suite of operational tools for
 The operational toolset includes:
 
 - **Repository Migration Tools**: Migrate data between storage strategies
-- **Backup and Restore Utilities**: Comprehensive backup and recovery
 - **Batch Processing Tools**: Handle large-scale operations efficiently
 - **Utility Libraries**: Common operational functions
 - **Resource Naming Tools**: Pattern-based naming and validation
@@ -115,106 +114,6 @@ The migration system uses the application's existing configuration and provides 
 - **Error Handling**: Automatic error detection and reporting
 
 **Note**: Advanced features like parallel processing, custom backup creation, and detailed validation are handled internally by the migration system but are not exposed as configurable options in the current implementation.
-
-## Backup and Restore Utilities
-
-### Backup Operations
-
-#### Manual Backup
-
-```bash
-# Create manual backup
-python -c "
-from src.infrastructure.storage.repository_migrator import RepositoryMigrator
-from src.infrastructure.di.container import get_container
-
-container = get_container()
-migrator = RepositoryMigrator(container)
-
-backup_path = migrator.create_backup(
-    source_type='json',
-    backup_location='backups/manual_backup_$(date +%Y%m%d_%H%M%S).json'
-)
-print(f'Backup created: {backup_path}')
-"
-```
-
-#### Automated Backup
-
-```bash
-# Set up automated backup (cron job)
-# Add to crontab: crontab -e
-0 2 * * * /path/to/backup_script.sh
-
-# backup_script.sh
-#!/bin/bash
-cd /path/to/open-resource-broker
-source .venv/bin/activate
-
-BACKUP_DIR="backups/$(date +%Y%m%d)"
-mkdir -p "$BACKUP_DIR"
-
-# Backup configuration
-cp config/config.json "$BACKUP_DIR/config_$(date +%H%M%S).json"
-
-# Backup data
-python -c "
-from src.infrastructure.storage.repository_migrator import RepositoryMigrator
-from src.infrastructure.di.container import get_container
-
-container = get_container()
-migrator = RepositoryMigrator(container)
-backup_path = migrator.create_backup('json', '$BACKUP_DIR/data_$(date +%H%M%S).json')
-print(f'Data backup created: {backup_path}')
-"
-
-# Cleanup old backups (keep last 30 days)
-find backups/ -type d -mtime +30 -exec rm -rf {} \;
-```
-
-### Restore Operations
-
-#### Restore from Backup
-
-```bash
-# Restore data from backup
-python -c "
-from src.infrastructure.storage.repository_migrator import RepositoryMigrator
-from src.infrastructure.di.container import get_container
-
-container = get_container()
-migrator = RepositoryMigrator(container)
-
-# Restore from specific backup
-restore_result = migrator.restore_from_backup(
-    backup_path='backups/migration_backup_20250630_120000.json',
-    target_type='json'
-)
-print(f'Restore completed: {restore_result}')
-"
-```
-
-#### Point-in-Time Recovery
-
-```bash
-# Restore to specific point in time
-python -c "
-from datetime import datetime
-from src.infrastructure.storage.repository_migrator import RepositoryMigrator
-
-migrator = RepositoryMigrator(container)
-
-# Find backup closest to target time
-target_time = datetime(2025, 6, 30, 10, 0, 0)
-backup_path = migrator.find_backup_by_time(target_time)
-
-if backup_path:
-    restore_result = migrator.restore_from_backup(backup_path, 'json')
-    print(f'Point-in-time restore completed: {restore_result}')
-else:
-    print('No backup found for target time')
-"
-```
 
 ## Batch Processing Tools
 
@@ -576,7 +475,7 @@ print(f'95th percentile: {analysis[\"p95_response_time\"]:.2f}s')
 print(f'Error rate: {analysis[\"error_rate\"]:.2f}%')
 
 # Slowest operations
-print('\\nSlowest Operations:')
+print('\nSlowest Operations:')
 for op in analysis['slowest_operations'][:5]:
     print(f'  {op[\"operation\"]}: {op[\"time\"]:.2f}s')
 "
@@ -647,7 +546,7 @@ for component, status in health_report.items():
 
 # Overall health score
 overall_score = health_checker.calculate_health_score(health_report)
-print(f'\\nOverall Health Score: {overall_score}/100')
+print(f'\nOverall Health Score: {overall_score}/100')
 "
 ```
 
@@ -691,17 +590,6 @@ echo "Cleaning up logs..."
 find logs/ -name "*.log.*" -mtime +7 -exec gzip {} \;
 find logs/ -name "*.gz" -mtime +30 -delete
 echo "Log cleanup completed"
-
-# 4. Backup creation
-echo "Creating backup..."
-python -c "
-from src.infrastructure.storage.repository_migrator import RepositoryMigrator
-from src.infrastructure.di.container import get_container
-container = get_container()
-migrator = RepositoryMigrator(container)
-backup_path = migrator.create_backup('json', 'backups/maintenance_backup_$(date +%Y%m%d_%H%M%S).json')
-print(f'Backup created: {backup_path}')
-"
 
 echo "Operational maintenance completed successfully!"
 ```
@@ -750,14 +638,6 @@ echo "Operational maintenance completed successfully!"
 ```bash
 # Check migration logs
 tail -f logs/app.log | grep migration
-
-# Validate source data
-python -c "
-from src.infrastructure.storage.repository_migrator import RepositoryMigrator
-migrator = RepositoryMigrator(container)
-validation_result = migrator.validate_source_data('json')
-print(f'Source validation: {validation_result}')
-"
 ```
 
 #### Performance Issues
