@@ -37,7 +37,7 @@ def test_hf_scheduler_type_matches_written_file_key(tmp_path):
     import json
 
     strategy = make_hf_strategy()
-    generated = strategy.format_templates_for_generation([_MINIMAL_SNAKE_TEMPLATE])
+    generated = strategy.format_templates_for_dispatch([_MINIMAL_SNAKE_TEMPLATE])
     f = tmp_path / "hf_rt.json"
     f.write_text(
         json.dumps({"scheduler_type": strategy.get_scheduler_type(), "templates": generated})
@@ -50,7 +50,7 @@ def test_default_scheduler_type_matches_written_file_key(tmp_path):
     import json
 
     strategy = make_default_strategy()
-    generated = strategy.format_templates_for_generation([_MINIMAL_SNAKE_TEMPLATE])
+    generated = strategy.format_templates_for_dispatch([_MINIMAL_SNAKE_TEMPLATE])
     f = tmp_path / "default_rt.json"
     f.write_text(
         json.dumps({"scheduler_type": strategy.get_scheduler_type(), "templates": generated})

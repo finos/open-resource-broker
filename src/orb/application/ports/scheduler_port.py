@@ -41,8 +41,12 @@ class SchedulerPort(ABC):
         """Format template DTOs to scheduler response."""
 
     @abstractmethod
-    def format_templates_for_generation(self, templates: list[dict]) -> list[dict]:
+    def format_templates_for_dispatch(self, templates: list[dict]) -> list[dict]:
         """Convert internal templates to scheduler's expected input format."""
+
+    def serialize_template_for_storage(self, template_dict: dict) -> dict:
+        """Serialize a TemplateDTO dict to on-disk format. No defaults applied."""
+        return self.format_templates_for_dispatch([template_dict])[0]
 
     @abstractmethod
     def format_request_status_response(self, requests: list[Any]) -> dict[str, Any]:
@@ -99,5 +103,13 @@ class SchedulerPort(ABC):
         """Return True if log output should be written to the console."""
 
     @abstractmethod
+    def format_template_mutation_response(self, raw: dict[str, Any]) -> dict[str, Any]:
+        """Format template mutation response to scheduler format."""
+
+    @abstractmethod
     def format_health_response(self, checks: list[dict[str, Any]]) -> dict[str, Any]:
         """Format health check results into a scheduler-specific response dict."""
+
+    @abstractmethod
+    def get_template_paths(self) -> list[str]:
+        """Return the list of template file paths for this scheduler."""

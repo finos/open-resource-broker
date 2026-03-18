@@ -23,6 +23,7 @@ class CreateRequestCommand(BaseCommand):
     requested_count: int
     timeout: Optional[int] = 3600
     tags: Optional[Dict[str, Any]] = None
+    additional_data: Optional[Dict[str, Any]] = None
 
     # Store created request_id for caller to use in subsequent query
     created_request_id: Optional[str] = None

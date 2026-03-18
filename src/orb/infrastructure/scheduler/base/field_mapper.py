@@ -53,14 +53,13 @@ class SchedulerFieldMapper(ABC):
         return self._apply_output_transformations(mapped)
 
     def format_for_generation(
-        self, internal_templates: List[Dict[str, Any]]
+        self, internal_templates: List[Dict[str, Any]], copy_unmapped: bool = False
     ) -> List[Dict[str, Any]]:
         """Format internal templates for scheduler's expected input format with transformations."""
         formatted = []
 
         for template in internal_templates:
-            # Use the same logic as map_output_fields to get transformations
-            formatted_template = self.map_output_fields(template, copy_unmapped=False)
+            formatted_template = self.map_output_fields(template, copy_unmapped=copy_unmapped)
             formatted.append(formatted_template)
 
         return formatted

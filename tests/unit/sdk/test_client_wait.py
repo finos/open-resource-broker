@@ -24,15 +24,17 @@ class TestWaitForRequestTerminalImmediately:
     @pytest.mark.asyncio
     async def test_wait_for_request_returns_immediately_if_terminal(self) -> None:
         client = _make_client()
-        result = {"status": "complete", "request_id": "req-1"}
-        client.get_request = AsyncMock(return_value=result)  # type: ignore[attr-defined]
+        request_entry = {"status": "complete", "request_id": "req-1"}
+        client.get_request_status = AsyncMock(  # type: ignore[attr-defined]
+            return_value={"requests": [request_entry]}
+        )
 
         with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             returned = await client.wait_for_request("req-1")
 
-        assert returned == result
+        assert returned == request_entry
         mock_sleep.assert_not_called()
-        client.get_request.assert_called_once_with(request_id="req-1")
+        client.get_request_status.assert_called_once()  # type: ignore[attr-defined]
 
 
 class TestWaitForRequestPolls:
@@ -41,10 +43,14 @@ class TestWaitForRequestPolls:
     @pytest.mark.asyncio
     async def test_wait_for_request_polls_until_terminal(self) -> None:
         client = _make_client()
-        pending = {"status": "pending"}
-        completed = {"status": "complete"}
-        client.get_request = AsyncMock(  # type: ignore[attr-defined]
-            side_effect=[pending, pending, completed]
+        pending_entry = {"status": "pending"}
+        completed_entry = {"status": "complete"}
+        client.get_request_status = AsyncMock(  # type: ignore[attr-defined]
+            side_effect=[
+                {"requests": [pending_entry]},
+                {"requests": [pending_entry]},
+                {"requests": [completed_entry]},
+            ]
         )
 
         sleep_calls: list[float] = []
@@ -55,9 +61,9 @@ class TestWaitForRequestPolls:
         with patch("asyncio.sleep", side_effect=fake_sleep):
             result = await client.wait_for_request("req-2", poll_interval=5.0, timeout=300.0)
 
-        assert result == completed
+        assert result == completed_entry
         assert len(sleep_calls) == 2
-        assert client.get_request.call_count == 3  # type: ignore[attr-defined]
+        assert client.get_request_status.call_count == 3  # type: ignore[attr-defined]
 
 
 class TestWaitForRequestTimeout:
@@ -66,7 +72,9 @@ class TestWaitForRequestTimeout:
     @pytest.mark.asyncio
     async def test_wait_for_request_raises_timeout_error(self) -> None:
         client = _make_client()
-        client.get_request = AsyncMock(return_value={"status": "pending"})  # type: ignore[attr-defined]
+        client.get_request_status = AsyncMock(  # type: ignore[attr-defined]
+            return_value={"requests": [{"status": "pending"}]}
+        )
 
         # Use a very short timeout so the loop exits quickly
         with patch("asyncio.sleep", new_callable=AsyncMock):
@@ -95,7 +103,9 @@ class TestWaitForRequestTimeout:
     @pytest.mark.asyncio
     async def test_wait_for_request_timeout_zero_raises_if_not_terminal(self) -> None:
         client = _make_client()
-        client.get_request = AsyncMock(return_value={"status": "in_progress"})  # type: ignore[attr-defined]
+        client.get_request_status = AsyncMock(  # type: ignore[attr-defined]
+            return_value={"requests": [{"status": "in_progress"}]}
+        )
 
         import asyncio
 

@@ -495,15 +495,15 @@ class TemplateConfigurationManager:
         """
         try:
             await self.storage_service.delete_template(template_id)
-
-            # Invalidate cache to ensure fresh data on next load
-            self.cache_service.invalidate()
-
             self.logger.info("Deleted template %s", template_id)
 
         except Exception as e:
             self.logger.error("Failed to delete template %s: %s", template_id, e)
             raise
+
+        finally:
+            # Always invalidate cache so stale entries don't block subsequent creates
+            self.cache_service.invalidate()
 
     def get_template(self, template_id: str) -> Optional[TemplateDTO]:
         """Get template by ID synchronously for compatibility."""

@@ -26,6 +26,7 @@ class ListActiveRequestsQuery(Query, BaseModel):
     model_config = ConfigDict(frozen=True)
 
     provider_name: Optional[str] = None
+    status: Optional[str] = None
     filter_expressions: list[str] = []
     all_resources: bool = False
     limit: Optional[int] = 50  # Default: 50, Max: 1000

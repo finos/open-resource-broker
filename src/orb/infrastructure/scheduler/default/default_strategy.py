@@ -182,7 +182,7 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
             d["instance_type"] = next(iter(machine_types), "") if machine_types else ""
         return d
 
-    def format_templates_for_generation(self, templates: list[dict]) -> list[dict]:
+    def format_templates_for_dispatch(self, templates: list[dict]) -> list[dict]:
         """No conversion needed - use field mapper (identity mapping)."""
         return self.field_mapper.format_for_generation(templates)
 
@@ -256,6 +256,14 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
             return workdir
         else:
             return workdir
+
+    def format_template_mutation_response(self, raw: dict[str, Any]) -> dict[str, Any]:
+        """Format template mutation response using snake_case keys."""
+        return {
+            "template_id": raw.get("template_id"),
+            "status": raw.get("status"),
+            "validation_errors": raw.get("validation_errors", []),
+        }
 
     def format_request_response(self, request_data: Any) -> dict[str, Any]:
         """Format request creation response to native domain format."""
