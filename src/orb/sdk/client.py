@@ -514,6 +514,7 @@ class ORBClient:
             ListRequestsInput(
                 status=kwargs.get("status"),
                 limit=kwargs.get("limit", 50),
+                offset=kwargs.get("offset", 0),
                 sync=kwargs.get("sync", False),
             )
         )
@@ -589,6 +590,8 @@ class ORBClient:
                 status=kwargs.get("status"),
                 provider_name=kwargs.get("provider_name"),
                 request_id=kwargs.get("request_id"),
+                limit=kwargs.get("limit", 100),
+                offset=kwargs.get("offset", 0),
             )
         )
         scheduler = self._container.get_optional(SchedulerPort)

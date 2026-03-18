@@ -9,7 +9,6 @@ from orb.application.services.orchestration.base import OrchestratorBase
 from orb.application.services.orchestration.dtos import (
     GetRequestStatusInput,
     GetRequestStatusOutput,
-    RequestStatusError,
 )
 from orb.domain.base.ports.logging_port import LoggingPort
 
@@ -43,7 +42,7 @@ class GetRequestStatusOrchestrator(OrchestratorBase[GetRequestStatusInput, GetRe
                 request_dicts.append(self._to_dict(result))
             except Exception as exc:
                 self._logger.error("Failed to get status for %s: %s", request_id, exc)
-                request_dicts.append(RequestStatusError(request_id=request_id, error=str(exc)))
+                request_dicts.append({"request_id": request_id, "error": str(exc)})
 
         return GetRequestStatusOutput(requests=request_dicts)
 

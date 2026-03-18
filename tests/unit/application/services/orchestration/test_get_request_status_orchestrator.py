@@ -118,8 +118,8 @@ class TestGetRequestStatusOrchestrator:
         result = await orchestrator.execute(input)
         assert len(result.requests) == 1
         entry = result.requests[0]
-        assert entry.request_id == "req-bad"
-        assert entry.error == "not found"
+        assert entry["request_id"] == "req-bad"
+        assert entry["error"] == "not found"
 
     @pytest.mark.asyncio
     async def test_execute_query_error_logs_error(self, orchestrator, mock_query_bus, mock_logger):
@@ -176,3 +176,40 @@ class TestGetRequestStatusOrchestrator:
         assert entry["request_id"] == "req-detail-1"
         assert entry["status"] == "running"
         assert entry["machine_references"] == ["m-001", "m-002"]
+
+    @pytest.mark.asyncio
+    async def test_execute_query_error_entry_is_dict(self, orchestrator, mock_query_bus):
+        mock_query_bus.execute.side_effect = Exception("boom")
+        input = GetRequestStatusInput(request_ids=["req-bad"])
+        result = await orchestrator.execute(input)
+        assert isinstance(result.requests[0], dict)
+
+    @pytest.mark.asyncio
+    async def test_execute_query_error_entry_has_request_id_and_error_keys(
+        self, orchestrator, mock_query_bus
+    ):
+        mock_query_bus.execute.side_effect = Exception("boom")
+        input = GetRequestStatusInput(request_ids=["req-bad"])
+        result = await orchestrator.execute(input)
+        assert result.requests[0].get("request_id") == "req-bad"
+
+    @pytest.mark.asyncio
+    async def test_execute_query_error_entry_get_status_returns_empty_string(
+        self, orchestrator, mock_query_bus
+    ):
+        mock_query_bus.execute.side_effect = Exception("boom")
+        input = GetRequestStatusInput(request_ids=["req-bad"])
+        result = await orchestrator.execute(input)
+        assert result.requests[0].get("status", "") == ""
+
+    @pytest.mark.asyncio
+    async def test_execute_mixed_success_and_error_all_entries_are_dicts(
+        self, orchestrator, mock_query_bus
+    ):
+        ok = MagicMock(spec=["model_dump"])
+        ok.model_dump = MagicMock(return_value={"request_id": "req-ok", "status": "running"})
+        mock_query_bus.execute.side_effect = [ok, Exception("fail")]
+        input = GetRequestStatusInput(request_ids=["req-ok", "req-bad"])
+        result = await orchestrator.execute(input)
+        assert len(result.requests) == 2
+        assert all(isinstance(e, dict) for e in result.requests)
