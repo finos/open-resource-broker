@@ -7,8 +7,18 @@ to the appropriate handlers via the VMSS / SingleVM infrastructure layer.
 from __future__ import annotations
 
 import time
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
+from application.services.spot_placement_planner import (
+    PlacementPlanEntry,
+    SpotPlacementPlanner,
+)
+from application.services.spot_placement_execution import (
+    SpotPlacementExecutionService,
+    build_planned_execution_metadata,
+    create_acquire_request,
+)
 from domain.base.dependency_injection import injectable
 from domain.base.ports import LoggingPort
 from providers.azure.configuration.config import AzureProviderConfig
@@ -25,6 +35,9 @@ from providers.azure.infrastructure.handlers.azure_handler import AzureHandler
 from providers.azure.infrastructure.handlers.cyclecloud_handler import CycleCloudHandler
 from providers.azure.infrastructure.handlers.single_vm_handler import SingleVMHandler
 from providers.azure.infrastructure.handlers.vmss_handler import VMSSHandler
+from providers.azure.infrastructure.services.spot_placement_score_adapter import (
+    AzureSpotPlacementScoreAdapter,
+)
 from providers.azure.managers.azure_resource_manager import AzureResourceManager
 from providers.base.strategy import (
     ProviderCapabilities,
@@ -66,6 +79,8 @@ class AzureProviderStrategy(ProviderStrategy):
         self._handlers: dict[str, AzureHandler] = {}
         self._azure_provisioning_port = azure_provisioning_port
         self._azure_provisioning_port_resolver = azure_provisioning_port_resolver
+        self._spot_placement_planner = SpotPlacementPlanner()
+        self._spot_placement_execution = SpotPlacementExecutionService()
 
     # ------------------------------------------------------------------
     # Lazy-initialised properties
@@ -130,6 +145,192 @@ class AzureProviderStrategy(ProviderStrategy):
                 ),
             }
         return self._handlers
+
+    @staticmethod
+    def _should_use_spot_placement(template: AzureTemplate) -> bool:
+        return getattr(template, "allocation_strategy", None) == "spotPlacementScore"
+
+    def _build_spot_placement_plan(
+        self,
+        azure_template: AzureTemplate,
+        count: int,
+    ) -> list[PlacementPlanEntry]:
+        adapter = AzureSpotPlacementScoreAdapter(
+            azure_client=self.azure_client,
+            logger=self._logger,
+            subscription_id=azure_template.subscription_id or self._azure_config.subscription_id,
+            base_location=azure_template.location or self._azure_config.region,
+        )
+        scores = adapter.score_candidates(requested_count=count, template=azure_template)
+        plan = self._spot_placement_planner.create_plan(
+            requested_count=count,
+            scores=scores,
+            split_strategy=azure_template.placement_split_strategy,
+            primary_share_percent=azure_template.placement_primary_share_percent,
+        )
+        if plan:
+            return plan
+
+        if scores:
+            self._logger.warning(
+                "Azure spot placement scores returned no viable candidates; "
+                "falling back to template candidate order"
+            )
+            return self._build_fallback_spot_placement_plan(scores, count)
+
+        return []
+
+    @staticmethod
+    def _build_fallback_spot_placement_plan(
+        scores: list[PlacementScore],
+        requested_count: int,
+    ) -> list[PlacementPlanEntry]:
+        if requested_count <= 0 or not scores:
+            return []
+
+        fallback_scores = [
+            replace(
+                score,
+                approximate=True,
+                metadata={
+                    **score.metadata,
+                    "fallback_reason": "no_viable_provider_scores",
+                },
+            )
+            for score in scores
+        ]
+        return [
+            PlacementPlanEntry(score=fallback_scores[0], planned_count=requested_count),
+            *[
+                PlacementPlanEntry(score=score, planned_count=0)
+                for score in fallback_scores[1:]
+            ],
+        ]
+
+    @staticmethod
+    def _is_capacity_like_failure(child_result: dict[str, Any]) -> bool:
+        error_codes = set(child_result.get("error_codes", []))
+        return bool(
+            error_codes
+            & {
+                "AllocationFailed",
+                "ZonalAllocationFailed",
+                "SkuNotAvailable",
+                "OverconstrainedAllocationRequest",
+            }
+        )
+
+    @staticmethod
+    def _clone_template_for_plan_entry(
+            azure_template: AzureTemplate,
+        plan_entry: PlacementPlanEntry,
+    ) -> AzureTemplate:
+        cloned_data = azure_template.model_dump(mode="json", exclude_none=True)
+        selected_vm_size = plan_entry.score.candidate.instance_type
+        cloned_data["vm_size"] = selected_vm_size
+        cloned_data["vm_sizes"] = []
+        cloned_data["allocation_strategy"] = "capacityOptimized"
+        cloned_data["location"] = plan_entry.score.candidate.region or azure_template.location
+        cloned_data["zones"] = (
+            [plan_entry.score.candidate.zone] if plan_entry.score.candidate.zone else []
+        )
+        cloned_data["placement_regions"] = []
+        cloned_data["placement_zones"] = []
+        return AzureTemplate.model_validate(cloned_data)
+
+    def _execute_planned_spot_launches(
+        self,
+        azure_template: AzureTemplate,
+        provider_api: str,
+        count: int,
+        template_config: dict[str, Any],
+        operation: ProviderOperation,
+    ) -> ProviderResult:
+        handler = self.handlers.get(provider_api)
+        if not handler:
+            return ProviderResult.error_result(
+                f"No handler available for provider_api: {provider_api}",
+                "HANDLER_NOT_FOUND",
+            )
+
+        plan = self._build_spot_placement_plan(azure_template, count)
+        if not plan:
+            return ProviderResult.error_result(
+                "No viable spot placement candidates returned scores",
+                "NO_PLACEMENT_CANDIDATES",
+            )
+
+        request_metadata = dict(operation.parameters.get("request_metadata", {}) or {})
+        base_request_id = operation.parameters.get("request_id") or (
+            operation.context.get("request_id") if operation.context else None
+        )
+
+        summary = self._spot_placement_execution.execute_plan(
+            plan=plan,
+            total_count=count,
+            build_child_template=lambda plan_entry: self._clone_template_for_plan_entry(
+                azure_template, plan_entry
+            ),
+            build_child_request=lambda requested_for_entry, idx: create_acquire_request(
+                template_id=azure_template.template_id,
+                count=requested_for_entry,
+                provider_type="azure",
+                provider_instance="azure-default",
+                provider_api=provider_api,
+                request_metadata=request_metadata,
+                parent_request_id=base_request_id,
+                plan_entry_index=idx,
+            ),
+            launch_child=lambda child_request, child_template: handler.acquire_hosts(
+                child_request, child_template
+            ),
+            is_capacity_like_failure=self._is_capacity_like_failure,
+        )
+
+        provider_data = build_planned_execution_metadata(plan, summary)
+
+        if summary.terminal_error_message and not summary.resource_ids and not summary.instances:
+            return ProviderResult.error_result(
+                f"Provisioning failed: {summary.terminal_error_message}",
+                "PROVISIONING_ADAPTER_ERROR",
+                {
+                    "operation": "create_instances",
+                    "template_config": template_config,
+                    "handler_used": provider_api,
+                    "method": "planned_handler",
+                    "provider_data": provider_data,
+                },
+            )
+
+        if not summary.resource_ids and not summary.instances and summary.unfulfilled_count > 0:
+            return ProviderResult.error_result(
+                "Spot placement plan could not provision any instances",
+                "PROVISIONING_ADAPTER_ERROR",
+                {
+                    "operation": "create_instances",
+                    "template_config": template_config,
+                    "handler_used": provider_api,
+                    "method": "planned_handler",
+                    "provider_data": provider_data,
+                },
+            )
+
+        return ProviderResult.success_result(
+            {
+                "resource_ids": summary.resource_ids,
+                "instances": summary.instances,
+                "provider_api": provider_api,
+                "count": count,
+                "template_id": azure_template.template_id,
+            },
+            {
+                "operation": "create_instances",
+                "template_config": template_config,
+                "handler_used": provider_api,
+                "method": "planned_handler",
+                "provider_data": provider_data,
+            },
+        )
 
     # ------------------------------------------------------------------
     # ProviderStrategy contract
@@ -501,6 +702,15 @@ class AzureProviderStrategy(ProviderStrategy):
                         "method": "dry_run",
                         "provider_data": {"dry_run": True},
                     },
+                )
+
+            if self._should_use_spot_placement(azure_template):
+                return self._execute_planned_spot_launches(
+                    azure_template=azure_template,
+                    provider_api=provider_api,
+                    count=count,
+                    template_config=template_config,
+                    operation=operation,
                 )
 
             handler_result = handler.acquire_hosts(request, azure_template)

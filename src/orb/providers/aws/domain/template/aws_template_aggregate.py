@@ -253,6 +253,15 @@ class AWSTemplate(Template):
         # (generic/example templates may have empty subnet_ids/image_id, filled at runtime
         # from provider.template_defaults via _coalesce_merge)
 
+        if self.allocation_strategy == AllocationStrategy.SPOT_PLACEMENT_SCORE.value:
+            candidate_types = list((self.instance_types or {}).keys())
+            if self.instance_type and self.instance_type not in candidate_types:
+                candidate_types.insert(0, self.instance_type)
+            if len(candidate_types) < 2:
+                raise ValueError(
+                    "spotPlacementScore allocation strategy requires at least two candidate instance types"
+                )
+
         # Auto-assign default fleet_type if not provided
         # Set fleet_type from metadata if not already set
         if not self.fleet_type:

@@ -5,6 +5,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from domain.base.value_objects import AllocationStrategy, PlacementSplitStrategy
+
 
 class Template(BaseModel):
     """Template configuration value object with both snake_case and camelCase support via aliases."""
@@ -22,6 +24,8 @@ class Template(BaseModel):
 
     # Instance configuration
     instance_type: Optional[str] = None
+    vm_size: Optional[str] = None
+    vm_sizes: list[str] = Field(default_factory=list)
     image_id: Optional[str] = None
     max_instances: int = 1
 
@@ -33,6 +37,10 @@ class Template(BaseModel):
     price_type: str = "ondemand"
     allocation_strategy: Optional[str] = None  # Will be set based on price_type
     max_price: Optional[float] = None
+    placement_split_strategy: PlacementSplitStrategy = PlacementSplitStrategy.HYBRID
+    placement_primary_share_percent: int = 80
+    placement_regions: list[str] = Field(default_factory=list)
+    placement_zones: list[str] = Field(default_factory=list)
 
     # Machine types configuration (unified for all providers)
     machine_types: dict[str, int] = Field(default_factory=dict)
@@ -121,6 +129,29 @@ class Template(BaseModel):
                 f"Tag keys must not start with 'orb:' (reserved for system use): "
                 f"{', '.join(sorted(reserved_keys))}"
             )
+
+        if self.placement_primary_share_percent < 0 or self.placement_primary_share_percent > 100:
+            raise ValueError("placement_primary_share_percent must be between 0 and 100")
+
+        if self.allocation_strategy == AllocationStrategy.SPOT_PLACEMENT_SCORE.value:
+            if self.price_type != "spot":
+                raise ValueError("spotPlacementScore allocation strategy requires price_type='spot'")
+
+            candidate_count = 0
+            if self.instance_types:
+                candidate_count = len(self.instance_types)
+            elif self.instance_type:
+                candidate_count = 1
+
+            vm_sizes = self.vm_sizes or []
+            vm_size = getattr(self, "vm_size", None)
+            if vm_size:
+                candidate_count = max(candidate_count, len([vm_size, *vm_sizes]))
+
+            if candidate_count < 2:
+                raise ValueError(
+                    "spotPlacementScore allocation strategy requires at least two candidate instance types"
+                )
 
         return self
 

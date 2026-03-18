@@ -25,6 +25,7 @@ from typing import Any, Optional
 from pydantic import AliasChoices, ConfigDict, Field, model_validator
 
 from domain.template.template_aggregate import Template
+from domain.base.value_objects import AllocationStrategy
 from providers.azure.domain.template.value_objects import (
     AzureAllocationStrategy,
     AzureCachingType,
@@ -420,6 +421,13 @@ class AzureTemplate(Template):
     @model_validator(mode="after")
     def validate_azure_template(self) -> "AzureTemplate":
         """Azure-specific template validation."""
+        if self.allocation_strategy == AllocationStrategy.SPOT_PLACEMENT_SCORE.value:
+            candidate_sizes = [self.vm_size, *(self.vm_sizes or [])]
+            if len(candidate_sizes) < 2:
+                raise ValueError(
+                    "spotPlacementScore allocation strategy requires at least two candidate vm sizes"
+                )
+
         if self.spot_percentage is not None:
             if self.provider_api not in (
                 AzureProviderApi.VMSS,

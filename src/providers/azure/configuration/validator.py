@@ -62,6 +62,7 @@ def validate_azure_template(template_config: dict[str, Any]) -> dict[str, Any]:
 
     # VM size validation -----------------------------------------------
     vm_size = template_config.get("vm_size", "")
+    vm_sizes = template_config.get("vm_sizes") or []
     if vm_size and not vm_size.startswith("Standard_"):
         warnings.append(
             f"Uncommon VM size format: '{vm_size}'. "
@@ -89,6 +90,15 @@ def validate_azure_template(template_config: dict[str, Any]) -> dict[str, Any]:
     spot_percentage = template_config.get("spot_percentage")
     orchestration_mode = template_config.get("orchestration_mode", "Flexible")
     single_placement_group = bool(template_config.get("single_placement_group", False))
+    allocation_strategy = template_config.get("allocation_strategy")
+
+    if allocation_strategy == "spotPlacementScore":
+        if priority != "Spot":
+            errors.append("spotPlacementScore requires Spot priority Azure VMs")
+        if len([vm_size, *vm_sizes]) < 2:
+            errors.append(
+                "spotPlacementScore requires at least two candidate vm sizes via vm_size/vm_sizes"
+            )
 
     if priority == "Regular":
         if eviction_policy is not None:

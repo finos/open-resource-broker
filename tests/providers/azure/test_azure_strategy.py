@@ -9,6 +9,14 @@ import asyncio
 import pytest
 from unittest.mock import MagicMock
 
+from application.services.spot_placement_planner import (
+    PlacementCandidate,
+    PlacementPlanEntry,
+    PlacementScore,
+)
+from providers.azure.infrastructure.services.spot_placement_score_adapter import (
+    AzureSpotPlacementScoreAdapter,
+)
 from providers.azure.configuration.config import AzureProviderConfig
 from providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
 from providers.base.strategy import (
@@ -647,3 +655,151 @@ class TestCleanup:
         assert strategy._initialized is False
         assert strategy._handlers == {}
         assert strategy._client is None
+
+
+class TestSpotPlacementPlanning:
+    def test_create_instances_uses_planned_handler_path(self, strategy, monkeypatch):
+        handler = MagicMock()
+        handler.acquire_hosts.side_effect = [
+            {"success": False, "error_message": "AllocationFailed: No capacity in selected zone"},
+            {"success": True, "resource_ids": ["vmss-b"], "instances": []},
+        ]
+        strategy._handlers["VMSS"] = handler
+
+        monkeypatch.setattr(
+            strategy,
+            "_build_spot_placement_plan",
+            lambda template, count: [
+                PlacementPlanEntry(
+                    score=PlacementScore(
+                        candidate=PlacementCandidate(
+                            candidate_id="azure:eastus2:1:Standard_D4s_v5",
+                            instance_type="Standard_D4s_v5",
+                            region="eastus2",
+                            zone="1",
+                        ),
+                        raw_score="High",
+                        normalized_score=1.0,
+                    ),
+                    planned_count=2,
+                ),
+                PlacementPlanEntry(
+                    score=PlacementScore(
+                        candidate=PlacementCandidate(
+                            candidate_id="azure:eastus2:2:Standard_D8s_v5",
+                            instance_type="Standard_D8s_v5",
+                            region="eastus2",
+                            zone="2",
+                        ),
+                        raw_score="Medium",
+                        normalized_score=0.6,
+                    ),
+                    planned_count=1,
+                ),
+            ],
+        )
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={
+                "count": 2,
+                "request_id": "req-11111111-1111-4111-8111-111111111111",
+                "template_config": {
+                    "template_id": "tmpl-1",
+                    "provider_api": "VMSS",
+                    "resource_group": "rg1",
+                    "location": "eastus2",
+                    "image": {
+                        "image_id": "/subscriptions/x/resourceGroups/rg/providers/Microsoft.Compute/images/img"
+                    },
+                    "vm_size": "Standard_D4s_v5",
+                    "vm_sizes": ["Standard_D8s_v5"],
+                    "price_type": "spot",
+                    "priority": "Spot",
+                    "allocation_strategy": "spotPlacementScore",
+                    "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCu"],
+                },
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert result.success
+        assert result.data["resource_ids"] == ["vmss-b"]
+        assert result.metadata["method"] == "planned_handler"
+        assert result.metadata["provider_data"]["unfulfilled_count"] == 0
+        assert len(result.metadata["provider_data"]["child_results"]) == 2
+        first_request = handler.acquire_hosts.call_args_list[0].args[0]
+        assert str(first_request.request_id).startswith("req-")
+        assert str(first_request.request_id) != "req-11111111-1111-4111-8111-111111111111"
+        assert first_request.metadata["parent_request_id"] == "req-11111111-1111-4111-8111-111111111111"
+        assert first_request.metadata["spot_placement_plan_entry_index"] == 0
+
+    def test_create_instances_falls_back_when_scores_are_stale(self, strategy, monkeypatch):
+        handler = MagicMock()
+        handler.acquire_hosts.return_value = {
+            "success": True,
+            "resource_ids": ["vmss-fallback"],
+            "instances": [],
+        }
+        strategy._handlers["VMSS"] = handler
+
+        monkeypatch.setattr(
+            AzureSpotPlacementScoreAdapter,
+            "score_candidates",
+            lambda self, requested_count, template: [
+                PlacementScore(
+                    candidate=PlacementCandidate(
+                        candidate_id="azure:eastus2:regional:Standard_D4s_v5",
+                        instance_type="Standard_D4s_v5",
+                        region="eastus2",
+                    ),
+                    raw_score="DataNotFoundOrStale",
+                    normalized_score=0.0,
+                    metadata={"raw_entry": {"score": "DataNotFoundOrStale"}},
+                ),
+                PlacementScore(
+                    candidate=PlacementCandidate(
+                        candidate_id="azure:eastus2:regional:Standard_D8s_v5",
+                        instance_type="Standard_D8s_v5",
+                        region="eastus2",
+                    ),
+                    raw_score="DataNotFoundOrStale",
+                    normalized_score=0.0,
+                    metadata={"raw_entry": {"score": "DataNotFoundOrStale"}},
+                ),
+            ],
+        )
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={
+                "count": 2,
+                "template_config": {
+                    "template_id": "tmpl-stale",
+                    "provider_api": "VMSS",
+                    "resource_group": "rg1",
+                    "location": "eastus2",
+                    "image": {
+                        "image_id": "/subscriptions/x/resourceGroups/rg/providers/Microsoft.Compute/images/img"
+                    },
+                    "vm_size": "Standard_D4s_v5",
+                    "vm_sizes": ["Standard_D8s_v5"],
+                    "price_type": "spot",
+                    "priority": "Spot",
+                    "allocation_strategy": "spotPlacementScore",
+                    "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCu"],
+                },
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert result.success
+        assert result.data["resource_ids"] == ["vmss-fallback"]
+        assert result.metadata["method"] == "planned_handler"
+        serialized_plan = result.metadata["provider_data"]["placement_plan"]
+        assert serialized_plan[0]["instance_type"] == "Standard_D4s_v5"
+        assert serialized_plan[0]["planned_count"] == 2
+        assert serialized_plan[0]["approximate"] is True
+        assert serialized_plan[0]["metadata"]["fallback_reason"] == "no_viable_provider_scores"
