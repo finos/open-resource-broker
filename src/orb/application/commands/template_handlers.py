@@ -7,15 +7,14 @@ from orb.application.template.commands import (
     DeleteTemplateCommand,
     UpdateTemplateCommand,
 )
-from orb.domain.base import UnitOfWorkFactory
-from orb.domain.base.exceptions import BusinessRuleError, EntityNotFoundError
+from orb.domain.base.exceptions import DuplicateError, EntityNotFoundError
 from orb.domain.base.ports import (
-    ContainerPort,
     ErrorHandlingPort,
     EventPublisherPort,
     LoggingPort,
 )
-from orb.domain.template.template_aggregate import Template
+from orb.domain.base.ports.template_configuration_port import TemplateConfigurationPort
+from orb.infrastructure.template.dtos import TemplateDTO
 
 
 @command_handler(CreateTemplateCommand)  # type: ignore[arg-type]
@@ -25,8 +24,8 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  #
 
     Responsibilities:
     - Validate template configuration
-    - Create template aggregate
-    - Persist template through repository
+    - Check for duplicate template IDs
+    - Persist template through TemplateConfigurationManager
     - Publish TemplateCreated domain event
 
     CQRS Compliance: Returns None. Results stored in command.validation_errors and command.created.
@@ -34,16 +33,14 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  #
 
     def __init__(
         self,
-        uow_factory: UnitOfWorkFactory,
+        template_port: TemplateConfigurationPort,
         logger: LoggingPort,
-        container: ContainerPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
     ) -> None:
         """Initialize the instance."""
         super().__init__(logger, event_publisher, error_handler)
-        self._uow_factory = uow_factory
-        self._container = container
+        self._template_port = template_port
 
     async def validate_command(self, command: CreateTemplateCommand) -> None:
         """Validate create template command."""
@@ -56,76 +53,55 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  #
             raise ValueError("image_id is required")
 
     async def execute_command(self, command: CreateTemplateCommand) -> None:
-        """Create new template with validation and events."""
+        """Create new template via TemplateConfigurationManager."""
         self.logger.info("Creating template: %s", command.template_id)
 
-        try:
-            # Get template configuration port for validation
-            from orb.domain.base.ports.template_configuration_port import (
-                TemplateConfigurationPort,
-            )
-
-            template_port = self._container.get(TemplateConfigurationPort)
-
-            # Validate template configuration — merge command fields with extra config
-            validation_errors = template_port.validate_template_config(
-                {
-                    "template_id": command.template_id,
-                    "provider_api": command.provider_api,
-                    "image_id": command.image_id,
-                    **command.configuration,
-                }
-            )
-            if validation_errors:
-                self.logger.warning(
-                    "Template validation failed for %s: %s",
-                    command.template_id,
-                    validation_errors,
-                )
-                command.validation_errors = validation_errors
-                command.created = False
-                return
-
-            # Create template aggregate
-            template = Template(
-                template_id=command.template_id,
-                name=command.name or command.template_id,
-                description=command.description,
-                provider_api=command.provider_api,
-                instance_type=command.instance_type,
-                image_id=command.image_id,
-                subnet_ids=command.configuration.get("subnet_ids", []),
-                security_group_ids=command.configuration.get("security_group_ids", []),
-                tags=command.tags,
-            )
-
-            # Persist template through repository
-            with self._uow_factory.create_unit_of_work() as uow:
-                # Check if template already exists
-                from orb.domain.template.value_objects import TemplateId
-
-                existing_template = uow.templates.get_by_id(TemplateId(value=command.template_id))
-                if existing_template:
-                    raise BusinessRuleError(f"Template {command.template_id} already exists")
-
-                # Add new template
-                uow.templates.save(template)
-
-                self.logger.info("Template created successfully: %s", command.template_id)
-
-            command.created = True
-
-        except BusinessRuleError as e:
-            self.logger.error(
-                "Business rule violation creating template %s: %s",
+        # Validate configuration first
+        validation_errors = self._template_port.validate_template_config(
+            {
+                "template_id": command.template_id,
+                "provider_api": command.provider_api,
+                "image_id": command.image_id,
+                **command.configuration,
+            }
+        )
+        if validation_errors:
+            self.logger.warning(
+                "Template validation failed for %s: %s",
                 command.template_id,
-                e,
+                validation_errors,
             )
-            command.validation_errors = [str(e)]
+            command.validation_errors = validation_errors
             command.created = False
-        except Exception as e:
-            self.logger.error("Failed to create template %s: %s", command.template_id, e)
-            raise
+            return
+
+        template_manager = self._template_port.get_template_manager()
+
+        # Duplicate check
+        existing = await template_manager.get_template_by_id(command.template_id)
+        if existing:
+            raise DuplicateError(
+                f"Template {command.template_id} already exists",
+                details={"entity_type": "Template", "entity_id": command.template_id},
+            )
+
+        # Build DTO from command fields — configuration provides defaults, named fields win
+        dto_fields = {
+            **command.configuration,
+            "template_id": command.template_id,
+            "name": command.name or command.template_id,
+            "description": command.description,
+            "provider_api": command.provider_api,
+            "image_id": command.image_id,
+            "tags": command.tags,
+        }
+        # Remove None values so TemplateDTO defaults apply
+        dto_fields = {k: v for k, v in dto_fields.items() if v is not None}
+        dto = TemplateDTO(**dto_fields)
+
+        await template_manager.save_template(dto)
+        self.logger.info("Template created successfully: %s", command.template_id)
+        command.created = True
 
 
 @command_handler(UpdateTemplateCommand)  # type: ignore[arg-type]
@@ -136,8 +112,7 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, None]):  #
     Responsibilities:
     - Validate template exists
     - Validate updated configuration
-    - Update template aggregate
-    - Persist changes through repository
+    - Persist changes through TemplateConfigurationManager
     - Publish TemplateUpdated domain event
 
     CQRS Compliance: Returns None. Results stored in command.validation_errors and command.updated.
@@ -145,15 +120,13 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, None]):  #
 
     def __init__(
         self,
-        uow_factory: UnitOfWorkFactory,
+        template_port: TemplateConfigurationPort,
         logger: LoggingPort,
-        container: ContainerPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
     ) -> None:
         super().__init__(logger, event_publisher, error_handler)
-        self._uow_factory = uow_factory
-        self._container = container
+        self._template_port = template_port
 
     async def validate_command(self, command: UpdateTemplateCommand) -> None:
         """Validate update template command."""
@@ -162,77 +135,60 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, None]):  #
             raise ValueError("template_id is required")
 
     async def execute_command(self, command: UpdateTemplateCommand) -> None:
-        """Update existing template with validation and events."""
+        """Update existing template via TemplateConfigurationManager."""
         self.logger.info("Updating template: %s", command.template_id)
 
-        try:
-            # Get template configuration port for validation
-            from orb.domain.base.ports.template_configuration_port import (
-                TemplateConfigurationPort,
+        template_manager = self._template_port.get_template_manager()
+
+        existing = await template_manager.get_template_by_id(command.template_id)
+        if not existing:
+            raise EntityNotFoundError("Template", command.template_id)
+
+        # Apply updates onto the existing DTO
+        from typing import Any
+
+        update_fields: dict[str, Any] = {}
+
+        # Apply configuration as field overrides first
+        if command.configuration:
+            valid_fields = TemplateDTO.model_fields.keys()
+            update_fields.update(
+                {k: v for k, v in command.configuration.items() if k in valid_fields}
             )
 
-            template_port = self._container.get(TemplateConfigurationPort)
+        # Named fields override configuration
+        for field, value in {
+            "name": command.name,
+            "description": command.description,
+            "image_id": command.image_id,
+        }.items():
+            if value is not None:
+                update_fields[field] = value
 
-            # Validate updated configuration if provided
-            validation_errors = []
-            if command.configuration:
-                validation_errors = template_port.validate_template_config(command.configuration)
-                if validation_errors:
-                    self.logger.warning(
-                        "Template update validation failed for %s: %s",
-                        command.template_id,
-                        validation_errors,
-                    )
-                    command.validation_errors = validation_errors
-                    command.updated = False
-                    return
+        # instance_type → machine_types (backward compat)
+        if command.instance_type is not None and "machine_types" not in update_fields:
+            update_fields["machine_types"] = {command.instance_type: 1}
 
-            # Update template through repository
-            with self._uow_factory.create_unit_of_work() as uow:
-                # Get existing template
-                from orb.domain.template.value_objects import TemplateId
+        if update_fields:
+            updated = existing.model_copy(update=update_fields)
+        else:
+            updated = existing
 
-                template = uow.templates.get_by_id(TemplateId(value=command.template_id))
-                if not template:
-                    raise EntityNotFoundError("Template", command.template_id)
+        # Validate the fully-merged DTO (not the raw partial patch)
+        validation_errors = self._template_port.validate_template_config(updated.model_dump())
+        if validation_errors:
+            self.logger.warning(
+                "Template update validation failed for %s: %s",
+                command.template_id,
+                validation_errors,
+            )
+            command.validation_errors = validation_errors
+            command.updated = False
+            return
 
-                # Track changes for event
-                changes = {}
-
-                # Update template properties
-                if command.name is not None:
-                    template = template.update_name(command.name)
-                    changes["name"] = command.name
-
-                if command.description is not None:
-                    template = template.update_description(command.description)
-                    changes["description"] = command.description
-
-                if command.configuration:
-                    template = template.update_configuration(command.configuration)
-                    changes["configuration"] = command.configuration
-
-                if command.instance_type is not None:
-                    template = template.update_instance_type(command.instance_type)
-                    changes["instance_type"] = command.instance_type
-
-                if command.image_id is not None:
-                    template = template.update_image_id(command.image_id)
-                    changes["image_id"] = command.image_id
-
-                # Save changes
-                uow.templates.save(template)
-
-                self.logger.info("Template updated successfully: %s", command.template_id)
-
-            command.updated = True
-
-        except EntityNotFoundError:
-            self.logger.error("Template not found for update: %s", command.template_id)
-            raise
-        except Exception as e:
-            self.logger.error("Failed to update template %s: %s", command.template_id, e)
-            raise
+        await template_manager.save_template(updated)
+        self.logger.info("Template updated successfully: %s", command.template_id)
+        command.updated = True
 
 
 @command_handler(DeleteTemplateCommand)  # type: ignore[arg-type]
@@ -242,8 +198,7 @@ class DeleteTemplateHandler(BaseCommandHandler[DeleteTemplateCommand, None]):  #
 
     Responsibilities:
     - Validate template exists
-    - Check if template is in use
-    - Delete template through repository
+    - Delete template through TemplateConfigurationManager
     - Publish TemplateDeleted domain event
 
     CQRS Compliance: Returns None. Results stored in command.deleted.
@@ -251,15 +206,13 @@ class DeleteTemplateHandler(BaseCommandHandler[DeleteTemplateCommand, None]):  #
 
     def __init__(
         self,
-        uow_factory: UnitOfWorkFactory,
+        template_port: TemplateConfigurationPort,
         logger: LoggingPort,
-        container: ContainerPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
     ) -> None:
         super().__init__(logger, event_publisher, error_handler)
-        self._uow_factory = uow_factory
-        self._container = container
+        self._template_port = template_port
 
     async def validate_command(self, command: DeleteTemplateCommand) -> None:
         """Validate delete template command."""
@@ -268,44 +221,15 @@ class DeleteTemplateHandler(BaseCommandHandler[DeleteTemplateCommand, None]):  #
             raise ValueError("template_id is required")
 
     async def execute_command(self, command: DeleteTemplateCommand) -> None:
-        """Delete template with validation and events."""
+        """Delete template via TemplateConfigurationManager."""
         self.logger.info("Deleting template: %s", command.template_id)
 
-        try:
-            # Delete template through repository
-            with self._uow_factory.create_unit_of_work() as uow:
-                # Get existing template
-                from orb.domain.template.value_objects import TemplateId
+        template_manager = self._template_port.get_template_manager()
 
-                template_id = TemplateId(value=command.template_id)
-                template = uow.templates.get_by_id(template_id)
-                if not template:
-                    raise EntityNotFoundError("Template", command.template_id)
+        existing = await template_manager.get_template_by_id(command.template_id)
+        if not existing:
+            raise EntityNotFoundError("Template", command.template_id)
 
-                # Check if template is in use (business rule)
-                # This could be expanded to check for active requests using this
-                # template
-                if hasattr(template, "is_in_use") and template.is_in_use():
-                    raise BusinessRuleError(
-                        f"Cannot delete template {command.template_id}: template is in use"
-                    )
-
-                # Delete template
-                uow.templates.delete(template_id)
-
-                self.logger.info("Template deleted successfully: %s", command.template_id)
-
-            command.deleted = True
-
-        except EntityNotFoundError:
-            self.logger.error("Template not found for deletion: %s", command.template_id)
-            raise
-        except BusinessRuleError:
-            self.logger.error(
-                "Cannot delete template %s: business rule violation",
-                command.template_id,
-            )
-            raise
-        except Exception as e:
-            self.logger.error("Failed to delete template %s: %s", command.template_id, e)
-            raise
+        await template_manager.delete_template(command.template_id)
+        self.logger.info("Template deleted successfully: %s", command.template_id)
+        command.deleted = True

@@ -15,6 +15,7 @@ from orb.domain.base.events.domain_events import (
     TemplateDeletedEvent,
     TemplateUpdatedEvent,
 )
+from orb.domain.base.exceptions import EntityNotFoundError
 from orb.domain.base.ports.event_publisher_port import EventPublisherPort
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.infrastructure.template.dtos import TemplateDTO
@@ -68,11 +69,17 @@ class TemplateStorageService:
             # Load existing templates from target file
             existing_templates = await self._load_templates_from_file(target_file)
 
-            # Update or add the template
-            template_dict = template.model_dump(exclude_none=False)
+            # Convert to scheduler-native format before writing
+            template_dict = template.model_dump(exclude_none=True)
+            template_dict = self.scheduler_strategy.serialize_template_for_storage(template_dict)
+
+            # Update or add the template (on-disk entries may use native camelCase keys)
             template_found = False
             for i, existing_template in enumerate(existing_templates):
-                if existing_template.get("template_id") == template.template_id:
+                existing_id = existing_template.get("template_id") or existing_template.get(
+                    "templateId"
+                )
+                if existing_id == template.template_id:
                     existing_templates[i] = template_dict
                     template_found = True
                     break
@@ -124,26 +131,39 @@ class TemplateStorageService:
             # Determine source file
             if source_file:
                 target_file = source_file
+                existing_templates = await self._load_templates_from_file(target_file)
+                original_count = len(existing_templates)
+                existing_templates = [
+                    t
+                    for t in existing_templates
+                    if t.get("template_id") != template_id and t.get("templateId") != template_id
+                ]
+                if len(existing_templates) == original_count:
+                    raise EntityNotFoundError("Template", template_id)
             else:
-                # Use first template path as default
+                # Search all paths for the template
                 template_paths = self.scheduler_strategy.get_template_paths()  # type: ignore[attr-defined]
                 if not template_paths:
                     raise ValueError("No template paths available from scheduler strategy")
-                target_file = Path(template_paths[0])
 
-            # Load existing templates from source file
-            existing_templates = await self._load_templates_from_file(target_file)
+                target_file = None
+                existing_templates = []
+                for path in template_paths:
+                    candidate = Path(path)
+                    templates = await self._load_templates_from_file(candidate)
+                    filtered = [
+                        t
+                        for t in templates
+                        if t.get("template_id") != template_id
+                        and t.get("templateId") != template_id
+                    ]
+                    if len(filtered) < len(templates):
+                        target_file = candidate
+                        existing_templates = filtered
+                        break
 
-            # Remove the template
-            original_count = len(existing_templates)
-            existing_templates = [
-                t
-                for t in existing_templates
-                if t.get("template_id") != template_id and t.get("templateId") != template_id
-            ]
-
-            if len(existing_templates) == original_count:
-                raise ValueError(f"Template {template_id} not found in source file")
+                if target_file is None:
+                    raise EntityNotFoundError("Template", template_id)
 
             # Write back to file
             await self._write_templates_to_file(target_file, existing_templates)
@@ -168,11 +188,20 @@ class TemplateStorageService:
             raise
 
     async def _load_templates_from_file(self, file_path: Path) -> list[dict[str, Any]]:
-        """Load raw template data from a file using scheduler strategy."""
+        """Load raw on-disk template dicts without field mapping."""
+        if not file_path.exists():
+            return []
         try:
-            # Use scheduler strategy to load and parse templates
-            templates = self.scheduler_strategy.load_templates_from_path(str(file_path))  # type: ignore[attr-defined]
-            return templates
+            with open(file_path, encoding="utf-8") as f:
+                if file_path.suffix.lower() in {".yml", ".yaml"}:
+                    import yaml
+
+                    raw = yaml.safe_load(f) or {}
+                else:
+                    import json
+
+                    raw = json.load(f)
+            return raw.get("templates", []) if isinstance(raw, dict) else []
         except Exception as e:
             self.logger.error("Failed to load templates from %s: %s", file_path, e)
             return []
@@ -189,16 +218,26 @@ class TemplateStorageService:
             # Ensure directory exists
             file_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Prepare data structure (HostFactory format expects templates array)
-            data = {"templates": templates}
+            # Embed scheduler_type so round-trip loading can delegate correctly
+            data: dict[str, Any] = {
+                "scheduler_type": self.scheduler_strategy.get_scheduler_type(),
+                "templates": templates,
+            }
 
             # Write in appropriate format based on file extension
             if file_path.suffix.lower() in {".yml", ".yaml"}:
                 with open(file_path, "w", encoding="utf-8") as f:
                     yaml.dump(data, f, default_flow_style=False, indent=2)
             else:
+                from datetime import date, datetime
+
+                def _json_default(obj: Any) -> Any:
+                    if isinstance(obj, (datetime, date)):
+                        return obj.isoformat()
+                    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
                 with open(file_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
+                    json.dump(data, f, indent=2, ensure_ascii=False, default=_json_default)
 
             self.logger.debug("Wrote %s templates to %s", len(templates), file_path)
 

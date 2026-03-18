@@ -95,7 +95,7 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         Returns:
             TemplateDTO or None
         """
-        return self._template_manager.get_template(template_id)
+        return await self._template_manager.get_template_by_id(template_id)
 
     async def get_templates_by_provider(self, provider_api: str) -> list[TemplateDTO]:
         """

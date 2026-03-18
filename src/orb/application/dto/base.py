@@ -40,7 +40,7 @@ class BaseDTO(BaseModel):
         Returns:
             Dict with snake_case keys (Pythonic format)
         """
-        return self.model_dump(mode="json")
+        return self.model_dump(mode="json", exclude_none=True)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "BaseDTO":

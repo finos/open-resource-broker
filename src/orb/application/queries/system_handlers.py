@@ -1,6 +1,6 @@
 """System query handlers for administrative operations."""
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from orb.application.base.handlers import BaseQueryHandler
 from orb.application.decorators import query_handler
@@ -9,20 +9,29 @@ from orb.application.dto.queries import (
     ValidateStorageQuery,  # type: ignore[attr-defined]
 )
 from orb.application.dto.system import (
+    CircuitBreakerSectionDTO,
     ConfigurationSectionResponse,
+    LoggingSectionDTO,
+    PathsSectionDTO,
     ProviderConfigDTO,
+    ProviderSectionDTO,
+    RequestLimitsSectionDTO,
+    SchedulerSectionDTO,
+    ServerSectionDTO,
+    StorageSectionDTO,
+    SystemConfigDTO,
     SystemStatusDTO,
     ValidationResultDTO,
 )
 from orb.application.queries.system import (
     GetConfigurationSectionQuery,
     GetProviderConfigQuery,
+    GetSystemConfigQuery,
     GetSystemStatusQuery,
     ValidateProviderConfigQuery,
 )
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
-from orb.domain.constants import PROVIDER_TYPE_AWS
 from orb.domain.services.timestamp_service import TimestampService
 
 # Use TYPE_CHECKING to avoid direct infrastructure imports
@@ -107,63 +116,56 @@ class GetProviderConfigHandler(BaseQueryHandler[GetProviderConfigQuery, Provider
             config_manager = self.container.get(ConfigurationPort)
 
             # Get provider configuration
-            if hasattr(config_manager, "get_provider_config"):
-                provider_config = config_manager.get_provider_config()
+            provider_config = config_manager.get_provider_config()
 
-                # Get full configuration sources
-                config_sources = config_manager.get_configuration_sources()
+            # Get full configuration sources
+            config_sources = config_manager.get_configuration_sources()
 
-                # Determine default provider
-                active_providers = (
-                    provider_config.get_active_providers()  # type: ignore[union-attr]
-                    if hasattr(provider_config, "get_active_providers")
-                    else []
-                )
-                default_provider = active_providers[0].name if active_providers else None  # type: ignore[union-attr]
+            # Determine default provider
+            active_providers = (
+                provider_config.get_active_providers()  # type: ignore[union-attr]
+                if provider_config is not None
+                else []
+            )
+            default_provider = active_providers[0].name if active_providers else None  # type: ignore[union-attr]
 
-                # Get last updated time from config file
-                last_updated = None
-                if config_sources.get("config_file"):
-                    import os
+            # Get last updated time from config file
+            last_updated = None
+            if config_sources.get("config_file"):
+                import os
 
-                    try:
-                        mtime = os.path.getmtime(config_sources["config_file"])
-                        last_updated = self.timestamp_service.format_for_display(mtime)
-                    except (OSError, ValueError):
-                        pass
+                try:
+                    mtime = os.path.getmtime(config_sources["config_file"])
+                    last_updated = self.timestamp_service.format_for_display(mtime)
+                except (OSError, ValueError) as exc:
+                    # Failure to read or format the config file's modification time is non-fatal;
+                    # log at debug level and leave `last_updated` as None.
+                    self.logger.debug(
+                        "Failed to determine last updated time for config file '%s': %s",
+                        config_sources.get("config_file"),
+                        exc,
+                    )
 
-                return ProviderConfigDTO(
-                    provider_mode=(
-                        provider_config.get_mode().value  # type: ignore[union-attr]
-                        if hasattr(provider_config, "get_mode")
-                        else "legacy"
-                    ),
-                    active_providers=([p.name for p in active_providers]),  # type: ignore[union-attr]
-                    provider_count=len(active_providers),
-                    default_provider=default_provider,
-                    configuration_source=config_sources["primary_source"]
-                    if isinstance(config_sources, dict)
-                    else "unknown",
-                    config_file=config_sources.get("config_file")
-                    if isinstance(config_sources, dict)
-                    else None,
-                    template_file=config_sources.get("template_file")
-                    if isinstance(config_sources, dict)
-                    else None,
-                    last_updated=last_updated,
-                )
-            else:
-                # Fallback for legacy configuration
-                return ProviderConfigDTO(
-                    provider_mode="legacy",
-                    active_providers=[PROVIDER_TYPE_AWS],
-                    provider_count=1,
-                    default_provider=None,
-                    configuration_source="legacy",
-                    config_file=None,
-                    template_file=None,
-                    last_updated=None,
-                )
+            return ProviderConfigDTO(
+                provider_mode=(
+                    provider_config.get_mode().value  # type: ignore[union-attr]
+                    if provider_config is not None
+                    else "legacy"
+                ),
+                active_providers=([p.name for p in active_providers]),  # type: ignore[union-attr]
+                provider_count=len(active_providers),
+                default_provider=default_provider,
+                configuration_source=config_sources["primary_source"]
+                if isinstance(config_sources, dict)
+                else "unknown",
+                config_file=config_sources.get("config_file")
+                if isinstance(config_sources, dict)
+                else None,
+                template_file=config_sources.get("template_file")
+                if isinstance(config_sources, dict)
+                else None,
+                last_updated=last_updated,
+            )
 
         except Exception as e:
             self.logger.error("Failed to get provider configuration: %s", e)
@@ -212,20 +214,15 @@ class ValidateProviderConfigHandler(
             warnings = []
 
             # Validate configuration structure
-            if hasattr(config_manager, "validate_configuration"):
-                validation_result = config_manager.validate_configuration()
-                if isinstance(validation_result, dict):
-                    validation_errors.extend(validation_result.get("errors", []))
-                    warnings.extend(validation_result.get("warnings", []))
+            validation_result = config_manager.validate_configuration()
+            if isinstance(validation_result, dict):
+                validation_errors.extend(validation_result.get("errors", []))
+                warnings.extend(validation_result.get("warnings", []))
 
             # Additional validation logic
             try:
-                provider_config = (
-                    config_manager.get_provider_config()
-                    if hasattr(config_manager, "get_provider_config")
-                    else None
-                )
-                if provider_config and hasattr(provider_config, "get_active_providers"):
+                provider_config = config_manager.get_provider_config()
+                if provider_config is not None:
                     active_providers = provider_config.get_active_providers()  # type: ignore[union-attr]
                     if not active_providers:
                         warnings.append("No active providers configured")
@@ -442,3 +439,145 @@ class ValidateMCPHandler(BaseQueryHandler[ValidateMCPQuery, dict[str, Any]]):
                 "warnings": [],
                 "mcp_enabled": False,
             }
+
+
+@query_handler(GetSystemConfigQuery)
+class GetSystemConfigHandler(BaseQueryHandler[GetSystemConfigQuery, SystemConfigDTO]):
+    """Handler for getting full system configuration overview."""
+
+    def __init__(
+        self,
+        logger: LoggingPort,
+        container: ContainerPort,
+        error_handler: ErrorHandlingPort,
+    ) -> None:
+        super().__init__(logger, error_handler)
+        self.container = container
+
+    async def execute_query(self, query: GetSystemConfigQuery) -> SystemConfigDTO:
+        """Execute system config query."""
+        from orb.domain.base.ports import ConfigurationPort
+
+        cfg = self.container.get(ConfigurationPort)
+
+        # --- paths ---
+        loaded_templates_file: str | None = None
+        template_search_paths: list[str] | None = None
+        try:
+            import os
+
+            from orb.application.ports.scheduler_port import SchedulerPort
+
+            scheduler = self.container.get(SchedulerPort)
+            all_paths = scheduler.get_template_paths() or []
+
+            for path in all_paths:
+                if os.path.exists(path):
+                    loaded_templates_file = path
+                    break
+
+            if query.verbose:
+                template_search_paths = all_paths
+        except Exception:  # noqa: BLE001 — template path resolution is best-effort; fall back to None
+            pass
+
+        paths = PathsSectionDTO(
+            root_dir=cfg.get_root_dir() if hasattr(cfg, "get_root_dir") else "",
+            config_dir=cfg.get_config_dir() if hasattr(cfg, "get_config_dir") else "",
+            work_dir=cfg.get_work_dir() if hasattr(cfg, "get_work_dir") else "",
+            log_dir=cfg.get_log_dir() if hasattr(cfg, "get_log_dir") else "",
+            loaded_config_file=cast(Any, cfg).get_loaded_config_file()
+            if hasattr(cfg, "get_loaded_config_file")
+            else None,
+            loaded_templates_file=loaded_templates_file,
+            template_search_paths=template_search_paths,
+        )
+
+        # --- provider ---
+        active_providers: list[str] = []
+        provider_mode = "legacy"
+        default_provider: str | None = None
+        try:
+            provider_config = (
+                cfg.get_provider_config() if hasattr(cfg, "get_provider_config") else None
+            )
+            if provider_config and hasattr(provider_config, "get_active_providers"):
+                providers = provider_config.get_active_providers()
+                active_providers = [p.name for p in providers]
+                default_provider = active_providers[0] if active_providers else None
+            if provider_config and hasattr(provider_config, "get_mode"):
+                provider_mode = provider_config.get_mode().value
+        except Exception as exc:
+            # Provider config inspection failed — fall back to defaults
+            self.logger.warning("Could not inspect provider configuration: %s", exc)
+        provider = ProviderSectionDTO(
+            active_providers=active_providers,
+            provider_mode=provider_mode,
+            default_provider=default_provider,
+        )
+
+        # --- storage ---
+        storage_strategy = cfg.get_storage_strategy()
+        storage_cfg = cfg.get_storage_config() if hasattr(cfg, "get_storage_config") else {}
+        storage = StorageSectionDTO(
+            strategy=storage_strategy,
+            data_path=storage_cfg.get("data_path") if isinstance(storage_cfg, dict) else None,
+            backup_enabled=bool(storage_cfg.get("backup_enabled", False))
+            if isinstance(storage_cfg, dict)
+            else False,
+            backup_path=storage_cfg.get("backup_path") if isinstance(storage_cfg, dict) else None,
+        )
+
+        # --- scheduler ---
+        scheduler = SchedulerSectionDTO(scheduler_type=cfg.get_scheduler_strategy())
+
+        # --- server (only if enabled) ---
+        server: ServerSectionDTO | None = None
+        server_cfg = cfg.get("server", {})
+        if isinstance(server_cfg, dict) and server_cfg.get("enabled"):
+            server = ServerSectionDTO(
+                enabled=True,
+                host=server_cfg.get("host"),
+                port=server_cfg.get("port"),
+            )
+
+        # --- verbose sections ---
+        logging_section: LoggingSectionDTO | None = None
+        request_limits: RequestLimitsSectionDTO | None = None
+        circuit_breaker: CircuitBreakerSectionDTO | None = None
+
+        if query.verbose:
+            log_cfg = cfg.get_logging_config() if hasattr(cfg, "get_logging_config") else {}
+            if isinstance(log_cfg, dict):
+                logging_section = LoggingSectionDTO(
+                    level=str(log_cfg.get("level", "INFO")),
+                    log_file=log_cfg.get("file"),
+                    console_enabled=bool(log_cfg.get("console_enabled", True)),
+                )
+
+            req_cfg = cfg.get_request_config() if hasattr(cfg, "get_request_config") else {}
+            if isinstance(req_cfg, dict):
+                request_limits = RequestLimitsSectionDTO(
+                    max_machines=req_cfg.get("max_machines_per_request"),
+                    default_timeout=req_cfg.get("default_timeout"),
+                    grace_period=req_cfg.get("grace_period"),
+                )
+
+            cb_cfg = cfg.get("circuit_breaker", {})
+            if isinstance(cb_cfg, dict):
+                circuit_breaker = CircuitBreakerSectionDTO(
+                    enabled=bool(cb_cfg.get("enabled", False)),
+                    failure_threshold=cb_cfg.get("failure_threshold"),
+                    recovery_timeout=cb_cfg.get("recovery_timeout"),
+                )
+
+        return SystemConfigDTO(
+            paths=paths,
+            provider=provider,
+            storage=storage,
+            scheduler=scheduler,
+            server=server,
+            logging=logging_section,
+            request_limits=request_limits,
+            circuit_breaker=circuit_breaker,
+        )
