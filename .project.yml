@@ -6,7 +6,7 @@ project:
   name: open-resource-broker
   pypi_name: orb-py # PyPI distribution name
   short_name: orb # CLI command name
-  version: 1.3.0
+  version: 1.4.0
   description: "Open Resource Broker (ORB) — dynamic cloud resource provisioning via CLI and REST API"
   author: "AWS Professional Services"
   email: "aws-proserve@amazon.com"
