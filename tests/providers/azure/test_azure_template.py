@@ -126,6 +126,26 @@ class TestSpotValidation:
         assert t.eviction_policy == AzureEvictionPolicy.DEALLOCATE
         assert t.spot_allocation_strategy == AzureAllocationStrategy.CAPACITY_OPTIMIZED
 
+    def test_spot_percentage_promotes_priority_to_spot(self):
+        t = AzureTemplate(**_BASE_FIELDS, spot_percentage=70)
+        assert t.priority == AzurePriority.SPOT
+
+    def test_spot_percentage_requires_flexible(self):
+        with pytest.raises(ValueError, match="Flexible orchestration mode"):
+            AzureTemplate(
+                **_BASE_FIELDS,
+                spot_percentage=70,
+                orchestration_mode=AzureVMSSOrchestrationMode.UNIFORM,
+            )
+
+    def test_spot_percentage_rejects_single_placement_group(self):
+        with pytest.raises(ValueError, match="single_placement_group"):
+            AzureTemplate(
+                **_BASE_FIELDS,
+                spot_percentage=70,
+                single_placement_group=True,
+            )
+
     def test_regular_rejects_eviction_policy(self):
         with pytest.raises(ValueError, match="eviction_policy"):
             AzureTemplate(**_BASE_FIELDS, priority="Regular", eviction_policy="Delete")
@@ -238,6 +258,22 @@ class TestArmPayload:
         ]
         assert arm["skuProfile"]["allocationStrategy"] == "CapacityOptimized"
         assert "vmSizeProperties" not in arm["properties"]["virtualMachineProfile"]["hardwareProfile"]
+
+    def test_spot_percentage_populates_priority_mix_policy(self):
+        t = AzureTemplate(
+            **_BASE_FIELDS,
+            vm_sizes=["Standard_D8s_v5"],
+            spot_percentage=70,
+            base_regular_priority_count=2,
+        )
+        arm = t.to_azure_api_format()
+
+        vm_profile = arm["properties"]["virtualMachineProfile"]
+        assert vm_profile["priority"] == "Spot"
+        assert arm["properties"]["priorityMixPolicy"] == {
+            "baseRegularPriorityCount": 2,
+            "regularPriorityPercentageAboveBase": 30,
+        }
 
     def test_zones_in_arm_payload(self):
         t = AzureTemplate(

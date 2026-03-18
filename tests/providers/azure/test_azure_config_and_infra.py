@@ -152,6 +152,23 @@ class TestAzureValidationAdapter:
         with patch("config.manager.get_config_manager", side_effect=Exception("no config")):
             assert adapter.validate_provider_api("VMSSUniform") is True
 
+    def test_validate_template_configuration_rejects_spot_percentage_for_uniform(self):
+        adapter = AzureValidationAdapter(config=AzureProviderConfig(), logger=MagicMock())
+
+        result = adapter.validate_template_configuration({
+            "provider_api": "VMSS",
+            "orchestration_mode": "Uniform",
+            "spot_percentage": 70,
+            "vm_size": "Standard_D4s_v5",
+            "resource_group": "rg",
+            "location": "eastus2",
+            "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
+            "image": {"publisher": "C", "offer": "o", "sku": "s"},
+        })
+
+        assert result["valid"] is False
+        assert any("spot_percentage requires Flexible orchestration mode" in error for error in result["errors"])
+
 
 class TestAzureMachineAdapter:
     def test_create_machine_from_normalized_instance_adds_metadata(self):

@@ -86,12 +86,29 @@ def validate_azure_template(template_config: dict[str, Any]) -> dict[str, Any]:
     priority = template_config.get("priority", "Regular")
     eviction_policy = template_config.get("eviction_policy")
     billing_max_price = template_config.get("billing_profile_max_price")
+    spot_percentage = template_config.get("spot_percentage")
+    orchestration_mode = template_config.get("orchestration_mode", "Flexible")
+    single_placement_group = bool(template_config.get("single_placement_group", False))
 
     if priority == "Regular":
         if eviction_policy is not None:
             errors.append("eviction_policy is only valid for Spot or Low priority VMs")
         if billing_max_price is not None:
             errors.append("billing_profile_max_price is only valid for Spot priority VMs")
+
+    if spot_percentage is not None:
+        if not isinstance(spot_percentage, int) or not (0 <= spot_percentage <= 100):
+            errors.append("spot_percentage must be an integer between 0 and 100")
+        if provider_api not in {"VMSS", "VMSSUniform"}:
+            errors.append("spot_percentage is only supported for VMSS-based templates")
+        if orchestration_mode != "Flexible":
+            errors.append("spot_percentage requires Flexible orchestration mode")
+        if single_placement_group:
+            errors.append(
+                "spot_percentage is not supported when single_placement_group is enabled"
+            )
+        if priority == "Low":
+            errors.append("spot_percentage is not compatible with Low priority VMs")
 
     # Zone balance requires zones
     if template_config.get("zone_balance") and not template_config.get("zones"):
@@ -103,4 +120,3 @@ def validate_azure_template(template_config: dict[str, Any]) -> dict[str, Any]:
         "warnings": warnings,
         "validated_fields": list(template_config.keys()),
     }
-

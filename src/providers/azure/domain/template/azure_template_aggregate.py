@@ -150,6 +150,26 @@ class AzureTemplate(Template):
         description="Max price ($/hr) for Spot VMs. -1 = market price.",
         validation_alias=AliasChoices("billing_profile_max_price", "billingProfileMaxPrice"),
     )
+    spot_percentage: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description=(
+            "Desired percentage of Spot VMs above the regular-priority base count. "
+            "Mapped to Azure Flexible VMSS priorityMixPolicy."
+        ),
+        validation_alias=AliasChoices("spot_percentage", "spotPercentage"),
+    )
+    base_regular_priority_count: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Minimum number of regular-priority VMs to keep when using Spot Priority Mix."
+        ),
+        validation_alias=AliasChoices(
+            "base_regular_priority_count", "baseRegularPriorityCount"
+        ),
+    )
     spot_allocation_strategy: Optional[AzureAllocationStrategy] = Field(
         default=None,
         description="Spot allocation strategy (LowestPrice, CapacityOptimized).",
@@ -400,6 +420,30 @@ class AzureTemplate(Template):
     @model_validator(mode="after")
     def validate_azure_template(self) -> "AzureTemplate":
         """Azure-specific template validation."""
+        if self.spot_percentage is not None:
+            if self.provider_api not in (
+                AzureProviderApi.VMSS,
+                AzureProviderApi.VMSS_UNIFORM,
+            ):
+                raise ValueError(
+                    "spot_percentage is only supported for VMSS-based Azure templates"
+                )
+            if self.orchestration_mode != AzureVMSSOrchestrationMode.FLEXIBLE:
+                raise ValueError(
+                    "spot_percentage requires Flexible orchestration mode"
+                )
+            if self.single_placement_group:
+                raise ValueError(
+                    "spot_percentage is not supported when single_placement_group is enabled"
+                )
+            # Azure requires Spot priority on the scale set when using priorityMixPolicy.
+            if self.priority == AzurePriority.LOW:
+                raise ValueError(
+                    "spot_percentage is not compatible with Low priority VMs; use Spot"
+                )
+            if self.priority == AzurePriority.REGULAR:
+                object.__setattr__(self, "priority", AzurePriority.SPOT)
+
         # Spot VMs require an eviction policy
         if self.priority == AzurePriority.SPOT:
             if self.eviction_policy is None:
@@ -675,6 +719,12 @@ class AzureTemplate(Template):
             if self.spot_restore_timeout:
                 spot_restore["restoreTimeout"] = self.spot_restore_timeout
             properties["spotRestorePolicy"] = spot_restore
+
+        if self.spot_percentage is not None:
+            properties["priorityMixPolicy"] = {
+                "baseRegularPriorityCount": self.base_regular_priority_count,
+                "regularPriorityPercentageAboveBase": 100 - self.spot_percentage,
+            }
 
         # --- Identity ---
         identity: dict[str, Any] | None = None
