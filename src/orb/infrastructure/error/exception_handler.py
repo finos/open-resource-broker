@@ -27,6 +27,7 @@ from orb.domain.base.exceptions import (
     BusinessRuleViolationError,
     ConfigurationError,
     DomainException,
+    DuplicateError,
     EntityNotFoundError,
     InfrastructureError,
     ValidationError,
@@ -68,6 +69,7 @@ class ErrorCategory:
 
     # Business rule errors
     BUSINESS_RULE_VIOLATION = "business_rule_violation"
+    DUPLICATE = "duplicate_error"
     INVALID_STATE = "invalid_state"
     OPERATION_NOT_ALLOWED = "operation_not_allowed"
 
@@ -258,6 +260,7 @@ class InfrastructureErrorResponse(BaseDTO):
             ErrorCategory.MACHINE_NOT_FOUND: HTTPStatus.NOT_FOUND,
             ErrorCategory.REQUEST_NOT_FOUND: HTTPStatus.NOT_FOUND,
             ErrorCategory.BUSINESS_RULE_VIOLATION: HTTPStatus.UNPROCESSABLE_ENTITY,
+            ErrorCategory.DUPLICATE: HTTPStatus.CONFLICT,
             ErrorCategory.INVALID_STATE: HTTPStatus.CONFLICT,
             ErrorCategory.OPERATION_NOT_ALLOWED: HTTPStatus.FORBIDDEN,
             ErrorCategory.CONFIGURATION: HTTPStatus.INTERNAL_SERVER_ERROR,
@@ -366,6 +369,7 @@ class ExceptionHandler:
         self._type_mapper.register_handler(
             BusinessRuleViolationError, self._preserve_business_rule_violation
         )
+        self._type_mapper.register_handler(DuplicateError, self._preserve_duplicate_error)
 
         # TEMPLATE EXCEPTIONS - Preserve with template context
         self._type_mapper.register_handler(TemplateException, self._preserve_template_exception)
@@ -473,6 +477,23 @@ class ExceptionHandler:
                 "error_code": exc.error_code,
                 "rule_violation": exc.message,
                 "rule_details": exc.details,
+                "context": context.to_dict(),
+                **kwargs,
+            },
+        )
+        return exc
+
+    def _preserve_duplicate_error(
+        self, exc: DuplicateError, context: ExceptionContext, **kwargs
+    ) -> DuplicateError:
+        """Preserve duplicate error with conflict-specific logging."""
+        self.logger.warning(
+            "Duplicate resource in %s",
+            context.operation,
+            extra={
+                "error_code": exc.error_code,
+                "duplicate_message": exc.message,
+                "duplicate_details": exc.details,
                 "context": context.to_dict(),
                 **kwargs,
             },
