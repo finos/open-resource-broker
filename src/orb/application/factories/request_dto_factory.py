@@ -39,7 +39,7 @@ class RequestDTOFactory:
             # For return requests, terminated is success, pending is executing
             if status in ["terminated", "stopped"]:
                 return "succeed"
-            elif status in ["pending", "terminating"]:
+            elif status in ["pending", "terminating", "shutting-down", "stopping"]:
                 return "executing"
             else:
                 return "fail"
