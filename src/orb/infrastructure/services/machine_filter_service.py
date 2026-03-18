@@ -40,7 +40,7 @@ class MachineFilterService(FilterService):
             return field.strip(), FilterOperator.NOT_EQUAL, value.strip()
 
         # Contains ~ (but not part of =~ or !~)
-        if "~" in filter_expr and "=" not in filter_expr.split("~")[0]:
+        if "~" in filter_expr and "=" not in filter_expr.split("~", maxsplit=1)[0]:
             field, value = filter_expr.split("~", 1)
             return field.strip(), FilterOperator.CONTAINS, value.strip()
 

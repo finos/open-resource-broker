@@ -123,17 +123,16 @@ class AWSProviderStrategy(ProviderStrategy):
                     self._logger.debug("AWS client created via resolver")
                 except Exception as exc:
                     self._logger.warning("Failed to resolve AWSClient: %s", exc, exc_info=True)
-            else:
-                if self._config_port is not None:
-                    try:
-                        self._aws_client = AWSClient(
-                            config=self._config_port,
-                            logger=self._logger,
-                            provider_name=self._provider_name,
-                        )
-                        self._logger.debug("AWS client created directly")
-                    except Exception as exc:
-                        self._logger.warning("Failed to create AWSClient: %s", exc, exc_info=True)
+            elif self._config_port is not None:
+                try:
+                    self._aws_client = AWSClient(
+                        config=self._config_port,
+                        logger=self._logger,
+                        provider_name=self._provider_name,
+                    )
+                    self._logger.debug("AWS client created directly")
+                except Exception as exc:
+                    self._logger.warning("Failed to create AWSClient: %s", exc, exc_info=True)
         return self._aws_client
 
     def initialize(self) -> bool:
@@ -526,7 +525,7 @@ class AWSProviderStrategy(ProviderStrategy):
             result["fleet_role"] = args.fleet_role
         return result
 
-    def register_health_checks(self, health_check: "HealthCheck") -> None:
+    def register_health_checks(self, health_check: HealthCheck) -> None:
         """Register AWS-specific health checks if client is available."""
         if self.aws_client is None:
             return
