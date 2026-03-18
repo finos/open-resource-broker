@@ -5,6 +5,7 @@ import argparse
 import pytest
 
 from orb.cli.args import add_machine_actions, add_provider_actions, add_request_actions, add_template_actions
+from orb.cli.args_extractor import ArgsExtractor
 from orb.domain.machine.machine_status import MachineStatus
 
 
@@ -55,3 +56,30 @@ def test_machines_list_invalid_status_raises_argparse_error():
     with pytest.raises(SystemExit) as exc_info:
         _parse(sp, ["list", "--status", "not-a-real-status"])
     assert exc_info.value.code != 0
+
+
+# ---------------------------------------------------------------------------
+# Task 2044 — fix extract_output_format + rename --template-id to --request-id
+# ---------------------------------------------------------------------------
+
+
+def test_extract_output_format_reads_format_attr():
+    ns = argparse.Namespace(format="yaml", output="/tmp/out.txt")
+    extractor = ArgsExtractor(ns)
+    assert extractor.extract_output_format() == "yaml"
+
+
+def test_extract_output_format_does_not_return_file_path():
+    ns = argparse.Namespace(output="/tmp/results.json")
+    extractor = ArgsExtractor(ns)
+    result = extractor.extract_output_format(default="table")
+    assert result != "/tmp/results.json"
+
+
+def test_machines_list_has_request_id_flag_not_template_id():
+    sp = _make_subparsers()
+    add_machine_actions(sp)
+    list_parser = sp.choices["list"]
+    all_opts = [opt for a in list_parser._actions for opt in getattr(a, "option_strings", [])]
+    assert "--request-id" in all_opts
+    assert "--template-id" not in all_opts

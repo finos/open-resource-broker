@@ -85,7 +85,7 @@ def add_machine_actions(subparsers):
         choices=[s.value for s in MachineStatus],
         help="Filter by machine status (specific filter)",
     )
-    machines_list.add_argument("--template-id", help="Filter by template ID (specific filter)")
+    machines_list.add_argument("--request-id", dest="request_id", help="Filter by request ID")
     machines_list.add_argument(
         "--timestamp-format",
         choices=["auto", "unix", "iso"],

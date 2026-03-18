@@ -98,7 +98,7 @@ class ArgsExtractor:
 
     def extract_output_format(self, default: str = "table") -> str:
         """Extract output format from args."""
-        return getattr(self.args, "output", default)
+        return getattr(self.args, "format", default)
 
     def extract_provider_override(self) -> Optional[str]:
         """Extract provider override from global args."""

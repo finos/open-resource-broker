@@ -87,7 +87,7 @@ async def handle_list_machines(args: "argparse.Namespace") -> dict[str, Any]:
         ListMachinesInput(
             status=getattr(args, "status", None),
             provider_name=getattr(args, "provider", None),
-            request_id=getattr(args, "request_id", None) or getattr(args, "template_id", None),
+            request_id=getattr(args, "request_id", None),
         )
     )
     return formatter.format_machine_list(result.machines)
