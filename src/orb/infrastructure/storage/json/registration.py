@@ -108,6 +108,8 @@ def create_json_unit_of_work(config: Any) -> Any:
                 request_file=single_file,
                 template_file=single_file,
                 create_dirs=True,
+                backup_count=json_config.backup_count,
+                backup_enabled=json_config.backup_enabled,
             )
         else:
             # For split files, use individual file names
@@ -118,6 +120,8 @@ def create_json_unit_of_work(config: Any) -> Any:
                 request_file=split_files.get("requests", "requests.json"),
                 template_file=split_files.get("templates", "templates.json"),
                 create_dirs=True,
+                backup_count=json_config.backup_count,
+                backup_enabled=json_config.backup_enabled,
             )
     else:
         # For testing or other scenarios - assume it's a dict with file paths

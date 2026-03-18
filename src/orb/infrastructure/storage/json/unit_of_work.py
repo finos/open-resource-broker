@@ -33,6 +33,8 @@ class JSONUnitOfWork(BaseUnitOfWork):
         template_file: str = "templates.json",
         legacy_template_file: Optional[str] = None,
         create_dirs: bool = True,
+        backup_count: int = 5,
+        backup_enabled: bool = True,
     ) -> None:
         """
         Initialize JSON unit of work with simplified repositories.
@@ -44,6 +46,8 @@ class JSONUnitOfWork(BaseUnitOfWork):
             template_file: Template data file name
             legacy_template_file: Legacy template file (optional)
             create_dirs: Whether to create directories
+            backup_count: Number of backup files to keep
+            backup_enabled: Whether to create backups
         """
         super().__init__()
 
@@ -66,6 +70,8 @@ class JSONUnitOfWork(BaseUnitOfWork):
             create_dirs=create_dirs,
             entity_type="machines",
             metrics=metrics,
+            backup_count=backup_count,
+            backup_enabled=backup_enabled,
         )
 
         request_strategy = JSONStorageStrategy(
@@ -73,6 +79,8 @@ class JSONUnitOfWork(BaseUnitOfWork):
             create_dirs=create_dirs,
             entity_type="requests",
             metrics=metrics,
+            backup_count=backup_count,
+            backup_enabled=backup_enabled,
         )
 
         template_path = (
@@ -83,6 +91,8 @@ class JSONUnitOfWork(BaseUnitOfWork):
             create_dirs=create_dirs,
             entity_type="templates",
             metrics=metrics,
+            backup_count=backup_count,
+            backup_enabled=backup_enabled,
         )
 
         # Create repositories using simplified implementations

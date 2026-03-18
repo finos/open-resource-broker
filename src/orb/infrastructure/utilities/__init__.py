@@ -30,14 +30,12 @@ from orb.infrastructure.utilities.common.serialization import (
 from orb.infrastructure.utilities.common.string_utils import (
     extract_provider_type,
 )
-from orb.infrastructure.utilities.factories.api_handler_factory import APIHandlerFactory
 
 # Import factories (removed legacy ProviderFactory)
 from orb.infrastructure.utilities.factories.repository_factory import RepositoryFactory
 from orb.infrastructure.utilities.factories.sql_engine_factory import SQLEngineFactory
 
 __all__: list[str] = [
-    "APIHandlerFactory",
     # Factories (legacy ProviderFactory removed)
     "RepositoryFactory",
     "SQLEngineFactory",

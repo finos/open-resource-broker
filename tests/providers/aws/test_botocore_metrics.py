@@ -49,7 +49,7 @@ class TestBotocoreMetrics:
     @pytest.fixture
     def handler(self, metrics_collector, logger):
         """Create BotocoreMetricsHandler instance."""
-        return BotocoreMetricsHandler(metrics_collector, logger, {"aws_metrics_enabled": True})
+        return BotocoreMetricsHandler(metrics_collector, logger, {"provider_metrics_enabled": True})
 
     @mock_aws
     def test_event_registration(self, handler):
@@ -314,7 +314,7 @@ class TestIntegrationWithMoto:
         """Create instrumented boto3 session."""
         metrics = Mock(spec=MetricsCollector)
         logger = Mock(spec=LoggingPort)
-        handler = BotocoreMetricsHandler(metrics, logger, {"aws_metrics_enabled": True})
+        handler = BotocoreMetricsHandler(metrics, logger, {"provider_metrics_enabled": True})
 
         session = boto3.Session()
         handler.register_events(session)

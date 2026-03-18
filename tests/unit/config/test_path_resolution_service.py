@@ -27,7 +27,7 @@ class TestResolveFilePath:
 
     def test_resolve_file_path_no_explicit_uses_scheduler_dir_when_provider_set(self):
         """When scheduler_directory_provider returns a dir, it is used."""
-        provider = lambda file_type: "/sched/conf"  # noqa: E731
+        provider = lambda file_type: "/sched/conf"
         svc = PathResolutionService(scheduler_directory_provider=provider)
         result = svc.resolve_file_path("config", "config.json")
         assert result == "/sched/conf/config.json"
@@ -39,7 +39,7 @@ class TestResolveFilePath:
         monkeypatch.setattr(
             "orb.config.platform_dirs.get_config_location", lambda: tmp_path / "config"
         )
-        provider = lambda file_type: None  # noqa: E731
+        provider = lambda file_type: None
         svc = PathResolutionService(scheduler_directory_provider=provider)
         result = svc.resolve_file_path("config", "config.json")
         assert result == str(tmp_path / "config" / "config.json")
@@ -97,7 +97,7 @@ class TestResolveDirectory:
 
     def test_resolve_directory_with_scheduler_provider_returns_scheduler_dir(self):
         """When scheduler provider returns a dir, resolve_directory returns it."""
-        provider = lambda file_type: "/sched/work"  # noqa: E731
+        provider = lambda file_type: "/sched/work"
         svc = PathResolutionService(scheduler_directory_provider=provider)
         result = svc.resolve_directory("work")
         assert result == "/sched/work"

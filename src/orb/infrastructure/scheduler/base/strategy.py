@@ -112,6 +112,14 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
         problem_statuses = ["failed", "cancelled", "timeout", "partial"]
         return 1 if status in problem_statuses else 0
 
+    def format_template_mutation_response(self, raw: dict[str, Any]) -> dict[str, Any]:
+        """Format template mutation response using snake_case keys (default)."""
+        return {
+            "template_id": raw.get("template_id"),
+            "status": raw.get("status"),
+            "validation_errors": raw.get("validation_errors", []),
+        }
+
     def format_health_response(self, checks: list[dict[str, Any]]) -> dict[str, Any]:
         """Format health check response."""
         passed = sum(1 for c in checks if c.get("status") == "pass")
@@ -139,7 +147,10 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
         """
         formatted = []
         for request in requests:
-            formatted.append(request.to_dict())
+            if isinstance(request, dict):
+                formatted.append(request)
+            else:
+                formatted.append(request.to_dict())
         return {
             "requests": formatted,
             "message": "Request status retrieved successfully",

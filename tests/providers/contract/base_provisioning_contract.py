@@ -82,7 +82,7 @@ class BaseProvisioningContract:
     ):
         """release_hosts must complete without raising for a valid acquire result."""
         result = provider_under_test.acquire_hosts(valid_provision_request, valid_template)
-        result.get("resource_ids", [])  # noqa: F841 — validates key exists
+        result.get("resource_ids", [])
         # Providers that release by instance IDs use provider_data; passing empty list
         # is the safe cross-provider call (matches existing moto test pattern).
         provider_under_test.release_hosts([])

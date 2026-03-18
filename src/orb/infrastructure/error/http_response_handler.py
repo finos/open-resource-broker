@@ -11,6 +11,7 @@ from typing import Callable
 from orb.domain.base.exceptions import (
     BusinessRuleViolationError,
     ConfigurationError,
+    DuplicateError,
     EntityNotFoundError,
     InfrastructureError,
     ValidationError,
@@ -71,6 +72,7 @@ class HTTPErrorResponseHandler:
             ValidationError: self._handle_validation_error_http,
             EntityNotFoundError: self._handle_not_found_error_http,
             BusinessRuleViolationError: self._handle_business_rule_error_http,
+            DuplicateError: self._handle_duplicate_error_http,
             # Request errors
             RequestNotFoundError: self._handle_request_not_found_http,
             RequestValidationError: self._handle_request_validation_http,
@@ -103,6 +105,16 @@ class HTTPErrorResponseHandler:
             category=ErrorCategory.NOT_FOUND,
             details=getattr(exception, "details", {}),
             http_status=HTTPStatus.NOT_FOUND,
+        )
+
+    def _handle_duplicate_error_http(self, exception: DuplicateError) -> ErrorResponse:
+        """Handle duplicate resource errors for HTTP responses."""
+        return ErrorResponse(
+            error_code="DUPLICATE_ERROR",
+            message=str(exception),
+            category=ErrorCategory.BUSINESS_RULE,
+            details=getattr(exception, "details", {}),
+            http_status=HTTPStatus.CONFLICT,
         )
 
     def _handle_business_rule_error_http(

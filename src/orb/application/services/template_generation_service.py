@@ -217,7 +217,7 @@ class TemplateGenerationService:
             template_dicts.append(template_dict)
 
         # Apply scheduler formatting
-        return self._scheduler_strategy.format_templates_for_generation(template_dicts)
+        return self._scheduler_strategy.format_templates_for_dispatch(template_dicts)
 
     def _get_templates_file_path(self, filename: str) -> Path:
         """Get the full path for templates file."""
@@ -377,4 +377,4 @@ class TemplateGenerationService:
     ) -> List[Dict[str, Any]]:
         """Format merged template dictionaries using scheduler strategy."""
         # Templates are already dicts, just apply scheduler formatting
-        return self._scheduler_strategy.format_templates_for_generation(template_dicts)
+        return self._scheduler_strategy.format_templates_for_dispatch(template_dicts)

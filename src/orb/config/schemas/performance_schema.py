@@ -5,63 +5,6 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from .base_config import BaseCircuitBreakerConfig
 
 
-class BatchSizesConfig(BaseModel):
-    """Batch sizes for different operations.
-
-    NOTE: All fields here are AWS EC2 API operation names and are AWS-specific.
-    Known debt: move to providers/aws/configuration/ once PerformanceConfig is
-    decoupled from AppConfig or a provider-extension mechanism exists.
-    """
-
-    terminate_instances: int = Field(
-        25, description="Batch size for terminate_instances operations"
-    )
-    create_tags: int = Field(20, description="Batch size for create_tags operations")
-    describe_instances: int = Field(25, description="Batch size for describe_instances operations")
-    run_instances: int = Field(10, description="Batch size for run_instances operations")
-    describe_spot_fleet_instances: int = Field(
-        20, description="Batch size for describe_spot_fleet_instances operations"
-    )
-    describe_auto_scaling_groups: int = Field(
-        20, description="Batch size for describe_auto_scaling_groups operations"
-    )
-    describe_launch_templates: int = Field(
-        20, description="Batch size for describe_launch_templates operations"
-    )
-    describe_spot_fleet_requests: int = Field(
-        20, description="Batch size for describe_spot_fleet_requests operations"
-    )
-    describe_ec2_fleet_instances: int = Field(
-        20, description="Batch size for describe_ec2_fleet_instances operations"
-    )
-    describe_images: int = Field(15, description="Batch size for describe_images operations")
-    describe_security_groups: int = Field(
-        25, description="Batch size for describe_security_groups operations"
-    )
-    describe_subnets: int = Field(25, description="Batch size for describe_subnets operations")
-
-    @field_validator(
-        "terminate_instances",
-        "create_tags",
-        "describe_instances",
-        "run_instances",
-        "describe_spot_fleet_instances",
-        "describe_auto_scaling_groups",
-        "describe_launch_templates",
-        "describe_spot_fleet_requests",
-        "describe_ec2_fleet_instances",
-        "describe_images",
-        "describe_security_groups",
-        "describe_subnets",
-    )
-    @classmethod
-    def validate_batch_size(cls, v: int) -> int:
-        """Validate batch size."""
-        if v < 1:
-            raise ValueError("Batch size must be at least 1")
-        return v
-
-
 class AdaptiveBatchSizingConfig(BaseModel):
     """Adaptive batch sizing configuration."""
 
@@ -196,28 +139,10 @@ class PerformanceConfig(BaseModel):
         default_factory=lambda: LazyLoadingConfig()  # type: ignore[call-arg]
     )
     enable_batching: bool = Field(True, description="Whether to enable batching of API calls")
-    batch_sizes: dict[str, int] = Field(
-        default_factory=lambda: {
-            "terminate_instances": 25,
-            "create_tags": 20,
-            "describe_instances": 25,
-            "run_instances": 10,
-            "describe_spot_fleet_instances": 20,
-            "describe_auto_scaling_groups": 20,
-            "describe_launch_templates": 20,
-            "describe_spot_fleet_requests": 20,
-            "describe_ec2_fleet_instances": 20,
-            "describe_images": 15,
-            "describe_security_groups": 25,
-            "describe_subnets": 25,
-        }
-    )
     enable_parallel: bool = Field(True, description="Whether to enable parallel processing")
     max_workers: int = Field(
         10, description="Maximum number of worker threads for parallel processing"
     )
-    enable_caching: bool = Field(True, description="Whether to enable resource caching")
-    cache_ttl: int = Field(300, description="Cache time-to-live in seconds")
     enable_adaptive_batch_sizing: bool = Field(
         True, description="Whether to enable adaptive batch sizing"
     )
@@ -232,14 +157,6 @@ class PerformanceConfig(BaseModel):
         """Validate max workers."""
         if v < 1:
             raise ValueError("Maximum workers must be at least 1")
-        return v
-
-    @field_validator("cache_ttl")
-    @classmethod
-    def validate_cache_ttl(cls, v: int) -> int:
-        """Validate cache TTL."""
-        if v < 0:
-            raise ValueError("Cache TTL must be non-negative")
         return v
 
 

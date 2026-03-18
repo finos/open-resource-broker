@@ -13,7 +13,12 @@ import pytest
 
 from orb.application.ports.scheduler_port import SchedulerPort
 from orb.application.request.dto import RequestDTO
-from orb.infrastructure.di.buses import CommandBus, QueryBus
+from orb.application.services.orchestration.acquire_machines import AcquireMachinesOrchestrator
+from orb.application.services.orchestration.dtos import (
+    AcquireMachinesOutput,
+    GetRequestStatusOutput,
+)
+from orb.application.services.orchestration.get_request_status import GetRequestStatusOrchestrator
 
 
 def _make_namespace(**kwargs) -> argparse.Namespace:
@@ -32,18 +37,55 @@ def _make_request_dto(status: str = "complete") -> RequestDTO:
     )
 
 
-def _mock_container(scheduler_return: dict):
-    """Build a mock DI container with a typed scheduler mock."""
+def _mock_container(scheduler_return: dict, status_orch_requests: list | None = None):
+    """Build a mock DI container with orchestrators and a typed scheduler mock."""
+    from orb.application.services.orchestration.cancel_request import CancelRequestOrchestrator
+    from orb.application.services.orchestration.dtos import (
+        CancelRequestOutput,
+        ListRequestsOutput,
+        ListReturnRequestsOutput,
+    )
+    from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
+    from orb.application.services.orchestration.list_return_requests import (
+        ListReturnRequestsOrchestrator,
+    )
+
     container = MagicMock()
-    command_bus = AsyncMock()
-    query_bus = AsyncMock()
     scheduler = MagicMock(spec=SchedulerPort)
     scheduler.format_request_status_response.return_value = scheduler_return
     scheduler.parse_request_data.return_value = [{"request_id": "req-abc"}]
 
-    dispatch_map = {CommandBus: command_bus, QueryBus: query_bus, SchedulerPort: scheduler}
+    status_orch = AsyncMock(spec=GetRequestStatusOrchestrator)
+    status_orch.execute.return_value = GetRequestStatusOutput(
+        requests=status_orch_requests
+        if status_orch_requests is not None
+        else [{"request_id": "req-abc", "status": "complete"}]
+    )
+
+    list_req_orch = AsyncMock(spec=ListRequestsOrchestrator)
+    list_req_orch.execute.return_value = ListRequestsOutput(requests=[])
+
+    list_ret_orch = AsyncMock(spec=ListReturnRequestsOrchestrator)
+    list_ret_orch.execute.return_value = ListReturnRequestsOutput(requests=[])
+
+    cancel_orch = AsyncMock(spec=CancelRequestOrchestrator)
+    cancel_orch.execute.return_value = CancelRequestOutput(
+        request_id="req-abc", status="cancelled", raw={}
+    )
+
+    acquire_orch = AsyncMock(spec=AcquireMachinesOrchestrator)
+    acquire_orch.execute.return_value = AcquireMachinesOutput(request_id="req-1", status="pending")
+
+    dispatch_map = {
+        SchedulerPort: scheduler,
+        GetRequestStatusOrchestrator: status_orch,
+        ListRequestsOrchestrator: list_req_orch,
+        ListReturnRequestsOrchestrator: list_ret_orch,
+        CancelRequestOrchestrator: cancel_orch,
+        AcquireMachinesOrchestrator: acquire_orch,
+    }
     container.get.side_effect = lambda t: dispatch_map.get(t, MagicMock())
-    return container, command_bus, query_bus, scheduler
+    return container, scheduler, status_orch, acquire_orch
 
 
 # ---------------------------------------------------------------------------
@@ -55,8 +97,7 @@ def _mock_container(scheduler_return: dict):
 async def test_cli_calls_format_request_status_response():
     """CLI handle_get_request_status must delegate to scheduler.format_request_status_response."""
     expected = {"requests": [{"requestId": "req-abc", "status": "complete"}]}
-    container, _, query_bus, scheduler = _mock_container(expected)
-    query_bus.execute.return_value = _make_request_dto()
+    container, scheduler, *_ = _mock_container(expected)
 
     args = _make_namespace(request_id="req-abc", all=False)
 
@@ -70,11 +111,9 @@ async def test_cli_calls_format_request_status_response():
 
 
 @pytest.mark.asyncio
-async def test_cli_format_receives_dto_list():
-    """format_request_status_response must be called with a list of RequestDTO objects."""
-    container, _, query_bus, scheduler = _mock_container({"requests": []})
-    dto = _make_request_dto("complete")
-    query_bus.execute.return_value = dto
+async def test_cli_format_receives_list():
+    """format_request_status_response must be called with a list."""
+    container, scheduler, *_ = _mock_container({"requests": []})
 
     args = _make_namespace(request_id="req-abc", all=False)
 
@@ -85,15 +124,13 @@ async def test_cli_format_receives_dto_list():
 
     call_args = scheduler.format_request_status_response.call_args[0][0]
     assert isinstance(call_args, list)
-    assert all(isinstance(item, RequestDTO) for item in call_args)
 
 
 @pytest.mark.asyncio
 async def test_cli_all_flag_delegates_to_scheduler():
     """CLI handle_get_request_status with all=True must still delegate to scheduler."""
     expected = {"requests": []}
-    container, _, query_bus, scheduler = _mock_container(expected)
-    query_bus.execute.return_value = []
+    container, scheduler, _, _ = _mock_container(expected, status_orch_requests=[])
 
     args = _make_namespace(all=True)
 
@@ -183,36 +220,20 @@ def test_hf_and_default_produce_different_id_field_names():
 @pytest.mark.asyncio
 async def test_cli_request_machines_delegates_format_request_response():
     """handle_request_machines must call scheduler.format_request_response, not build response itself."""
-    container = MagicMock()
-    command_bus = AsyncMock()
-    query_bus = AsyncMock()
-    scheduler = MagicMock(spec=SchedulerPort)
+    container, scheduler, _, acquire_orch = _mock_container({})
     scheduler.parse_request_data.return_value = {"template_id": "t1", "requested_count": 1}
     scheduler.format_request_response.return_value = {"requestId": "req-1", "message": "ok"}
     scheduler.get_exit_code_for_status.return_value = 0
-
-    dispatch_map = {CommandBus: command_bus, QueryBus: query_bus, SchedulerPort: scheduler}
-    container.get.side_effect = lambda t: dispatch_map.get(t, MagicMock())
-
-    request_dto = MagicMock()
-    request_dto.status = "pending"
-    request_dto.resource_ids = []
-    request_dto.metadata = {}
-    query_bus.execute.return_value = request_dto
+    acquire_orch.execute.return_value = AcquireMachinesOutput(
+        request_id="req-1",
+        status="pending",
+        machine_ids=[],
+        raw={"request_id": "req-1", "status": "pending", "resource_ids": []},
+    )
 
     args = _make_namespace(template_id="t1", machine_count=1, metadata={})
 
-    with (
-        patch("orb.interface.request_command_handlers.get_container", return_value=container),
-        patch(
-            "orb.domain.request.request_identifiers.RequestId.generate",
-            return_value=MagicMock(__str__=lambda self: "req-1"),
-        ),
-        patch(
-            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active",
-            return_value=False,
-        ),
-    ):
+    with patch("orb.interface.request_command_handlers.get_container", return_value=container):
         from orb.interface.request_command_handlers import handle_request_machines
 
         await handle_request_machines(args)
@@ -231,8 +252,7 @@ async def test_cli_request_machines_delegates_format_request_response():
 async def test_cli_passes_scheduler_return_value_through():
     """The return value from scheduler.format_request_status_response must be the handler result."""
     sentinel = {"requests": [{"requestId": "sentinel-value", "status": "complete"}]}
-    container, _, query_bus, scheduler = _mock_container(sentinel)
-    query_bus.execute.return_value = []
+    container, _, _, _ = _mock_container(sentinel, status_orch_requests=[])
 
     args = _make_namespace(all=True)
 

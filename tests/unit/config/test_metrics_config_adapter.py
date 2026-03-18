@@ -84,16 +84,13 @@ def test_metrics_config_partial_overrides_preserve_defaults():
     assert aws_cfg["track_payload_sizes"] is False
 
 
-# --- task 1718: backward-compatibility aliases on MetricsConfig ---
-
-
-def test_metrics_config_old_aws_metrics_key_populates_provider_metrics():
-    """aws_metrics alias (old name) must populate provider_metrics field."""
-    cfg = MetricsConfig.model_validate({"aws_metrics": {"aws_metrics_enabled": True}})
-    assert cfg.provider_metrics.provider_metrics_enabled is True
-
-
 def test_metrics_config_new_provider_metrics_key_works():
     """provider_metrics (new name) must also be accepted directly."""
     cfg = MetricsConfig.model_validate({"provider_metrics": {"provider_metrics_enabled": True}})
     assert cfg.provider_metrics.provider_metrics_enabled is True
+
+
+def test_metrics_config_rejects_aws_metrics_alias():
+    """aws_metrics alias must no longer be accepted."""
+    cfg = MetricsConfig.model_validate({"aws_metrics": {"provider_metrics_enabled": True}})
+    assert cfg.provider_metrics.provider_metrics_enabled is False

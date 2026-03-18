@@ -211,7 +211,7 @@ class IPAddressRange(ValueObject):
             return False
 
         # Validate IP part
-        ip = cidr.split("/")[0]
+        ip = cidr.split("/", maxsplit=1)[0]
         if not all(0 <= int(octet) <= 255 for octet in ip.split(".")):
             return False
 

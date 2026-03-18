@@ -67,6 +67,7 @@ from orb.config.schemas.app_schema import AppConfig
 from orb.domain.base.value_objects import InstanceId
 from orb.domain.machine.aggregate import Machine
 from orb.domain.request.aggregate import Request
+from orb.domain.request.value_objects import RequestType
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.di.buses import CommandBus, QueryBus
 from orb.infrastructure.di.container import DIContainer
@@ -204,7 +205,7 @@ def app_config(test_config_dict: dict[str, Any]) -> AppConfig:
 @pytest.fixture
 def aws_config() -> AWSConfig:
     """Create a test AWS configuration."""
-    return AWSConfig(
+    return AWSConfig(  # type: ignore[call-arg]
         region="us-east-1",
         profile="default",
         access_key_id="testing",
@@ -294,11 +295,11 @@ def sample_template() -> Template:
 def sample_request() -> Request:
     """Create a sample request for testing."""
     return Request.create_new_request(
+        request_type=RequestType.ACQUIRE,
         template_id="template-001",
         machine_count=2,
-        requester_id="test-user",
-        priority=1,
-        tags={"Environment": "test"},
+        provider_type="aws",
+        metadata={"requester_id": "test-user", "priority": 1, "tags": {"Environment": "test"}},
     )
 
 
@@ -307,7 +308,7 @@ def sample_machine() -> Machine:
     """Create a sample machine for testing."""
     return Machine(
         id="machine-001",
-        instance_id=InstanceId("i-1234567890abcdef0"),
+        instance_id=InstanceId(value="i-1234567890abcdef0"),
         template_id="template-001",
         request_id="request-001",
         status="running",
@@ -502,11 +503,15 @@ class TestDataBuilder:
     ) -> Request:
         """Build a test request."""
         return Request.create_new_request(
+            request_type=kwargs.get("request_type", RequestType.ACQUIRE),
             template_id=template_id or generate_template_id(),
             machine_count=machine_count,
-            requester_id=kwargs.get("requester_id", "test-user"),
-            priority=kwargs.get("priority", 1),
-            tags=kwargs.get("tags", {"Environment": "test"}),
+            provider_type=kwargs.get("provider_type", "aws"),
+            metadata={
+                "requester_id": kwargs.get("requester_id", "test-user"),
+                "priority": kwargs.get("priority", 1),
+                "tags": kwargs.get("tags", {"Environment": "test"}),
+            },
         )
 
     @staticmethod
@@ -516,7 +521,7 @@ class TestDataBuilder:
         """Build a test machine."""
         return Machine(
             id=machine_id or generate_test_id(),
-            instance_id=InstanceId(instance_id or generate_instance_id()),
+            instance_id=InstanceId(value=instance_id or generate_instance_id()),
             template_id=kwargs.get("template_id", generate_template_id()),
             request_id=kwargs.get("request_id", generate_request_id()),
             status=kwargs.get("status", "running"),

@@ -158,10 +158,7 @@ class ConfigurationAdapter(ConfigurationPort):
                         if k != "provider_metrics"
                     }
                 )
-                # Accept both "provider_metrics" (new) and "aws_metrics" (legacy JSON key)
-                raw_nested = metrics_config.get("provider_metrics") or metrics_config.get(
-                    "aws_metrics"
-                )
+                raw_nested = metrics_config.get("provider_metrics")
                 if raw_nested and isinstance(raw_nested, dict):
                     result["provider_metrics"].update(raw_nested)
 
@@ -170,18 +167,47 @@ class ConfigurationAdapter(ConfigurationPort):
             self._logger.warning("Failed to load metrics config, using defaults: %s", e)
             return defaults
 
+    def get_loaded_config_file(self) -> str | None:
+        """Get the path of the loaded configuration file."""
+        return self._config_manager.get_loaded_config_file()
+
+    def get_root_dir(self) -> str:
+        """Get the root directory path."""
+        from orb.config.platform_dirs import get_root_location
+
+        return str(get_root_location())
+
     def get_storage_config(self) -> dict[str, Any]:
         """Get storage configuration."""
         try:
             storage_config = self._config_manager.get("storage", {})
+            strategy = storage_config.get("strategy", storage_config.get("type", "json"))
+            if strategy == "json":
+                json_cfg = storage_config.get("json_strategy", {})
+                data_path = json_cfg.get("base_path")
+                backup_enabled = json_cfg.get("backup_enabled", True)
+            elif strategy == "sql":
+                sql_cfg = storage_config.get("sql_strategy", {})
+                data_path = sql_cfg.get("name")
+                backup_enabled = False
+            else:
+                data_path = None
+                backup_enabled = storage_config.get("backup_enabled", True)
+            backup_path = storage_config.get("backup_path")
             return {
-                "type": storage_config.get("type", "json"),
-                "path": storage_config.get("path", "data"),
-                "backup_enabled": storage_config.get("backup_enabled", True),
+                "strategy": strategy,
+                "data_path": data_path,
+                "backup_enabled": backup_enabled,
+                "backup_path": backup_path,
             }
         except Exception as e:
             self._logger.warning("Failed to load storage config, using defaults: %s", e)
-            return {"type": "json", "path": "data", "backup_enabled": True}
+            return {
+                "strategy": "json",
+                "data_path": None,
+                "backup_enabled": True,
+                "backup_path": None,
+            }
 
     def get_events_config(self) -> dict[str, Any]:
         """Get events configuration."""

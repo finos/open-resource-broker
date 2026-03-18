@@ -57,11 +57,11 @@ class TestResourcesReadRequests:
         assert "requests" in text_data
 
     @pytest.mark.asyncio
-    async def test_resources_read_requests_calls_list_return_requests_tool(self):
-        """resources/read requests:// delegates to the list_return_requests tool."""
+    async def test_resources_read_requests_calls_list_requests_tool(self):
+        """resources/read requests:// delegates to the list_requests tool."""
         server = _make_server()
         mock_tool = AsyncMock(return_value={"requests": []})
-        server.tools["list_return_requests"] = mock_tool
+        server.tools["list_requests"] = mock_tool
 
         message = {
             "jsonrpc": "2.0",
@@ -82,8 +82,10 @@ class TestResourcesReadRequests:
 class TestResourcesReadMachines:
     @pytest.mark.asyncio
     async def test_resources_read_machines_uri_returns_contents(self):
-        """resources/read with machines:// URI returns contents with not-implemented message."""
+        """resources/read with machines:// URI returns contents list."""
         server = _make_server()
+        mock_result = {"machines": [{"machine_id": "m-123"}]}
+        server.tools["list_machines"] = AsyncMock(return_value=mock_result)
 
         message = {
             "jsonrpc": "2.0",
@@ -100,13 +102,14 @@ class TestResourcesReadMachines:
         assert contents[0]["uri"] == "machines://"
         assert contents[0]["mimeType"] == "application/json"
         text_data = json.loads(contents[0]["text"])
-        # machines resource is not yet implemented — must carry an error key
-        assert "error" in text_data
+        assert "machines" in text_data
 
     @pytest.mark.asyncio
-    async def test_resources_read_machines_does_not_raise(self):
-        """resources/read machines:// must not raise — returns a structured response."""
+    async def test_resources_read_machines_calls_list_machines_tool(self):
+        """resources/read machines:// delegates to the list_machines tool."""
         server = _make_server()
+        mock_tool = AsyncMock(return_value={"machines": []})
+        server.tools["list_machines"] = mock_tool
 
         message = {
             "jsonrpc": "2.0",
@@ -114,11 +117,9 @@ class TestResourcesReadMachines:
             "method": "resources/read",
             "params": {"uri": "machines://"},
         }
-        response = await server.handle_message(json.dumps(message))
-        data = json.loads(response)
+        await server.handle_message(json.dumps(message))
 
-        assert data.get("error") is None  # top-level JSON-RPC error must be absent
-        assert "result" in data
+        mock_tool.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------------

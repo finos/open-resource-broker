@@ -1,54 +1,13 @@
 """Request-related command handlers for the interface layer."""
 
-import time
 from typing import TYPE_CHECKING, Any, Union
 
 from orb.application.ports.scheduler_port import SchedulerPort
-from orb.domain.base.configuration_service import DomainConfigurationService
-from orb.domain.request.exceptions import RequestNotFoundError
-from orb.infrastructure.di.buses import CommandBus, QueryBus
 from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
 
 if TYPE_CHECKING:
     import argparse
-
-    from orb.domain.base.ports.console_port import ConsolePort
-
-_WAIT_POLL_INTERVAL: int = 10
-
-
-async def _poll_until_terminal(
-    request_id: str,
-    timeout_seconds: int,
-    poll_interval: int,
-    query_bus: QueryBus,
-    console: "ConsolePort",
-) -> Any:
-    """Poll GetRequestQuery until the request reaches a terminal status or timeout."""
-    import asyncio
-
-    from orb.application.dto.queries import GetRequestQuery
-    from orb.domain.request.request_types import RequestStatus
-
-    deadline = time.monotonic() + timeout_seconds
-
-    while True:
-        query = GetRequestQuery(request_id=request_id)
-        request_dto = await query_bus.execute(query)
-        status_str = request_dto.status if request_dto else "pending"
-
-        if RequestStatus(status_str).is_terminal():
-            return request_dto
-
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            console.warning(
-                f"Timed out waiting for request {request_id} after {timeout_seconds} seconds"
-            )
-            raise SystemExit(1)
-
-        await asyncio.sleep(min(poll_interval, remaining))
 
 
 @handle_interface_exceptions(context="get_request_status", interface_type="cli")
@@ -64,11 +23,15 @@ async def handle_get_request_status(
     Returns:
         Request status information
     """
-    container = get_container()
-    query_bus = container.get(QueryBus)
-    scheduler_strategy = container.get(SchedulerPort)
+    from orb.application.services.orchestration.dtos import GetRequestStatusInput
+    from orb.application.services.orchestration.get_request_status import (
+        GetRequestStatusOrchestrator,
+    )
 
-    # Validation: Prevent --all with specific IDs
+    container = get_container()
+    orchestrator = container.get(GetRequestStatusOrchestrator)
+    scheduler = container.get(SchedulerPort)
+
     has_all = getattr(args, "all", False)
     has_specific_ids = bool(
         getattr(args, "request_ids", []) or getattr(args, "flag_request_ids", [])
@@ -81,115 +44,43 @@ async def handle_get_request_status(
         }
 
     if has_all:
-        # Create query for all active requests
-        from orb.application.dto.queries import ListActiveRequestsQuery
-
-        query = ListActiveRequestsQuery(all_resources=True)
-        request_dtos = await query_bus.execute(query)
-
-        # Format response using scheduler strategy
-        return scheduler_strategy.format_request_status_response(request_dtos)
-    else:
-        # Existing specific ID logic
-        # Pass raw input data to scheduler strategy (scheduler-agnostic)
-        # First precedence is input data, then arguments
-        if hasattr(args, "input_data") and args.input_data:
-            raw_request_data = args.input_data
-        else:
-            request_ids_from_args = []
-
-            # Handle request_id that might be a list (from CLI command factory)
-            if hasattr(args, "request_id") and args.request_id:
-                if isinstance(args.request_id, list):
-                    request_ids_from_args.extend(args.request_id)
-                else:
-                    request_ids_from_args.append(args.request_id)
-
-            # Merge positional and flag arguments
-            if hasattr(args, "request_ids") and args.request_ids:
-                request_ids_from_args.extend(args.request_ids)
-            if hasattr(args, "flag_request_ids") and args.flag_request_ids:
-                request_ids_from_args.extend(args.flag_request_ids)
-
-            raw_request_data = {
-                "requests": [{"request_id": request_id} for request_id in request_ids_from_args]
-            }
-
-        # Let scheduler strategy parse the raw data (each scheduler handles its own format)
-        parsed_result = scheduler_strategy.parse_request_data(raw_request_data)
-
-        # Validate parsed data - runtime may return a list despite port typing dict
-        parsed_data_list: list[dict[str, Any]] = (
-            parsed_result if isinstance(parsed_result, list) else [parsed_result]
+        result = await orchestrator.execute(
+            GetRequestStatusInput(all_requests=True, detailed=getattr(args, "detailed", False))
         )
+        return scheduler.format_request_status_response(result.requests)
 
-        if not parsed_data_list:
-            return {"error": "No request ID provided", "message": "Request ID is required"}
-
-        request_dtos = []
-
-        # Extract request IDs from parsed data
+    # Collect request IDs from args or input_data
+    if hasattr(args, "input_data") and args.input_data:
+        raw = args.input_data
+        parsed = scheduler.parse_request_data(raw)
+        parsed_list: list[dict[str, Any]] = parsed if isinstance(parsed, list) else [parsed]
         request_ids = [
             item.get("request_id")
-            for item in parsed_data_list
+            for item in parsed_list
             if isinstance(item, dict) and item.get("request_id")
         ]
+    else:
+        request_ids = []
+        if hasattr(args, "request_id") and args.request_id:
+            if isinstance(args.request_id, list):
+                request_ids.extend(args.request_id)
+            else:
+                request_ids.append(args.request_id)
+        if hasattr(args, "request_ids") and args.request_ids:
+            request_ids.extend(args.request_ids)
+        if hasattr(args, "flag_request_ids") and args.flag_request_ids:
+            request_ids.extend(args.flag_request_ids)
 
-        if not request_ids:
-            return {"error": "No valid request IDs provided", "message": "Request IDs are required"}
+    if not request_ids:
+        return {"error": "No request ID provided", "message": "Request ID is required"}
 
-        # Use batch query if multiple IDs, individual queries otherwise
-        if len(request_ids) == 1:
-            from orb.application.dto.queries import GetRequestQuery
-
-            try:
-                query = GetRequestQuery(request_id=str(request_ids[0]))
-                request_dto = await query_bus.execute(query)
-                if request_dto:
-                    request_dtos.append(request_dto)
-            except RequestNotFoundError:
-                from datetime import datetime, timezone
-
-                from orb.application.request.dto import RequestDTO
-
-                request_dtos.append(
-                    RequestDTO(
-                        request_id=str(request_ids[0]),
-                        status="pending",
-                        requested_count=0,
-                        created_at=datetime.now(timezone.utc),
-                    )
-                )
-            except Exception:
-                raise
-        else:
-            # For multiple IDs, we need to query each individually since there's no batch query yet
-            from orb.application.dto.queries import GetRequestQuery
-
-            for request_id in request_ids:
-                try:
-                    query = GetRequestQuery(request_id=str(request_id))
-                    request_dto = await query_bus.execute(query)
-                    if request_dto:
-                        request_dtos.append(request_dto)
-                except RequestNotFoundError:
-                    from datetime import datetime, timezone
-
-                    from orb.application.request.dto import RequestDTO
-
-                    request_dtos.append(
-                        RequestDTO(
-                            request_id=str(request_id),
-                            status="pending",
-                            requested_count=0,
-                            created_at=datetime.now(timezone.utc),
-                        )
-                    )
-                except Exception:
-                    raise
-
-        # Format response using scheduler strategy
-        return scheduler_strategy.format_request_status_response(request_dtos)
+    result = await orchestrator.execute(
+        GetRequestStatusInput(
+            request_ids=[str(rid) for rid in request_ids],
+            detailed=getattr(args, "detailed", False),
+        )
+    )
+    return scheduler.format_request_status_response(result.requests)
 
 
 @handle_interface_exceptions(context="request_machines", interface_type="cli")
@@ -205,34 +96,29 @@ async def handle_request_machines(
     Returns:
         Machine request results in HostFactory format
     """
+    from orb.application.services.orchestration.acquire_machines import (
+        AcquireMachinesOrchestrator,
+    )
+    from orb.application.services.orchestration.dtos import AcquireMachinesInput
+
     container = get_container()
-    command_bus = container.get(CommandBus)
-    scheduler_strategy = container.get(SchedulerPort)
+    orchestrator = container.get(AcquireMachinesOrchestrator)
+    scheduler = container.get(SchedulerPort)
 
-    from orb.application.dto.commands import CreateRequestCommand
-    from orb.infrastructure.mocking.dry_run_context import is_dry_run_active
-
-    # Pass raw input data to scheduler strategy (scheduler-agnostic)
-    # Each strategy's parse_request_data() owns envelope unwrapping for its own format
+    # Parse template_id and machine_count from input_data or args
     if hasattr(args, "input_data") and args.input_data:
-        raw_request_data = args.input_data
+        parsed_result = scheduler.parse_request_data(args.input_data)
+        parsed_data: dict[str, Any] = parsed_result if isinstance(parsed_result, dict) else {}
     else:
-        # Merge positional and flag arguments
         template_id = getattr(args, "template_id", None) or getattr(args, "flag_template_id", None)
         machine_count = getattr(args, "machine_count", None) or getattr(
             args, "flag_machine_count", None
         )
-        machine_id = getattr(args, "machine_id", None) or getattr(args, "flag_machine_id", None)
-
-        raw_request_data = {
+        parsed_data = {
             "template_id": template_id,
             "requested_count": machine_count,
-            "machine_id": machine_id,  # For show operations
         }
 
-    # Let scheduler strategy parse the raw data (each scheduler handles its own format)
-    parsed_result = scheduler_strategy.parse_request_data(raw_request_data)
-    parsed_data: dict[str, Any] = parsed_result if isinstance(parsed_result, dict) else {}
     template_id = parsed_data.get("template_id")
     machine_count = parsed_data.get("requested_count", 1)
 
@@ -248,118 +134,21 @@ async def handle_request_machines(
             "message": "Machine count must be provided",
         }
 
-    # Check if dry-run is active and add to metadata
-    metadata = getattr(args, "metadata", {})
-    metadata["dry_run"] = is_dry_run_active()
+    wait = getattr(args, "wait", False)
+    timeout_seconds = getattr(args, "timeout", 300)
 
-    from orb.domain.request.request_identifiers import RequestId
-    from orb.domain.request.request_types import RequestType
-
-    domain_config = container.get(DomainConfigurationService)
-    request_id = str(
-        RequestId.generate(RequestType.ACQUIRE, prefix=domain_config.get_acquire_request_prefix())
+    result = await orchestrator.execute(
+        AcquireMachinesInput(
+            template_id=str(template_id),
+            requested_count=int(machine_count),
+            wait=bool(wait),
+            timeout_seconds=int(timeout_seconds),
+        )
     )
 
-    command = CreateRequestCommand(
-        request_id=request_id,
-        template_id=template_id,
-        requested_count=int(machine_count),
-        metadata=metadata,
-    )
-
-    # Execute command — CQRS commands return None; use pre-generated request_id
-    try:
-        await command_bus.execute(command)  # type: ignore[arg-type]
-    except Exception as e:
-        error_response = {"request_id": request_id, "status": "failed", "status_message": str(e)}
-        if scheduler_strategy:
-            return scheduler_strategy.format_request_response(error_response), 1
-        return error_response, 1
-
-    # Get the request details to include resource ID information
-    try:
-        from orb.application.dto.queries import GetRequestQuery
-
-        query_bus = container.get(QueryBus)
-        query = GetRequestQuery(request_id=request_id)
-        request_dto = await query_bus.execute(query)
-
-        # Extract resource IDs for the message
-        resource_ids = getattr(request_dto, "resource_ids", []) if request_dto else []
-
-        # Create response data with resource ID information
-        status = request_dto.status if request_dto else "pending"
-        error_msg = None
-        if request_dto and hasattr(request_dto, "metadata"):
-            if isinstance(request_dto.metadata, dict):
-                error_msg = request_dto.metadata.get("error_message")
-            else:
-                error_msg = getattr(request_dto.metadata, "error_message", None)
-
-        request_data = {
-            "request_id": request_id,
-            "resource_ids": resource_ids,
-            "template_id": template_id,
-            "status": status,
-            "status_message": error_msg,
-        }
-
-        # --wait: poll until terminal status or timeout
-        wait = getattr(args, "wait", False)
-        timeout_seconds = getattr(args, "timeout", 300)
-        if wait and timeout_seconds > 0:
-            from orb.domain.base.ports.console_port import ConsolePort
-
-            console = container.get(ConsolePort)
-            request_dto = await _poll_until_terminal(
-                request_id=request_id,
-                timeout_seconds=timeout_seconds,
-                poll_interval=_WAIT_POLL_INTERVAL,
-                query_bus=query_bus,
-                console=console,
-            )
-            # Rebuild request_data from final polled state
-            resource_ids = getattr(request_dto, "resource_ids", []) if request_dto else []
-            status = request_dto.status if request_dto else status
-            error_msg = None
-            if request_dto and hasattr(request_dto, "metadata"):
-                if isinstance(request_dto.metadata, dict):
-                    error_msg = request_dto.metadata.get("error_message")
-                else:
-                    error_msg = getattr(request_dto.metadata, "error_message", None)
-            request_data = {
-                "request_id": request_id,
-                "resource_ids": resource_ids,
-                "template_id": template_id,
-                "status": status,
-                "status_message": error_msg,
-            }
-
-        # Return success response using scheduler strategy formatting
-        if scheduler_strategy:
-            response = scheduler_strategy.format_request_response(request_data)
-            status = request_dto.status if request_dto else "pending"
-            exit_code = scheduler_strategy.get_exit_code_for_status(status)
-            return response, exit_code
-        else:
-            # Fallback if no scheduler strategy (shouldn't happen)
-            return {
-                "error": "No scheduler strategy available",
-                "message": "Unable to format response",
-            }, 1
-    except Exception as e:
-        # Fallback if we can't get request details
-        from orb.domain.base.ports import LoggingPort
-
-        container.get(LoggingPort).warning("Could not get request details for resource ID: %s", e)
-        if scheduler_strategy:
-            response = scheduler_strategy.format_request_response({"request_id": request_id})
-            return response, 0  # Command succeeded, just couldn't get details
-        else:
-            return {
-                "error": "No scheduler strategy available",
-                "message": "Unable to format response",
-            }, 1
+    response = scheduler.format_request_response(result.raw)
+    exit_code = scheduler.get_exit_code_for_status(result.status)
+    return response, exit_code
 
 
 @handle_interface_exceptions(context="get_return_requests", interface_type="cli")
@@ -373,29 +162,17 @@ async def handle_get_return_requests(args: "argparse.Namespace") -> dict[str, An
     Returns:
         Return requests list in scheduler format
     """
+    from orb.application.services.orchestration.dtos import ListReturnRequestsInput
+    from orb.application.services.orchestration.list_return_requests import (
+        ListReturnRequestsOrchestrator,
+    )
+
     container = get_container()
-    query_bus = container.get(QueryBus)
-    scheduler_strategy = container.get(SchedulerPort)
+    orchestrator = container.get(ListReturnRequestsOrchestrator)
+    scheduler = container.get(SchedulerPort)
 
-    from orb.application.dto.queries import ListReturnRequestsQuery
-
-    # Extract machine name filter from JSON input if provided
-    machine_names: list[str] = []
-    if hasattr(args, "input_data") and args.input_data:
-        raw = args.input_data
-        if "machines" in raw:
-            machine_names = [
-                name
-                for m in raw["machines"]
-                if isinstance(m, dict)
-                for name in [m.get("name") or m.get("machineId") or m.get("machine_id")]
-                if name is not None
-            ]
-
-    query = ListReturnRequestsQuery(machine_names=machine_names)
-    request_dtos = await query_bus.execute(query)
-
-    return scheduler_strategy.format_request_status_response(request_dtos)
+    result = await orchestrator.execute(ListReturnRequestsInput())
+    return scheduler.format_request_status_response(result.requests)
 
 
 @handle_interface_exceptions(context="request_return_machines", interface_type="cli")
@@ -409,19 +186,19 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> dict[str
     Returns:
         Return request results
     """
+    from orb.application.services.orchestration.dtos import ReturnMachinesInput
+    from orb.application.services.orchestration.return_machines import (
+        ReturnMachinesOrchestrator,
+    )
+
     container = get_container()
-    command_bus = container.get(CommandBus)
-    query_bus = container.get(QueryBus)
+    orchestrator = container.get(ReturnMachinesOrchestrator)
+    scheduler = container.get(SchedulerPort)
 
-    from orb.application.dto.commands import CreateReturnRequestCommand
-
-    # Validation: Prevent --all with specific IDs
     has_all = getattr(args, "all", False)
-    machine_ids = []
+    machine_ids: list[str] = []
 
-    # Handle input data from -f flag (HostFactory compatibility)
     if hasattr(args, "input_data") and args.input_data:
-        # Extract machine IDs from JSON input data
         raw_request_data = args.input_data
         if "machines" in raw_request_data:
             machine_ids = [
@@ -430,7 +207,6 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> dict[str
                 if machine.get("machineId") or machine.get("machine_id")
             ]
     else:
-        # Use positional arguments
         machine_ids = getattr(args, "machine_ids", [])
 
     has_specific_ids = bool(machine_ids)
@@ -442,7 +218,6 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> dict[str
         }
 
     if has_all:
-        # Safety confirmation for destructive --all operations
         has_force = getattr(args, "force", False)
         if not has_force:
             return {
@@ -450,86 +225,52 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> dict[str
                 "message": "Use --force to confirm returning all machines",
             }
 
-        # Get all active machines
-        from orb.application.dto.queries import ListMachinesQuery
-
-        query = ListMachinesQuery(all_resources=True, active_only=True)
-        machine_dtos = await query_bus.execute(query)
-
-        # Extract machine IDs from DTOs (handle both dict and object DTOs)
-        machine_ids = []
-        for machine in machine_dtos:
-            if isinstance(machine, dict):
-                machine_id = machine.get("machine_id")
-            else:
-                machine_id = getattr(machine, "machine_id", None)
-
-            if machine_id:
-                machine_ids.append(machine_id)
-
-        if not machine_ids:
-            return {
-                "error": "No active machines found",
-                "message": "No machines available to return",
-            }
-
-    if not machine_ids:
+    if not has_all and not machine_ids:
         return {
             "error": "Machine IDs are required",
             "message": "Machine IDs must be provided either as arguments or in JSON file",
         }
 
-    command = CreateReturnRequestCommand(
-        machine_ids=machine_ids,
-        force_return=getattr(args, "force", False),
+    result = await orchestrator.execute(
+        ReturnMachinesInput(
+            machine_ids=machine_ids,
+            all_machines=has_all,
+            force=getattr(args, "force", False),
+        )
     )
 
-    # Execute command — CQRS commands return None; read results from command fields
-    await command_bus.execute(command)  # type: ignore[arg-type]
-
-    created_ids = getattr(command, "created_request_ids", None) or []
-    request_id = created_ids[0] if created_ids else None
-
-    scheduler_strategy = container.get(SchedulerPort)
-    request_data = {"request_id": request_id, "status": "pending"}
-    if scheduler_strategy:
-        return scheduler_strategy.format_request_response(request_data)
-    return {"requestId": request_id, "message": "Return request created successfully"}
+    return scheduler.format_request_response(result.raw)
 
 
 @handle_interface_exceptions(context="list_requests", interface_type="cli")
 async def handle_list_requests(args: "argparse.Namespace") -> dict[str, Any]:
     """List all active provisioning requests."""
+    from orb.application.services.orchestration.dtos import ListRequestsInput
+    from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
+
     container = get_container()
-    query_bus = container.get(QueryBus)
-    scheduler_strategy = container.get(SchedulerPort)
+    orchestrator = container.get(ListRequestsOrchestrator)
+    scheduler = container.get(SchedulerPort)
 
-    from orb.application.dto.queries import ListActiveRequestsQuery
-
-    query = ListActiveRequestsQuery(all_resources=True)
-    request_dtos = await query_bus.execute(query)
-
-    return scheduler_strategy.format_request_status_response(request_dtos)
+    result = await orchestrator.execute(ListRequestsInput())
+    return scheduler.format_request_status_response(result.requests)
 
 
 @handle_interface_exceptions(context="cancel_request", interface_type="cli")
 async def handle_cancel_request(args: "argparse.Namespace") -> dict[str, Any]:
     """Handle cancel request operations."""
-    container = get_container()
-    command_bus = container.get(CommandBus)
-    scheduler_strategy = container.get(SchedulerPort)
+    from orb.application.services.orchestration.cancel_request import CancelRequestOrchestrator
+    from orb.application.services.orchestration.dtos import CancelRequestInput
 
-    from orb.application.dto.commands import CancelRequestCommand
+    container = get_container()
+    orchestrator = container.get(CancelRequestOrchestrator)
+    scheduler = container.get(SchedulerPort)
 
     request_id = getattr(args, "request_id", None) or getattr(args, "flag_request_id", None)
     if not request_id:
         return {"error": "Request ID is required", "message": "Request ID must be provided"}
 
-    reason = getattr(args, "reason", None) or ""
-    command = CancelRequestCommand(request_id=request_id, reason=reason)
-    await command_bus.execute(command)  # type: ignore[arg-type]
+    reason = getattr(args, "reason", None) or "Cancelled via API"
+    result = await orchestrator.execute(CancelRequestInput(request_id=request_id, reason=reason))
 
-    request_data = {"request_id": request_id, "status": "cancelled"}
-    if scheduler_strategy:
-        return scheduler_strategy.format_request_response(request_data)
-    return {"request_id": request_id, "message": "Request cancelled successfully"}
+    return scheduler.format_request_response(result.raw)

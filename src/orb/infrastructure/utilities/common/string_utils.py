@@ -19,7 +19,7 @@ def extract_provider_type(provider_name: str) -> str:
         Provider type (the prefix before the first separator)
     """
     if "_" in provider_name:
-        return provider_name.split("_")[0]
+        return provider_name.split("_", maxsplit=1)[0]
     if "-" in provider_name:
-        return provider_name.split("-")[0]
+        return provider_name.split("-", maxsplit=1)[0]
     return provider_name

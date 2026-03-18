@@ -143,6 +143,11 @@ def _register_services_lazy(container: "DIContainer") -> "DIContainer":
     # 9. Register infrastructure services immediately (needed for template system)
     register_infrastructure_services(container)
 
+    # 9b. Register orchestrators
+    from orb.infrastructure.di.orchestrator_registry import register_orchestrators
+
+    register_orchestrators(container)
+
     # 9a. Register monitoring services (cross-cutting concern, not provider-specific)
     register_monitoring_services(container)
 
@@ -179,6 +184,9 @@ def _register_services_eager(container: "DIContainer") -> "DIContainer":
     setup_cqrs_infrastructure(container)
     register_provider_services(container)
     register_infrastructure_services(container)
+    from orb.infrastructure.di.orchestrator_registry import register_orchestrators
+
+    register_orchestrators(container)
     register_monitoring_services(container)
     register_server_services(container)
 

@@ -89,25 +89,6 @@ class StatusValuesConfig(BaseModel):
     )
 
 
-class LimitsConfig(BaseModel):
-    """Limits configuration."""
-
-    tag_key_length: int = Field(128, description="Maximum length of tag keys")
-    tag_value_length: int = Field(256, description="Maximum length of tag values")
-    max_tags_per_resource: int = Field(50, description="Maximum number of tags per resource")
-    max_instance_types_per_fleet: int = Field(
-        20, description="Maximum number of instance types per fleet"
-    )
-    max_subnets_per_fleet: int = Field(16, description="Maximum number of subnets per fleet")
-    max_security_groups_per_instance: int = Field(
-        5, description="Maximum number of security groups per instance"
-    )
-    max_batch_size: int = Field(100, description="Maximum batch size for API calls")
-    max_instances_per_request: int = Field(
-        1000, description="Maximum number of instances per request"
-    )
-
-
 class NamingConfig(BaseModel):
     """Naming configuration."""
 
@@ -152,25 +133,15 @@ class NamingConfig(BaseModel):
             "spot_fleet": r"^sfr-[a-f0-9]+$",
             "ec2_fleet": r"^fleet-[a-f0-9]+$",
             "asg": r"^[a-zA-Z0-9_-]+$",
-            # NOTE: ami_id and arn are AWS-specific patterns. Known debt: move to
-            # providers/aws/configuration/ once NamingConfig supports provider-specific
-            # pattern extensions rather than a single flat dict.
-            "ami_id": r"^(ami-[a-f0-9]{8,17}|/aws/service/.+)$",
-            "subnet": r"^subnet-[a-f0-9]{8,17}$",
-            "security_group": r"^sg-[a-f0-9]{8,17}$",
             "instance_type": r"^[a-z][0-9][a-z]?\.[a-z0-9]+$",
             "region": r"^[a-z]{2}-[a-z]+-\d$",
-            "account_id": r"^\d{12}$",
-            "launch_template": r"^lt-[a-f0-9]{8,17}$",
             "request_id": r"^(req|ret)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
             "tag_key": r"^[\w\s+=.@-]+$",
             "cidr_block": r"^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$",
-            "arn": r"^arn:aws:[a-zA-Z0-9\-]+:[a-z0-9\-]*:[0-9]{12}:.+$",
         },
         description="Validation patterns for various resources",
     )
     prefixes: PrefixConfig = Field(default_factory=lambda: PrefixConfig())  # type: ignore[call-arg]
-    limits: LimitsConfig = Field(default_factory=lambda: LimitsConfig())  # type: ignore[call-arg]
 
 
 class RequestConfig(BaseModel):

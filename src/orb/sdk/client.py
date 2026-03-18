@@ -11,12 +11,19 @@ from contextlib import suppress
 from typing import Any, Callable, Dict, Optional
 
 from orb.bootstrap import Application
+from orb.config.managers.configuration_manager import ConfigurationManager
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.infrastructure.di.container import create_container
 
 from .config import SDKConfig
 from .discovery import MethodInfo, SDKMethodDiscovery
-from .exceptions import ConfigurationError, ProviderError, SDKError
+from .exceptions import (
+    ConfigurationError,
+    NotFoundError,
+    ProviderError,
+    RequestTimeoutError,
+    SDKError,
+)
 from .middleware import SDKMiddleware, build_middleware_chain
 
 
@@ -41,6 +48,7 @@ class ORBClient:
         config: Optional[dict[str, Any]] = None,
         config_path: Optional[str] = None,
         app_config: Optional[dict[str, Any]] = None,
+        scheduler: Optional[str] = None,
         **kwargs,
     ) -> None:
         """
@@ -65,6 +73,8 @@ class ORBClient:
         # Override with explicit parameters
         if provider is not None:
             self._config.provider = provider
+        if scheduler is not None:
+            self._config.scheduler = scheduler
         if config_path:
             self._config.config_path = config_path
 
@@ -118,6 +128,20 @@ class ORBClient:
             # same process don't share state via the module-level singleton.
             self._container = create_container()
 
+            # If a scheduler override is requested, pre-register a ConfigurationManager
+            # with the override already applied. This mirrors bootstrap._ensure_container()
+            # but must happen before Application is constructed so that when initialize()
+            # calls _ensure_container() it finds this instance and does not create a fresh
+            # one without the override. TemplateConfigurationManager is constructed lazily
+            # on first use and calls container.get(SchedulerPort) → config.get_scheduler_strategy()
+            # at that point — so the override must be in place then.
+            if self._config.scheduler:
+                cm = ConfigurationManager(
+                    config_file=self._config.config_path, config_dict=self._app_config
+                )
+                cm.override_scheduler_strategy(self._config.scheduler)
+                self._container.register_instance(ConfigurationManager, cm)
+
             # skip_validation=True bypasses StartupValidator (sys.exit) in Application.__init__
             self._app = Application(
                 config_path=self._config.config_path,
@@ -163,9 +187,12 @@ class ORBClient:
                 self._query_bus, self._command_bus
             )
 
-            # Dynamically add methods to SDK instance
+            # Dynamically add methods to SDK instance.
+            # Skip names that have explicit orchestrator-backed implementations
+            # defined directly on this class — those take precedence.
             for method_name, method_func in self._methods.items():
-                setattr(self, method_name, method_func)
+                if method_name not in self._EXPLICIT_METHODS:
+                    setattr(self, method_name, method_func)
 
             # Apply middleware if any were added before initialization
             if self._middlewares:
@@ -198,10 +225,10 @@ class ORBClient:
             self._container.clear()
             self._container = None
 
-        # Remove dynamically added methods
+        # Remove dynamically added methods (skip explicit orchestrator-backed methods)
         if self._discovery:
             for method_name in self._discovery.list_available_methods():
-                if hasattr(self, method_name):
+                if method_name not in self._EXPLICIT_METHODS and hasattr(self, method_name):
                     delattr(self, method_name)
 
     # Context manager support
@@ -227,7 +254,7 @@ class ORBClient:
                 "SDK not initialized. Call initialize() or use as async context manager."
             )
 
-        return list(self._methods.keys())
+        return sorted(self._EXPLICIT_METHODS | set(self._methods.keys()))
 
     def get_method_info(self, method_name: str) -> Optional[MethodInfo]:
         """
@@ -390,19 +417,401 @@ class ORBClient:
             wrapped = build_middleware_chain(self._middlewares, method_name, raw_method)
             setattr(self, method_name, wrapped)
 
-    # CLI-equivalent convenience methods
-    async def request_machines(self, template_id: str, count: int, **kwargs) -> Any:
-        """Request machines (CLI-style convenience method).
+    # Names of methods that have explicit orchestrator-backed implementations below.
+    # The setattr loop in initialize() skips these so discovery does not overwrite them.
+    _EXPLICIT_METHODS: frozenset[str] = frozenset(
+        {
+            "request_machines",
+            "get_request_status",
+            "list_requests",
+            "return_machines",
+            "cancel_request",
+            "list_machines",
+            "get_machine",
+            "list_templates",
+            "get_template",
+            "create_template",
+            "update_template",
+            "delete_template",
+            "validate_template",
+            "refresh_templates",
+        }
+    )
+
+    # --- Orchestrator-backed explicit methods ---
+    # Each method resolves its orchestrator from the DI container and calls it
+    # directly, bypassing the CQRS bus discovery layer for these core operations.
+
+    async def request_machines(self, template_id: str, count: int, **kwargs) -> dict:
+        """Request machines via AcquireMachinesOrchestrator.
 
         Equivalent to: orb machines request <template_id> <count>
-        Maps to: create_request()
         """
         if not self._initialized:
-            raise SDKError(
-                "SDK not initialized. Call initialize() or use as async context manager."
-            )
+            raise SDKError("SDK not initialized. Use as async context manager.")
+        assert self._container is not None
 
-        return await self.create_request(template_id=template_id, count=count, **kwargs)  # type: ignore[attr-defined]
+        from orb.application.ports.scheduler_port import SchedulerPort
+        from orb.application.services.orchestration.acquire_machines import (
+            AcquireMachinesOrchestrator,
+        )
+        from orb.application.services.orchestration.dtos import AcquireMachinesInput
+
+        orchestrator = self._container.get(AcquireMachinesOrchestrator)
+        result = await orchestrator.execute(
+            AcquireMachinesInput(
+                template_id=template_id,
+                requested_count=count,
+                wait=kwargs.get("wait", False),
+                timeout_seconds=kwargs.get("timeout_seconds", 300),
+                additional_data=kwargs.get("additional_data", {}),
+            )
+        )
+        scheduler = self._container.get_optional(SchedulerPort)
+        if scheduler is not None:
+            return scheduler.format_request_response(result.raw)
+        return result.raw
+
+    async def get_request_status(self, request_ids: list, **kwargs) -> dict:
+        """Get status for one or more requests via GetRequestStatusOrchestrator."""
+        if not self._initialized:
+            raise SDKError("SDK not initialized. Use as async context manager.")
+        assert self._container is not None
+
+        from orb.application.ports.scheduler_port import SchedulerPort
+        from orb.application.services.orchestration.dtos import GetRequestStatusInput
+        from orb.application.services.orchestration.get_request_status import (
+            GetRequestStatusOrchestrator,
+        )
+
+        orchestrator = self._container.get(GetRequestStatusOrchestrator)
+        result = await orchestrator.execute(
+            GetRequestStatusInput(
+                request_ids=list(request_ids),
+                all_requests=kwargs.get("all_requests", False),
+                detailed=kwargs.get("detailed", False),
+            )
+        )
+        scheduler = self._container.get_optional(SchedulerPort)
+        if scheduler is not None:
+            return scheduler.format_request_status_response(result.requests)
+        return {"requests": result.requests}
+
+    async def list_requests(self, **kwargs) -> dict:
+        """List requests via ListRequestsOrchestrator."""
+        if not self._initialized:
+            raise SDKError("SDK not initialized. Use as async context manager.")
+        assert self._container is not None
+
+        from orb.application.ports.scheduler_port import SchedulerPort
+        from orb.application.services.orchestration.dtos import ListRequestsInput
+        from orb.application.services.orchestration.list_requests import (
+            ListRequestsOrchestrator,
+        )
+
+        orchestrator = self._container.get(ListRequestsOrchestrator)
+        result = await orchestrator.execute(
+            ListRequestsInput(
+                status=kwargs.get("status"),
+                limit=kwargs.get("limit", 50),
+                offset=kwargs.get("offset", 0),
+                sync=kwargs.get("sync", False),
+            )
+        )
+        scheduler = self._container.get_optional(SchedulerPort)
+        if scheduler is not None:
+            return scheduler.format_request_status_response(result.requests)
+        return {"requests": result.requests}
+
+    async def return_machines(self, machine_ids: list, **kwargs) -> dict:
+        """Return machines via ReturnMachinesOrchestrator."""
+        if not self._initialized:
+            raise SDKError("SDK not initialized. Use as async context manager.")
+        assert self._container is not None
+
+        from orb.application.ports.scheduler_port import SchedulerPort
+        from orb.application.services.orchestration.dtos import ReturnMachinesInput
+        from orb.application.services.orchestration.return_machines import (
+            ReturnMachinesOrchestrator,
+        )
+
+        orchestrator = self._container.get(ReturnMachinesOrchestrator)
+        result = await orchestrator.execute(
+            ReturnMachinesInput(
+                machine_ids=list(machine_ids),
+                all_machines=kwargs.get("all_machines", False),
+                force=kwargs.get("force", False),
+            )
+        )
+        scheduler = self._container.get_optional(SchedulerPort)
+        if scheduler is not None:
+            return scheduler.format_request_response(result.raw)
+        return result.raw
+
+    async def cancel_request(self, request_id: str, **kwargs) -> dict:
+        """Cancel a request via CancelRequestOrchestrator."""
+        if not self._initialized:
+            raise SDKError("SDK not initialized. Use as async context manager.")
+        assert self._container is not None
+
+        from orb.application.ports.scheduler_port import SchedulerPort
+        from orb.application.services.orchestration.cancel_request import (
+            CancelRequestOrchestrator,
+        )
+        from orb.application.services.orchestration.dtos import CancelRequestInput
+
+        orchestrator = self._container.get(CancelRequestOrchestrator)
+        result = await orchestrator.execute(
+            CancelRequestInput(
+                request_id=request_id,
+                reason=kwargs.get("reason", "Cancelled via API"),
+            )
+        )
+        scheduler = self._container.get_optional(SchedulerPort)
+        if scheduler is not None:
+            return scheduler.format_request_response(result.raw)
+        return result.raw
+
+    async def list_machines(self, **kwargs) -> dict:
+        """List machines via ListMachinesOrchestrator with scheduler formatting."""
+        if not self._initialized:
+            raise SDKError("SDK not initialized. Use as async context manager.")
+        assert self._container is not None
+
+        from orb.application.ports.scheduler_port import SchedulerPort
+        from orb.application.services.orchestration.dtos import ListMachinesInput
+        from orb.application.services.orchestration.list_machines import (
+            ListMachinesOrchestrator,
+        )
+
+        orchestrator = self._container.get(ListMachinesOrchestrator)
+        result = await orchestrator.execute(
+            ListMachinesInput(
+                status=kwargs.get("status"),
+                provider_name=kwargs.get("provider_name"),
+                request_id=kwargs.get("request_id"),
+                limit=kwargs.get("limit", 100),
+                offset=kwargs.get("offset", 0),
+            )
+        )
+        scheduler = self._container.get_optional(SchedulerPort)
+        if scheduler is not None:
+            return scheduler.format_machine_status_response(result.machines)
+        return {"machines": [m.to_dict() for m in result.machines if hasattr(m, "to_dict")]}
+
+    async def get_machine(self, machine_id: str, **kwargs) -> dict:
+        """Get a single machine via GetMachineOrchestrator with scheduler formatting."""
+        if not self._initialized:
+            raise SDKError("SDK not initialized. Use as async context manager.")
+        assert self._container is not None
+
+        from orb.application.ports.scheduler_port import SchedulerPort
+        from orb.application.services.orchestration.dtos import GetMachineInput
+        from orb.application.services.orchestration.get_machine import GetMachineOrchestrator
+
+        orchestrator = self._container.get(GetMachineOrchestrator)
+        result = await orchestrator.execute(GetMachineInput(machine_id=machine_id))
+        if result.machine is None:
+            raise NotFoundError("Machine", machine_id)
+        scheduler = self._container.get_optional(SchedulerPort)
+        if scheduler is not None and hasattr(result.machine, "to_dict"):
+            return scheduler.format_machine_details_response(result.machine.to_dict())
+        if hasattr(result.machine, "to_dict"):
+            return result.machine.to_dict()
+        return {}
+
+    async def list_templates(self, **kwargs) -> dict:
+        """List templates via ListTemplatesOrchestrator with scheduler formatting."""
+        if not self._initialized:
+            raise SDKError("SDK not initialized. Use as async context manager.")
+        assert self._container is not None
+
+        from orb.application.ports.scheduler_port import SchedulerPort
+        from orb.application.services.orchestration.dtos import ListTemplatesInput
+        from orb.application.services.orchestration.list_templates import (
+            ListTemplatesOrchestrator,
+        )
+
+        orchestrator = self._container.get(ListTemplatesOrchestrator)
+        result = await orchestrator.execute(
+            ListTemplatesInput(
+                active_only=kwargs.get("active_only", True),
+                provider_name=kwargs.get("provider_name"),
+                limit=kwargs.get("limit", 50),
+            )
+        )
+        scheduler = self._container.get_optional(SchedulerPort)
+        if scheduler is not None:
+            return scheduler.format_templates_response(result.templates)
+        return {
+            "templates": [
+                t.model_dump()
+                if hasattr(t, "model_dump")
+                else t.to_dict()
+                if hasattr(t, "to_dict")
+                else t
+                for t in result.templates
+            ]
+        }
+
+    async def get_template(self, template_id: str, **kwargs) -> dict:
+        """Get a single template via GetTemplateOrchestrator with scheduler formatting."""
+        if not self._initialized:
+            raise SDKError("SDK not initialized. Use as async context manager.")
+        assert self._container is not None
+
+        from orb.application.ports.scheduler_port import SchedulerPort
+        from orb.application.services.orchestration.dtos import GetTemplateInput
+        from orb.application.services.orchestration.get_template import GetTemplateOrchestrator
+
+        orchestrator = self._container.get(GetTemplateOrchestrator)
+        result = await orchestrator.execute(GetTemplateInput(template_id=template_id))
+        if result.template is None:
+            raise NotFoundError("Template", template_id)
+        scheduler = self._container.get_optional(SchedulerPort)
+        if scheduler is not None:
+            return scheduler.format_template_for_display(result.template)
+        if hasattr(result.template, "to_dict"):
+            return result.template.to_dict()
+        return {}
+
+    async def create_template(
+        self, template_id: str, provider_api: str, image_id: str, **kwargs
+    ) -> dict:
+        """Create a template via CreateTemplateOrchestrator with scheduler formatting."""
+        if not self._initialized:
+            raise SDKError("SDK not initialized. Use as async context manager.")
+        assert self._container is not None
+
+        from orb.application.ports.scheduler_port import SchedulerPort
+        from orb.application.services.orchestration.create_template import (
+            CreateTemplateOrchestrator,
+        )
+        from orb.application.services.orchestration.dtos import CreateTemplateInput
+
+        # Named kwargs extracted explicitly; everything else goes into configuration
+        _explicit = {"name", "description", "instance_type", "tags", "configuration"}
+        extra = {k: v for k, v in kwargs.items() if k not in _explicit}
+        configuration = {**extra, **kwargs.get("configuration", {})}
+
+        orchestrator = self._container.get(CreateTemplateOrchestrator)
+        result = await orchestrator.execute(
+            CreateTemplateInput(
+                template_id=template_id,
+                provider_api=provider_api,
+                image_id=image_id,
+                name=kwargs.get("name"),
+                description=kwargs.get("description"),
+                instance_type=kwargs.get("instance_type"),
+                tags=kwargs.get("tags", {}),
+                configuration=configuration,
+            )
+        )
+        scheduler = self._container.get_optional(SchedulerPort)
+        if scheduler is not None:
+            return scheduler.format_template_mutation_response(result.raw)
+        return result.raw
+
+    async def update_template(self, template_id: str, **kwargs) -> dict:
+        """Update a template via UpdateTemplateOrchestrator with scheduler formatting."""
+        if not self._initialized:
+            raise SDKError("SDK not initialized. Use as async context manager.")
+        assert self._container is not None
+
+        from orb.application.ports.scheduler_port import SchedulerPort
+        from orb.application.services.orchestration.dtos import UpdateTemplateInput
+        from orb.application.services.orchestration.update_template import (
+            UpdateTemplateOrchestrator,
+        )
+
+        # Named kwargs extracted explicitly; everything else goes into configuration
+        _explicit = {"name", "description", "instance_type", "image_id", "configuration"}
+        extra = {k: v for k, v in kwargs.items() if k not in _explicit}
+        configuration = {**extra, **kwargs.get("configuration", {})}
+
+        orchestrator = self._container.get(UpdateTemplateOrchestrator)
+        result = await orchestrator.execute(
+            UpdateTemplateInput(
+                template_id=template_id,
+                name=kwargs.get("name"),
+                description=kwargs.get("description"),
+                instance_type=kwargs.get("instance_type"),
+                image_id=kwargs.get("image_id"),
+                configuration=configuration,
+            )
+        )
+        scheduler = self._container.get_optional(SchedulerPort)
+        if scheduler is not None:
+            return scheduler.format_template_mutation_response(result.raw)
+        return result.raw
+
+    async def delete_template(self, template_id: str, **kwargs) -> dict:
+        """Delete a template via DeleteTemplateOrchestrator with scheduler formatting."""
+        if not self._initialized:
+            raise SDKError("SDK not initialized. Use as async context manager.")
+        assert self._container is not None
+
+        from orb.application.ports.scheduler_port import SchedulerPort
+        from orb.application.services.orchestration.delete_template import (
+            DeleteTemplateOrchestrator,
+        )
+        from orb.application.services.orchestration.dtos import DeleteTemplateInput
+        from orb.domain.base.exceptions import EntityNotFoundError
+
+        orchestrator = self._container.get(DeleteTemplateOrchestrator)
+        try:
+            result = await orchestrator.execute(DeleteTemplateInput(template_id=template_id))
+        except EntityNotFoundError:
+            raise NotFoundError("Template", template_id)
+        scheduler = self._container.get_optional(SchedulerPort)
+        if scheduler is not None:
+            return scheduler.format_template_mutation_response(result.raw)
+        return result.raw
+
+    async def validate_template(self, **kwargs) -> dict:
+        """Validate a template via ValidateTemplateOrchestrator with scheduler formatting."""
+        if not self._initialized:
+            raise SDKError("SDK not initialized. Use as async context manager.")
+        assert self._container is not None
+
+        from orb.application.ports.scheduler_port import SchedulerPort
+        from orb.application.services.orchestration.dtos import ValidateTemplateInput
+        from orb.application.services.orchestration.validate_template import (
+            ValidateTemplateOrchestrator,
+        )
+
+        orchestrator = self._container.get(ValidateTemplateOrchestrator)
+        result = await orchestrator.execute(
+            ValidateTemplateInput(
+                template_id=kwargs.get("template_id"),
+                config=kwargs.get("config"),
+            )
+        )
+        scheduler = self._container.get_optional(SchedulerPort)
+        if scheduler is not None:
+            return scheduler.format_template_mutation_response(result.raw)
+        return result.raw
+
+    async def refresh_templates(self, **kwargs) -> dict:
+        """Refresh templates via RefreshTemplatesOrchestrator with scheduler formatting."""
+        if not self._initialized:
+            raise SDKError("SDK not initialized. Use as async context manager.")
+        assert self._container is not None
+
+        from orb.application.ports.scheduler_port import SchedulerPort
+        from orb.application.services.orchestration.dtos import RefreshTemplatesInput
+        from orb.application.services.orchestration.refresh_templates import (
+            RefreshTemplatesOrchestrator,
+        )
+
+        orchestrator = self._container.get(RefreshTemplatesOrchestrator)
+        result = await orchestrator.execute(
+            RefreshTemplatesInput(provider_name=kwargs.get("provider_name"))
+        )
+        scheduler = self._container.get_optional(SchedulerPort)
+        if scheduler is not None:
+            return scheduler.format_templates_response(result.templates)
+        return {"templates": result.templates}
 
     async def show_template(self, template_id: str) -> Any:
         """Show template details (CLI-style convenience method).
@@ -416,6 +825,13 @@ class ORBClient:
             )
 
         return await self.get_template(template_id=template_id)  # type: ignore[attr-defined]
+
+    async def get_template_or_none(self, *, template_id: str, **kwargs: Any) -> Any:
+        """Return template details, or None if the template does not exist."""
+        try:
+            return await self.get_template(template_id=template_id, **kwargs)  # type: ignore[attr-defined]
+        except NotFoundError:
+            return None
 
     async def health_check(self) -> Any:
         """Check provider health (CLI-style convenience method).
@@ -435,36 +851,11 @@ class ORBClient:
     # At runtime each is replaced by setattr() in initialize() with the real
     # async callable wired to the CQRS bus.
 
-    # Template operations
-    async def get_template(self, *, template_id: str, **kwargs: Any) -> Any:
-        pass
-
-    async def list_templates(self, *, active_only: bool = False, **kwargs: Any) -> Any:
-        pass
-
-    async def validate_template(self, *, template_id: str, **kwargs: Any) -> Any:
-        pass
-
     async def get_configuration(self, **kwargs: Any) -> Any:
-        pass
-
-    async def create_template(self, *, template_id: str, **kwargs: Any) -> Any:
-        pass
-
-    async def update_template(self, *, template_id: str, **kwargs: Any) -> Any:
-        pass
-
-    async def delete_template(self, *, template_id: str, **kwargs: Any) -> Any:
-        pass
-
-    async def refresh_templates(self, **kwargs: Any) -> Any:
         pass
 
     # Request operations
     async def get_request(self, *, request_id: str, **kwargs: Any) -> Any:
-        pass
-
-    async def list_requests(self, **kwargs: Any) -> Any:
         pass
 
     async def list_return_requests(self, **kwargs: Any) -> Any:
@@ -485,9 +876,6 @@ class ORBClient:
     async def update_request_status(self, *, request_id: str, **kwargs: Any) -> Any:
         pass
 
-    async def cancel_request(self, *, request_id: str, **kwargs: Any) -> Any:
-        pass
-
     async def complete_request(self, *, request_id: str, **kwargs: Any) -> Any:
         pass
 
@@ -498,12 +886,6 @@ class ORBClient:
         pass
 
     # Machine operations
-    async def get_machine(self, *, machine_id: str, **kwargs: Any) -> Any:
-        pass
-
-    async def list_machines(self, **kwargs: Any) -> Any:
-        pass
-
     async def get_active_machine_count(self, **kwargs: Any) -> Any:
         pass
 
@@ -642,9 +1024,11 @@ class ORBClient:
 
         from orb.domain.request.request_types import RequestStatus
 
-        deadline = asyncio.get_event_loop().time() + timeout
+        deadline = asyncio.get_running_loop().time() + timeout
         while True:
-            result = await self.get_request(request_id=request_id)
+            status_result = await self.get_request_status(request_ids=[request_id], detailed=False)
+            requests = status_result.get("requests", []) if isinstance(status_result, dict) else []
+            result = requests[0] if requests else {}
             status_str = (
                 result.get("status", "")
                 if isinstance(result, dict)
@@ -657,12 +1041,9 @@ class ORBClient:
                 # Invalid or unknown status string; treat as non-terminal and continue polling.
                 pass
 
-            remaining = deadline - asyncio.get_event_loop().time()
+            remaining = deadline - asyncio.get_running_loop().time()
             if remaining <= 0:
-                raise TimeoutError(
-                    f"Request {request_id!r} did not reach terminal status within {timeout}s. "
-                    f"Last status: {status_str!r}"
-                )
+                raise RequestTimeoutError(request_id=request_id, timeout=timeout)
             await asyncio.sleep(min(poll_interval, remaining))
 
     async def wait_for_return(

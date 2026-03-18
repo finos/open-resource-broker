@@ -28,16 +28,34 @@ def _make_args(**kwargs: Any) -> argparse.Namespace:
 
 
 def _mock_command_bus(updated: bool = True) -> MagicMock:
-    response = MagicMock()
-    response.validation_errors = []
-    bus = MagicMock()
-    bus.execute = AsyncMock(return_value=response)
-    return bus
+    from orb.application.services.orchestration.dtos import UpdateTemplateOutput
+
+    orchestrator = MagicMock()
+    orchestrator.execute = AsyncMock(
+        return_value=UpdateTemplateOutput(
+            template_id="tpl-1", updated=updated, validation_errors=[], raw={}
+        )
+    )
+    return orchestrator
 
 
 def _patch_container(bus: MagicMock):
+    from orb.application.ports.scheduler_port import SchedulerPort
+    from orb.application.services.orchestration.update_template import UpdateTemplateOrchestrator
+
+    mock_scheduler = MagicMock(spec=SchedulerPort)
+    mock_scheduler.format_template_mutation_response.return_value = {"success": True}
+
     container = MagicMock()
-    container.get.return_value = bus
+
+    def _get(cls):
+        if cls is UpdateTemplateOrchestrator:
+            return bus
+        if cls is SchedulerPort:
+            return mock_scheduler
+        return MagicMock()
+
+    container.get.side_effect = _get
     return patch(
         "orb.interface.template_command_handlers.get_container",
         return_value=container,
@@ -79,8 +97,11 @@ async def test_update_reads_name_from_file(tmp_path: Path) -> None:
     assert result["success"] is True
     call_args = bus.execute.call_args[0][0]
     assert call_args.name == "my-template"
-    assert call_args.description == "a description"
-    assert call_args.configuration == {"key": "value"}
+    assert call_args.configuration == {
+        "name": "my-template",
+        "description": "a description",
+        "configuration": {"key": "value"},
+    }
     assert call_args.template_id == "tpl-1"
 
 
@@ -201,5 +222,152 @@ async def test_update_empty_json_object_sends_nones(tmp_path: Path) -> None:
     assert result["success"] is True
     call_args = bus.execute.call_args[0][0]
     assert call_args.name is None
-    assert call_args.description is None
     assert call_args.configuration == {}
+
+
+# ---------------------------------------------------------------------------
+# TC-1: flat file passes full dict as configuration
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_update_flat_file_passes_full_dict_as_configuration(tmp_path: Path) -> None:
+    """Flat template file: full dict is passed as configuration, not a sub-key."""
+    file_dict = {
+        "template_id": "tpl-1",
+        "name": "n",
+        "instance_type": "t3.micro",
+        "image_id": "ami-1",
+        "tags": {"env": "prod"},
+    }
+    template_file = tmp_path / "tmpl.json"
+    template_file.write_text(json.dumps(file_dict))
+
+    bus = _mock_command_bus()
+    args = _make_args(template_id="tpl-1", file=str(template_file))
+
+    with _patch_container(bus), _patch_dry_run():
+        result = await handle_update_template(args)
+
+    assert result["success"] is True
+    call_args = bus.execute.call_args[0][0]
+    assert call_args.configuration == file_dict
+    assert call_args.instance_type == "t3.micro"
+    assert call_args.image_id == "ami-1"
+
+
+# ---------------------------------------------------------------------------
+# TC-2: file with nested 'configuration' key passes full outer dict
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_update_nested_configuration_key_passes_outer_dict(tmp_path: Path) -> None:
+    """File with a nested 'configuration' key: outer dict is passed, not the sub-key."""
+    file_dict = {"template_id": "tpl-1", "configuration": {"instance_type": "t3.micro"}}
+    template_file = tmp_path / "tmpl.json"
+    template_file.write_text(json.dumps(file_dict))
+
+    bus = _mock_command_bus()
+    args = _make_args(template_id="tpl-1", file=str(template_file))
+
+    with _patch_container(bus), _patch_dry_run():
+        result = await handle_update_template(args)
+
+    assert result["success"] is True
+    call_args = bus.execute.call_args[0][0]
+    assert call_args.configuration == file_dict
+
+
+# ---------------------------------------------------------------------------
+# TC-3: instance_type wired from file
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_update_instance_type_wired_from_file(tmp_path: Path) -> None:
+    """instance_type from the file is passed to UpdateTemplateInput."""
+    template_file = tmp_path / "tmpl.json"
+    template_file.write_text(json.dumps({"name": "n", "instance_type": "t3.large"}))
+
+    bus = _mock_command_bus()
+    args = _make_args(template_id="tpl-1", file=str(template_file))
+
+    with _patch_container(bus), _patch_dry_run():
+        await handle_update_template(args)
+
+    call_args = bus.execute.call_args[0][0]
+    assert call_args.instance_type == "t3.large"
+
+
+# ---------------------------------------------------------------------------
+# TC-4: image_id wired from file
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_update_image_id_wired_from_file(tmp_path: Path) -> None:
+    """image_id from the file is passed to UpdateTemplateInput."""
+    template_file = tmp_path / "tmpl.json"
+    template_file.write_text(json.dumps({"name": "n", "image_id": "ami-99"}))
+
+    bus = _mock_command_bus()
+    args = _make_args(template_id="tpl-1", file=str(template_file))
+
+    with _patch_container(bus), _patch_dry_run():
+        await handle_update_template(args)
+
+    call_args = bus.execute.call_args[0][0]
+    assert call_args.image_id == "ami-99"
+
+
+# ---------------------------------------------------------------------------
+# TC-6: REST and CLI produce identical UpdateTemplateInput for same payload
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_update_cli_and_rest_produce_identical_input(tmp_path: Path) -> None:
+    """CLI and REST paths produce the same UpdateTemplateInput for equivalent payloads.
+
+    TemplateUpdateRequest has no description/configuration fields, so we use the
+    fields it does support: name, instance_type, image_id, tags.
+    Both paths must pass the full payload dict as configuration.
+    """
+    from orb.api.routers.templates import TemplateUpdateRequest
+    from orb.application.services.orchestration.dtos import UpdateTemplateInput
+
+    payload = {
+        "name": "my-template",
+        "instance_type": "t3.micro",
+        "image_id": "ami-1",
+        "tags": {"env": "prod"},
+    }
+
+    # REST path: model_dump() of TemplateUpdateRequest is the full body
+    rest_body = TemplateUpdateRequest(**payload)
+    rest_input = UpdateTemplateInput(
+        template_id="tpl-1",
+        name=rest_body.name,
+        instance_type=rest_body.instance_type,
+        image_id=rest_body.image_id,
+        configuration=rest_body.model_dump(),
+    )
+
+    # CLI path: json.load of equivalent file
+    template_file = tmp_path / "tmpl.json"
+    template_file.write_text(json.dumps(payload))
+
+    bus = _mock_command_bus()
+    args = _make_args(template_id="tpl-1", file=str(template_file))
+
+    with _patch_container(bus), _patch_dry_run():
+        await handle_update_template(args)
+
+    cli_input = bus.execute.call_args[0][0]
+
+    assert cli_input.instance_type == rest_input.instance_type
+    assert cli_input.image_id == rest_input.image_id
+    # Both pass the full payload as configuration (REST via model_dump, CLI via json.load)
+    assert cli_input.configuration == payload
+    assert rest_input.configuration == rest_body.model_dump()

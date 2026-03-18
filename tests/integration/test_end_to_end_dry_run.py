@@ -18,7 +18,7 @@ class TestEndToEndDryRun:
     def setup_method(self):
         """Set up test fixtures."""
         self.mock_logger = Mock()
-        self.aws_config = AWSProviderConfig(region="us-east-1", profile="default")
+        self.aws_config = AWSProviderConfig(region="us-east-1", profile="default")  # type: ignore[call-arg]
         self.mock_aws_client = Mock()
         self.aws_strategy = AWSProviderStrategy(
             config=self.aws_config,

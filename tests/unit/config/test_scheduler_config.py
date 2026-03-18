@@ -16,14 +16,14 @@ class TestSchedulerConfig:
 
     def test_default_scheduler_config(self):
         """Test default scheduler configuration."""
-        config = SchedulerConfig()
+        config = SchedulerConfig()  # type: ignore[call-arg]
         assert config.type == "default"
         assert config.config_root is None
         assert config.get_config_root() == str(get_config_location())
 
     def test_custom_scheduler_config(self):
         """Test custom scheduler configuration."""
-        config = SchedulerConfig(type="hostfactory", config_root="/custom/path")
+        config = SchedulerConfig(type="hostfactory", config_root="/custom/path")  # type: ignore[call-arg]
         assert config.type == "hostfactory"
         assert config.config_root == "/custom/path"
         assert config.get_config_root() == "/custom/path"
@@ -31,18 +31,18 @@ class TestSchedulerConfig:
     def test_scheduler_config_with_env_var(self):
         """Test scheduler configuration with environment variable."""
         with patch.dict(os.environ, {"HF_PROVIDER_CONFDIR": "/env/path"}):
-            config = SchedulerConfig(config_root="$HF_PROVIDER_CONFDIR")
+            config = SchedulerConfig(config_root="$HF_PROVIDER_CONFDIR")  # type: ignore[call-arg]
             # Note: Environment expansion happens at the loader level
             assert config.config_root == "$HF_PROVIDER_CONFDIR"
 
     def test_invalid_type_raises_validation_error(self):
         """Test that an invalid scheduler type raises ValidationError."""
         with pytest.raises(ValidationError):
-            SchedulerConfig(type="invalid")
+            SchedulerConfig(type="invalid")  # type: ignore[call-arg]
 
     def test_hostfactory_type_is_valid(self):
         """Test that hostfactory is a valid scheduler type."""
-        config = SchedulerConfig(type="hostfactory")
+        config = SchedulerConfig(type="hostfactory")  # type: ignore[call-arg]
         assert config.type == "hostfactory"
 
 

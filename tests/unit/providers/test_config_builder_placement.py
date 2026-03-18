@@ -15,6 +15,6 @@ def test_no_aws_import_in_config_validator():
 
 def test_config_builder_importable_from_providers():
     """ProviderConfigBuilder is importable from orb.providers.config_builder."""
-    from orb.providers.config_builder import ProviderConfigBuilder  # noqa: F401
+    from orb.providers.config_builder import ProviderConfigBuilder
 
     assert ProviderConfigBuilder is not None

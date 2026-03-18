@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from orb.infrastructure.interfaces.provider import BaseProviderConfig
+from orb.providers.aws.configuration.batch_sizes_config import AWSBatchSizesConfig
+from orb.providers.aws.configuration.naming_config import AWSNamingConfig
 from orb.providers.aws.domain.template.value_objects import ProviderApi
 from orb.providers.aws.storage.config import AWSStorageConfig
 
@@ -132,6 +134,18 @@ class AWSProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
     # Launch template configuration
     launch_template: LaunchTemplateConfiguration = Field(
         default_factory=LaunchTemplateConfiguration  # type: ignore[call-arg]
+    )
+
+    # AWS-specific batch sizes configuration
+    batch_sizes: AWSBatchSizesConfig = Field(
+        default_factory=AWSBatchSizesConfig,  # type: ignore[call-arg]
+        description="Batch sizes for AWS EC2 API operations",
+    )
+
+    # AWS-specific naming patterns configuration
+    naming: AWSNamingConfig = Field(
+        default_factory=AWSNamingConfig,  # type: ignore[call-arg]
+        description="Regex patterns for validating AWS resource IDs",
     )
 
     # AWS storage backend configuration

@@ -60,3 +60,34 @@ async def test_active_only_false_returns_all() -> None:
 def test_active_only_default_is_true() -> None:
     query = ListTemplatesQuery()
     assert query.active_only is True
+
+
+@pytest.mark.asyncio
+async def test_pagination_limit_and_offset() -> None:
+    logger = MagicMock()
+    error_handler = MagicMock()
+    generic_filter_service = MagicMock()
+    generic_filter_service.apply_filters = MagicMock(side_effect=lambda items, _: items)
+
+    dtos = [MagicMock() for _ in range(5)]
+    for dto in dtos:
+        dto.is_active = True
+
+    template_manager = MagicMock()
+    template_manager.load_templates = AsyncMock(return_value=dtos)
+
+    container = MagicMock()
+    container.get = MagicMock(return_value=template_manager)
+
+    handler = ListTemplatesHandler(
+        logger=logger,
+        error_handler=error_handler,
+        container=container,
+        generic_filter_service=generic_filter_service,
+    )
+
+    query = ListTemplatesQuery(active_only=False, limit=2, offset=1)
+    result = await handler.execute_query(query)
+
+    assert len(result) == 2
+    assert result == dtos[1:3]

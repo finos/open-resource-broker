@@ -205,8 +205,7 @@
     "level": "INFO",
     "file_path": "logs/app.log",
     "console_enabled": false,
-    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s [%(pathname)s:%(lineno)d (%(funcName)s)]",
-    "accept_propagated_setting": false
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s [%(pathname)s:%(lineno)d (%(funcName)s)]"
   },
   "template": {
     "max_number": 10,
@@ -215,8 +214,7 @@
       "provider_type": "{provider_type}_templates.json",
       "generic": "templates.json"
     },
-    "default_price_type": "ondemand",
-    "default_provider_api": "EC2Fleet"
+    "default_price_type": "ondemand"
   },
   "events": {
     "enabled": true,

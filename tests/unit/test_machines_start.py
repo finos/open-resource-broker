@@ -26,8 +26,18 @@ async def test_machines_start_specific_ids():
 
         mock_command_bus = AsyncMock()
 
+        mock_orchestrator = AsyncMock()
+        mock_orchestrator.execute.return_value = Mock(
+            success=True,
+            message="started",
+            started_machines=["i-123", "i-456"],
+            failed_machines=[],
+        )
+
         def mock_get(service_type):
             name = getattr(service_type, "__name__", "")
+            if name == "StartMachinesOrchestrator":
+                return mock_orchestrator
             if name == "CommandBus":
                 return mock_command_bus
             if name == "ProviderSelectionPort":
@@ -58,9 +68,25 @@ async def test_machines_start_all():
         mock_get_container.return_value = mock_container
 
         mock_query_bus = AsyncMock()
+        from orb.application.machine.dto import MachineDTO
+
         mock_query_bus.execute.return_value = [
-            {"machine_id": "i-stopped1"},
-            {"machine_id": "i-stopped2"},
+            MachineDTO(
+                machine_id="i-stopped1",
+                name="m1",
+                status="stopped",
+                instance_type="t2.micro",
+                private_ip="10.0.0.1",
+                result="executing",
+            ),
+            MachineDTO(
+                machine_id="i-stopped2",
+                name="m2",
+                status="stopped",
+                instance_type="t2.micro",
+                private_ip="10.0.0.2",
+                result="executing",
+            ),
         ]
 
         mock_provider_port = Mock()
@@ -74,8 +100,18 @@ async def test_machines_start_all():
 
         mock_command_bus = AsyncMock()
 
+        mock_orchestrator = AsyncMock()
+        mock_orchestrator.execute.return_value = Mock(
+            success=True,
+            message="started",
+            started_machines=["i-stopped1", "i-stopped2"],
+            failed_machines=[],
+        )
+
         def mock_get(service_type):
             name = getattr(service_type, "__name__", "")
+            if name == "StartMachinesOrchestrator":
+                return mock_orchestrator
             if name == "QueryBus":
                 return mock_query_bus
             if name == "CommandBus":

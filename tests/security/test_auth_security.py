@@ -17,9 +17,9 @@ class TestAuthenticationSecurity:
     @pytest.fixture
     def auth_client(self):
         """Client with Bearer token authentication."""
-        server_config = ServerConfig(
+        server_config = ServerConfig(  # type: ignore[call-arg]
             enabled=True,
-            auth=AuthConfig(
+            auth=AuthConfig(  # type: ignore[call-arg]
                 enabled=True,
                 strategy="bearer_token",
                 bearer_token={

@@ -74,7 +74,7 @@ class TestInjectableDecorator:
 
         with patch("orb.infrastructure.di.container.get_container", return_value=self.container):
             # Create instance - dependencies should be auto-resolved
-            instance = ServiceWithDependency()
+            instance = ServiceWithDependency()  # type: ignore[call-arg]
 
             assert isinstance(instance.port, MockAdapter)
             assert instance.port.name == "injected"
@@ -91,7 +91,7 @@ class TestInjectableDecorator:
                 self.optional_service = optional_service
 
         with patch("orb.infrastructure.di.container.get_container", return_value=self.container):
-            instance = ServiceWithOptional()
+            instance = ServiceWithOptional()  # type: ignore[call-arg]
 
             # Required dependency resolved
             assert isinstance(instance.port, MockAdapter)
@@ -112,7 +112,7 @@ class TestInjectableDecorator:
                 self.unavailable = unavailable
 
         with patch("orb.infrastructure.di.container.get_container", return_value=self.container):
-            instance = ServiceWithUnavailableOptional()
+            instance = ServiceWithUnavailableOptional()  # type: ignore[call-arg]
 
             # Required dependency resolved
             assert isinstance(instance.port, MockAdapter)
@@ -130,7 +130,7 @@ class TestInjectableDecorator:
                 self.service = service
 
         with patch("orb.infrastructure.di.container.get_container", return_value=self.container):
-            instance = MixedService(manual_param="test_value")
+            instance = MixedService(manual_param="test_value")  # type: ignore[call-arg]
 
             # Auto-resolved dependencies
             assert isinstance(instance.port, MockAdapter)
@@ -154,7 +154,7 @@ class TestInjectableDecorator:
                 self.service = service
 
         with patch("orb.infrastructure.di.container.get_container", return_value=self.container):
-            instance = ServiceWithDefaults()
+            instance = ServiceWithDefaults()  # type: ignore[call-arg]
 
             assert isinstance(instance.port, MockAdapter)
             assert instance.default_param == "default"
@@ -178,7 +178,7 @@ class TestInjectableDecorator:
         ):
             # Should raise exception since required dependency can't be resolved
             with pytest.raises(TypeError):  # Missing required argument
-                ServiceWithError()
+                ServiceWithError()  # type: ignore[call-arg]
 
     def test_injectable_info_extraction(self):
         """Test extracting information about injectable classes."""

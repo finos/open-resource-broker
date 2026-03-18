@@ -15,6 +15,7 @@ from orb.application.dto.queries import (
 from orb.application.provider.queries import GetProviderMetricsQuery
 from orb.application.queries.system import (
     GetProviderConfigQuery,
+    GetSystemConfigQuery,
     GetSystemStatusQuery,
     ValidateProviderConfigQuery,
 )
@@ -97,3 +98,11 @@ class SystemCommandFactory:
     ) -> SetConfigurationCommand:
         """Create command to set configuration value."""
         return SetConfigurationCommand(key=key, value=value)
+
+    def create_get_system_config_query(
+        self,
+        verbose: bool = False,
+        **kwargs: Any,
+    ) -> GetSystemConfigQuery:
+        """Create query to get full system configuration."""
+        return GetSystemConfigQuery(verbose=verbose)

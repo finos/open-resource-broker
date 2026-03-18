@@ -13,16 +13,25 @@ def _make_args(**kwargs) -> argparse.Namespace:
     return ns
 
 
-def _make_container(command_bus=None, query_bus=None):
+def _make_container(command_bus=None, query_bus=None, orchestrator=None):
     container = MagicMock()
 
+    from orb.application.ports.scheduler_port import SchedulerPort
+    from orb.application.services.orchestration.create_template import CreateTemplateOrchestrator
     from orb.infrastructure.di.buses import CommandBus, QueryBus
+
+    mock_scheduler = MagicMock(spec=SchedulerPort)
+    mock_scheduler.format_template_mutation_response.return_value = {"success": True}
 
     def _get(cls):
         if cls is CommandBus:
             return command_bus
         if cls is QueryBus:
             return query_bus
+        if cls is CreateTemplateOrchestrator:
+            return orchestrator
+        if cls is SchedulerPort:
+            return mock_scheduler
         return MagicMock()
 
     container.get.side_effect = _get
@@ -74,13 +83,19 @@ class TestHandleCreateTemplateValidateOnly:
     def test_validate_only_false_executes_command_bus(self, tmp_path):
         import asyncio
 
+        from orb.application.services.orchestration.create_template import (
+            CreateTemplateOrchestrator,
+        )
+        from orb.application.services.orchestration.dtos import CreateTemplateOutput
         from orb.interface.template_command_handlers import handle_create_template
 
-        mock_response = MagicMock()
-        mock_response.validation_errors = []
-        command_bus = MagicMock()
-        command_bus.execute = AsyncMock(return_value=mock_response)
-        container = _make_container(command_bus=command_bus)
+        mock_orchestrator = MagicMock(spec=CreateTemplateOrchestrator)
+        mock_orchestrator.execute = AsyncMock(
+            return_value=CreateTemplateOutput(
+                template_id="tmpl-001", created=True, validation_errors=[]
+            )
+        )
+        container = _make_container(orchestrator=mock_orchestrator)
 
         args = _make_args(
             file=self._make_template_file(tmp_path),
@@ -94,6 +109,6 @@ class TestHandleCreateTemplateValidateOnly:
             ):
                 result = asyncio.run(handle_create_template(args))
 
-        command_bus.execute.assert_called_once()
+        mock_orchestrator.execute.assert_called_once()
         assert result["success"] is True
         assert result.get("validate_only") is None

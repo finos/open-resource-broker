@@ -208,7 +208,7 @@ async def demo_template_crud(sdk) -> None:
             provider_api="EC2Fleet",
             image_id="ami-0abcdef1234567890",
             name="SDK Demo Template",
-            instance_type="t3.medium",
+            configuration={"machine_types": {"t3.medium": 1}},
         )
         print(f"    create_template -> {result}")
     except MethodExecutionError as e:
@@ -229,7 +229,7 @@ async def demo_template_crud(sdk) -> None:
         result = await sdk.update_template(
             template_id=template_id,
             name="SDK Demo Template (updated)",
-            instance_type="t3.large",
+            configuration={"machine_types": {"t3.large": 1}},
         )
         print(f"    update_template -> {result}")
     except MethodExecutionError as e:
@@ -322,11 +322,10 @@ async def demo_return_machines(sdk, machine_ids: list[str], dry_run: bool) -> st
 
     try:
         result = await sdk.create_return_request(machine_ids=machine_ids)
-        return_request_id = (
-            result.get("created_request_id") or result.get("request_id") or result.get("id")
-            if isinstance(result, dict)
-            else None
-        )
+        return_request_id = None
+        if isinstance(result, dict):
+            ids = result.get("created_request_ids") or []
+            return_request_id = ids[0] if ids else result.get("request_id") or result.get("id")
         print(f"    Return request created: {return_request_id}")
         return return_request_id
     except MethodExecutionError as e:
@@ -377,21 +376,27 @@ async def demo_batch(sdk, template_id: str, dry_run: bool) -> None:
 
 
 async def demo_serialization(sdk) -> None:
-    """Demonstrate raw_response and format serialization options."""
+    """Demonstrate raw_response and format serialization options.
+
+    Note: format= and raw_response= only apply to CQRS-discovered methods
+    (e.g. list_active_requests, get_request). The 14 explicit orchestrator-backed
+    methods (list_templates, request_machines, etc.) absorb these kwargs silently.
+    """
     print("\n[7] Serialization options...")
     try:
+        # Use a CQRS-discovered method to demonstrate format= / raw_response=
         # JSON string output
-        json_str = await sdk.list_templates(format="json")
+        json_str = await sdk.list_active_requests(format="json")
         if isinstance(json_str, str):
             print(f"    format='json' -> str of length {len(json_str)}")
 
         # YAML string output
-        yaml_str = await sdk.list_templates(format="yaml")
+        yaml_str = await sdk.list_active_requests(format="yaml")
         if isinstance(yaml_str, str):
             print(f"    format='yaml' -> str of length {len(yaml_str)}")
 
         # Raw handler result — no dict conversion, format= is ignored
-        raw = await sdk.list_templates(raw_response=True)
+        raw = await sdk.list_active_requests(raw_response=True)
         print(f"    raw_response=True -> {type(raw).__name__}")
     except MethodExecutionError as e:
         print(f"    Serialization demo skipped: {e.message}")

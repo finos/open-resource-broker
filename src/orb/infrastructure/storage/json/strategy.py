@@ -30,6 +30,8 @@ class JSONStorageStrategy(BaseStorageStrategy):
         create_dirs: bool = True,
         entity_type: str = "entities",
         metrics: Optional[Any] = None,
+        backup_count: int = 5,
+        backup_enabled: bool = True,
     ) -> None:
         """
         Initialize JSON storage strategy with components.
@@ -47,7 +49,9 @@ class JSONStorageStrategy(BaseStorageStrategy):
         self._metrics: Optional[Any] = metrics
 
         # Initialize components
-        self.file_manager = FileManager(file_path, create_dirs)
+        self.file_manager = FileManager(
+            file_path, create_dirs, backup_count=backup_count, backup_enabled=backup_enabled
+        )
         self.lock_manager = LockManager("reader_writer")
         self.serializer = JSONSerializer()
         self.transaction_manager = MemoryTransactionManager()

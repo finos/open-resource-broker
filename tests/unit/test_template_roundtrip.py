@@ -12,6 +12,7 @@ from datetime import date, datetime
 
 import pytest
 
+from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
     HostFactorySchedulerStrategy,
 )
@@ -25,7 +26,7 @@ def _make_strategy() -> HostFactorySchedulerStrategy:
     return HostFactorySchedulerStrategy()
 
 
-def _template_to_dto(template: AWSTemplate) -> TemplateDTO:
+def _template_to_dto(template: Template) -> TemplateDTO:
     """Convert an AWSTemplate to a TemplateDTO, stamping a created_at timestamp."""
     dto = TemplateDTO.from_domain(template)
     # Stamp a fixed timestamp so round-trip assertions are deterministic
@@ -44,13 +45,13 @@ class TestTemplateRoundTrip:
     # Helpers
     # ------------------------------------------------------------------
 
-    def _roundtrip(self, template: AWSTemplate) -> dict:
+    def _roundtrip(self, template: Template) -> dict:
         """
         Full round-trip: domain template → HF wire format → loaded internal dict.
 
         Steps mirror what `orb templates generate` + `load_templates_from_path` do:
           1. Convert domain object to TemplateDTO
-          2. Call format_templates_for_generation (internal → HF camelCase)
+          2. Call format_templates_for_dispatch (internal → HF camelCase)
           3. Write to a temp JSON file
           4. Load back via load_templates_from_path (HF camelCase → internal)
         """
@@ -58,8 +59,8 @@ class TestTemplateRoundTrip:
         internal_dict = dto.to_dict()
 
         # Step 2: format for generation (produces HF camelCase wire format)
-        hf_dicts = self.strategy.format_templates_for_generation([internal_dict])
-        assert len(hf_dicts) == 1, "format_templates_for_generation must return one entry"
+        hf_dicts = self.strategy.format_templates_for_dispatch([internal_dict])
+        assert len(hf_dicts) == 1, "format_templates_for_dispatch must return one entry"
 
         # Step 3: write to temp file (datetime fields serialised as ISO strings)
         def _default(obj):
@@ -148,6 +149,7 @@ class TestTemplateRoundTrip:
         assert hetero, "Expected at least one heterogeneous template in example set"
 
         for template in hetero:
+            assert isinstance(template, AWSTemplate)
             result = self._roundtrip(template)
             assert result.get("percent_on_demand") == template.percent_on_demand, (
                 f"percent_on_demand mismatch for {template.template_id}"
@@ -159,12 +161,8 @@ class TestTemplateRoundTrip:
             if template.allocation_strategy is None:
                 continue
             result = self._roundtrip(template)
-            # allocation_strategy may be an enum or string; normalise to str for comparison
-            expected = (
-                template.allocation_strategy.value
-                if hasattr(template.allocation_strategy, "value")
-                else str(template.allocation_strategy)
-            )
+            # allocation_strategy is a str on Template; normalise to str for comparison
+            expected = str(template.allocation_strategy)
             assert result.get("allocation_strategy") == expected, (
                 f"allocation_strategy mismatch for {template.template_id}"
             )

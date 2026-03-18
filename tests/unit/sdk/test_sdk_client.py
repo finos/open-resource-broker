@@ -339,15 +339,27 @@ class TestConvenienceMethods:
             await sdk.request_machines("tmpl-1", 5)
 
     @pytest.mark.asyncio
-    async def test_request_machines_delegates_to_create_request(self):
+    async def test_request_machines_delegates_to_orchestrator(self):
+        from orb.application.services.orchestration.dtos import AcquireMachinesOutput
+
         sdk = _initialized_sdk()
-        mock_create = AsyncMock(return_value={"request_id": "req-123"})
-        sdk.create_request = mock_create  # type: ignore[attr-defined]
+        mock_container = MagicMock()
+        sdk._container = mock_container
+
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.execute = AsyncMock(
+            return_value=AcquireMachinesOutput(
+                request_id="req-123",
+                status="pending",
+                raw={"request_id": "req-123", "status": "pending"},
+            )
+        )
+        mock_container.get.return_value = mock_orchestrator
+        mock_container.get_optional.return_value = None
 
         result = await sdk.request_machines("tmpl-1", 3)
 
-        mock_create.assert_awaited_once_with(template_id="tmpl-1", count=3)
-        assert result == {"request_id": "req-123"}
+        assert result == {"request_id": "req-123", "status": "pending"}
 
     @pytest.mark.asyncio
     async def test_show_template_raises_when_not_initialized(self):

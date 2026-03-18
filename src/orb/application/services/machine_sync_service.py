@@ -28,7 +28,7 @@ class MachineSyncService:
         self.uow_factory = uow_factory
         self._config_port = config_port
         self.logger = logger
-        self._provider_registry_service: Optional["ProviderRegistryService"] = (
+        self._provider_registry_service: Optional[ProviderRegistryService] = (
             provider_registry_service
         )
 

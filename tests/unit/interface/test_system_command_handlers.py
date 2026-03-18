@@ -75,16 +75,19 @@ class TestStubHandlers:
 class TestHandleProviderHealth:
     @pytest.mark.asyncio
     async def test_dispatches_get_system_status_query(self):
-        from orb.application.queries.system import GetSystemStatusQuery
         from orb.interface.system_command_handlers import handle_provider_health
 
-        container, query_bus = _mock_container_with_query_bus(query_return={"status": "ok"})
+        orchestrator = AsyncMock()
+        orchestrator.execute = AsyncMock(
+            return_value=MagicMock(health={"status": "ok"}, message="ok")
+        )
+        container = MagicMock()
+        container.get.return_value = orchestrator
 
         with patch("orb.interface.system_command_handlers.get_container", return_value=container):
             result = await handle_provider_health(_ns())
 
-        query_bus.execute.assert_awaited_once()
-        assert isinstance(query_bus.execute.call_args[0][0], GetSystemStatusQuery)
+        orchestrator.execute.assert_awaited_once()
         assert isinstance(result, dict)
         assert "health" in result
 
@@ -93,16 +96,19 @@ class TestHandleProviderHealth:
 class TestHandleProviderConfig:
     @pytest.mark.asyncio
     async def test_dispatches_get_provider_config_query(self):
-        from orb.application.queries.system import GetProviderConfigQuery
         from orb.interface.system_command_handlers import handle_provider_config
 
-        container, query_bus = _mock_container_with_query_bus(query_return={"provider": "aws"})
+        orchestrator = AsyncMock()
+        orchestrator.execute = AsyncMock(
+            return_value=MagicMock(config={"provider": "aws"}, message="ok")
+        )
+        container = MagicMock()
+        container.get.return_value = orchestrator
 
         with patch("orb.interface.system_command_handlers.get_container", return_value=container):
             result = await handle_provider_config(_ns())
 
-        query_bus.execute.assert_awaited_once()
-        assert isinstance(query_bus.execute.call_args[0][0], GetProviderConfigQuery)
+        orchestrator.execute.assert_awaited_once()
         assert isinstance(result, dict)
         assert "config" in result
 
@@ -111,33 +117,37 @@ class TestHandleProviderConfig:
 class TestHandleProviderMetrics:
     @pytest.mark.asyncio
     async def test_dispatches_get_provider_metrics_query_with_provider_name(self):
-        from orb.application.provider.queries import GetProviderMetricsQuery
         from orb.interface.system_command_handlers import handle_provider_metrics
 
-        container, query_bus = _mock_container_with_query_bus(query_return={"latency_ms": 42})
+        orchestrator = AsyncMock()
+        orchestrator.execute = AsyncMock(
+            return_value=MagicMock(metrics={"latency_ms": 42}, message="ok")
+        )
+        container = MagicMock()
+        container.get.return_value = orchestrator
 
         with patch("orb.interface.system_command_handlers.get_container", return_value=container):
             result = await handle_provider_metrics(_ns(provider="aws"))
 
-        query_bus.execute.assert_awaited_once()
-        q = query_bus.execute.call_args[0][0]
-        assert isinstance(q, GetProviderMetricsQuery)
-        assert q.provider_name == "aws"
+        orchestrator.execute.assert_awaited_once()
+        call_input = orchestrator.execute.call_args[0][0]
+        assert call_input.provider_name == "aws"
         assert "metrics" in result
 
     @pytest.mark.asyncio
     async def test_dispatches_with_no_provider_name(self):
-        from orb.application.provider.queries import GetProviderMetricsQuery
         from orb.interface.system_command_handlers import handle_provider_metrics
 
-        container, query_bus = _mock_container_with_query_bus(query_return={})
+        orchestrator = AsyncMock()
+        orchestrator.execute = AsyncMock(return_value=MagicMock(metrics={}, message="ok"))
+        container = MagicMock()
+        container.get.return_value = orchestrator
 
         with patch("orb.interface.system_command_handlers.get_container", return_value=container):
             await handle_provider_metrics(_ns())
 
-        q = query_bus.execute.call_args[0][0]
-        assert isinstance(q, GetProviderMetricsQuery)
-        assert q.provider_name is None
+        call_input = orchestrator.execute.call_args[0][0]
+        assert call_input.provider_name is None
 
 
 @pytest.mark.unit
@@ -185,25 +195,17 @@ class TestHandleListProviders:
     async def test_returns_providers_from_config_port(self):
         from orb.interface.system_command_handlers import handle_list_providers
 
-        mock_provider = MagicMock()
-        mock_provider.name = "aws-default"
-        mock_provider.type = "aws"
-        mock_provider.config = {"region": "us-east-1"}
-        mock_provider.enabled = True
-        mock_provider.weight = 1
-        mock_provider.priority = 1
-        mock_provider.get_effective_handlers.return_value = {"machines": MagicMock()}
+        mock_result = MagicMock()
+        mock_result.providers = [{"name": "aws-default", "type": "aws", "region": "us-east-1"}]
+        mock_result.count = 1
+        mock_result.selection_policy = "round-robin"
+        mock_result.message = ""
 
-        mock_provider_config = MagicMock()
-        mock_provider_config.get_active_providers.return_value = [mock_provider]
-        mock_provider_config.provider_defaults = {}
-        mock_provider_config.selection_policy = "round-robin"
-
-        mock_config_port = MagicMock()
-        mock_config_port.get_provider_config.return_value = mock_provider_config
+        mock_orchestrator = AsyncMock()
+        mock_orchestrator.execute.return_value = mock_result
 
         container = MagicMock()
-        container.get.return_value = mock_config_port
+        container.get.return_value = mock_orchestrator
 
         with patch("orb.interface.system_command_handlers.get_container", return_value=container):
             result = await handle_list_providers(_ns())
@@ -216,11 +218,17 @@ class TestHandleListProviders:
     async def test_no_provider_config_returns_empty_list(self):
         from orb.interface.system_command_handlers import handle_list_providers
 
-        mock_config_port = MagicMock()
-        mock_config_port.get_provider_config.return_value = None
+        mock_result = MagicMock()
+        mock_result.providers = []
+        mock_result.count = 0
+        mock_result.selection_policy = ""
+        mock_result.message = ""
+
+        mock_orchestrator = AsyncMock()
+        mock_orchestrator.execute.return_value = mock_result
 
         container = MagicMock()
-        container.get.return_value = mock_config_port
+        container.get.return_value = mock_orchestrator
 
         with patch("orb.interface.system_command_handlers.get_container", return_value=container):
             result = await handle_list_providers(_ns())
@@ -229,17 +237,15 @@ class TestHandleListProviders:
         assert result["providers"] == []
 
     @pytest.mark.asyncio
-    async def test_exception_returns_error_dict(self):
+    async def test_exception_raises(self):
         from orb.interface.system_command_handlers import handle_list_providers
 
         container = MagicMock()
         container.get.side_effect = RuntimeError("container exploded")
 
         with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            result = await handle_list_providers(_ns())
-
-        assert result["count"] == 0
-        assert "error" in result
+            with pytest.raises(Exception, match="container exploded"):
+                await handle_list_providers(_ns())
 
 
 # ---------------------------------------------------------------------------

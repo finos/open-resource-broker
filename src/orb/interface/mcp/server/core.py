@@ -401,19 +401,14 @@ class OpenResourceBrokerMCPServer:
     async def _get_requests_resource(self, uri: str) -> dict[str, Any]:
         """Get requests resource data."""
         args = type("Args", (), {})()
-        result = await self.tools["list_return_requests"](args)
+        result = await self.tools["list_requests"](args)
         return result
 
     async def _get_machines_resource(self, uri: str) -> dict[str, Any]:
         """Get machines resource data."""
-        return {
-            "error": "Not implemented",
-            "endpoint": "machines resource",
-            "message": (
-                "Machine listing is planned but not yet available. "
-                "Use the list_return_requests tool to check provisioning status."
-            ),
-        }
+        args = type("Args", (), {})()
+        result = await self.tools["list_machines"](args)
+        return result
 
     async def _get_providers_resource(self, uri: str) -> dict[str, Any]:
         """Get providers resource data."""

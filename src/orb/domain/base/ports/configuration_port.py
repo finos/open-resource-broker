@@ -36,6 +36,18 @@ class ConfigurationPort(ProviderConfigPort):
         """Get cache directory path."""
 
     @abstractmethod
+    def get_work_dir(self) -> str:
+        """Get work directory path."""
+
+    @abstractmethod
+    def get_config_dir(self) -> str:
+        """Get configuration directory path."""
+
+    @abstractmethod
+    def get_log_dir(self) -> str:
+        """Get log directory path."""
+
+    @abstractmethod
     def get_package_info(self) -> dict[str, Any]:
         """Get package metadata information."""
 
@@ -67,13 +79,13 @@ class ConfigurationPort(ProviderConfigPort):
     def override_provider_instance(self, provider_name: str) -> None:
         """Override the active provider instance."""
 
-    def override_provider_region(self, region: str) -> None:
+    def override_provider_region(self, region: str) -> None:  # pyright: ignore[reportUnusedParameter]
         """Override the provider region for this session.
 
         Provider-specific concern — concrete adapters override this.
         """
 
-    def override_provider_profile(self, profile: str) -> None:
+    def override_provider_profile(self, profile: str) -> None:  # pyright: ignore[reportUnusedParameter]
         """Override the provider credential profile for this session.
 
         Provider-specific concern — concrete adapters override this.
@@ -119,11 +131,11 @@ class ConfigurationPort(ProviderConfigPort):
         """Get configuration value by key."""
         return self.get_configuration_value(key, default)
 
-    def get_typed(self, key: str, expected_type: type, default: Any = None) -> Any:
+    def get_typed(self, key: str, expected_type: type, default: Any = None) -> Any:  # pyright: ignore[reportUnusedParameter]
         """Get typed configuration value."""
         return self.get_configuration_value(key, default)
 
-    def get_typed_with_defaults(self, key: str, expected_type: type, default: Any = None) -> Any:
+    def get_typed_with_defaults(self, key: str, expected_type: type, default: Any = None) -> Any:  # pyright: ignore[reportUnusedParameter]
         """Get typed configuration value with defaults."""
         return self.get_configuration_value(key, default)
 
@@ -139,7 +151,7 @@ class ConfigurationPort(ProviderConfigPort):
         """Get the configured storage strategy."""
         return "default"
 
-    def override_scheduler_strategy(self, strategy: str) -> None:
+    def override_scheduler_strategy(self, strategy: str) -> None:  # pyright: ignore[reportUnusedParameter]
         """Override the scheduler strategy."""
 
     def restore_scheduler_strategy(self) -> None:
@@ -155,6 +167,14 @@ class ConfigurationPort(ProviderConfigPort):
     def get_active_providers(self) -> list[Any]:
         """Get list of active providers."""
         return []
+
+    def get_loaded_config_file(self) -> str | None:
+        """Get the path of the loaded configuration file, or None if not loaded from a file."""
+        return None
+
+    def get_root_dir(self) -> str:
+        """Get the root directory path."""
+        return ""
 
     @property
     def app_config(self) -> Any:

@@ -6,6 +6,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from orb.application.ports import SchedulerPort
+from orb.application.services.orchestration.dtos import ListTemplatesOutput
+from orb.application.services.orchestration.get_request_status import (
+    GetRequestStatusOrchestrator,
+)
+from orb.application.services.orchestration.list_templates import ListTemplatesOrchestrator
 from orb.infrastructure.di.buses import QueryBus
 from orb.infrastructure.di.container import DIContainer
 from orb.interface.request_command_handlers import handle_get_request_status
@@ -24,14 +29,14 @@ class TestCLIHandlerExecution:
     async def test_handle_list_templates(self, mock_get_container):
         """Test that handle_list_templates executes correctly."""
         container = MagicMock(spec=DIContainer)
-        query_bus = AsyncMock(spec=QueryBus)
         scheduler_strategy = MagicMock(spec=SchedulerPort)
 
         templates = [
             {"id": "template1", "name": "Template 1"},
             {"id": "template2", "name": "Template 2"},
         ]
-        query_bus.execute = AsyncMock(return_value=templates)
+        orchestrator = AsyncMock(spec=ListTemplatesOrchestrator)
+        orchestrator.execute.return_value = ListTemplatesOutput(templates=templates)
 
         formatted_templates = {
             "templates": templates,
@@ -41,7 +46,7 @@ class TestCLIHandlerExecution:
         scheduler_strategy.format_templates_response = MagicMock(return_value=formatted_templates)
 
         container.get.side_effect = lambda x: {
-            QueryBus: query_bus,
+            ListTemplatesOrchestrator: orchestrator,
             SchedulerPort: scheduler_strategy,
         }.get(x)
 
@@ -138,9 +143,17 @@ class TestCLIHandlerExecution:
             "requests": [{"requestId": "req-abc123", "status": "complete"}]
         }
 
+        from orb.application.services.orchestration.dtos import GetRequestStatusOutput
+
+        orchestrator = AsyncMock(spec=GetRequestStatusOrchestrator)
+        orchestrator.execute.return_value = GetRequestStatusOutput(
+            requests=[{"request_id": "req-abc123", "status": "complete"}]
+        )
+
         container.get.side_effect = lambda x: {
             QueryBus: query_bus,
             SchedulerPort: scheduler_strategy,
+            GetRequestStatusOrchestrator: orchestrator,
         }.get(x)
 
         mock_get_container.return_value = container
@@ -155,8 +168,7 @@ class TestCLIHandlerExecution:
         result = await handle_get_request_status(args)
 
         assert isinstance(result, dict)
-        # Verify the query bus was actually called — proves request_id was extracted correctly
-        query_bus.execute.assert_called_once()
+        orchestrator.execute.assert_called_once()
         scheduler_strategy.format_request_status_response.assert_called_once()
 
 
@@ -168,14 +180,14 @@ class TestFormatConversionConsistency:
     async def test_format_conversion_in_template_handler(self, mock_get_container):
         """Test that format conversion is done using the scheduler strategy in template handlers."""
         container = MagicMock(spec=DIContainer)
-        query_bus = AsyncMock(spec=QueryBus)
         scheduler_strategy = MagicMock(spec=SchedulerPort)
 
         templates = [
             {"id": "template1", "name": "Template 1"},
             {"id": "template2", "name": "Template 2"},
         ]
-        query_bus.execute = AsyncMock(return_value=templates)
+        orchestrator = AsyncMock(spec=ListTemplatesOrchestrator)
+        orchestrator.execute.return_value = ListTemplatesOutput(templates=templates)
 
         formatted_templates = {
             "templates": [
@@ -187,7 +199,7 @@ class TestFormatConversionConsistency:
         scheduler_strategy.format_templates_response = MagicMock(return_value=formatted_templates)
 
         container.get.side_effect = lambda x: {
-            QueryBus: query_bus,
+            ListTemplatesOrchestrator: orchestrator,
             SchedulerPort: scheduler_strategy,
         }.get(x)
 

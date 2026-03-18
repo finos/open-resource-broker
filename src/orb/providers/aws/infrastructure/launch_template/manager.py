@@ -596,7 +596,7 @@ class AWSLaunchTemplateManager:
         if instance_profile and instance_profile.startswith("arn:aws:iam::"):
             # Extract the role name from the ARN
             # ARN format: arn:aws:iam::account-id:role/role-name
-            return instance_profile.split("/")[-1]
+            return instance_profile.rsplit("/", maxsplit=1)[-1]
         return instance_profile
 
     def _generate_client_token(self, request: Request, aws_template: AWSTemplate) -> str:

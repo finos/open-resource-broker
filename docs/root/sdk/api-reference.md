@@ -448,3 +448,17 @@ All REST responses use camelCase keys. Common envelope fields:
 | `validationWarnings` | array | validate template |
 
 Request status responses are formatted by the active `SchedulerPort` strategy and their shape varies by scheduler type.
+
+---
+
+## Error Types
+
+| Error | Description |
+|-------|-------------|
+| `SDKError` | Base class for all SDK errors |
+| `ConfigurationError` | Configuration-related errors (invalid config, missing files) |
+| `ProviderError` | Cloud provider initialization or operation errors |
+| `HandlerDiscoveryError` | CQRS handler discovery failures |
+| `MethodExecutionError` | SDK method execution failures |
+| `NotFoundError` | Raised when a requested entity (template, request, machine) does not exist. Has `entity_type` and `entity_id` attributes. |
+| `AlreadyExistsError` | Raised when attempting to create an entity that already exists. Has `entity_type` and `entity_id` attributes. |

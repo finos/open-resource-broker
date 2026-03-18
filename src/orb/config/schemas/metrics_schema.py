@@ -1,6 +1,6 @@
 """Metrics configuration schema."""
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 
 # NOTE: ProviderMetricsConfig is AWS-specific and ideally belongs in
@@ -11,11 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class ProviderMetricsConfig(BaseModel):
     """Provider-specific metrics configuration."""
 
-    model_config = ConfigDict(populate_by_name=True)
-
-    provider_metrics_enabled: bool = Field(
-        False, alias="aws_metrics_enabled", description="Enable provider metrics collection"
-    )
+    provider_metrics_enabled: bool = Field(False, description="Enable provider metrics collection")
     sample_rate: float = Field(1.0, description="Sampling rate for metrics (0.0-1.0)")
     monitored_services: list[str] = Field(
         default_factory=list, description="List of services to monitor"
@@ -29,8 +25,6 @@ class ProviderMetricsConfig(BaseModel):
 class MetricsConfig(BaseModel):
     """Metrics configuration."""
 
-    model_config = ConfigDict(populate_by_name=True)
-
     metrics_enabled: bool = Field(False, description="Enable metrics collection")
     metrics_dir: str = Field("./metrics", description="Directory for metrics files")
     metrics_interval: int = Field(60, description="Metrics collection interval in seconds")
@@ -39,6 +33,5 @@ class MetricsConfig(BaseModel):
     trace_file_max_size_mb: int = Field(10, description="Maximum trace file size in MB")
     provider_metrics: ProviderMetricsConfig = Field(
         default_factory=ProviderMetricsConfig,  # type: ignore[arg-type]
-        alias="aws_metrics",
         description="Provider-specific metrics configuration",
     )

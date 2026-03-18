@@ -298,7 +298,7 @@ def test_round_trip_hf_format(tmp_path):
         }
     ]
 
-    generated = strategy.format_templates_for_generation(domain_dicts)
+    generated = strategy.format_templates_for_dispatch(domain_dicts)
     tpl_file = tmp_path / "rt_hf.json"
     tpl_file.write_text(json.dumps({"scheduler_type": "hostfactory", "templates": generated}))
 
@@ -311,7 +311,7 @@ def test_round_trip_hf_format(tmp_path):
 
 
 def test_round_trip_hf_generated_file_has_camelcase_keys(tmp_path):
-    """format_templates_for_generation for HF produces camelCase keys on disk."""
+    """format_templates_for_dispatch for HF produces camelCase keys on disk."""
     strategy = _make_hf_strategy()
     domain_dicts = [
         {
@@ -328,7 +328,7 @@ def test_round_trip_hf_generated_file_has_camelcase_keys(tmp_path):
         }
     ]
 
-    generated = strategy.format_templates_for_generation(domain_dicts)
+    generated = strategy.format_templates_for_dispatch(domain_dicts)
 
     assert len(generated) == 1
     g = generated[0]
@@ -337,11 +337,11 @@ def test_round_trip_hf_generated_file_has_camelcase_keys(tmp_path):
 
 
 def test_round_trip_default_generated_file_has_snake_case_keys(tmp_path):
-    """format_templates_for_generation for Default strategy produces snake_case keys."""
+    """format_templates_for_dispatch for Default strategy produces snake_case keys."""
     strategy = _make_default_strategy()
     domain_dicts = [_MINIMAL_SNAKE_TEMPLATE]
 
-    generated = strategy.format_templates_for_generation(domain_dicts)
+    generated = strategy.format_templates_for_dispatch(domain_dicts)
 
     assert len(generated) == 1
     g = generated[0]

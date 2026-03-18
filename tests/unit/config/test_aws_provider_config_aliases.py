@@ -5,7 +5,7 @@ from orb.providers.aws.configuration.config import AWSProviderConfig
 
 def test_canonical_field_names():
     """Constructing with canonical field names works."""
-    config = AWSProviderConfig(region="us-east-1", aws_max_retries=5)
+    config = AWSProviderConfig(region="us-east-1", aws_max_retries=5)  # type: ignore[call-arg]
     assert config.aws_max_retries == 5
 
 
@@ -20,6 +20,6 @@ def test_validation_alias_names():
 
 def test_defaults_when_omitted():
     """Omitting optional fields yields documented defaults."""
-    config = AWSProviderConfig(region="us-east-1")
+    config = AWSProviderConfig(region="us-east-1")  # type: ignore[call-arg]
     assert config.aws_max_retries == 3
     assert config.aws_read_timeout == 30

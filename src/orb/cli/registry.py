@@ -246,7 +246,7 @@ def build_registry() -> None:
     register("storage", "validate", handle_validate_storage_config)
 
     # --- config ---
-    register("config", "show", _make_bus_handler("get_provider_config"))
+    register("config", "show", _make_bus_handler("get_system_config"))
     register("config", "get", _make_bus_handler("get_configuration"))
     register("config", "set", _make_bus_handler("set_configuration"))
     register("config", "validate", _make_bus_handler("validate_provider_config"))

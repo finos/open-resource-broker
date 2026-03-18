@@ -5,6 +5,12 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
+class FilenamePatterns(BaseModel):
+    provider_specific: str = Field(default="{provider_name}_templates.json")
+    provider_type: str = Field(default="{provider_type}_templates.json")
+    generic: str = Field(default="templates.json")
+
+
 class TemplateConfig(BaseModel):
     """Core template configuration - provider agnostic.
 
@@ -30,7 +36,9 @@ class TemplateConfig(BaseModel):
         None, description="Default provider type (aws, provider1, provider2)"
     )
     default_provider_name: Optional[str] = Field(None, description="Default provider instance name")
-    default_provider_api: str = Field("EC2Fleet", description="Default provider API")
+    default_provider_api: Optional[str] = Field(None, description="Default provider API")
+
+    filename_patterns: FilenamePatterns = Field(default_factory=FilenamePatterns)
 
     # Generic pricing configuration
     default_price_type: str = Field(

@@ -27,13 +27,22 @@ def create_sql_strategy(config: Any) -> Any:
     # Extract configuration parameters
     if hasattr(config, "sql_strategy"):
         sql_config = config.sql_strategy
-        connection_string = _build_connection_string(sql_config)
+        db_config = getattr(config, "database", None)
+        connection_timeout = db_config.connection_timeout if db_config is not None else 30
+        config_dict = {
+            "type": sql_config.type,
+            "name": sql_config.name,
+            "pool_size": sql_config.pool_size,
+            "max_overflow": sql_config.max_overflow,
+            "connection_timeout": connection_timeout,
+        }
     else:
         # Fallback for simple config
         connection_string = getattr(config, "connection_string", "sqlite:///data.db")
+        config_dict = {"connection_string": connection_string}
 
     return SQLStorageStrategy(
-        config={"connection_string": connection_string},
+        config=config_dict,
         table_name="generic_storage",
         columns={"id": "TEXT PRIMARY KEY", "data": "TEXT"},
     )

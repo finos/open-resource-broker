@@ -204,7 +204,7 @@ class AWSTemplate(Template):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # AWS-specific fields
-    provider_api: ProviderApi = ProviderApi.EC2_FLEET  # type: ignore[assignment]
+    provider_api: Optional[ProviderApi] = None  # type: ignore[assignment]
     fleet_type: Optional[AWSFleetType] = None
     fleet_role: Optional[str] = None
     user_data: Optional[str] = None
@@ -369,7 +369,7 @@ class AWSTemplate(Template):
         # Add AWS-specific fields
         aws_format = {
             **base_format,
-            "provider_api": self.provider_api.value,
+            "provider_api": self.provider_api.value if self.provider_api else None,
             "fleet_type": self.fleet_type.value if self.fleet_type else None,
             "fleet_role": self.fleet_role,
             "key_name": self.key_name,
@@ -420,7 +420,7 @@ class AWSTemplate(Template):
         # Add AWS-specific fields
         aws_data = {
             **core_data,
-            "provider_api": ProviderApi(data.get("provider_api")),
+            "provider_api": ProviderApi(data["provider_api"]) if data.get("provider_api") else None,
             "fleet_type": (
                 AWSFleetType(data.get("fleet_type")) if data.get("fleet_type") else None
             ),
@@ -495,6 +495,12 @@ class AWSTemplate(Template):
                 price_type = PriceType(self.price_type)
             except ValueError:
                 price_type = None
+
+        if self.provider_api is None:
+            raise ValueError(
+                f"provider_api is not set on template '{self.template_id}' — "
+                "cannot build AWSConfiguration without a handler type"
+            )
 
         return AWSConfiguration(
             handler_type=self.provider_api,

@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from orb.api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
 from orb.application.dto.queries import GetRequestQuery, ListActiveRequestsQuery
+from orb.application.services.orchestration.get_request_status import GetRequestStatusOrchestrator
 
 # Check if FastAPI is available
 try:
@@ -21,294 +21,157 @@ except ImportError:
 @pytest.mark.unit
 @pytest.mark.api
 class TestAPIHandlersComprehensive:
-    """Comprehensive tests for all API handlers."""
+    """Comprehensive tests for orchestrator modules (replaces deleted handler tests)."""
+
+    _ORCHESTRATOR_MODULES = [
+        "orb.application.services.orchestration.acquire_machines",
+        "orb.application.services.orchestration.cancel_request",
+        "orb.application.services.orchestration.get_machine",
+        "orb.application.services.orchestration.get_request_status",
+        "orb.application.services.orchestration.list_machines",
+        "orb.application.services.orchestration.list_requests",
+        "orb.application.services.orchestration.list_return_requests",
+        "orb.application.services.orchestration.list_templates",
+        "orb.application.services.orchestration.return_machines",
+    ]
 
     def get_handler_modules(self):
-        """Get all handler modules."""
-        handler_modules = []
-        handler_files = [
-            "get_available_templates_handler",
-            "get_request_status_handler",
-            "get_return_requests_handler",
-            "request_machines_handler",
-            "request_return_machines_handler",
-        ]
-
-        for handler_file in handler_files:
+        """Get all orchestrator modules."""
+        modules = []
+        for mod_path in self._ORCHESTRATOR_MODULES:
             try:
-                module = importlib.import_module(f"orb.api.handlers.{handler_file}")
-                handler_modules.append((handler_file, module))
+                module = importlib.import_module(mod_path)
+                modules.append((mod_path.split(".")[-1], module))
             except ImportError:
                 continue
-
-        return handler_modules
+        return modules
 
     def get_handler_classes(self, module):
-        """Get handler classes from module."""
+        """Get orchestrator classes from module."""
         classes = []
         for name, obj in inspect.getmembers(module):
-            if inspect.isclass(obj) and "Handler" in name and not name.startswith("Base"):
+            if inspect.isclass(obj) and "Orchestrator" in name and not name.startswith("Base"):
                 classes.append((name, obj))
         return classes
 
     def test_handler_modules_exist(self):
-        """Test that handler modules exist."""
+        """Test that orchestrator modules exist."""
         modules = self.get_handler_modules()
-        assert len(modules) > 0, "At least one handler module should exist"
+        assert len(modules) > 0, "At least one orchestrator module should exist"
 
     def test_handler_classes_exist(self):
-        """Test that handler classes exist in modules."""
+        """Test that orchestrator classes exist in modules."""
         modules = self.get_handler_modules()
-        total_classes = 0
-
-        for _module_name, module in modules:
-            classes = self.get_handler_classes(module)
-            total_classes += len(classes)
-
-        assert total_classes > 0, "At least one handler class should exist"
+        total_classes = sum(len(self.get_handler_classes(m)) for _, m in modules)
+        assert total_classes > 0, "At least one orchestrator class should exist"
 
     def test_handler_initialization(self):
-        """Test handler initialization."""
+        """Test orchestrator initialization with mocked dependencies."""
+        from unittest.mock import MagicMock
+
+        from orb.domain.base.ports.logging_port import LoggingPort
+        from orb.infrastructure.di.buses import CommandBus, QueryBus
+
         modules = self.get_handler_modules()
-
         for _module_name, module in modules:
-            classes = self.get_handler_classes(module)
-
-            for class_name, handler_class in classes:
+            for class_name, orch_class in self.get_handler_classes(module):
                 try:
-                    # Try to create instance with mocked dependencies
-                    mock_deps = [Mock() for _ in range(5)]  # Create enough mocks
-
-                    # Try different initialization patterns
-                    handler = None
-                    for i in range(len(mock_deps) + 1):
-                        try:
-                            if i == 0:
-                                handler = handler_class()
-                            else:
-                                handler = handler_class(*mock_deps[:i])
-                            break
-                        except TypeError:
-                            continue
-
-                    if handler:
-                        assert handler is not None
-                        # Test basic attributes
-                        assert hasattr(handler, "__class__")
-
+                    instance = orch_class(
+                        command_bus=MagicMock(spec=CommandBus),
+                        query_bus=MagicMock(spec=QueryBus),
+                        logger=MagicMock(spec=LoggingPort),
+                    )
+                    assert instance is not None
+                    assert hasattr(instance, "execute")
                 except Exception as e:
-                    # Log but don't fail - some handlers might have complex dependencies
                     print(f"Could not initialize {class_name}: {e}")
 
     @pytest.mark.asyncio
     async def test_handler_methods(self):
-        """Test handler methods exist and are callable."""
+        """Test that orchestrators have an async execute method."""
         modules = self.get_handler_modules()
-
         for _module_name, module in modules:
-            classes = self.get_handler_classes(module)
-
-            for class_name, handler_class in classes:
-                try:
-                    # Create handler with mocked dependencies
-                    mock_deps = [Mock() for _ in range(5)]
-                    handler = None
-
-                    for i in range(len(mock_deps) + 1):
-                        try:
-                            if i == 0:
-                                handler = handler_class()
-                            else:
-                                handler = handler_class(*mock_deps[:i])
-                            break
-                        except TypeError:
-                            continue
-
-                    if handler:
-                        # Find callable methods
-                        methods = [
-                            name
-                            for name, method in inspect.getmembers(handler)
-                            if callable(method) and not name.startswith("_")
-                        ]
-
-                        assert len(methods) > 0, f"{class_name} should have callable methods"
-
-                        # Test common method names
-                        common_methods = ["handle", "process", "execute", "__call__"]
-                        has_main_method = any(hasattr(handler, method) for method in common_methods)
-
-                        if has_main_method:
-                            # Try to call main method with mocked parameters
-                            for method_name in common_methods:
-                                if hasattr(handler, method_name):
-                                    method = getattr(handler, method_name)
-                                    if inspect.iscoroutinefunction(method):
-                                        try:
-                                            # Mock any dependencies the method might need
-                                            if hasattr(handler, "query_bus"):
-                                                handler.query_bus.send = AsyncMock(return_value={})
-                                            if hasattr(handler, "command_bus"):
-                                                handler.command_bus.send = AsyncMock(
-                                                    return_value={}
-                                                )
-
-                                            # Try calling with no args first
-                                            await method()
-                                            break
-                                        except Exception:
-                                            # Try with mock arguments
-                                            try:
-                                                await method(Mock())
-                                                break
-                                            except Exception:  # nosec B110
-                                                # Method might require specific arguments
-                                                pass
-
-                except Exception as e:
-                    # Log but don't fail
-                    print(f"Could not test methods for {class_name}: {e}")
+            for class_name, orch_class in self.get_handler_classes(module):
+                assert hasattr(orch_class, "execute"), f"{class_name} missing execute()"
+                assert inspect.iscoroutinefunction(orch_class.execute), (
+                    f"{class_name}.execute() must be async"
+                )
 
     def test_handler_dependencies(self):
-        """Test handler dependency injection."""
+        """Test orchestrator constructor has expected dependency parameters."""
         modules = self.get_handler_modules()
-
         for _module_name, module in modules:
-            classes = self.get_handler_classes(module)
-
-            for _class_name, handler_class in classes:
-                # Check constructor signature
-                sig = inspect.signature(handler_class.__init__)
-                params = list(sig.parameters.keys())[1:]  # Skip 'self'
-
-                # Handlers should have dependencies
-                if len(params) > 0:
-                    # Common dependency names
-                    common_deps = [
-                        "query_bus",
-                        "command_bus",
-                        "repository",
-                        "logger",
-                        "service",
-                    ]
-                    has_common_dep = any(
-                        any(dep in param for dep in common_deps) for param in params
-                    )
-
-                    # Either has common dependencies or has some dependencies
-                    assert has_common_dep or len(params) > 0
+            for _class_name, orch_class in self.get_handler_classes(module):
+                sig = inspect.signature(orch_class.__init__)
+                params = list(sig.parameters.keys())[1:]  # skip self
+                assert len(params) > 0
 
 
 @pytest.mark.unit
 @pytest.mark.api
-class TestRequestStatusHandlerBehaviour:
-    """Focused tests covering REST request status handler edge cases."""
+class TestRequestStatusOrchestratorBehaviour:
+    """Focused tests covering GetRequestStatusOrchestrator edge cases."""
 
-    @pytest.mark.asyncio
-    async def test_handles_request_status_response_with_scheduler_formatting(self):
-        query_bus = Mock()
-        command_bus = Mock()
+    def _make_orchestrator(self, query_bus, command_bus=None):
+        from unittest.mock import MagicMock
 
-        # Query bus returns basic status for the request_id
-        query_bus.execute = AsyncMock(return_value="complete")
+        from orb.infrastructure.di.buses import CommandBus
 
-        # Scheduler strategy formats the response dict
-        scheduler = Mock()
-        scheduler.format_request_status_response.return_value = {
-            "requests": [
-                {"request_id": "req-12345678-1234-1234-1234-123456789012", "status": "complete"}
-            ]
-        }
-        handler = GetRequestStatusRESTHandler(
+        return GetRequestStatusOrchestrator(
+            command_bus=command_bus or MagicMock(spec=CommandBus),
             query_bus=query_bus,
-            command_bus=command_bus,
-            scheduler_strategy=scheduler,
-            logger=Mock(),
-            error_handler=Mock(),
-            metrics=None,
+            logger=MagicMock(),
         )
 
-        api_request = {
-            "input_data": {"requests": [{"requestId": "req-12345678-1234-1234-1234-123456789012"}]},
-            "all_flag": False,
-            "long": False,
-        }
+    @pytest.mark.asyncio
+    async def test_single_request_id_dispatches_get_request_query(self):
+        from orb.application.services.orchestration.dtos import GetRequestStatusInput
 
-        result = await handler.handle(api_request)
+        query_bus = Mock()
+        query_bus.execute = AsyncMock(return_value={"request_id": "req-1", "status": "complete"})
 
-        # handler now returns a plain dict from scheduler.format_request_status_response
-        assert isinstance(result, dict)
-        assert result["requests"][0]["request_id"] == "req-12345678-1234-1234-1234-123456789012"
-        scheduler.format_request_status_response.assert_called_once()
+        orchestrator = self._make_orchestrator(query_bus)
+        result = await orchestrator.execute(
+            GetRequestStatusInput(request_ids=["req-1"], all_requests=False, detailed=False)
+        )
 
-        # Ensure the correct query type was used
         query_bus.execute.assert_awaited_once()
         assert isinstance(query_bus.execute.call_args.args[0], GetRequestQuery)
+        assert len(result.requests) == 1
 
     @pytest.mark.asyncio
-    async def test_all_flag_uses_list_active_requests(self):
-        query_bus = Mock()
-        command_bus = Mock()
+    async def test_all_requests_dispatches_list_active_requests_query(self):
+        from orb.application.services.orchestration.dtos import GetRequestStatusInput
 
         mock_req = Mock()
-        mock_req.to_dict.return_value = {"request_id": "req-2", "status": "running"}
+        mock_req.model_dump = Mock(return_value={"request_id": "req-2", "status": "running"})
+        query_bus = Mock()
         query_bus.execute = AsyncMock(return_value=[mock_req])
 
-        scheduler = Mock()
-        scheduler.format_request_status_response.return_value = {
-            "requests": [{"request_id": "req-2", "status": "running"}]
-        }
-
-        handler = GetRequestStatusRESTHandler(
-            query_bus=query_bus,
-            command_bus=command_bus,
-            scheduler_strategy=scheduler,
-            logger=Mock(),
-            error_handler=Mock(),
-            metrics=None,
+        orchestrator = self._make_orchestrator(query_bus)
+        result = await orchestrator.execute(
+            GetRequestStatusInput(request_ids=[], all_requests=True, detailed=False)
         )
-
-        api_request = {"all_flag": True, "long": False}
-        result = await handler.handle(api_request)
 
         query_bus.execute.assert_awaited_once()
         assert isinstance(query_bus.execute.call_args.args[0], ListActiveRequestsQuery)
-        assert isinstance(result, dict)
-        assert result["requests"][0]["request_id"] == "req-2"
+        assert len(result.requests) == 1
 
     @pytest.mark.asyncio
-    async def test_long_requests_use_get_request_query(self):
-        query_bus = Mock()
-        command_bus = Mock()
-        scheduler = Mock()
-        scheduler.format_request_status_response.return_value = {
-            "requests": [
-                {"request_id": "req-87654321-4321-4321-4321-210987654321", "status": "complete"}
-            ]
-        }
+    async def test_detailed_flag_sets_long_on_query(self):
+        from orb.application.services.orchestration.dtos import GetRequestStatusInput
 
+        query_bus = Mock()
         query_bus.execute = AsyncMock(return_value=Mock())
 
-        handler = GetRequestStatusRESTHandler(
-            query_bus=query_bus,
-            command_bus=command_bus,
-            scheduler_strategy=scheduler,
-            logger=Mock(),
-            error_handler=Mock(),
-            metrics=None,
+        orchestrator = self._make_orchestrator(query_bus)
+        await orchestrator.execute(
+            GetRequestStatusInput(request_ids=["req-3"], all_requests=False, detailed=True)
         )
 
-        api_request = {
-            "input_data": {"requests": [{"requestId": "req-87654321-4321-4321-4321-210987654321"}]},
-            "all_flag": False,
-            "long": True,
-        }
-
-        await handler.handle(api_request)
-
-        # First execute corresponds to the long=True request
         executed_query = query_bus.execute.call_args.args[0]
         assert isinstance(executed_query, GetRequestQuery)
+        assert executed_query.long is True
 
 
 @pytest.mark.unit

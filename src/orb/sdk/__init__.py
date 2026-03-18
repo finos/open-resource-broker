@@ -50,10 +50,13 @@ Usage:
 from .client import ORB, OpenResourceBroker, ORBClient
 from .config import SDKConfig
 from .exceptions import (
+    AlreadyExistsError as AlreadyExistsError,
     ConfigurationError,
     HandlerDiscoveryError,
     MethodExecutionError,
+    NotFoundError as NotFoundError,
     ProviderError,
+    RequestTimeoutError as RequestTimeoutError,
     SDKError,
 )
 from .middleware import SDKMiddleware
@@ -67,10 +70,13 @@ __all__: list[str] = [
     "ORB",
     "orb",
     "OpenResourceBroker",
+    "AlreadyExistsError",
     "ConfigurationError",
     "HandlerDiscoveryError",
     "MethodExecutionError",
+    "NotFoundError",
     "ProviderError",
+    "RequestTimeoutError",
     "SDKConfig",
     "SDKError",
     "SDKMiddleware",

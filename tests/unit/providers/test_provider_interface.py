@@ -66,7 +66,9 @@ class TestProviderPort:
 
         # Test extra fields are allowed
         config_with_extras = ProviderConfig(
-            provider_type="test", region="test-region", custom_field="custom_value"
+            provider_type="test",
+            region="test-region",
+            custom_field="custom_value",  # type: ignore[call-arg]
         )
         assert config_with_extras.custom_field == "custom_value"
 

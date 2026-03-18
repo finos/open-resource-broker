@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from orb.application.services.provider_registry_service import ProviderRegistryService
@@ -197,11 +197,15 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, list[MachineDTO]])
                         else None,
                         tags=machine.tags,
                     )
-                    machine_dtos.append(machine_dto.to_dict())
+                    machine_dtos.append(machine_dto)
 
                 if query.filter_expressions:
-                    machine_dtos = self._generic_filter_service.apply_filters(
-                        machine_dtos, query.filter_expressions
+                    machine_dtos = cast(
+                        list[MachineDTO],
+                        self._generic_filter_service.apply_filters(
+                            machine_dtos,
+                            query.filter_expressions,  # type: ignore[arg-type]
+                        ),
                     )
 
                 self.logger.info(
@@ -211,7 +215,7 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, list[MachineDTO]])
                     limit,
                     offset,
                 )
-                return machine_dtos  # type: ignore[return-value]
+                return machine_dtos
 
         except Exception as e:
             self.logger.error("Failed to list machines: %s", e)

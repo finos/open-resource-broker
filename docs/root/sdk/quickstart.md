@@ -26,19 +26,20 @@ from orb import ORBClient as orb
 
 async with orb(provider="aws") as sdk:
     # List available templates
-    templates = await sdk.list_templates(active_only=True)
+    result = await sdk.list_templates(active_only=True)
+    templates = result.get("templates", result) if isinstance(result, dict) else result
     print(f"Found {len(templates)} templates")
 
-    # Create machines using CLI-style convenience method
+    # Create machines using the orchestrator method
     if templates:
         request = await sdk.request_machines(
             template_id=templates[0]["template_id"],
             count=5
         )
-        print(f"Created request: {request['created_request_id']}")
+        print(f"Created request: {request['request_id']}")
 
         # Check status
-        status = await sdk.get_request(request_id=request["created_request_id"])
+        status = await sdk.get_request(request_id=request["request_id"])
         print(f"Request status: {status}")
 ```
 
@@ -243,6 +244,8 @@ async with orb(provider="mock") as sdk:
     print(f"SDK stats: {stats}")
 ```
 
+> **Note:** `list_available_methods()` returns only CQRS-discovered methods. The 14 explicit orchestrator-backed methods (`list_templates`, `get_template`, `create_template`, `update_template`, `delete_template`, `validate_template`, `refresh_templates`, `list_machines`, `get_machine`, `request_machines`, `return_machines`, `cancel_request`, `list_requests`, `get_request_status`) are not included in this list.
+
 ### Type Safety
 
 The SDK provides `ORBClientProtocol` for IDE autocompletion and type checking:
@@ -277,14 +280,14 @@ async with orb(provider="aws") as sdk:
         name="New Template",
         provider_api="aws",
         image_id="ami-12345678",
-        instance_type="t3.medium"
+        configuration={"machine_types": {"t3.medium": 1}}
     )
 
     # Update template
     updated_template = await sdk.update_template(
         template_id="my-template",
         name="Updated Template",
-        instance_type="t3.large"
+        configuration={"machine_types": {"t3.large": 1}}
     )
 
     # Delete template
@@ -383,7 +386,8 @@ except SDKError as e:
 ### Custom Middleware
 
 ```python
-from orb import ORBClient as orb, SDKMiddleware
+from orb import ORBClient as orb
+from orb.sdk import SDKMiddleware
 
 class LoggingMiddleware(SDKMiddleware):
     async def process(self, method_name, args, kwargs, next_handler):
@@ -436,19 +440,21 @@ All SDK methods accept optional serialization parameters:
 - `format="json"` — returns a JSON string instead of a dict.
 - `format="yaml"` — returns a YAML string instead of a dict.
 
+> **Note:** `format=` and `raw_response=` only apply to CQRS-discovered methods (e.g. `list_active_requests`, `get_request`). The 14 explicit orchestrator-backed methods (`list_templates`, `request_machines`, `return_machines`, etc.) accept these kwargs but ignore them silently.
+
 ```python
 async with orb(provider="aws") as sdk:
     # Raw handler result — no dict conversion applied
-    raw_data = await sdk.list_templates(raw_response=True)
+    raw_data = await sdk.list_active_requests(raw_response=True)
 
     # JSON string representation
-    json_str = await sdk.list_templates(format="json")
+    json_str = await sdk.list_active_requests(format="json")
 
     # YAML string representation
-    yaml_str = await sdk.list_templates(format="yaml")
+    yaml_str = await sdk.list_active_requests(format="yaml")
 
     # raw_response takes precedence — format is ignored here
-    raw_data = await sdk.list_templates(raw_response=True, format="json")
+    raw_data = await sdk.list_active_requests(raw_response=True, format="json")
 ```
 
 ## Performance Considerations

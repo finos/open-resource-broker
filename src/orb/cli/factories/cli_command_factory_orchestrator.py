@@ -121,6 +121,10 @@ class CLICommandFactoryOrchestrator:
         """Create query to get provider configuration."""
         return self._system_factory.create_get_provider_config_query(**kwargs)
 
+    def create_get_system_config_query(self, **kwargs: Any):
+        """Create query to get full system configuration."""
+        return self._system_factory.create_get_system_config_query(**kwargs)
+
     def create_get_provider_metrics_query(self, **kwargs: Any):
         """Create query to get provider metrics."""
         return self._system_factory.create_get_provider_metrics_query(**kwargs)

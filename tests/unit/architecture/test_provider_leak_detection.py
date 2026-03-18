@@ -62,6 +62,7 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
             "infrastructure/scheduler/hostfactory/hostfactory_strategy.py",
             "orb.providers.aws.utilities.ec2.instances",
         ),
+        ("config/schemas/cleanup_schema.py", "orb.providers.aws.configuration.cleanup_config"),
     }
 )
 

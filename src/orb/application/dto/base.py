@@ -1,13 +1,19 @@
 """Base DTO class with stable API and clean snake_case format."""
 
+from abc import ABC
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import Any, Optional, Union
 
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
-if TYPE_CHECKING:
-    pass
+
+class Command(ABC):
+    """Base interface for commands."""
+
+
+class Query(ABC):
+    """Base interface for queries."""
 
 
 class BaseDTO(BaseModel):
@@ -40,7 +46,7 @@ class BaseDTO(BaseModel):
         Returns:
             Dict with snake_case keys (Pythonic format)
         """
-        return self.model_dump(mode="json")
+        return self.model_dump(mode="json", exclude_none=True)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "BaseDTO":
@@ -79,7 +85,7 @@ class BaseDTO(BaseModel):
 # CQRS Base Classes
 
 
-class BaseCommand(BaseDTO):
+class BaseCommand(BaseDTO, Command):
     """Base class for command DTOs.
 
     CQRS: Commands can store results in mutable fields for callers to access.
@@ -94,7 +100,7 @@ class BaseCommand(BaseDTO):
     dry_run: bool = False  # Enable dry-run mode for testing without real resource creation
 
 
-class BaseQuery(BaseDTO):
+class BaseQuery(BaseDTO, Query):
     """Base class for query DTOs."""
 
     query_id: Optional[str] = None

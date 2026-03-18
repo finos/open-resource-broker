@@ -42,7 +42,6 @@ class TestBootstrapIntegration:
         mock_logging_config.max_size = 10485760
         mock_logging_config.backup_count = 5
         mock_logging_config.console_enabled = True
-        mock_logging_config.accept_propagated_setting = False
         mock_app_config.logging = mock_logging_config
         mock_config_manager.get_typed.return_value = mock_app_config
         return mock_config_manager

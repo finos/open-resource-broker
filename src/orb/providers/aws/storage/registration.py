@@ -100,14 +100,19 @@ def create_dynamodb_unit_of_work(config: Any) -> Any:
         )
         aws_client = session.client("dynamodb", config=boto_config)
 
+        collections = config.app_config.naming.collections
+        machine_name = collections.get("machines", "machines")
+        request_name = collections.get("requests", "requests")
+        template_name = collections.get("templates", "templates")
+
         return DynamoDBUnitOfWork(  # type: ignore[abstract]
             aws_client=aws_client,
             logger=_logger,
             region=dynamodb_config.region,
             profile=dynamodb_config.profile,
-            machine_table=f"{dynamodb_config.table_prefix}-machines",
-            request_table=f"{dynamodb_config.table_prefix}-requests",
-            template_table=f"{dynamodb_config.table_prefix}-templates",
+            machine_table=f"{dynamodb_config.table_prefix}-{machine_name}",
+            request_table=f"{dynamodb_config.table_prefix}-{request_name}",
+            template_table=f"{dynamodb_config.table_prefix}-{template_name}",
         )
     else:
         # For testing or other scenarios - assume it's a dict with AWS config

@@ -186,9 +186,11 @@ def setup_logging(config: LoggingConfig) -> None:
 
             return formatted
 
-    colored_formatter = FileHighlightFormatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s [%(pathname)s:%(lineno)d (%(funcName)s)]"
+    fmt = (
+        config.format
+        or "%(asctime)s - %(name)s - %(levelname)s - %(message)s [%(pathname)s:%(lineno)d (%(funcName)s)]"
     )
+    colored_formatter = FileHighlightFormatter(fmt)
 
     # Configure file logging first (so it gets clean record before console colors)
     if config.file_path:

@@ -107,7 +107,7 @@ class EventHandler(ABC):
         if self.logger:
             self.logger.debug("Processing event: %s", event.event_type)
 
-    async def _post_process(self, event: DomainEvent) -> None:  # noqa: B027
+    async def _post_process(self, event: DomainEvent) -> None:
         """
         Perform common post-processing logic.
 

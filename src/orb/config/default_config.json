@@ -117,6 +117,18 @@
             "spot_fleet": true,
             "run_instances": true
           }
+        },
+        "naming": {
+          "subnet": "^subnet-[0-9a-f]{8,17}$",
+          "security_group": "^sg-[0-9a-f]{8,17}$",
+          "ec2_instance": "^i-[0-9a-f]{8,17}$",
+          "ami": "^(ami-[0-9a-f]{8,17}|/aws/service/.+)$",
+          "ec2_fleet": "^fleet-[0-9a-f]{8,17}$",
+          "launch_template": "^lt-[0-9a-f]{8,17}$",
+          "instance_type": "^[a-z][0-9]+[a-z]*\\.[a-z0-9]+$",
+          "tag_key": "^[a-zA-Z0-9\\s\\._:/=+\\-@]{1,128}$",
+          "arn": "^arn:aws:[a-zA-Z0-9\\-]+:[a-zA-Z0-9\\-]*:[0-9]{12}:.+$",
+          "account_id": "^\\d{12}$"
         }
       }
     }
@@ -181,13 +193,8 @@
       "spot_fleet": "^sfr-[a-f0-9]+$",
       "ec2_fleet": "^fleet-[a-f0-9]+$",
       "asg": "^[a-zA-Z0-9_-]+$",
-      "ami_id": "^ami-[a-f0-9]{8,17}$",
-      "subnet": "^subnet-[a-f0-9]{8,17}$",
-      "security_group": "^sg-[a-f0-9]{8,17}$",
       "instance_type": "^[a-z][0-9][a-z]?\\.[a-z0-9]+$",
       "region": "^[a-z]{2}-[a-z]+-\\d$",
-      "account_id": "^\\d{12}$",
-      "launch_template": "^lt-[a-f0-9]{8,17}$",
       "request_id": "^(req|ret)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
     },
     "prefixes": {
@@ -205,8 +212,7 @@
     "level": "INFO",
     "file_path": "logs/app.log",
     "console_enabled": false,
-    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s [%(pathname)s:%(lineno)d (%(funcName)s)]",
-    "accept_propagated_setting": false
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s [%(pathname)s:%(lineno)d (%(funcName)s)]"
   },
   "template": {
     "max_number": 10,
@@ -215,8 +221,7 @@
       "provider_type": "{provider_type}_templates.json",
       "generic": "templates.json"
     },
-    "default_price_type": "ondemand",
-    "default_provider_api": "EC2Fleet"
+    "default_price_type": "ondemand"
   },
   "events": {
     "enabled": true,
@@ -227,11 +232,6 @@
     "default_timeout": 300,
     "default_grace_period": 300,
     "max_machines_per_request": 100
-  },
-  "database": {
-    "connection_timeout": 30,
-    "query_timeout": 60,
-    "max_connections": 10
   },
   "environment": "development",
   "debug": false,
@@ -244,24 +244,8 @@
       "preload_critical": []
     },
     "enable_batching": true,
-    "batch_sizes": {
-      "terminate_instances": 25,
-      "create_tags": 20,
-      "describe_instances": 25,
-      "run_instances": 10,
-      "describe_spot_fleet_instances": 20,
-      "describe_auto_scaling_groups": 20,
-      "describe_launch_templates": 20,
-      "describe_spot_fleet_requests": 20,
-      "describe_ec2_fleet_instances": 20,
-      "describe_images": 15,
-      "describe_security_groups": 25,
-      "describe_subnets": 25
-    },
     "enable_parallel": true,
     "max_workers": 10,
-    "enable_caching": false,
-    "cache_ttl": 300,
     "enable_adaptive_batch_sizing": true,
     "adaptive_batch_sizing": {
       "initial_batch_size": 10,
@@ -316,7 +300,9 @@
           "requests": "requests.json",
           "machines": "machines.json"
         }
-      }
+      },
+      "backup_enabled": true,
+      "backup_count": 5
     },
     "sql_strategy": {
       "type": "sqlite",
@@ -326,6 +312,11 @@
       "pool_size": 5,
       "max_overflow": 10,
       "timeout": 30
+    },
+    "database": {
+      "connection_timeout": 30,
+      "query_timeout": 60,
+      "max_connections": 10
     }
   },
   "server": {
@@ -391,9 +382,7 @@
     "recovery_timeout": 60,
     "half_open_max_calls": 3
   },
-  "request_timeout": 300,
-  "max_machines_per_request": 100,
-  "resource": {
+"resource": {
     "prefixes": {
       "default": "",
       "request": "req-",

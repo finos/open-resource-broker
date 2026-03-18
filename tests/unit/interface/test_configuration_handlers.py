@@ -45,9 +45,13 @@ class TestProviderConfigHandlers:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 
-            mock_query_bus = AsyncMock()
-            mock_query_bus.execute = AsyncMock(return_value={"provider": "aws"})
-            mock_container.get.return_value = mock_query_bus
+            from unittest.mock import MagicMock
+
+            mock_orchestrator = AsyncMock()
+            mock_orchestrator.execute = AsyncMock(
+                return_value=MagicMock(config={"provider": "aws"}, message="ok")
+            )
+            mock_container.get.return_value = mock_orchestrator
 
             # handle_provider_config takes only args (no app parameter)
             result = await handle_provider_config(args)

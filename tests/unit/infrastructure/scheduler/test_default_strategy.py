@@ -34,6 +34,7 @@ class TestDefaultSchedulerStrategy:
         parsed_request = self.strategy.parse_request_data(raw_request)
 
         # Verify domain format parsing
+        assert isinstance(parsed_request, dict)
         assert parsed_request["template_id"] == "test-template"
         assert parsed_request["requested_count"] == 3
         assert parsed_request["request_type"] == "provision"
@@ -46,6 +47,7 @@ class TestDefaultSchedulerStrategy:
         parsed_request = self.strategy.parse_request_data(raw_request)
 
         # Verify count fallback
+        assert isinstance(parsed_request, dict)
         assert parsed_request["template_id"] == "test-template"
         assert parsed_request["requested_count"] == 5
         assert parsed_request["request_type"] == "provision"  # Default

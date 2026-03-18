@@ -334,14 +334,14 @@ def test_default_parse_template_config_creates_template_object():
 
 
 # ---------------------------------------------------------------------------
-# format_templates_for_generation round-trip
+# format_templates_for_dispatch round-trip
 # ---------------------------------------------------------------------------
 
 
 def test_hf_generation_produces_camelcase_keys():
-    """format_templates_for_generation for HF produces camelCase sentinel key."""
+    """format_templates_for_dispatch for HF produces camelCase sentinel key."""
     strategy = make_hf_strategy()
-    generated = strategy.format_templates_for_generation([_MINIMAL_SNAKE_TEMPLATE])
+    generated = strategy.format_templates_for_dispatch([_MINIMAL_SNAKE_TEMPLATE])
     assert len(generated) == 1
     g = generated[0]
     assert "templateId" in g, "HF generation must produce 'templateId' camelCase key"
@@ -353,7 +353,7 @@ def test_hf_generation_no_snake_case_for_mapped_fields():
     from orb.infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings
 
     strategy = make_hf_strategy()
-    generated = strategy.format_templates_for_generation([_MINIMAL_SNAKE_TEMPLATE])
+    generated = strategy.format_templates_for_dispatch([_MINIMAL_SNAKE_TEMPLATE])
     g = generated[0]
     all_domain_fields = set(HostFactoryFieldMappings.get_mappings("aws").values())
     for domain_field in all_domain_fields:
@@ -365,7 +365,7 @@ def test_hf_generation_no_snake_case_for_mapped_fields():
 def test_hf_round_trip_generate_write_load(tmp_path):
     """Generate → write → load produces the same template_id and max_instances."""
     strategy = make_hf_strategy()
-    generated = strategy.format_templates_for_generation([_MINIMAL_SNAKE_TEMPLATE])
+    generated = strategy.format_templates_for_dispatch([_MINIMAL_SNAKE_TEMPLATE])
     f = tmp_path / "rt.json"
     write_hf_file(f, generated)
     loaded = strategy.load_templates_from_path(str(f))
@@ -375,9 +375,9 @@ def test_hf_round_trip_generate_write_load(tmp_path):
 
 
 def test_default_generation_produces_snake_case_keys():
-    """format_templates_for_generation for Default produces snake_case keys."""
+    """format_templates_for_dispatch for Default produces snake_case keys."""
     strategy = make_default_strategy()
-    generated = strategy.format_templates_for_generation([_MINIMAL_SNAKE_TEMPLATE])
+    generated = strategy.format_templates_for_dispatch([_MINIMAL_SNAKE_TEMPLATE])
     assert len(generated) == 1
     g = generated[0]
     assert "template_id" in g
@@ -389,7 +389,7 @@ def test_default_generation_produces_snake_case_keys():
 def test_default_round_trip_generate_write_load(tmp_path):
     """Default: generate → write → load produces matching template."""
     strategy = make_default_strategy()
-    generated = strategy.format_templates_for_generation([_MINIMAL_SNAKE_TEMPLATE])
+    generated = strategy.format_templates_for_dispatch([_MINIMAL_SNAKE_TEMPLATE])
     f = tmp_path / "rt_default.json"
     write_default_file(f, generated)
     loaded = strategy.load_templates_from_path(str(f))

@@ -4,6 +4,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from .common_schema import DatabaseConfig
+
 
 class JsonStrategyConfig(BaseModel):
     """JSON storage strategy configuration."""
@@ -126,6 +128,7 @@ class StorageConfig(BaseModel):
     strategy: str = Field("json", description="Storage strategy (json, sql)")
     json_strategy: JsonStrategyConfig = Field(default_factory=JsonStrategyConfig)  # type: ignore[call-arg]
     sql_strategy: SqlStrategyConfig = Field(default_factory=SqlStrategyConfig)  # type: ignore[call-arg]
+    database: DatabaseConfig = Field(default_factory=DatabaseConfig)  # type: ignore[call-arg]
 
     @field_validator("strategy")
     @classmethod

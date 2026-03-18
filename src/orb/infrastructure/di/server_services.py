@@ -26,7 +26,7 @@ def register_server_services(container: DIContainer) -> None:
     if server_config.enabled:
         logger.info("Server enabled - registering FastAPI services")
         _register_fastapi_services(container, server_config)
-        _register_api_handlers(container)
+        _register_orchestrators(container)
         logger.info("FastAPI services registered successfully")
     else:
         logger.debug("Server disabled - skipping FastAPI service registration")
@@ -45,145 +45,154 @@ def _register_fastapi_services(container: DIContainer, server_config: ServerConf
     container.register_singleton(ServerConfig, lambda c: server_config)
 
 
-def _register_api_handlers(container: DIContainer) -> None:
-    """Register API handlers with dependency injection."""
-    # Import shared dependencies once at the top so they are always bound
+def _register_orchestrators(container: DIContainer) -> None:
+    """Register orchestrators with dependency injection."""
     try:
-        from orb.application.ports.scheduler_port import SchedulerPort
-        from orb.domain.base.configuration_service import DomainConfigurationService
-        from orb.domain.base.ports import ErrorHandlingPort
         from orb.domain.base.ports.logging_port import LoggingPort
         from orb.infrastructure.di.buses import CommandBus, QueryBus
-        from orb.monitoring.metrics import MetricsCollector
     except ImportError as e:
-        logger.debug("Shared API handler dependencies not available: %s", e)
+        logger.debug("Orchestrator dependencies not available: %s", e)
         return
 
     try:
-        # Register template handler with constructor injection
-        from orb.api.handlers.get_available_templates_handler import (
-            GetAvailableTemplatesRESTHandler,
+        from orb.application.services.orchestration.acquire_machines import (
+            AcquireMachinesOrchestrator,
         )
 
-        if not container.is_registered(GetAvailableTemplatesRESTHandler):
+        if not container.is_registered(AcquireMachinesOrchestrator):
             container.register_singleton(
-                GetAvailableTemplatesRESTHandler,
-                lambda c: GetAvailableTemplatesRESTHandler(
-                    query_bus=c.get(QueryBus),
+                AcquireMachinesOrchestrator,
+                lambda c: AcquireMachinesOrchestrator(
                     command_bus=c.get(CommandBus),
-                    scheduler_strategy=c.get(SchedulerPort),
-                    metrics=(
-                        c.get(MetricsCollector) if c.is_registered(MetricsCollector) else None
-                    ),
-                ),
-            )
-
-    except ImportError:
-        logger.debug("Template handler not available for registration")
-
-    try:
-        # Register request machines handler
-        from orb.api.handlers.request_machines_handler import RequestMachinesRESTHandler
-
-        if not container.is_registered(RequestMachinesRESTHandler):
-            container.register_singleton(
-                RequestMachinesRESTHandler,
-                lambda c: RequestMachinesRESTHandler(
                     query_bus=c.get(QueryBus),
-                    command_bus=c.get(CommandBus),
-                    scheduler_strategy=c.get(SchedulerPort),
                     logger=c.get(LoggingPort),
-                    error_handler=(
-                        c.get(ErrorHandlingPort) if c.is_registered(ErrorHandlingPort) else None
-                    ),
-                    metrics=(
-                        c.get(MetricsCollector) if c.is_registered(MetricsCollector) else None
-                    ),
-                    domain_config_service=(
-                        c.get(DomainConfigurationService)
-                        if c.is_registered(DomainConfigurationService)
-                        else None
-                    ),
                 ),
             )
-
     except ImportError:
-        logger.debug("Request machines handler not available for registration")
+        logger.debug("AcquireMachinesOrchestrator not available for registration")
 
     try:
-        # Register request status handler
-        from orb.api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
-
-        if not container.is_registered(GetRequestStatusRESTHandler):
-            container.register_singleton(
-                GetRequestStatusRESTHandler,
-                lambda c: GetRequestStatusRESTHandler(
-                    query_bus=c.get(QueryBus),
-                    command_bus=c.get(CommandBus),
-                    scheduler_strategy=c.get(SchedulerPort),
-                    logger=c.get(LoggingPort),
-                    error_handler=(
-                        c.get(ErrorHandlingPort) if c.is_registered(ErrorHandlingPort) else None
-                    ),
-                    metrics=(
-                        c.get(MetricsCollector) if c.is_registered(MetricsCollector) else None
-                    ),
-                ),
-            )
-
-    except ImportError:
-        logger.debug("Request status handler not available for registration")
-
-    try:
-        # Register return requests handler
-        from orb.api.handlers.get_return_requests_handler import (
-            GetReturnRequestsRESTHandler,
-        )
-        from orb.config.managers.configuration_manager import ConfigurationManager
-
-        if not container.is_registered(GetReturnRequestsRESTHandler):
-            container.register_singleton(
-                GetReturnRequestsRESTHandler,
-                lambda c: GetReturnRequestsRESTHandler(
-                    query_bus=c.get(QueryBus),
-                    command_bus=c.get(CommandBus),
-                    scheduler_strategy=c.get(SchedulerPort),
-                    config_manager=c.get(ConfigurationManager),
-                    logger=c.get(LoggingPort),
-                    error_handler=(
-                        c.get(ErrorHandlingPort) if c.is_registered(ErrorHandlingPort) else None
-                    ),
-                    metrics=(
-                        c.get(MetricsCollector) if c.is_registered(MetricsCollector) else None
-                    ),
-                ),
-            )
-
-    except ImportError:
-        logger.debug("Return requests handler not available for registration")
-
-    try:
-        # Register return machines handler
-        from orb.api.handlers.request_return_machines_handler import (
-            RequestReturnMachinesRESTHandler,
+        from orb.application.services.orchestration.get_request_status import (
+            GetRequestStatusOrchestrator,
         )
 
-        if not container.is_registered(RequestReturnMachinesRESTHandler):
+        if not container.is_registered(GetRequestStatusOrchestrator):
             container.register_singleton(
-                RequestReturnMachinesRESTHandler,
-                lambda c: RequestReturnMachinesRESTHandler(
-                    query_bus=c.get(QueryBus),
+                GetRequestStatusOrchestrator,
+                lambda c: GetRequestStatusOrchestrator(
                     command_bus=c.get(CommandBus),
-                    scheduler_strategy=c.get(SchedulerPort),
+                    query_bus=c.get(QueryBus),
                     logger=c.get(LoggingPort),
-                    error_handler=(
-                        c.get(ErrorHandlingPort) if c.is_registered(ErrorHandlingPort) else None
-                    ),
-                    metrics=(
-                        c.get(MetricsCollector) if c.is_registered(MetricsCollector) else None
-                    ),
                 ),
             )
-
     except ImportError:
-        logger.debug("Return machines handler not available for registration")
+        logger.debug("GetRequestStatusOrchestrator not available for registration")
+
+    try:
+        from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
+
+        if not container.is_registered(ListRequestsOrchestrator):
+            container.register_singleton(
+                ListRequestsOrchestrator,
+                lambda c: ListRequestsOrchestrator(
+                    command_bus=c.get(CommandBus),
+                    query_bus=c.get(QueryBus),
+                    logger=c.get(LoggingPort),
+                ),
+            )
+    except ImportError:
+        logger.debug("ListRequestsOrchestrator not available for registration")
+
+    try:
+        from orb.application.services.orchestration.return_machines import (
+            ReturnMachinesOrchestrator,
+        )
+
+        if not container.is_registered(ReturnMachinesOrchestrator):
+            container.register_singleton(
+                ReturnMachinesOrchestrator,
+                lambda c: ReturnMachinesOrchestrator(
+                    command_bus=c.get(CommandBus),
+                    query_bus=c.get(QueryBus),
+                    logger=c.get(LoggingPort),
+                ),
+            )
+    except ImportError:
+        logger.debug("ReturnMachinesOrchestrator not available for registration")
+
+    try:
+        from orb.application.services.orchestration.cancel_request import CancelRequestOrchestrator
+
+        if not container.is_registered(CancelRequestOrchestrator):
+            container.register_singleton(
+                CancelRequestOrchestrator,
+                lambda c: CancelRequestOrchestrator(
+                    command_bus=c.get(CommandBus),
+                    query_bus=c.get(QueryBus),
+                    logger=c.get(LoggingPort),
+                ),
+            )
+    except ImportError:
+        logger.debug("CancelRequestOrchestrator not available for registration")
+
+    try:
+        from orb.application.services.orchestration.list_machines import ListMachinesOrchestrator
+
+        if not container.is_registered(ListMachinesOrchestrator):
+            container.register_singleton(
+                ListMachinesOrchestrator,
+                lambda c: ListMachinesOrchestrator(
+                    command_bus=c.get(CommandBus),
+                    query_bus=c.get(QueryBus),
+                    logger=c.get(LoggingPort),
+                ),
+            )
+    except ImportError:
+        logger.debug("ListMachinesOrchestrator not available for registration")
+
+    try:
+        from orb.application.services.orchestration.get_machine import GetMachineOrchestrator
+
+        if not container.is_registered(GetMachineOrchestrator):
+            container.register_singleton(
+                GetMachineOrchestrator,
+                lambda c: GetMachineOrchestrator(
+                    command_bus=c.get(CommandBus),
+                    query_bus=c.get(QueryBus),
+                    logger=c.get(LoggingPort),
+                ),
+            )
+    except ImportError:
+        logger.debug("GetMachineOrchestrator not available for registration")
+
+    try:
+        from orb.application.services.orchestration.list_templates import ListTemplatesOrchestrator
+
+        if not container.is_registered(ListTemplatesOrchestrator):
+            container.register_singleton(
+                ListTemplatesOrchestrator,
+                lambda c: ListTemplatesOrchestrator(
+                    command_bus=c.get(CommandBus),
+                    query_bus=c.get(QueryBus),
+                    logger=c.get(LoggingPort),
+                ),
+            )
+    except ImportError:
+        logger.debug("ListTemplatesOrchestrator not available for registration")
+
+    try:
+        from orb.application.services.orchestration.list_return_requests import (
+            ListReturnRequestsOrchestrator,
+        )
+
+        if not container.is_registered(ListReturnRequestsOrchestrator):
+            container.register_singleton(
+                ListReturnRequestsOrchestrator,
+                lambda c: ListReturnRequestsOrchestrator(
+                    command_bus=c.get(CommandBus),
+                    query_bus=c.get(QueryBus),
+                    logger=c.get(LoggingPort),
+                ),
+            )
+    except ImportError:
+        logger.debug("ListReturnRequestsOrchestrator not available for registration")

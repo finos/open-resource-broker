@@ -88,10 +88,10 @@ class TestConfigDrivenProviderRegistration:
 
     def test_provider_config_with_valid_providers(self):
         """Test ProviderConfig creation with valid providers."""
-        provider_config = ProviderConfig(
+        provider_config = ProviderConfig(  # type: ignore[call-arg]
             selection_policy="FIRST_AVAILABLE",
             providers=[
-                ProviderInstanceConfig(
+                ProviderInstanceConfig(  # type: ignore[call-arg]
                     name="aws-test",
                     type="aws",
                     enabled=True,
@@ -108,10 +108,10 @@ class TestConfigDrivenProviderRegistration:
 
     def test_provider_config_with_disabled_provider(self):
         """Test ProviderConfig with a disabled provider."""
-        provider_config = ProviderConfig(
+        provider_config = ProviderConfig(  # type: ignore[call-arg]
             selection_policy="FIRST_AVAILABLE",
             providers=[
-                ProviderInstanceConfig(
+                ProviderInstanceConfig(  # type: ignore[call-arg]
                     name="aws-disabled",
                     type="aws",
                     enabled=False,
@@ -129,16 +129,16 @@ class TestConfigDrivenProviderRegistration:
 
     def test_provider_config_with_multiple_instances(self):
         """Test ProviderConfig with multiple provider instances."""
-        provider_config = ProviderConfig(
+        provider_config = ProviderConfig(  # type: ignore[call-arg]
             selection_policy="ROUND_ROBIN",
             providers=[
-                ProviderInstanceConfig(
+                ProviderInstanceConfig(  # type: ignore[call-arg]
                     name="aws-us-east-1",
                     type="aws",
                     enabled=True,
                     config={"region": "us-east-1"},
                 ),
-                ProviderInstanceConfig(
+                ProviderInstanceConfig(  # type: ignore[call-arg]
                     name="aws-us-west-2",
                     type="aws",
                     enabled=True,
@@ -154,8 +154,8 @@ class TestConfigDrivenProviderRegistration:
 
     def test_provider_config_default_values(self):
         """Test ProviderConfig has sensible defaults."""
-        provider_config = ProviderConfig(
-            providers=[ProviderInstanceConfig(name="aws-test", type="aws", enabled=True)]
+        provider_config = ProviderConfig(  # type: ignore[call-arg]
+            providers=[ProviderInstanceConfig(name="aws-test", type="aws", enabled=True)]  # type: ignore[call-arg]
         )
 
         assert provider_config.selection_policy == "FIRST_AVAILABLE"
@@ -163,7 +163,7 @@ class TestConfigDrivenProviderRegistration:
 
     def test_provider_instance_config_defaults(self):
         """Test ProviderInstanceConfig has sensible defaults."""
-        instance = ProviderInstanceConfig(name="aws-test", type="aws", enabled=True)
+        instance = ProviderInstanceConfig(name="aws-test", type="aws", enabled=True)  # type: ignore[call-arg]
 
         assert instance.name == "aws-test"
         assert instance.type == "aws"

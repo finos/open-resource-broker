@@ -1,8 +1,8 @@
 """Command and Query interfaces for CQRS pattern."""
 
-from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
+from orb.application.dto.base import Command, Query
 from orb.application.interfaces.command_handler import CommandHandler
 
 T = TypeVar("T")  # Query type
@@ -11,31 +11,8 @@ R = TypeVar("R")  # Result type
 __all__: list[str] = ["Command", "CommandHandler", "Query", "QueryHandler"]
 
 
-class Query(ABC):
-    """Base interface for queries."""
-
-
-class QueryHandler(Generic[T, R], ABC):
+class QueryHandler(Generic[T, R]):
     """Base interface for query handlers."""
 
-    @abstractmethod
-    async def handle(self, query: T) -> R:
-        """
-        Handle a query asynchronously.
-
-        Args:
-            query: Query to handle (strongly typed)
-
-        Returns:
-            Query result (strongly typed)
-
-        Raises:
-            ValidationError: If query is invalid
-        """
-
-
-class Command(ABC):
-    """Base interface for commands."""
-
-
-# CommandHandler is imported from the centralized location
+    async def handle(self, query: T) -> R:  # type: ignore[return]
+        pass

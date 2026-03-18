@@ -346,15 +346,17 @@ class TestProviderDefaultsInheritance:
 
     def test_handler_config_merge_functionality(self):
         """Test HandlerConfig merge_with method works correctly."""
-        base_config = HandlerConfig(
-            handler_class="EC2FleetHandler",
-            supports_spot=True,
-            supports_ondemand=True,
-            max_instances=1000,
+        base_config = HandlerConfig.model_validate(  # type: ignore[attr-defined]
+            {
+                "handler_class": "EC2FleetHandler",
+                "supports_spot": True,
+                "supports_ondemand": True,
+                "max_instances": 1000,
+            }
         )
 
-        override_config = HandlerConfig(
-            handler_class="EC2FleetHandler", supports_spot=False, max_instances=100
+        override_config = HandlerConfig.model_validate(  # type: ignore[attr-defined]
+            {"handler_class": "EC2FleetHandler", "supports_spot": False, "max_instances": 100}
         )
 
         merged_config = base_config.merge_with(override_config)
@@ -374,7 +376,7 @@ class TestProviderDefaultsInheritance:
             )(),
         )
         with mock_registry:
-            provider = ProviderInstanceConfig(
+            provider = ProviderInstanceConfig(  # type: ignore[call-arg]
                 name="test-provider",
                 type="provider2",  # Valid type but no defaults provided
                 enabled=True,

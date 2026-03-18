@@ -1,9 +1,9 @@
 """Machine-related command handlers for the interface layer."""
 
+import asyncio
 from typing import TYPE_CHECKING, Any
 
 from orb.application.ports.scheduler_port import SchedulerPort
-from orb.infrastructure.di.buses import QueryBus
 from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
 
@@ -22,19 +22,18 @@ async def handle_get_machine_status(args: "argparse.Namespace") -> dict[str, Any
     Returns:
         Machine status information for all requested machines
     """
-    container = get_container()
-    query_bus = container.get(QueryBus)
-    scheduler_strategy = container.get(SchedulerPort)
+    from orb.application.services.orchestration.dtos import GetMachineInput, ListMachinesInput
+    from orb.application.services.orchestration.get_machine import GetMachineOrchestrator
+    from orb.application.services.orchestration.list_machines import ListMachinesOrchestrator
 
-    # Validation: Prevent --all with specific IDs
+    container = get_container()
+    scheduler = container.get(SchedulerPort)
+
     has_all = getattr(args, "all", False)
     machine_ids_from_args = []
 
-    # Handle positional arguments
     if hasattr(args, "machine_ids") and args.machine_ids:
         machine_ids_from_args.extend(args.machine_ids)
-
-    # Handle flag arguments
     if hasattr(args, "flag_machine_ids") and args.flag_machine_ids:
         machine_ids_from_args.extend(args.flag_machine_ids)
 
@@ -47,40 +46,23 @@ async def handle_get_machine_status(args: "argparse.Namespace") -> dict[str, Any
         }
 
     if has_all:
-        from orb.application.dto.queries import ListMachinesQuery
-        from orb.application.machine.dto import MachineDTO
+        orchestrator = container.get(ListMachinesOrchestrator)
+        result = await orchestrator.execute(ListMachinesInput())
+        return scheduler.format_machine_status_response(result.machines)
 
-        query = ListMachinesQuery(all_resources=True)
-        machine_dicts = await query_bus.execute(query)
+    if not machine_ids_from_args:
+        return {"error": "No machine IDs provided", "message": "Machine IDs are required"}
 
-        # Convert dictionaries back to MachineDTO objects for scheduler formatting
-        machine_dtos = []
-        for machine_dict in machine_dicts:
-            machine_dto = MachineDTO(**machine_dict)
-            machine_dtos.append(machine_dto)
+    orchestrator = container.get(GetMachineOrchestrator)
+    results = await asyncio.gather(
+        *[orchestrator.execute(GetMachineInput(machine_id=mid)) for mid in machine_ids_from_args],
+        return_exceptions=True,
+    )
+    machine_dtos = [
+        r.machine for r in results if not isinstance(r, BaseException) and r.machine is not None
+    ]
 
-        return scheduler_strategy.format_machine_status_response(machine_dtos)
-    else:
-        if not machine_ids_from_args:
-            return {"error": "No machine IDs provided", "message": "Machine IDs are required"}
-
-        # Query each machine individually and collect results
-        machine_dtos = []
-
-        from orb.application.dto.queries import GetMachineQuery
-
-        for machine_id in machine_ids_from_args:
-            try:
-                query = GetMachineQuery(machine_id=machine_id)
-                machine_dto = await query_bus.execute(query)
-                if machine_dto:
-                    machine_dtos.append(machine_dto)
-            except Exception:
-                # Continue with other machines if one fails
-                continue
-
-        # Format response using scheduler strategy
-        return scheduler_strategy.format_machine_status_response(machine_dtos)
+    return scheduler.format_machine_status_response(machine_dtos)
 
 
 @handle_interface_exceptions(context="list_machines", interface_type="cli")
@@ -94,32 +76,21 @@ async def handle_list_machines(args: "argparse.Namespace") -> dict[str, Any]:
     Returns:
         Machines list formatted for scheduler compatibility
     """
+    from orb.application.services.orchestration.dtos import ListMachinesInput
+    from orb.application.services.orchestration.list_machines import ListMachinesOrchestrator
+
     container = get_container()
-    query_bus = container.get(QueryBus)
-    scheduler_strategy = container.get(SchedulerPort)
+    orchestrator = container.get(ListMachinesOrchestrator)
+    scheduler = container.get(SchedulerPort)
 
-    from orb.application.dto.queries import ListMachinesQuery
-    from orb.application.dto.responses import MachineDTO
-
-    # Create query with filters from args
-    query = ListMachinesQuery(
-        provider_name=getattr(args, "provider", None),
-        status=getattr(args, "status", None),
-        request_id=getattr(args, "request_id", None) or getattr(args, "template_id", None),
+    result = await orchestrator.execute(
+        ListMachinesInput(
+            status=getattr(args, "status", None),
+            provider_name=getattr(args, "provider", None),
+            request_id=getattr(args, "request_id", None) or getattr(args, "template_id", None),
+        )
     )
-
-    # Execute query to get machine dictionaries
-    machine_dicts = await query_bus.execute(query)
-
-    # Convert dictionaries back to MachineDTO objects for scheduler formatting
-    machine_dtos = []
-    for machine_dict in machine_dicts:
-        # Create MachineDTO from dictionary
-        machine_dto = MachineDTO(**machine_dict)
-        machine_dtos.append(machine_dto)
-
-    # Format response using scheduler strategy for proper field mapping
-    return scheduler_strategy.format_machine_status_response(machine_dtos)
+    return scheduler.format_machine_status_response(result.machines)
 
 
 @handle_interface_exceptions(context="stop_machines", interface_type="cli")
@@ -158,69 +129,23 @@ async def handle_stop_machines(args: "argparse.Namespace") -> dict[str, Any]:
             "message": "Specify machine IDs or use --all --force",
         }
 
+    from orb.application.services.orchestration.dtos import StopMachinesInput
+    from orb.application.services.orchestration.stop_machines import StopMachinesOrchestrator
+
     container = get_container()
-    query_bus = container.get(QueryBus)
-
-    # Get machines to stop
-    if has_all:
-        from orb.application.dto.queries import ListMachinesQuery
-
-        query = ListMachinesQuery(status="running")
-        machine_dtos = await query_bus.execute(query)
-        machine_ids = [machine["machine_id"] for machine in machine_dtos]
-    else:
-        machine_ids = machine_ids_from_args
-
-    if not machine_ids:
-        return {
-            "success": True,
-            "message": "No machines to stop",
-            "stopped_machines": [],
-        }
-
-    # Stop machines via provider strategy dispatch
-    from orb.domain.base.ports import ProviderSelectionPort
-    from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
-
-    provider_selection_port = container.get(ProviderSelectionPort)
-    selection = provider_selection_port.select_active_provider()
-    operation = ProviderOperation(
-        operation_type=ProviderOperationType.STOP_INSTANCES,
-        parameters={"instance_ids": machine_ids},
+    orchestrator = container.get(StopMachinesOrchestrator)
+    result = await orchestrator.execute(
+        StopMachinesInput(
+            machine_ids=machine_ids_from_args,
+            all_machines=has_all,
+            force=has_force,
+        )
     )
-    provider_result = await provider_selection_port.execute_operation(
-        selection.provider_name, operation
-    )
-    stop_results: dict[str, bool] = (
-        provider_result.data.get("results", {})
-        if provider_result.success
-        else {mid: False for mid in machine_ids}
-    )
-
-    # Update machine status to "stopping" for successfully stopped machines
-    from orb.application.machine.commands import UpdateMachineStatusCommand
-    from orb.infrastructure.di.buses import CommandBus
-
-    command_bus = container.get(CommandBus)
-
-    stopped_machines = []
-    failed_machines = []
-
-    for machine_id, success in stop_results.items():
-        if success:
-            # Update status to stopping
-            command = UpdateMachineStatusCommand(machine_id=machine_id, status="stopping")
-            await command_bus.execute(command)  # type: ignore[arg-type]
-            stopped_machines.append(machine_id)
-        else:
-            failed_machines.append(machine_id)
-
     return {
-        "success": len(failed_machines) == 0,
-        "message": f"Stopped {len(stopped_machines)} machines"
-        + (f", failed to stop {len(failed_machines)}" if failed_machines else ""),
-        "stopped_machines": stopped_machines,
-        "failed_machines": failed_machines,
+        "success": result.success,
+        "message": result.message,
+        "stopped_machines": result.stopped_machines,
+        "failed_machines": result.failed_machines,
     }
 
 
@@ -252,67 +177,20 @@ async def handle_start_machines(args: "argparse.Namespace") -> dict[str, Any]:
             "message": "Specify machine IDs or use --all",
         }
 
+    from orb.application.services.orchestration.dtos import StartMachinesInput
+    from orb.application.services.orchestration.start_machines import StartMachinesOrchestrator
+
     container = get_container()
-    query_bus = container.get(QueryBus)
-
-    # Get machines to start
-    if has_all:
-        from orb.application.dto.queries import ListMachinesQuery
-
-        query = ListMachinesQuery(status="stopped")
-        machine_dtos = await query_bus.execute(query)
-        machine_ids = [machine["machine_id"] for machine in machine_dtos]
-    else:
-        machine_ids = machine_ids_from_args
-
-    if not machine_ids:
-        return {
-            "success": True,
-            "message": "No machines to start",
-            "started_machines": [],
-        }
-
-    # Start machines via provider strategy dispatch
-    from orb.domain.base.ports import ProviderSelectionPort
-    from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
-
-    provider_selection_port = container.get(ProviderSelectionPort)
-    selection = provider_selection_port.select_active_provider()
-    operation = ProviderOperation(
-        operation_type=ProviderOperationType.START_INSTANCES,
-        parameters={"instance_ids": machine_ids},
+    orchestrator = container.get(StartMachinesOrchestrator)
+    result = await orchestrator.execute(
+        StartMachinesInput(
+            machine_ids=machine_ids_from_args,
+            all_machines=has_all,
+        )
     )
-    provider_result = await provider_selection_port.execute_operation(
-        selection.provider_name, operation
-    )
-    start_results: dict[str, bool] = (
-        provider_result.data.get("results", {})
-        if provider_result.success
-        else {mid: False for mid in machine_ids}
-    )
-
-    # Update machine status to "pending" for successfully started machines
-    from orb.application.machine.commands import UpdateMachineStatusCommand
-    from orb.infrastructure.di.buses import CommandBus
-
-    command_bus = container.get(CommandBus)
-
-    started_machines = []
-    failed_machines = []
-
-    for machine_id, success in start_results.items():
-        if success:
-            # Update status to pending (starting)
-            command = UpdateMachineStatusCommand(machine_id=machine_id, status="pending")
-            await command_bus.execute(command)  # type: ignore[arg-type]
-            started_machines.append(machine_id)
-        else:
-            failed_machines.append(machine_id)
-
     return {
-        "success": len(failed_machines) == 0,
-        "message": f"Started {len(started_machines)} machines"
-        + (f", failed to start {len(failed_machines)}" if failed_machines else ""),
-        "started_machines": started_machines,
-        "failed_machines": failed_machines,
+        "success": result.success,
+        "message": result.message,
+        "started_machines": result.started_machines,
+        "failed_machines": result.failed_machines,
     }

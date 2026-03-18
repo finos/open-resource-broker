@@ -127,6 +127,8 @@ class CancelRequestHandler(BaseCommandHandler[CancelRequestCommand, None]):  # t
                 self.event_publisher.publish(event)  # type: ignore[union-attr]
 
             self.logger.info("Request canceled: %s", command.request_id)
+            command.cancelled = True
+            command.final_status = RequestStatus.CANCELLED.value
 
         except EntityNotFoundError:
             self.logger.error(

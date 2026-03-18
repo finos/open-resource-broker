@@ -19,7 +19,13 @@ class FileManager:
     backup management, and integrity verification.
     """
 
-    def __init__(self, file_path: str, create_dirs: bool = True, backup_count: int = 5) -> None:
+    def __init__(
+        self,
+        file_path: str,
+        create_dirs: bool = True,
+        backup_count: int = 5,
+        backup_enabled: bool = True,
+    ) -> None:
         """
         Initialize file manager.
 
@@ -27,15 +33,21 @@ class FileManager:
             file_path: Path to the main data file
             create_dirs: Whether to create parent directories
             backup_count: Number of backup files to keep
+            backup_enabled: Whether to create backups
         """
         self.file_path = Path(file_path)
         self.backup_count = backup_count
+        self.backup_enabled = backup_enabled
+        self.backup_dir = self.file_path.parent / "backups"
         self.logger = get_logger(__name__)
 
         # Create parent directories if needed
         if create_dirs and not self.file_path.parent.exists():
             self.file_path.parent.mkdir(parents=True, exist_ok=True)
             self.logger.info("Created directory: %s", self.file_path.parent)
+
+        if backup_enabled and create_dirs:
+            self.backup_dir.mkdir(parents=True, exist_ok=True)
 
     def read_file(self) -> str:
         """
@@ -116,9 +128,30 @@ class FileManager:
         if not self.file_path.exists():
             return None
 
+        if not self.backup_enabled:
+            return None
+
         try:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = self.file_path.with_suffix(f".backup_{timestamp}{self.file_path.suffix}")
+            backup_path = (
+                self.backup_dir / f"{self.file_path.stem}.backup_{timestamp}{self.file_path.suffix}"
+            )
+
+            # Skip if content unchanged since last backup
+            _existing = sorted(
+                self.backup_dir.glob(f"{self.file_path.stem}.backup_*{self.file_path.suffix}"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            if _existing:
+                try:
+                    _cur = self.calculate_checksum(self.file_path.read_text(encoding="utf-8"))
+                    _last = self.calculate_checksum(_existing[0].read_text(encoding="utf-8"))
+                    if _cur == _last:
+                        self.logger.debug("Skipping backup — content unchanged")
+                        return None
+                except Exception as e:
+                    self.logger.debug("Failed to compare checksums for backup optimisation: %s", e)
 
             shutil.copy2(self.file_path, backup_path)
             self.logger.debug("Created backup: %s", backup_path)
@@ -137,7 +170,7 @@ class FileManager:
         try:
             # Find all backup files
             backup_pattern = f"{self.file_path.stem}.backup_*{self.file_path.suffix}"
-            backup_files = list(self.file_path.parent.glob(backup_pattern))
+            backup_files = list(self.backup_dir.glob(backup_pattern))
 
             # Sort by modification time (newest first)
             backup_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
@@ -211,7 +244,7 @@ class FileManager:
         try:
             # Find most recent backup
             backup_pattern = f"{self.file_path.stem}.backup_*{self.file_path.suffix}"
-            backup_files = list(self.file_path.parent.glob(backup_pattern))
+            backup_files = list(self.backup_dir.glob(backup_pattern))
 
             if not backup_files:
                 self.logger.warning("No backup files found for recovery")

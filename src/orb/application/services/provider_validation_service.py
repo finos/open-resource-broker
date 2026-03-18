@@ -49,7 +49,7 @@ class ProviderValidationService:
 
         self.logger.debug("Available provider strategies: %s", available_strategies)
 
-    async def select_and_validate_provider(self, template: "Template") -> ProviderSelectionResult:
+    async def select_and_validate_provider(self, template: Template) -> ProviderSelectionResult:
         """Select provider and validate template compatibility."""
         selection_result = self._provider_selection_port.select_provider_for_template(template)
         self.logger.info(

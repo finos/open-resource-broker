@@ -126,6 +126,9 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[TemplateDTO
             limit = min(query.limit or 50, 1000)  # type: ignore[union-attr]
             offset = query.offset or 0  # type: ignore[union-attr]
 
+            if limit > 0:
+                template_dtos = template_dtos[offset : offset + limit]
+
             self.logger.info(
                 "Found %s templates (total: %s, limit: %s, offset: %s)",
                 len(template_dtos),
@@ -174,9 +177,12 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
 
                     raise EntityNotFoundError("Template", template_id)
 
-                template_config = template_dto.configuration or {}
+                template_config = template_dto.model_dump(exclude_none=True)
                 template_config["template_id"] = template_dto.template_id
 
+            except EntityNotFoundError:
+                self.logger.error("Template not found: %s", template_id)
+                raise
             except Exception as e:
                 self.logger.error("Failed to load template %s: %s", template_id, e)
                 return {

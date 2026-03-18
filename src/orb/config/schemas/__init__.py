@@ -4,7 +4,6 @@ from .app_schema import AppConfig, validate_config
 from .common_schema import (
     DatabaseConfig,
     EventsConfig,
-    LimitsConfig,
     NamingConfig,
     PrefixConfig,
     RequestConfig,
@@ -15,7 +14,6 @@ from .common_schema import (
 from .logging_schema import LoggingConfig
 from .performance_schema import (
     AdaptiveBatchSizingConfig,
-    BatchSizesConfig,
     CircuitBreakerConfig,
     PerformanceConfig,
 )
@@ -42,14 +40,12 @@ __all__: list[str] = [
     "AppConfig",
     "AuthConfig",
     "BackoffConfig",
-    "BatchSizesConfig",
     "CORSConfig",
     "CircuitBreakerConfig",
     "DatabaseConfig",
     "EventsConfig",
     "HealthCheckConfig",
     "JsonStrategyConfig",
-    "LimitsConfig",
     # Logging configuration
     "LoggingConfig",
     # Common configurations

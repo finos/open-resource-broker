@@ -5,6 +5,7 @@ from typing import Optional
 
 # Import AWSProviderConfig for compatibility
 from .config import AWSProviderConfig
+from .naming_config import AWSNamingConfig
 
 
 @dataclass
@@ -16,27 +17,6 @@ class AWSLimits:
     max_tags_per_resource: int = 50
     max_security_groups: int = 5
     max_subnets: int = 16
-
-
-@dataclass
-class AWSNamingConfig:
-    """AWS naming patterns and validation rules."""
-
-    patterns: dict[str, str] = field(
-        default_factory=lambda: {
-            "subnet": r"^subnet-[0-9a-f]{8,17}$",
-            "security_group": r"^sg-[0-9a-f]{8,17}$",
-            "ec2_instance": r"^i-[0-9a-f]{8,17}$",
-            "ami": r"^ami-[0-9a-f]{8,17}$",
-            "ec2_fleet": r"^fleet-[0-9a-f]{8,17}$",
-            "launch_template": r"^lt-[0-9a-f]{8,17}$",
-            "instance_type": r"^[a-z][0-9]+[a-z]*\.[a-z0-9]+$",
-            "tag_key": r"^[a-zA-Z0-9\s\._:/=+\-@]{1,128}$",
-            "arn": r"^arn:aws:[a-zA-Z0-9\-]+:[a-zA-Z0-9\-]*:[0-9]{12}:.+$",
-        }
-    )
-
-    limits: AWSLimits = field(default_factory=AWSLimits)
 
 
 @dataclass
@@ -104,34 +84,38 @@ class AWSHandlerConfig:
     defaults: AWSHandlerDefaults = field(default_factory=AWSHandlerDefaults)
 
 
-# Global AWS configuration instances
-_aws_naming_config = AWSNamingConfig()
-
-
 class AWSConfigManager:
     """Manager for AWS configuration."""
 
-    def __init__(self) -> None:
-        """Initialize the instance."""
-        self._naming_config = _aws_naming_config
+    def __init__(self, provider_config: Optional[AWSProviderConfig] = None) -> None:
+        """Initialize with an optional provider config to load naming patterns from."""
+        self._provider_config = provider_config
+
+    @property
+    def _naming_config(self) -> AWSNamingConfig:
+        """Return naming config from provider config if available, else defaults."""
+        if self._provider_config is not None:
+            return self._provider_config.naming
+        return AWSNamingConfig()  # type: ignore[call-arg]
+
+    def configure(self, provider_config: AWSProviderConfig) -> None:
+        """Update the provider config used to resolve naming patterns."""
+        self._provider_config = provider_config
 
     def get_typed(self, config_type):
         """Get typed configuration."""
         if config_type == AWSNamingConfig:
             return self._naming_config
-        else:
-            # Import here to avoid circular imports
-            from .config import AWSProviderConfig
-
-            if config_type == AWSProviderConfig:
-                # Return a default instance - in real usage this would be injected
-                raise ValueError(
-                    "AWSProviderConfig not available from config manager — no AWS provider configured"
-                )
-            raise ValueError(f"Unknown AWS config type: {config_type}")
+        if config_type == AWSProviderConfig:
+            if self._provider_config is not None:
+                return self._provider_config
+            raise ValueError(
+                "AWSProviderConfig not available from config manager — no AWS provider configured"
+            )
+        raise ValueError(f"Unknown AWS config type: {config_type}")
 
 
-# Global AWS config manager instance
+# Global AWS config manager instance — can be reconfigured at startup via configure()
 _aws_config_manager = AWSConfigManager()
 
 

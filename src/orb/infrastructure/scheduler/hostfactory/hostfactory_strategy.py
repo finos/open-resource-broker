@@ -184,6 +184,14 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         else:
             raise ValueError(f"Unsupported HostFactory operation: {operation}")
 
+    def format_template_mutation_response(self, raw: dict[str, Any]) -> dict[str, Any]:
+        """Format template mutation response using camelCase keys."""
+        return {
+            "templateId": raw.get("template_id"),
+            "status": raw.get("status"),
+            "validationErrors": raw.get("validation_errors", []),
+        }
+
     def format_request_response(self, request_data: Any) -> dict[str, Any]:
         """Format request creation response to HostFactory format."""
         request_dict = self._coerce_to_dict(request_data)
@@ -565,7 +573,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "nram": ["Numeric", str(nram)],
         }
 
-    def format_templates_for_generation(self, templates: list[dict]) -> list[dict]:
+    def format_templates_for_dispatch(self, templates: list[dict]) -> list[dict]:
         """Convert internal templates to HostFactory format without applying defaults."""
         processed_templates = []
 
@@ -575,11 +583,18 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             promoted = dict(template)
             for key, value in promoted.pop("metadata", {}).items():
                 promoted.setdefault(key, value)
-            # Convert to HostFactory format for file storage WITHOUT applying defaults
+            # Convert to HostFactory format for dispatch WITHOUT applying defaults
             hf_template = self.field_mapper.format_for_generation([promoted])[0]
             processed_templates.append(hf_template)
 
         return processed_templates
+
+    def serialize_template_for_storage(self, template_dict: dict) -> dict:
+        """Serialize to HF camelCase format, preserving all unmapped fields."""
+        promoted = dict(template_dict)
+        for key, value in promoted.pop("metadata", {}).items():
+            promoted.setdefault(key, value)
+        return self.field_mapper.format_for_generation([promoted], copy_unmapped=True)[0]
 
     def format_request_status_response(self, requests: list[RequestDTO]) -> dict[str, Any]:
         """
@@ -588,8 +603,8 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         """
         formatted_requests = []
         for request_dto in requests:
-            # Use DTO's to_dict() method
-            req_dict = request_dto.to_dict()
+            # Use DTO's to_dict() method (handle plain dicts from orchestrator layer)
+            req_dict = request_dto if isinstance(request_dto, dict) else request_dto.to_dict()
 
             # Rename machine_references to machines for HostFactory compatibility
             if "machine_references" in req_dict:

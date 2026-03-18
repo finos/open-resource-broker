@@ -124,27 +124,23 @@ class TestFormatConversionConsistency:
 class TestFormatConversionInHandlers:
     """Test that format conversion is used consistently in handlers."""
 
-    def test_format_conversion_in_api_handler(self):
-        """Test that format conversion is done using the scheduler strategy in API handlers."""
-        from orb.api.handlers.get_available_templates_handler import (
-            GetAvailableTemplatesRESTHandler,
-        )
+    def test_format_conversion_in_list_templates_orchestrator(self):
+        """Test that ListTemplatesOrchestrator can be instantiated with a scheduler strategy."""
+        from orb.application.services.orchestration.list_templates import ListTemplatesOrchestrator
+        from orb.infrastructure.di.buses import CommandBus, QueryBus
 
-        query_bus = MagicMock()
-        command_bus = MagicMock()
-        scheduler_strategy = MagicMock(spec=SchedulerPort)
-        metrics = MagicMock()
+        command_bus = MagicMock(spec=CommandBus)
+        query_bus = MagicMock(spec=QueryBus)
+        logger = MagicMock()
 
-        handler = GetAvailableTemplatesRESTHandler(
-            query_bus=query_bus,
+        orchestrator = ListTemplatesOrchestrator(
             command_bus=command_bus,
-            scheduler_strategy=scheduler_strategy,
-            metrics=metrics,
+            query_bus=query_bus,
+            logger=logger,
         )
 
-        # Verify handler was created and has the scheduler strategy
-        assert handler is not None
-        assert handler._scheduler_strategy is scheduler_strategy
+        assert orchestrator is not None
+        assert orchestrator._query_bus is query_bus
 
     @pytest.mark.asyncio
     async def test_format_conversion_in_cli_handler(self):
@@ -154,18 +150,22 @@ class TestFormatConversionInHandlers:
         from orb.interface.template_command_handlers import handle_list_templates
 
         with patch("orb.interface.template_command_handlers.get_container") as mock_get_container:
-            container = MagicMock()
-            query_bus = MagicMock()
-            scheduler_strategy = MagicMock(spec=SchedulerPort)
-
             from unittest.mock import AsyncMock
 
-            query_bus.execute = AsyncMock(return_value=[])
+            from orb.application.services.orchestration.list_templates import (
+                ListTemplatesOrchestrator,
+            )
+
+            container = MagicMock()
+            scheduler_strategy = MagicMock(spec=SchedulerPort)
+            orchestrator = MagicMock(spec=ListTemplatesOrchestrator)
+            orchestrator.execute = AsyncMock(return_value=MagicMock(templates=[{"id": "t1"}]))
+            scheduler_strategy.format_templates_response = MagicMock(return_value=[])
 
             container.get.side_effect = lambda x: {
-                "QueryBus": query_bus,
-                "SchedulerPort": scheduler_strategy,
-            }.get(x.__name__ if hasattr(x, "__name__") else str(x), MagicMock())
+                ListTemplatesOrchestrator: orchestrator,
+                SchedulerPort: scheduler_strategy,
+            }.get(x, MagicMock(spec=SchedulerPort))
 
             mock_get_container.return_value = container
 

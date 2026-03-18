@@ -627,6 +627,7 @@ def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
 
     # Process all providers
     providers_list = []
+    default_provider_name: str | None = None
     for provider_data in user_config.get("providers", []):
         provider_config = {"profile": provider_data["profile"], "region": provider_data["region"]}
         provider_type = provider_data["type"]
@@ -646,9 +647,9 @@ def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
             "config": provider_config,
         }
 
-        # Mark as default if flagged
+        # Track default provider name — ProviderInstanceConfig has no "default" field
         if provider_data.get("is_default", False):
-            provider_instance["default"] = True
+            default_provider_name = provider_name
 
         # Add template_defaults if infrastructure was discovered.
         # Promote all infrastructure_defaults to template_defaults except for keys
@@ -675,9 +676,17 @@ def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
 
         providers_list.append(provider_instance)
 
+    # Default to first provider if none explicitly marked
+    if not default_provider_name and providers_list:
+        default_provider_name = providers_list[0]["name"]
+
+    provider_section: dict[str, Any] = {"providers": providers_list}
+    if default_provider_name:
+        provider_section["default_provider_instance"] = default_provider_name
+
     config = {
         "scheduler": {"type": user_config["scheduler_type"]},
-        "provider": {"providers": providers_list},
+        "provider": provider_section,
     }
 
     from orb.infrastructure.scheduler.registry import get_scheduler_registry

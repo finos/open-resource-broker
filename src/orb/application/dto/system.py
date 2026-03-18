@@ -222,6 +222,87 @@ class ProviderStrategyConfigDTO(BaseDTO):
     )
 
 
+class PathsSectionDTO(BaseDTO):
+    """Paths section of system config."""
+
+    root_dir: str
+    config_dir: str
+    work_dir: str
+    log_dir: str
+    loaded_config_file: Optional[str] = None
+    loaded_templates_file: Optional[str] = None
+    template_search_paths: Optional[list[str]] = Field(default=None)
+
+
+class ProviderSectionDTO(BaseDTO):
+    """Provider section of system config."""
+
+    active_providers: list[str]
+    provider_mode: str
+    default_provider: Optional[str] = None
+
+
+class StorageSectionDTO(BaseDTO):
+    """Storage section of system config."""
+
+    strategy: str
+    data_path: Optional[str] = None
+    backup_enabled: bool = False
+    backup_path: Optional[str] = None
+
+
+class SchedulerSectionDTO(BaseDTO):
+    """Scheduler section of system config."""
+
+    scheduler_type: str
+
+
+class LoggingSectionDTO(BaseDTO):
+    """Logging section of system config."""
+
+    level: str
+    log_file: Optional[str] = None
+    console_enabled: bool = True
+
+
+class RequestLimitsSectionDTO(BaseDTO):
+    """Request limits section of system config."""
+
+    max_machines: Optional[int] = None
+    default_timeout: Optional[int] = None
+    grace_period: Optional[int] = None
+
+
+class CircuitBreakerSectionDTO(BaseDTO):
+    """Circuit breaker section of system config."""
+
+    enabled: bool = False
+    failure_threshold: Optional[int] = None
+    recovery_timeout: Optional[int] = None
+
+
+class ServerSectionDTO(BaseDTO):
+    """Server section of system config."""
+
+    enabled: bool
+    host: Optional[str] = None
+    port: Optional[int] = None
+
+
+class SystemConfigDTO(BaseDTO):
+    """DTO for full system configuration overview."""
+
+    paths: PathsSectionDTO
+    provider: ProviderSectionDTO
+    storage: StorageSectionDTO
+    scheduler: SchedulerSectionDTO
+    server: Optional[ServerSectionDTO] = None
+    # Verbose-only sections
+    logging: Optional[LoggingSectionDTO] = None
+    request_limits: Optional[RequestLimitsSectionDTO] = None
+    circuit_breaker: Optional[CircuitBreakerSectionDTO] = None
+
+
 class ValidationDTO(BaseDTO):
     """DTO for template validation results."""
 

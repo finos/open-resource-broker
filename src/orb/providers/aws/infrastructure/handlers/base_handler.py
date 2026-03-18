@@ -15,7 +15,6 @@ from typing import Any, Callable, Optional, TypeVar
 from botocore.exceptions import ClientError
 
 from orb.application.base.provider_handlers import BaseProviderHandler
-from orb.config.schemas.cleanup_schema import CleanupConfig
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.exceptions import InfrastructureError
 from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
@@ -23,6 +22,7 @@ from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.resilience import retry
+from orb.providers.aws.configuration.cleanup_config import CleanupConfig
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.exceptions.aws_exceptions import (
     AuthorizationError,
@@ -345,6 +345,35 @@ class AWSHandler(ABC):
         """Get service name from handler class name."""
         return self.__class__.__name__.replace("Handler", "").lower()
 
+    def _get_circuit_breaker_config(self) -> dict[str, int]:
+        """
+        Get circuit breaker configuration from config_port or return defaults.
+
+        Returns:
+            Dictionary with circuit breaker configuration:
+            - failure_threshold: Number of failures before opening circuit
+            - reset_timeout: Time to wait before attempting recovery (maps from recovery_timeout)
+            - half_open_timeout: Timeout for half-open state (hardcoded until schema updated)
+        """
+        defaults = {
+            "failure_threshold": 5,
+            "reset_timeout": 60,
+            "half_open_timeout": 30,  # TODO: add half_open_timeout to CircuitBreakerConfig schema
+        }
+
+        if self.config_port is None:
+            return defaults
+
+        try:
+            cb_config = self.config_port.app_config.circuit_breaker
+            return {
+                "failure_threshold": cb_config.failure_threshold,
+                "reset_timeout": cb_config.recovery_timeout,  # Schema uses recovery_timeout
+                "half_open_timeout": 30,  # TODO: add half_open_timeout to CircuitBreakerConfig schema
+            }
+        except AttributeError:
+            return defaults
+
     def _get_retry_strategy_config(
         self,
         operation_type: str,
@@ -393,9 +422,7 @@ class AWSHandler(ABC):
                 "base_delay": 1.0,
                 "max_delay": 30.0,
                 "jitter": True,
-                "failure_threshold": 5,
-                "reset_timeout": 60,
-                "half_open_timeout": 30,
+                **self._get_circuit_breaker_config(),
             }
         elif operation_type == "read_only":
             # Use lighter retry for read operations

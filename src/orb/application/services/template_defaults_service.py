@@ -103,6 +103,15 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         result = self._coalesce_merge(resolved_defaults, template_dict)
 
         self.logger.debug("Final template has %s fields after default resolution", len(result))
+
+        # Belt-and-suspenders: warn if provider_api is still absent after all layers
+        if not result.get("provider_api"):
+            self.logger.warning(
+                "provider_api is None after all default layers for template %s — "
+                "no handler will be selected; set provider_api in the template file or provider defaults",
+                result.get("template_id", "unknown"),
+            )
+
         return result
 
     def _coalesce_merge(

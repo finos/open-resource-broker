@@ -207,31 +207,30 @@ class AWSClient:
             if self._provider_name:
                 provider_name = self._provider_name
                 self._logger.debug("Using specific provider: %s", provider_name)
-            else:
-                # Use injected resolver if available, otherwise fall through to legacy path
-                if self._active_provider_name_resolver is not None:
-                    try:
-                        resolved = self._active_provider_name_resolver()
-                        if resolved:
-                            provider_name = resolved
-                            self._logger.debug(
-                                "Resolved active provider name via injected resolver: %s",
-                                provider_name,
-                            )
-                        else:
-                            self._logger.debug(
-                                "Injected resolver returned no provider name; skipping primary path"
-                            )
-                            return None
-                    except Exception as e:
-                        self._logger.debug("Injected resolver raised an exception: %s", str(e))
+            # Use injected resolver if available, otherwise fall through to legacy path
+            elif self._active_provider_name_resolver is not None:
+                try:
+                    resolved = self._active_provider_name_resolver()
+                    if resolved:
+                        provider_name = resolved
+                        self._logger.debug(
+                            "Resolved active provider name via injected resolver: %s",
+                            provider_name,
+                        )
+                    else:
+                        self._logger.debug(
+                            "Injected resolver returned no provider name; skipping primary path"
+                        )
                         return None
-                else:
-                    # No resolver and no explicit provider_name — skip primary path
-                    self._logger.debug(
-                        "No provider_name and no resolver provided; skipping primary config path"
-                    )
+                except Exception as e:
+                    self._logger.debug("Injected resolver raised an exception: %s", str(e))
                     return None
+            else:
+                # No resolver and no explicit provider_name — skip primary path
+                self._logger.debug(
+                    "No provider_name and no resolver provided; skipping primary config path"
+                )
+                return None
 
             # Get the provider instance configuration
             provider_config = self._config_manager.get_provider_config()
@@ -297,11 +296,20 @@ class AWSClient:
         """
         Load performance configuration from ConfigurationManager.
 
+        Batch sizes are sourced from AWSProviderConfig (AWS-specific).
+
         Returns:
             Performance configuration dictionary
         """
+        from orb.providers.aws.configuration.batch_sizes_config import AWSBatchSizesConfig
+
+        # Resolve batch sizes from AWSProviderConfig if available, else use defaults
+        batch_sizes: dict[str, int] = AWSBatchSizesConfig().model_dump()  # type: ignore[call-arg]
+        aws_provider_config = self._get_selected_aws_provider_config()
+        if aws_provider_config is not None and hasattr(aws_provider_config, "batch_sizes"):
+            batch_sizes = aws_provider_config.batch_sizes.model_dump()
+
         try:
-            # Try to get performance config from ConfigurationManager
             from orb.config import PerformanceConfig
 
             perf_config = self._config_manager.get_typed(PerformanceConfig)  # type: ignore[call-arg]
@@ -309,11 +317,9 @@ class AWSClient:
                 self._logger.debug("Loaded performance configuration from ConfigurationManager")
                 return {
                     "enable_batching": perf_config.enable_batching,
-                    "batch_sizes": dict(perf_config.batch_sizes),
+                    "batch_sizes": batch_sizes,
                     "enable_parallel": perf_config.enable_parallel,
                     "max_workers": perf_config.max_workers,
-                    "enable_caching": perf_config.enable_caching,
-                    "cache_ttl": perf_config.cache_ttl,
                 }
         except Exception as e:
             self._logger.debug(
@@ -324,16 +330,9 @@ class AWSClient:
         # Default configuration
         return {
             "enable_batching": True,
-            "batch_sizes": {
-                "terminate_instances": 25,
-                "create_tags": 20,
-                "describe_instances": 25,
-                "run_instances": 10,
-            },
+            "batch_sizes": batch_sizes,
             "enable_parallel": True,
             "max_workers": 10,
-            "enable_caching": True,
-            "cache_ttl": 300,
         }
 
     # Property getters for lazy initialization of AWS service clients
@@ -395,10 +394,7 @@ class AWSClient:
                 if isinstance(metrics_config, dict)
                 else {}
             )
-            aws_metrics_enabled = aws_cfg.get(
-                "provider_metrics_enabled",
-                aws_cfg.get("aws_metrics_enabled", metrics_config.get("aws_metrics_enabled", True)),
-            )
+            aws_metrics_enabled = aws_cfg.get("provider_metrics_enabled", True)
             self._logger.debug("provider_metrics_enabled flag value: %s", aws_metrics_enabled)
             return aws_metrics_enabled
         except Exception as e:

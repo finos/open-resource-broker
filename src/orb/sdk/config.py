@@ -27,6 +27,7 @@ class SDKConfig:
     provider: str = "aws"
     region: Optional[str] = None
     profile: Optional[str] = None
+    scheduler: Optional[str] = None
 
     # Operation configuration
     timeout: int = 300

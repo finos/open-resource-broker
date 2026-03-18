@@ -89,7 +89,7 @@ class TestAWSProviderStrategyAliases:
         from orb.providers.aws.configuration.config import AWSProviderConfig
         from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
-        config = AWSProviderConfig(region="us-east-1")
+        config = AWSProviderConfig(region="us-east-1")  # type: ignore[call-arg]
         logger = MagicMock()
         return AWSProviderStrategy(config=config, logger=logger)
 

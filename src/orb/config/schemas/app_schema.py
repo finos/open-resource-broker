@@ -6,7 +6,6 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .common_schema import (
-    DatabaseConfig,
     EventsConfig,
     NamingConfig,
     RequestConfig,
@@ -37,15 +36,12 @@ class AppConfig(BaseModel):
     storage: StorageConfig = Field(default_factory=lambda: StorageConfig())  # type: ignore[call-arg]
     resource: ResourceConfig = Field(default_factory=lambda: ResourceConfig())  # type: ignore[call-arg]
     request: RequestConfig = Field(default_factory=lambda: RequestConfig())  # type: ignore[call-arg]
-    database: DatabaseConfig = Field(default_factory=lambda: DatabaseConfig())  # type: ignore[call-arg]
     circuit_breaker: CircuitBreakerConfig = Field(default_factory=lambda: CircuitBreakerConfig())  # type: ignore[call-arg]
     performance: PerformanceConfig = Field(default_factory=lambda: PerformanceConfig())  # type: ignore[call-arg]
     server: ServerConfig = Field(default_factory=lambda: ServerConfig())  # type: ignore[call-arg]
     native_spec: NativeSpecConfig = Field(default_factory=lambda: NativeSpecConfig())  # type: ignore[call-arg]
     environment: str = Field("development", description="Environment")
     debug: bool = Field(False, description="Debug mode")
-    request_timeout: int = Field(300, description="Request timeout in seconds")
-    max_machines_per_request: int = Field(100, description="Maximum number of machines per request")
 
     @model_validator(mode="after")
     def ensure_template_config(self) -> "AppConfig":
@@ -93,22 +89,6 @@ class AppConfig(BaseModel):
         valid_environments = ["development", "testing", "staging", "production"]
         if v not in valid_environments:
             raise ValueError(f"Environment must be one of {valid_environments}")
-        return v
-
-    @field_validator("request_timeout")
-    @classmethod
-    def validate_request_timeout(cls, v: int) -> int:
-        """Validate request timeout."""
-        if v < 0:
-            raise ValueError("Request timeout must be positive")
-        return v
-
-    @field_validator("max_machines_per_request")
-    @classmethod
-    def validate_max_machines(cls, v: int) -> int:
-        """Validate max machines per request."""
-        if v < 1:
-            raise ValueError("Maximum machines per request must be at least 1")
         return v
 
 

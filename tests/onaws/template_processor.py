@@ -276,7 +276,7 @@ class TemplateProcessor:
         raw_dicts = hf_strategy.load_templates_from_path(str(templates_file))
 
         target_strategy = TemplateProcessor._make_strategy(scheduler_type)
-        formatted = target_strategy.format_templates_for_generation(raw_dicts)
+        formatted = target_strategy.format_templates_for_dispatch(raw_dicts)
 
         return {"scheduler_type": scheduler_type, "templates": formatted}
 

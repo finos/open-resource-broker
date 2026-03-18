@@ -23,6 +23,7 @@ class CreateRequestCommand(BaseCommand):
     requested_count: int
     timeout: Optional[int] = 3600
     tags: Optional[Dict[str, Any]] = None
+    additional_data: Optional[Dict[str, Any]] = None
 
     # Store created request_id for caller to use in subsequent query
     created_request_id: Optional[str] = None
@@ -55,13 +56,15 @@ class UpdateRequestStatusCommand(Command, BaseModel):
     message: Optional[str] = None
 
 
-class CancelRequestCommand(Command, BaseModel):
+class CancelRequestCommand(BaseCommand):
     """Command to cancel a request."""
-
-    model_config = ConfigDict(frozen=True)
 
     request_id: str
     reason: str
+
+    # Store results for caller to access after command execution
+    cancelled: bool = False
+    final_status: Optional[str] = None
 
 
 class SyncRequestCommand(Command, BaseModel):

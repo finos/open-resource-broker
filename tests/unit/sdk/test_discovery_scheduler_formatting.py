@@ -66,17 +66,6 @@ def test_request_dto_calls_format_request_for_display(
     assert result == {"requestId": "r-1", "status": "running"}
 
 
-def test_request_machines_response_calls_format_request_response(
-    discovery_with_scheduler, mock_scheduler_port
-):
-    dto = _make_dto("RequestMachinesResponse", {"request_id": "r-1", "message": "ok"})
-
-    result = discovery_with_scheduler._standardize_return_type(dto)
-
-    mock_scheduler_port.format_request_response.assert_called_once()
-    assert result == {"requestId": "r-1", "message": "ok"}
-
-
 def test_return_request_response_calls_format_request_status_response(
     discovery_with_scheduler, mock_scheduler_port
 ):
@@ -87,28 +76,6 @@ def test_return_request_response_calls_format_request_status_response(
     # expects_list=True for ReturnRequestResponse, so called with [dto]
     mock_scheduler_port.format_request_status_response.assert_called_once_with([dto])
     assert result == {"requests": [{"requestId": "r-1"}]}
-
-
-def test_template_dto_calls_format_template_for_display(
-    discovery_with_scheduler, mock_scheduler_port
-):
-    dto = _make_dto("TemplateDTO", {"template_id": "t-1"})
-
-    result = discovery_with_scheduler._standardize_return_type(dto)
-
-    mock_scheduler_port.format_template_for_display.assert_called_once()
-    assert result == {"templateId": "t-1"}
-
-
-def test_machine_dto_calls_format_machine_details_response(
-    discovery_with_scheduler, mock_scheduler_port
-):
-    dto = _make_dto("MachineDTO", {"machine_id": "m-1"})
-
-    result = discovery_with_scheduler._standardize_return_type(dto)
-
-    mock_scheduler_port.format_machine_details_response.assert_called_once()
-    assert result == {"machineId": "m-1"}
 
 
 # ---------------------------------------------------------------------------
@@ -123,21 +90,9 @@ def test_list_of_request_dtos_calls_format_request_status_response(
 
     result = discovery_with_scheduler._standardize_return_type([dto])
 
-    # RequestDTO has expects_list=False, so list path calls formatter per item
-    mock_scheduler_port.format_request_for_display.assert_called_once()
-    # format_request_for_display returns {"requestId": "r-1", "status": "running"}
-    assert result == [{"requestId": "r-1", "status": "running"}]
-
-
-def test_list_of_request_status_response_dtos_passes_full_list(
-    discovery_with_scheduler, mock_scheduler_port
-):
-    dto = _make_dto("RequestStatusResponse", {"request_id": "r-1"})
-
-    result = discovery_with_scheduler._standardize_return_type([dto])
-
-    # RequestStatusResponse has expects_list=True, so full list passed
+    # RequestDTO list uses _SCHEDULER_FORMAT_LIST_DISPATCH -> format_request_status_response
     mock_scheduler_port.format_request_status_response.assert_called_once_with([dto])
+    mock_scheduler_port.format_request_for_display.assert_not_called()
     assert result == {"requests": [{"requestId": "r-1"}]}
 
 

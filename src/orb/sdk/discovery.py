@@ -17,8 +17,14 @@ from orb.application.decorators import (
     get_registered_command_handlers,
     get_registered_query_handlers,
 )
+from orb.domain.base.exceptions import DuplicateError, EntityNotFoundError
 
-from .exceptions import HandlerDiscoveryError, MethodExecutionError
+from .exceptions import (
+    AlreadyExistsError,
+    HandlerDiscoveryError,
+    MethodExecutionError,
+    NotFoundError,
+)
 from .parameter_mapping import ParameterMapper
 
 
@@ -48,12 +54,19 @@ class SDKMethodDiscovery:
     # expects_list=False: pass the serialised dict of a single DTO
     _SCHEDULER_FORMAT_DISPATCH: dict[str, tuple[str, bool]] = {
         "RequestDTO": ("format_request_for_display", False),
-        "RequestStatusResponse": ("format_request_status_response", True),
         "ReturnRequestResponse": ("format_request_status_response", True),
+        "MachineDTO": ("format_machine_details_response", False),
         "RequestMachinesResponse": ("format_request_response", False),
         "RequestReturnMachinesResponse": ("format_request_response", False),
-        "TemplateDTO": ("format_template_for_display", False),
-        "MachineDTO": ("format_machine_details_response", False),
+    }
+
+    # Override dispatch for when the same DTO type appears as a list.
+    # Keys are DTO class names; values are (method_name, expects_list) just like above.
+    # When a list of DTOs is processed and the class name appears here, this entry
+    # takes precedence over _SCHEDULER_FORMAT_DISPATCH.
+    _SCHEDULER_FORMAT_LIST_DISPATCH: dict[str, tuple[str, bool]] = {
+        "MachineDTO": ("format_machine_status_response", True),
+        "RequestDTO": ("format_request_status_response", True),
     }
 
     def __init__(self, scheduler_port: "Optional[SchedulerPort]" = None) -> None:
@@ -222,7 +235,9 @@ class SDKMethodDiscovery:
         if not originals:
             return raws
         class_name = type(originals[0]).__name__
-        dispatch = self._SCHEDULER_FORMAT_DISPATCH.get(class_name)
+        dispatch = self._SCHEDULER_FORMAT_LIST_DISPATCH.get(
+            class_name
+        ) or self._SCHEDULER_FORMAT_DISPATCH.get(class_name)
         if dispatch is None:
             return raws
         method_name, expects_list = dispatch
@@ -371,6 +386,14 @@ class SDKMethodDiscovery:
 
             except MethodExecutionError:
                 raise
+            except EntityNotFoundError as e:
+                raise NotFoundError(
+                    e.details.get("entity_type", "Entity"), e.details.get("entity_id", "unknown")
+                ) from e
+            except DuplicateError as e:
+                raise AlreadyExistsError(
+                    e.details.get("entity_type", "Entity"), e.details.get("entity_id", "unknown")
+                ) from e
             except Exception as e:
                 raise MethodExecutionError(
                     f"Failed to execute {method_info.name}: {e!s}",
@@ -380,7 +403,7 @@ class SDKMethodDiscovery:
                         "original_kwargs": kwargs,
                         "mapped_kwargs": ParameterMapper.map_parameters(query_type, kwargs),
                     },
-                )
+                ) from e
 
         # Add metadata to the method
         sdk_method.__name__ = method_info.name
@@ -440,6 +463,7 @@ class SDKMethodDiscovery:
         "CreateTemplateCommand": ["created", "validation_errors"],
         "UpdateTemplateCommand": ["updated", "validation_errors"],
         "DeleteTemplateCommand": ["deleted"],
+        "RefreshTemplatesCommand": ["result"],
     }
 
     def _extract_command_output(self, command: Any) -> Any:
@@ -493,6 +517,14 @@ class SDKMethodDiscovery:
 
             except MethodExecutionError:
                 raise
+            except EntityNotFoundError as e:
+                raise NotFoundError(
+                    e.details.get("entity_type", "Entity"), e.details.get("entity_id", "unknown")
+                ) from e
+            except DuplicateError as e:
+                raise AlreadyExistsError(
+                    e.details.get("entity_type", "Entity"), e.details.get("entity_id", "unknown")
+                ) from e
             except Exception as e:
                 raise MethodExecutionError(
                     f"Failed to execute {method_info.name}: {e!s}",

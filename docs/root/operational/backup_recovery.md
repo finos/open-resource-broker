@@ -32,21 +32,6 @@ The application supports multiple backup strategies depending on your storage co
 
 #### Manual JSON Backup
 ```bash
-# Create manual backup
-python -c "
-from src.infrastructure.storage.repository_migrator import RepositoryMigrator
-from src.infrastructure.di.container import get_container
-
-container = get_container()
-migrator = RepositoryMigrator(container)
-
-backup_path = migrator.create_backup(
-    source_type='json',
-    backup_location=f'backups/manual_backup_{datetime.now().strftime(\"%Y%m%d_%H%M%S\")}.json'
-)
-print(f'Backup created: {backup_path}')
-"
-
 # Verify backup integrity
 python -c "
 import json
@@ -69,22 +54,6 @@ DATE=$(date +%Y%m%d_%H%M%S)
 
 # Create backup directory
 mkdir -p "$BACKUP_DIR"
-
-# Create backup
-python -c "
-from src.infrastructure.storage.repository_migrator import RepositoryMigrator
-from src.infrastructure.di.container import get_container
-import os
-
-container = get_container()
-migrator = RepositoryMigrator(container)
-
-backup_path = migrator.create_backup(
-    source_type='json',
-    backup_location='$BACKUP_DIR/backup_$DATE.json'
-)
-print(f'Backup created: {backup_path}')
-"
 
 # Compress backup
 gzip "$BACKUP_DIR/backup_$DATE.json"
@@ -284,21 +253,8 @@ echo "SSM template backup completed: ssm_templates_$DATE.json"
 
 #### Full Recovery from Backup
 ```bash
-# Restore from backup
-python -c "
-from src.infrastructure.storage.repository_migrator import RepositoryMigrator
-from src.infrastructure.di.container import get_container
-
-container = get_container()
-migrator = RepositoryMigrator(container)
-
-# Restore from specific backup
-restore_result = migrator.restore_from_backup(
-    backup_path='backups/json/backup_20250630_120000.json.gz',
-    target_type='json'
-)
-print(f'Restore completed: {restore_result}')
-"
+# Restore from a JSON backup
+gunzip -c backups/json/backup_20250630_120000.json.gz > data/request_database.json
 ```
 
 #### Selective Recovery

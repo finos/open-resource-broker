@@ -7,23 +7,36 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from orb.api.dependencies import (
-    get_command_bus,
-    get_query_bus,
-    get_request_machines_handler,
-    get_request_status_handler,
-    get_return_machines_handler,
+    get_acquire_machines_orchestrator,
+    get_cancel_request_orchestrator,
+    get_list_machines_orchestrator,
+    get_list_requests_orchestrator,
+    get_list_return_requests_orchestrator,
+    get_machine_orchestrator,
+    get_request_status_orchestrator,
+    get_return_machines_orchestrator,
     get_scheduler_strategy,
 )
 from orb.api.routers.machines import router as machines_router
 from orb.api.routers.requests import router as requests_router
-from orb.application.dto.commands import CancelRequestCommand
-from orb.application.dto.queries import (
-    GetMachineQuery,
-    ListActiveRequestsQuery,
-    ListMachinesQuery,
-    ListReturnRequestsQuery,
+from orb.application.services.orchestration.dtos import (
+    AcquireMachinesInput,
+    AcquireMachinesOutput,
+    CancelRequestInput,
+    CancelRequestOutput,
+    GetMachineInput,
+    GetMachineOutput,
+    GetRequestStatusInput,
+    GetRequestStatusOutput,
+    ListMachinesInput,
+    ListMachinesOutput,
+    ListRequestsInput,
+    ListRequestsOutput,
+    ListReturnRequestsInput,
+    ListReturnRequestsOutput,
+    ReturnMachinesInput,
+    ReturnMachinesOutput,
 )
-from orb.application.request.queries import ListRequestsQuery
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -54,169 +67,200 @@ def requests_app():
 class TestMachinesRouter:
     """Tests for the /machines router."""
 
-    def _make_client(
-        self, app, mock_query_bus=None, mock_request_handler=None, mock_return_handler=None
-    ):
-        mock_scheduler = MagicMock()
-        mock_scheduler.format_machine_status_response.return_value = {"machines": []}
-        mock_scheduler.format_machine_details_response.return_value = {}
-        app.dependency_overrides[get_scheduler_strategy] = lambda: mock_scheduler
-        if mock_query_bus is not None:
-            app.dependency_overrides[get_query_bus] = lambda: mock_query_bus
-        if mock_request_handler is not None:
-            app.dependency_overrides[get_request_machines_handler] = lambda: mock_request_handler
-        if mock_return_handler is not None:
-            app.dependency_overrides[get_return_machines_handler] = lambda: mock_return_handler
-        return TestClient(app, raise_server_exceptions=False)
+    def _make_scheduler(self):
+        scheduler = MagicMock()
+        scheduler.format_request_response.return_value = {"request_id": "req-abc", "message": "ok"}
+        scheduler.format_machine_status_response.return_value = {"machines": []}
+        scheduler.format_machine_details_response.return_value = {"machine_id": "i-123"}
+        return scheduler
 
-    def _make_request_handler(self, request_id="req-abc"):
-        handler = MagicMock()
-        handler.handle = AsyncMock(return_value={"request_id": request_id, "message": "ok"})
-        return handler
+    def _override_acquire(self, app, output: AcquireMachinesOutput):
+        orch = MagicMock()
+        orch.execute = AsyncMock(return_value=output)
+        app.dependency_overrides[get_acquire_machines_orchestrator] = lambda: orch
+        return orch
+
+    def _override_return(self, app, output: ReturnMachinesOutput):
+        orch = MagicMock()
+        orch.execute = AsyncMock(return_value=output)
+        app.dependency_overrides[get_return_machines_orchestrator] = lambda: orch
+        return orch
+
+    def _override_list_machines(self, app, output: ListMachinesOutput):
+        orch = MagicMock()
+        orch.execute = AsyncMock(return_value=output)
+        app.dependency_overrides[get_list_machines_orchestrator] = lambda: orch
+        return orch
+
+    def _override_get_machine(self, app, output: GetMachineOutput):
+        orch = MagicMock()
+        orch.execute = AsyncMock(return_value=output)
+        app.dependency_overrides[get_machine_orchestrator] = lambda: orch
+        return orch
+
+    def _set_scheduler(self, app, scheduler=None):
+        s = scheduler or self._make_scheduler()
+        app.dependency_overrides[get_scheduler_strategy] = lambda: s
+        return s
 
     def test_request_machines_happy_path(self, machines_app):
-        handler = self._make_request_handler("req-abc")
-        client = self._make_client(machines_app, mock_request_handler=handler)
+        output = AcquireMachinesOutput(
+            request_id="req-abc", status="pending", raw={"request_id": "req-abc", "message": "ok"}
+        )
+        orch = self._override_acquire(machines_app, output)
+        scheduler = self._set_scheduler(machines_app)
+        client = TestClient(machines_app, raise_server_exceptions=False)
 
         resp = client.post("/machines/request", json={"template_id": "t1", "count": 3})
 
         assert resp.status_code == 202
-        body = resp.json()
-        assert body["request_id"] == "req-abc"
-        assert body["message"] == "ok"
-        handler.handle.assert_awaited_once()
+        orch.execute.assert_awaited_once()
+        inp: AcquireMachinesInput = orch.execute.call_args.args[0]
+        assert inp.template_id == "t1"
+        assert inp.requested_count == 3
+        scheduler.format_request_response.assert_called_once_with(output.raw)
 
     def test_request_machines_camel_case_body(self, machines_app):
-        handler = self._make_request_handler("req-camel")
-        client = self._make_client(machines_app, mock_request_handler=handler)
+        output = AcquireMachinesOutput(request_id="req-camel", status="pending", raw={})
+        orch = self._override_acquire(machines_app, output)
+        self._set_scheduler(machines_app)
+        client = TestClient(machines_app, raise_server_exceptions=False)
 
         resp = client.post("/machines/request", json={"templateId": "t1", "machineCount": 3})
 
         assert resp.status_code == 202
-        assert resp.json()["request_id"] == "req-camel"
+        inp: AcquireMachinesInput = orch.execute.call_args.args[0]
+        assert inp.template_id == "t1"
+        assert inp.requested_count == 3
 
     def test_request_machines_snake_case_count_alias(self, machines_app):
-        handler = self._make_request_handler("req-snake")
-        client = self._make_client(machines_app, mock_request_handler=handler)
+        output = AcquireMachinesOutput(request_id="req-snake", status="pending", raw={})
+        orch = self._override_acquire(machines_app, output)
+        self._set_scheduler(machines_app)
+        client = TestClient(machines_app, raise_server_exceptions=False)
 
         resp = client.post("/machines/request", json={"template_id": "t1", "machine_count": 5})
 
         assert resp.status_code == 202
-        assert resp.json()["request_id"] == "req-snake"
+        inp: AcquireMachinesInput = orch.execute.call_args.args[0]
+        assert inp.requested_count == 5
 
     def test_request_machines_missing_template_id(self, machines_app):
-        handler = self._make_request_handler()
-        client = self._make_client(machines_app, mock_request_handler=handler)
+        self._set_scheduler(machines_app)
+        client = TestClient(machines_app, raise_server_exceptions=False)
 
         resp = client.post("/machines/request", json={"count": 3})
 
         assert resp.status_code == 422
 
     def test_request_machines_missing_count(self, machines_app):
-        handler = self._make_request_handler()
-        client = self._make_client(machines_app, mock_request_handler=handler)
+        self._set_scheduler(machines_app)
+        client = TestClient(machines_app, raise_server_exceptions=False)
 
         resp = client.post("/machines/request", json={"template_id": "t1"})
 
         assert resp.status_code == 422
 
     def test_return_machines_happy_path(self, machines_app):
-        handler = MagicMock()
-        handler.handle = AsyncMock(return_value={"returned": ["i-123"]})
-        client = self._make_client(machines_app, mock_return_handler=handler)
+        output = ReturnMachinesOutput(
+            request_id="ret-1", status="pending", raw={"returned": ["i-123"]}
+        )
+        orch = self._override_return(machines_app, output)
+        self._set_scheduler(machines_app)
+        client = TestClient(machines_app, raise_server_exceptions=False)
 
         resp = client.post("/machines/return", json={"machine_ids": ["i-123"]})
 
         assert resp.status_code == 200
-        handler.handle.assert_awaited_once()
-        call_arg = handler.handle.call_args.args[0]
-        assert call_arg["input_data"]["machine_ids"] == ["i-123"]
+        orch.execute.assert_awaited_once()
+        inp: ReturnMachinesInput = orch.execute.call_args.args[0]
+        assert inp.machine_ids == ["i-123"]
 
     def test_return_machines_empty_ids(self, machines_app):
-        handler = MagicMock()
-        handler.handle = AsyncMock(return_value={})
-        client = self._make_client(machines_app, mock_return_handler=handler)
+        output = ReturnMachinesOutput(request_id=None, status="pending", raw={})
+        orch = self._override_return(machines_app, output)
+        self._set_scheduler(machines_app)
+        client = TestClient(machines_app, raise_server_exceptions=False)
 
         resp = client.post("/machines/return", json={"machine_ids": []})
 
         assert resp.status_code == 200
-        handler.handle.assert_awaited_once()
+        orch.execute.assert_awaited_once()
 
     def test_return_machines_camel_case_body(self, machines_app):
-        handler = MagicMock()
-        handler.handle = AsyncMock(return_value={})
-        client = self._make_client(machines_app, mock_return_handler=handler)
+        output = ReturnMachinesOutput(request_id=None, status="pending", raw={})
+        orch = self._override_return(machines_app, output)
+        self._set_scheduler(machines_app)
+        client = TestClient(machines_app, raise_server_exceptions=False)
 
         resp = client.post("/machines/return", json={"machineIds": ["i-456"]})
 
         assert resp.status_code == 200
-        call_arg = handler.handle.call_args.args[0]
-        assert call_arg["input_data"]["machine_ids"] == ["i-456"]
+        inp: ReturnMachinesInput = orch.execute.call_args.args[0]
+        assert inp.machine_ids == ["i-456"]
 
     def test_list_machines_happy_path(self, machines_app):
-        query_bus = AsyncMock()
-        query_bus.execute = AsyncMock(return_value=[])
-        client = self._make_client(machines_app, mock_query_bus=query_bus)
+        output = ListMachinesOutput(machines=[])
+        orch = self._override_list_machines(machines_app, output)
+        self._set_scheduler(machines_app)
+        client = TestClient(machines_app, raise_server_exceptions=False)
 
         resp = client.get("/machines/")
 
         assert resp.status_code == 200
-        query_bus.execute.assert_awaited_once()
-        query = query_bus.execute.call_args.args[0]
-        assert isinstance(query, ListMachinesQuery)
+        orch.execute.assert_awaited_once()
+        inp: ListMachinesInput = orch.execute.call_args.args[0]
+        assert isinstance(inp, ListMachinesInput)
 
     def test_list_machines_with_filters(self, machines_app):
-        query_bus = AsyncMock()
-        query_bus.execute = AsyncMock(return_value=[])
-        client = self._make_client(machines_app, mock_query_bus=query_bus)
+        output = ListMachinesOutput(machines=[])
+        orch = self._override_list_machines(machines_app, output)
+        self._set_scheduler(machines_app)
+        client = TestClient(machines_app, raise_server_exceptions=False)
 
         resp = client.get("/machines/?status=running&limit=10")
 
         assert resp.status_code == 200
-        query = query_bus.execute.call_args.args[0]
-        assert isinstance(query, ListMachinesQuery)
-        assert query.status == "running"
-        assert query.limit == 10
+        inp: ListMachinesInput = orch.execute.call_args.args[0]
+        assert inp.status == "running"
+        assert inp.limit == 10
 
     def test_list_machines_with_request_id_filter(self, machines_app):
-        query_bus = AsyncMock()
-        query_bus.execute = AsyncMock(return_value=[])
-        client = self._make_client(machines_app, mock_query_bus=query_bus)
+        output = ListMachinesOutput(machines=[])
+        orch = self._override_list_machines(machines_app, output)
+        self._set_scheduler(machines_app)
+        client = TestClient(machines_app, raise_server_exceptions=False)
 
         resp = client.get("/machines/?request_id=req-xyz")
 
         assert resp.status_code == 200
-        query = query_bus.execute.call_args.args[0]
-        assert query.request_id == "req-xyz"
+        inp: ListMachinesInput = orch.execute.call_args.args[0]
+        assert inp.request_id == "req-xyz"
 
     def test_get_machine_happy_path(self, machines_app):
-        query_bus = AsyncMock()
-        result = MagicMock()
-        result.to_dict.return_value = {"machine_id": "i-123", "status": "running"}
-        query_bus.execute = AsyncMock(return_value=result)
-        client = self._make_client(machines_app, mock_query_bus=query_bus)
+        machine = MagicMock()
+        machine.to_dict.return_value = {"machine_id": "i-123", "status": "running"}
+        output = GetMachineOutput(machine=machine)
+        orch = self._override_get_machine(machines_app, output)
+        self._set_scheduler(machines_app)
+        client = TestClient(machines_app, raise_server_exceptions=False)
 
         resp = client.get("/machines/i-123")
 
         assert resp.status_code == 200
-        query_bus.execute.assert_awaited_once()
-        query = query_bus.execute.call_args.args[0]
-        assert isinstance(query, GetMachineQuery)
-        assert query.machine_id == "i-123"
+        orch.execute.assert_awaited_once()
+        inp: GetMachineInput = orch.execute.call_args.args[0]
+        assert inp.machine_id == "i-123"
 
-    def test_request_machines_passes_additional_data(self, machines_app):
-        handler = self._make_request_handler("req-extra")
-        client = self._make_client(machines_app, mock_request_handler=handler)
+    def test_get_machine_not_found(self, machines_app):
+        output = GetMachineOutput(machine=None)
+        self._override_get_machine(machines_app, output)
+        self._set_scheduler(machines_app)
+        client = TestClient(machines_app, raise_server_exceptions=False)
 
-        resp = client.post(
-            "/machines/request",
-            json={"template_id": "t1", "count": 2, "additional_data": {"region": "us-east-1"}},
-        )
+        resp = client.get("/machines/i-missing")
 
-        assert resp.status_code == 202
-        call_arg = handler.handle.call_args.args[0]
-        # additional_data is merged into the template payload
-        assert call_arg.template.get("region") == "us-east-1"
+        assert resp.status_code == 404
 
 
 # ---------------------------------------------------------------------------
@@ -229,187 +273,201 @@ class TestMachinesRouter:
 class TestRequestsRouter:
     """Tests for the /requests router."""
 
-    def _make_client(
-        self, app, mock_query_bus=None, mock_command_bus=None, mock_status_handler=None
-    ):
-        mock_scheduler = MagicMock()
-        mock_scheduler.format_request_status_response.return_value = {"requests": []}
-        mock_scheduler.format_request_response.return_value = {
+    def _make_scheduler(self):
+        scheduler = MagicMock()
+        scheduler.format_request_status_response.return_value = {"requests": []}
+        scheduler.format_request_response.return_value = {
             "request_id": "req-789",
             "status": "cancelled",
         }
-        app.dependency_overrides[get_scheduler_strategy] = lambda: mock_scheduler
-        if mock_query_bus is not None:
-            app.dependency_overrides[get_query_bus] = lambda: mock_query_bus
-        if mock_command_bus is not None:
-            app.dependency_overrides[get_command_bus] = lambda: mock_command_bus
-        if mock_status_handler is not None:
-            app.dependency_overrides[get_request_status_handler] = lambda: mock_status_handler
-        return TestClient(app, raise_server_exceptions=False)
+        return scheduler
 
-    def _make_list_result(self, request_id="req-1", status="pending"):
-        item = MagicMock()
-        item.model_dump.return_value = {"request_id": request_id, "status": status}
-        return [item]
+    def _set_scheduler(self, app, scheduler=None):
+        s = scheduler or self._make_scheduler()
+        app.dependency_overrides[get_scheduler_strategy] = lambda: s
+        return s
 
-    def _make_sync_result(self, request_id="req-1", status="running"):
-        item = MagicMock()
-        item.to_dict.return_value = {"request_id": request_id, "status": status}
-        return [item]
+    def _override_list_requests(self, app, output: ListRequestsOutput):
+        orch = MagicMock()
+        orch.execute = AsyncMock(return_value=output)
+        app.dependency_overrides[get_list_requests_orchestrator] = lambda: orch
+        return orch
+
+    def _override_list_return_requests(self, app, output: ListReturnRequestsOutput):
+        orch = MagicMock()
+        orch.execute = AsyncMock(return_value=output)
+        app.dependency_overrides[get_list_return_requests_orchestrator] = lambda: orch
+        return orch
+
+    def _override_status(self, app, output: GetRequestStatusOutput):
+        orch = MagicMock()
+        orch.execute = AsyncMock(return_value=output)
+        app.dependency_overrides[get_request_status_orchestrator] = lambda: orch
+        return orch
+
+    def _override_cancel(self, app, output: CancelRequestOutput):
+        orch = MagicMock()
+        orch.execute = AsyncMock(return_value=output)
+        app.dependency_overrides[get_cancel_request_orchestrator] = lambda: orch
+        return orch
 
     def test_list_requests_happy_path(self, requests_app):
-        query_bus = AsyncMock()
-        query_bus.execute = AsyncMock(return_value=self._make_list_result())
-        client = self._make_client(requests_app, mock_query_bus=query_bus)
+        output = ListRequestsOutput(requests=[{"request_id": "req-1", "status": "pending"}])
+        orch = self._override_list_requests(requests_app, output)
+        self._set_scheduler(requests_app)
+        client = TestClient(requests_app, raise_server_exceptions=False)
 
         resp = client.get("/requests/")
 
         assert resp.status_code == 200
-        query_bus.execute.assert_awaited_once()
-        query = query_bus.execute.call_args.args[0]
-        assert isinstance(query, ListRequestsQuery)
+        orch.execute.assert_awaited_once()
+        inp: ListRequestsInput = orch.execute.call_args.args[0]
+        assert isinstance(inp, ListRequestsInput)
+        assert inp.sync is False
 
     def test_list_requests_with_status_filter(self, requests_app):
-        query_bus = AsyncMock()
-        query_bus.execute = AsyncMock(return_value=self._make_list_result(status="pending"))
-        client = self._make_client(requests_app, mock_query_bus=query_bus)
+        output = ListRequestsOutput(requests=[])
+        orch = self._override_list_requests(requests_app, output)
+        self._set_scheduler(requests_app)
+        client = TestClient(requests_app, raise_server_exceptions=False)
 
         resp = client.get("/requests/?status=pending")
 
         assert resp.status_code == 200
-        query = query_bus.execute.call_args.args[0]
-        assert isinstance(query, ListRequestsQuery)
-        assert query.status == "pending"
+        inp: ListRequestsInput = orch.execute.call_args.args[0]
+        assert inp.status == "pending"
 
     def test_list_requests_with_limit(self, requests_app):
-        query_bus = AsyncMock()
-        query_bus.execute = AsyncMock(return_value=self._make_list_result())
-        client = self._make_client(requests_app, mock_query_bus=query_bus)
+        output = ListRequestsOutput(requests=[])
+        orch = self._override_list_requests(requests_app, output)
+        self._set_scheduler(requests_app)
+        client = TestClient(requests_app, raise_server_exceptions=False)
 
         resp = client.get("/requests/?limit=5")
 
         assert resp.status_code == 200
-        query = query_bus.execute.call_args.args[0]
-        assert query.limit == 5
+        inp: ListRequestsInput = orch.execute.call_args.args[0]
+        assert inp.limit == 5
 
     def test_list_requests_with_sync(self, requests_app):
-        query_bus = AsyncMock()
-        query_bus.execute = AsyncMock(return_value=self._make_sync_result())
-        client = self._make_client(requests_app, mock_query_bus=query_bus)
+        output = ListRequestsOutput(requests=[])
+        orch = self._override_list_requests(requests_app, output)
+        self._set_scheduler(requests_app)
+        client = TestClient(requests_app, raise_server_exceptions=False)
 
         resp = client.get("/requests/?sync=true")
 
         assert resp.status_code == 200
-        query = query_bus.execute.call_args.args[0]
-        assert isinstance(query, ListActiveRequestsQuery)
-        assert query.all_resources is True
+        inp: ListRequestsInput = orch.execute.call_args.args[0]
+        assert inp.sync is True
 
     def test_list_return_requests(self, requests_app):
-        query_bus = AsyncMock()
-        item = MagicMock()
-        item.to_dict.return_value = {"request_id": "ret-1", "status": "pending_return"}
-        query_bus.execute = AsyncMock(return_value=[item])
-        client = self._make_client(requests_app, mock_query_bus=query_bus)
+        output = ListReturnRequestsOutput(requests=[{"request_id": "ret-1"}])
+        orch = self._override_list_return_requests(requests_app, output)
+        self._set_scheduler(requests_app)
+        client = TestClient(requests_app, raise_server_exceptions=False)
 
         resp = client.get("/requests/return")
 
         assert resp.status_code == 200
-        query_bus.execute.assert_awaited_once()
-        query = query_bus.execute.call_args.args[0]
-        assert isinstance(query, ListReturnRequestsQuery)
+        orch.execute.assert_awaited_once()
+        inp: ListReturnRequestsInput = orch.execute.call_args.args[0]
+        assert isinstance(inp, ListReturnRequestsInput)
 
     def test_list_return_requests_with_limit(self, requests_app):
-        query_bus = AsyncMock()
-        query_bus.execute = AsyncMock(return_value=[])
-        client = self._make_client(requests_app, mock_query_bus=query_bus)
+        output = ListReturnRequestsOutput(requests=[])
+        orch = self._override_list_return_requests(requests_app, output)
+        self._set_scheduler(requests_app)
+        client = TestClient(requests_app, raise_server_exceptions=False)
 
         resp = client.get("/requests/return?limit=20")
 
         assert resp.status_code == 200
-        query = query_bus.execute.call_args.args[0]
-        assert query.limit == 20
+        inp: ListReturnRequestsInput = orch.execute.call_args.args[0]
+        assert inp.limit == 20
 
     def test_get_request_status(self, requests_app):
-        handler = MagicMock()
-        handler.handle = AsyncMock(
-            return_value={"requests": [{"request_id": "req-123", "status": "running"}]}
-        )
-        client = self._make_client(requests_app, mock_status_handler=handler)
+        output = GetRequestStatusOutput(requests=[{"request_id": "req-123", "status": "running"}])
+        orch = self._override_status(requests_app, output)
+        self._set_scheduler(requests_app)
+        client = TestClient(requests_app, raise_server_exceptions=False)
 
         resp = client.get("/requests/req-123/status")
 
         assert resp.status_code == 200
-        handler.handle.assert_awaited_once()
-        call_arg = handler.handle.call_args.args[0]
-        assert call_arg["input_data"]["requests"][0]["requestId"] == "req-123"
-        assert call_arg["all_flag"] is False
+        orch.execute.assert_awaited_once()
+        inp: GetRequestStatusInput = orch.execute.call_args.args[0]
+        assert inp.request_ids == ["req-123"]
+        assert inp.all_requests is False
 
     def test_get_request_status_long_default_true(self, requests_app):
-        handler = MagicMock()
-        handler.handle = AsyncMock(return_value=MagicMock())
-        client = self._make_client(requests_app, mock_status_handler=handler)
+        output = GetRequestStatusOutput(requests=[])
+        orch = self._override_status(requests_app, output)
+        self._set_scheduler(requests_app)
+        client = TestClient(requests_app, raise_server_exceptions=False)
 
         client.get("/requests/req-123/status")
 
-        call_arg = handler.handle.call_args.args[0]
-        # long defaults to True in the router
-        assert call_arg["long"] is True
+        inp: GetRequestStatusInput = orch.execute.call_args.args[0]
+        assert inp.detailed is True
 
     def test_get_request_status_long_false(self, requests_app):
-        handler = MagicMock()
-        handler.handle = AsyncMock(return_value=MagicMock())
-        client = self._make_client(requests_app, mock_status_handler=handler)
+        output = GetRequestStatusOutput(requests=[])
+        orch = self._override_status(requests_app, output)
+        self._set_scheduler(requests_app)
+        client = TestClient(requests_app, raise_server_exceptions=False)
 
         client.get("/requests/req-123/status?long=false")
 
-        call_arg = handler.handle.call_args.args[0]
-        assert call_arg["long"] is False
+        inp: GetRequestStatusInput = orch.execute.call_args.args[0]
+        assert inp.detailed is False
 
     def test_get_request_details(self, requests_app):
-        handler = MagicMock()
-        handler.handle = AsyncMock(
-            return_value={"requests": [{"request_id": "req-456", "status": "complete"}]}
-        )
-        client = self._make_client(requests_app, mock_status_handler=handler)
+        # GET /requests/{id} (no /status) was removed; expect 404 or 405
+        self._set_scheduler(requests_app)
+        client = TestClient(requests_app, raise_server_exceptions=False)
 
         resp = client.get("/requests/req-456")
 
-        assert resp.status_code == 200
-        handler.handle.assert_awaited_once()
-        call_arg = handler.handle.call_args.args[0]
-        assert call_arg["input_data"]["requests"][0]["requestId"] == "req-456"
-        assert call_arg["long"] is True
+        assert resp.status_code in (404, 405)
 
     def test_cancel_request_happy_path(self, requests_app):
-        command_bus = AsyncMock()
-        command_bus.execute = AsyncMock(return_value=None)
-        client = self._make_client(requests_app, mock_command_bus=command_bus)
+        output = CancelRequestOutput(
+            request_id="req-789",
+            status="cancelled",
+            raw={"request_id": "req-789", "status": "cancelled"},
+        )
+        orch = self._override_cancel(requests_app, output)
+        self._set_scheduler(requests_app)
+        client = TestClient(requests_app, raise_server_exceptions=False)
 
         resp = client.delete("/requests/req-789")
 
         assert resp.status_code == 200
-        command_bus.execute.assert_awaited_once()
-        cmd = command_bus.execute.call_args.args[0]
-        assert isinstance(cmd, CancelRequestCommand)
-        assert cmd.request_id == "req-789"
+        orch.execute.assert_awaited_once()
+        inp: CancelRequestInput = orch.execute.call_args.args[0]
+        assert inp.request_id == "req-789"
+        assert inp.reason == "Cancelled via REST API"
 
     def test_cancel_request_with_reason(self, requests_app):
-        command_bus = AsyncMock()
-        command_bus.execute = AsyncMock(return_value=None)
-        client = self._make_client(requests_app, mock_command_bus=command_bus)
+        output = CancelRequestOutput(request_id="req-789", status="cancelled", raw={})
+        orch = self._override_cancel(requests_app, output)
+        self._set_scheduler(requests_app)
+        client = TestClient(requests_app, raise_server_exceptions=False)
 
         resp = client.delete("/requests/req-789?reason=no+longer+needed")
 
         assert resp.status_code == 200
-        cmd = command_bus.execute.call_args.args[0]
-        assert cmd.reason == "no longer needed"
+        inp: CancelRequestInput = orch.execute.call_args.args[0]
+        assert inp.reason == "no longer needed"
 
     def test_cancel_request_default_reason(self, requests_app):
-        command_bus = AsyncMock()
-        command_bus.execute = AsyncMock(return_value=None)
-        client = self._make_client(requests_app, mock_command_bus=command_bus)
+        output = CancelRequestOutput(request_id="req-999", status="cancelled", raw={})
+        orch = self._override_cancel(requests_app, output)
+        self._set_scheduler(requests_app)
+        client = TestClient(requests_app, raise_server_exceptions=False)
 
         client.delete("/requests/req-999")
 
-        cmd = command_bus.execute.call_args.args[0]
-        assert cmd.reason == "Cancelled via REST API"
+        inp: CancelRequestInput = orch.execute.call_args.args[0]
+        assert inp.reason == "Cancelled via REST API"

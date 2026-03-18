@@ -176,6 +176,9 @@ def add_request_actions(subparsers):
     requests_status.add_argument(
         "--request-id", "-r", action="append", dest="flag_request_ids", help="Request ID to check"
     )
+    requests_status.add_argument(
+        "--detailed", action="store_true", help="Show detailed request information"
+    )
 
 
 def add_infrastructure_actions(subparsers):

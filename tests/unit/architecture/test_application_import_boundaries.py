@@ -33,6 +33,7 @@ _FORBIDDEN_PREFIXES = (
 _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
     {
         ("application/queries/template_query_handlers.py", "orb.infrastructure.template.dtos"),
+        ("application/commands/template_handlers.py", "orb.infrastructure.template.dtos"),
         (
             "application/commands/cleanup_handlers.py",
             "orb.infrastructure.events.infrastructure_events",

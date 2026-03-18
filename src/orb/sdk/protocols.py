@@ -35,16 +35,16 @@ class ORBClientProtocol(Protocol):
     async def get_configuration(self, **kwargs: Any) -> dict[str, Any]:  # type: ignore[return]
         pass
 
-    async def create_template(self, *, template_id: str, **kwargs: Any) -> None:
+    async def create_template(self, *, template_id: str, **kwargs: Any) -> dict[str, Any]:  # type: ignore[return]
         pass
 
-    async def update_template(self, *, template_id: str, **kwargs: Any) -> None:
+    async def update_template(self, *, template_id: str, **kwargs: Any) -> dict[str, Any]:  # type: ignore[return]
         pass
 
-    async def delete_template(self, *, template_id: str, **kwargs: Any) -> None:
+    async def delete_template(self, *, template_id: str, **kwargs: Any) -> dict[str, Any]:  # type: ignore[return]
         pass
 
-    async def refresh_templates(self, **kwargs: Any) -> None:
+    async def refresh_templates(self, **kwargs: Any) -> dict[str, Any]:  # type: ignore[return]
         pass
 
     # --- Request operations ---
@@ -76,7 +76,7 @@ class ORBClientProtocol(Protocol):
     async def update_request_status(self, *, request_id: str, **kwargs: Any) -> None:
         pass
 
-    async def cancel_request(self, *, request_id: str, **kwargs: Any) -> None:
+    async def cancel_request(self, *, request_id: str, **kwargs: Any) -> dict[str, Any]:  # type: ignore[return]
         pass
 
     async def complete_request(self, *, request_id: str, **kwargs: Any) -> None:

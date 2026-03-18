@@ -177,6 +177,7 @@ class TestStorageStrategyAdapter:
 
         # Test find_all
         all_data = self.adapter.find_all()
+        assert isinstance(all_data, dict)
         assert "test-1" in all_data
         assert all_data["test-1"] == test_data
 

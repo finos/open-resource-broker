@@ -82,17 +82,29 @@ class SQLConnectionManager(ResourceManager):
     def _initialize_engine(self) -> None:
         """Initialize SQLAlchemy engine with connection pooling."""
         try:
+            # Fast-path: use connection_string directly when provided
+            if "connection_string" in self.config:
+                connection_string = self.config["connection_string"]
+                self.engine = create_engine(connection_string, pool_pre_ping=True)
+                self.session_factory = sessionmaker(bind=self.engine)
+                self.logger.info("Initialized connection manager from connection_string")
+                return
+
             db_type = self.config.get("type", "sqlite")
 
             if db_type == "sqlite":
                 db_path = self.config.get("name", "database.db")
                 connection_string = f"sqlite:///{db_path}"
+                timeout = self.config.get("connection_timeout", 30)
 
                 self.engine = create_engine(
                     connection_string,
                     echo=self.config.get("echo", False),
                     pool_pre_ping=True,
-                    connect_args={"check_same_thread": False},  # SQLite specific
+                    connect_args={
+                        "check_same_thread": False,
+                        "timeout": timeout,
+                    },  # SQLite specific
                 )
 
             elif db_type == "postgresql":

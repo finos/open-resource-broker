@@ -126,6 +126,16 @@ class ConfigurationLoader:
                 stacklevel=2,
             )
 
+        # Warn if deprecated performance.batch_sizes key is present
+        if isinstance(config, dict) and "batch_sizes" in config.get("performance", {}):
+            warnings.warn(
+                "performance.batch_sizes is deprecated since ORB 2.x. "
+                "Move it to provider.providers[N].config.batch_sizes. "
+                "This key will be removed in ORB 3.0.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         # Override with environment variables (highest precedence)
         cls._load_from_env(config, config_manager)
 
@@ -310,9 +320,9 @@ class ConfigurationLoader:
         if val := os.environ.get("ORB_ENVIRONMENT"):
             config["environment"] = val
         if val := os.environ.get("ORB_REQUEST_TIMEOUT"):
-            config["request_timeout"] = int(val)
+            config.setdefault("request", {})["default_timeout"] = int(val)
         if val := os.environ.get("ORB_MAX_MACHINES_PER_REQUEST"):
-            config["max_machines_per_request"] = int(val)
+            config.setdefault("request", {})["max_machines_per_request"] = int(val)
         if val := os.environ.get("ORB_CONFIG_FILE"):
             config["config_file"] = val
 
@@ -359,15 +369,17 @@ class ConfigurationLoader:
                 json_strategy = storage.setdefault("json_strategy", {})
                 existing_base_path = json_strategy.get("base_path", "data")
                 if not os.path.isabs(existing_base_path):
-                    json_strategy["base_path"] = scheduler_dir
-                    get_config_logger().debug("Set JSON storage base_path to %s", scheduler_dir)
+                    json_strategy["base_path"] = os.path.join(scheduler_dir, "data")
+                    get_config_logger().debug(
+                        "Set JSON storage base_path to %s", os.path.join(scheduler_dir, "data")
+                    )
 
                 # Update SQL storage strategy database path from scheduler directory.
                 # Applied unconditionally — non-SQLite engines ignore the name field.
                 sql_strategy = storage.setdefault("sql_strategy", {})
-                sql_strategy["name"] = os.path.join(scheduler_dir, "database.db")
+                sql_strategy["name"] = os.path.join(scheduler_dir, "data", "database.db")
                 get_config_logger().debug(
-                    "Set SQL storage name to %s", os.path.join(scheduler_dir, "database.db")
+                    "Set SQL storage name to %s", os.path.join(scheduler_dir, "data", "database.db")
                 )
         except Exception as e:
             get_config_logger().debug("Could not get scheduler directories: %s", e)

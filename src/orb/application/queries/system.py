@@ -40,3 +40,11 @@ class ValidateProviderConfigQuery(Query, BaseModel):
     model_config = ConfigDict(frozen=True)
 
     detailed: bool = True
+
+
+class GetSystemConfigQuery(Query, BaseModel):
+    """Query to get full system configuration overview."""
+
+    model_config = ConfigDict(frozen=True)
+
+    verbose: bool = False

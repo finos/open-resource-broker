@@ -6,19 +6,6 @@ including environment variable names and configuration keys.
 
 # Environment variable prefixes
 ENV_PREFIX_ORB = "ORB_"
-ENV_PREFIX_HF = "HF_"  # Legacy prefix for backward compatibility
-
-# Configuration keys
-CONFIG_KEY_PROVIDER = "provider"
-CONFIG_KEY_REGION = "region"
-CONFIG_KEY_PROFILE = "profile"
-CONFIG_KEY_CREDENTIALS = "credentials"
-CONFIG_KEY_TIMEOUT = "timeout"
-CONFIG_KEY_RETRY = "retry"
-CONFIG_KEY_CACHE = "cache"
-CONFIG_KEY_LOGGING = "logging"
-CONFIG_KEY_STORAGE = "storage"
-CONFIG_KEY_SCHEDULER = "scheduler"
 
 # Storage backend types
 STORAGE_BACKEND_JSON = "json"

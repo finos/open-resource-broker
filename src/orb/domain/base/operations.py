@@ -20,6 +20,8 @@ class OperationType(str, Enum):
     GET_AVAILABLE_TEMPLATES = "get_available_templates"
     HEALTH_CHECK = "health_check"
     RESOLVE_IMAGE = "resolve_image"
+    START_INSTANCES = "start_instances"
+    STOP_INSTANCES = "stop_instances"
 
 
 @dataclass
