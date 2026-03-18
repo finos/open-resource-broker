@@ -144,10 +144,16 @@ class Application:
             self._log_final_provider_info()
 
             self._initialized = True
-            self.logger.info(
-                "Open Resource Broker initialized successfully with %s provider",
-                self.provider_type,
-            )
+            if hasattr(self, "_provider_registry") and self._provider_registry:
+                _types = self._provider_registry.get_registered_providers()
+                self.logger.info(
+                    "Open Resource Broker initialized successfully with providers: %s", _types
+                )
+            else:
+                self.logger.info(
+                    "Open Resource Broker initialized successfully with %s provider",
+                    self.provider_type,
+                )
             return True
 
         except Exception as e:
