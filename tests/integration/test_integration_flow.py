@@ -21,7 +21,7 @@ def test_aws_provider_strategy_uses_handlers():
         from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
 
         # Create AWS provider strategy
-        config = AWSProviderConfig(region="us-west-2", profile="default")
+        config = AWSProviderConfig(region="us-west-2", profile="default")  # type: ignore[call-arg]
         logger = get_logger(__name__)
         strategy = AWSProviderStrategy(config, logger)
 

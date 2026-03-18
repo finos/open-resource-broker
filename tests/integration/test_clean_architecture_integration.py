@@ -30,7 +30,6 @@ class TestCleanArchitectureIntegration:
         template_config.model_dump.return_value = {
             "max_number": 10,
             "default_price_type": "ondemand",
-            "default_provider_api": "EC2Fleet",
         }
         config_manager.get_template_config.return_value = template_config
 
@@ -111,13 +110,12 @@ class TestCleanArchitectureIntegration:
         clean_config = {
             "max_number": 10,
             "default_price_type": "ondemand",
-            "default_provider_api": "EC2Fleet",
         }
 
         template_config = TemplateConfig(**clean_config)
         assert template_config.max_number == 10
         assert template_config.default_price_type == "ondemand"
-        assert template_config.default_provider_api == "EC2Fleet"
+        assert template_config.default_provider_api is None
 
         # Verify AWS-specific fields are not present
         config_dict = template_config.model_dump()
@@ -137,7 +135,7 @@ class TestCleanArchitectureIntegration:
     def test_aws_extension_configuration(self):
         """Test AWS extension configuration works correctly."""
         # Test AWS extension config
-        aws_extension_config = AWSTemplateExtensionConfig(
+        aws_extension_config = AWSTemplateExtensionConfig(  # type: ignore[call-arg]
             allocation_strategy="capacity_optimized",
             volume_type="gp3",
             spot_fleet_request_expiry=30,
@@ -261,7 +259,7 @@ class TestCleanArchitectureIntegration:
         )
 
         # Test provider defaults with extensions
-        provider_defaults = ProviderDefaults(
+        provider_defaults = ProviderDefaults(  # type: ignore[call-arg]
             template_defaults={"image_id": "ami-12345678"},
             extensions={"ami_resolution": {"enabled": True}},
         )
@@ -270,7 +268,7 @@ class TestCleanArchitectureIntegration:
         assert provider_defaults.extensions["ami_resolution"]["enabled"] is True
 
         # Test provider instance with extensions
-        provider_instance = ProviderInstanceConfig(
+        provider_instance = ProviderInstanceConfig(  # type: ignore[call-arg]
             name="aws-test",
             type="aws",
             template_defaults={"machine_types": {"t2.micro": 1}},

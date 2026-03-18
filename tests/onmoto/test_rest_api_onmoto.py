@@ -44,33 +44,13 @@ def fastapi_app(orb_config_dir, moto_aws):
     from orb.api.server import create_fastapi_app
     from orb.config.schemas.server_schema import ServerConfig
     from orb.infrastructure.di.container import get_container
-    from orb.infrastructure.di.server_services import _register_api_handlers
+    from orb.infrastructure.di.server_services import _register_orchestrators
 
     # Bootstrap DI (reads ORB_CONFIG_DIR from env, set by orb_config_dir fixture)
     container = get_container()
 
-    # Register API handlers (server_services skips them when server.enabled=False by default)
-    _register_api_handlers(container)
-
-    # Re-register RequestMachinesRESTHandler with metrics=None to avoid calling
-    # record_api_success/record_api_failure which don't exist on MetricsCollector.
-    from orb.api.handlers.request_machines_handler import RequestMachinesRESTHandler
-    from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
-    from orb.infrastructure.di.buses import CommandBus, QueryBus
-
-    container.unregister(RequestMachinesRESTHandler)
-    container.register_singleton(
-        RequestMachinesRESTHandler,
-        lambda c: RequestMachinesRESTHandler(
-            query_bus=c.get(QueryBus),
-            command_bus=c.get(CommandBus),
-            logger=c.get(LoggingPort),
-            error_handler=(
-                c.get(ErrorHandlingPort) if c.is_registered(ErrorHandlingPort) else None
-            ),
-            metrics=None,
-        ),
-    )
+    # Register orchestrators (server_services skips them when server.enabled=False by default)
+    _register_orchestrators(container)
 
     # Inject moto-backed AWS factory
     aws_client = _make_moto_aws_client()

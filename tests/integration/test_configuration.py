@@ -170,7 +170,7 @@ def test_aws_provider_config_class():
         )
 
         # Test LaunchTemplateConfiguration class
-        lt_config = LaunchTemplateConfiguration()
+        lt_config = LaunchTemplateConfiguration()  # type: ignore[call-arg]
 
         # Validate default values
         if not lt_config.create_per_request:
@@ -193,7 +193,7 @@ def test_aws_provider_config_class():
 
         # Test AWSProviderConfig includes launch template
         # Need to provide authentication for validation
-        aws_config = AWSProviderConfig(profile="default")
+        aws_config = AWSProviderConfig(profile="default")  # type: ignore[call-arg]
 
         if not hasattr(aws_config, "launch_template"):
             print("   FAIL: AWSProviderConfig missing launch_template field")

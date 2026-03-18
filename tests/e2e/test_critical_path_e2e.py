@@ -18,11 +18,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from orb.api.dependencies import (
+    get_acquire_machines_orchestrator,
     get_command_bus,
     get_query_bus,
-    get_request_machines_handler,
-    get_request_status_handler,
-    get_return_machines_handler,
+    get_request_status_orchestrator,
+    get_return_machines_orchestrator,
 )
 from orb.api.server import create_fastapi_app
 from orb.config.schemas.server_schema import AuthConfig, ServerConfig
@@ -34,7 +34,7 @@ from orb.infrastructure.di.buses import CommandBus, QueryBus
 
 
 def _server_config() -> ServerConfig:
-    return ServerConfig(enabled=True, auth=AuthConfig(enabled=False, strategy="replace"))
+    return ServerConfig(enabled=True, auth=AuthConfig(enabled=False, strategy="replace"))  # type: ignore[call-arg]
 
 
 def _make_query_bus(return_value: Any = None) -> AsyncMock:
@@ -69,14 +69,12 @@ class TestRequestLifecycle:
 
     def test_request_machines_returns_request_id(self, app, client: TestClient):
         """POST /api/v1/machines/request creates a request and returns a request_id."""
-        mock_response = Mock()
-        mock_response.to_dict = Mock(
-            return_value={"requestId": "req-acquire-abc123", "status": "pending"}
-        )
-        mock_handler = AsyncMock()
-        mock_handler.handle = AsyncMock(return_value=mock_response)
+        mock_result = Mock()
+        mock_result.raw = {"requestId": "req-acquire-abc123", "status": "pending"}
+        mock_orchestrator = AsyncMock()
+        mock_orchestrator.execute = AsyncMock(return_value=mock_result)
 
-        app.dependency_overrides[get_request_machines_handler] = lambda: mock_handler
+        app.dependency_overrides[get_acquire_machines_orchestrator] = lambda: mock_orchestrator
         try:
             response = client.post(
                 "/api/v1/machines/request",
@@ -99,15 +97,14 @@ class TestRequestLifecycle:
 
     def test_get_request_status_returns_status(self, app, client: TestClient):
         """GET /api/v1/requests/{id}/status returns request status."""
-        mock_result = {
-            "requestId": "req-acquire-abc123",
-            "status": "running",
-            "machineCount": 2,
-        }
-        mock_handler = AsyncMock()
-        mock_handler.handle = AsyncMock(return_value=mock_result)
+        mock_result = Mock()
+        mock_result.requests = [
+            {"requestId": "req-acquire-abc123", "status": "running", "machineCount": 2}
+        ]
+        mock_orchestrator = AsyncMock()
+        mock_orchestrator.execute = AsyncMock(return_value=mock_result)
 
-        app.dependency_overrides[get_request_status_handler] = lambda: mock_handler
+        app.dependency_overrides[get_request_status_orchestrator] = lambda: mock_orchestrator
         try:
             response = client.get("/api/v1/requests/req-acquire-abc123/status")
         finally:
@@ -115,22 +112,24 @@ class TestRequestLifecycle:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["requestId"] == "req-acquire-abc123"
-        assert data["status"] == "running"
+        assert data["requests"][0]["requestId"] == "req-acquire-abc123"
+        assert data["requests"][0]["status"] == "running"
 
-    def test_get_request_status_passes_request_id_to_handler(self, app, client: TestClient):
-        """GET /api/v1/requests/{id}/status passes the correct request_id to the handler."""
-        mock_handler = AsyncMock()
-        mock_handler.handle = AsyncMock(return_value={"requestId": "req-acquire-xyz"})
+    def test_get_request_status_passes_request_id_to_orchestrator(self, app, client: TestClient):
+        """GET /api/v1/requests/{id}/status passes the correct request_id to the orchestrator."""
+        mock_result = Mock()
+        mock_result.requests = [{"requestId": "req-acquire-xyz"}]
+        mock_orchestrator = AsyncMock()
+        mock_orchestrator.execute = AsyncMock(return_value=mock_result)
 
-        app.dependency_overrides[get_request_status_handler] = lambda: mock_handler
+        app.dependency_overrides[get_request_status_orchestrator] = lambda: mock_orchestrator
         try:
             client.get("/api/v1/requests/req-acquire-xyz/status")
         finally:
             app.dependency_overrides.clear()
 
-        call_args = mock_handler.handle.call_args[0][0]
-        assert call_args["input_data"]["requests"][0]["requestId"] == "req-acquire-xyz"
+        call_arg = mock_orchestrator.execute.call_args[0][0]
+        assert call_arg.request_ids == ["req-acquire-xyz"]
 
     def test_list_requests_returns_response(self, app, client: TestClient):
         """GET /api/v1/requests/ returns a list of requests."""
@@ -156,15 +155,16 @@ class TestRequestLifecycle:
 
     def test_return_machines_creates_return_request(self, app, client: TestClient):
         """POST /api/v1/machines/return initiates machine return."""
-        mock_result = {
+        mock_result = Mock()
+        mock_result.raw = {
             "success": True,
             "returnRequestIds": ["req-return-abc"],
             "processedMachines": ["i-abc123"],
         }
-        mock_handler = AsyncMock()
-        mock_handler.handle = AsyncMock(return_value=mock_result)
+        mock_orchestrator = AsyncMock()
+        mock_orchestrator.execute = AsyncMock(return_value=mock_result)
 
-        app.dependency_overrides[get_return_machines_handler] = lambda: mock_handler
+        app.dependency_overrides[get_return_machines_orchestrator] = lambda: mock_orchestrator
         try:
             response = client.post(
                 "/api/v1/machines/return",
@@ -182,14 +182,14 @@ class TestRequestLifecycle:
         request_id = "req-acquire-lifecycle-001"
 
         # Step 1: create request
-        mock_create_response = Mock()
-        mock_create_response.to_dict = Mock(
-            return_value={"requestId": request_id, "status": "pending"}
-        )
-        mock_request_handler = AsyncMock()
-        mock_request_handler.handle = AsyncMock(return_value=mock_create_response)
+        mock_create_result = Mock()
+        mock_create_result.raw = {"requestId": request_id, "status": "pending"}
+        mock_acquire_orchestrator = AsyncMock()
+        mock_acquire_orchestrator.execute = AsyncMock(return_value=mock_create_result)
 
-        app.dependency_overrides[get_request_machines_handler] = lambda: mock_request_handler
+        app.dependency_overrides[get_acquire_machines_orchestrator] = lambda: (
+            mock_acquire_orchestrator
+        )
         try:
             create_resp = client.post(
                 "/api/v1/machines/request",
@@ -200,46 +200,42 @@ class TestRequestLifecycle:
         assert create_resp.status_code == 202
 
         # Step 2: poll status - pending
-        mock_status_handler = AsyncMock()
-        mock_status_handler.handle = AsyncMock(
-            return_value={"requestId": request_id, "status": "pending"}
-        )
-        app.dependency_overrides[get_request_status_handler] = lambda: mock_status_handler
+        mock_status_result = Mock()
+        mock_status_result.requests = [{"requestId": request_id, "status": "pending"}]
+        mock_status_orchestrator = AsyncMock()
+        mock_status_orchestrator.execute = AsyncMock(return_value=mock_status_result)
+        app.dependency_overrides[get_request_status_orchestrator] = lambda: mock_status_orchestrator
         try:
             status_resp = client.get(f"/api/v1/requests/{request_id}/status")
         finally:
             app.dependency_overrides.clear()
         assert status_resp.status_code == 200
-        assert status_resp.json()["status"] == "pending"
+        assert status_resp.json()["requests"][0]["status"] == "pending"
 
         # Step 3: poll status - running
-        mock_status_handler.handle = AsyncMock(
-            return_value={"requestId": request_id, "status": "running"}
-        )
-        app.dependency_overrides[get_request_status_handler] = lambda: mock_status_handler
+        mock_status_result.requests = [{"requestId": request_id, "status": "running"}]
+        app.dependency_overrides[get_request_status_orchestrator] = lambda: mock_status_orchestrator
         try:
             status_resp = client.get(f"/api/v1/requests/{request_id}/status")
         finally:
             app.dependency_overrides.clear()
-        assert status_resp.json()["status"] == "running"
+        assert status_resp.json()["requests"][0]["status"] == "running"
 
         # Step 4: poll status - complete
-        mock_status_handler.handle = AsyncMock(
-            return_value={"requestId": request_id, "status": "complete"}
-        )
-        app.dependency_overrides[get_request_status_handler] = lambda: mock_status_handler
+        mock_status_result.requests = [{"requestId": request_id, "status": "complete"}]
+        app.dependency_overrides[get_request_status_orchestrator] = lambda: mock_status_orchestrator
         try:
             status_resp = client.get(f"/api/v1/requests/{request_id}/status")
         finally:
             app.dependency_overrides.clear()
-        assert status_resp.json()["status"] == "complete"
+        assert status_resp.json()["requests"][0]["status"] == "complete"
 
     def test_request_handler_error_surfaces_as_server_error(self, app, client: TestClient):
-        """When the handler raises, the API returns a 5xx response."""
-        mock_handler = AsyncMock()
-        mock_handler.handle = AsyncMock(side_effect=RuntimeError("provisioning failed"))
+        """When the orchestrator raises, the API returns a 5xx response."""
+        mock_orchestrator = AsyncMock()
+        mock_orchestrator.execute = AsyncMock(side_effect=RuntimeError("provisioning failed"))
 
-        app.dependency_overrides[get_request_machines_handler] = lambda: mock_handler
+        app.dependency_overrides[get_acquire_machines_orchestrator] = lambda: mock_orchestrator
         try:
             response = client.post(
                 "/api/v1/machines/request",
@@ -256,14 +252,14 @@ class TestRequestLifecycle:
         machine_ids = ["i-lifecycle-001", "i-lifecycle-002"]
 
         # Step 1: create request
-        mock_create_response = Mock()
-        mock_create_response.to_dict = Mock(
-            return_value={"requestId": request_id, "status": "pending"}
-        )
-        mock_request_handler = AsyncMock()
-        mock_request_handler.handle = AsyncMock(return_value=mock_create_response)
+        mock_create_result = Mock()
+        mock_create_result.raw = {"requestId": request_id, "status": "pending"}
+        mock_acquire_orchestrator = AsyncMock()
+        mock_acquire_orchestrator.execute = AsyncMock(return_value=mock_create_result)
 
-        app.dependency_overrides[get_request_machines_handler] = lambda: mock_request_handler
+        app.dependency_overrides[get_acquire_machines_orchestrator] = lambda: (
+            mock_acquire_orchestrator
+        )
         try:
             create_resp = client.post(
                 "/api/v1/machines/request",
@@ -276,34 +272,38 @@ class TestRequestLifecycle:
         assert create_resp.json()["requestId"] == request_id
 
         # Step 2: poll status - running with machines provisioned
-        mock_status_handler = AsyncMock()
-        mock_status_handler.handle = AsyncMock(
-            return_value={
+        mock_status_result = Mock()
+        mock_status_result.requests = [
+            {
                 "requestId": request_id,
                 "status": "running",
                 "machines": [{"machineId": mid, "status": "running"} for mid in machine_ids],
             }
-        )
-        app.dependency_overrides[get_request_status_handler] = lambda: mock_status_handler
+        ]
+        mock_status_orchestrator = AsyncMock()
+        mock_status_orchestrator.execute = AsyncMock(return_value=mock_status_result)
+        app.dependency_overrides[get_request_status_orchestrator] = lambda: mock_status_orchestrator
         try:
             status_resp = client.get(f"/api/v1/requests/{request_id}/status")
         finally:
             app.dependency_overrides.clear()
 
         assert status_resp.status_code == 200
-        assert status_resp.json()["status"] == "running"
-        assert len(status_resp.json()["machines"]) == 2
+        assert status_resp.json()["requests"][0]["status"] == "running"
+        assert len(status_resp.json()["requests"][0]["machines"]) == 2
 
         # Step 3: return machines (cleanup)
-        mock_return_handler = AsyncMock()
-        mock_return_handler.handle = AsyncMock(
-            return_value={
-                "success": True,
-                "returnRequestIds": ["req-return-lifecycle-001"],
-                "processedMachines": machine_ids,
-            }
+        mock_return_result = Mock()
+        mock_return_result.raw = {
+            "success": True,
+            "returnRequestIds": ["req-return-lifecycle-001"],
+            "processedMachines": machine_ids,
+        }
+        mock_return_orchestrator = AsyncMock()
+        mock_return_orchestrator.execute = AsyncMock(return_value=mock_return_result)
+        app.dependency_overrides[get_return_machines_orchestrator] = lambda: (
+            mock_return_orchestrator
         )
-        app.dependency_overrides[get_return_machines_handler] = lambda: mock_return_handler
         try:
             return_resp = client.post(
                 "/api/v1/machines/return",
@@ -318,17 +318,17 @@ class TestRequestLifecycle:
         assert set(return_data["processedMachines"]) == set(machine_ids)
 
         # Step 4: poll original request - now completed
-        mock_status_handler.handle = AsyncMock(
-            return_value={"requestId": request_id, "status": "complete", "machines": []}
-        )
-        app.dependency_overrides[get_request_status_handler] = lambda: mock_status_handler
+        mock_status_result.requests = [
+            {"requestId": request_id, "status": "complete", "machines": []}
+        ]
+        app.dependency_overrides[get_request_status_orchestrator] = lambda: mock_status_orchestrator
         try:
             final_resp = client.get(f"/api/v1/requests/{request_id}/status")
         finally:
             app.dependency_overrides.clear()
 
         assert final_resp.status_code == 200
-        assert final_resp.json()["status"] == "complete"
+        assert final_resp.json()["requests"][0]["status"] == "complete"
 
 
 # ---------------------------------------------------------------------------
@@ -632,14 +632,14 @@ class TestTemplateManagement:
 
         # Step 3: use the template_id in a machines request
         request_id = "req-acquire-tpl-use-001"
-        mock_request_response = Mock()
-        mock_request_response.to_dict = Mock(
-            return_value={"requestId": request_id, "status": "pending"}
-        )
-        mock_request_handler = AsyncMock()
-        mock_request_handler.handle = AsyncMock(return_value=mock_request_response)
+        mock_acquire_result = Mock()
+        mock_acquire_result.raw = {"requestId": request_id, "status": "pending"}
+        mock_acquire_orchestrator = AsyncMock()
+        mock_acquire_orchestrator.execute = AsyncMock(return_value=mock_acquire_result)
 
-        app.dependency_overrides[get_request_machines_handler] = lambda: mock_request_handler
+        app.dependency_overrides[get_acquire_machines_orchestrator] = lambda: (
+            mock_acquire_orchestrator
+        )
         try:
             request_resp = client.post(
                 "/api/v1/machines/request",
@@ -651,14 +651,9 @@ class TestTemplateManagement:
         assert request_resp.status_code == 202
         assert request_resp.json()["requestId"] == request_id
 
-        # Verify the handler was called with the correct template_id
-        call_arg = mock_request_handler.handle.call_args[0][0]
-        actual_template_id = (
-            call_arg.template["templateId"]
-            if hasattr(call_arg, "template")
-            else call_arg["input_data"]["templateId"]
-        )
-        assert actual_template_id == template_id
+        # Verify the orchestrator was called with the correct template_id
+        call_arg = mock_acquire_orchestrator.execute.call_args[0][0]
+        assert call_arg.template_id == template_id
 
 
 # ---------------------------------------------------------------------------
@@ -704,14 +699,14 @@ class TestMachineLifecycle:
         request_id = "req-acquire-machine-001"
 
         # Provision
-        mock_provision_response = Mock()
-        mock_provision_response.to_dict = Mock(
-            return_value={"requestId": request_id, "status": "pending"}
-        )
-        mock_provision_handler = AsyncMock()
-        mock_provision_handler.handle = AsyncMock(return_value=mock_provision_response)
+        mock_provision_result = Mock()
+        mock_provision_result.raw = {"requestId": request_id, "status": "pending"}
+        mock_acquire_orchestrator = AsyncMock()
+        mock_acquire_orchestrator.execute = AsyncMock(return_value=mock_provision_result)
 
-        app.dependency_overrides[get_request_machines_handler] = lambda: mock_provision_handler
+        app.dependency_overrides[get_acquire_machines_orchestrator] = lambda: (
+            mock_acquire_orchestrator
+        )
         try:
             provision_resp = client.post(
                 "/api/v1/machines/request",
@@ -722,9 +717,9 @@ class TestMachineLifecycle:
         assert provision_resp.status_code == 202
 
         # Check status
-        mock_status_handler = AsyncMock()
-        mock_status_handler.handle = AsyncMock(
-            return_value={
+        mock_status_result = Mock()
+        mock_status_result.requests = [
+            {
                 "requestId": request_id,
                 "status": "running",
                 "machines": [
@@ -733,8 +728,10 @@ class TestMachineLifecycle:
                     {"machineId": "i-003", "status": "running"},
                 ],
             }
-        )
-        app.dependency_overrides[get_request_status_handler] = lambda: mock_status_handler
+        ]
+        mock_status_orchestrator = AsyncMock()
+        mock_status_orchestrator.execute = AsyncMock(return_value=mock_status_result)
+        app.dependency_overrides[get_request_status_orchestrator] = lambda: mock_status_orchestrator
         try:
             status_resp = client.get(f"/api/v1/requests/{request_id}/status")
         finally:
@@ -742,8 +739,8 @@ class TestMachineLifecycle:
 
         assert status_resp.status_code == 200
         status_data = status_resp.json()
-        assert status_data["status"] == "running"
-        assert len(status_data["machines"]) == 3
+        assert status_data["requests"][0]["status"] == "running"
+        assert len(status_data["requests"][0]["machines"]) == 3
 
     def test_provision_then_terminate_machines(self, app, client: TestClient):
         """Full machine lifecycle: provision -> running -> terminate."""
@@ -751,14 +748,14 @@ class TestMachineLifecycle:
         machine_ids = ["i-term-001", "i-term-002"]
 
         # Step 1: provision
-        mock_provision_response = Mock()
-        mock_provision_response.to_dict = Mock(
-            return_value={"requestId": request_id, "status": "running"}
-        )
-        mock_provision_handler = AsyncMock()
-        mock_provision_handler.handle = AsyncMock(return_value=mock_provision_response)
+        mock_provision_result = Mock()
+        mock_provision_result.raw = {"requestId": request_id, "status": "running"}
+        mock_acquire_orchestrator = AsyncMock()
+        mock_acquire_orchestrator.execute = AsyncMock(return_value=mock_provision_result)
 
-        app.dependency_overrides[get_request_machines_handler] = lambda: mock_provision_handler
+        app.dependency_overrides[get_acquire_machines_orchestrator] = lambda: (
+            mock_acquire_orchestrator
+        )
         try:
             provision_resp = client.post(
                 "/api/v1/machines/request",
@@ -769,15 +766,18 @@ class TestMachineLifecycle:
         assert provision_resp.status_code == 202
 
         # Step 2: terminate via return
-        mock_return_result = {
+        mock_return_result = Mock()
+        mock_return_result.raw = {
             "success": True,
             "returnRequestIds": ["req-return-term-001"],
             "processedMachines": machine_ids,
         }
-        mock_return_handler = AsyncMock()
-        mock_return_handler.handle = AsyncMock(return_value=mock_return_result)
+        mock_return_orchestrator = AsyncMock()
+        mock_return_orchestrator.execute = AsyncMock(return_value=mock_return_result)
 
-        app.dependency_overrides[get_return_machines_handler] = lambda: mock_return_handler
+        app.dependency_overrides[get_return_machines_orchestrator] = lambda: (
+            mock_return_orchestrator
+        )
         try:
             return_resp = client.post(
                 "/api/v1/machines/return",
@@ -791,21 +791,24 @@ class TestMachineLifecycle:
         assert return_data["success"] is True
         assert set(return_data["processedMachines"]) == set(machine_ids)
 
-    def test_return_handler_receives_correct_machine_ids(self, app, client: TestClient):
-        """Return handler is called with the machine IDs from the request body."""
+    def test_return_orchestrator_receives_correct_machine_ids(self, app, client: TestClient):
+        """Return orchestrator is called with the machine IDs from the request body."""
         machine_ids = ["i-aaa", "i-bbb", "i-ccc"]
-        mock_return_handler = AsyncMock()
-        mock_return_handler.handle = AsyncMock(return_value={"success": True})
+        mock_return_result = Mock()
+        mock_return_result.raw = {"success": True}
+        mock_return_orchestrator = AsyncMock()
+        mock_return_orchestrator.execute = AsyncMock(return_value=mock_return_result)
 
-        app.dependency_overrides[get_return_machines_handler] = lambda: mock_return_handler
+        app.dependency_overrides[get_return_machines_orchestrator] = lambda: (
+            mock_return_orchestrator
+        )
         try:
             client.post("/api/v1/machines/return", json={"machine_ids": machine_ids})
         finally:
             app.dependency_overrides.clear()
 
-        call_args = mock_return_handler.handle.call_args[0][0]
-        returned_ids = call_args["input_data"]["machine_ids"]
-        assert returned_ids == machine_ids
+        call_arg = mock_return_orchestrator.execute.call_args[0][0]
+        assert call_arg.machine_ids == machine_ids
 
 
 # ---------------------------------------------------------------------------

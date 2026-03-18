@@ -37,7 +37,7 @@ class TestOCPComplianceIntegration:
 
         assert "aws" in registry.get_registered_providers()
 
-        config = ProviderInstanceConfig(
+        config = ProviderInstanceConfig(  # type: ignore[call-arg]
             name="test-instance",
             type="aws",
             enabled=True,
@@ -63,7 +63,7 @@ class TestOCPComplianceIntegration:
         registry = get_provider_registry()
         assert "aws" in registry.get_registered_providers()
 
-        config = ProviderInstanceConfig(
+        config = ProviderInstanceConfig(  # type: ignore[call-arg]
             name="aws-test",
             type="aws",
             enabled=True,
@@ -89,7 +89,7 @@ class TestOCPComplianceIntegration:
             config_factory=lambda x: Mock(),
         )
 
-        provider_config = ProviderInstanceConfig(
+        provider_config = ProviderInstanceConfig(  # type: ignore[call-arg]
             name="test-provider",
             type="test_type",
             enabled=True,
@@ -212,9 +212,9 @@ class TestOCPComplianceIntegration:
         assert "legacy" not in mode_values
 
         # Verify ProviderConfig works with single provider (SINGLE mode)
-        config = ProviderConfig(
+        config = ProviderConfig(  # type: ignore[call-arg]
             providers=[
-                ProviderInstanceConfig(
+                ProviderInstanceConfig(  # type: ignore[call-arg]
                     name="aws-default",
                     type="aws",
                     enabled=True,

@@ -166,7 +166,7 @@ class TestRequestAggregate:
         """Test request validation for required fields."""
         # provider_type is required — omitting it raises
         with pytest.raises((ValueError, TypeError)):
-            Request.create_new_request(
+            Request.create_new_request(  # type: ignore[call-arg]
                 request_type=RequestType.ACQUIRE,
                 template_id="template-001",
                 machine_count=1,

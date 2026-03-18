@@ -113,7 +113,7 @@ class TestCQRSCompliance:
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
-            CreateRequestCommand(
+            CreateRequestCommand(  # type: ignore[call-arg]
                 template_id="test-template"
                 # Missing required requested_count field
             )
@@ -128,7 +128,7 @@ class TestCQRSCompliance:
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
-            GetTemplateQuery()  # Missing required template_id should be invalid
+            GetTemplateQuery()  # type: ignore[call-arg]  # Missing required template_id should be invalid
 
     def test_dependency_injection_integration(self):
         """Test that CQRS components integrate with DI container."""

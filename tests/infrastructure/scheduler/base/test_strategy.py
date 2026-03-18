@@ -35,7 +35,7 @@ class ConcreteSchedulerStrategy(BaseSchedulerStrategy):
     def format_templates_response(self, templates: list[Template]) -> dict[str, Any]:
         return {"templates": []}
 
-    def format_templates_for_generation(self, templates: list[dict]) -> list[dict]:
+    def format_templates_for_dispatch(self, templates: list[dict]) -> list[dict]:
         return templates
 
     def format_request_response(self, request_data: dict[str, Any]) -> dict[str, Any]:
@@ -134,7 +134,7 @@ class TestBaseSchedulerStrategy:
         logger = Mock()
 
         with pytest.raises(TypeError):
-            BaseSchedulerStrategy(config_manager, logger)
+            BaseSchedulerStrategy(config_manager, logger)  # type: ignore[call-arg]
 
     def test_get_log_level_reads_from_injected_config(self):
         """get_log_level returns level from injected config when no scheduler override."""

@@ -19,8 +19,9 @@ class TestAuthenticationFlows:
     def test_no_auth_flow(self):
         """Test API access with no authentication."""
         # Create server config with no auth
-        server_config = ServerConfig(
-            enabled=True, auth=AuthConfig(enabled=False, strategy="replace")
+        server_config = ServerConfig(  # type: ignore[call-arg]
+            enabled=True,
+            auth=AuthConfig(enabled=False, strategy="replace"),  # type: ignore[call-arg]
         )
 
         # Create FastAPI app
@@ -42,9 +43,9 @@ class TestAuthenticationFlows:
     def test_bearer_token_auth_flow(self):
         """Test API access with Bearer token authentication."""
         # Create server config with bearer token auth
-        server_config = ServerConfig(
+        server_config = ServerConfig(  # type: ignore[call-arg]
             enabled=True,
-            auth=AuthConfig(
+            auth=AuthConfig(  # type: ignore[call-arg]
                 enabled=True,
                 strategy="bearer_token",
                 bearer_token={
@@ -86,9 +87,9 @@ class TestAuthenticationFlows:
     def test_invalid_token_handling(self):
         """Test handling of invalid tokens."""
         # Create server config with bearer token auth
-        server_config = ServerConfig(
+        server_config = ServerConfig(  # type: ignore[call-arg]
             enabled=True,
-            auth=AuthConfig(
+            auth=AuthConfig(  # type: ignore[call-arg]
                 enabled=True,
                 strategy="bearer_token",
                 bearer_token={
@@ -173,9 +174,9 @@ class TestAuthenticationFlows:
 
     def test_excluded_paths(self):
         """Test that excluded paths bypass authentication."""
-        server_config = ServerConfig(
+        server_config = ServerConfig(  # type: ignore[call-arg]
             enabled=True,
-            auth=AuthConfig(
+            auth=AuthConfig(  # type: ignore[call-arg]
                 enabled=True,
                 strategy="bearer_token",
                 bearer_token={"secret_key": "test-secret-key-minimum-32-bytes!"},
@@ -195,7 +196,7 @@ class TestAuthenticationFlows:
 
     def test_cors_headers(self):
         """Test CORS headers are properly set."""
-        server_config = ServerConfig(enabled=True, auth=AuthConfig(enabled=False))
+        server_config = ServerConfig(enabled=True, auth=AuthConfig(enabled=False))  # type: ignore[call-arg]
 
         app = create_fastapi_app(server_config)
         client = TestClient(app)

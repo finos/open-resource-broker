@@ -150,7 +150,7 @@ class TestAWSTemplateExtensionConfig:
             AWSTemplateExtensionConfig,
         )
 
-        config = AWSTemplateExtensionConfig()
+        config = AWSTemplateExtensionConfig()  # type: ignore[call-arg]
 
         # Should have fleet_type field
         assert hasattr(config, "fleet_type")
@@ -162,7 +162,7 @@ class TestAWSTemplateExtensionConfig:
             AWSTemplateExtensionConfig,
         )
 
-        config = AWSTemplateExtensionConfig(fleet_type="request")
+        config = AWSTemplateExtensionConfig(fleet_type="request")  # type: ignore[call-arg]
         defaults = config.to_template_defaults()
 
         # Should include fleet_type in defaults
@@ -175,7 +175,7 @@ class TestAWSTemplateExtensionConfig:
             AWSTemplateExtensionConfig,
         )
 
-        config = AWSTemplateExtensionConfig(fleet_type=None)
+        config = AWSTemplateExtensionConfig(fleet_type=None)  # type: ignore[call-arg]
         defaults = config.to_template_defaults()
 
         # Should NOT include None values in defaults

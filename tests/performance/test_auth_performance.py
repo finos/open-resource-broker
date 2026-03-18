@@ -18,8 +18,9 @@ class TestAuthenticationPerformance:
     @pytest.fixture
     def no_auth_client(self):
         """Client with no authentication."""
-        server_config = ServerConfig(
-            enabled=True, auth=AuthConfig(enabled=False, strategy="replace")
+        server_config = ServerConfig(  # type: ignore[call-arg]
+            enabled=True,
+            auth=AuthConfig(enabled=False, strategy="replace"),  # type: ignore[call-arg]
         )
         app = create_fastapi_app(server_config)
         return TestClient(app)
@@ -27,9 +28,9 @@ class TestAuthenticationPerformance:
     @pytest.fixture
     def auth_client_and_token(self):
         """Client with authentication and valid token."""
-        server_config = ServerConfig(
+        server_config = ServerConfig(  # type: ignore[call-arg]
             enabled=True,
-            auth=AuthConfig(
+            auth=AuthConfig(  # type: ignore[call-arg]
                 enabled=True,
                 strategy="bearer_token",
                 bearer_token={

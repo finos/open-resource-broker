@@ -124,7 +124,7 @@ def test_provider_strategy_integration():
             from orb.providers.aws.configuration.config import AWSProviderConfig
 
             # Create appropriate AWS config
-            aws_config = AWSProviderConfig(region="us-west-2", profile="default")
+            aws_config = AWSProviderConfig(region="us-west-2", profile="default")  # type: ignore[call-arg]
 
             strategy = AWSProviderStrategy(config=aws_config, logger=mock_logger)
             print("   PASS: Provider strategy instantiation successful")

@@ -13,7 +13,7 @@ class TestNativeSpecValidation:
 
     def test_native_spec_config_defaults(self):
         """Test default native spec configuration."""
-        config = NativeSpecConfig()
+        config = NativeSpecConfig()  # type: ignore[call-arg]
 
         assert config.enabled is False
         assert config.merge_mode == "merge"
@@ -29,17 +29,17 @@ class TestNativeSpecValidation:
     def test_native_spec_config_invalid_merge_mode(self):
         """Test invalid merge mode raises validation error."""
         with pytest.raises(ValidationError) as exc_info:
-            NativeSpecConfig(enabled=True, merge_mode="invalid")
+            NativeSpecConfig(enabled=True, merge_mode="invalid")  # type: ignore[call-arg]
 
         assert "merge_mode" in str(exc_info.value)
 
     def test_native_spec_enabled_validation(self):
         """Test enabled field validation."""
         # Valid boolean values
-        config1 = NativeSpecConfig(enabled=True)
+        config1 = NativeSpecConfig(enabled=True)  # type: ignore[call-arg]
         assert config1.enabled is True
 
-        config2 = NativeSpecConfig(enabled=False)
+        config2 = NativeSpecConfig(enabled=False)  # type: ignore[call-arg]
         assert config2.enabled is False
 
     def test_aws_template_native_spec_fields(self):

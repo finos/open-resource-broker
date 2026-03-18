@@ -417,8 +417,10 @@ class TestDataProtectionSecurity:
         sanitized_data = sanitize_data(unsanitized_data)
 
         # Verify harmful content is removed
+        assert isinstance(sanitized_data, dict)
         assert "<script>" not in sanitized_data["template_id"]
         assert "DROP TABLE" not in sanitized_data["requester_id"]
+        assert isinstance(sanitized_data["metadata"], dict)
         assert "<img" not in sanitized_data["metadata"]["description"]
         assert "../" not in sanitized_data["metadata"]["notes"]
 

@@ -111,22 +111,12 @@ class TestDependencyInjectionComprehensive:
             from orb.infrastructure.di.buses import CommandBus, QueryBus
 
             # Test CommandBus
-            try:
-                command_bus = CommandBus()
-                assert command_bus is not None
-            except TypeError:
-                # Might require dependencies
-                command_bus = CommandBus(Mock(), Mock())
-                assert command_bus is not None
+            command_bus = CommandBus(Mock(), Mock())
+            assert command_bus is not None
 
             # Test QueryBus
-            try:
-                query_bus = QueryBus()
-                assert query_bus is not None
-            except TypeError:
-                # Might require dependencies
-                query_bus = QueryBus(Mock(), Mock())
-                assert query_bus is not None
+            query_bus = QueryBus(Mock(), Mock())
+            assert query_bus is not None
 
         except ImportError:
             pytest.skip("Command/Query buses not available")
@@ -138,10 +128,7 @@ class TestDependencyInjectionComprehensive:
             from orb.infrastructure.di.buses import CommandBus, QueryBus
 
             # Test CommandBus send
-            try:
-                command_bus = CommandBus()
-            except TypeError:
-                command_bus = CommandBus(Mock(), Mock())
+            command_bus = CommandBus(Mock(), Mock())
 
             if hasattr(command_bus, "send"):
                 try:
@@ -152,10 +139,7 @@ class TestDependencyInjectionComprehensive:
                     pass
 
             # Test QueryBus send
-            try:
-                query_bus = QueryBus()
-            except TypeError:
-                query_bus = QueryBus(Mock(), Mock())
+            query_bus = QueryBus(Mock(), Mock())
 
             if hasattr(query_bus, "send"):
                 try:
@@ -566,7 +550,6 @@ class TestFactoriesComprehensive:
         # Check different factory locations
         factory_paths = [
             "orb.infrastructure.factories.provider_strategy_factory",
-            "orb.infrastructure.utilities.factories.api_handler_factory",
             "orb.infrastructure.utilities.factories.repository_factory",
             "orb.infrastructure.utilities.factories.sql_engine_factory",
             "orb.infrastructure.adapters.factories.container_adapter_factory",

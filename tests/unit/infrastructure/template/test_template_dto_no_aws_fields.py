@@ -110,8 +110,8 @@ class TestFromDomainPacksAWSFieldsIntoMetadata:
 
     def test_abis_instance_requirements_in_metadata(self):
         abis = ABISInstanceRequirements(
-            vcpu_count={"Min": 2, "Max": 8},
-            memory_mib={"Min": 4096, "Max": 16384},
+            VCpuCount={"Min": 2, "Max": 8},
+            MemoryMiB={"Min": 4096, "Max": 16384},
         )
         template = _make_aws_template(abis_instance_requirements=abis)
         dto = TemplateDTO.from_domain(template)
@@ -175,8 +175,8 @@ class TestAWSTemplateRoundTrip:
 
     def test_abis_roundtrip(self):
         abis = ABISInstanceRequirements(
-            vcpu_count={"Min": 4, "Max": 16},
-            memory_mib={"Min": 8192, "Max": 32768},
+            VCpuCount={"Min": 4, "Max": 16},
+            MemoryMiB={"Min": 8192, "Max": 32768},
         )
         original = _make_aws_template(abis_instance_requirements=abis)
         dto = TemplateDTO.from_domain(original)

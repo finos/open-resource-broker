@@ -11,7 +11,7 @@ class TestNativeSpecConfig:
 
     def test_default_values(self):
         """Test default configuration values."""
-        config = NativeSpecConfig()
+        config = NativeSpecConfig()  # type: ignore[call-arg]
         assert config.enabled is False
         assert config.merge_mode == "merge"
 
@@ -19,13 +19,13 @@ class TestNativeSpecConfig:
         """Test valid merge mode values."""
         valid_modes = ["merge", "replace"]
         for mode in valid_modes:
-            config = NativeSpecConfig(merge_mode=mode)
+            config = NativeSpecConfig(merge_mode=mode)  # type: ignore[call-arg]
             assert config.merge_mode == mode
 
     def test_invalid_merge_mode(self):
         """Test invalid merge mode raises validation error."""
         with pytest.raises(ValidationError):
-            NativeSpecConfig(merge_mode="invalid")
+            NativeSpecConfig(merge_mode="invalid")  # type: ignore[call-arg]
 
     def test_enabled_configuration(self):
         """Test enabled configuration."""

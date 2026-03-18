@@ -70,7 +70,7 @@ class TestRequestBusinessRules:
     def test_template_id_cannot_be_empty(self):
         """Test that provider_type is required — omitting it raises."""
         with pytest.raises((ValueError, TypeError)):
-            Request.create_new_request(
+            Request.create_new_request(  # type: ignore[call-arg]
                 request_type=RequestType.ACQUIRE,
                 template_id="test-template",
                 machine_count=1,
@@ -79,7 +79,7 @@ class TestRequestBusinessRules:
     def test_return_request_must_have_machine_ids(self):
         """Test that return requests require provider_name — omitting it raises."""
         with pytest.raises((ValueError, TypeError)):
-            Request.create_return_request(
+            Request.create_return_request(  # type: ignore[call-arg]
                 machine_ids=["i-1234567890abcdef0"],
                 provider_type="aws",
             )
@@ -374,7 +374,7 @@ class TestBusinessRuleEnforcement:
         """Test that validation happens when data enters aggregates."""
         # provider_type is required — omitting it raises at creation boundary
         with pytest.raises((ValueError, TypeError)):
-            Request.create_new_request(
+            Request.create_new_request(  # type: ignore[call-arg]
                 request_type=RequestType.ACQUIRE,
                 template_id="test-template",
                 machine_count=1,

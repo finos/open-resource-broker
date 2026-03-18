@@ -36,8 +36,9 @@ class TestAPIEndpoints:
     @pytest.fixture
     def client(self):
         """Create test client with no authentication."""
-        server_config = ServerConfig(
-            enabled=True, auth=AuthConfig(enabled=False, strategy="replace")
+        server_config = ServerConfig(  # type: ignore[call-arg]
+            enabled=True,
+            auth=AuthConfig(enabled=False, strategy="replace"),  # type: ignore[call-arg]
         )
         with patch("orb.api.server._register_routers") as mock_register:
             mock_register.side_effect = self._install_stub_routes
@@ -47,9 +48,9 @@ class TestAPIEndpoints:
     @pytest.fixture
     def auth_client(self):
         """Create test client with authentication."""
-        server_config = ServerConfig(
+        server_config = ServerConfig(  # type: ignore[call-arg]
             enabled=True,
-            auth=AuthConfig(
+            auth=AuthConfig(  # type: ignore[call-arg]
                 enabled=True,
                 strategy="bearer_token",
                 bearer_token={"secret_key": "test-secret-key-minimum-32-bytes!"},

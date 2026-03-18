@@ -19,17 +19,19 @@ from orb.providers.aws.storage.registration import (
 def _make_config_manager(aws_provider_config: AWSProviderConfig) -> MagicMock:
     """Return a mock ConfigurationManager whose get_typed returns the given config."""
     from orb.config.manager import ConfigurationManager
+    from orb.config.schemas.common_schema import NamingConfig
 
     mock = MagicMock(spec=ConfigurationManager)
     mock.get_typed.return_value = aws_provider_config
+    mock.app_config.naming = NamingConfig()  # type: ignore[call-arg]
     return mock
 
 
 def test_create_dynamodb_strategy_uses_typed_config():
     dynamodb_cfg = DynamodbStrategyConfig(region="eu-west-1", profile="prod", table_prefix="myapp")
-    aws_cfg = AWSProviderConfig(
+    aws_cfg = AWSProviderConfig(  # type: ignore[call-arg]
         region="us-east-1",
-        storage=AWSStorageConfig(dynamodb=dynamodb_cfg),
+        storage=AWSStorageConfig(dynamodb=dynamodb_cfg),  # type: ignore[call-arg]
     )
     config = _make_config_manager(aws_cfg)
 
