@@ -255,7 +255,13 @@ async def handle_list_requests(args: "argparse.Namespace") -> dict[str, Any]:
     orchestrator = container.get(ListRequestsOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
-    result = await orchestrator.execute(ListRequestsInput())
+    result = await orchestrator.execute(
+        ListRequestsInput(
+            status=getattr(args, "status", None),
+            limit=getattr(args, "limit", None) or 50,
+            offset=getattr(args, "offset", 0) or 0,
+        )
+    )
     return formatter.format_request_status(result.requests)
 
 

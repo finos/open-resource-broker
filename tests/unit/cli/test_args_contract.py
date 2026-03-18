@@ -104,3 +104,71 @@ def test_providers_exec_accepts_args_flag():
     ns = _parse(sp, ["exec", "describe-instances", "--args", '{"key": "val"}'])
     resolved = getattr(ns, "params", None) or getattr(ns, "args", None)
     assert resolved == '{"key": "val"}'
+
+
+# ---------------------------------------------------------------------------
+# Task 2045 — requests list --offset forwarded to orchestrator
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_requests_list_offset_forwarded_to_orchestrator():
+    import argparse
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from orb.application.dto.interface_response import InterfaceResponse
+    from orb.application.services.orchestration.dtos import ListRequestsOutput
+    from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
+    from orb.application.services.response_formatting_service import ResponseFormattingService
+    from orb.interface.request_command_handlers import handle_list_requests
+
+    container = MagicMock()
+    list_req_orch = AsyncMock(spec=ListRequestsOrchestrator)
+    list_req_orch.execute.return_value = ListRequestsOutput(requests=[])
+    formatter = MagicMock(spec=ResponseFormattingService)
+    formatter.format_request_status.return_value = InterfaceResponse(data={"requests": []})
+
+    container.get.side_effect = lambda t: {
+        ListRequestsOrchestrator: list_req_orch,
+        ResponseFormattingService: formatter,
+    }.get(t, MagicMock())
+
+    ns = argparse.Namespace(offset=25, limit=50, status=None)
+
+    with patch("orb.interface.request_command_handlers.get_container", return_value=container):
+        await handle_list_requests(ns)
+
+    call_input = list_req_orch.execute.call_args[0][0]
+    assert call_input.offset == 25
+
+
+@pytest.mark.asyncio
+async def test_requests_list_status_forwarded_to_orchestrator():
+    import argparse
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from orb.application.dto.interface_response import InterfaceResponse
+    from orb.application.services.orchestration.dtos import ListRequestsOutput
+    from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
+    from orb.application.services.response_formatting_service import ResponseFormattingService
+    from orb.interface.request_command_handlers import handle_list_requests
+
+    container = MagicMock()
+    list_req_orch = AsyncMock(spec=ListRequestsOrchestrator)
+    list_req_orch.execute.return_value = ListRequestsOutput(requests=[])
+    formatter = MagicMock(spec=ResponseFormattingService)
+    formatter.format_request_status.return_value = InterfaceResponse(data={"requests": []})
+
+    container.get.side_effect = lambda t: {
+        ListRequestsOrchestrator: list_req_orch,
+        ResponseFormattingService: formatter,
+    }.get(t, MagicMock())
+
+    ns = argparse.Namespace(offset=0, limit=10, status="pending")
+
+    with patch("orb.interface.request_command_handlers.get_container", return_value=container):
+        await handle_list_requests(ns)
+
+    call_input = list_req_orch.execute.call_args[0][0]
+    assert call_input.status == "pending"
+    assert call_input.limit == 10
