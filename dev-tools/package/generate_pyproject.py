@@ -8,15 +8,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-try:
-    import tomllib
-except ImportError:
-    try:
-        import tomli as tomllib  # noqa: F401
-    except ImportError:
-        logging.error("Neither tomllib nor tomli available. Install tomli: pip install tomli")
-        sys.exit(1)
-
 # Get project root
 project_root = Path(__file__).parent.parent.parent
 
