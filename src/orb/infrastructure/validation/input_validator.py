@@ -137,6 +137,24 @@ class InputValidator:
         return int_value
 
     @staticmethod
+    def validate_aws_region(region: str) -> str:
+        """
+        Validate that input is a valid AWS region name.
+
+        Args:
+            region: AWS region string to validate
+
+        Returns:
+            Validated region string
+
+        Raises:
+            ValidationError: If region format is invalid
+        """
+        if not re.match(r"^[a-z]{2,}-[a-z]+-\d+$", region):
+            raise ValidationError(f"Invalid AWS region: {region}")
+        return region
+
+    @staticmethod
     def validate_choice(value: str, choices: list[str], case_sensitive: bool = False) -> str:
         """
         Validate that input is one of allowed choices.
