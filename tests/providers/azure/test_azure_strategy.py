@@ -120,6 +120,27 @@ class TestCapacityMetadata:
             "state": "Updating",
         }
 
+    def test_vmss_capacity_uses_operation_resource_group_when_provided(self, strategy):
+        strategy._resource_manager = MagicMock()
+        strategy._resource_manager.get_vmss_capacity.return_value = {
+            "capacity": 4,
+            "provisioned_instance_count": 2,
+            "provisioning_state": "Updating",
+        }
+
+        metadata = {}
+        strategy._augment_vmss_capacity_metadata(
+            metadata,
+            ["vmss-demo"],
+            resource_group="override-rg",
+        )
+
+        strategy._resource_manager.get_vmss_capacity.assert_called_once_with(
+            "override-rg",
+            "vmss-demo",
+        )
+        assert metadata["fleet_capacity_fulfilment"]["target_capacity_units"] == 4
+
     def test_describe_resource_instances_surfaces_vmss_errors_without_instances(self, strategy):
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
@@ -198,6 +219,36 @@ class TestCapacityMetadata:
         assert result.success
         assert result.metadata["capacity_shortfall"]["missing_capacity_units"] == 2
         assert result.metadata["capacity_shortfall"]["likely_causes"] == ["AllocationFailed"]
+
+    def test_describe_resource_instances_uses_operation_resource_group_for_capacity(self, strategy):
+        handler = MagicMock()
+        handler.check_hosts_status.return_value = []
+        handler.get_vmss_resource_errors.return_value = []
+        strategy._handlers["VMSS"] = handler
+        strategy._resource_manager = MagicMock()
+        strategy._resource_manager.get_vmss_capacity.return_value = {
+            "capacity": 2,
+            "provisioned_instance_count": 0,
+            "provisioning_state": "Updating",
+        }
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
+            parameters={
+                "resource_ids": ["vmss-demo"],
+                "provider_api": "VMSS",
+                "resource_group": "custom-rg",
+                "template_id": "tmpl-1",
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert result.success
+        strategy._resource_manager.get_vmss_capacity.assert_called_once_with(
+            "custom-rg",
+            "vmss-demo",
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -1356,7 +1356,11 @@ class AzureProviderStrategy(ProviderStrategy):
                                     vmss_errors.append(error)
                     if vmss_errors:
                         metadata["fleet_errors"] = vmss_errors
-                    self._augment_vmss_capacity_metadata(metadata, resource_ids)
+                    self._augment_vmss_capacity_metadata(
+                        metadata,
+                        resource_ids,
+                        resource_group=resource_group,
+                    )
                 return ProviderResult.success_result(
                     {"instances": []},
                     metadata,
@@ -1396,7 +1400,13 @@ class AzureProviderStrategy(ProviderStrategy):
                 AzureProviderApi.VMSS.value,
                 AzureProviderApi.VMSS_UNIFORM.value,
             ):
-                self._augment_vmss_capacity_metadata(metadata, resource_ids)
+                self._augment_vmss_capacity_metadata(
+                    metadata,
+                    resource_ids,
+                    resource_group=operation.parameters.get(
+                        "resource_group", self._azure_config.resource_group
+                    ),
+                )
 
             self._augment_shortfall_metadata(metadata)
 
@@ -1473,13 +1483,16 @@ class AzureProviderStrategy(ProviderStrategy):
     # ------------------------------------------------------------------
 
     def _augment_vmss_capacity_metadata(
-        self, metadata: dict[str, Any], resource_ids: list[str]
+        self,
+        metadata: dict[str, Any],
+        resource_ids: list[str],
+        resource_group: Optional[str] = None,
     ) -> None:
         if not resource_ids or not self.resource_manager:
             return
 
         vmss_name = resource_ids[0]
-        resource_group = self._azure_config.resource_group
+        resource_group = resource_group or self._azure_config.resource_group
         if not resource_group:
             return
 
