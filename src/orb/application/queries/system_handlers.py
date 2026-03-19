@@ -369,8 +369,8 @@ class ValidateStorageHandler(BaseQueryHandler[ValidateStorageQuery, dict[str, An
             # Test storage connectivity by attempting to list requests
             with self.uow_factory.create_unit_of_work() as uow:
                 # Try to access repositories
-                requests = uow.requests.list_all()
-                machines = uow.machines.list_all()
+                requests = uow.requests.find_all()
+                machines = uow.machines.find_all()
 
                 return {
                     "status": "success",
