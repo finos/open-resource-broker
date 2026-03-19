@@ -68,7 +68,9 @@ async def handle_validate_storage_config(  # type: ignore[return]
         raw = result if isinstance(result, dict) else {"status": "healthy"}
         return formatter.format_success({**raw, "message": "Storage configuration is valid"})  # type: ignore[attr-defined]
     except ImportError:
-        return formatter.format_success({"message": "Storage configuration is valid", "status": "ok"})  # type: ignore[attr-defined]
+        return formatter.format_success(
+            {"message": "Storage configuration is valid", "status": "ok"}
+        )  # type: ignore[attr-defined]
     except Exception as e:
         return formatter.format_error(f"Storage configuration invalid: {e}")
 

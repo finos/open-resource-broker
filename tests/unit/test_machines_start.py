@@ -39,7 +39,12 @@ async def test_machines_start_specific_ids():
 
         mock_formatter = Mock(spec=ResponseFormattingService)
         mock_formatter.format_success.return_value = InterfaceResponse(
-            data={"success": True, "started_machines": ["i-123", "i-456"], "failed_machines": [], "message": "started"},
+            data={
+                "success": True,
+                "started_machines": ["i-123", "i-456"],
+                "failed_machines": [],
+                "message": "started",
+            },
             exit_code=0,
         )
 
@@ -124,7 +129,12 @@ async def test_machines_start_all():
 
         mock_formatter = Mock(spec=ResponseFormattingService)
         mock_formatter.format_success.return_value = InterfaceResponse(
-            data={"success": True, "started_machines": ["i-stopped1", "i-stopped2"], "failed_machines": [], "message": "started"},
+            data={
+                "success": True,
+                "started_machines": ["i-stopped1", "i-stopped2"],
+                "failed_machines": [],
+                "message": "started",
+            },
             exit_code=0,
         )
 

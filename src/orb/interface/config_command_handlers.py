@@ -75,9 +75,7 @@ async def handle_validate_provider_config(args: Any) -> "Union[dict[str, Any], I
     container = get_container()
     formatter = container.get(ResponseFormattingService)
     factory = CLICommandFactoryOrchestrator()
-    query = factory.create_validate_provider_config_query(
-        detailed=getattr(args, "detailed", False)
-    )
+    query = factory.create_validate_provider_config_query(detailed=getattr(args, "detailed", False))
     result = await container.get(QueryBus).execute(query)
     raw: dict[str, Any] = result if isinstance(result, dict) else vars(result)
     return formatter.format_config(raw)

@@ -99,7 +99,9 @@ class TestStorageCommandHandlers:
 
             mock_formatter = MagicMock(spec=ResponseFormattingService)
             mock_formatter.format_success = MagicMock(
-                return_value=InterfaceResponse(data={"status": "healthy", "message": "Storage configuration is valid"})
+                return_value=InterfaceResponse(
+                    data={"status": "healthy", "message": "Storage configuration is valid"}
+                )
             )
 
             mock_container = MagicMock()

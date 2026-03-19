@@ -105,7 +105,9 @@ async def handle_list_machines(
 
 
 @handle_interface_exceptions(context="stop_machines", interface_type="cli")
-async def handle_stop_machines(args: "argparse.Namespace") -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_stop_machines(
+    args: "argparse.Namespace",
+) -> Union[dict[str, Any], InterfaceResponse]:
     """
     Handle stop machines operations.
 
@@ -155,15 +157,19 @@ async def handle_stop_machines(args: "argparse.Namespace") -> Union[dict[str, An
             force=has_force,
         )
     )
-    return formatter.format_success({
-        "message": result.message,
-        "stopped_machines": result.stopped_machines,
-        "failed_machines": result.failed_machines,
-    })
+    return formatter.format_success(
+        {
+            "message": result.message,
+            "stopped_machines": result.stopped_machines,
+            "failed_machines": result.failed_machines,
+        }
+    )
 
 
 @handle_interface_exceptions(context="start_machines", interface_type="cli")
-async def handle_start_machines(args: "argparse.Namespace") -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_start_machines(
+    args: "argparse.Namespace",
+) -> Union[dict[str, Any], InterfaceResponse]:
     """
     Handle start machines operations.
 
@@ -204,15 +210,19 @@ async def handle_start_machines(args: "argparse.Namespace") -> Union[dict[str, A
             all_machines=has_all,
         )
     )
-    return formatter.format_success({
-        "message": result.message,
-        "started_machines": result.started_machines,
-        "failed_machines": result.failed_machines,
-    })
+    return formatter.format_success(
+        {
+            "message": result.message,
+            "started_machines": result.started_machines,
+            "failed_machines": result.failed_machines,
+        }
+    )
 
 
 @handle_interface_exceptions(context="get_machine", interface_type="cli")
-async def handle_get_machine(args: "argparse.Namespace") -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_get_machine(
+    args: "argparse.Namespace",
+) -> Union[dict[str, Any], InterfaceResponse]:
     """Handle machines show — fetch a single machine and wrap in InterfaceResponse."""
     from orb.application.services.orchestration.dtos import GetMachineInput
     from orb.application.services.orchestration.get_machine import GetMachineOrchestrator
@@ -228,5 +238,9 @@ async def handle_get_machine(args: "argparse.Namespace") -> Union[dict[str, Any]
     result = await orchestrator.execute(GetMachineInput(machine_id=machine_id))
     if result.machine is None:
         return formatter.format_error("Machine not found")
-    raw = result.machine.model_dump() if hasattr(result.machine, "model_dump") else vars(result.machine)
+    raw = (
+        result.machine.model_dump()
+        if hasattr(result.machine, "model_dump")
+        else vars(result.machine)
+    )
     return formatter.format_machine_operation(raw)

@@ -65,7 +65,9 @@ class TestStubHandlers:
             mock_formatter if t is ResponseFormattingService else mock_registry
         )
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=mock_container):
+        with patch(
+            "orb.interface.system_command_handlers.get_container", return_value=mock_container
+        ):
             result = await handle_reload_provider_config(_ns())
 
         assert isinstance(result, InterfaceResponse)
