@@ -266,9 +266,7 @@ class TestHandleMcpValidate:
             result = await handle_mcp_validate(args)
 
         data = result.data if hasattr(result, "data") else result
-        config_check = next(
-            (c for c in data["checks"] if "Configuration File" in c["check"]), None
-        )
+        config_check = next((c for c in data["checks"] if "Configuration File" in c["check"]), None)
         assert config_check is not None
         assert config_check["status"] == "PASS"
         assert "2 keys" in config_check["details"]

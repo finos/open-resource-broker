@@ -95,9 +95,7 @@ async def handle_mcp_tools_call(args) -> Union[dict[str, Any], InterfaceResponse
         result = await tools.call_tool(args.tool_name, tool_args)
 
         if getattr(args, "format", "json") == "table" and "data" in result:
-            return InterfaceResponse(
-                data=_format_result_table(result, args.tool_name), exit_code=0
-            )
+            return InterfaceResponse(data=_format_result_table(result, args.tool_name), exit_code=0)
         else:
             return InterfaceResponse(data=result, exit_code=0)
 
@@ -238,7 +236,9 @@ async def handle_mcp_validate(args) -> Union[dict[str, Any], InterfaceResponse]:
 
     exit_code = 0 if validation_result["valid"] else 1
     if getattr(args, "format", "json") == "table":
-        return InterfaceResponse(data=_format_validation_table(validation_result), exit_code=exit_code)
+        return InterfaceResponse(
+            data=_format_validation_table(validation_result), exit_code=exit_code
+        )
     else:
         return InterfaceResponse(data=validation_result, exit_code=exit_code)
 
