@@ -73,7 +73,7 @@ async def handle_get_template(args: argparse.Namespace) -> Union[dict[str, Any],
 
     template_id = getattr(args, "template_id", None) or getattr(args, "flag_template_id", None)
     if not template_id:
-        return {"success": False, "error": "Template ID is required", "template": None}
+        return {"error": True, "message": "Template ID is required"}
 
     container = get_container()
     orchestrator = container.get(GetTemplateOrchestrator)
@@ -108,27 +108,27 @@ async def handle_create_template(args: argparse.Namespace) -> Union[dict[str, An
         }
 
     if not hasattr(args, "file") or not args.file:
-        return {"success": False, "error": "Template file is required"}
+        return {"error": True, "message": "Template file is required"}
 
     try:
         with open(args.file) as f:
             template_config = json.load(f)
     except FileNotFoundError:
-        return {"success": False, "error": f"Template file not found: {args.file}"}
+        return {"error": True, "message": f"Template file not found: {args.file}"}
     except json.JSONDecodeError as e:
-        return {"success": False, "error": f"Invalid JSON in template file: {e}"}
+        return {"error": True, "message": f"Invalid JSON in template file: {e}"}
 
     template_id = template_config.get("template_id") or template_config.get("templateId")
     if not template_id:
-        return {"success": False, "error": "template_id is required in template file"}
+        return {"error": True, "message": "template_id is required in template file"}
 
     provider_api = template_config.get("provider_api") or template_config.get("providerApi")
     if not provider_api:
-        return {"success": False, "error": "provider_api is required in template file"}
+        return {"error": True, "message": "provider_api is required in template file"}
 
     image_id = template_config.get("image_id") or template_config.get("imageId")
     if not image_id:
-        return {"success": False, "error": "image_id is required in template file"}
+        return {"error": True, "message": "image_id is required in template file"}
 
     if getattr(args, "validate_only", False):
         return {
@@ -158,16 +158,14 @@ async def handle_create_template(args: argparse.Namespace) -> Union[dict[str, An
         )
     except DuplicateError:
         return {
-            "success": False,
-            "error": f"Template '{template_id}' already exists",
-            "template_id": template_id,
+            "error": True,
+            "message": f"Template '{template_id}' already exists",
         }
 
     if result.validation_errors:
         return {
-            "success": False,
-            "error": f"Template validation failed: {', '.join(result.validation_errors)}",
-            "template_id": template_id,
+            "error": True,
+            "message": f"Template validation failed: {', '.join(result.validation_errors)}",
         }
 
     return formatter.format_template_mutation(result.raw)
@@ -192,23 +190,23 @@ async def handle_update_template(args: argparse.Namespace) -> Union[dict[str, An
 
     file_path = getattr(args, "file", None)
     if not file_path:
-        return {"success": False, "error": "Template file is required"}
+        return {"error": True, "message": "Template file is required"}
 
     try:
         with open(file_path) as f:
             template_config = json.load(f)
     except FileNotFoundError:
-        return {"success": False, "error": f"Template file not found: {file_path}"}
+        return {"error": True, "message": f"Template file not found: {file_path}"}
     except json.JSONDecodeError as e:
-        return {"success": False, "error": f"Invalid JSON in template file: {e}"}
+        return {"error": True, "message": f"Invalid JSON in template file: {e}"}
 
     if not isinstance(template_config, dict):
-        return {"success": False, "error": "Template file must contain a JSON object"}
+        return {"error": True, "message": "Template file must contain a JSON object"}
 
     file_template_id = template_config.get("template_id") or template_config.get("templateId")
     resolved_template_id = template_id or file_template_id
     if not resolved_template_id:
-        return {"success": False, "error": "Template ID is required (via arg or file)"}
+        return {"error": True, "message": "Template ID is required (via arg or file)"}
 
     container = get_container()
     orchestrator = container.get(UpdateTemplateOrchestrator)
@@ -227,16 +225,14 @@ async def handle_update_template(args: argparse.Namespace) -> Union[dict[str, An
         )
     except EntityNotFoundError:
         return {
-            "success": False,
-            "error": f"Template '{resolved_template_id}' not found",
-            "template_id": resolved_template_id,
+            "error": True,
+            "message": f"Template '{resolved_template_id}' not found",
         }
 
     if result.validation_errors:
         return {
-            "success": False,
-            "error": f"Template validation failed: {', '.join(result.validation_errors)}",
-            "template_id": resolved_template_id,
+            "error": True,
+            "message": f"Template validation failed: {', '.join(result.validation_errors)}",
         }
 
     return formatter.format_template_mutation(result.raw)
@@ -251,7 +247,7 @@ async def handle_delete_template(args: argparse.Namespace) -> Union[dict[str, An
 
     template_id = getattr(args, "template_id", None) or getattr(args, "flag_template_id", None)
     if not template_id:
-        return {"success": False, "error": "Template ID is required"}
+        return {"error": True, "message": "Template ID is required"}
 
     if is_dry_run_active():
         return {
@@ -269,16 +265,14 @@ async def handle_delete_template(args: argparse.Namespace) -> Union[dict[str, An
         result = await orchestrator.execute(DeleteTemplateInput(template_id=template_id))
     except EntityNotFoundError:
         return {
-            "success": False,
-            "error": f"Template '{template_id}' not found",
-            "template_id": template_id,
+            "error": True,
+            "message": f"Template '{template_id}' not found",
         }
 
     if not result.deleted:
         return {
-            "success": False,
-            "error": f"Template '{template_id}' could not be deleted",
-            "template_id": template_id,
+            "error": True,
+            "message": f"Template '{template_id}' could not be deleted",
         }
 
     return formatter.format_template_mutation(result.raw)
@@ -327,9 +321,8 @@ async def handle_validate_template(args: argparse.Namespace) -> Union[dict[str, 
         template_file = Path(args.file)
         if not template_file.exists():
             return {
-                "success": False,
-                "error": f"Template file not found: {template_file}",
-                "valid": False,
+                "error": True,
+                "message": f"Template file not found: {template_file}",
             }
 
         try:
@@ -340,9 +333,8 @@ async def handle_validate_template(args: argparse.Namespace) -> Union[dict[str, 
                     template_config = json.load(f)
         except Exception as e:
             return {
-                "success": False,
-                "error": f"Failed to parse template file: {e!s}",
-                "valid": False,
+                "error": True,
+                "message": f"Failed to parse template file: {e!s}",
             }
 
         template_id = template_config.get("template_id", "file-template")
@@ -358,9 +350,8 @@ async def handle_validate_template(args: argparse.Namespace) -> Union[dict[str, 
         return formatter.format_template_mutation(result.raw)
 
     return {
-        "success": False,
-        "error": "Must provide either template_id, --file, or --all",
-        "valid": False,
+        "error": True,
+        "message": "Must provide either template_id, --file, or --all",
     }
 
 

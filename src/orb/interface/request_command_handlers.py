@@ -41,8 +41,8 @@ async def handle_get_request_status(
 
     if has_all and has_specific_ids:
         return {
-            "error": "Cannot use --all with specific request IDs",
-            "message": "Use either --all or specific IDs, not both",
+            "error": True,
+            "message": "Cannot use --all with specific request IDs",
         }
 
     formatter = container.get(ResponseFormattingService)
@@ -76,7 +76,7 @@ async def handle_get_request_status(
             request_ids.extend(args.flag_request_ids)
 
     if not request_ids:
-        return {"error": "No request ID provided", "message": "Request ID is required"}
+        return {"error": True, "message": "No request ID provided"}
 
     result = await orchestrator.execute(
         GetRequestStatusInput(
@@ -127,16 +127,10 @@ async def handle_request_machines(
     machine_count = parsed_data.get("requested_count", 1)
 
     if not template_id:
-        return {
-            "error": "Template ID is required",
-            "message": "Template ID must be provided",
-        }
+        return {"error": True, "message": "Template ID is required"}
 
     if not machine_count:
-        return {
-            "error": "Machine count is required",
-            "message": "Machine count must be provided",
-        }
+        return {"error": True, "message": "Machine count is required"}
 
     wait = getattr(args, "wait", False)
     timeout_seconds = getattr(args, "timeout", 300)
@@ -223,22 +217,22 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> Union[di
 
     if has_all and has_specific_ids:
         return {
-            "error": "Cannot use --all with specific machine IDs",
-            "message": "Use either --all or specific IDs, not both",
+            "error": True,
+            "message": "Cannot use --all with specific machine IDs",
         }
 
     if has_all:
         has_force = getattr(args, "force", False)
         if not has_force:
             return {
-                "error": "Destructive operation requires --force flag",
-                "message": "Use --force to confirm returning all machines",
+                "error": True,
+                "message": "Destructive operation requires --force flag",
             }
 
     if not has_all and not machine_ids:
         return {
-            "error": "Machine IDs are required",
-            "message": "Machine IDs must be provided either as arguments or in JSON file",
+            "error": True,
+            "message": "Machine IDs are required",
         }
 
     result = await orchestrator.execute(
@@ -284,7 +278,7 @@ async def handle_cancel_request(args: "argparse.Namespace") -> Union[dict[str, A
 
     request_id = getattr(args, "request_id", None) or getattr(args, "flag_request_id", None)
     if not request_id:
-        return {"error": "Request ID is required", "message": "Request ID must be provided"}
+        return {"error": True, "message": "Request ID is required"}
 
     reason = getattr(args, "reason", None) or "Cancelled via API"
     result = await orchestrator.execute(CancelRequestInput(request_id=request_id, reason=reason))

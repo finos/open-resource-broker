@@ -97,7 +97,7 @@ def add_machine_actions(subparsers):
     add_global_arguments(machines_show)
     machines_show.add_argument("machine_id", nargs="?", help="Machine ID to show")
     machines_show.add_argument(
-        "--machine-id", "-m", dest="machine_ids_flag", help="Machine ID to show"
+        "--machine-id", "-m", dest="flag_machine_id", help="Machine ID to show"
     )
 
     machines_request = subparsers.add_parser("request", help="Request machines")
