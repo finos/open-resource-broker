@@ -108,8 +108,7 @@ def test_providers_exec_accepts_args_flag():
     _, sp = sp_tuple
     add_provider_actions(sp)
     ns = _parse(sp_tuple, ["exec", "describe-instances", "--args", '{"key": "val"}'])
-    resolved = getattr(ns, "params", None) or getattr(ns, "args", None)
-    assert resolved == '{"key": "val"}'
+    assert ns.params == '{"key": "val"}'
 
 
 # ---------------------------------------------------------------------------
@@ -265,3 +264,86 @@ def test_cli_contract_flag_exists(resource, subcommand, flag, short):
     assert flag in all_opts, f"{flag} missing from {resource} {subcommand}"
     if short:
         assert short in all_opts, f"{short} missing from {resource} {subcommand}"
+
+
+# ---------------------------------------------------------------------------
+# machine_ids_flag actually used by stop/start/return handlers
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_stop_machines_uses_machine_ids_flag():
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from orb.application.services.orchestration.dtos import StopMachinesOutput
+    from orb.application.services.orchestration.stop_machines import StopMachinesOrchestrator
+    from orb.interface.machine_command_handlers import handle_stop_machines
+
+    orch = AsyncMock(spec=StopMachinesOrchestrator)
+    orch.execute.return_value = StopMachinesOutput(
+        success=True, message="ok", stopped_machines=["i-flag1"], failed_machines=[]
+    )
+    container = MagicMock()
+    container.get.return_value = orch
+
+    ns = argparse.Namespace(all=False, force=False, machine_ids=[], machine_ids_flag=["i-flag1"])
+
+    with patch("orb.interface.machine_command_handlers.get_container", return_value=container):
+        await handle_stop_machines(ns)
+
+    call_input = orch.execute.call_args[0][0]
+    assert "i-flag1" in call_input.machine_ids
+
+
+@pytest.mark.asyncio
+async def test_start_machines_uses_machine_ids_flag():
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from orb.application.services.orchestration.dtos import StartMachinesOutput
+    from orb.application.services.orchestration.start_machines import StartMachinesOrchestrator
+    from orb.interface.machine_command_handlers import handle_start_machines
+
+    orch = AsyncMock(spec=StartMachinesOrchestrator)
+    orch.execute.return_value = StartMachinesOutput(
+        success=True, message="ok", started_machines=["i-flag2"], failed_machines=[]
+    )
+    container = MagicMock()
+    container.get.return_value = orch
+
+    ns = argparse.Namespace(all=False, machine_ids=[], machine_ids_flag=["i-flag2"])
+
+    with patch("orb.interface.machine_command_handlers.get_container", return_value=container):
+        await handle_start_machines(ns)
+
+    call_input = orch.execute.call_args[0][0]
+    assert "i-flag2" in call_input.machine_ids
+
+
+@pytest.mark.asyncio
+async def test_request_return_machines_uses_machine_ids_flag():
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from orb.application.dto.interface_response import InterfaceResponse
+    from orb.application.services.orchestration.dtos import ReturnMachinesOutput
+    from orb.application.services.orchestration.return_machines import ReturnMachinesOrchestrator
+    from orb.application.services.response_formatting_service import ResponseFormattingService
+    from orb.interface.request_command_handlers import handle_request_return_machines
+
+    orch = AsyncMock(spec=ReturnMachinesOrchestrator)
+    orch.execute.return_value = ReturnMachinesOutput(request_id=None, status="completed")
+    formatter = MagicMock(spec=ResponseFormattingService)
+    formatter.format_request_operation.return_value = InterfaceResponse(data={})
+
+    container = MagicMock()
+    container.get.side_effect = lambda t: {
+        ReturnMachinesOrchestrator: orch,
+        ResponseFormattingService: formatter,
+    }.get(t, MagicMock())
+
+    ns = argparse.Namespace(all=False, force=False, machine_ids=[], machine_ids_flag=["i-flag3"])
+
+    with patch("orb.interface.request_command_handlers.get_container", return_value=container):
+        await handle_request_return_machines(ns)
+
+    call_input = orch.execute.call_args[0][0]
+    assert "i-flag3" in call_input.machine_ids

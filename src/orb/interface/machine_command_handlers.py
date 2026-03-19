@@ -35,8 +35,8 @@ async def handle_get_machine_status(args: "argparse.Namespace") -> Union[dict[st
 
     if hasattr(args, "machine_ids") and args.machine_ids:
         machine_ids_from_args.extend(args.machine_ids)
-    if hasattr(args, "flag_machine_ids") and args.flag_machine_ids:
-        machine_ids_from_args.extend(args.flag_machine_ids)
+    if hasattr(args, "machine_ids_flag") and args.machine_ids_flag:
+        machine_ids_from_args.extend(args.machine_ids_flag)
 
     has_specific_ids = bool(machine_ids_from_args)
 
@@ -108,7 +108,7 @@ async def handle_stop_machines(args: "argparse.Namespace") -> dict[str, Any]:
     # Validation: --all requires --force
     has_all = getattr(args, "all", False)
     has_force = getattr(args, "force", False)
-    machine_ids_from_args = getattr(args, "machine_ids", []) or []
+    machine_ids_from_args = (getattr(args, "machine_ids", []) or []) + (getattr(args, "machine_ids_flag", []) or [])
 
     if has_all and not has_force:
         return {
@@ -163,7 +163,7 @@ async def handle_start_machines(args: "argparse.Namespace") -> dict[str, Any]:
     """
     # Validation: Cannot use both --all and specific IDs
     has_all = getattr(args, "all", False)
-    machine_ids_from_args = getattr(args, "machine_ids", []) or []
+    machine_ids_from_args = (getattr(args, "machine_ids", []) or []) + (getattr(args, "machine_ids_flag", []) or [])
 
     if has_all and machine_ids_from_args:
         return {

@@ -150,7 +150,6 @@ async def handle_request_machines(
         )
     )
 
-    container = get_container()
     formatter = container.get(ResponseFormattingService)
     return formatter.format_request_operation(result.raw, result.status)
 
@@ -211,7 +210,7 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> Union[di
                 if machine.get("machineId") or machine.get("machine_id")
             ]
     else:
-        machine_ids = getattr(args, "machine_ids", [])
+        machine_ids = (getattr(args, "machine_ids", []) or []) + (getattr(args, "machine_ids_flag", []) or [])
 
     has_specific_ids = bool(machine_ids)
 
@@ -259,7 +258,7 @@ async def handle_list_requests(args: "argparse.Namespace") -> Union[dict[str, An
     result = await orchestrator.execute(
         ListRequestsInput(
             status=getattr(args, "status", None),
-            limit=getattr(args, "limit", None) or 50,
+            limit=args.limit if getattr(args, "limit", None) is not None else 50,
             offset=getattr(args, "offset", 0) or 0,
         )
     )
