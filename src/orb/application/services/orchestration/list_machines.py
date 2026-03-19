@@ -37,4 +37,5 @@ class ListMachinesOrchestrator(OrchestratorBase[ListMachinesInput, ListMachinesO
             offset=input.offset,
         )
         results = await self._query_bus.execute(query)
-        return ListMachinesOutput(machines=list(results or []))
+        machines = list(results or [])
+        return ListMachinesOutput(machines=machines, count=len(machines))

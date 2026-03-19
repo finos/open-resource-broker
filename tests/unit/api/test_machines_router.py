@@ -122,7 +122,7 @@ class TestValidateTemplateTypedBody:
             return_value=ValidateTemplateOutput(
                 valid=True,
                 errors=[],
-                raw={"valid": True, "template_id": "t1"},
+                template_id="t1",
             )
         )
         client = _make_templates_client(

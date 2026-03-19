@@ -69,8 +69,8 @@ class TestCancelRequestOrchestrator:
     async def test_execute_raw_contains_request_id_and_status(self, orchestrator):
         input = CancelRequestInput(request_id="req-xyz")
         result = await orchestrator.execute(input)
-        assert result.raw["request_id"] == "req-xyz"
-        assert result.raw["status"] == "cancelled"
+        assert result.request_id == "req-xyz"
+        assert result.status == "cancelled"
 
     @pytest.mark.asyncio
     async def test_execute_uses_default_reason(self, orchestrator, mock_command_bus):

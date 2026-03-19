@@ -12,7 +12,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from orb.application.dto.interface_response import InterfaceResponse
 from orb.application.ports.scheduler_port import SchedulerPort
 from orb.application.services.orchestration.acquire_machines import AcquireMachinesOrchestrator
 from orb.application.services.orchestration.cancel_request import CancelRequestOrchestrator
@@ -40,13 +39,13 @@ def _make_namespace(**kwargs) -> argparse.Namespace:
 
 def _mock_container_with_formatter():
     """Return (container, formatter) with all orchestrators pre-wired as AsyncMocks."""
+    from orb.application.dto.interface_response import InterfaceResponse
+
     container = MagicMock()
     scheduler = MagicMock(spec=SchedulerPort)
-    scheduler.parse_request_data.return_value = []
-
     formatter = MagicMock(spec=ResponseFormattingService)
     formatter.format_request_status.return_value = InterfaceResponse(data={"requests": []})
-    formatter.format_request_operation.return_value = InterfaceResponse(data={"requestId": "req-1"})
+    formatter.format_request_operation.return_value = InterfaceResponse(data={"request_id": "req-1"})
 
     status_orch = AsyncMock(spec=GetRequestStatusOrchestrator)
     status_orch.execute.return_value = GetRequestStatusOutput(requests=[])
@@ -61,7 +60,6 @@ def _mock_container_with_formatter():
     cancel_orch.execute.return_value = CancelRequestOutput(
         request_id="req-123",
         status="cancelled",
-        raw={"request_id": "req-123", "status": "cancelled"},
     )
 
     acquire_orch = AsyncMock(spec=AcquireMachinesOrchestrator)
@@ -106,7 +104,7 @@ def _mock_container_with_formatter():
     ],
 )
 @pytest.mark.asyncio
-async def test_handler_delegates_to_formatter(handler_fn, args_factory, query_return):
+async def test_handler_delegates_to_scheduler(handler_fn, args_factory, query_return):
     """Every list/status handler must call formatter.format_request_status."""
     module_path, fn_name = handler_fn.rsplit(".", 1)
     module = importlib.import_module(module_path)
@@ -126,12 +124,15 @@ async def test_handler_delegates_to_formatter(handler_fn, args_factory, query_re
 
 
 @pytest.mark.asyncio
-async def test_get_request_status_single_id_delegates_to_formatter():
+async def test_get_request_status_single_id_delegates_to_scheduler():
     """handle_get_request_status with a single request_id must delegate to formatter."""
+    from orb.application.dto.interface_response import InterfaceResponse
     from orb.interface.request_command_handlers import handle_get_request_status
 
     container, formatter = _mock_container_with_formatter()
+    formatter.format_request_status.return_value = InterfaceResponse(data={"requests": []})
 
+    # Override the status orchestrator to return a result with the request
     status_orch = AsyncMock(spec=GetRequestStatusOrchestrator)
     status_orch.execute.return_value = GetRequestStatusOutput(
         requests=[{"request_id": "req-123", "status": "complete"}]
@@ -147,7 +148,8 @@ async def test_get_request_status_single_id_delegates_to_formatter():
         result = await handle_get_request_status(args)
 
     formatter.format_request_status.assert_called_once()
-    assert isinstance(result, InterfaceResponse)
+    from orb.application.dto.interface_response import InterfaceResponse as IR
+    assert isinstance(result, IR)
 
 
 # ---------------------------------------------------------------------------
@@ -156,11 +158,22 @@ async def test_get_request_status_single_id_delegates_to_formatter():
 
 
 @pytest.mark.asyncio
-async def test_request_machines_delegates_format_request_operation():
+async def test_request_machines_delegates_format_request_response():
     """handle_request_machines must call formatter.format_request_operation."""
+    from orb.application.dto.interface_response import InterfaceResponse
     from orb.interface.request_command_handlers import handle_request_machines
 
     container, formatter = _mock_container_with_formatter()
+    formatter.format_request_operation.return_value = InterfaceResponse(
+        data={"requestId": "req-1", "message": "ok"}, exit_code=0
+    )
+
+    # scheduler.parse_request_data is still needed for input_data path — wire it
+    scheduler = container.get(SchedulerPort)
+    scheduler.parse_request_data.return_value = {
+        "template_id": "t1",
+        "requested_count": 1,
+    }
 
     args = _make_namespace(template_id="t1", machine_count=1, metadata={})
 
@@ -176,11 +189,15 @@ async def test_request_machines_delegates_format_request_operation():
 
 
 @pytest.mark.asyncio
-async def test_cancel_request_delegates_format_request_operation():
+async def test_cancel_request_delegates_format_request_response():
     """handle_cancel_request must call formatter.format_request_operation."""
+    from orb.application.dto.interface_response import InterfaceResponse
     from orb.interface.request_command_handlers import handle_cancel_request
 
     container, formatter = _mock_container_with_formatter()
+    formatter.format_request_operation.return_value = InterfaceResponse(
+        data={"request_id": "req-123", "status": "cancelled"}
+    )
 
     args = _make_namespace(request_id="req-123")
 
@@ -188,16 +205,17 @@ async def test_cancel_request_delegates_format_request_operation():
         result = await handle_cancel_request(args)
 
     formatter.format_request_operation.assert_called_once()
-    assert isinstance(result, InterfaceResponse)
+    from orb.application.dto.interface_response import InterfaceResponse as IR
+    assert isinstance(result, IR)
 
 
 # ---------------------------------------------------------------------------
-# Formatter is actually consulted (not bypassed via container.get fallback)
+# ResponseFormattingService is actually consulted (not bypassed via container.get fallback)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_formatter_retrieved_from_container():
+async def test_scheduler_port_retrieved_from_container():
     """Container must be asked for ResponseFormattingService — not bypassed."""
     from orb.interface.request_command_handlers import handle_get_return_requests
 
@@ -208,6 +226,7 @@ async def test_formatter_retrieved_from_container():
     with patch("orb.interface.request_command_handlers.get_container", return_value=container):
         await handle_get_return_requests(args)
 
+    # Verify ResponseFormattingService was requested from the container
     retrieved_types = [call.args[0] for call in container.get.call_args_list]
     assert ResponseFormattingService in retrieved_types, (
         "handler must retrieve ResponseFormattingService from DI container"

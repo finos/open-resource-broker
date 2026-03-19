@@ -35,4 +35,5 @@ class ListTemplatesOrchestrator(OrchestratorBase[ListTemplatesInput, ListTemplat
             limit=input.limit,
         )
         results = await self._query_bus.execute(query)
-        return ListTemplatesOutput(templates=list(results or []))
+        templates = list(results or [])
+        return ListTemplatesOutput(templates=templates, count=len(templates))

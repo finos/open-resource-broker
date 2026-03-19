@@ -37,12 +37,13 @@ class ListRequestsOrchestrator(OrchestratorBase[ListRequestsInput, ListRequestsO
             query = ListRequestsQuery(status=input.status, limit=input.limit, offset=input.offset)  # type: ignore[assignment]
 
         results = await self._query_bus.execute(query)
-        return ListRequestsOutput(requests=[self._to_dict(r) for r in (results or [])])
+        requests = [self._to_dict(r) for r in (results or [])]
+        return ListRequestsOutput(requests=requests, count=len(requests))
 
     @staticmethod
     def _to_dict(obj: object) -> dict:
-        if hasattr(obj, "model_dump"):
-            return obj.model_dump()  # type: ignore[union-attr]
         if hasattr(obj, "to_dict"):
             return obj.to_dict()  # type: ignore[union-attr]
+        if hasattr(obj, "model_dump"):
+            return obj.model_dump()  # type: ignore[union-attr]
         return dict(obj) if isinstance(obj, dict) else {"data": str(obj)}

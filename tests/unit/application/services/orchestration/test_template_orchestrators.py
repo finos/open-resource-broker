@@ -140,8 +140,9 @@ class TestCreateTemplateOrchestrator:
         result = await create_orch.execute(
             CreateTemplateInput(template_id="t-1", provider_api="EC2Fleet", image_id="ami-abc")
         )
-        assert set(result.raw.keys()) >= {"template_id", "status", "created", "validation_errors"}
-        assert result.raw["status"] == "created"
+        assert result.template_id == "t-1"
+        assert result.created is not None
+        assert isinstance(result.validation_errors, list)
 
 
 # ---------------------------------------------------------------------------
@@ -203,8 +204,9 @@ class TestUpdateTemplateOrchestrator:
 
         mock_command_bus.execute.side_effect = _set
         result = await update_orch.execute(UpdateTemplateInput(template_id="t-2"))
-        assert set(result.raw.keys()) >= {"template_id", "status", "updated", "validation_errors"}
-        assert result.raw["status"] == "updated"
+        assert result.template_id == "t-2"
+        assert result.updated is not None
+        assert isinstance(result.validation_errors, list)
 
 
 # ---------------------------------------------------------------------------
@@ -407,7 +409,7 @@ class TestRefreshTemplatesOrchestrator:
         self, refresh_orch, mock_command_bus
     ):
         async def _set(cmd):
-            cmd.result = {"templates": [{"id": "t-1"}, {"id": "t-2"}]}
+            cmd.result = {"templates": [{"template_id": "t-1"}, {"template_id": "t-2"}]}
 
         mock_command_bus.execute.side_effect = _set
         result = await refresh_orch.execute(RefreshTemplatesInput())

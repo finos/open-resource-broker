@@ -351,7 +351,6 @@ class TestConvenienceMethods:
             return_value=AcquireMachinesOutput(
                 request_id="req-123",
                 status="pending",
-                raw={"request_id": "req-123", "status": "pending"},
             )
         )
         mock_container.get.return_value = mock_orchestrator
@@ -359,7 +358,7 @@ class TestConvenienceMethods:
 
         result = await sdk.request_machines("tmpl-1", 3)
 
-        assert result == {"request_id": "req-123", "status": "pending"}
+        assert result == {"request_id": "req-123", "status": "pending", "machine_ids": []}
 
     @pytest.mark.asyncio
     async def test_show_template_raises_when_not_initialized(self):

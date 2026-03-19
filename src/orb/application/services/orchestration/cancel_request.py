@@ -40,6 +40,5 @@ class CancelRequestOrchestrator(OrchestratorBase[CancelRequestInput, CancelReque
         return CancelRequestOutput(
             request_id=input.request_id,
             status=status,
-            raw=request_dict,
             requests=[request_dict],
         )

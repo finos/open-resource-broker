@@ -468,9 +468,10 @@ class ORBClient:
             )
         )
         scheduler = self._container.get_optional(SchedulerPort)
+        raw = {"request_id": result.request_id, "status": result.status, "machine_ids": result.machine_ids}
         if scheduler is not None:
-            return scheduler.format_request_response(result.raw)
-        return result.raw
+            return scheduler.format_request_response(raw)
+        return raw
 
     async def get_request_status(self, request_ids: list, **kwargs) -> dict:
         """Get status for one or more requests via GetRequestStatusOrchestrator."""
@@ -544,9 +545,10 @@ class ORBClient:
             )
         )
         scheduler = self._container.get_optional(SchedulerPort)
+        raw = {"request_id": result.request_id, "status": result.status, "message": result.message, "skipped_machines": result.skipped_machines}
         if scheduler is not None:
-            return scheduler.format_request_response(result.raw)
-        return result.raw
+            return scheduler.format_request_response(raw)
+        return raw
 
     async def cancel_request(self, request_id: str, **kwargs) -> dict:
         """Cancel a request via CancelRequestOrchestrator."""
@@ -568,9 +570,10 @@ class ORBClient:
             )
         )
         scheduler = self._container.get_optional(SchedulerPort)
+        raw = {"request_id": result.request_id, "status": result.status}
         if scheduler is not None:
-            return scheduler.format_request_response(result.raw)
-        return result.raw
+            return scheduler.format_request_response(raw)
+        return raw
 
     async def list_machines(self, **kwargs) -> dict:
         """List machines via ListMachinesOrchestrator with scheduler formatting."""
@@ -708,9 +711,10 @@ class ORBClient:
             )
         )
         scheduler = self._container.get_optional(SchedulerPort)
+        raw = {"template_id": result.template_id, "status": "created" if result.created else "validation_failed", "created": result.created, "validation_errors": result.validation_errors}
         if scheduler is not None:
-            return scheduler.format_template_mutation_response(result.raw)
-        return result.raw
+            return scheduler.format_template_mutation_response(raw)
+        return raw
 
     async def update_template(self, template_id: str, **kwargs) -> dict:
         """Update a template via UpdateTemplateOrchestrator with scheduler formatting."""
@@ -741,9 +745,10 @@ class ORBClient:
             )
         )
         scheduler = self._container.get_optional(SchedulerPort)
+        raw = {"template_id": result.template_id, "status": "updated" if result.updated else "validation_failed", "updated": result.updated, "validation_errors": result.validation_errors}
         if scheduler is not None:
-            return scheduler.format_template_mutation_response(result.raw)
-        return result.raw
+            return scheduler.format_template_mutation_response(raw)
+        return raw
 
     async def delete_template(self, template_id: str, **kwargs) -> dict:
         """Delete a template via DeleteTemplateOrchestrator with scheduler formatting."""
@@ -764,9 +769,10 @@ class ORBClient:
         except EntityNotFoundError:
             raise NotFoundError("Template", template_id)
         scheduler = self._container.get_optional(SchedulerPort)
+        raw = {"template_id": result.template_id, "status": "deleted" if result.deleted else "not_found", "deleted": result.deleted}
         if scheduler is not None:
-            return scheduler.format_template_mutation_response(result.raw)
-        return result.raw
+            return scheduler.format_template_mutation_response(raw)
+        return raw
 
     async def validate_template(self, **kwargs) -> dict:
         """Validate a template via ValidateTemplateOrchestrator with scheduler formatting."""
@@ -788,9 +794,10 @@ class ORBClient:
             )
         )
         scheduler = self._container.get_optional(SchedulerPort)
+        raw = {"template_id": result.template_id, "status": "validated", "valid": result.valid, "validation_errors": result.errors, "message": result.message}
         if scheduler is not None:
-            return scheduler.format_template_mutation_response(result.raw)
-        return result.raw
+            return scheduler.format_template_mutation_response(raw)
+        return raw
 
     async def refresh_templates(self, **kwargs) -> dict:
         """Refresh templates via RefreshTemplatesOrchestrator with scheduler formatting."""

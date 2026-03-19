@@ -11,6 +11,7 @@ from orb.application.services.orchestration.dtos import (
     RefreshTemplatesOutput,
 )
 from orb.domain.base.ports.logging_port import LoggingPort
+from orb.infrastructure.template.dtos import TemplateDTO
 
 
 class RefreshTemplatesOrchestrator(OrchestratorBase[RefreshTemplatesInput, RefreshTemplatesOutput]):
@@ -33,5 +34,6 @@ class RefreshTemplatesOrchestrator(OrchestratorBase[RefreshTemplatesInput, Refre
         await self._command_bus.execute(command)
 
         result = command.result or {}
-        templates: list[dict] = result.get("templates", [])
+        raw_templates: list[dict] = result.get("templates", [])
+        templates = [TemplateDTO.from_dict(t) for t in raw_templates if isinstance(t, dict)]
         return RefreshTemplatesOutput(templates=templates)

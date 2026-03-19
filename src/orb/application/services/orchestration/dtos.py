@@ -22,7 +22,6 @@ class AcquireMachinesOutput:
     request_id: str
     status: str
     machine_ids: list[str] = dataclasses.field(default_factory=list)
-    raw: dict[str, Any] = dataclasses.field(default_factory=dict)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -54,6 +53,7 @@ class ListRequestsInput:
 @dataclasses.dataclass(frozen=True)
 class ListRequestsOutput:
     requests: list[dict[str, Any]] = dataclasses.field(default_factory=list)
+    count: int = 0
 
 
 @dataclasses.dataclass(frozen=True)
@@ -67,7 +67,8 @@ class ReturnMachinesInput:
 class ReturnMachinesOutput:
     request_id: Optional[str]
     status: str
-    raw: dict[str, Any] = dataclasses.field(default_factory=dict)
+    message: str = ""
+    skipped_machines: list[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -80,7 +81,6 @@ class CancelRequestInput:
 class CancelRequestOutput:
     request_id: str
     status: str
-    raw: dict[str, Any] = dataclasses.field(default_factory=dict)
     requests: list[dict[str, Any]] = dataclasses.field(default_factory=list)
 
 
@@ -96,6 +96,7 @@ class ListMachinesInput:
 @dataclasses.dataclass(frozen=True)
 class ListMachinesOutput:
     machines: list[MachineDTO] = dataclasses.field(default_factory=list)
+    count: int = 0
 
 
 @dataclasses.dataclass(frozen=True)
@@ -120,6 +121,7 @@ class ListTemplatesInput:
 @dataclasses.dataclass(frozen=True)
 class ListTemplatesOutput:
     templates: list[Any] = dataclasses.field(default_factory=list)
+    count: int = 0
 
 
 @dataclasses.dataclass(frozen=True)
@@ -161,7 +163,6 @@ class CreateTemplateOutput:
     template_id: str
     created: bool
     validation_errors: list[str] = dataclasses.field(default_factory=list)
-    raw: dict[str, Any] = dataclasses.field(default_factory=dict)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -179,7 +180,6 @@ class UpdateTemplateOutput:
     template_id: str
     updated: bool
     validation_errors: list[str] = dataclasses.field(default_factory=list)
-    raw: dict[str, Any] = dataclasses.field(default_factory=dict)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -191,7 +191,6 @@ class DeleteTemplateInput:
 class DeleteTemplateOutput:
     template_id: str
     deleted: bool
-    raw: dict[str, Any] = dataclasses.field(default_factory=dict)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -205,7 +204,7 @@ class ValidateTemplateOutput:
     valid: bool
     errors: list[str] = dataclasses.field(default_factory=list)
     message: str = ""
-    raw: dict[str, Any] = dataclasses.field(default_factory=dict)
+    template_id: Optional[str] = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -215,7 +214,7 @@ class RefreshTemplatesInput:
 
 @dataclasses.dataclass(frozen=True)
 class RefreshTemplatesOutput:
-    templates: list[dict[str, Any]] = dataclasses.field(default_factory=list)
+    templates: list[Any] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(frozen=True)

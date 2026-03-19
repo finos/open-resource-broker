@@ -2,7 +2,6 @@
 
 from typing import TYPE_CHECKING, Any, Union
 
-from orb.application.dto.interface_response import InterfaceResponse
 from orb.application.ports.scheduler_port import SchedulerPort
 from orb.application.services.response_formatting_service import ResponseFormattingService
 from orb.infrastructure.di.container import get_container
@@ -11,20 +10,14 @@ from orb.infrastructure.error.decorators import handle_interface_exceptions
 if TYPE_CHECKING:
     import argparse
 
+    from orb.application.dto.interface_response import InterfaceResponse
+
 
 @handle_interface_exceptions(context="get_request_status", interface_type="cli")
 async def handle_get_request_status(
     args: "argparse.Namespace",
-) -> Union[dict[str, Any], tuple[dict[str, Any], int], list[Any], InterfaceResponse]:
-    """
-    Handle get request status operations with --all support.
-
-    Args:
-        args: Argument namespace with resource/action structure
-
-    Returns:
-        Request status information
-    """
+) -> Union[dict[str, Any], "InterfaceResponse"]:
+    """Handle get request status operations with --all support."""
     from orb.application.services.orchestration.dtos import GetRequestStatusInput
     from orb.application.services.orchestration.get_request_status import (
         GetRequestStatusOrchestrator,
@@ -32,7 +25,7 @@ async def handle_get_request_status(
 
     container = get_container()
     orchestrator = container.get(GetRequestStatusOrchestrator)
-    scheduler = container.get(SchedulerPort)
+    formatter = container.get(ResponseFormattingService)
 
     has_all = getattr(args, "all", False)
     has_specific_ids = bool(
@@ -41,11 +34,9 @@ async def handle_get_request_status(
 
     if has_all and has_specific_ids:
         return {
-            "error": True,
-            "message": "Cannot use --all with specific request IDs",
+            "error": "Cannot use --all with specific request IDs",
+            "message": "Use either --all or specific IDs, not both",
         }
-
-    formatter = container.get(ResponseFormattingService)
 
     if has_all:
         result = await orchestrator.execute(
@@ -54,6 +45,7 @@ async def handle_get_request_status(
         return formatter.format_request_status(result.requests)
 
     # Collect request IDs from args or input_data
+    scheduler = container.get(SchedulerPort)
     if hasattr(args, "input_data") and args.input_data:
         raw = args.input_data
         parsed = scheduler.parse_request_data(raw)
@@ -76,7 +68,7 @@ async def handle_get_request_status(
             request_ids.extend(args.flag_request_ids)
 
     if not request_ids:
-        return {"error": True, "message": "No request ID provided"}
+        return {"error": "No request ID provided", "message": "Request ID is required"}
 
     result = await orchestrator.execute(
         GetRequestStatusInput(
@@ -90,16 +82,8 @@ async def handle_get_request_status(
 @handle_interface_exceptions(context="request_machines", interface_type="cli")
 async def handle_request_machines(
     args: "argparse.Namespace",
-) -> Any:
-    """
-    Handle request machines operations.
-
-    Args:
-        args: Argument namespace with resource/action structure
-
-    Returns:
-        Machine request results in HostFactory format
-    """
+) -> Union[dict[str, Any], "InterfaceResponse"]:
+    """Handle request machines operations."""
     from orb.application.services.orchestration.acquire_machines import (
         AcquireMachinesOrchestrator,
     )
@@ -107,9 +91,9 @@ async def handle_request_machines(
 
     container = get_container()
     orchestrator = container.get(AcquireMachinesOrchestrator)
+    formatter = container.get(ResponseFormattingService)
     scheduler = container.get(SchedulerPort)
 
-    # Parse template_id and machine_count from input_data or args
     if hasattr(args, "input_data") and args.input_data:
         parsed_result = scheduler.parse_request_data(args.input_data)
         parsed_data: dict[str, Any] = parsed_result if isinstance(parsed_result, dict) else {}
@@ -127,10 +111,16 @@ async def handle_request_machines(
     machine_count = parsed_data.get("requested_count", 1)
 
     if not template_id:
-        return {"error": True, "message": "Template ID is required"}
+        return {
+            "error": "Template ID is required",
+            "message": "Template ID must be provided",
+        }
 
     if not machine_count:
-        return {"error": True, "message": "Machine count is required"}
+        return {
+            "error": "Machine count is required",
+            "message": "Machine count must be provided",
+        }
 
     wait = getattr(args, "wait", False)
     timeout_seconds = getattr(args, "timeout", 300)
@@ -144,21 +134,15 @@ async def handle_request_machines(
         )
     )
 
-    formatter = container.get(ResponseFormattingService)
-    return formatter.format_request_operation(result.raw, result.status)
+    return formatter.format_request_operation(
+        {"request_id": result.request_id, "status": result.status, "machine_ids": result.machine_ids},
+        result.status,
+    )
 
 
 @handle_interface_exceptions(context="get_return_requests", interface_type="cli")
-async def handle_get_return_requests(args: "argparse.Namespace") -> Union[dict[str, Any], InterfaceResponse]:
-    """
-    Handle get return requests operations.
-
-    Args:
-        args: Argument namespace with resource/action structure
-
-    Returns:
-        Return requests list in scheduler format
-    """
+async def handle_get_return_requests(args: "argparse.Namespace") -> Union[dict[str, Any], "InterfaceResponse"]:
+    """Handle get return requests operations."""
     from orb.application.services.orchestration.dtos import ListReturnRequestsInput
     from orb.application.services.orchestration.list_return_requests import (
         ListReturnRequestsOrchestrator,
@@ -168,28 +152,16 @@ async def handle_get_return_requests(args: "argparse.Namespace") -> Union[dict[s
     orchestrator = container.get(ListReturnRequestsOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
-    status = getattr(args, "status", None)
-    limit = getattr(args, "limit", None)
-    result = await orchestrator.execute(
-        ListReturnRequestsInput(
-            status=status,
-            limit=limit if limit is not None else 50,
-        )
-    )
+    result = await orchestrator.execute(ListReturnRequestsInput(
+        status=getattr(args, "status", None),
+        limit=getattr(args, "limit", 50),
+    ))
     return formatter.format_request_status(result.requests)
 
 
 @handle_interface_exceptions(context="request_return_machines", interface_type="cli")
-async def handle_request_return_machines(args: "argparse.Namespace") -> Union[dict[str, Any], InterfaceResponse]:
-    """
-    Handle request return machines operations.
-
-    Args:
-        args: Argument namespace with resource/action structure
-
-    Returns:
-        Return request results
-    """
+async def handle_request_return_machines(args: "argparse.Namespace") -> Union[dict[str, Any], "InterfaceResponse"]:
+    """Handle request return machines operations."""
     from orb.application.services.orchestration.dtos import ReturnMachinesInput
     from orb.application.services.orchestration.return_machines import (
         ReturnMachinesOrchestrator,
@@ -211,28 +183,28 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> Union[di
                 if machine.get("machineId") or machine.get("machine_id")
             ]
     else:
-        machine_ids = (getattr(args, "machine_ids", []) or []) + (getattr(args, "machine_ids_flag", []) or [])
+        machine_ids = getattr(args, "machine_ids_flag", None) or getattr(args, "machine_ids", [])
 
     has_specific_ids = bool(machine_ids)
 
     if has_all and has_specific_ids:
         return {
-            "error": True,
-            "message": "Cannot use --all with specific machine IDs",
+            "error": "Cannot use --all with specific machine IDs",
+            "message": "Use either --all or specific IDs, not both",
         }
 
     if has_all:
         has_force = getattr(args, "force", False)
         if not has_force:
             return {
-                "error": True,
-                "message": "Destructive operation requires --force flag",
+                "error": "Destructive operation requires --force flag",
+                "message": "Use --force to confirm returning all machines",
             }
 
     if not has_all and not machine_ids:
         return {
-            "error": True,
-            "message": "Machine IDs are required",
+            "error": "Machine IDs are required",
+            "message": "Machine IDs must be provided either as arguments or in JSON file",
         }
 
     result = await orchestrator.execute(
@@ -243,11 +215,14 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> Union[di
         )
     )
 
-    return formatter.format_request_operation(result.raw, result.status)
+    return formatter.format_request_operation(
+        {"request_id": result.request_id, "status": result.status, "message": result.message, "skipped_machines": result.skipped_machines},
+        result.status,
+    )
 
 
 @handle_interface_exceptions(context="list_requests", interface_type="cli")
-async def handle_list_requests(args: "argparse.Namespace") -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_list_requests(args: "argparse.Namespace") -> Union[dict[str, Any], "InterfaceResponse"]:
     """List all active provisioning requests."""
     from orb.application.services.orchestration.dtos import ListRequestsInput
     from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
@@ -256,18 +231,17 @@ async def handle_list_requests(args: "argparse.Namespace") -> Union[dict[str, An
     orchestrator = container.get(ListRequestsOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
-    result = await orchestrator.execute(
-        ListRequestsInput(
-            status=getattr(args, "status", None),
-            limit=args.limit if getattr(args, "limit", None) is not None else 50,
-            offset=getattr(args, "offset", 0) or 0,
-        )
-    )
+    result = await orchestrator.execute(ListRequestsInput(
+        status=getattr(args, "status", None),
+        limit=getattr(args, "limit", 50),
+        sync=getattr(args, "sync", False),
+        offset=getattr(args, "offset", 0),
+    ))
     return formatter.format_request_status(result.requests)
 
 
 @handle_interface_exceptions(context="cancel_request", interface_type="cli")
-async def handle_cancel_request(args: "argparse.Namespace") -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_cancel_request(args: "argparse.Namespace") -> Union[dict[str, Any], "InterfaceResponse"]:
     """Handle cancel request operations."""
     from orb.application.services.orchestration.cancel_request import CancelRequestOrchestrator
     from orb.application.services.orchestration.dtos import CancelRequestInput
@@ -278,9 +252,12 @@ async def handle_cancel_request(args: "argparse.Namespace") -> Union[dict[str, A
 
     request_id = getattr(args, "request_id", None) or getattr(args, "flag_request_id", None)
     if not request_id:
-        return {"error": True, "message": "Request ID is required"}
+        return {"error": "Request ID is required", "message": "Request ID must be provided"}
 
     reason = getattr(args, "reason", None) or "Cancelled via API"
     result = await orchestrator.execute(CancelRequestInput(request_id=request_id, reason=reason))
 
-    return formatter.format_request_operation(result.raw, result.status)
+    return formatter.format_request_operation(
+        {"request_id": result.request_id, "status": result.status},
+        result.status,
+    )

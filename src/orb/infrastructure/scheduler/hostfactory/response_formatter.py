@@ -177,39 +177,35 @@ class HostFactoryResponseFormatter:
         """Format MachineDTOs to HostFactory machine response."""
         return {
             "machines": [
-                {k: v for k, v in {
-                    # IBM HF spec fields
-                    "machineId": str(machine.machine_id),
-                    "name": str(machine.machine_id),
-                    "result": self.map_machine_status_to_result(str(machine.status)),
-                    "status": str(machine.status),
-                    "privateIpAddress": machine.private_ip,
-                    "publicIpAddress": machine.public_ip,
-                    "launchtime": int(machine.launch_time) if machine.launch_time else 0,
-                    "message": machine.status_reason or "",
-                    "cloudHostId": None,
-                    # ORB extended fields
-                    "instanceType": str(machine.instance_type) if machine.instance_type else None,
+                {
+                    "instanceId": str(machine.machine_id),
                     "templateId": str(machine.template_id),
                     "requestId": str(machine.request_id),
-                    "imageId": str(machine.image_id) if machine.image_id else None,
+                    "vmType": str(machine.instance_type),
+                    "imageId": str(machine.image_id),
+                    "privateIp": machine.private_ip,
+                    "publicIp": machine.public_ip,
                     "subnetId": machine.subnet_id,
                     "securityGroupIds": machine.security_group_ids,
+                    "status": str(machine.status),
                     "statusReason": machine.status_reason,
+                    "launchTime": machine.launch_time,
                     "terminationTime": machine.termination_time,
                     "tags": machine.tags,
-                }.items() if v is not None and v != {} and v != []}
+                }
                 for machine in machines
             ]
         }
 
     def format_machine_details_response(self, machine_data: dict) -> dict:
         """Format machine details with HostFactory-specific fields."""
-        raw = {
+        return {
             "id": machine_data.get("id"),
             "name": machine_data.get("name"),
             "status": machine_data.get("status"),
             "provider": "hostfactory",
+            "instance_type": machine_data.get("instance_type"),
+            "region": machine_data.get("region"),
             "instanceId": machine_data.get("id"),
             "vmType": machine_data.get("instance_type"),
             "imageId": machine_data.get("image_id"),
@@ -222,7 +218,14 @@ class HostFactoryResponseFormatter:
             "terminationTime": machine_data.get("termination_time"),
             "tags": machine_data.get("tags"),
         }
-        return {k: v for k, v in raw.items() if v is not None and v != {} and v != []}
+
+    def format_template_mutation_response(self, raw: dict[str, Any]) -> dict[str, Any]:
+        """Format template mutation response using HostFactory camelCase keys."""
+        return {
+            "templateId": raw.get("template_id"),
+            "status": raw.get("status"),
+            "validationErrors": raw.get("validation_errors", []),
+        }
 
     def format_machines_for_hostfactory(
         self, machines: list[dict[str, Any]], request_type: str | None = None

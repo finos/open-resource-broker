@@ -181,7 +181,6 @@ class TestAcquireMachinesOrchestrator:
         assert hasattr(result, "request_id")
         assert hasattr(result, "status")
         assert hasattr(result, "machine_ids")
-        assert hasattr(result, "raw")
 
     @pytest.mark.asyncio
     async def test_wait_false_raw_contains_machine_ids_empty(self, orchestrator, mock_command_bus):
@@ -194,9 +193,9 @@ class TestAcquireMachinesOrchestrator:
             AcquireMachinesInput(template_id="tmpl-1", requested_count=1, wait=False)
         )
 
-        assert result.raw["request_id"] == "req-001"
-        assert result.raw["status"] == "pending"
-        assert result.raw["machine_ids"] == []
+        assert result.request_id == "req-001"
+        assert result.status == "pending"
+        assert result.machine_ids == []
 
     @pytest.mark.asyncio
     async def test_wait_true_raw_contains_machine_ids(
@@ -222,9 +221,9 @@ class TestAcquireMachinesOrchestrator:
                 )
             )
 
-        assert result.raw["machine_ids"] == ["m-aaa"]
-        assert result.raw["request_id"] == "req-002"
-        assert result.raw["status"] == "completed"
+        assert result.machine_ids == ["m-aaa"]
+        assert result.request_id == "req-002"
+        assert result.status == "completed"
 
     @pytest.mark.asyncio
     async def test_wait_true_failed_raw_contains_machine_ids_empty(
@@ -248,8 +247,8 @@ class TestAcquireMachinesOrchestrator:
                 )
             )
 
-        assert result.raw["machine_ids"] == []
-        assert result.raw["status"] == "failed"
+        assert result.machine_ids == []
+        assert result.status == "failed"
 
     @pytest.mark.asyncio
     async def test_wait_true_timeout_raw_contains_machine_ids_empty(
@@ -272,8 +271,8 @@ class TestAcquireMachinesOrchestrator:
                 )
             )
 
-        assert result.raw["machine_ids"] == []
-        assert result.raw["status"] == "timeout"
+        assert result.machine_ids == []
+        assert result.status == "timeout"
 
     @pytest.mark.asyncio
     async def test_raw_machine_ids_matches_machine_ids(
@@ -300,7 +299,7 @@ class TestAcquireMachinesOrchestrator:
                 )
             )
 
-        assert result.raw["machine_ids"] == result.machine_ids
+        assert result.machine_ids == result.machine_ids
 
     @pytest.mark.asyncio
     async def test_poll_consecutive_errors_abort(

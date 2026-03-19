@@ -58,8 +58,8 @@ class ListReturnRequestsOrchestrator(
 
     @staticmethod
     def _to_dict(obj: object) -> dict:
-        if hasattr(obj, "model_dump"):
-            return obj.model_dump()  # type: ignore[union-attr]
         if hasattr(obj, "to_dict"):
             return obj.to_dict()  # type: ignore[union-attr]
+        if hasattr(obj, "model_dump"):
+            return obj.model_dump()  # type: ignore[union-attr]
         return dict(obj) if isinstance(obj, dict) else {"data": str(obj)}

@@ -52,7 +52,6 @@ class AcquireMachinesOrchestrator(OrchestratorBase[AcquireMachinesInput, Acquire
             request_id=request_id,
             status=status,
             machine_ids=machine_ids,
-            raw={"request_id": request_id, "status": status, "machine_ids": machine_ids},
         )
 
     async def _poll_until_terminal(

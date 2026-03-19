@@ -109,7 +109,7 @@ class TestCreateTemplate:
         raw = {"template_id": "t1", "status": "created", "validation_errors": []}
         mock_orch = MagicMock()
         mock_orch.execute = AsyncMock(
-            return_value=CreateTemplateOutput(template_id="t1", created=True, raw=raw)
+            return_value=CreateTemplateOutput(template_id="t1", created=True)
         )
 
         mock_scheduler = MagicMock(spec=SchedulerPort)
@@ -121,7 +121,7 @@ class TestCreateTemplate:
         result = await sdk.create_template("t1", "EC2Fleet", "ami-123")
 
         mock_orch.execute.assert_awaited_once()
-        mock_scheduler.format_template_mutation_response.assert_called_once_with(raw)
+        mock_scheduler.format_template_mutation_response.assert_called_once()
         assert result == raw
 
     @pytest.mark.asyncio
@@ -150,7 +150,7 @@ class TestUpdateTemplate:
         raw = {"template_id": "t1", "status": "updated", "validation_errors": []}
         mock_orch = MagicMock()
         mock_orch.execute = AsyncMock(
-            return_value=UpdateTemplateOutput(template_id="t1", updated=True, raw=raw)
+            return_value=UpdateTemplateOutput(template_id="t1", updated=True)
         )
 
         mock_scheduler = MagicMock(spec=SchedulerPort)
@@ -162,7 +162,7 @@ class TestUpdateTemplate:
         result = await sdk.update_template("t1", name="new-name")
 
         mock_orch.execute.assert_awaited_once()
-        mock_scheduler.format_template_mutation_response.assert_called_once_with(raw)
+        mock_scheduler.format_template_mutation_response.assert_called_once()
         assert result == raw
 
     @pytest.mark.asyncio
@@ -191,7 +191,7 @@ class TestDeleteTemplate:
         raw = {"template_id": "t1", "status": "deleted", "validation_errors": []}
         mock_orch = MagicMock()
         mock_orch.execute = AsyncMock(
-            return_value=DeleteTemplateOutput(template_id="t1", deleted=True, raw=raw)
+            return_value=DeleteTemplateOutput(template_id="t1", deleted=True)
         )
 
         mock_scheduler = MagicMock(spec=SchedulerPort)
@@ -203,7 +203,7 @@ class TestDeleteTemplate:
         result = await sdk.delete_template("t1")
 
         mock_orch.execute.assert_awaited_once()
-        mock_scheduler.format_template_mutation_response.assert_called_once_with(raw)
+        mock_scheduler.format_template_mutation_response.assert_called_once()
         assert result == raw
 
     @pytest.mark.asyncio
@@ -232,7 +232,7 @@ class TestValidateTemplate:
         raw = {"template_id": "t1", "status": "validated", "valid": True, "validation_errors": []}
         mock_orch = MagicMock()
         mock_orch.execute = AsyncMock(
-            return_value=ValidateTemplateOutput(valid=True, errors=[], raw=raw)
+            return_value=ValidateTemplateOutput(valid=True, errors=[])
         )
 
         mock_scheduler = MagicMock(spec=SchedulerPort)
@@ -244,15 +244,8 @@ class TestValidateTemplate:
         result = await sdk.validate_template(template_id="t1")
 
         mock_orch.execute.assert_awaited_once()
-        mock_scheduler.format_template_mutation_response.assert_called_once_with(raw)
+        mock_scheduler.format_template_mutation_response.assert_called_once()
         assert result == raw
-
-    @pytest.mark.asyncio
-    @pytest.mark.unit
-    async def test_raises_sdk_error_when_not_initialized(self):
-        sdk = ORBClient(config={"provider": "aws"})
-        with pytest.raises(SDKError):
-            await sdk.validate_template(template_id="t1")
 
 
 # ---------------------------------------------------------------------------

@@ -82,8 +82,8 @@ class TestDeleteTemplateOrchestrator:
 
         mock_command_bus.execute.side_effect = _set_deleted
         result = await orchestrator.execute(DeleteTemplateInput(template_id="t-3"))
-        assert set(result.raw.keys()) >= {"template_id", "status", "deleted"}
-        assert result.raw["status"] == "deleted"
+        assert result.template_id == "t-3"
+        assert result.deleted is not None
 
     # --- 2017: EntityNotFoundError handling ---
 
@@ -98,8 +98,7 @@ class TestDeleteTemplateOrchestrator:
     async def test_entity_not_found_returns_not_found_status(self, orchestrator, mock_command_bus):
         mock_command_bus.execute.side_effect = EntityNotFoundError("Template", "tmpl-1")
         result = await orchestrator.execute(DeleteTemplateInput(template_id="tmpl-1"))
-        assert result.raw["status"] == "not_found"
-        assert result.raw["deleted"] is False
+        assert result.deleted is False
 
     @pytest.mark.asyncio
     async def test_entity_not_found_does_not_propagate(self, orchestrator, mock_command_bus):

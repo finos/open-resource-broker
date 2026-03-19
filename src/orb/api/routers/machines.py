@@ -87,7 +87,7 @@ async def request_machines(
         )
     )
     return JSONResponse(
-        content=scheduler.format_request_response(result.raw),
+        content=scheduler.format_request_response({"request_id": result.request_id, "status": result.status, "machine_ids": result.machine_ids}),
         status_code=202,
     )
 
@@ -111,25 +111,22 @@ async def return_machines(
             force=request_data.force,
         )
     )
-    return JSONResponse(content=scheduler.format_request_response(result.raw))
-
-
-PROVIDER_NAME_QUERY = Query(None, description="Filter by provider name")
+    return JSONResponse(content=scheduler.format_request_response({"request_id": result.request_id, "status": result.status, "message": result.message, "skipped_machines": result.skipped_machines}))
 
 
 @router.get("/", summary="List Machines", description="List machines with optional filtering")
 @handle_rest_exceptions(endpoint="/api/v1/machines", method="GET")
 async def list_machines(
     status: Optional[str] = STATUS_QUERY,
+    provider_name: Optional[str] = Query(None),
     request_id: Optional[str] = REQUEST_ID_QUERY,
-    provider_name: Optional[str] = PROVIDER_NAME_QUERY,
     limit: int = Query(50),
     offset: int = OFFSET_QUERY,
     orchestrator=LIST_ORCHESTRATOR,
     scheduler=SCHEDULER_STRATEGY,
 ) -> JSONResponse:
     result = await orchestrator.execute(
-        ListMachinesInput(status=status, request_id=request_id, provider_name=provider_name, limit=limit, offset=offset)
+        ListMachinesInput(status=status, provider_name=provider_name, request_id=request_id, limit=limit, offset=offset)
     )
     return JSONResponse(content=scheduler.format_machine_status_response(result.machines))
 

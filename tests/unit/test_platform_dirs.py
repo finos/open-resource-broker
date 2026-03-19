@@ -281,9 +281,10 @@ class TestGetConfigLocation:
         monkeypatch.delenv("ORB_ROOT_DIR", raising=False)
         with patch.object(
             sys, "executable", "/home/user/.local/share/mise/installs/python/3.12.0/bin/python"
-        ):
-            with patch("pathlib.Path.home", return_value=Path("/home/user")):
-                result = get_config_location()
+        ), patch.object(sys, "prefix", "/home/user/.local/share/mise/installs/python/3.12.0"), \
+           patch.object(sys, "base_prefix", "/usr"), \
+           patch("pathlib.Path.home", return_value=Path("/home/user")):
+            result = get_config_location()
         assert result == Path("/home/user/.orb/config")
 
     def test_uv_tool_install(self):

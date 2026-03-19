@@ -95,13 +95,13 @@ class TestReturnMachinesOrchestrator:
         result = await orchestrator.execute(input)
         assert result.status == "no_op"
         assert result.request_id is None
-        assert result.raw["skipped_machines"] == ["m-001"]
+        assert result.skipped_machines == ["m-001"]
 
     @pytest.mark.asyncio
     async def test_execute_raw_contains_status(self, orchestrator):
         input = ReturnMachinesInput(machine_ids=["m-001"])
         result = await orchestrator.execute(input)
-        assert result.raw["status"] == "pending"
+        assert result.status == "pending"
 
     @pytest.mark.asyncio
     async def test_execute_does_not_call_query_bus(self, orchestrator, mock_query_bus):

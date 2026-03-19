@@ -31,19 +31,9 @@ class DeleteTemplateOrchestrator(OrchestratorBase[DeleteTemplateInput, DeleteTem
             return DeleteTemplateOutput(
                 template_id=input.template_id,
                 deleted=False,
-                raw={
-                    "template_id": input.template_id,
-                    "status": "not_found",
-                    "deleted": False,
-                },
             )
 
         return DeleteTemplateOutput(
             template_id=input.template_id,
             deleted=command.deleted,
-            raw={
-                "template_id": input.template_id,
-                "status": "deleted",
-                "deleted": command.deleted,
-            },
         )

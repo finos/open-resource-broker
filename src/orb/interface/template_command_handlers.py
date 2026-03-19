@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, Union
 
-from orb.application.dto.interface_response import InterfaceResponse
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.application.services.response_formatting_service import ResponseFormattingService
 from orb.domain.base.exceptions import DuplicateError, EntityNotFoundError
 from orb.infrastructure.di.container import get_container
@@ -18,9 +18,11 @@ from orb.infrastructure.error.decorators import handle_interface_exceptions
 if TYPE_CHECKING:
     import argparse
 
+    from orb.application.dto.interface_response import InterfaceResponse
+
 
 @handle_interface_exceptions(context="list_templates", interface_type="cli")
-async def handle_list_templates(args: argparse.Namespace) -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_list_templates(args: "argparse.Namespace") -> "Union[dict[str, Any], InterfaceResponse]":
     """Handle list templates operations using the ListTemplatesOrchestrator."""
     from orb.application.services.orchestration.dtos import ListTemplatesInput
     from orb.application.services.orchestration.list_templates import ListTemplatesOrchestrator
@@ -30,26 +32,27 @@ async def handle_list_templates(args: argparse.Namespace) -> Union[dict[str, Any
     orchestrator = container.get(ListTemplatesOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
-    # Extract parameters from args or input_data (HostFactory compatibility)
     if hasattr(args, "input_data") and args.input_data:
         input_data = args.input_data
         provider_name = input_data.get("provider_api") or input_data.get("provider_name")
+        provider_api = input_data.get("provider_api")
         active_only = input_data.get("active_only", True)
+        limit = input_data.get("limit", 50)
+        offset = input_data.get("offset", 0)
     else:
-        provider_name = getattr(args, "provider_api", None) or getattr(args, "provider_name", None)
+        provider_name = getattr(args, "provider_name", None)
+        provider_api = getattr(args, "provider_api", None)
         active_only = getattr(args, "active_only", True)
-
-    limit = getattr(args, "limit", None)
-    offset = getattr(args, "offset", None)
-    provider_api = getattr(args, "provider_api", None) if not (hasattr(args, "input_data") and args.input_data) else None
+        limit = getattr(args, "limit", 50)
+        offset = getattr(args, "offset", 0)
 
     result = await orchestrator.execute(
         ListTemplatesInput(
             active_only=active_only,
             provider_name=provider_name,
             provider_api=provider_api,
-            limit=limit if limit is not None else 50,
-            offset=offset if offset is not None else 0,
+            limit=limit,
+            offset=offset,
         )
     )
 
@@ -66,21 +69,23 @@ async def handle_list_templates(args: argparse.Namespace) -> Union[dict[str, Any
 
 
 @handle_interface_exceptions(context="get_template", interface_type="cli")
-async def handle_get_template(args: argparse.Namespace) -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_get_template(args: "argparse.Namespace") -> "Union[dict[str, Any], InterfaceResponse]":
     """Handle get template operations using the GetTemplateOrchestrator."""
     from orb.application.services.orchestration.dtos import GetTemplateInput
     from orb.application.services.orchestration.get_template import GetTemplateOrchestrator
 
     template_id = getattr(args, "template_id", None) or getattr(args, "flag_template_id", None)
     if not template_id:
-        return {"error": True, "message": "Template ID is required"}
+        return {"success": False, "error": "Template ID is required", "template": None}
 
     container = get_container()
     orchestrator = container.get(GetTemplateOrchestrator)
-    formatter = container.get(ResponseFormattingService)
+    scheduler = container.get(SchedulerPort)
 
     provider_name = getattr(args, "provider_name", None)
-    result = await orchestrator.execute(GetTemplateInput(template_id=template_id, provider_name=provider_name))
+    result = await orchestrator.execute(
+        GetTemplateInput(template_id=template_id, provider_name=provider_name)
+    )
 
     if not result.template:
         return {
@@ -89,11 +94,11 @@ async def handle_get_template(args: argparse.Namespace) -> Union[dict[str, Any],
             "template": None,
         }
 
-    return formatter.format_template_mutation(result.template if isinstance(result.template, dict) else result.template.model_dump())
+    return scheduler.format_template_for_display(result.template)
 
 
 @handle_interface_exceptions(context="create_template", interface_type="cli")
-async def handle_create_template(args: argparse.Namespace) -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_create_template(args: "argparse.Namespace") -> "Union[dict[str, Any], InterfaceResponse]":
     """Handle create template operations using the CreateTemplateOrchestrator."""
     from orb.application.services.orchestration.create_template import CreateTemplateOrchestrator
     from orb.application.services.orchestration.dtos import CreateTemplateInput
@@ -108,27 +113,27 @@ async def handle_create_template(args: argparse.Namespace) -> Union[dict[str, An
         }
 
     if not hasattr(args, "file") or not args.file:
-        return {"error": True, "message": "Template file is required"}
+        return {"success": False, "error": "Template file is required"}
 
     try:
         with open(args.file) as f:
             template_config = json.load(f)
     except FileNotFoundError:
-        return {"error": True, "message": f"Template file not found: {args.file}"}
+        return {"success": False, "error": f"Template file not found: {args.file}"}
     except json.JSONDecodeError as e:
-        return {"error": True, "message": f"Invalid JSON in template file: {e}"}
+        return {"success": False, "error": f"Invalid JSON in template file: {e}"}
 
     template_id = template_config.get("template_id") or template_config.get("templateId")
     if not template_id:
-        return {"error": True, "message": "template_id is required in template file"}
+        return {"success": False, "error": "template_id is required in template file"}
 
     provider_api = template_config.get("provider_api") or template_config.get("providerApi")
     if not provider_api:
-        return {"error": True, "message": "provider_api is required in template file"}
+        return {"success": False, "error": "provider_api is required in template file"}
 
     image_id = template_config.get("image_id") or template_config.get("imageId")
     if not image_id:
-        return {"error": True, "message": "image_id is required in template file"}
+        return {"success": False, "error": "image_id is required in template file"}
 
     if getattr(args, "validate_only", False):
         return {
@@ -158,21 +163,28 @@ async def handle_create_template(args: argparse.Namespace) -> Union[dict[str, An
         )
     except DuplicateError:
         return {
-            "error": True,
-            "message": f"Template '{template_id}' already exists",
+            "success": False,
+            "error": f"Template '{template_id}' already exists",
+            "template_id": template_id,
         }
 
     if result.validation_errors:
         return {
-            "error": True,
-            "message": f"Template validation failed: {', '.join(result.validation_errors)}",
+            "success": False,
+            "error": f"Template validation failed: {', '.join(result.validation_errors)}",
+            "template_id": template_id,
         }
 
-    return formatter.format_template_mutation(result.raw)
+    return formatter.format_template_mutation({
+        "template_id": result.template_id,
+        "status": "created" if result.created else "validation_failed",
+        "created": result.created,
+        "validation_errors": result.validation_errors,
+    })
 
 
 @handle_interface_exceptions(context="update_template", interface_type="cli")
-async def handle_update_template(args: argparse.Namespace) -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_update_template(args: "argparse.Namespace") -> dict[str, Any]:
     """Handle update template operations using the UpdateTemplateOrchestrator."""
     from orb.application.services.orchestration.dtos import UpdateTemplateInput
     from orb.application.services.orchestration.update_template import UpdateTemplateOrchestrator
@@ -190,27 +202,27 @@ async def handle_update_template(args: argparse.Namespace) -> Union[dict[str, An
 
     file_path = getattr(args, "file", None)
     if not file_path:
-        return {"error": True, "message": "Template file is required"}
+        return {"success": False, "error": "Template file is required"}
 
     try:
         with open(file_path) as f:
             template_config = json.load(f)
     except FileNotFoundError:
-        return {"error": True, "message": f"Template file not found: {file_path}"}
+        return {"success": False, "error": f"Template file not found: {file_path}"}
     except json.JSONDecodeError as e:
-        return {"error": True, "message": f"Invalid JSON in template file: {e}"}
+        return {"success": False, "error": f"Invalid JSON in template file: {e}"}
 
     if not isinstance(template_config, dict):
-        return {"error": True, "message": "Template file must contain a JSON object"}
+        return {"success": False, "error": "Template file must contain a JSON object"}
 
     file_template_id = template_config.get("template_id") or template_config.get("templateId")
     resolved_template_id = template_id or file_template_id
     if not resolved_template_id:
-        return {"error": True, "message": "Template ID is required (via arg or file)"}
+        return {"success": False, "error": "Template ID is required (via arg or file)"}
 
     container = get_container()
     orchestrator = container.get(UpdateTemplateOrchestrator)
-    formatter = container.get(ResponseFormattingService)
+    scheduler = container.get(SchedulerPort)
 
     try:
         result = await orchestrator.execute(
@@ -225,21 +237,28 @@ async def handle_update_template(args: argparse.Namespace) -> Union[dict[str, An
         )
     except EntityNotFoundError:
         return {
-            "error": True,
-            "message": f"Template '{resolved_template_id}' not found",
+            "success": False,
+            "error": f"Template '{resolved_template_id}' not found",
+            "template_id": resolved_template_id,
         }
 
     if result.validation_errors:
         return {
-            "error": True,
-            "message": f"Template validation failed: {', '.join(result.validation_errors)}",
+            "success": False,
+            "error": f"Template validation failed: {', '.join(result.validation_errors)}",
+            "template_id": resolved_template_id,
         }
 
-    return formatter.format_template_mutation(result.raw)
+    return scheduler.format_template_mutation_response({
+        "template_id": result.template_id,
+        "status": "updated" if result.updated else "validation_failed",
+        "updated": result.updated,
+        "validation_errors": result.validation_errors,
+    })
 
 
 @handle_interface_exceptions(context="delete_template", interface_type="cli")
-async def handle_delete_template(args: argparse.Namespace) -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_delete_template(args: "argparse.Namespace") -> dict[str, Any]:
     """Handle delete template operations using the DeleteTemplateOrchestrator."""
     from orb.application.services.orchestration.delete_template import DeleteTemplateOrchestrator
     from orb.application.services.orchestration.dtos import DeleteTemplateInput
@@ -247,7 +266,7 @@ async def handle_delete_template(args: argparse.Namespace) -> Union[dict[str, An
 
     template_id = getattr(args, "template_id", None) or getattr(args, "flag_template_id", None)
     if not template_id:
-        return {"error": True, "message": "Template ID is required"}
+        return {"success": False, "error": "Template ID is required"}
 
     if is_dry_run_active():
         return {
@@ -259,27 +278,33 @@ async def handle_delete_template(args: argparse.Namespace) -> Union[dict[str, An
 
     container = get_container()
     orchestrator = container.get(DeleteTemplateOrchestrator)
-    formatter = container.get(ResponseFormattingService)
+    scheduler = container.get(SchedulerPort)
 
     try:
         result = await orchestrator.execute(DeleteTemplateInput(template_id=template_id))
     except EntityNotFoundError:
         return {
-            "error": True,
-            "message": f"Template '{template_id}' not found",
+            "success": False,
+            "error": f"Template '{template_id}' not found",
+            "template_id": template_id,
         }
 
     if not result.deleted:
         return {
-            "error": True,
-            "message": f"Template '{template_id}' could not be deleted",
+            "success": False,
+            "error": f"Template '{template_id}' could not be deleted",
+            "template_id": template_id,
         }
 
-    return formatter.format_template_mutation(result.raw)
+    return scheduler.format_template_mutation_response({
+        "template_id": result.template_id,
+        "status": "deleted" if result.deleted else "not_found",
+        "deleted": result.deleted,
+    })
 
 
 @handle_interface_exceptions(context="validate_template", interface_type="cli")
-async def handle_validate_template(args: argparse.Namespace) -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_validate_template(args: "argparse.Namespace") -> dict[str, Any]:
     """Handle validate template operations using the ValidateTemplateOrchestrator."""
     from orb.application.services.orchestration.dtos import ValidateTemplateInput
     from orb.application.services.orchestration.validate_template import (
@@ -288,9 +313,8 @@ async def handle_validate_template(args: argparse.Namespace) -> Union[dict[str, 
 
     container = get_container()
     orchestrator = container.get(ValidateTemplateOrchestrator)
-    formatter = container.get(ResponseFormattingService)
+    scheduler = container.get(SchedulerPort)
 
-    # --all: validate every loaded template
     if hasattr(args, "all") and args.all:
         from orb.application.services.orchestration.dtos import ListTemplatesInput
         from orb.application.services.orchestration.list_templates import ListTemplatesOrchestrator
@@ -312,7 +336,6 @@ async def handle_validate_template(args: argparse.Namespace) -> Union[dict[str, 
             "results": results,
         }
 
-    # --file: validate from file
     if hasattr(args, "file") and args.file:
         from pathlib import Path
 
@@ -321,8 +344,9 @@ async def handle_validate_template(args: argparse.Namespace) -> Union[dict[str, 
         template_file = Path(args.file)
         if not template_file.exists():
             return {
-                "error": True,
-                "message": f"Template file not found: {template_file}",
+                "success": False,
+                "error": f"Template file not found: {template_file}",
+                "valid": False,
             }
 
         try:
@@ -333,30 +357,43 @@ async def handle_validate_template(args: argparse.Namespace) -> Union[dict[str, 
                     template_config = json.load(f)
         except Exception as e:
             return {
-                "error": True,
-                "message": f"Failed to parse template file: {e!s}",
+                "success": False,
+                "error": f"Failed to parse template file: {e!s}",
+                "valid": False,
             }
 
         template_id = template_config.get("template_id", "file-template")
         result = await orchestrator.execute(
             ValidateTemplateInput(template_id=template_id, config=template_config)
         )
-        return formatter.format_template_mutation(result.raw)
+        return scheduler.format_template_mutation_response({
+            "template_id": result.template_id,
+            "status": "validated",
+            "valid": result.valid,
+            "validation_errors": result.errors,
+            "message": result.message,
+        })
 
-    # template_id: validate a loaded template by ID
     if hasattr(args, "template_id") and args.template_id:
         template_id = args.template_id
         result = await orchestrator.execute(ValidateTemplateInput(template_id=template_id))
-        return formatter.format_template_mutation(result.raw)
+        return scheduler.format_template_mutation_response({
+            "template_id": result.template_id,
+            "status": "validated",
+            "valid": result.valid,
+            "validation_errors": result.errors,
+            "message": result.message,
+        })
 
     return {
-        "error": True,
-        "message": "Must provide either template_id, --file, or --all",
+        "success": False,
+        "error": "Must provide either template_id, --file, or --all",
+        "valid": False,
     }
 
 
 @handle_interface_exceptions(context="refresh_templates", interface_type="cli")
-async def handle_refresh_templates(args: argparse.Namespace) -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_refresh_templates(args: "argparse.Namespace") -> "Union[dict[str, Any], InterfaceResponse]":
     """Handle refresh templates operations using the RefreshTemplatesOrchestrator."""
     from orb.application.services.orchestration.dtos import RefreshTemplatesInput
     from orb.application.services.orchestration.refresh_templates import (

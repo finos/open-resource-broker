@@ -105,7 +105,7 @@ class TestMachinesRouter:
 
     def test_request_machines_happy_path(self, machines_app):
         output = AcquireMachinesOutput(
-            request_id="req-abc", status="pending", raw={"request_id": "req-abc", "message": "ok"}
+            request_id="req-abc", status="pending"
         )
         orch = self._override_acquire(machines_app, output)
         scheduler = self._set_scheduler(machines_app)
@@ -118,10 +118,12 @@ class TestMachinesRouter:
         inp: AcquireMachinesInput = orch.execute.call_args.args[0]
         assert inp.template_id == "t1"
         assert inp.requested_count == 3
-        scheduler.format_request_response.assert_called_once_with(output.raw)
+        scheduler.format_request_response.assert_called_once_with(
+            {"request_id": "req-abc", "status": "pending", "machine_ids": []}
+        )
 
     def test_request_machines_camel_case_body(self, machines_app):
-        output = AcquireMachinesOutput(request_id="req-camel", status="pending", raw={})
+        output = AcquireMachinesOutput(request_id="req-camel", status="pending")
         orch = self._override_acquire(machines_app, output)
         self._set_scheduler(machines_app)
         client = TestClient(machines_app, raise_server_exceptions=False)
@@ -134,7 +136,7 @@ class TestMachinesRouter:
         assert inp.requested_count == 3
 
     def test_request_machines_snake_case_count_alias(self, machines_app):
-        output = AcquireMachinesOutput(request_id="req-snake", status="pending", raw={})
+        output = AcquireMachinesOutput(request_id="req-snake", status="pending")
         orch = self._override_acquire(machines_app, output)
         self._set_scheduler(machines_app)
         client = TestClient(machines_app, raise_server_exceptions=False)
@@ -163,7 +165,7 @@ class TestMachinesRouter:
 
     def test_return_machines_happy_path(self, machines_app):
         output = ReturnMachinesOutput(
-            request_id="ret-1", status="pending", raw={"returned": ["i-123"]}
+            request_id="ret-1", status="pending"
         )
         orch = self._override_return(machines_app, output)
         self._set_scheduler(machines_app)
@@ -177,7 +179,7 @@ class TestMachinesRouter:
         assert inp.machine_ids == ["i-123"]
 
     def test_return_machines_empty_ids(self, machines_app):
-        output = ReturnMachinesOutput(request_id=None, status="pending", raw={})
+        output = ReturnMachinesOutput(request_id=None, status="pending")
         orch = self._override_return(machines_app, output)
         self._set_scheduler(machines_app)
         client = TestClient(machines_app, raise_server_exceptions=False)
@@ -188,7 +190,7 @@ class TestMachinesRouter:
         orch.execute.assert_awaited_once()
 
     def test_return_machines_camel_case_body(self, machines_app):
-        output = ReturnMachinesOutput(request_id=None, status="pending", raw={})
+        output = ReturnMachinesOutput(request_id=None, status="pending")
         orch = self._override_return(machines_app, output)
         self._set_scheduler(machines_app)
         client = TestClient(machines_app, raise_server_exceptions=False)
@@ -435,7 +437,6 @@ class TestRequestsRouter:
         output = CancelRequestOutput(
             request_id="req-789",
             status="cancelled",
-            raw={"request_id": "req-789", "status": "cancelled"},
         )
         orch = self._override_cancel(requests_app, output)
         self._set_scheduler(requests_app)
@@ -450,7 +451,7 @@ class TestRequestsRouter:
         assert inp.reason == "Cancelled via REST API"
 
     def test_cancel_request_with_reason(self, requests_app):
-        output = CancelRequestOutput(request_id="req-789", status="cancelled", raw={})
+        output = CancelRequestOutput(request_id="req-789", status="cancelled")
         orch = self._override_cancel(requests_app, output)
         self._set_scheduler(requests_app)
         client = TestClient(requests_app, raise_server_exceptions=False)
@@ -462,7 +463,7 @@ class TestRequestsRouter:
         assert inp.reason == "no longer needed"
 
     def test_cancel_request_default_reason(self, requests_app):
-        output = CancelRequestOutput(request_id="req-999", status="cancelled", raw={})
+        output = CancelRequestOutput(request_id="req-999", status="cancelled")
         orch = self._override_cancel(requests_app, output)
         self._set_scheduler(requests_app)
         client = TestClient(requests_app, raise_server_exceptions=False)

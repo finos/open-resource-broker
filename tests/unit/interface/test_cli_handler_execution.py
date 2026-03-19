@@ -68,19 +68,25 @@ class TestCLIHandlerExecution:
     @patch("orb.interface.scheduler_command_handlers.get_container")
     async def test_handle_list_scheduler_strategies(self, mock_get_container):
         """Test that handle_list_scheduler_strategies executes correctly."""
-        container = MagicMock(spec=DIContainer)
-        query_bus = AsyncMock(spec=QueryBus)
-        scheduler_strategy = MagicMock(spec=SchedulerPort)
+        from orb.application.dto.interface_response import InterfaceResponse
+        from orb.application.services.orchestration.dtos import ListSchedulerStrategiesOutput
+        from orb.application.services.orchestration.list_scheduler_strategies import (
+            ListSchedulerStrategiesOrchestrator,
+        )
 
-        strategies = [
-            {"id": "strategy1", "name": "Strategy 1"},
-            {"id": "strategy2", "name": "Strategy 2"},
-        ]
-        query_bus.execute.return_value = strategies
+        container = MagicMock(spec=DIContainer)
+        mock_orch = AsyncMock(spec=ListSchedulerStrategiesOrchestrator)
+        mock_orch.execute.return_value = ListSchedulerStrategiesOutput(
+            strategies=[{"id": "s1"}, {"id": "s2"}], current_strategy="s1", count=2
+        )
+        mock_formatter = MagicMock(spec=ResponseFormattingService)
+        mock_formatter.format_scheduler_strategy_list.return_value = InterfaceResponse(
+            data={"strategies": [{"id": "s1"}, {"id": "s2"}], "current_strategy": "s1", "count": 2}
+        )
 
         container.get.side_effect = lambda x: {
-            QueryBus: query_bus,
-            SchedulerPort: scheduler_strategy,
+            ListSchedulerStrategiesOrchestrator: mock_orch,
+            ResponseFormattingService: mock_formatter,
         }.get(x)
 
         mock_get_container.return_value = container
@@ -89,30 +95,33 @@ class TestCLIHandlerExecution:
 
         result = await handle_list_scheduler_strategies(args)
 
-        assert result["strategies"] == strategies
-        assert result["count"] == len(strategies)
-        assert "message" in result
-
-        query_bus.execute.assert_called_once()
+        assert isinstance(result, InterfaceResponse)
+        assert "strategies" in result.data
+        mock_orch.execute.assert_called_once()
 
     @pytest.mark.asyncio
     @patch("orb.interface.storage_command_handlers.get_container")
     async def test_handle_list_storage_strategies(self, mock_get_container):
         """Test that handle_list_storage_strategies executes correctly."""
-        container = MagicMock(spec=DIContainer)
-        query_bus = AsyncMock(spec=QueryBus)
-        scheduler_strategy = MagicMock(spec=SchedulerPort)
+        from orb.application.dto.interface_response import InterfaceResponse
+        from orb.application.services.orchestration.dtos import ListStorageStrategiesOutput
+        from orb.application.services.orchestration.list_storage_strategies import (
+            ListStorageStrategiesOrchestrator,
+        )
 
-        # handle_list_storage_strategies accesses .strategies, .total_count, .current_strategy
-        mock_result = MagicMock()
-        mock_result.strategies = ["json", "sqlite"]
-        mock_result.total_count = 2
-        mock_result.current_strategy = "json"
-        query_bus.execute.return_value = mock_result
+        container = MagicMock(spec=DIContainer)
+        mock_orch = AsyncMock(spec=ListStorageStrategiesOrchestrator)
+        mock_orch.execute.return_value = ListStorageStrategiesOutput(
+            strategies=["json", "sqlite"], current_strategy="json", count=2
+        )
+        mock_formatter = MagicMock(spec=ResponseFormattingService)
+        mock_formatter.format_storage_strategy_list.return_value = InterfaceResponse(
+            data={"strategies": ["json", "sqlite"], "current_strategy": "json", "count": 2}
+        )
 
         container.get.side_effect = lambda x: {
-            QueryBus: query_bus,
-            SchedulerPort: scheduler_strategy,
+            ListStorageStrategiesOrchestrator: mock_orch,
+            ResponseFormattingService: mock_formatter,
         }.get(x)
 
         mock_get_container.return_value = container
@@ -121,11 +130,9 @@ class TestCLIHandlerExecution:
 
         result = await handle_list_storage_strategies(args)
 
-        assert "strategies" in result
-        assert "count" in result
-        assert "message" in result
-
-        query_bus.execute.assert_called_once()
+        assert isinstance(result, InterfaceResponse)
+        assert "strategies" in result.data
+        mock_orch.execute.assert_called_once()
 
     @pytest.mark.asyncio
     @patch("orb.interface.request_command_handlers.get_container")
@@ -161,7 +168,7 @@ class TestCLIHandlerExecution:
             SchedulerPort: scheduler_strategy,
             GetRequestStatusOrchestrator: orchestrator,
             ResponseFormattingService: formatter,
-        }.get(x)
+        }.get(x, MagicMock())
 
         mock_get_container.return_value = container
 

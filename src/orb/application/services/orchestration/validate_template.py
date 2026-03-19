@@ -43,11 +43,5 @@ class ValidateTemplateOrchestrator(OrchestratorBase[ValidateTemplateInput, Valid
             valid=valid,
             errors=errors,
             message=message,
-            raw={
-                "template_id": input.template_id,
-                "status": "validated",
-                "valid": valid,
-                "validation_errors": errors,
-                "message": message,
-            },
+            template_id=input.template_id,
         )

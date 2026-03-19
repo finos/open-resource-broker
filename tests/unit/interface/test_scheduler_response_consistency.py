@@ -2,6 +2,7 @@
 
 Verifies that CLI handlers delegate to ResponseFormattingService for formatting, and that
 the same scheduler produces identical output regardless of which interface calls it.
+These tests document the expected post-fix behaviour for REST/MCP (ticket 1910).
 """
 
 import argparse
@@ -38,8 +39,8 @@ def _make_request_dto(status: str = "complete") -> RequestDTO:
     )
 
 
-def _mock_container(formatter_return: dict, status_orch_requests: list | None = None):
-    """Build a mock DI container with orchestrators and a typed formatter mock."""
+def _mock_container(formatter_status_return: dict, status_orch_requests: list | None = None):
+    """Build a mock DI container with orchestrators, scheduler, and formatter."""
     from orb.application.services.orchestration.cancel_request import CancelRequestOrchestrator
     from orb.application.services.orchestration.dtos import (
         CancelRequestOutput,
@@ -56,8 +57,12 @@ def _mock_container(formatter_return: dict, status_orch_requests: list | None = 
     scheduler.parse_request_data.return_value = [{"request_id": "req-abc"}]
 
     formatter = MagicMock(spec=ResponseFormattingService)
-    formatter.format_request_status.return_value = InterfaceResponse(data=formatter_return)
-    formatter.format_request_operation.return_value = InterfaceResponse(data=formatter_return)
+    formatter.format_request_status.return_value = InterfaceResponse(
+        data=formatter_status_return
+    )
+    formatter.format_request_operation.return_value = InterfaceResponse(
+        data={"requestId": "req-1", "message": "ok"}, exit_code=0
+    )
 
     status_orch = AsyncMock(spec=GetRequestStatusOrchestrator)
     status_orch.execute.return_value = GetRequestStatusOutput(
@@ -74,7 +79,7 @@ def _mock_container(formatter_return: dict, status_orch_requests: list | None = 
 
     cancel_orch = AsyncMock(spec=CancelRequestOrchestrator)
     cancel_orch.execute.return_value = CancelRequestOutput(
-        request_id="req-abc", status="cancelled", raw={}
+        request_id="req-abc", status="cancelled"
     )
 
     acquire_orch = AsyncMock(spec=AcquireMachinesOrchestrator)
@@ -99,10 +104,10 @@ def _mock_container(formatter_return: dict, status_orch_requests: list | None = 
 
 
 @pytest.mark.asyncio
-async def test_cli_calls_format_request_status():
+async def test_cli_calls_format_request_status_response():
     """CLI handle_get_request_status must delegate to formatter.format_request_status."""
-    expected = {"requests": [{"requestId": "req-abc", "status": "complete"}]}
-    container, formatter, *_ = _mock_container(expected)
+    expected_data = {"requests": [{"requestId": "req-abc", "status": "complete"}]}
+    container, formatter, *_ = _mock_container(expected_data)
 
     args = _make_namespace(request_id="req-abc", all=False)
 
@@ -113,12 +118,12 @@ async def test_cli_calls_format_request_status():
 
     formatter.format_request_status.assert_called_once()
     assert isinstance(result, InterfaceResponse)
-    assert result.data == expected
+    assert result.data == expected_data
 
 
 @pytest.mark.asyncio
 async def test_cli_format_receives_list():
-    """format_request_status must be called with a list."""
+    """formatter.format_request_status must be called with a list."""
     container, formatter, *_ = _mock_container({"requests": []})
 
     args = _make_namespace(request_id="req-abc", all=False)
@@ -133,10 +138,10 @@ async def test_cli_format_receives_list():
 
 
 @pytest.mark.asyncio
-async def test_cli_all_flag_delegates_to_formatter():
+async def test_cli_all_flag_delegates_to_scheduler():
     """CLI handle_get_request_status with all=True must still delegate to formatter."""
-    expected = {"requests": []}
-    container, formatter, _, _ = _mock_container(expected, status_orch_requests=[])
+    expected_data = {"requests": []}
+    container, formatter, _, _ = _mock_container(expected_data, status_orch_requests=[])
 
     args = _make_namespace(all=True)
 
@@ -147,7 +152,7 @@ async def test_cli_all_flag_delegates_to_formatter():
 
     formatter.format_request_status.assert_called_once()
     assert isinstance(result, InterfaceResponse)
-    assert result.data == expected
+    assert result.data == expected_data
 
 
 # ---------------------------------------------------------------------------
@@ -225,8 +230,8 @@ def test_hf_and_default_produce_different_id_field_names():
 
 
 @pytest.mark.asyncio
-async def test_cli_request_machines_delegates_format_request_operation():
-    """handle_request_machines must call formatter.format_request_operation."""
+async def test_cli_request_machines_delegates_format_request_response():
+    """handle_request_machines must call formatter.format_request_operation, not build response itself."""
     container, formatter, _, acquire_orch = _mock_container({})
     scheduler = container.get(SchedulerPort)
     scheduler.parse_request_data.return_value = {"template_id": "t1", "requested_count": 1}
@@ -234,7 +239,6 @@ async def test_cli_request_machines_delegates_format_request_operation():
         request_id="req-1",
         status="pending",
         machine_ids=[],
-        raw={"request_id": "req-1", "status": "pending", "resource_ids": []},
     )
 
     args = _make_namespace(template_id="t1", machine_count=1, metadata={})
@@ -245,6 +249,8 @@ async def test_cli_request_machines_delegates_format_request_operation():
         await handle_request_machines(args)
 
     formatter.format_request_operation.assert_called_once()
+    call_arg = formatter.format_request_operation.call_args[0][0]
+    assert "request_id" in call_arg
 
 
 # ---------------------------------------------------------------------------
@@ -253,11 +259,10 @@ async def test_cli_request_machines_delegates_format_request_operation():
 
 
 @pytest.mark.asyncio
-async def test_cli_passes_formatter_return_value_through():
+async def test_cli_passes_scheduler_return_value_through():
     """The return value from formatter.format_request_status must be the handler result."""
     sentinel_data = {"requests": [{"requestId": "sentinel-value", "status": "complete"}]}
     container, formatter, _, _ = _mock_container(sentinel_data, status_orch_requests=[])
-    formatter.format_request_status.return_value = InterfaceResponse(data=sentinel_data)
 
     args = _make_namespace(all=True)
 

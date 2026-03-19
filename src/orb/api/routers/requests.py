@@ -156,4 +156,4 @@ async def cancel_request(
             reason=reason or "Cancelled via REST API",
         )
     )
-    return JSONResponse(content=scheduler.format_request_response(result.raw))
+    return JSONResponse(content=scheduler.format_request_response({"request_id": result.request_id, "status": result.status}))

@@ -33,27 +33,26 @@ def _mock_command_bus(updated: bool = True) -> MagicMock:
     orchestrator = MagicMock()
     orchestrator.execute = AsyncMock(
         return_value=UpdateTemplateOutput(
-            template_id="tpl-1", updated=updated, validation_errors=[], raw={}
+            template_id="tpl-1", updated=updated, validation_errors=[]
         )
     )
     return orchestrator
 
 
 def _patch_container(bus: MagicMock):
-    from orb.application.dto.interface_response import InterfaceResponse
+    from orb.application.ports.scheduler_port import SchedulerPort
     from orb.application.services.orchestration.update_template import UpdateTemplateOrchestrator
-    from orb.application.services.response_formatting_service import ResponseFormattingService
 
-    mock_formatter = MagicMock(spec=ResponseFormattingService)
-    mock_formatter.format_template_mutation.return_value = InterfaceResponse(data={"success": True})
+    mock_scheduler = MagicMock(spec=SchedulerPort)
+    mock_scheduler.format_template_mutation_response.return_value = {"success": True}
 
     container = MagicMock()
 
     def _get(cls):
         if cls is UpdateTemplateOrchestrator:
             return bus
-        if cls is ResponseFormattingService:
-            return mock_formatter
+        if cls is SchedulerPort:
+            return mock_scheduler
         return MagicMock()
 
     container.get.side_effect = _get
@@ -95,7 +94,7 @@ async def test_update_reads_name_from_file(tmp_path: Path) -> None:
     with _patch_container(bus), _patch_dry_run():
         result = await handle_update_template(args)
 
-    assert result.data["success"] is True
+    assert result["success"] is True
     call_args = bus.execute.call_args[0][0]
     assert call_args.name == "my-template"
     assert call_args.configuration == {
@@ -163,7 +162,7 @@ async def test_update_cli_template_id_wins_over_file(tmp_path: Path) -> None:
     with _patch_container(bus), _patch_dry_run():
         result = await handle_update_template(args)
 
-    assert result.data["success"] is True
+    assert result["success"] is True
     call_args = bus.execute.call_args[0][0]
     assert call_args.template_id == "cli-id"
 
@@ -180,7 +179,7 @@ async def test_update_template_id_from_file_when_no_cli_arg(tmp_path: Path) -> N
     with _patch_container(bus), _patch_dry_run():
         result = await handle_update_template(args)
 
-    assert result.data["success"] is True
+    assert result["success"] is True
     call_args = bus.execute.call_args[0][0]
     assert call_args.template_id == "file-id"
 
@@ -205,7 +204,7 @@ async def test_update_unknown_fields_ignored(tmp_path: Path) -> None:
     with _patch_container(bus), _patch_dry_run():
         result = await handle_update_template(args)
 
-    assert result.data["success"] is True
+    assert result["success"] is True
 
 
 @pytest.mark.asyncio
@@ -220,7 +219,7 @@ async def test_update_empty_json_object_sends_nones(tmp_path: Path) -> None:
     with _patch_container(bus), _patch_dry_run():
         result = await handle_update_template(args)
 
-    assert result.data["success"] is True
+    assert result["success"] is True
     call_args = bus.execute.call_args[0][0]
     assert call_args.name is None
     assert call_args.configuration == {}
@@ -250,7 +249,7 @@ async def test_update_flat_file_passes_full_dict_as_configuration(tmp_path: Path
     with _patch_container(bus), _patch_dry_run():
         result = await handle_update_template(args)
 
-    assert result.data["success"] is True
+    assert result["success"] is True
     call_args = bus.execute.call_args[0][0]
     assert call_args.configuration == file_dict
     assert call_args.instance_type == "t3.micro"
@@ -275,7 +274,7 @@ async def test_update_nested_configuration_key_passes_outer_dict(tmp_path: Path)
     with _patch_container(bus), _patch_dry_run():
         result = await handle_update_template(args)
 
-    assert result.data["success"] is True
+    assert result["success"] is True
     call_args = bus.execute.call_args[0][0]
     assert call_args.configuration == file_dict
 

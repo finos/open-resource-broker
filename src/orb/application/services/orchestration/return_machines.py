@@ -41,7 +41,7 @@ class ReturnMachinesOrchestrator(OrchestratorBase[ReturnMachinesInput, ReturnMac
                 return ReturnMachinesOutput(
                     request_id=None,
                     status="no_machines",
-                    raw={"status": "no_machines", "message": "No active machines found"},
+                    message="No active machines found",
                 )
         else:
             machine_ids = list(input.machine_ids)
@@ -53,19 +53,18 @@ class ReturnMachinesOrchestrator(OrchestratorBase[ReturnMachinesInput, ReturnMac
         await self._command_bus.execute(command)
 
         if not command.created_request_ids:
-            skipped = command.skipped_machines or []
+            skipped = [str(m) for m in (command.skipped_machines or [])]
             self._logger.warning(
                 "CreateReturnRequestCommand produced no request IDs; skipped=%s", skipped
             )
             return ReturnMachinesOutput(
                 request_id=None,
                 status="no_op",
-                raw={"status": "no_op", "skipped_machines": skipped},
+                skipped_machines=skipped,
             )
         request_id = command.created_request_ids[0]
         status = "pending"
         return ReturnMachinesOutput(
             request_id=request_id,
             status=status,
-            raw={"request_id": request_id, "status": status},
         )

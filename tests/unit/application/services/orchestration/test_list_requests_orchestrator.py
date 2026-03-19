@@ -93,8 +93,8 @@ class TestListRequestsOrchestrator:
 
     @pytest.mark.asyncio
     async def test_execute_maps_results_to_dicts(self, orchestrator, mock_query_bus):
-        r = MagicMock()
-        r.model_dump = MagicMock(return_value={"request_id": "req-1"})
+        r = MagicMock(spec=["to_dict"])
+        r.to_dict = MagicMock(return_value={"request_id": "req-1"})
         mock_query_bus.execute.return_value = [r]
         input = ListRequestsInput()
         result = await orchestrator.execute(input)

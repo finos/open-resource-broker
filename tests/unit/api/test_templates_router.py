@@ -90,7 +90,6 @@ class TestTemplatesRouter:
             return_value=CreateTemplateOutput(
                 template_id="tpl-new",
                 created=True,
-                raw={"template_id": "tpl-new", "status": "created", "validation_errors": []},
             )
         )
         client = self._make_client(
@@ -145,7 +144,6 @@ class TestTemplatesRouter:
             return_value=CreateTemplateOutput(
                 template_id="tpl-1",
                 created=True,
-                raw={"template_id": "tpl-1", "status": "created", "validation_errors": []},
             )
         )
         client = self._make_client(
@@ -165,11 +163,6 @@ class TestTemplatesRouter:
                 template_id="tpl-warn",
                 created=True,
                 validation_errors=["missing image_id"],
-                raw={
-                    "template_id": "tpl-warn",
-                    "status": "created",
-                    "validation_errors": ["missing image_id"],
-                },
             )
         )
         client = self._make_client(
@@ -191,7 +184,6 @@ class TestTemplatesRouter:
             return_value=UpdateTemplateOutput(
                 template_id="tpl-1",
                 updated=True,
-                raw={"template_id": "tpl-1", "status": "updated", "validation_errors": []},
             )
         )
         client = self._make_client(
@@ -212,7 +204,6 @@ class TestTemplatesRouter:
             return_value=UpdateTemplateOutput(
                 template_id="tpl-1",
                 updated=True,
-                raw={"template_id": "tpl-1", "status": "updated", "validation_errors": []},
             )
         )
         client = self._make_client(
@@ -243,11 +234,6 @@ class TestTemplatesRouter:
                 template_id="tpl-1",
                 updated=True,
                 validation_errors=["bad field"],
-                raw={
-                    "template_id": "tpl-1",
-                    "status": "updated",
-                    "validation_errors": ["bad field"],
-                },
             )
         )
         client = self._make_client(
@@ -269,7 +255,6 @@ class TestTemplatesRouter:
             return_value=DeleteTemplateOutput(
                 template_id="tpl-del",
                 deleted=True,
-                raw={"template_id": "tpl-del", "status": "deleted", "validation_errors": []},
             )
         )
         client = self._make_client(
@@ -334,12 +319,6 @@ class TestTemplatesRouter:
             return_value=ValidateTemplateOutput(
                 valid=True,
                 errors=[],
-                raw={
-                    "template_id": "tpl-v",
-                    "status": "validated",
-                    "valid": True,
-                    "validation_errors": [],
-                },
             )
         )
         client = self._make_client(
@@ -363,12 +342,6 @@ class TestTemplatesRouter:
             return_value=ValidateTemplateOutput(
                 valid=False,
                 errors=["missing image_id"],
-                raw={
-                    "template_id": "tpl-bad",
-                    "status": "validated",
-                    "valid": False,
-                    "validation_errors": ["missing image_id"],
-                },
             )
         )
         client = self._make_client(
@@ -533,12 +506,6 @@ class TestTemplatesRouteOrder:
             return_value=ValidateTemplateOutput(
                 valid=True,
                 errors=[],
-                raw={
-                    "template_id": None,
-                    "status": "validated",
-                    "valid": True,
-                    "validation_errors": [],
-                },
             )
         )
         client = self._make_client(
