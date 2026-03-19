@@ -47,7 +47,9 @@ async def handle_show_storage_config(
     orchestrator = container.get(GetStorageConfigOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
-    result = await orchestrator.execute(GetStorageConfigInput(strategy_name=getattr(args, "strategy", None)))
+    result = await orchestrator.execute(
+        GetStorageConfigInput(strategy_name=getattr(args, "strategy", None))
+    )
     return formatter.format_storage_config(result.config)
 
 

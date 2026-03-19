@@ -129,27 +129,41 @@ async def handle_create_template(
         }
 
     if not hasattr(args, "file") or not args.file:
-        return InterfaceResponse(data={"success": False, "error": "Template file is required"}, exit_code=1)
+        return InterfaceResponse(
+            data={"success": False, "error": "Template file is required"}, exit_code=1
+        )
 
     try:
         with open(args.file) as f:
             template_config = json.load(f)
     except FileNotFoundError:
-        return InterfaceResponse(data={"success": False, "error": f"Template file not found: {args.file}"}, exit_code=1)
+        return InterfaceResponse(
+            data={"success": False, "error": f"Template file not found: {args.file}"}, exit_code=1
+        )
     except json.JSONDecodeError as e:
-        return InterfaceResponse(data={"success": False, "error": f"Invalid JSON in template file: {e}"}, exit_code=1)
+        return InterfaceResponse(
+            data={"success": False, "error": f"Invalid JSON in template file: {e}"}, exit_code=1
+        )
 
     template_id = template_config.get("template_id") or template_config.get("templateId")
     if not template_id:
-        return InterfaceResponse(data={"success": False, "error": "template_id is required in template file"}, exit_code=1)
+        return InterfaceResponse(
+            data={"success": False, "error": "template_id is required in template file"},
+            exit_code=1,
+        )
 
     provider_api = template_config.get("provider_api") or template_config.get("providerApi")
     if not provider_api:
-        return InterfaceResponse(data={"success": False, "error": "provider_api is required in template file"}, exit_code=1)
+        return InterfaceResponse(
+            data={"success": False, "error": "provider_api is required in template file"},
+            exit_code=1,
+        )
 
     image_id = template_config.get("image_id") or template_config.get("imageId")
     if not image_id:
-        return InterfaceResponse(data={"success": False, "error": "image_id is required in template file"}, exit_code=1)
+        return InterfaceResponse(
+            data={"success": False, "error": "image_id is required in template file"}, exit_code=1
+        )
 
     if getattr(args, "validate_only", False):
         return {
@@ -228,18 +242,27 @@ async def handle_update_template(
 
     file_path = getattr(args, "file", None)
     if not file_path:
-        return InterfaceResponse(data={"success": False, "error": "Template file is required"}, exit_code=1)
+        return InterfaceResponse(
+            data={"success": False, "error": "Template file is required"}, exit_code=1
+        )
 
     try:
         with open(file_path) as f:
             template_config = json.load(f)
     except FileNotFoundError:
-        return InterfaceResponse(data={"success": False, "error": f"Template file not found: {file_path}"}, exit_code=1)
+        return InterfaceResponse(
+            data={"success": False, "error": f"Template file not found: {file_path}"}, exit_code=1
+        )
     except json.JSONDecodeError as e:
-        return InterfaceResponse(data={"success": False, "error": f"Invalid JSON in template file: {e}"}, exit_code=1)
+        return InterfaceResponse(
+            data={"success": False, "error": f"Invalid JSON in template file: {e}"}, exit_code=1
+        )
 
     if not isinstance(template_config, dict):
-        return InterfaceResponse(data={"success": False, "error": "Template file must contain a JSON object"}, exit_code=1)
+        return InterfaceResponse(
+            data={"success": False, "error": "Template file must contain a JSON object"},
+            exit_code=1,
+        )
 
     file_template_id = template_config.get("template_id") or template_config.get("templateId")
     resolved_template_id = template_id or file_template_id

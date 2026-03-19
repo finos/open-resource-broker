@@ -283,7 +283,11 @@ async def handle_cancel_request(
         return {"error": "Request ID is required", "message": "Request ID must be provided"}
 
     reason = getattr(args, "reason", None) or "Cancelled via API"
-    result = await orchestrator.execute(CancelRequestInput(request_id=request_id, reason=reason, force=getattr(args, "force", False)))
+    result = await orchestrator.execute(
+        CancelRequestInput(
+            request_id=request_id, reason=reason, force=getattr(args, "force", False)
+        )
+    )
 
     return formatter.format_request_operation(
         {"request_id": result.request_id, "status": result.status},

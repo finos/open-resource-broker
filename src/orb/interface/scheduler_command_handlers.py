@@ -47,7 +47,9 @@ async def handle_show_scheduler_config(
     orchestrator = container.get(GetSchedulerConfigOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
-    result = await orchestrator.execute(GetSchedulerConfigInput(strategy_name=getattr(args, "strategy", None)))
+    result = await orchestrator.execute(
+        GetSchedulerConfigInput(strategy_name=getattr(args, "strategy", None))
+    )
     return formatter.format_scheduler_config(result.config)
 
 
