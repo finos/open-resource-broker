@@ -78,7 +78,7 @@ class TestHandleProviderAdd:
             )
             result = await handle_provider_add(args)
 
-        assert result == 1
+        assert result.get("error") is True and result.get("exit_code") == 1
 
     @pytest.mark.asyncio
     async def test_missing_aws_profile_returns_1(self, tmp_path):
@@ -99,7 +99,7 @@ class TestHandleProviderAdd:
             )
             result = await handle_provider_add(args)
 
-        assert result == 1
+        assert result.get("error") is True and result.get("exit_code") == 1
 
     @pytest.mark.asyncio
     async def test_missing_aws_region_returns_1(self, tmp_path):
@@ -120,7 +120,7 @@ class TestHandleProviderAdd:
             )
             result = await handle_provider_add(args)
 
-        assert result == 1
+        assert result.get("error") is True and result.get("exit_code") == 1
 
     @pytest.mark.asyncio
     async def test_duplicate_provider_returns_1(self, tmp_path):
@@ -147,7 +147,7 @@ class TestHandleProviderAdd:
             )
             result = await handle_provider_add(args)
 
-        assert result == 1
+        assert result.get("error") is True and result.get("exit_code") == 1
 
     @pytest.mark.asyncio
     async def test_success_returns_0_and_writes_config(self, tmp_path):
@@ -174,7 +174,7 @@ class TestHandleProviderAdd:
             )
             result = await handle_provider_add(args)
 
-        assert result == 0
+        assert result.get("error") is not True
         saved = json.loads((tmp_path / "config.json").read_text())
         names = [p["name"] for p in saved["provider"]["providers"]]
         assert "aws-prod" in names
@@ -204,7 +204,7 @@ class TestHandleProviderAdd:
             )
             result = await handle_provider_add(args)
 
-        assert result == 1
+        assert result.get("error") is True and result.get("exit_code") == 1
 
 
 # ---------------------------------------------------------------------------
@@ -225,7 +225,7 @@ class TestHandleProviderRemove:
         ):
             result = await handle_provider_remove(_ns(provider_name="aws-default"))
 
-        assert result == 1
+        assert result.get("error") is True and result.get("exit_code") == 1
 
     @pytest.mark.asyncio
     async def test_provider_not_found_returns_1(self, tmp_path):
@@ -239,7 +239,7 @@ class TestHandleProviderRemove:
         ):
             result = await handle_provider_remove(_ns(provider_name="nonexistent"))
 
-        assert result == 1
+        assert result.get("error") is True and result.get("exit_code") == 1
 
     @pytest.mark.asyncio
     async def test_last_provider_guard_returns_1(self, tmp_path):
@@ -253,7 +253,7 @@ class TestHandleProviderRemove:
         ):
             result = await handle_provider_remove(_ns(provider_name="aws-default"))
 
-        assert result == 1
+        assert result.get("error") is True and result.get("exit_code") == 1
 
     @pytest.mark.asyncio
     async def test_success_returns_0_and_removes_provider(self, tmp_path):
@@ -283,7 +283,7 @@ class TestHandleProviderRemove:
         ):
             result = await handle_provider_remove(_ns(provider_name="aws-a"))
 
-        assert result == 0
+        assert result.get("error") is not True
         saved = json.loads((tmp_path / "config.json").read_text())
         names = [p["name"] for p in saved["provider"]["providers"]]
         assert "aws-a" not in names
@@ -310,7 +310,7 @@ class TestHandleProviderUpdate:
             args = _ns(provider_name="aws-default", aws_region=None, aws_profile=None)
             result = await handle_provider_update(args)
 
-        assert result == 1
+        assert result.get("error") is True and result.get("exit_code") == 1
 
     @pytest.mark.asyncio
     async def test_provider_not_found_returns_1(self, tmp_path):
@@ -325,7 +325,7 @@ class TestHandleProviderUpdate:
             args = _ns(provider_name="nonexistent", aws_region="eu-west-1", aws_profile=None)
             result = await handle_provider_update(args)
 
-        assert result == 1
+        assert result.get("error") is True and result.get("exit_code") == 1
 
     @pytest.mark.asyncio
     async def test_success_returns_0_and_writes_config(self, tmp_path):
@@ -346,7 +346,7 @@ class TestHandleProviderUpdate:
             args = _ns(provider_name="aws-default", aws_region="ap-southeast-1", aws_profile=None)
             result = await handle_provider_update(args)
 
-        assert result == 0
+        assert result.get("error") is not True
         saved = json.loads((tmp_path / "config.json").read_text())
         provider = next(p for p in saved["provider"]["providers"] if p["name"] == "aws-default")
         assert provider["config"]["region"] == "ap-southeast-1"
@@ -371,7 +371,7 @@ class TestHandleProviderSetDefault:
         ):
             result = await handle_provider_set_default(_ns(provider_name="nonexistent"))
 
-        assert result == 1
+        assert result.get("error") is True and result.get("exit_code") == 1
 
     @pytest.mark.asyncio
     async def test_success_returns_0_and_writes_default(self, tmp_path):
@@ -385,7 +385,7 @@ class TestHandleProviderSetDefault:
         ):
             result = await handle_provider_set_default(_ns(provider_name="aws-default"))
 
-        assert result == 0
+        assert result.get("error") is not True
         saved = json.loads((tmp_path / "config.json").read_text())
         assert saved["provider"]["default_provider"] == "aws-default"
 
@@ -411,7 +411,7 @@ class TestHandleProviderGetDefault:
         ):
             result = await handle_provider_get_default(_ns())
 
-        assert result == 0
+        assert result.get("error") is not True
 
     @pytest.mark.asyncio
     async def test_fallback_to_first_provider_returns_0(self, tmp_path):
@@ -425,7 +425,7 @@ class TestHandleProviderGetDefault:
         ):
             result = await handle_provider_get_default(_ns())
 
-        assert result == 0
+        assert result.get("error") is not True
 
     @pytest.mark.asyncio
     async def test_no_providers_returns_1(self, tmp_path):
@@ -439,7 +439,7 @@ class TestHandleProviderGetDefault:
         ):
             result = await handle_provider_get_default(_ns())
 
-        assert result == 1
+        assert result.get("error") is True and result.get("exit_code") == 1
 
 
 # ---------------------------------------------------------------------------

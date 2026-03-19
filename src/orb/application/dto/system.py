@@ -150,7 +150,7 @@ class SystemStatusDTO(BaseDTO):
         default_factory=lambda: datetime.now(timezone.utc),
         description="Last health check timestamp",
     )
-    components: dict[str, str] = Field(
+    components: dict[str, Any] = Field(
         default_factory=dict, description="Status of individual components"
     )
 

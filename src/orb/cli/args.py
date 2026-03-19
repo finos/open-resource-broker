@@ -284,6 +284,10 @@ def add_provider_actions(subparsers):
     add_global_arguments(providers_set_default)
     providers_set_default.add_argument("provider_name", help="Provider name to set as default")
 
+    providers_get = subparsers.add_parser("get", help="Get provider details by name")
+    add_global_arguments(providers_get)
+    providers_get.add_argument("name", help="Provider name")
+
     providers_get_default = subparsers.add_parser("get-default", help="Show default provider")
     add_global_arguments(providers_get_default)
 

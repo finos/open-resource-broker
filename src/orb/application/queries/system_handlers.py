@@ -275,13 +275,27 @@ class GetSystemStatusHandler(BaseQueryHandler[GetSystemStatusQuery, SystemStatus
         self.logger.info("Getting system status")
 
         try:
+            import importlib.metadata
+            import os
             import time
 
-            # Get basic system information
-            system_status = {
+            import psutil
+
+            # Real metrics
+            uptime_seconds = time.time() - psutil.boot_time()
+            memory_usage_mb = psutil.Process().memory_info().rss / 1024 / 1024
+            cpu_usage_percent = psutil.cpu_percent(interval=None)
+            disk_usage_percent = psutil.disk_usage("/").percent
+
+            try:
+                version = importlib.metadata.version("orb")
+            except importlib.metadata.PackageNotFoundError:
+                version = "unknown"
+
+            environment = os.environ.get("ORB_ENVIRONMENT", os.environ.get("ENV", "production"))
+
+            system_status: dict[str, Any] = {
                 "status": "operational",
-                "timestamp": self.timestamp_service.current_timestamp(),
-                "uptime": self.timestamp_service.format_for_display(time.time()),
                 "components": {},
             }
 
@@ -303,7 +317,6 @@ class GetSystemStatusHandler(BaseQueryHandler[GetSystemStatusQuery, SystemStatus
 
             # Check container status
             try:
-                # Basic container health check
                 system_status["components"]["dependency_injection"] = {
                     "status": "healthy",
                     "details": "DI container operational",
@@ -317,14 +330,14 @@ class GetSystemStatusHandler(BaseQueryHandler[GetSystemStatusQuery, SystemStatus
 
             return SystemStatusDTO(
                 status=system_status["status"],
-                uptime_seconds=0.0,
-                version="unknown",
-                environment="unknown",
+                uptime_seconds=uptime_seconds,
+                version=version,
+                environment=environment,
                 active_connections=0,
-                memory_usage_mb=0.0,
-                cpu_usage_percent=0.0,
-                disk_usage_percent=0.0,
-                components={k: str(v) for k, v in system_status["components"].items()},
+                memory_usage_mb=memory_usage_mb,
+                cpu_usage_percent=cpu_usage_percent,
+                disk_usage_percent=disk_usage_percent,
+                components=system_status["components"],
             )
 
         except Exception as e:

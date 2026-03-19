@@ -130,6 +130,7 @@ def build_registry() -> None:
     # --- providers ---
     from orb.interface.provider_config_handler import (
         handle_provider_add,
+        handle_provider_get,
         handle_provider_get_default,
         handle_provider_remove,
         handle_provider_set_default,
@@ -142,6 +143,7 @@ def build_registry() -> None:
     register("providers", "update", handle_provider_update)
     register("providers", "set-default", handle_provider_set_default)
     register("providers", "get-default", handle_provider_get_default)
+    register("providers", "get", handle_provider_get)
     register("providers", "show", handle_provider_show)
     register("providers", "list", _make_bus_handler("list_available_providers"))
     register("providers", "health", _make_bus_handler("get_provider_health"))
