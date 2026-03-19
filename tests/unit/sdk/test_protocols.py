@@ -25,15 +25,15 @@ class TestSDKProtocolFixes:
     def test_protocol_get_request_status_param_is_request_ids(self):
         from orb.sdk.protocols import ORBClientProtocol
 
-        sig = inspect.signature(ORBClientProtocol.get_request_status)
+        sig = inspect.signature(getattr(ORBClientProtocol, "get_request_status"))
         assert "request_ids" in sig.parameters
 
     def test_protocol_stop_machines_is_coroutine(self):
         from orb.sdk.protocols import ORBClientProtocol
 
-        assert inspect.iscoroutinefunction(ORBClientProtocol.stop_machines)
+        assert inspect.iscoroutinefunction(getattr(ORBClientProtocol, "stop_machines"))
 
     def test_protocol_start_machines_is_coroutine(self):
         from orb.sdk.protocols import ORBClientProtocol
 
-        assert inspect.iscoroutinefunction(ORBClientProtocol.start_machines)
+        assert inspect.iscoroutinefunction(getattr(ORBClientProtocol, "start_machines"))

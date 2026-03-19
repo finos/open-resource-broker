@@ -70,7 +70,6 @@ class TestHandleListTemplatesForwardsParams:
     def test_handle_list_templates_forwards_limit_offset_and_provider_api(self):
         from orb.application.services.orchestration.dtos import ListTemplatesInput
         from orb.application.services.orchestration.list_templates import ListTemplatesOrchestrator
-        from orb.domain.base.ports.console_port import ConsolePort
         from orb.interface.template_command_handlers import handle_list_templates
 
         mock_orch = MagicMock(spec=ListTemplatesOrchestrator)

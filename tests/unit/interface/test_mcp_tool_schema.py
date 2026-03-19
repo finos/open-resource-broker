@@ -8,7 +8,7 @@ machine_count for request_machines, not the old 'count').
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 
 def _make_server():
