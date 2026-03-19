@@ -13,8 +13,8 @@ from orb.api.dependencies import (
     get_acquire_machines_orchestrator,
     get_list_machines_orchestrator,
     get_machine_orchestrator,
+    get_response_formatting_service,
     get_return_machines_orchestrator,
-    get_scheduler_strategy,
 )
 from orb.api.models.base import APIRequest
 from orb.application.services.orchestration.dtos import (
@@ -32,7 +32,7 @@ ACQUIRE_ORCHESTRATOR = Depends(get_acquire_machines_orchestrator)
 RETURN_ORCHESTRATOR = Depends(get_return_machines_orchestrator)
 LIST_ORCHESTRATOR = Depends(get_list_machines_orchestrator)
 GET_ORCHESTRATOR = Depends(get_machine_orchestrator)
-SCHEDULER_STRATEGY = Depends(get_scheduler_strategy)
+FORMATTER = Depends(get_response_formatting_service)
 STATUS_QUERY = Query(None, description="Filter by machine status")
 REQUEST_ID_QUERY = Query(None, description="Filter by request ID")
 OFFSET_QUERY = Query(0, ge=0, description="Number of results to skip")
@@ -70,7 +70,7 @@ class ReturnMachinesRequest(APIRequest):
 async def request_machines(
     request_data: RequestMachinesRequest,
     orchestrator=ACQUIRE_ORCHESTRATOR,
-    scheduler=SCHEDULER_STRATEGY,
+    formatter=FORMATTER,
 ) -> JSONResponse:
     """
     Request new machines from a template.
@@ -87,7 +87,7 @@ async def request_machines(
         )
     )
     return JSONResponse(
-        content=scheduler.format_request_response({"request_id": result.request_id, "status": result.status, "machine_ids": result.machine_ids}),
+        content=formatter.format_request_operation({"request_id": result.request_id, "status": result.status, "machine_ids": result.machine_ids}, result.status).data,
         status_code=202,
     )
 
@@ -97,7 +97,7 @@ async def request_machines(
 async def return_machines(
     request_data: ReturnMachinesRequest,
     orchestrator=RETURN_ORCHESTRATOR,
-    scheduler=SCHEDULER_STRATEGY,
+    formatter=FORMATTER,
 ) -> JSONResponse:
     """
     Return machines to the provider.
@@ -111,7 +111,7 @@ async def return_machines(
             force=request_data.force,
         )
     )
-    return JSONResponse(content=scheduler.format_request_response({"request_id": result.request_id, "status": result.status, "message": result.message, "skipped_machines": result.skipped_machines}))
+    return JSONResponse(content=formatter.format_request_operation({"request_id": result.request_id, "status": result.status, "message": result.message, "skipped_machines": result.skipped_machines}, result.status).data)
 
 
 @router.get("/", summary="List Machines", description="List machines with optional filtering")
@@ -123,12 +123,12 @@ async def list_machines(
     limit: int = Query(50),
     offset: int = OFFSET_QUERY,
     orchestrator=LIST_ORCHESTRATOR,
-    scheduler=SCHEDULER_STRATEGY,
+    formatter=FORMATTER,
 ) -> JSONResponse:
     result = await orchestrator.execute(
         ListMachinesInput(status=status, provider_name=provider_name, request_id=request_id, limit=limit, offset=offset)
     )
-    return JSONResponse(content=scheduler.format_machine_status_response(result.machines))
+    return JSONResponse(content=formatter.format_machine_list(result.machines).data)
 
 
 @router.get("/{machine_id}", summary="Get Machine", description="Get specific machine details")
@@ -136,10 +136,10 @@ async def list_machines(
 async def get_machine(
     machine_id: str,
     orchestrator=GET_ORCHESTRATOR,
-    scheduler=SCHEDULER_STRATEGY,
+    formatter=FORMATTER,
 ) -> JSONResponse:
     result = await orchestrator.execute(GetMachineInput(machine_id=machine_id))
     if result.machine is None:
         return JSONResponse(content={"detail": f"Machine {machine_id} not found"}, status_code=404)
     data = result.machine.model_dump()
-    return JSONResponse(content=scheduler.format_machine_details_response(data))
+    return JSONResponse(content=formatter.format_machine_detail(data).data)

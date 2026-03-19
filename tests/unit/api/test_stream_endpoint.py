@@ -7,8 +7,9 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from orb.api.dependencies import get_request_status_orchestrator, get_scheduler_strategy
+from orb.api.dependencies import get_request_status_orchestrator, get_response_formatting_service
 from orb.api.routers.requests import router as requests_router
+from orb.application.dto.interface_response import InterfaceResponse
 from orb.application.services.orchestration.dtos import GetRequestStatusOutput
 
 
@@ -30,11 +31,11 @@ def _make_orchestrator_returning(*statuses):
     return orchestrator
 
 
-def _make_scheduler():
-    """Return a mock scheduler that passes through the requests list."""
-    scheduler = MagicMock()
-    scheduler.format_request_status_response.side_effect = lambda reqs: {"requests": reqs}
-    return scheduler
+def _make_formatter():
+    """Return a mock formatter that passes through the requests list."""
+    formatter = MagicMock()
+    formatter.format_request_status.side_effect = lambda reqs: InterfaceResponse(data={"requests": reqs})
+    return formatter
 
 
 def _collect_sse_lines(response) -> list[dict]:
@@ -60,7 +61,7 @@ class TestStreamEndpoint:
 
     def _make_client(self, app, orchestrator):
         app.dependency_overrides[get_request_status_orchestrator] = lambda: orchestrator
-        app.dependency_overrides[get_scheduler_strategy] = _make_scheduler
+        app.dependency_overrides[get_response_formatting_service] = _make_formatter
         return TestClient(app, raise_server_exceptions=False)
 
     def test_happy_path_sse_data_lines_format(self, requests_app):

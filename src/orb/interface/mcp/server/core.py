@@ -56,7 +56,14 @@ class OpenResourceBrokerMCPServer:
 
     def _register_core_tools(self) -> None:
         """Register core MCP tools from CLI handlers."""
+        from orb.interface.machine_command_handlers import (
+            handle_get_machine_status,
+            handle_list_machines,
+            handle_start_machines,
+            handle_stop_machines,
+        )
         from orb.interface.request_command_handlers import (
+            handle_cancel_request,
             handle_get_request_status,
             handle_get_return_requests,
             handle_list_requests,
@@ -92,6 +99,13 @@ class OpenResourceBrokerMCPServer:
         self.tools["request_machines"] = handle_request_machines
         self.tools["list_return_requests"] = handle_get_return_requests
         self.tools["return_machines"] = handle_request_return_machines
+        self.tools["cancel_request"] = handle_cancel_request
+
+        # Machine tools
+        self.tools["list_machines"] = handle_list_machines
+        self.tools["get_machine_status"] = handle_get_machine_status
+        self.tools["stop_machines"] = handle_stop_machines
+        self.tools["start_machines"] = handle_start_machines
 
     def _register_core_resources(self) -> None:
         """Register core MCP resources."""
@@ -274,6 +288,8 @@ class OpenResourceBrokerMCPServer:
         # Call the tool function
         tool_func = self.tools[tool_name]
         result = await tool_func(args)
+        if hasattr(result, "data"):
+            result = result.data
 
         return {"content": [{"type": "text", "text": json.dumps(result, indent=2, default=str)}]}
 
@@ -428,6 +444,41 @@ class OpenResourceBrokerMCPServer:
                 "machine_ids": {"type": "array", "items": {"type": "string"}},
                 "all": {"type": "boolean"},
                 "force": {"type": "boolean"},
+            },
+            "required": [],
+        },
+        "cancel_request": {
+            "properties": {
+                "request_id": {"type": "string"},
+                "reason": {"type": "string"},
+            },
+            "required": ["request_id"],
+        },
+        "list_machines": {
+            "properties": {
+                "status": {"type": "string"},
+                "limit": {"type": "integer"},
+                "offset": {"type": "integer"},
+                "request_id": {"type": "string"},
+            },
+            "required": [],
+        },
+        "get_machine_status": {
+            "properties": {"machine_id": {"type": "string"}},
+            "required": ["machine_id"],
+        },
+        "stop_machines": {
+            "properties": {
+                "machine_ids": {"type": "array", "items": {"type": "string"}},
+                "all": {"type": "boolean"},
+                "force": {"type": "boolean"},
+            },
+            "required": [],
+        },
+        "start_machines": {
+            "properties": {
+                "machine_ids": {"type": "array", "items": {"type": "string"}},
+                "all": {"type": "boolean"},
             },
             "required": [],
         },

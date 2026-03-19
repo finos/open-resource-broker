@@ -15,7 +15,7 @@ from orb.api.dependencies import (
     get_list_requests_orchestrator,
     get_list_return_requests_orchestrator,
     get_request_status_orchestrator,
-    get_scheduler_strategy,
+    get_response_formatting_service,
 )
 from orb.application.services.orchestration.dtos import (
     CancelRequestInput,
@@ -32,7 +32,7 @@ STATUS_ORCHESTRATOR = Depends(get_request_status_orchestrator)
 LIST_ORCHESTRATOR = Depends(get_list_requests_orchestrator)
 RETURN_LIST_ORCHESTRATOR = Depends(get_list_return_requests_orchestrator)
 CANCEL_ORCHESTRATOR = Depends(get_cancel_request_orchestrator)
-SCHEDULER_STRATEGY = Depends(get_scheduler_strategy)
+FORMATTER = Depends(get_response_formatting_service)
 STATUS_QUERY = Query(None, description="Filter by request status")
 LIMIT_QUERY = Query(50, description="Limit number of results")
 OFFSET_QUERY = Query(0, ge=0, description="Number of results to skip")
@@ -48,7 +48,7 @@ async def list_requests(
     offset: int = OFFSET_QUERY,
     sync: bool = Query(False, description="Sync with provider before returning results"),
     orchestrator=LIST_ORCHESTRATOR,
-    scheduler=SCHEDULER_STRATEGY,
+    formatter=FORMATTER,
 ) -> JSONResponse:
     """
     List requests with optional filtering.
@@ -61,7 +61,7 @@ async def list_requests(
     result = await orchestrator.execute(
         ListRequestsInput(status=status, limit=limit or 50, offset=offset, sync=sync)
     )
-    return JSONResponse(content=scheduler.format_request_status_response(result.requests))
+    return JSONResponse(content=formatter.format_request_status(result.requests).data)
 
 
 @router.get("/return", summary="List Return Requests", description="List requests pending return")
@@ -69,11 +69,11 @@ async def list_requests(
 async def list_return_requests(
     limit: int = LIMIT_QUERY,
     orchestrator=RETURN_LIST_ORCHESTRATOR,
-    scheduler=SCHEDULER_STRATEGY,
+    formatter=FORMATTER,
 ) -> JSONResponse:
     """List requests that are pending return."""
     result = await orchestrator.execute(ListReturnRequestsInput(limit=limit or 50))
-    return JSONResponse(content=scheduler.format_request_status_response(result.requests))
+    return JSONResponse(content=formatter.format_request_status(result.requests).data)
 
 
 @router.get(
@@ -86,7 +86,7 @@ async def get_request_status(
     request_id: str,
     long: bool = Query(True, description="Include detailed info and refresh provider state"),
     orchestrator=STATUS_ORCHESTRATOR,
-    scheduler=SCHEDULER_STRATEGY,
+    formatter=FORMATTER,
 ) -> JSONResponse:
     """
     Get the status of a specific request.
@@ -97,7 +97,7 @@ async def get_request_status(
     result = await orchestrator.execute(
         GetRequestStatusInput(request_ids=[request_id], detailed=long)
     )
-    return JSONResponse(content=scheduler.format_request_status_response(result.requests))
+    return JSONResponse(content=formatter.format_request_status(result.requests).data)
 
 
 @router.get(
@@ -108,7 +108,7 @@ async def get_request_status(
 async def stream_request_status(
     request_id: str,
     orchestrator=STATUS_ORCHESTRATOR,
-    scheduler=SCHEDULER_STRATEGY,
+    formatter=FORMATTER,
     interval: float = Query(2.0, ge=0.5, le=60, description="Poll interval in seconds"),
     timeout: float = Query(300.0, ge=1, le=3600, description="Max stream duration in seconds"),
 ) -> StreamingResponse:
@@ -121,7 +121,7 @@ async def stream_request_status(
                 result = await orchestrator.execute(
                     GetRequestStatusInput(request_ids=[request_id], detailed=False)
                 )
-                formatted = scheduler.format_request_status_response(result.requests)
+                formatted = formatter.format_request_status(result.requests).data
                 yield f"data: {json.dumps(formatted)}\n\n"
                 requests_list = formatted.get("requests", [])
                 if requests_list:
@@ -148,7 +148,7 @@ async def cancel_request(
     request_id: str,
     reason: Optional[str] = Query(None, description="Cancellation reason"),
     orchestrator=CANCEL_ORCHESTRATOR,
-    scheduler=SCHEDULER_STRATEGY,
+    formatter=FORMATTER,
 ) -> JSONResponse:
     result = await orchestrator.execute(
         CancelRequestInput(
@@ -156,4 +156,4 @@ async def cancel_request(
             reason=reason or "Cancelled via REST API",
         )
     )
-    return JSONResponse(content=scheduler.format_request_response({"request_id": result.request_id, "status": result.status}))
+    return JSONResponse(content=formatter.format_request_operation({"request_id": result.request_id, "status": result.status}, result.status).data)
