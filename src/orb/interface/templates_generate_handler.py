@@ -52,14 +52,10 @@ async def handle_templates_generate(args) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        import traceback
-
-        # Print traceback to stderr but don't include in JSON response
-        traceback.print_exc()
-
         return {
+            "error": str(e),
             "status": "error",
-            "message": f"Failed to generate templates: {e}",
+            "success": False,
         }
 
 

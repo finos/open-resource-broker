@@ -30,8 +30,8 @@ async def handle_infrastructure_discover(args) -> Dict[str, Any]:
 
     except Exception as e:
         return {
+            "error": f"Infrastructure discovery failed: {e}",
             "status": "error",
-            "message": f"Infrastructure discovery failed: {e}",
         }
 
 
@@ -45,15 +45,17 @@ async def handle_infrastructure_show(args) -> Dict[str, Any]:
         else:
             providers = _get_active_providers_with_overrides()
 
+        provider_data = []
         for provider in providers:
             _show_provider_infrastructure(provider)
+            provider_data.append(provider)
 
-        return {"status": "success"}
+        return {"status": "success", "providers": provider_data}
 
     except Exception as e:
         return {
+            "error": f"Failed to show infrastructure: {e}",
             "status": "error",
-            "message": f"Failed to show infrastructure: {e}",
         }
 
 
@@ -77,8 +79,8 @@ async def handle_infrastructure_validate(args) -> Dict[str, Any]:
 
     except Exception as e:
         return {
+            "error": f"Infrastructure validation failed: {e}",
             "status": "error",
-            "message": f"Infrastructure validation failed: {e}",
         }
 
 
