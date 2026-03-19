@@ -12,6 +12,7 @@ from orb.domain.base.exceptions import (
     BusinessRuleViolationError,
     ConfigurationError,
     EntityNotFoundError,
+    InfrastructureError,
     ValidationError,
 )
 from orb.domain.machine.exceptions import (
@@ -26,7 +27,6 @@ from orb.domain.template.exceptions import (
     TemplateNotFoundError,
     TemplateValidationError,
 )
-from orb.domain.base.exceptions import InfrastructureError
 from orb.infrastructure.error.exception_handler import ErrorCategory, ErrorCode
 from orb.infrastructure.error.http_response_handler import HTTPErrorResponseHandler
 

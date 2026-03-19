@@ -102,8 +102,8 @@ class TestRequestMachinesAsync:
 
         assert response.status_code == 202
         body = response.json()
-        assert "requestId" in body
-        assert body["requestId"] == fake_request_id
+        assert "request_id" in body
+        assert body["request_id"] == fake_request_id
 
     def test_request_id_has_req_prefix(self, client, machines_orchestrator):
         """requestId in response must start with 'req-'."""
@@ -116,7 +116,7 @@ class TestRequestMachinesAsync:
         )
 
         body = response.json()
-        assert body["requestId"].startswith("req-")
+        assert body["request_id"].startswith("req-")
 
     def test_missing_template_id_returns_error(self, client):
         """Missing templateId must be rejected before reaching the orchestrator."""
@@ -172,15 +172,15 @@ class TestRequestStatusPolling:
         assert body["requests"][0]["status"] == "complete"
 
     def test_poll_long_false(self, client, status_orchestrator):
-        """long=false query param is forwarded to the orchestrator."""
+        """verbose=false query param is forwarded to the orchestrator."""
         request_id = "req-00000000-0000-0000-0000-000000000013"
         status_orchestrator.execute.return_value = _make_status_result(request_id, "running")
 
-        response = client.get(f"/api/v1/requests/{request_id}/status?long=false")
+        response = client.get(f"/api/v1/requests/{request_id}/status?verbose=false")
 
         assert response.status_code == 200
         call_arg = status_orchestrator.execute.call_args[0][0]
-        assert call_arg.detailed is False
+        assert call_arg.verbose is False
 
     def test_poll_long_true_by_default(self, client, status_orchestrator):
         """long defaults to True."""
@@ -190,7 +190,7 @@ class TestRequestStatusPolling:
         client.get(f"/api/v1/requests/{request_id}/status")
 
         call_arg = status_orchestrator.execute.call_args[0][0]
-        assert call_arg.detailed is True
+        assert call_arg.verbose is True
 
 
 # ---------------------------------------------------------------------------
