@@ -64,3 +64,31 @@ class ResponseFormattingService:
         """Format storage configuration."""
         data = {"config": config}
         return InterfaceResponse(data=data)
+
+    def format_system_status(self, status: Any) -> InterfaceResponse:
+        """Format system status (DTO or dict) for CLI display."""
+        if hasattr(status, "model_dump"):
+            raw = status.model_dump()
+        elif hasattr(status, "to_dict"):
+            raw = status.to_dict()
+        elif isinstance(status, dict):
+            raw = status
+        else:
+            raw = {"status": str(status)}
+        data = self._scheduler.format_system_status_response(raw)
+        return InterfaceResponse(data=data)
+
+    def format_provider_detail(self, provider: dict[str, Any]) -> InterfaceResponse:
+        """Format a provider detail dict for CLI display."""
+        data = self._scheduler.format_provider_detail_response(provider)
+        return InterfaceResponse(data=data)
+
+    def format_storage_test(self, raw: dict[str, Any]) -> InterfaceResponse:
+        """Format a storage test result for CLI display."""
+        data = self._scheduler.format_storage_test_response(raw)
+        exit_code = 0 if data.get("success") else 1
+        return InterfaceResponse(data=data, exit_code=exit_code)
+
+    def format_error(self, message: str, exit_code: int = 1) -> InterfaceResponse:
+        """Format an error response."""
+        return InterfaceResponse(data={"success": False, "error": message}, exit_code=exit_code)

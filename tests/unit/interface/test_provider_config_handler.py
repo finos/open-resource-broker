@@ -461,7 +461,7 @@ class TestHandleProviderShow:
         ):
             result = await handle_provider_show(_ns(provider_name="aws-default"))
 
-        assert result == 0
+        assert result.exit_code == 0
 
     @pytest.mark.asyncio
     async def test_specific_provider_not_found_returns_1(self, tmp_path):
@@ -475,7 +475,7 @@ class TestHandleProviderShow:
         ):
             result = await handle_provider_show(_ns(provider_name="nonexistent"))
 
-        assert result == 1
+        assert result.exit_code == 1
 
     @pytest.mark.asyncio
     async def test_default_provider_returns_0(self, tmp_path):
@@ -491,7 +491,7 @@ class TestHandleProviderShow:
         ):
             result = await handle_provider_show(_ns(provider_name=None))
 
-        assert result == 0
+        assert result.exit_code == 0
 
     @pytest.mark.asyncio
     async def test_no_providers_returns_1(self, tmp_path):
@@ -505,4 +505,4 @@ class TestHandleProviderShow:
         ):
             result = await handle_provider_show(_ns(provider_name=None))
 
-        assert result == 1
+        assert result.exit_code == 1

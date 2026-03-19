@@ -251,9 +251,9 @@ async def handle_list_requests(
     result = await orchestrator.execute(
         ListRequestsInput(
             status=getattr(args, "status", None),
-            limit=getattr(args, "limit", 50),
+            limit=getattr(args, "limit", None) or 50,
             sync=getattr(args, "sync", False),
-            offset=getattr(args, "offset", 0),
+            offset=getattr(args, "offset", None) or 0,
         )
     )
     return formatter.format_request_status(result.requests)

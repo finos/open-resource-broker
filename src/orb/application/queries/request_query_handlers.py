@@ -247,14 +247,14 @@ class ListReturnRequestsHandler(BaseQueryHandler[ListReturnRequestsQuery, list[R
 
                 request_dtos = []
                 for request in return_requests:
-                    request_dto = RequestDTO(
-                        request_id=str(request.request_id),
-                        template_id=request.template_id,
-                        requested_count=request.requested_count,
-                        status=request.status.value,
-                        created_at=request.created_at,
-                        metadata=request.metadata or {},
-                    )
+                    machines = []
+                    if request.machine_ids:
+                        machines = uow.machines.find_by_ids(request.machine_ids)
+
+                    from orb.application.factories.request_dto_factory import RequestDTOFactory
+
+                    dto_factory = RequestDTOFactory()
+                    request_dto = dto_factory.create_from_domain(request, machines)
                     request_dtos.append(request_dto)
 
                 if query.machine_names:

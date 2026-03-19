@@ -1,8 +1,10 @@
 """Provider configuration command handlers."""
 
 import json
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
+from orb.application.dto.interface_response import InterfaceResponse
+from orb.application.services.response_formatting_service import ResponseFormattingService
 from orb.config.platform_dirs import get_config_location
 from orb.domain.base.ports.console_port import ConsolePort
 from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
@@ -258,68 +260,55 @@ async def handle_provider_get_default(args) -> int:
         return 1
 
 
-async def handle_provider_show(args) -> int:
+async def handle_provider_show(args) -> Union[dict[str, Any], InterfaceResponse]:
     """Handle orb providers show command."""
     try:
-        console = get_container().get(ConsolePort)
+        container = get_container()
+        formatter = container.get(ResponseFormattingService)
         config_file = get_config_location() / "config.json"
         if not config_file.exists():
-            console.error("No configuration found")
-            return 1
+            return formatter.format_error("No configuration found")
 
         with open(config_file) as f:
             config = json.load(f)
 
         providers = config.get("provider", {}).get("providers", [])
 
-        def _display_provider(p: dict) -> None:
-            console.info(f"Provider: {p['name']}")
-            console.info(f"Type: {p['type']}")
+        def _build_provider_dict(p: dict) -> dict[str, Any]:
             spec = CLISpecRegistry.get(p.get("type", ""))
+            display_config: dict[str, Any]
             if spec is not None:
-                for label, value in spec.format_display(p.get("config", {})):
-                    console.info(f"{label}: {value}")
+                display_config = dict(spec.format_display(p.get("config", {})))
             else:
-                for key, value in p.get("config", {}).items():
-                    console.info(f"{key}: {value}")
-            console.info(f"Enabled: {p.get('enabled', True)}")
+                display_config = p.get("config", {})
+            result: dict[str, Any] = {
+                "name": p["name"],
+                "type": p["type"],
+                "enabled": p.get("enabled", True),
+                "config": display_config,
+            }
             if p.get("template_defaults"):
-                console.info("Template Defaults:")
-                for key, value in p["template_defaults"].items():
-                    label = key.replace("_", " ").title()
-                    if isinstance(value, list):
-                        console.info(f"  {label}: {', '.join(value)}")
-                    else:
-                        console.info(f"  {label}: {value}")
+                result["template_defaults"] = p["template_defaults"]
+            return result
 
         if args.provider_name:
             provider = next((p for p in providers if p["name"] == args.provider_name), None)
             if not provider:
-                console.error(f"Provider '{args.provider_name}' not found")
-                return 1
-            _display_provider(provider)
+                return formatter.format_error(f"Provider '{args.provider_name}' not found")
+            return formatter.format_provider_detail(_build_provider_dict(provider))
         else:
             default_provider = config.get("provider", {}).get("default_provider")
             if default_provider:
                 for p in providers:
                     if p["name"] == default_provider:
-                        console.info(f"Default Provider: {p['name']}")
-                        _display_provider(p)
-                        break
-            elif providers:
-                first_provider = providers[0]
-                console.info(f"No explicit default set. First provider: {first_provider['name']}")
-                _display_provider(first_provider)
-            else:
-                console.error("No providers configured")
-                return 1
-
-        return 0
+                        return formatter.format_provider_detail(_build_provider_dict(p))
+            if providers:
+                return formatter.format_provider_detail(_build_provider_dict(providers[0]))
+            return formatter.format_error("No providers configured")
 
     except Exception as e:
-        get_container().get(ConsolePort).error(f"Failed to show provider: {e}")
         logger.error("Failed to show provider: %s", e, exc_info=True)
-        return 1
+        return formatter.format_error(f"Failed to show provider: {e}")
 
 
 def _test_provider_credentials(provider_type: str, credential_config: dict) -> tuple[bool, str]:

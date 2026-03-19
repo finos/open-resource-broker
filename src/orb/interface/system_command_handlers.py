@@ -1,7 +1,8 @@
 """System-related command handlers for the interface layer."""
 
-from typing import Any
+from typing import Any, Union
 
+from orb.application.dto.interface_response import InterfaceResponse
 from orb.domain.constants import PROVIDER_TYPE_AWS
 from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
@@ -142,12 +143,14 @@ async def handle_provider_metrics(args) -> dict[str, Any]:
 
 
 @handle_interface_exceptions(context="system_status", interface_type="cli")
-async def handle_system_status(args) -> dict[str, Any]:
+async def handle_system_status(args) -> Union[dict[str, Any], InterfaceResponse]:
     """Handle system status query."""
+    from orb.application.services.response_formatting_service import ResponseFormattingService
     from orb.infrastructure.di.buses import QueryBus
 
     container = get_container()
     query_bus = container.get(QueryBus)
+    formatter = container.get(ResponseFormattingService)
 
     from orb.application.queries.system import GetSystemStatusQuery
 
@@ -156,7 +159,7 @@ async def handle_system_status(args) -> dict[str, Any]:
     )
     status = await query_bus.execute(query)
 
-    return {"system_status": status, "message": "System status retrieved successfully"}
+    return formatter.format_system_status(status)
 
 
 @handle_interface_exceptions(context="system_metrics", interface_type="cli")

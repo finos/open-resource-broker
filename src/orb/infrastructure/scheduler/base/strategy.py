@@ -130,6 +130,23 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
             "summary": {"total": len(checks), "passed": passed, "failed": failed},
         }
 
+    def format_system_status_response(self, raw: dict[str, Any]) -> dict[str, Any]:
+        """Format system status dict for CLI display."""
+        return raw
+
+    def format_provider_detail_response(self, raw: dict[str, Any]) -> dict[str, Any]:
+        """Format provider detail dict for CLI display."""
+        return raw
+
+    def format_storage_test_response(self, raw: dict[str, Any]) -> dict[str, Any]:
+        """Format storage test result dict for CLI display."""
+        success = raw.get("status") == "success" or raw.get("success") is True
+        return {
+            **raw,
+            "success": success,
+            "message": "Storage test completed successfully" if success else "Storage test failed",
+        }
+
     def _apply_template_defaults(self, template_dict: dict, provider_name: str) -> dict:
         """Apply template defaults via the template defaults service if available."""
         if self._template_defaults_service is None:

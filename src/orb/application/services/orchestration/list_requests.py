@@ -23,7 +23,7 @@ class ListRequestsOrchestrator(OrchestratorBase[ListRequestsInput, ListRequestsO
 
     async def execute(self, input: ListRequestsInput) -> ListRequestsOutput:  # type: ignore[return]
         self._logger.info(
-            "ListRequestsOrchestrator: status=%s limit=%d sync=%s",
+            "ListRequestsOrchestrator: status=%s limit=%s sync=%s",
             input.status,
             input.limit,
             input.sync,

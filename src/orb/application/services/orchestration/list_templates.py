@@ -22,7 +22,7 @@ class ListTemplatesOrchestrator(OrchestratorBase[ListTemplatesInput, ListTemplat
 
     async def execute(self, input: ListTemplatesInput) -> ListTemplatesOutput:  # type: ignore[return]
         self._logger.info(
-            "ListTemplatesOrchestrator: active_only=%s provider=%s limit=%d",
+            "ListTemplatesOrchestrator: active_only=%s provider=%s limit=%s",
             input.active_only,
             input.provider_name,
             input.limit,

@@ -57,6 +57,11 @@ async def execute_command(args, app, resource_parsers) -> Union[str, tuple[str, 
         output_format = getattr(args, "format", "json")
         return format_output(result.data, output_format), result.exit_code
 
+    # Raw dict with error key → exit code 1
+    if isinstance(result, dict) and result.get("error"):
+        output_format = getattr(args, "format", "json")
+        return format_output(result, output_format), 1
+
     container = get_container()
     scheduler_port = container.get(SchedulerPort)
     formatter = create_cli_formatter(scheduler_port)

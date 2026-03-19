@@ -87,9 +87,14 @@ async def handle_get_template(
     scheduler = container.get(SchedulerPort)
 
     provider_name = getattr(args, "provider_name", None)
-    result = await orchestrator.execute(
-        GetTemplateInput(template_id=template_id, provider_name=provider_name)
-    )
+    try:
+        result = await orchestrator.execute(
+            GetTemplateInput(template_id=template_id, provider_name=provider_name)
+        )
+    except EntityNotFoundError:
+        from orb.application.services.response_formatting_service import ResponseFormattingService
+        formatter = container.get(ResponseFormattingService)
+        return formatter.format_error(f"Template '{template_id}' not found")
 
     if not result.template:
         return {
@@ -316,7 +321,7 @@ async def handle_delete_template(args: "argparse.Namespace") -> dict[str, Any]:
 
 
 @handle_interface_exceptions(context="validate_template", interface_type="cli")
-async def handle_validate_template(args: "argparse.Namespace") -> dict[str, Any]:
+async def handle_validate_template(args: "argparse.Namespace") -> "Union[dict[str, Any], InterfaceResponse]":
     """Handle validate template operations using the ValidateTemplateOrchestrator."""
     from orb.application.services.orchestration.dtos import ValidateTemplateInput
     from orb.application.services.orchestration.validate_template import (
@@ -390,7 +395,12 @@ async def handle_validate_template(args: "argparse.Namespace") -> dict[str, Any]
 
     if hasattr(args, "template_id") and args.template_id:
         template_id = args.template_id
-        result = await orchestrator.execute(ValidateTemplateInput(template_id=template_id))
+        try:
+            result = await orchestrator.execute(ValidateTemplateInput(template_id=template_id))
+        except EntityNotFoundError:
+            from orb.application.services.response_formatting_service import ResponseFormattingService
+            formatter = container.get(ResponseFormattingService)
+            return formatter.format_error(f"Template '{template_id}' not found")
         return scheduler.format_template_mutation_response(
             {
                 "template_id": result.template_id,

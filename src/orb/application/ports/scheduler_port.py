@@ -113,3 +113,15 @@ class SchedulerPort(ABC):
     @abstractmethod
     def get_template_paths(self) -> list[str]:
         """Return the list of template file paths for this scheduler."""
+
+    @abstractmethod
+    def format_system_status_response(self, raw: dict[str, Any]) -> dict[str, Any]:
+        """Format system status dict for CLI display."""
+
+    @abstractmethod
+    def format_provider_detail_response(self, raw: dict[str, Any]) -> dict[str, Any]:
+        """Format provider detail dict for CLI display."""
+
+    @abstractmethod
+    def format_storage_test_response(self, raw: dict[str, Any]) -> dict[str, Any]:
+        """Format storage test result dict for CLI display."""

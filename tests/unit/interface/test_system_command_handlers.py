@@ -154,10 +154,19 @@ class TestHandleProviderMetrics:
 class TestHandleSystemStatus:
     @pytest.mark.asyncio
     async def test_dispatches_get_system_status_query_with_flags(self):
+        from orb.application.dto.interface_response import InterfaceResponse
         from orb.application.queries.system import GetSystemStatusQuery
+        from orb.application.services.response_formatting_service import ResponseFormattingService
         from orb.interface.system_command_handlers import handle_system_status
 
         container, query_bus = _mock_container_with_query_bus(query_return={"healthy": True})
+        mock_formatter = MagicMock(spec=ResponseFormattingService)
+        mock_formatter.format_system_status.return_value = InterfaceResponse(
+            data={"system_status": {"healthy": True}}, exit_code=0
+        )
+        container.get.side_effect = lambda t: (
+            query_bus if t.__name__ == "QueryBus" else mock_formatter
+        )
 
         with patch("orb.interface.system_command_handlers.get_container", return_value=container):
             result = await handle_system_status(_ns(detailed=True))
@@ -167,14 +176,22 @@ class TestHandleSystemStatus:
         assert isinstance(q, GetSystemStatusQuery)
         assert q.include_provider_health is True
         assert q.detailed is True
-        assert "system_status" in result
+        assert isinstance(result, InterfaceResponse)
+        assert "system_status" in result.data
 
     @pytest.mark.asyncio
     async def test_detailed_defaults_to_false_when_not_set(self):
+        from orb.application.dto.interface_response import InterfaceResponse
         from orb.application.queries.system import GetSystemStatusQuery
+        from orb.application.services.response_formatting_service import ResponseFormattingService
         from orb.interface.system_command_handlers import handle_system_status
 
         container, query_bus = _mock_container_with_query_bus(query_return={})
+        mock_formatter = MagicMock(spec=ResponseFormattingService)
+        mock_formatter.format_system_status.return_value = InterfaceResponse(data={}, exit_code=0)
+        container.get.side_effect = lambda t: (
+            query_bus if t.__name__ == "QueryBus" else mock_formatter
+        )
 
         with patch("orb.interface.system_command_handlers.get_container", return_value=container):
             await handle_system_status(_ns())

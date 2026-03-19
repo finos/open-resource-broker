@@ -92,9 +92,9 @@ class CLICommandFactoryOrchestrator:
         """Create query to list machines."""
         return self._machine_factory.create_list_machines_query(**kwargs)
 
-    def create_get_machine_query(self, **kwargs: Any):
+    def create_get_machine_query(self, machine_id: str, **kwargs: Any):
         """Create query to get machine by ID."""
-        return self._machine_factory.create_get_machine_query(**kwargs)
+        return self._machine_factory.create_get_machine_query(machine_id=machine_id, **kwargs)
 
     def create_update_machine_status_command(self, **kwargs: Any):
         """Create command to update machine status."""
@@ -141,13 +141,13 @@ class CLICommandFactoryOrchestrator:
         """Create query to validate MCP."""
         return self._system_factory.create_mcp_validate_query(**kwargs)
 
-    def create_get_configuration_query(self, **kwargs: Any):
+    def create_get_configuration_query(self, key: str, default: "Any | None" = None, **kwargs: Any):
         """Create query to get configuration value."""
-        return self._system_factory.create_get_configuration_query(**kwargs)
+        return self._system_factory.create_get_configuration_query(key=key, default=default, **kwargs)
 
-    def create_set_configuration_command(self, **kwargs: Any):
+    def create_set_configuration_command(self, key: str, value: str, **kwargs: Any):
         """Create command to set configuration value."""
-        return self._system_factory.create_set_configuration_command(**kwargs)
+        return self._system_factory.create_set_configuration_command(key=key, value=value, **kwargs)
 
     # Provider operations
     def create_get_provider_health_query(self, **kwargs: Any):

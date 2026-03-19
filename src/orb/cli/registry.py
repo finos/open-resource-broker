@@ -190,6 +190,7 @@ def build_registry() -> None:
         handle_cancel_request,
         handle_get_request_status,
         handle_get_return_requests,
+        handle_list_requests,
         handle_request_machines,
         handle_request_return_machines,
     )
@@ -197,7 +198,7 @@ def build_registry() -> None:
     register("requests", "create", handle_request_machines)
     register("requests", "show", handle_get_request_status)
     register("requests", "status", handle_get_request_status)
-    register("requests", "list", _make_bus_handler("list_requests"))
+    register("requests", "list", handle_list_requests)
     register("requests", "cancel", handle_cancel_request)
     register("requests", "return", handle_request_return_machines)
     register("requests", "list-returns", handle_get_return_requests)

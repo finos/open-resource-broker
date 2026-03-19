@@ -73,19 +73,21 @@ async def handle_validate_storage_config(args: "argparse.Namespace") -> dict[str
 
 
 @handle_interface_exceptions(context="test_storage", interface_type="cli")
-async def handle_test_storage(args: "argparse.Namespace") -> dict[str, Any]:
+async def handle_test_storage(args: "argparse.Namespace") -> "Union[dict[str, Any], InterfaceResponse]":
     """Handle test storage operations."""
     from orb.infrastructure.di.buses import QueryBus
 
     container = get_container()
     query_bus = container.get(QueryBus)
+    formatter = container.get(ResponseFormattingService)
 
     from orb.application.dto.queries import ValidateStorageQuery  # type: ignore[attr-defined]
 
     query = ValidateStorageQuery()
     result = await query_bus.execute(query)
 
-    return {"test_result": result, "message": "Storage test completed successfully"}
+    raw = result if isinstance(result, dict) else {"test_result": result}
+    return formatter.format_storage_test(raw)
 
 
 @handle_interface_exceptions(context="storage_health", interface_type="cli")

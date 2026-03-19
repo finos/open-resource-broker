@@ -35,7 +35,7 @@ class ListReturnRequestsOrchestrator(
 
     async def execute(self, input: ListReturnRequestsInput) -> ListReturnRequestsOutput:  # type: ignore[return]
         self._logger.info(
-            "ListReturnRequestsOrchestrator: status=%s limit=%d",
+            "ListReturnRequestsOrchestrator: status=%s limit=%s",
             input.status,
             input.limit,
         )

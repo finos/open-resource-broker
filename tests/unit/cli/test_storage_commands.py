@@ -105,19 +105,30 @@ class TestStorageCommandHandlers:
     @pytest.mark.asyncio
     async def test_handle_test_storage(self):
         """Test storage connection test handler."""
+        from orb.application.dto.interface_response import InterfaceResponse
+        from orb.application.services.response_formatting_service import ResponseFormattingService
+
         args = Namespace(resource="storage", action="test")
 
         with patch("orb.interface.storage_command_handlers.get_container") as mock_get_container:
             mock_query_bus = AsyncMock()
-            mock_query_bus.execute = AsyncMock(return_value={"success": True})
+            mock_query_bus.execute = AsyncMock(return_value={"success": True, "status": "success"})
+
+            mock_formatter = MagicMock(spec=ResponseFormattingService)
+            mock_formatter.format_storage_test.return_value = InterfaceResponse(
+                data={"success": True, "message": "Storage test completed successfully"}, exit_code=0
+            )
 
             mock_container = MagicMock()
-            mock_container.get.return_value = mock_query_bus
+            mock_container.get.side_effect = lambda t: (
+                mock_query_bus if t is not ResponseFormattingService else mock_formatter
+            )
             mock_get_container.return_value = mock_container
 
             result = await handle_test_storage(args)
 
-            assert isinstance(result, dict)
+        assert isinstance(result, InterfaceResponse)
+        assert result.exit_code == 0
 
     @pytest.mark.asyncio
     async def test_handle_storage_health(self):
