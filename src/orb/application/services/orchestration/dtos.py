@@ -49,6 +49,7 @@ class ListRequestsInput:
     sync: bool = False
     offset: int = 0
     template_id: Optional[str] = None
+    request_type: Optional[str] = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -76,6 +77,7 @@ class ReturnMachinesOutput:
 class CancelRequestInput:
     request_id: str
     reason: str = "Cancelled via API"
+    force: bool = False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -92,6 +94,7 @@ class ListMachinesInput:
     request_id: Optional[str] = None
     limit: int = 100
     offset: int = 0
+    timestamp_format: Optional[str] = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -308,7 +311,7 @@ class ListSchedulerStrategiesOutput:
 
 @dataclasses.dataclass(frozen=True)
 class GetSchedulerConfigInput:
-    pass
+    strategy_name: Optional[str] = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -331,7 +334,7 @@ class ListStorageStrategiesOutput:
 
 @dataclasses.dataclass(frozen=True)
 class GetStorageConfigInput:
-    pass
+    strategy_name: Optional[str] = None
 
 
 @dataclasses.dataclass(frozen=True)

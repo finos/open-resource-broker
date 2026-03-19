@@ -105,6 +105,7 @@ async def handle_list_machines(
             request_id=getattr(args, "request_id", None),
             limit=limit,
             offset=offset,
+            timestamp_format=getattr(args, "timestamp_format", None),
         )
     )
     return formatter.format_machine_list(result.machines)

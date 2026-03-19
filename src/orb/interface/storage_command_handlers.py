@@ -47,7 +47,7 @@ async def handle_show_storage_config(
     orchestrator = container.get(GetStorageConfigOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
-    result = await orchestrator.execute(GetStorageConfigInput())
+    result = await orchestrator.execute(GetStorageConfigInput(strategy_name=getattr(args, "strategy", None)))
     return formatter.format_storage_config(result.config)
 
 
@@ -88,7 +88,10 @@ async def handle_test_storage(
 
     from orb.application.dto.queries import ValidateStorageQuery  # type: ignore[attr-defined]
 
-    query = ValidateStorageQuery()
+    query = ValidateStorageQuery(
+        strategy_name=getattr(args, "strategy", None),
+        timeout=getattr(args, "timeout", 30),
+    )
     result = await query_bus.execute(query)
 
     raw = result if isinstance(result, dict) else {"test_result": result}
@@ -110,7 +113,10 @@ async def handle_storage_health(
             GetStorageHealthQuery,  # type: ignore[attr-defined]
         )
 
-        query = GetStorageHealthQuery(verbose=getattr(args, "verbose", False))
+        query = GetStorageHealthQuery(
+            strategy_name=getattr(args, "strategy", None),
+            verbose=getattr(args, "verbose", False),
+        )
         health = await query_bus.execute(query)
         raw = (
             health

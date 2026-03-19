@@ -15,8 +15,6 @@ async def handle_infrastructure_discover(args) -> Dict[str, Any]:
     try:
         if args.provider:
             providers = [_get_provider_config(args.provider)]
-        elif getattr(args, "all_providers", False):
-            providers = _get_active_providers_with_overrides()
         else:
             providers = _get_active_providers_with_overrides()
 
@@ -43,8 +41,6 @@ async def handle_infrastructure_show(args) -> Dict[str, Any]:
     try:
         if args.provider:
             providers = [_get_provider_config(args.provider)]
-        elif getattr(args, "all_providers", False):
-            providers = _get_active_providers_with_overrides()
         else:
             providers = _get_active_providers_with_overrides()
 

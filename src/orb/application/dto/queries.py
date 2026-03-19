@@ -139,6 +139,9 @@ class ValidateStorageQuery(Query, BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
+    strategy_name: Optional[str] = None
+    timeout: int = 30
+
 
 class ValidateMCPQuery(Query, BaseModel):
     """Query to validate MCP configuration."""
