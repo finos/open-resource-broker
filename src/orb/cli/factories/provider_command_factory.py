@@ -6,6 +6,7 @@ from orb.application.provider.commands import ExecuteProviderOperationCommand
 from orb.application.provider.queries import (
     GetProviderCapabilitiesQuery,
     GetProviderHealthQuery,
+    GetProviderMetricsQuery,
     GetProviderStrategyConfigQuery,
     ListAvailableProvidersQuery,
 )
@@ -22,17 +23,21 @@ class ProviderCommandFactory:
     def create_get_provider_health_query(
         self,
         provider_name: Optional[str] = None,
-        include_details: bool = True,
-        include_metrics: bool = False,
-        filter_healthy_only: bool = False,
-        provider_type: Optional[str] = None,
-        filter_expressions: Optional[list] = None,
         **kwargs: Any,
     ) -> GetProviderHealthQuery:
         """Create query to get provider health."""
-        return GetProviderHealthQuery(
+        return GetProviderHealthQuery(provider_name=provider_name)
+
+    def create_get_provider_metrics_query(
+        self,
+        timeframe: Optional[str] = None,
+        provider_name: Optional[str] = None,
+        **kwargs: Any,
+    ) -> GetProviderMetricsQuery:
+        """Create query to get provider metrics."""
+        return GetProviderMetricsQuery(
+            timeframe=timeframe or "24h",
             provider_name=provider_name,
-            include_details=include_details,
         )
 
     def create_list_available_providers_query(
@@ -73,19 +78,11 @@ class ProviderCommandFactory:
 
     def create_get_provider_strategy_config_query(
         self,
-        include_selection_policies: bool = True,
-        include_fallback_config: bool = True,
-        include_health_check_config: bool = True,
-        include_circuit_breaker_config: bool = True,
+        provider_name: Optional[str] = None,
         **kwargs: Any,
     ) -> GetProviderStrategyConfigQuery:
         """Create query to get provider strategy configuration."""
-        return GetProviderStrategyConfigQuery(
-            include_selection_policies=include_selection_policies,
-            include_fallback_config=include_fallback_config,
-            include_health_check_config=include_health_check_config,
-            include_circuit_breaker_config=include_circuit_breaker_config,
-        )
+        return GetProviderStrategyConfigQuery()
 
     def create_execute_provider_operation_command(
         self,

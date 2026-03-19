@@ -195,12 +195,10 @@ def build_registry() -> None:
         handle_request_return_machines,
     )
 
-    register("requests", "create", handle_request_machines)
     register("requests", "show", handle_get_request_status)
     register("requests", "status", handle_get_request_status)
     register("requests", "list", handle_list_requests)
     register("requests", "cancel", handle_cancel_request)
-    register("requests", "return", handle_request_return_machines)
     register("requests", "list-returns", handle_get_return_requests)
 
     # --- machines ---
