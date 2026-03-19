@@ -17,6 +17,7 @@ from providers.azure.exceptions.azure_exceptions import (
     VMNotFoundError,
 )
 from providers.azure.infrastructure.adapters.machine_adapter import AzureMachineAdapter
+from providers.azure.infrastructure.azure_client import AzureClient
 from providers.azure.registration import create_azure_config
 from providers.azure.infrastructure.adapters.azure_validation_adapter import (
     AzureValidationAdapter,
@@ -117,6 +118,31 @@ class TestConfigValidation:
         result = validate_azure_config(c)
         assert result["valid"] is False
         assert any("subscription_id" in e for e in result["errors"])
+
+    def test_azure_client_uses_typed_config_when_active_provider_is_not_azure(self):
+        azure_config = AzureProviderConfig(
+            subscription_id="12345678-1234-1234-1234-123456789012",
+            resource_group="rg-explicit",
+            region="westeurope",
+        )
+        config_port = MagicMock()
+        config_port.get_typed.return_value = azure_config
+        config_port.get_provider_config.return_value = None
+
+        selection_service = MagicMock()
+        selection_service.select_active_provider.return_value = Mock(
+            provider_type="aws",
+            provider_instance="aws-default",
+        )
+        container = MagicMock()
+        container.get.return_value = selection_service
+
+        with patch("infrastructure.di.container.get_container", return_value=container):
+            client = AzureClient(config=config_port, logger=MagicMock())
+
+        assert client.subscription_id == azure_config.subscription_id
+        assert client.resource_group == "rg-explicit"
+        assert client.region_name == "westeurope"
 
 
 class TestAzureValidationAdapter:

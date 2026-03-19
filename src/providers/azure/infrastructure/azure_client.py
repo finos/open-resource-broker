@@ -165,6 +165,29 @@ class AzureClient:
 
         self._azure_config_loaded = True
 
+        typed_config_fallback: Optional[AzureProviderConfig] = None
+        try:
+            typed_config_fallback = self._config_manager.get_typed(AzureProviderConfig)
+            if typed_config_fallback is not None:
+                self._logger.debug("Loaded Azure config from typed configuration fallback")
+        except Exception as e:
+            self._logger.debug(
+                "Could not get Azure config from legacy config: %s", str(e)
+            )
+
+        provider_config = None
+        try:
+            provider_config = self._config_manager.get_provider_config()
+        except Exception as e:
+            self._logger.debug(
+                "Could not get provider config from config manager: %s", str(e)
+            )
+
+        # For per-instance DI shims, the typed Azure config is already authoritative.
+        if provider_config is None and typed_config_fallback is not None:
+            self._azure_config = typed_config_fallback
+            return typed_config_fallback
+
         # --- Primary: provider selection service --------------------------
         try:
             from application.services.provider_selection_service import (
@@ -183,11 +206,17 @@ class AzureClient:
             )
 
             if selection_result.provider_type not in ("azure", "Azure"):
+                if typed_config_fallback is not None:
+                    self._logger.debug(
+                        "Selected provider is not Azure (%s); using typed Azure config fallback",
+                        selection_result.provider_type,
+                    )
+                    self._azure_config = typed_config_fallback
+                    return typed_config_fallback
                 raise AzureConfigurationError(
                     f"Selected provider is not Azure: {selection_result.provider_type}"
                 )
 
-            provider_config = self._config_manager.get_provider_config()
             if provider_config:
                 for provider in provider_config.providers:
                     if provider.name == selection_result.provider_instance:
@@ -237,14 +266,9 @@ class AzureClient:
             )
 
         # --- Fallback: legacy typed config --------------------------------
-        try:
-            azure_provider_config = self._config_manager.get_typed(AzureProviderConfig)
-            self._azure_config = azure_provider_config
-            return azure_provider_config
-        except Exception as e:
-            self._logger.debug(
-                "Could not get Azure config from legacy config: %s", str(e)
-            )
+        if typed_config_fallback is not None:
+            self._azure_config = typed_config_fallback
+            return typed_config_fallback
 
         return None
 
