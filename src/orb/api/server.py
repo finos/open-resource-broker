@@ -170,10 +170,12 @@ def create_fastapi_app(server_config: Any) -> Any:
 
         try:
             health_port = get_container().get(HealthCheckPort)
+            health_port.run_all_checks()
             status = health_port.get_status()
         except Exception:
             status = {"status": "unknown"}
 
+        status = {"service": "open-resource-broker", "version": __version__, **status}
         http_status = 503 if status.get("status") == "unhealthy" else 200
         return JSONResponse(content=status, status_code=http_status)  # type: ignore[misc]
 
