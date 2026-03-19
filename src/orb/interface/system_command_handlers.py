@@ -1,6 +1,6 @@
 """System-related command handlers for the interface layer."""
 
-from typing import Any, Union
+from typing import Any, Union, cast
 
 from orb.application.dto.interface_response import InterfaceResponse
 from orb.domain.constants import PROVIDER_TYPE_AWS
@@ -79,13 +79,21 @@ async def handle_validate_provider_config(args) -> dict[str, Any]:
 
 
 @handle_interface_exceptions(context="reload_provider_config", interface_type="cli")
-async def handle_reload_provider_config(args) -> dict[str, Any]:
+async def handle_reload_provider_config(args) -> Union[dict[str, Any], InterfaceResponse]:
     """Handle reload provider config operations."""
-    return {
-        "error": "Not implemented",
-        "endpoint": "reload_provider_config",
-        "message": "Provider configuration reload is planned but not yet available.",
-    }
+    from orb.application.services.provider_registry_service import ProviderRegistryService
+    from orb.application.services.response_formatting_service import ResponseFormattingService
+
+    container = get_container()
+    formatter = container.get(ResponseFormattingService)
+    try:
+        registry = container.get(ProviderRegistryService)
+        if hasattr(registry, "reload"):
+            await cast(Any, registry).reload()
+            return formatter.format_success({"message": "Provider configuration reloaded"})
+        return formatter.format_error("Reload not supported by current provider registry")
+    except Exception as e:
+        return formatter.format_error(f"Reload failed: {e}")
 
 
 @handle_interface_exceptions(context="select_provider_strategy", interface_type="cli")
@@ -180,5 +188,4 @@ async def handle_system_metrics(args) -> dict[str, Any]:
             "message": "System metrics retrieved successfully",
         }
     except Exception as e:
-        # Gracefully handle any issues retrieving metrics
         return {"metrics": {}, "error": str(e), "message": "Failed to retrieve system metrics"}
