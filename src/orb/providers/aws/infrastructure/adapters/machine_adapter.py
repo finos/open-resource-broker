@@ -38,6 +38,17 @@ class AWSMachineAdapter:
         self._aws_client = aws_client
         self._logger = logger
 
+    @staticmethod
+    def _extract_status_reason(aws_instance_data: dict) -> str | None:
+        """Extract status reason from AWS instance data (PascalCase or snake_case)."""
+        sr = aws_instance_data.get("StateReason") or aws_instance_data.get("state_reason") or {}
+        return (
+            (sr.get("Message") or sr.get("message") if isinstance(sr, dict) else None)
+            or aws_instance_data.get("StateTransitionReason")
+            or aws_instance_data.get("state_transition_reason")
+            or None
+        )
+
     def _resolve_machine_name(self, aws_instance_data: dict) -> str:
         """
         Resolve machine name using priority order:
@@ -119,12 +130,7 @@ class AWSMachineAdapter:
                 machine_data["name"] = self._resolve_machine_name(aws_instance_data)
                 machine_data["private_dns_name"] = aws_instance_data.get("PrivateDnsName")
                 machine_data["public_dns_name"] = aws_instance_data.get("PublicDnsName")
-                _sr = aws_instance_data.get("state_reason", {})
-                machine_data["status_reason"] = (
-                    (_sr.get("message") if isinstance(_sr, dict) else None)
-                    or aws_instance_data.get("state_transition_reason")
-                    or None
-                )
+                machine_data["status_reason"] = self._extract_status_reason(aws_instance_data)
 
                 # Log DNS data for debugging
                 self._logger.info(
@@ -176,13 +182,7 @@ class AWSMachineAdapter:
                         "private_dns_name": aws_instance_data.get("PrivateDnsName"),
                         "public_dns_name": aws_instance_data.get("PublicDnsName"),
                         "launch_time": aws_instance_data.get("LaunchTime"),
-                        "status_reason": (
-                            lambda _sr: (
-                                (_sr.get("Message") if isinstance(_sr, dict) else None)
-                                or aws_instance_data.get("StateTransitionReason")
-                                or None
-                            )
-                        )(aws_instance_data.get("StateReason", {})),
+                        "status_reason": self._extract_status_reason(aws_instance_data),
                         "provider_api": provider_api,
                         "resource_id": resource_id,
                         "price_type": PriceType.ON_DEMAND.value,
@@ -239,13 +239,7 @@ class AWSMachineAdapter:
                     "private_dns_name": aws_instance_data.get("PrivateDnsName"),
                     "public_dns_name": aws_instance_data.get("PublicDnsName"),
                     "launch_time": aws_instance_data.get("LaunchTime"),
-                    "status_reason": (
-                        lambda _sr: (
-                            (_sr.get("Message") if isinstance(_sr, dict) else None)
-                            or aws_instance_data.get("StateTransitionReason")
-                            or None
-                        )
-                    )(aws_instance_data.get("StateReason", {})),
+                    "status_reason": self._extract_status_reason(aws_instance_data),
                     "provider_api": provider_api,
                     "resource_id": resource_id,
                     "price_type": (
