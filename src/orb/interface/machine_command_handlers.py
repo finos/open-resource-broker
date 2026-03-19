@@ -84,11 +84,15 @@ async def handle_list_machines(args: "argparse.Namespace") -> Union[dict[str, An
     orchestrator = container.get(ListMachinesOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
+    _limit = getattr(args, "limit", None)
+    _offset = getattr(args, "offset", None)
     result = await orchestrator.execute(
         ListMachinesInput(
             status=getattr(args, "status", None),
             provider_name=getattr(args, "provider", None),
             request_id=getattr(args, "request_id", None),
+            limit=int(_limit) if _limit is not None else 100,
+            offset=int(_offset) if _offset is not None else 0,
         )
     )
     return formatter.format_machine_list(result.machines)

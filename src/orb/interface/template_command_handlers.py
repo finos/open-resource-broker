@@ -39,8 +39,18 @@ async def handle_list_templates(args: argparse.Namespace) -> Union[dict[str, Any
         provider_name = getattr(args, "provider_api", None) or getattr(args, "provider_name", None)
         active_only = getattr(args, "active_only", True)
 
+    limit = getattr(args, "limit", None)
+    offset = getattr(args, "offset", None)
+    provider_api = getattr(args, "provider_api", None) if not (hasattr(args, "input_data") and args.input_data) else None
+
     result = await orchestrator.execute(
-        ListTemplatesInput(active_only=active_only, provider_name=provider_name)
+        ListTemplatesInput(
+            active_only=active_only,
+            provider_name=provider_name,
+            provider_api=provider_api,
+            limit=limit if limit is not None else 50,
+            offset=offset if offset is not None else 0,
+        )
     )
 
     if not result.templates:
@@ -69,7 +79,8 @@ async def handle_get_template(args: argparse.Namespace) -> Union[dict[str, Any],
     orchestrator = container.get(GetTemplateOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
-    result = await orchestrator.execute(GetTemplateInput(template_id=template_id))
+    provider_name = getattr(args, "provider_name", None)
+    result = await orchestrator.execute(GetTemplateInput(template_id=template_id, provider_name=provider_name))
 
     if not result.template:
         return {

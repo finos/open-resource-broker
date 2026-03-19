@@ -174,7 +174,14 @@ async def handle_get_return_requests(args: "argparse.Namespace") -> Union[dict[s
     orchestrator = container.get(ListReturnRequestsOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
-    result = await orchestrator.execute(ListReturnRequestsInput())
+    status = getattr(args, "status", None)
+    limit = getattr(args, "limit", None)
+    result = await orchestrator.execute(
+        ListReturnRequestsInput(
+            status=status,
+            limit=limit if limit is not None else 50,
+        )
+    )
     return formatter.format_request_status(result.requests)
 
 
