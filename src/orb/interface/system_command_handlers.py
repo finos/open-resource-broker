@@ -9,20 +9,12 @@ from orb.monitoring.metrics import MetricsCollector
 
 
 @handle_interface_exceptions(context="system_health", interface_type="cli")
-async def handle_system_health(args) -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_system_health(args) -> InterfaceResponse:
     """Handle system health check."""
-    import asyncio
-
     from orb.interface.health_command_handler import handle_health_check
 
-    loop = asyncio.get_running_loop()
-    try:
-        return await loop.run_in_executor(None, handle_health_check, args)
-    except Exception as e:
-        from orb.application.services.response_formatting_service import ResponseFormattingService
-
-        formatter = get_container().get(ResponseFormattingService)
-        return formatter.format_error(f"Health check failed: {e}")
+    result = handle_health_check(args)
+    return InterfaceResponse(data=result, exit_code=0 if result.get("success") else 1)
 
 
 @handle_interface_exceptions(context="provider_health", interface_type="cli")

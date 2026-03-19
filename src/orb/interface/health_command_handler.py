@@ -126,7 +126,7 @@ def handle_health_check(args) -> dict[str, Any]:
                         if health_status and health_status.is_healthy:
                             healthy_count += 1
                         elif health_status:
-                            errors.append(f"{provider_name}: {health_status.message}")
+                            errors.append(f"{provider_name}: {health_status.status_message}")
                         else:
                             errors.append(f"{provider_name}: No health data available")
                     except Exception as e:
