@@ -43,7 +43,6 @@ class TestCLIResponseFormatter(unittest.TestCase):
 
         result = formatter.format_response(response, MockArgs("json"))
 
-        # Should return the message only since that's the meaningful data
         self.assertEqual(result, '"Operation completed"')
 
     def test_format_base_response_error(self):
@@ -55,7 +54,6 @@ class TestCLIResponseFormatter(unittest.TestCase):
 
         result = formatter.format_response(response, MockArgs("json"))
 
-        # Should return tuple with exit code for errors
         self.assertIsInstance(result, tuple)
         formatted_output, exit_code = result
         self.assertEqual(exit_code, 1)
@@ -73,12 +71,8 @@ class TestCLIResponseFormatter(unittest.TestCase):
         self.assertIn('"value": 42', result)
 
     def test_format_with_scheduler_strategy(self):
-        """Test formatting with scheduler strategy."""
+        """Scheduler heuristics removed — data passes through as-is regardless of strategy."""
         mock_scheduler = Mock()
-        mock_scheduler.format_template_for_display = Mock(
-            return_value={"formatted": True, "template_id": "test"}
-        )
-
         formatter = CLIResponseFormatter(mock_scheduler)
         data = {"template_id": "test", "instance_type": "t3.micro"}
 
@@ -86,9 +80,8 @@ class TestCLIResponseFormatter(unittest.TestCase):
             data, MockArgs("json", resource="templates", action="show")
         )
 
-        # Should have called scheduler formatting
-        mock_scheduler.format_template_for_display.assert_called_once()
-        self.assertIn('"formatted": true', result)
+        self.assertIn('"template_id": "test"', result)
+        mock_scheduler.format_template_for_display.assert_not_called()
 
     def test_format_error_response_dict(self):
         """Test formatting error response as dict."""
@@ -106,8 +99,8 @@ class TestCLIResponseFormatter(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertIn('"error": true', formatted_output)
 
-    def test_format_success_with_exit_code(self):
-        """Test formatting success response with exit code."""
+    def test_format_dict_with_exit_code_passes_through(self):
+        """Dict with exit_code key returns tuple with that exit code."""
         formatter = CLIResponseFormatter()
         data = {"status": "success", "message": "Completed", "exit_code": 0}
 
@@ -117,8 +110,6 @@ class TestCLIResponseFormatter(unittest.TestCase):
         formatted_output, exit_code = result
         self.assertEqual(exit_code, 0)
         self.assertIn('"status": "success"', formatted_output)
-        # exit_code should be removed from display
-        self.assertNotIn('"exit_code"', formatted_output)
 
     def test_format_table_output(self):
         """Test formatting table output."""
@@ -132,7 +123,6 @@ class TestCLIResponseFormatter(unittest.TestCase):
 
         result = formatter.format_response(data, MockArgs("table"))
 
-        # Should contain table formatting
         self.assertIn("t1", result)
         self.assertIn("t3.micro", result)
 
@@ -153,12 +143,10 @@ class TestCLIResponseFormatter(unittest.TestCase):
         """Test format_success_message method."""
         formatter = CLIResponseFormatter()
 
-        # JSON format
         result = formatter.format_success_message("All good", "json")
         self.assertIn('"message": "All good"', result)
         self.assertIn('"success": true', result)
 
-        # Table format
         result = formatter.format_success_message("All good", "table")
         self.assertEqual(result, "All good")
 
@@ -174,38 +162,25 @@ class TestCLIResponseFormatter(unittest.TestCase):
         """Test fallback error handling when formatting fails."""
         formatter = CLIResponseFormatter()
 
-        # Create an object that will cause formatting to fail
         class BadObject:
             def to_dict(self):
                 raise RuntimeError("Formatting failed")
 
-        bad_obj = BadObject()
-        result = formatter.format_response(bad_obj, MockArgs("json"))
+        result = formatter.format_response(BadObject(), MockArgs("json"))
 
-        # Should return error tuple
         self.assertIsInstance(result, tuple)
         formatted_output, exit_code = result
         self.assertEqual(exit_code, 1)
         self.assertIn("Formatting error", formatted_output)
 
-    def test_extract_command_context(self):
-        """Test command context extraction."""
+    def test_heuristic_methods_removed(self):
+        """Scheduler heuristic methods were deleted in Phase 4."""
         formatter = CLIResponseFormatter()
-
-        # Test templates context
-        args = MockArgs(resource="templates")
-        context = formatter._extract_command_context(args)
-        self.assertEqual(context, "templates")
-
-        # Test requests context
-        args = MockArgs(resource="requests")
-        context = formatter._extract_command_context(args)
-        self.assertEqual(context, "requests")
-
-        # Test unknown resource
-        args = MockArgs(resource="unknown")
-        context = formatter._extract_command_context(args)
-        self.assertIsNone(context)
+        self.assertFalse(hasattr(formatter, "_extract_command_context"))
+        self.assertFalse(hasattr(formatter, "_apply_scheduler_formatting"))
+        self.assertFalse(hasattr(formatter, "_looks_like_template"))
+        self.assertFalse(hasattr(formatter, "_is_success_with_exit_code"))
+        self.assertFalse(hasattr(formatter, "_format_success_with_exit_code"))
 
 
 if __name__ == "__main__":

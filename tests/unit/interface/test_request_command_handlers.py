@@ -8,7 +8,6 @@ import pytest
 from orb.application.dto.interface_response import InterfaceResponse
 from orb.application.ports.scheduler_port import SchedulerPort
 from orb.application.services.orchestration.acquire_machines import AcquireMachinesOrchestrator
-from orb.application.services.response_formatting_service import ResponseFormattingService
 from orb.application.services.orchestration.cancel_request import CancelRequestOrchestrator
 from orb.application.services.orchestration.dtos import (
     AcquireMachinesOutput,
@@ -24,6 +23,7 @@ from orb.application.services.orchestration.list_return_requests import (
     ListReturnRequestsOrchestrator,
 )
 from orb.application.services.orchestration.return_machines import ReturnMachinesOrchestrator
+from orb.application.services.response_formatting_service import ResponseFormattingService
 from orb.interface.request_command_handlers import (
     handle_cancel_request,
     handle_get_request_status,

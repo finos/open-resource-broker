@@ -16,12 +16,13 @@ def _make_args(**kwargs) -> argparse.Namespace:
 def _make_container(command_bus=None, query_bus=None, orchestrator=None):
     container = MagicMock()
 
-    from orb.application.ports.scheduler_port import SchedulerPort
+    from orb.application.dto.interface_response import InterfaceResponse
     from orb.application.services.orchestration.create_template import CreateTemplateOrchestrator
+    from orb.application.services.response_formatting_service import ResponseFormattingService
     from orb.infrastructure.di.buses import CommandBus, QueryBus
 
-    mock_scheduler = MagicMock(spec=SchedulerPort)
-    mock_scheduler.format_template_mutation_response.return_value = {"success": True}
+    mock_formatter = MagicMock(spec=ResponseFormattingService)
+    mock_formatter.format_template_mutation.return_value = InterfaceResponse(data={"success": True})
 
     def _get(cls):
         if cls is CommandBus:
@@ -30,8 +31,8 @@ def _make_container(command_bus=None, query_bus=None, orchestrator=None):
             return query_bus
         if cls is CreateTemplateOrchestrator:
             return orchestrator
-        if cls is SchedulerPort:
-            return mock_scheduler
+        if cls is ResponseFormattingService:
+            return mock_formatter
         return MagicMock()
 
     container.get.side_effect = _get
@@ -110,5 +111,5 @@ class TestHandleCreateTemplateValidateOnly:
                 result = asyncio.run(handle_create_template(args))
 
         mock_orchestrator.execute.assert_called_once()
-        assert result["success"] is True
-        assert result.get("validate_only") is None
+        assert result.data["success"] is True
+        assert result.data.get("validate_only") is None

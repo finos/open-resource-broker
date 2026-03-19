@@ -24,6 +24,15 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
     - Simple integration for systems using domain format directly
     """
 
+    _STATUS_REASON_DEFAULTS: dict[str, str] = {
+        "terminated": "Instance has been terminated",
+        "shutting-down": "Instance is shutting down",
+        "stopping": "Instance is stopping",
+        "stopped": "Instance has been stopped",
+        "running": "Instance is running",
+        "pending": "Instance is starting up",
+    }
+
     def __init__(
         self,
         template_defaults_service: "TemplateDefaultsPort | None" = None,
@@ -180,30 +189,36 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
         if "instance_type" not in d:
             machine_types = d.get("machine_types", {})
             d["instance_type"] = next(iter(machine_types), "") if machine_types else ""
-        return d
+        return {k: v for k, v in d.items() if v is not None and v != {} and v != []}
 
     def format_templates_for_dispatch(self, templates: list[dict]) -> list[dict]:
         """No conversion needed - use field mapper (identity mapping)."""
         return self.field_mapper.format_for_generation(templates)
 
     def format_machine_status_response(self, machines: list[Machine]) -> dict[str, Any]:
-        """
-        Format domain Machines to native domain response format.
-
-        Uses the Machine's model_dump() method to serialize to native format.
-        """
+        """Format domain Machines to native domain response format."""
+        result = []
+        for machine in machines:
+            d = machine.model_dump()
+            if not d.get("status_reason"):
+                d["status_reason"] = self._STATUS_REASON_DEFAULTS.get(str(d.get("status", "")))
+            # Strip None, empty dicts, empty lists
+            d = {k: v for k, v in d.items() if v is not None and v != {} and v != []}
+            result.append(d)
         return {
-            "machines": [machine.model_dump() for machine in machines],
+            "machines": result,
             "message": "Machine status retrieved successfully",
             "count": len(machines),
         }
 
     def format_machine_details_response(self, machine_data: dict) -> dict:
         """Format machine details with default fields."""
-        return {
+        status = machine_data.get("status")
+        status_reason = machine_data.get("status_reason") or self._STATUS_REASON_DEFAULTS.get(str(status or ""))
+        raw = {
             "id": machine_data.get("id"),
             "name": machine_data.get("name"),
-            "status": machine_data.get("status"),
+            "status": status,
             "provider": "default",
             "instance_type": machine_data.get("instance_type"),
             "region": machine_data.get("region"),
@@ -212,11 +227,12 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
             "public_ip": machine_data.get("public_ip"),
             "subnet_id": machine_data.get("subnet_id"),
             "security_group_ids": machine_data.get("security_group_ids"),
-            "status_reason": machine_data.get("status_reason"),
+            "status_reason": status_reason,
             "launch_time": machine_data.get("launch_time"),
             "termination_time": machine_data.get("termination_time"),
             "tags": machine_data.get("tags"),
         }
+        return {k: v for k, v in raw.items() if v is not None and v != {} and v != []}
 
     def should_log_to_console(self) -> bool:
         """Check if logs should be written to console for Default scheduler.
@@ -256,14 +272,6 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
             return workdir
         else:
             return workdir
-
-    def format_template_mutation_response(self, raw: dict[str, Any]) -> dict[str, Any]:
-        """Format template mutation response using snake_case keys."""
-        return {
-            "template_id": raw.get("template_id"),
-            "status": raw.get("status"),
-            "validation_errors": raw.get("validation_errors", []),
-        }
 
     def format_request_response(self, request_data: Any) -> dict[str, Any]:
         """Format request creation response to native domain format."""

@@ -4,7 +4,12 @@ import argparse
 
 import pytest
 
-from orb.cli.args import add_machine_actions, add_provider_actions, add_request_actions, add_template_actions
+from orb.cli.args import (
+    add_machine_actions,
+    add_provider_actions,
+    add_request_actions,
+    add_template_actions,
+)
 from orb.cli.args_extractor import ArgsExtractor
 from orb.domain.machine.machine_status import MachineStatus
 
