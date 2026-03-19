@@ -88,19 +88,29 @@ class TestStorageCommandHandlers:
     @pytest.mark.asyncio
     async def test_handle_validate_storage_config(self):
         """Test validate storage configuration handler."""
+        from orb.application.dto.interface_response import InterfaceResponse
+        from orb.application.services.response_formatting_service import ResponseFormattingService
+
         args = Namespace(resource="storage", action="validate")
 
         with patch("orb.interface.storage_command_handlers.get_container") as mock_get_container:
             mock_query_bus = AsyncMock()
             mock_query_bus.execute = AsyncMock(return_value={"valid": True, "errors": []})
 
+            mock_formatter = MagicMock(spec=ResponseFormattingService)
+            mock_formatter.format_success = MagicMock(
+                return_value=InterfaceResponse(data={"status": "healthy", "message": "Storage configuration is valid"})
+            )
+
             mock_container = MagicMock()
-            mock_container.get.return_value = mock_query_bus
+            mock_container.get.side_effect = lambda t: (
+                mock_formatter if t is ResponseFormattingService else mock_query_bus
+            )
             mock_get_container.return_value = mock_container
 
             result = await handle_validate_storage_config(args)
 
-            assert isinstance(result, dict)
+            assert isinstance(result, InterfaceResponse)
 
     @pytest.mark.asyncio
     async def test_handle_test_storage(self):
@@ -134,36 +144,56 @@ class TestStorageCommandHandlers:
     @pytest.mark.asyncio
     async def test_handle_storage_health(self):
         """Test storage health check handler."""
+        from orb.application.dto.interface_response import InterfaceResponse
+        from orb.application.services.response_formatting_service import ResponseFormattingService
+
         args = Namespace(resource="storage", action="health")
 
         with patch("orb.interface.storage_command_handlers.get_container") as mock_get_container:
             mock_query_bus = AsyncMock()
             mock_query_bus.execute = AsyncMock(return_value={"status": "healthy"})
 
+            mock_formatter = MagicMock(spec=ResponseFormattingService)
+            mock_formatter.format_config = MagicMock(
+                return_value=InterfaceResponse(data={"status": "healthy"})
+            )
+
             mock_container = MagicMock()
-            mock_container.get.return_value = mock_query_bus
+            mock_container.get.side_effect = lambda t: (
+                mock_formatter if t is ResponseFormattingService else mock_query_bus
+            )
             mock_get_container.return_value = mock_container
 
             result = await handle_storage_health(args)
 
-            assert isinstance(result, dict)
+            assert isinstance(result, InterfaceResponse)
 
     @pytest.mark.asyncio
     async def test_handle_storage_metrics(self):
         """Test storage metrics handler."""
+        from orb.application.dto.interface_response import InterfaceResponse
+        from orb.application.services.response_formatting_service import ResponseFormattingService
+
         args = Namespace(resource="storage", action="metrics")
 
         with patch("orb.interface.storage_command_handlers.get_container") as mock_get_container:
             mock_query_bus = AsyncMock()
             mock_query_bus.execute = AsyncMock(return_value={"operations": 100})
 
+            mock_formatter = MagicMock(spec=ResponseFormattingService)
+            mock_formatter.format_config = MagicMock(
+                return_value=InterfaceResponse(data={"operations": 100})
+            )
+
             mock_container = MagicMock()
-            mock_container.get.return_value = mock_query_bus
+            mock_container.get.side_effect = lambda t: (
+                mock_formatter if t is ResponseFormattingService else mock_query_bus
+            )
             mock_get_container.return_value = mock_container
 
             result = await handle_storage_metrics(args)
 
-            assert isinstance(result, dict)
+            assert isinstance(result, InterfaceResponse)
 
 
 class TestStorageHandlerImports:
