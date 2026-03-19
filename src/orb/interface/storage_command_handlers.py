@@ -14,7 +14,9 @@ if TYPE_CHECKING:
 
 
 @handle_interface_exceptions(context="list_storage_strategies", interface_type="cli")
-async def handle_list_storage_strategies(args: "argparse.Namespace") -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_list_storage_strategies(
+    args: "argparse.Namespace",
+) -> Union[dict[str, Any], InterfaceResponse]:
     """Handle list storage strategies operations."""
     from orb.application.services.orchestration.dtos import ListStorageStrategiesInput
     from orb.application.services.orchestration.list_storage_strategies import (
@@ -32,7 +34,9 @@ async def handle_list_storage_strategies(args: "argparse.Namespace") -> Union[di
 
 
 @handle_interface_exceptions(context="show_storage_config", interface_type="cli")
-async def handle_show_storage_config(args: "argparse.Namespace") -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_show_storage_config(
+    args: "argparse.Namespace",
+) -> Union[dict[str, Any], InterfaceResponse]:
     """Handle show storage configuration operations."""
     from orb.application.services.orchestration.dtos import GetStorageConfigInput
     from orb.application.services.orchestration.get_storage_config import (

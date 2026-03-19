@@ -11,9 +11,7 @@ from orb.application.services.orchestration.dtos import (
 from orb.domain.base.ports.logging_port import LoggingPort
 
 
-class GetStorageConfigOrchestrator(
-    OrchestratorBase[GetStorageConfigInput, GetStorageConfigOutput]
-):
+class GetStorageConfigOrchestrator(OrchestratorBase[GetStorageConfigInput, GetStorageConfigOutput]):
     """Orchestrator for retrieving storage configuration."""
 
     def __init__(self, query_bus: QueryBusPort, logger: LoggingPort) -> None:

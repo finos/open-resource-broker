@@ -468,7 +468,11 @@ class ORBClient:
             )
         )
         scheduler = self._container.get_optional(SchedulerPort)
-        raw = {"request_id": result.request_id, "status": result.status, "machine_ids": result.machine_ids}
+        raw = {
+            "request_id": result.request_id,
+            "status": result.status,
+            "machine_ids": result.machine_ids,
+        }
         if scheduler is not None:
             return scheduler.format_request_response(raw)
         return raw
@@ -545,7 +549,12 @@ class ORBClient:
             )
         )
         scheduler = self._container.get_optional(SchedulerPort)
-        raw = {"request_id": result.request_id, "status": result.status, "message": result.message, "skipped_machines": result.skipped_machines}
+        raw = {
+            "request_id": result.request_id,
+            "status": result.status,
+            "message": result.message,
+            "skipped_machines": result.skipped_machines,
+        }
         if scheduler is not None:
             return scheduler.format_request_response(raw)
         return raw
@@ -711,7 +720,12 @@ class ORBClient:
             )
         )
         scheduler = self._container.get_optional(SchedulerPort)
-        raw = {"template_id": result.template_id, "status": "created" if result.created else "validation_failed", "created": result.created, "validation_errors": result.validation_errors}
+        raw = {
+            "template_id": result.template_id,
+            "status": "created" if result.created else "validation_failed",
+            "created": result.created,
+            "validation_errors": result.validation_errors,
+        }
         if scheduler is not None:
             return scheduler.format_template_mutation_response(raw)
         return raw
@@ -745,7 +759,12 @@ class ORBClient:
             )
         )
         scheduler = self._container.get_optional(SchedulerPort)
-        raw = {"template_id": result.template_id, "status": "updated" if result.updated else "validation_failed", "updated": result.updated, "validation_errors": result.validation_errors}
+        raw = {
+            "template_id": result.template_id,
+            "status": "updated" if result.updated else "validation_failed",
+            "updated": result.updated,
+            "validation_errors": result.validation_errors,
+        }
         if scheduler is not None:
             return scheduler.format_template_mutation_response(raw)
         return raw
@@ -769,7 +788,11 @@ class ORBClient:
         except EntityNotFoundError:
             raise NotFoundError("Template", template_id)
         scheduler = self._container.get_optional(SchedulerPort)
-        raw = {"template_id": result.template_id, "status": "deleted" if result.deleted else "not_found", "deleted": result.deleted}
+        raw = {
+            "template_id": result.template_id,
+            "status": "deleted" if result.deleted else "not_found",
+            "deleted": result.deleted,
+        }
         if scheduler is not None:
             return scheduler.format_template_mutation_response(raw)
         return raw
@@ -794,7 +817,13 @@ class ORBClient:
             )
         )
         scheduler = self._container.get_optional(SchedulerPort)
-        raw = {"template_id": result.template_id, "status": "validated", "valid": result.valid, "validation_errors": result.errors, "message": result.message}
+        raw = {
+            "template_id": result.template_id,
+            "status": "validated",
+            "valid": result.valid,
+            "validation_errors": result.errors,
+            "message": result.message,
+        }
         if scheduler is not None:
             return scheduler.format_template_mutation_response(raw)
         return raw

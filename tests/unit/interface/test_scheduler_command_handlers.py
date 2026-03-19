@@ -37,7 +37,11 @@ class TestSchedulerCommandHandlers:
             )
             mock_formatter = MagicMock(spec=ResponseFormattingService)
             mock_formatter.format_scheduler_strategy_list.return_value = InterfaceResponse(
-                data={"strategies": ["simple", "advanced"], "current_strategy": "simple", "count": 2}
+                data={
+                    "strategies": ["simple", "advanced"],
+                    "current_strategy": "simple",
+                    "count": 2,
+                }
             )
 
             mock_container.get.side_effect = lambda t: {

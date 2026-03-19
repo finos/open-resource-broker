@@ -69,10 +69,15 @@ class TestMachinesRouter:
 
     def _make_formatter(self):
         from orb.application.dto.interface_response import InterfaceResponse
+
         formatter = MagicMock()
-        formatter.format_request_operation.return_value = InterfaceResponse(data={"request_id": "req-abc", "message": "ok"})
+        formatter.format_request_operation.return_value = InterfaceResponse(
+            data={"request_id": "req-abc", "message": "ok"}
+        )
         formatter.format_machine_list.return_value = InterfaceResponse(data={"machines": []})
-        formatter.format_machine_detail.return_value = InterfaceResponse(data={"machine_id": "i-123"})
+        formatter.format_machine_detail.return_value = InterfaceResponse(
+            data={"machine_id": "i-123"}
+        )
         return formatter
 
     def _override_acquire(self, app, output: AcquireMachinesOutput):
@@ -105,9 +110,7 @@ class TestMachinesRouter:
         return f
 
     def test_request_machines_happy_path(self, machines_app):
-        output = AcquireMachinesOutput(
-            request_id="req-abc", status="pending"
-        )
+        output = AcquireMachinesOutput(request_id="req-abc", status="pending")
         orch = self._override_acquire(machines_app, output)
         scheduler = self._set_scheduler(machines_app)
         client = TestClient(machines_app, raise_server_exceptions=False)
@@ -165,9 +168,7 @@ class TestMachinesRouter:
         assert resp.status_code == 422
 
     def test_return_machines_happy_path(self, machines_app):
-        output = ReturnMachinesOutput(
-            request_id="ret-1", status="pending"
-        )
+        output = ReturnMachinesOutput(request_id="ret-1", status="pending")
         orch = self._override_return(machines_app, output)
         self._set_scheduler(machines_app)
         client = TestClient(machines_app, raise_server_exceptions=False)
@@ -278,9 +279,12 @@ class TestRequestsRouter:
 
     def _make_formatter(self):
         from orb.application.dto.interface_response import InterfaceResponse
+
         formatter = MagicMock()
         formatter.format_request_status.return_value = InterfaceResponse(data={"requests": []})
-        formatter.format_request_operation.return_value = InterfaceResponse(data={"request_id": "req-789", "status": "cancelled"})
+        formatter.format_request_operation.return_value = InterfaceResponse(
+            data={"request_id": "req-789", "status": "cancelled"}
+        )
         return formatter
 
     def _set_scheduler(self, app, scheduler=None):

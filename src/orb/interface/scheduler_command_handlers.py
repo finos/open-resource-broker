@@ -14,7 +14,9 @@ if TYPE_CHECKING:
 
 
 @handle_interface_exceptions(context="list_scheduler_strategies", interface_type="cli")
-async def handle_list_scheduler_strategies(args: "argparse.Namespace") -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_list_scheduler_strategies(
+    args: "argparse.Namespace",
+) -> Union[dict[str, Any], InterfaceResponse]:
     """Handle list scheduler strategies operations."""
     from orb.application.services.orchestration.dtos import ListSchedulerStrategiesInput
     from orb.application.services.orchestration.list_scheduler_strategies import (
@@ -32,7 +34,9 @@ async def handle_list_scheduler_strategies(args: "argparse.Namespace") -> Union[
 
 
 @handle_interface_exceptions(context="show_scheduler_config", interface_type="cli")
-async def handle_show_scheduler_config(args: "argparse.Namespace") -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_show_scheduler_config(
+    args: "argparse.Namespace",
+) -> Union[dict[str, Any], InterfaceResponse]:
     """Handle show scheduler configuration operations."""
     from orb.application.services.orchestration.dtos import GetSchedulerConfigInput
     from orb.application.services.orchestration.get_scheduler_config import (

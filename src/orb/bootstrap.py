@@ -147,7 +147,8 @@ class Application:
             if hasattr(self, "_provider_registry") and self._provider_registry:
                 _instances = self._provider_registry.get_registered_provider_instances()
                 self.logger.info(
-                    "Open Resource Broker initialized successfully with provider instances: %s", _instances
+                    "Open Resource Broker initialized successfully with provider instances: %s",
+                    _instances,
                 )
             else:
                 self.logger.info(

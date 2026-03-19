@@ -121,8 +121,10 @@ class AWSMachineAdapter:
                 machine_data["public_dns_name"] = aws_instance_data.get("PublicDnsName")
                 _sr = aws_instance_data.get("state_reason", {})
                 machine_data["status_reason"] = (
-                    _sr.get("message") if isinstance(_sr, dict) else None
-                ) or aws_instance_data.get("state_transition_reason") or None
+                    (_sr.get("message") if isinstance(_sr, dict) else None)
+                    or aws_instance_data.get("state_transition_reason")
+                    or None
+                )
 
                 # Log DNS data for debugging
                 self._logger.info(
@@ -176,8 +178,10 @@ class AWSMachineAdapter:
                         "launch_time": aws_instance_data.get("LaunchTime"),
                         "status_reason": (
                             lambda _sr: (
-                                _sr.get("Message") if isinstance(_sr, dict) else None
-                            ) or aws_instance_data.get("StateTransitionReason") or None
+                                (_sr.get("Message") if isinstance(_sr, dict) else None)
+                                or aws_instance_data.get("StateTransitionReason")
+                                or None
+                            )
                         )(aws_instance_data.get("StateReason", {})),
                         "provider_api": provider_api,
                         "resource_id": resource_id,
@@ -237,8 +241,10 @@ class AWSMachineAdapter:
                     "launch_time": aws_instance_data.get("LaunchTime"),
                     "status_reason": (
                         lambda _sr: (
-                            _sr.get("Message") if isinstance(_sr, dict) else None
-                        ) or aws_instance_data.get("StateTransitionReason") or None
+                            (_sr.get("Message") if isinstance(_sr, dict) else None)
+                            or aws_instance_data.get("StateTransitionReason")
+                            or None
+                        )
                     )(aws_instance_data.get("StateReason", {})),
                     "provider_api": provider_api,
                     "resource_id": resource_id,

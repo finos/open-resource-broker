@@ -273,7 +273,9 @@ class TestHandleSystemHealth:
         from orb.interface.system_command_handlers import handle_system_health
 
         mock_response = {"success": False, "status": "unhealthy", "checks": []}
-        with patch("orb.interface.health_command_handler.handle_health_check", return_value=mock_response):
+        with patch(
+            "orb.interface.health_command_handler.handle_health_check", return_value=mock_response
+        ):
             result = await handle_system_health(_ns())
 
         assert result["success"] is False

@@ -42,7 +42,11 @@ class TestCLIHandlerExecution:
         from orb.application.dto.interface_response import InterfaceResponse
 
         formatted_templates = InterfaceResponse(
-            data={"templates": templates, "count": 2, "message": "Retrieved 2 templates successfully"}
+            data={
+                "templates": templates,
+                "count": 2,
+                "message": "Retrieved 2 templates successfully",
+            }
         )
         formatter.format_template_list = MagicMock(return_value=formatted_templates)
 
@@ -159,6 +163,7 @@ class TestCLIHandlerExecution:
         )
         formatter = MagicMock(spec=ResponseFormattingService)
         from orb.application.dto.interface_response import InterfaceResponse
+
         formatter.format_request_status.return_value = InterfaceResponse(
             data={"requests": [{"requestId": "req-abc123", "status": "complete"}]}
         )
@@ -206,7 +211,13 @@ class TestFormatConversionConsistency:
         from orb.application.dto.interface_response import InterfaceResponse
 
         formatted_templates = InterfaceResponse(
-            data={"templates": [{"id": "template1", "formatted": True}, {"id": "template2", "formatted": True}], "count": 2}
+            data={
+                "templates": [
+                    {"id": "template1", "formatted": True},
+                    {"id": "template2", "formatted": True},
+                ],
+                "count": 2,
+            }
         )
         formatter.format_template_list = MagicMock(return_value=formatted_templates)
 

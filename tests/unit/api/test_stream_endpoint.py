@@ -34,7 +34,9 @@ def _make_orchestrator_returning(*statuses):
 def _make_formatter():
     """Return a mock formatter that passes through the requests list."""
     formatter = MagicMock()
-    formatter.format_request_status.side_effect = lambda reqs: InterfaceResponse(data={"requests": reqs})
+    formatter.format_request_status.side_effect = lambda reqs: InterfaceResponse(
+        data={"requests": reqs}
+    )
     return formatter
 
 

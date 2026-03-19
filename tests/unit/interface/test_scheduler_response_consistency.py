@@ -57,9 +57,7 @@ def _mock_container(formatter_status_return: dict, status_orch_requests: list | 
     scheduler.parse_request_data.return_value = [{"request_id": "req-abc"}]
 
     formatter = MagicMock(spec=ResponseFormattingService)
-    formatter.format_request_status.return_value = InterfaceResponse(
-        data=formatter_status_return
-    )
+    formatter.format_request_status.return_value = InterfaceResponse(data=formatter_status_return)
     formatter.format_request_operation.return_value = InterfaceResponse(
         data={"requestId": "req-1", "message": "ok"}, exit_code=0
     )
@@ -78,9 +76,7 @@ def _mock_container(formatter_status_return: dict, status_orch_requests: list | 
     list_ret_orch.execute.return_value = ListReturnRequestsOutput(requests=[])
 
     cancel_orch = AsyncMock(spec=CancelRequestOrchestrator)
-    cancel_orch.execute.return_value = CancelRequestOutput(
-        request_id="req-abc", status="cancelled"
-    )
+    cancel_orch.execute.return_value = CancelRequestOutput(request_id="req-abc", status="cancelled")
 
     acquire_orch = AsyncMock(spec=AcquireMachinesOrchestrator)
     acquire_orch.execute.return_value = AcquireMachinesOutput(request_id="req-1", status="pending")

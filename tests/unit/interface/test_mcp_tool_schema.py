@@ -15,10 +15,15 @@ def _make_server():
     """Instantiate OpenResourceBrokerMCPServer with all handler imports mocked."""
     with patch("orb.interface.mcp.server.core.get_logger", return_value=MagicMock()):
         # Patch all handler imports so the server can be constructed without DI
-        with patch("orb.interface.request_command_handlers.get_container", return_value=MagicMock()), \
-             patch("orb.interface.system_command_handlers.get_container", return_value=MagicMock()), \
-             patch("orb.interface.template_command_handlers.get_container", return_value=MagicMock()):
+        with (
+            patch("orb.interface.request_command_handlers.get_container", return_value=MagicMock()),
+            patch("orb.interface.system_command_handlers.get_container", return_value=MagicMock()),
+            patch(
+                "orb.interface.template_command_handlers.get_container", return_value=MagicMock()
+            ),
+        ):
             from orb.interface.mcp.server.core import OpenResourceBrokerMCPServer
+
             server = OpenResourceBrokerMCPServer()
     return server
 

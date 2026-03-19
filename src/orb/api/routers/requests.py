@@ -156,4 +156,8 @@ async def cancel_request(
             reason=reason or "Cancelled via REST API",
         )
     )
-    return JSONResponse(content=formatter.format_request_operation({"request_id": result.request_id, "status": result.status}, result.status).data)
+    return JSONResponse(
+        content=formatter.format_request_operation(
+            {"request_id": result.request_id, "status": result.status}, result.status
+        ).data
+    )

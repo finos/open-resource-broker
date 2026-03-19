@@ -22,7 +22,9 @@ if TYPE_CHECKING:
 
 
 @handle_interface_exceptions(context="list_templates", interface_type="cli")
-async def handle_list_templates(args: "argparse.Namespace") -> "Union[dict[str, Any], InterfaceResponse]":
+async def handle_list_templates(
+    args: "argparse.Namespace",
+) -> "Union[dict[str, Any], InterfaceResponse]":
     """Handle list templates operations using the ListTemplatesOrchestrator."""
     from orb.application.services.orchestration.dtos import ListTemplatesInput
     from orb.application.services.orchestration.list_templates import ListTemplatesOrchestrator
@@ -69,7 +71,9 @@ async def handle_list_templates(args: "argparse.Namespace") -> "Union[dict[str, 
 
 
 @handle_interface_exceptions(context="get_template", interface_type="cli")
-async def handle_get_template(args: "argparse.Namespace") -> "Union[dict[str, Any], InterfaceResponse]":
+async def handle_get_template(
+    args: "argparse.Namespace",
+) -> "Union[dict[str, Any], InterfaceResponse]":
     """Handle get template operations using the GetTemplateOrchestrator."""
     from orb.application.services.orchestration.dtos import GetTemplateInput
     from orb.application.services.orchestration.get_template import GetTemplateOrchestrator
@@ -98,7 +102,9 @@ async def handle_get_template(args: "argparse.Namespace") -> "Union[dict[str, An
 
 
 @handle_interface_exceptions(context="create_template", interface_type="cli")
-async def handle_create_template(args: "argparse.Namespace") -> "Union[dict[str, Any], InterfaceResponse]":
+async def handle_create_template(
+    args: "argparse.Namespace",
+) -> "Union[dict[str, Any], InterfaceResponse]":
     """Handle create template operations using the CreateTemplateOrchestrator."""
     from orb.application.services.orchestration.create_template import CreateTemplateOrchestrator
     from orb.application.services.orchestration.dtos import CreateTemplateInput
@@ -175,12 +181,14 @@ async def handle_create_template(args: "argparse.Namespace") -> "Union[dict[str,
             "template_id": template_id,
         }
 
-    return formatter.format_template_mutation({
-        "template_id": result.template_id,
-        "status": "created" if result.created else "validation_failed",
-        "created": result.created,
-        "validation_errors": result.validation_errors,
-    })
+    return formatter.format_template_mutation(
+        {
+            "template_id": result.template_id,
+            "status": "created" if result.created else "validation_failed",
+            "created": result.created,
+            "validation_errors": result.validation_errors,
+        }
+    )
 
 
 @handle_interface_exceptions(context="update_template", interface_type="cli")
@@ -249,12 +257,14 @@ async def handle_update_template(args: "argparse.Namespace") -> dict[str, Any]:
             "template_id": resolved_template_id,
         }
 
-    return scheduler.format_template_mutation_response({
-        "template_id": result.template_id,
-        "status": "updated" if result.updated else "validation_failed",
-        "updated": result.updated,
-        "validation_errors": result.validation_errors,
-    })
+    return scheduler.format_template_mutation_response(
+        {
+            "template_id": result.template_id,
+            "status": "updated" if result.updated else "validation_failed",
+            "updated": result.updated,
+            "validation_errors": result.validation_errors,
+        }
+    )
 
 
 @handle_interface_exceptions(context="delete_template", interface_type="cli")
@@ -296,11 +306,13 @@ async def handle_delete_template(args: "argparse.Namespace") -> dict[str, Any]:
             "template_id": template_id,
         }
 
-    return scheduler.format_template_mutation_response({
-        "template_id": result.template_id,
-        "status": "deleted" if result.deleted else "not_found",
-        "deleted": result.deleted,
-    })
+    return scheduler.format_template_mutation_response(
+        {
+            "template_id": result.template_id,
+            "status": "deleted" if result.deleted else "not_found",
+            "deleted": result.deleted,
+        }
+    )
 
 
 @handle_interface_exceptions(context="validate_template", interface_type="cli")
@@ -366,24 +378,28 @@ async def handle_validate_template(args: "argparse.Namespace") -> dict[str, Any]
         result = await orchestrator.execute(
             ValidateTemplateInput(template_id=template_id, config=template_config)
         )
-        return scheduler.format_template_mutation_response({
-            "template_id": result.template_id,
-            "status": "validated",
-            "valid": result.valid,
-            "validation_errors": result.errors,
-            "message": result.message,
-        })
+        return scheduler.format_template_mutation_response(
+            {
+                "template_id": result.template_id,
+                "status": "validated",
+                "valid": result.valid,
+                "validation_errors": result.errors,
+                "message": result.message,
+            }
+        )
 
     if hasattr(args, "template_id") and args.template_id:
         template_id = args.template_id
         result = await orchestrator.execute(ValidateTemplateInput(template_id=template_id))
-        return scheduler.format_template_mutation_response({
-            "template_id": result.template_id,
-            "status": "validated",
-            "valid": result.valid,
-            "validation_errors": result.errors,
-            "message": result.message,
-        })
+        return scheduler.format_template_mutation_response(
+            {
+                "template_id": result.template_id,
+                "status": "validated",
+                "valid": result.valid,
+                "validation_errors": result.errors,
+                "message": result.message,
+            }
+        )
 
     return {
         "success": False,
@@ -393,7 +409,9 @@ async def handle_validate_template(args: "argparse.Namespace") -> dict[str, Any]
 
 
 @handle_interface_exceptions(context="refresh_templates", interface_type="cli")
-async def handle_refresh_templates(args: "argparse.Namespace") -> "Union[dict[str, Any], InterfaceResponse]":
+async def handle_refresh_templates(
+    args: "argparse.Namespace",
+) -> "Union[dict[str, Any], InterfaceResponse]":
     """Handle refresh templates operations using the RefreshTemplatesOrchestrator."""
     from orb.application.services.orchestration.dtos import RefreshTemplatesInput
     from orb.application.services.orchestration.refresh_templates import (

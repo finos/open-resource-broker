@@ -13,7 +13,9 @@ if TYPE_CHECKING:
 
 
 @handle_interface_exceptions(context="get_machine_status", interface_type="cli")
-async def handle_get_machine_status(args: "argparse.Namespace") -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_get_machine_status(
+    args: "argparse.Namespace",
+) -> Union[dict[str, Any], InterfaceResponse]:
     """
     Handle get machine status operations for multiple machine IDs.
 
@@ -67,7 +69,9 @@ async def handle_get_machine_status(args: "argparse.Namespace") -> Union[dict[st
 
 
 @handle_interface_exceptions(context="list_machines", interface_type="cli")
-async def handle_list_machines(args: "argparse.Namespace") -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_list_machines(
+    args: "argparse.Namespace",
+) -> Union[dict[str, Any], InterfaceResponse]:
     """
     Handle list machines operations with scheduler-aware formatting.
 
@@ -114,7 +118,9 @@ async def handle_stop_machines(args: "argparse.Namespace") -> dict[str, Any]:
     # Validation: --all requires --force
     has_all = getattr(args, "all", False)
     has_force = getattr(args, "force", False)
-    machine_ids_from_args = (getattr(args, "machine_ids", []) or []) + (getattr(args, "machine_ids_flag", []) or [])
+    machine_ids_from_args = (getattr(args, "machine_ids", []) or []) + (
+        getattr(args, "machine_ids_flag", []) or []
+    )
 
     if has_all and not has_force:
         return {
@@ -169,7 +175,9 @@ async def handle_start_machines(args: "argparse.Namespace") -> dict[str, Any]:
     """
     # Validation: Cannot use both --all and specific IDs
     has_all = getattr(args, "all", False)
-    machine_ids_from_args = (getattr(args, "machine_ids", []) or []) + (getattr(args, "machine_ids_flag", []) or [])
+    machine_ids_from_args = (getattr(args, "machine_ids", []) or []) + (
+        getattr(args, "machine_ids_flag", []) or []
+    )
 
     if has_all and machine_ids_from_args:
         return {

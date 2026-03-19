@@ -136,7 +136,9 @@ class MachineSyncService:
                                 existing, MachineStatus(instance_status)
                             )
                         else:
-                            machine = self._create_machine_from_processed_data(processed_data, request)
+                            machine = self._create_machine_from_processed_data(
+                                processed_data, request
+                            )
                         domain_machines.append(machine)
                         returned_ids.add(processed_data["instance_id"])
                     except Exception as e:

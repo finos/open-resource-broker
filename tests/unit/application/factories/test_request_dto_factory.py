@@ -13,7 +13,9 @@ def factory():
 
 class TestMapMachineStatusToResultReturnRequest:
     def test_shutting_down_is_executing(self, factory):
-        assert factory.map_machine_status_to_result("shutting-down", RequestType.RETURN) == "executing"
+        assert (
+            factory.map_machine_status_to_result("shutting-down", RequestType.RETURN) == "executing"
+        )
 
     def test_stopping_is_executing(self, factory):
         assert factory.map_machine_status_to_result("stopping", RequestType.RETURN) == "executing"

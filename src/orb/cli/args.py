@@ -132,7 +132,11 @@ def add_machine_actions(subparsers):
     add_force_argument(machines_terminate)
     machines_terminate.add_argument("machine_ids", nargs="*", help="Machine IDs to terminate")
     machines_terminate.add_argument(
-        "--machine-id", "-m", action="append", dest="machine_ids_flag", help="Machine ID to terminate"
+        "--machine-id",
+        "-m",
+        action="append",
+        dest="machine_ids_flag",
+        help="Machine ID to terminate",
     )
 
     machines_status = subparsers.add_parser("status", help="Check machine status")
@@ -296,7 +300,9 @@ def add_provider_actions(subparsers):
     providers_exec = subparsers.add_parser("exec", help="Execute provider command")
     add_global_arguments(providers_exec)
     providers_exec.add_argument("operation", help="Operation to execute")
-    providers_exec.add_argument("--params", "--args", dest="params", help="Operation parameters (JSON format)")
+    providers_exec.add_argument(
+        "--params", "--args", dest="params", help="Operation parameters (JSON format)"
+    )
 
     providers_metrics = subparsers.add_parser("metrics", help="Show provider metrics")
     add_global_arguments(providers_metrics)

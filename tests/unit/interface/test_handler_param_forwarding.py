@@ -76,9 +76,7 @@ class TestHandleListTemplatesForwardsParams:
         mock_orch.execute = AsyncMock(return_value=MagicMock(templates=["t1"]))
         container = _make_container(ListTemplatesOrchestrator=mock_orch)
         container.get.side_effect = lambda cls: (
-            mock_orch
-            if cls.__name__ == "ListTemplatesOrchestrator"
-            else MagicMock()
+            mock_orch if cls.__name__ == "ListTemplatesOrchestrator" else MagicMock()
         )
 
         args = _make_args(
@@ -115,9 +113,7 @@ class TestHandleGetReturnRequestsForwardsParams:
 
         args = _make_args(status="pending", limit=5)
 
-        with patch(
-            "orb.interface.request_command_handlers.get_container", return_value=container
-        ):
+        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
             asyncio.run(handle_get_return_requests(args))
 
         mock_orch.execute.assert_called_once()
@@ -140,9 +136,7 @@ class TestHandleProviderHealthForwardsParams:
 
         args = _make_args(provider="aws")
 
-        with patch(
-            "orb.interface.system_command_handlers.get_container", return_value=container
-        ):
+        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
             asyncio.run(handle_provider_health(args))
 
         mock_orch.execute.assert_called_once()
@@ -164,9 +158,7 @@ class TestHandleProviderMetricsForwardsParams:
 
         args = _make_args(provider=None, timeframe="1h")
 
-        with patch(
-            "orb.interface.system_command_handlers.get_container", return_value=container
-        ):
+        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
             asyncio.run(handle_provider_metrics(args))
 
         mock_orch.execute.assert_called_once()

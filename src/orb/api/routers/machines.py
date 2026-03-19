@@ -87,7 +87,14 @@ async def request_machines(
         )
     )
     return JSONResponse(
-        content=formatter.format_request_operation({"request_id": result.request_id, "status": result.status, "machine_ids": result.machine_ids}, result.status).data,
+        content=formatter.format_request_operation(
+            {
+                "request_id": result.request_id,
+                "status": result.status,
+                "machine_ids": result.machine_ids,
+            },
+            result.status,
+        ).data,
         status_code=202,
     )
 
@@ -111,7 +118,17 @@ async def return_machines(
             force=request_data.force,
         )
     )
-    return JSONResponse(content=formatter.format_request_operation({"request_id": result.request_id, "status": result.status, "message": result.message, "skipped_machines": result.skipped_machines}, result.status).data)
+    return JSONResponse(
+        content=formatter.format_request_operation(
+            {
+                "request_id": result.request_id,
+                "status": result.status,
+                "message": result.message,
+                "skipped_machines": result.skipped_machines,
+            },
+            result.status,
+        ).data
+    )
 
 
 @router.get("/", summary="List Machines", description="List machines with optional filtering")
@@ -126,7 +143,13 @@ async def list_machines(
     formatter=FORMATTER,
 ) -> JSONResponse:
     result = await orchestrator.execute(
-        ListMachinesInput(status=status, provider_name=provider_name, request_id=request_id, limit=limit, offset=offset)
+        ListMachinesInput(
+            status=status,
+            provider_name=provider_name,
+            request_id=request_id,
+            limit=limit,
+            offset=offset,
+        )
     )
     return JSONResponse(content=formatter.format_machine_list(result.machines).data)
 

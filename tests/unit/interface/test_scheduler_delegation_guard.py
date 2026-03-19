@@ -45,7 +45,9 @@ def _mock_container_with_formatter():
     scheduler = MagicMock(spec=SchedulerPort)
     formatter = MagicMock(spec=ResponseFormattingService)
     formatter.format_request_status.return_value = InterfaceResponse(data={"requests": []})
-    formatter.format_request_operation.return_value = InterfaceResponse(data={"request_id": "req-1"})
+    formatter.format_request_operation.return_value = InterfaceResponse(
+        data={"request_id": "req-1"}
+    )
 
     status_orch = AsyncMock(spec=GetRequestStatusOrchestrator)
     status_orch.execute.return_value = GetRequestStatusOutput(requests=[])
@@ -149,6 +151,7 @@ async def test_get_request_status_single_id_delegates_to_scheduler():
 
     formatter.format_request_status.assert_called_once()
     from orb.application.dto.interface_response import InterfaceResponse as IR
+
     assert isinstance(result, IR)
 
 
@@ -206,6 +209,7 @@ async def test_cancel_request_delegates_format_request_response():
 
     formatter.format_request_operation.assert_called_once()
     from orb.application.dto.interface_response import InterfaceResponse as IR
+
     assert isinstance(result, IR)
 
 

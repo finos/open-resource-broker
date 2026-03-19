@@ -50,7 +50,9 @@ def _mock_container(extra: dict | None = None):
 
     # Default formatter return values — tests override as needed
     formatter.format_request_status.return_value = InterfaceResponse(data={"requests": []})
-    formatter.format_request_operation.return_value = InterfaceResponse(data={"request_id": "req-1", "status": "pending"})
+    formatter.format_request_operation.return_value = InterfaceResponse(
+        data={"request_id": "req-1", "status": "pending"}
+    )
 
     acquire_orch = AsyncMock(spec=AcquireMachinesOrchestrator)
     cancel_orch = AsyncMock(spec=CancelRequestOrchestrator)
@@ -99,9 +101,14 @@ class TestHandleRequestMachines:
         from orb.application.dto.interface_response import InterfaceResponse
 
         container, scheduler, acquire_orch, *_ = _mock_container()
-        formatter = container.get.side_effect.__self__ if hasattr(container.get.side_effect, '__self__') else None
+        formatter = (
+            container.get.side_effect.__self__
+            if hasattr(container.get.side_effect, "__self__")
+            else None
+        )
         # get formatter from dispatch map via container
         from orb.application.services.response_formatting_service import ResponseFormattingService
+
         formatter = container.get(ResponseFormattingService)
 
         acquire_orch.execute.return_value = AcquireMachinesOutput(
@@ -137,7 +144,9 @@ class TestHandleRequestMachines:
         acquire_orch.execute.return_value = AcquireMachinesOutput(
             request_id="req-xyz", status="pending"
         )
-        formatter.format_request_operation.return_value = InterfaceResponse(data={"requestId": "req-xyz"})
+        formatter.format_request_operation.return_value = InterfaceResponse(
+            data={"requestId": "req-xyz"}
+        )
 
         args = _make_namespace(
             input_data={"template_id": "t1", "requested_count": 2},

@@ -20,7 +20,9 @@ def _make_subparsers() -> tuple[argparse.ArgumentParser, argparse._SubParsersAct
     return parser, sp
 
 
-def _parse(sp_tuple: tuple[argparse.ArgumentParser, argparse._SubParsersAction], args: list[str]) -> argparse.Namespace:  # type: ignore[type-arg]
+def _parse(
+    sp_tuple: tuple[argparse.ArgumentParser, argparse._SubParsersAction], args: list[str]
+) -> argparse.Namespace:  # type: ignore[type-arg]
     """Parse args using the parent parser that owns the subparsers."""
     parser, _sp = sp_tuple
     return parser.parse_args(args)
@@ -35,7 +37,9 @@ def test_machines_list_status_has_choices():
     _, sp = _make_subparsers()
     add_machine_actions(sp)
     list_parser = sp.choices["list"]
-    status_action = next(a for a in list_parser._actions if "--status" in getattr(a, "option_strings", []))
+    status_action = next(
+        a for a in list_parser._actions if "--status" in getattr(a, "option_strings", [])
+    )
     choices = list(status_action.choices) if status_action.choices is not None else []
     assert len(choices) > 0
 
@@ -44,7 +48,9 @@ def test_machines_list_status_choices_match_machine_status_enum():
     _, sp = _make_subparsers()
     add_machine_actions(sp)
     list_parser = sp.choices["list"]
-    status_action = next(a for a in list_parser._actions if "--status" in getattr(a, "option_strings", []))
+    status_action = next(
+        a for a in list_parser._actions if "--status" in getattr(a, "option_strings", [])
+    )
     assert status_action.choices is not None
     assert set(status_action.choices) == {s.value for s in MachineStatus}
 
@@ -233,6 +239,7 @@ def test_templates_validate_accepts_template_id_flag():
 
 def test_build_parser_is_callable():
     from orb.cli.args import build_parser
+
     parser, resource_parsers = build_parser()
     assert isinstance(parser, argparse.ArgumentParser)
     assert isinstance(resource_parsers, dict)
@@ -241,31 +248,37 @@ def test_build_parser_is_callable():
 def test_parse_args_uses_build_parser():
     """parse_args must be a thin wrapper — build_parser must exist and be importable."""
     from orb.cli.args import build_parser, parse_args
+
     assert callable(build_parser)
     assert callable(parse_args)
 
 
-@pytest.mark.parametrize("resource,subcommand,flag,short", [
-    ("machines",  "return",    "--machine-id",   "-m"),
-    ("machines",  "terminate", "--machine-id",   "-m"),
-    ("machines",  "stop",      "--machine-id",   "-m"),
-    ("machines",  "start",     "--machine-id",   "-m"),
-    ("requests",  "show",      "--request-id",   "-r"),
-    ("requests",  "cancel",    "--request-id",   "-r"),
-    ("templates", "validate",  "--template-id",  "-t"),
-    ("providers", "health",    "--detailed",      None),
-])
+@pytest.mark.parametrize(
+    "resource,subcommand,flag,short",
+    [
+        ("machines", "return", "--machine-id", "-m"),
+        ("machines", "terminate", "--machine-id", "-m"),
+        ("machines", "stop", "--machine-id", "-m"),
+        ("machines", "start", "--machine-id", "-m"),
+        ("requests", "show", "--request-id", "-r"),
+        ("requests", "cancel", "--request-id", "-r"),
+        ("templates", "validate", "--template-id", "-t"),
+        ("providers", "health", "--detailed", None),
+    ],
+)
 def test_cli_contract_flag_exists(resource, subcommand, flag, short):
     adder_map = {
-        "machines":  add_machine_actions,
-        "requests":  add_request_actions,
+        "machines": add_machine_actions,
+        "requests": add_request_actions,
         "templates": add_template_actions,
         "providers": add_provider_actions,
     }
     _, sp = _make_subparsers()
     adder_map[resource](sp)
     sub_parser = sp.choices[subcommand]
-    all_opts = [opt for action in sub_parser._actions for opt in getattr(action, "option_strings", [])]
+    all_opts = [
+        opt for action in sub_parser._actions for opt in getattr(action, "option_strings", [])
+    ]
     assert flag in all_opts, f"{flag} missing from {resource} {subcommand}"
     if short:
         assert short in all_opts, f"{short} missing from {resource} {subcommand}"

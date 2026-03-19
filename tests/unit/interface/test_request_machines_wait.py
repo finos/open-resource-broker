@@ -29,7 +29,9 @@ def _mock_container():
         "template_id": "t1",
         "requested_count": 1,
     }
-    formatter.format_request_operation.return_value = InterfaceResponse(data={"requestId": "req-fixed"}, exit_code=0)
+    formatter.format_request_operation.return_value = InterfaceResponse(
+        data={"requestId": "req-fixed"}, exit_code=0
+    )
 
     container.get.side_effect = lambda t: {
         SchedulerPort: scheduler,

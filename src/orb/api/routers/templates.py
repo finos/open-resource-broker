@@ -134,7 +134,15 @@ async def validate_template(
     )
     return JSONResponse(
         status_code=200,
-        content=scheduler.format_template_mutation_response({"template_id": result.template_id, "status": "validated", "valid": result.valid, "validation_errors": result.errors, "message": result.message}),
+        content=scheduler.format_template_mutation_response(
+            {
+                "template_id": result.template_id,
+                "status": "validated",
+                "valid": result.valid,
+                "validation_errors": result.errors,
+                "message": result.message,
+            }
+        ),
     )
 
 
@@ -202,7 +210,14 @@ async def create_template(
     )
     return JSONResponse(
         status_code=201,
-        content=scheduler.format_template_mutation_response({"template_id": result.template_id, "status": "created" if result.created else "validation_failed", "created": result.created, "validation_errors": result.validation_errors}),
+        content=scheduler.format_template_mutation_response(
+            {
+                "template_id": result.template_id,
+                "status": "created" if result.created else "validation_failed",
+                "created": result.created,
+                "validation_errors": result.validation_errors,
+            }
+        ),
     )
 
 
@@ -237,7 +252,14 @@ async def update_template(
     )
     return JSONResponse(
         status_code=200,
-        content=scheduler.format_template_mutation_response({"template_id": result.template_id, "status": "updated" if result.updated else "validation_failed", "updated": result.updated, "validation_errors": result.validation_errors}),
+        content=scheduler.format_template_mutation_response(
+            {
+                "template_id": result.template_id,
+                "status": "updated" if result.updated else "validation_failed",
+                "updated": result.updated,
+                "validation_errors": result.validation_errors,
+            }
+        ),
     )
 
 
@@ -256,5 +278,11 @@ async def delete_template(
     result = await orchestrator.execute(DeleteTemplateInput(template_id=template_id))
     return JSONResponse(
         status_code=200,
-        content=scheduler.format_template_mutation_response({"template_id": result.template_id, "status": "deleted" if result.deleted else "not_found", "deleted": result.deleted}),
+        content=scheduler.format_template_mutation_response(
+            {
+                "template_id": result.template_id,
+                "status": "deleted" if result.deleted else "not_found",
+                "deleted": result.deleted,
+            }
+        ),
     )

@@ -231,9 +231,7 @@ class TestValidateTemplate:
 
         raw = {"template_id": "t1", "status": "validated", "valid": True, "validation_errors": []}
         mock_orch = MagicMock()
-        mock_orch.execute = AsyncMock(
-            return_value=ValidateTemplateOutput(valid=True, errors=[])
-        )
+        mock_orch.execute = AsyncMock(return_value=ValidateTemplateOutput(valid=True, errors=[]))
 
         mock_scheduler = MagicMock(spec=SchedulerPort)
         mock_scheduler.format_template_mutation_response.return_value = raw
