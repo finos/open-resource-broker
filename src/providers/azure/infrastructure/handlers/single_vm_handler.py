@@ -335,8 +335,17 @@ class SingleVMHandler(AzureHandler):
         machine_ids: list[str],
         resource_id: str,
         context: Optional[dict[str, Any]] = None,
-    ) -> None:
-        """Delete individual VMs and cleanup linked NICs/disks when safe."""
+    ) -> Optional[dict[str, Any]]:
+        """Submit deletion for individual VMs.
+
+        Important limitation:
+        - Azure VM deletion is now submit-and-return to align with the async
+          behavior used elsewhere in the provider and with AWS termination.
+        - Linked NIC/public IP/disk cleanup is therefore no longer performed
+          inline here, because those resources may still be attached while the
+          VM delete LRO is in progress.
+        - Cleanup remains a follow-up concern for later reconciliation work.
+        """
         context = context or {}
         resource_group = (
             context.get("resource_group") or self.azure_client.resource_group
@@ -349,10 +358,9 @@ class SingleVMHandler(AzureHandler):
 
         compute = self.azure_client.compute_client
         vm_names = self._resolve_vm_names(resource_group, machine_ids)
+        submitted_deletions: list[dict[str, Any]] = []
         for original_id, vm_name in zip(machine_ids, vm_names):
             try:
-                cleanup_targets = self._collect_vm_cleanup_targets(resource_group, vm_name)
-
                 self._logger.info(
                     "Deleting VM '%s' (requested id='%s')", vm_name, original_id
                 )
@@ -360,21 +368,38 @@ class SingleVMHandler(AzureHandler):
                     resource_group_name=resource_group,
                     vm_name=vm_name,
                 )
-                poller.result()
-                self._logger.info("VM '%s' deleted successfully", vm_name)
-
-                # Delete linked NICs and managed disks only when they are no longer attached.
-                for nic_rg, nic_name in cleanup_targets["nics"]:
-                    self._delete_nic(nic_rg, nic_name)
-
-                for disk_rg, disk_name in cleanup_targets["disks"]:
-                    self._delete_managed_disk_if_unattached(disk_rg, disk_name)
+                continuation_token = None
+                if hasattr(poller, "continuation_token"):
+                    try:
+                        continuation_token = poller.continuation_token()
+                    except Exception as exc:
+                        self._logger.debug(
+                            "Could not capture VM delete continuation token for '%s': %s",
+                            vm_name,
+                            exc,
+                        )
+                submitted_deletions.append(
+                    {
+                        "requested_id": str(original_id),
+                        "vm_name": vm_name,
+                        "continuation_token": continuation_token,
+                    }
+                )
             except Exception as exc:
                 self._logger.error("Failed to delete VM '%s': %s", vm_name, exc)
                 raise TerminationError(
                     f"Failed to delete VM '{vm_name}': {exc}",
                     resource_ids=[original_id],
                 ) from exc
+
+        return {
+            "provider_data": {
+                "resource_group": resource_group,
+                "operation_status": "submitted",
+                "submitted_deletions": submitted_deletions,
+                "cleanup_deferred": True,
+            }
+        }
 
     # ------------------------------------------------------------------
     # Internal helpers

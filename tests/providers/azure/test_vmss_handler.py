@@ -483,3 +483,33 @@ def test_single_vm_status_populates_network_identity():
     assert result[0]["public_ip"] == "52.1.2.3"
     assert result[0]["subnet_id"].endswith("/subnets/default")
     assert result[0]["vpc_id"].endswith("/virtualNetworks/test-vnet")
+
+
+def test_single_vm_release_submits_deletes_without_waiting():
+    azure_client = MagicMock()
+    logger = MagicMock()
+    handler = SingleVMHandler(azure_client=azure_client, logger=logger)
+
+    vm_1 = MagicMock()
+    vm_1.name = "vm-1"
+    vm_1.vm_id = "guid-1"
+    vm_2 = MagicMock()
+    vm_2.name = "vm-2"
+    vm_2.vm_id = "guid-2"
+    azure_client.compute_client.virtual_machines.list.return_value = [vm_1, vm_2]
+
+    delete_poller = MagicMock()
+    delete_poller.continuation_token.return_value = "single-delete-token"
+    delete_poller.result.side_effect = AssertionError("result() should not be called")
+    azure_client.compute_client.virtual_machines.begin_delete.return_value = delete_poller
+
+    result = handler.release_hosts(
+        machine_ids=["guid-1", "guid-2"],
+        resource_id="unused",
+        context={"resource_group": "test-rg"},
+    )
+
+    assert result["provider_data"]["operation_status"] == "submitted"
+    assert result["provider_data"]["cleanup_deferred"] is True
+    assert len(result["provider_data"]["submitted_deletions"]) == 2
+    assert azure_client.compute_client.virtual_machines.begin_delete.call_count == 2

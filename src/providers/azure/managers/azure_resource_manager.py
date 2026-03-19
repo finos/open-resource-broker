@@ -123,7 +123,7 @@ class AzureResourceManager:
     def scale_vmss(
         self, resource_group: str, vmss_name: str, capacity: int
     ) -> None:
-        """Update the VMSS SKU capacity (desired instance count)."""
+        """Submit a VMSS SKU capacity update without waiting for completion."""
         try:
             self._logger.info(
                 "Scaling VMSS '%s' to capacity %d", vmss_name, capacity
@@ -140,9 +140,21 @@ class AzureResourceManager:
                     parameters=vmss,
                 )
             )
-            poller.result()
+            continuation_token = None
+            if hasattr(poller, "continuation_token"):
+                try:
+                    continuation_token = poller.continuation_token()
+                except Exception as exc:
+                    self._logger.debug(
+                        "Could not capture VMSS scale continuation token for '%s': %s",
+                        vmss_name,
+                        exc,
+                    )
             self._logger.info(
-                "VMSS '%s' scaled to capacity %d", vmss_name, capacity
+                "Submitted VMSS '%s' scale to capacity %d (token=%s)",
+                vmss_name,
+                capacity,
+                continuation_token,
             )
         except Exception as exc:
             self._logger.error(
