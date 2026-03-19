@@ -34,10 +34,21 @@ async def test_machines_start_specific_ids():
             failed_machines=[],
         )
 
+        from orb.application.dto.interface_response import InterfaceResponse
+        from orb.application.services.response_formatting_service import ResponseFormattingService
+
+        mock_formatter = Mock(spec=ResponseFormattingService)
+        mock_formatter.format_success.return_value = InterfaceResponse(
+            data={"success": True, "started_machines": ["i-123", "i-456"], "failed_machines": [], "message": "started"},
+            exit_code=0,
+        )
+
         def mock_get(service_type):
             name = getattr(service_type, "__name__", "")
             if name == "StartMachinesOrchestrator":
                 return mock_orchestrator
+            if name == "ResponseFormattingService":
+                return mock_formatter
             if name == "CommandBus":
                 return mock_command_bus
             if name == "ProviderSelectionPort":
@@ -50,9 +61,9 @@ async def test_machines_start_specific_ids():
 
         result = await handle_start_machines(args)
 
-        assert result["success"] is True
-        assert "i-123" in result["started_machines"]
-        assert "i-456" in result["started_machines"]
+        assert result.data["success"] is True
+        assert "i-123" in result.data["started_machines"]
+        assert "i-456" in result.data["started_machines"]
 
 
 @pytest.mark.asyncio
@@ -108,10 +119,21 @@ async def test_machines_start_all():
             failed_machines=[],
         )
 
+        from orb.application.dto.interface_response import InterfaceResponse
+        from orb.application.services.response_formatting_service import ResponseFormattingService
+
+        mock_formatter = Mock(spec=ResponseFormattingService)
+        mock_formatter.format_success.return_value = InterfaceResponse(
+            data={"success": True, "started_machines": ["i-stopped1", "i-stopped2"], "failed_machines": [], "message": "started"},
+            exit_code=0,
+        )
+
         def mock_get(service_type):
             name = getattr(service_type, "__name__", "")
             if name == "StartMachinesOrchestrator":
                 return mock_orchestrator
+            if name == "ResponseFormattingService":
+                return mock_formatter
             if name == "QueryBus":
                 return mock_query_bus
             if name == "CommandBus":
@@ -126,7 +148,7 @@ async def test_machines_start_all():
 
         result = await handle_start_machines(args)
 
-        assert result["success"] is True
+        assert result.data["success"] is True
 
 
 @pytest.mark.asyncio

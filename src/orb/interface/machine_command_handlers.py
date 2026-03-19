@@ -155,8 +155,7 @@ async def handle_stop_machines(args: "argparse.Namespace") -> Union[dict[str, An
             force=has_force,
         )
     )
-    return formatter.format_machine_operation({
-        "success": result.success,
+    return formatter.format_success({
         "message": result.message,
         "stopped_machines": result.stopped_machines,
         "failed_machines": result.failed_machines,
@@ -205,8 +204,7 @@ async def handle_start_machines(args: "argparse.Namespace") -> Union[dict[str, A
             all_machines=has_all,
         )
     )
-    return formatter.format_machine_operation({
-        "success": result.success,
+    return formatter.format_success({
         "message": result.message,
         "started_machines": result.started_machines,
         "failed_machines": result.failed_machines,

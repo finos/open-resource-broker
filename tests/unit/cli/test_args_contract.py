@@ -295,14 +295,20 @@ async def test_stop_machines_uses_machine_ids_flag():
 
     from orb.application.services.orchestration.dtos import StopMachinesOutput
     from orb.application.services.orchestration.stop_machines import StopMachinesOrchestrator
+    from orb.application.services.response_formatting_service import ResponseFormattingService
     from orb.interface.machine_command_handlers import handle_stop_machines
 
     orch = AsyncMock(spec=StopMachinesOrchestrator)
     orch.execute.return_value = StopMachinesOutput(
         success=True, message="ok", stopped_machines=["i-flag1"], failed_machines=[]
     )
+    formatter = MagicMock(spec=ResponseFormattingService)
+    formatter.format_machine_operation.return_value = MagicMock()
     container = MagicMock()
-    container.get.return_value = orch
+    container.get.side_effect = lambda t: {
+        StopMachinesOrchestrator: orch,
+        ResponseFormattingService: formatter,
+    }.get(t, MagicMock())
 
     ns = argparse.Namespace(all=False, force=False, machine_ids=[], machine_ids_flag=["i-flag1"])
 
@@ -319,14 +325,20 @@ async def test_start_machines_uses_machine_ids_flag():
 
     from orb.application.services.orchestration.dtos import StartMachinesOutput
     from orb.application.services.orchestration.start_machines import StartMachinesOrchestrator
+    from orb.application.services.response_formatting_service import ResponseFormattingService
     from orb.interface.machine_command_handlers import handle_start_machines
 
     orch = AsyncMock(spec=StartMachinesOrchestrator)
     orch.execute.return_value = StartMachinesOutput(
         success=True, message="ok", started_machines=["i-flag2"], failed_machines=[]
     )
+    formatter = MagicMock(spec=ResponseFormattingService)
+    formatter.format_machine_operation.return_value = MagicMock()
     container = MagicMock()
-    container.get.return_value = orch
+    container.get.side_effect = lambda t: {
+        StartMachinesOrchestrator: orch,
+        ResponseFormattingService: formatter,
+    }.get(t, MagicMock())
 
     ns = argparse.Namespace(all=False, machine_ids=[], machine_ids_flag=["i-flag2"])
 
