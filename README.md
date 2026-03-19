@@ -23,6 +23,7 @@
   <a href="https://github.com/awslabs/open-resource-broker/actions/workflows/ci-quality.yml"><img src="https://github.com/awslabs/open-resource-broker/actions/workflows/ci-quality.yml/badge.svg" alt="Quality Checks"></a>
   <a href="https://github.com/awslabs/open-resource-broker/actions/workflows/security-code.yml"><img src="https://github.com/awslabs/open-resource-broker/actions/workflows/security-code.yml/badge.svg" alt="Security Scanning"></a>
   <a href="https://codecov.io/gh/awslabs/open-resource-broker"><img src="https://codecov.io/gh/awslabs/open-resource-broker/graph/badge.svg" alt="Coverage"></a>
+  <a href="https://github.com/awslabs/open-resource-broker/actions/workflows/docs.yml"><img src="https://github.com/awslabs/open-resource-broker/actions/workflows/docs.yml/badge.svg" alt="Documentation"></a>
 </p>
 
 ---
