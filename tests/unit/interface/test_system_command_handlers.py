@@ -259,22 +259,24 @@ class TestHandleSystemHealth:
     async def test_returns_success_when_health_check_returns_0(self):
         from orb.interface.system_command_handlers import handle_system_health
 
+        mock_response = {"success": True, "status": "healthy", "checks": []}
         with patch(
-            "orb.interface.health_command_handler.handle_health_check", return_value=0
+            "orb.interface.health_command_handler.handle_health_check", return_value=mock_response
         ) as mock_hc:
             result = await handle_system_health(_ns())
 
         mock_hc.assert_called_once()
-        assert result["status"] == "success"
+        assert result["success"] is True
 
     @pytest.mark.asyncio
     async def test_returns_error_when_health_check_returns_nonzero(self):
         from orb.interface.system_command_handlers import handle_system_health
 
-        with patch("orb.interface.health_command_handler.handle_health_check", return_value=1):
+        mock_response = {"success": False, "status": "unhealthy", "checks": []}
+        with patch("orb.interface.health_command_handler.handle_health_check", return_value=mock_response):
             result = await handle_system_health(_ns())
 
-        assert result["status"] == "error"
+        assert result["success"] is False
 
 
 # ---------------------------------------------------------------------------

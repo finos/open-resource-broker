@@ -10,11 +10,11 @@ from orb.domain.base.ports.health_check_port import HealthCheckPort
 from orb.infrastructure.di.container import get_container
 
 
-def handle_health_check(args) -> int:
+def handle_health_check(args) -> dict[str, Any]:
     """Handle health check command.
 
     Returns:
-        0 if all checks pass, 1 if any fail
+        Response dict with health check results
     """
     try:
         container = get_container()
@@ -198,13 +198,8 @@ def handle_health_check(args) -> int:
             summary = response["summary"]
             console.info(f"\nSummary: {summary['passed']}/{summary['total']} checks passed")
 
-        # Always output JSON
-        import json
-
-        print(json.dumps(response, indent=2))
-
-        return 0 if response["success"] else 1
+        return response
 
     except Exception as e:
         get_container().get(ConsolePort).error(f"Health check failed: {e}")
-        return 1
+        return {"success": False, "error": str(e)}

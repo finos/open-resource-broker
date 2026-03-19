@@ -17,9 +17,7 @@ async def handle_system_health(args) -> dict[str, Any]:
 
     # Run sync health check in executor
     loop = asyncio.get_running_loop()
-    result = await loop.run_in_executor(None, handle_health_check, args)
-
-    return {"status": "success" if result == 0 else "error"}
+    return await loop.run_in_executor(None, handle_health_check, args)
 
 
 @handle_interface_exceptions(context="provider_health", interface_type="cli")
