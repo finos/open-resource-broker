@@ -103,3 +103,11 @@ jobs:
           files: coverage-${{ inputs.test-type }}.xml
           flags: ${{ inputs.test-type }}
           name: ${{ inputs.test-type }}-tests
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: junit-${{ inputs.test-type }}.xml
