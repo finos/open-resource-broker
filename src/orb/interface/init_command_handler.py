@@ -85,8 +85,8 @@ async def handle_init(args) -> int:
 
         return 0
 
-    except KeyboardInterrupt:
-        console.error("\nInitialization cancelled by user")
+    except (KeyboardInterrupt, EOFError):
+        console.error("\nInitialization cancelled.")
         return 1
     except Exception as e:
         console.error("Failed to initialize ORB")
