@@ -101,11 +101,6 @@ class TestHandleRequestMachines:
         from orb.application.dto.interface_response import InterfaceResponse
 
         container, scheduler, acquire_orch, *_ = _mock_container()
-        formatter = (
-            container.get.side_effect.__self__
-            if hasattr(container.get.side_effect, "__self__")
-            else None
-        )
         # get formatter from dispatch map via container
         from orb.application.services.response_formatting_service import ResponseFormattingService
 
