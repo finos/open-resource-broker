@@ -16,18 +16,14 @@ ci-quality-radon:  ## Run radon complexity analysis
 	$(call run-tool,radon,cc $(PACKAGE) --min B --show-complexity)
 	$(call run-tool,radon,mi $(PACKAGE) --min B)
 
-ci-quality-mypy:  ## Run mypy type checking
-	@echo "Running mypy type check..."
-	$(call run-tool,mypy,src/)
-
 ci-quality-pyright:  ## Run pyright type checking
 	@echo "Running pyright type check..."
 	$(call run-tool,pyright,src/)
 
 # Composite target (for local convenience)
-ci-quality: ci-quality-ruff ci-quality-mypy  ## Run all enforced code quality checks
+ci-quality: ci-quality-ruff ci-quality-pyright  ## Run all enforced code quality checks
 
-ci-quality-full: ci-quality-ruff ci-quality-ruff-optional ci-quality-mypy  ## Run all code quality checks including optional
+ci-quality-full: ci-quality-ruff ci-quality-ruff-optional ci-quality-pyright  ## Run all code quality checks including optional
 
 # Individual architecture quality targets (with tool names)
 ci-arch-cqrs:  ## Run CQRS pattern validation

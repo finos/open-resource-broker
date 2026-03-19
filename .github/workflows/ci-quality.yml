@@ -10,7 +10,6 @@ on:
       - 'requirements*.txt'
       - 'uv.lock'
       - '.ruff.toml'
-      - 'mypy.ini'
       - '.github/workflows/ci-quality.yml'
   pull_request:
     branches: [ main, develop ]
@@ -21,7 +20,6 @@ on:
       - 'requirements*.txt'
       - 'uv.lock'
       - '.ruff.toml'
-      - 'mypy.ini'
       - '.github/workflows/ci-quality.yml'
 
 permissions:
@@ -164,25 +162,6 @@ jobs:
     - name: Run pyright type check
       run: make ci-quality-pyright
 
-  lint-mypy:
-    name: Type Checking (mypy) - Optional
-    runs-on: ubuntu-latest
-    needs: [config, setup-cache, lint-ruff]
-    permissions:
-      contents: read
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
-
-    - name: Setup UV with cache
-      uses: ./.github/actions/setup-uv-cached
-      with:
-        cache-key: ${{ needs.setup-cache.outputs.cache-key }}
-        fail-on-cache-miss: false
-
-    - name: Run mypy type check
-      continue-on-error: true
-      run: make ci-quality-mypy
 
   arch-validation:
     name: Architecture Validation
