@@ -131,7 +131,7 @@ class GetStorageHealthHandler(BaseQueryHandler[GetStorageHealthQuery, StorageHea
         if query.verbose:
             t0 = _time.perf_counter()
             with self._uow_factory.create_unit_of_work() as uow:
-                uow.requests.list_all(limit=1)
+                uow.requests.find_all()
             latency_ms = round((_time.perf_counter() - t0) * 1000, 2)
             details: dict = {"latency_ms": latency_ms, "connection_status": "active"}
         else:
