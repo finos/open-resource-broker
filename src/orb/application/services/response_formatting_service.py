@@ -89,6 +89,11 @@ class ResponseFormattingService:
         exit_code = 0 if data.get("success") else 1
         return InterfaceResponse(data=data, exit_code=exit_code)
 
+    def format_machine_operation(self, raw: dict[str, Any]) -> InterfaceResponse:
+        """Format a machine stop/start operation result."""
+        exit_code = 0 if not raw.get("error") else 1
+        return InterfaceResponse(data=raw, exit_code=exit_code)
+
     def format_config(self, raw: dict[str, Any]) -> InterfaceResponse:
         """Format a generic config/info dict as a successful response."""
         return InterfaceResponse(data=raw)
