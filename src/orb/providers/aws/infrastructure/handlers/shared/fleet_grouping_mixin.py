@@ -119,11 +119,11 @@ class FleetGroupingMixin:
             self._collect_groups_from_instances(
                 instances_needing_lookup, groups, group_ids_to_fetch
             )
-
-        # Fetch detailed resource information for all identified groups
-        if group_ids_to_fetch:
-            # Delegate to handler-specific resource details fetching
-            self._fetch_and_attach_group_details(group_ids_to_fetch, groups)
+            # Fetch details only for groups discovered via AWS lookup — groups resolved
+            # from the mapping are left with details=None so the release manager fetches
+            # them on demand (avoiding unnecessary describe calls on the return path).
+            if group_ids_to_fetch:
+                self._fetch_and_attach_group_details(group_ids_to_fetch, groups)
 
         # Log performance metrics and optimization results
         self._log_grouping_summary(
