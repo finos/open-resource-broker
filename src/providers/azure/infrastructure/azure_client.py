@@ -25,7 +25,7 @@ Note:
 from __future__ import annotations
 
 import threading
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, Protocol
 
 from domain.base.dependency_injection import injectable
 from domain.base.ports import ConfigurationPort, LoggingPort
@@ -37,8 +37,6 @@ from providers.azure.exceptions.azure_exceptions import (
 )
 
 if TYPE_CHECKING:
-    # These are only used for type hints; actual imports happen lazily.
-    from azure.core.credentials import TokenCredential
     from azure.mgmt.authorization import AuthorizationManagementClient
     from azure.mgmt.compute import ComputeManagementClient
     from azure.mgmt.monitor import MonitorManagementClient
@@ -46,6 +44,12 @@ if TYPE_CHECKING:
     from azure.mgmt.network import NetworkManagementClient
     from azure.mgmt.resource import ResourceManagementClient
     from azure.mgmt.resource.subscriptions import SubscriptionClient
+
+
+class AzureCredentialProtocol(Protocol):
+    """Credential surface this module requires from Azure identity objects."""
+
+    def get_token(self, *scopes: str, **kwargs: Any) -> Any: ...
 
 
 @injectable
@@ -116,7 +120,7 @@ class AzureClient:
         self._batch_lock = threading.RLock()
 
         # Lazy Azure SDK client slots
-        self._credential: Optional[TokenCredential] = None
+        self._credential: Optional[AzureCredentialProtocol] = None
         self._compute_client: Optional[ComputeManagementClient] = None
         self._network_client: Optional[NetworkManagementClient] = None
         self._resource_client: Optional[ResourceManagementClient] = None
@@ -277,7 +281,7 @@ class AzureClient:
     # ------------------------------------------------------------------
 
     @property
-    def credential(self) -> "TokenCredential":
+    def credential(self) -> AzureCredentialProtocol:
         """Return an Azure ``TokenCredential``, creating it on first access.
 
         Resolution order:
@@ -293,8 +297,11 @@ class AzureClient:
             self._logger.debug("Creating Azure credential on first use")
             try:
                 from azure.identity import DefaultAzureCredential
+                credential_kwargs: dict[str, Any] = {}
+                if self._azure_config and self._azure_config.client_id:
+                    credential_kwargs["managed_identity_client_id"] = self._azure_config.client_id
 
-                self._credential = DefaultAzureCredential()
+                self._credential = DefaultAzureCredential(**credential_kwargs)
                 self._logger.info("Azure DefaultAzureCredential initialised")
             except ImportError as exc:
                 raise AuthenticationError(

@@ -169,27 +169,12 @@ class AzureProviderConfig(BaseProviderConfig):
     )
 
     # ------------------------------------------------------------------
-    # Authentication (all optional — DefaultAzureCredential covers most cases)
+    # Authentication
     # ------------------------------------------------------------------
-    tenant_id: Optional[str] = Field(
-        None, description="Azure AD tenant ID (required for service-principal auth)"
-    )
     client_id: Optional[str] = Field(
-        None, description="Service-principal or managed-identity client ID"
+        None,
+        description="Managed-identity client ID for user-assigned identity selection",
     )
-    client_secret: Optional[str] = Field(
-        None, description="Service-principal client secret (avoid; prefer managed identity)"
-    )
-    use_managed_identity: bool = Field(
-        True, description="Prefer managed identity over explicit credentials"
-    )
-
-    # ------------------------------------------------------------------
-    # Proxy / network
-    # ------------------------------------------------------------------
-    proxy_host: Optional[str] = Field(None, description="Proxy server hostname")
-    proxy_port: Optional[int] = Field(None, description="Proxy server port")
-    verify_ssl: bool = Field(True, description="Verify TLS certificates for ARM calls")
 
     # ------------------------------------------------------------------
     # Retry / timeout

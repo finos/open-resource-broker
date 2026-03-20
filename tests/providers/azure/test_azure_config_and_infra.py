@@ -1,5 +1,8 @@
 """Tests for the Azure configuration, exceptions, resilience, and adapters."""
 
+import sys
+import types
+
 import pytest
 from unittest.mock import MagicMock, Mock, patch
 
@@ -179,6 +182,118 @@ class TestConfigValidation:
             assert strategy.azure_client.subscription_id == "12345678-1234-1234-1234-123456789012"
             assert strategy.azure_client.resource_group == "rg-explicit"
             assert "VMSS" in strategy.handlers
+
+    def test_azure_client_passes_managed_identity_client_id_when_configured(self):
+        azure_config = AzureProviderConfig(
+            subscription_id="12345678-1234-1234-1234-123456789012",
+            resource_group="rg-explicit",
+            region="westeurope",
+            client_id="managed-identity-client-id",
+        )
+        config_port = MagicMock()
+        config_port.get_typed.return_value = azure_config
+        config_port.get_provider_config.return_value = None
+
+        client = AzureClient(config=config_port, logger=MagicMock())
+
+        fake_identity = types.ModuleType("azure.identity")
+        fake_ctor = MagicMock(return_value=MagicMock())
+        fake_identity.DefaultAzureCredential = fake_ctor
+
+        with patch.dict(
+            sys.modules,
+            {
+                "azure": types.ModuleType("azure"),
+                "azure.identity": fake_identity,
+            },
+        ):
+            _ = client.credential
+
+        fake_ctor.assert_called_once_with(
+            managed_identity_client_id="managed-identity-client-id"
+        )
+
+    def test_azure_client_omits_managed_identity_client_id_when_unset(self):
+        azure_config = AzureProviderConfig(
+            subscription_id="12345678-1234-1234-1234-123456789012",
+            resource_group="rg-explicit",
+            region="westeurope",
+        )
+        config_port = MagicMock()
+        config_port.get_typed.return_value = azure_config
+        config_port.get_provider_config.return_value = None
+
+        client = AzureClient(config=config_port, logger=MagicMock())
+
+        fake_identity = types.ModuleType("azure.identity")
+        fake_ctor = MagicMock(return_value=MagicMock())
+        fake_identity.DefaultAzureCredential = fake_ctor
+
+        with patch.dict(
+            sys.modules,
+            {
+                "azure": types.ModuleType("azure"),
+                "azure.identity": fake_identity,
+            },
+        ):
+            _ = client.credential
+
+        fake_ctor.assert_called_once_with()
+
+
+class TestAzureAuthStrategy:
+    def test_auth_strategy_passes_managed_identity_client_id_when_configured(self):
+        from providers.azure.auth.azure_auth_strategy import AzureAuthStrategy
+
+        class ConcreteAzureAuthStrategy(AzureAuthStrategy):
+            def is_enabled(self) -> bool:
+                return self.enabled
+
+        strategy = ConcreteAzureAuthStrategy(
+            logger=MagicMock(),
+            client_id="managed-identity-client-id",
+        )
+
+        fake_identity = types.ModuleType("azure.identity")
+        fake_ctor = MagicMock(return_value=MagicMock())
+        fake_identity.DefaultAzureCredential = fake_ctor
+
+        with patch.dict(
+            sys.modules,
+            {
+                "azure": types.ModuleType("azure"),
+                "azure.identity": fake_identity,
+            },
+        ):
+            _ = strategy._get_credential()
+
+        fake_ctor.assert_called_once_with(
+            managed_identity_client_id="managed-identity-client-id"
+        )
+
+    def test_auth_strategy_omits_managed_identity_client_id_when_unset(self):
+        from providers.azure.auth.azure_auth_strategy import AzureAuthStrategy
+
+        class ConcreteAzureAuthStrategy(AzureAuthStrategy):
+            def is_enabled(self) -> bool:
+                return self.enabled
+
+        strategy = ConcreteAzureAuthStrategy(logger=MagicMock())
+
+        fake_identity = types.ModuleType("azure.identity")
+        fake_ctor = MagicMock(return_value=MagicMock())
+        fake_identity.DefaultAzureCredential = fake_ctor
+
+        with patch.dict(
+            sys.modules,
+            {
+                "azure": types.ModuleType("azure"),
+                "azure.identity": fake_identity,
+            },
+        ):
+            _ = strategy._get_credential()
+
+        fake_ctor.assert_called_once_with()
 
 
 class TestAzureValidationAdapter:

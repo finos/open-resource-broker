@@ -24,12 +24,10 @@ class AzureAuthStrategy(AuthPort):
     def __init__(
         self,
         logger: LoggingPort,
-        tenant_id: Optional[str] = None,
         client_id: Optional[str] = None,
         enabled: bool = True,
     ) -> None:
         self._logger = logger
-        self.tenant_id = tenant_id
         self.client_id = client_id
         self.enabled = enabled
         self._credential = None
@@ -39,8 +37,11 @@ class AzureAuthStrategy(AuthPort):
         if self._credential is None:
             try:
                 from azure.identity import DefaultAzureCredential
+                credential_kwargs: dict[str, Any] = {}
+                if self.client_id:
+                    credential_kwargs["managed_identity_client_id"] = self.client_id
 
-                self._credential = DefaultAzureCredential()
+                self._credential = DefaultAzureCredential(**credential_kwargs)
             except ImportError:
                 self._logger.error("azure-identity package is not installed")
                 raise
@@ -64,7 +65,6 @@ class AzureAuthStrategy(AuthPort):
                 permissions=["Microsoft.Compute/*", "Microsoft.Network/*"],
                 metadata={
                     "strategy": "azure_default_credential",
-                    "tenant_id": self.tenant_id,
                 },
             )
         except Exception as exc:
@@ -105,4 +105,3 @@ class AzureAuthStrategy(AuthPort):
 
     def get_strategy_name(self) -> str:
         return "azure_default_credential"
-
