@@ -96,6 +96,17 @@ class TestTemplateValidation:
         })
         assert result["valid"] is True
 
+    def test_missing_image_source_is_invalid(self):
+        result = validate_azure_template({
+            "template_id": "t1",
+            "vm_size": "Standard_D4s_v5",
+            "resource_group": "rg",
+            "location": "eastus2",
+            "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
+        })
+        assert result["valid"] is False
+        assert any("image source is required" in e for e in result["errors"])
+
     def test_missing_required_fields(self):
         result = validate_azure_template({})
         assert result["valid"] is False

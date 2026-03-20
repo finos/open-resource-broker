@@ -1,18 +1,9 @@
-"""Azure template extension configuration.
-
-Provides provider-specific extension fields that are merged into the core
-``Template`` when the provider type is ``azure``.  These are *defaults* –
-a template can override any of them.
-"""
+"""Azure template extension configuration."""
 
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-#TODO: Verify
-# ??? https://learn.microsoft.com/en-us/azure/cyclecloud/cluster-references/cluster-template-reference?view=cyclecloud-8
-# ??? https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/overview
-# ??? https://learn.microsoft.com/en-us/azure/templates/
 class AzureTemplateExtensionConfig(BaseModel):
     """Azure-specific template extension defaults.
 
@@ -30,22 +21,8 @@ class AzureTemplateExtensionConfig(BaseModel):
         description="Additional VM size candidates for Spot / flexible allocation",
     )
 
-    # Image defaults (Ubuntu 22.04 LTS Gen2 as sensible default)
-    image_publisher: str = Field("Canonical", description="Default image publisher")
-    image_offer: str = Field(
-        "0001-com-ubuntu-server-jammy", description="Default image offer"
-    )
-    image_sku: str = Field("22_04-lts-gen2", description="Default image SKU")
-    image_version: str = Field("latest", description="Default image version")
-
     # Pricing
     priority: str = Field("Regular", description="Default VM priority")
-    interruptible: bool = Field(False, description="Whether to use Spot VMs")
-
-    # Networking
-    accelerated_networking: bool = Field(
-        True, description="Enable accelerated networking where supported"
-    )
 
     # OS disk
     os_disk_type: str = Field("Premium_LRS", description="Default OS disk type")

@@ -29,6 +29,12 @@ _BASE_FIELDS = {
     "resource_group": "test-rg",
     "location": "eastus2",
     "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
+    "image": {
+        "publisher": "Canonical",
+        "offer": "0001-com-ubuntu-server-jammy",
+        "sku": "22_04-lts-gen2",
+        "version": "latest",
+    },
 }
 
 
@@ -60,6 +66,12 @@ class TestAzureTemplateConstruction:
         with pytest.raises(ValueError, match="SSH access is required"):
             AzureTemplate(**fields)
 
+    def test_rejects_missing_image_source(self):
+        fields = {**_BASE_FIELDS}
+        fields.pop("image")
+        with pytest.raises(ValueError, match="image source is required"):
+            AzureTemplate(**fields)
+
     def test_ssh_key_name_accepted(self):
         """ssh_key_name alone (without inline keys) should pass validation."""
         fields = {
@@ -68,6 +80,12 @@ class TestAzureTemplateConstruction:
             "resource_group": "test-rg",
             "location": "eastus2",
             "ssh_key_name": "my-azure-ssh-key",
+            "image": {
+                "publisher": "Canonical",
+                "offer": "0001-com-ubuntu-server-jammy",
+                "sku": "22_04-lts-gen2",
+                "version": "latest",
+            },
         }
         t = AzureTemplate(**fields)
         assert t.ssh_key_name == "my-azure-ssh-key"
@@ -77,19 +95,15 @@ class TestAzureTemplateConstruction:
         t = AzureTemplate(
             **_BASE_FIELDS,
             network_config={"subnet_id": "/subscriptions/.../subnets/default"},
-            image={
-                "publisher": "Canonical",
-                "offer": "0001-com-ubuntu-server-jammy",
-                "sku": "22_04-lts-gen2",
-                "version": "latest",
-            },
         )
         assert t.image is not None
         assert t.image.publisher == "Canonical"
 
     def test_with_custom_image_id(self):
+        fields = {**_BASE_FIELDS}
+        fields.pop("image", None)
         t = AzureTemplate(
-            **_BASE_FIELDS,
+            **fields,
             image={"image_id": "/subscriptions/.../images/my-image"},
         )
         assert t.image.image_id is not None
@@ -228,12 +242,6 @@ class TestArmPayload:
         t = AzureTemplate(
             **_BASE_FIELDS,
             network_config={"subnet_id": "/subscriptions/.../subnets/default"},
-            image={
-                "publisher": "Canonical",
-                "offer": "0001-com-ubuntu-server-jammy",
-                "sku": "22_04-lts-gen2",
-                "version": "latest",
-            },
         )
         arm = t.to_azure_api_format()
 
@@ -251,12 +259,6 @@ class TestArmPayload:
             **_BASE_FIELDS,
             priority="Spot",
             billing_profile_max_price=-1.0,
-            image={
-                "publisher": "Canonical",
-                "offer": "0001-com-ubuntu-server-jammy",
-                "sku": "22_04-lts-gen2",
-                "version": "latest",
-            },
         )
         arm = t.to_azure_api_format()
         vm_profile = arm["properties"]["virtualMachineProfile"]

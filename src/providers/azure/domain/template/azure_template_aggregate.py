@@ -502,6 +502,10 @@ class AzureTemplate(Template):
         # ssh_key_name (a reference to an Azure SSH Public Key resource) or inline ssh_public_keys.
         # CycleCloud manages SSH access internally so this is not required.
         if self.provider_api != AzureProviderApi.CYCLECLOUD:
+            if self.image is None and self.image_id is None:
+                raise ValueError(
+                    "An Azure image source is required. Provide either 'image' or 'image_id'."
+                )
             if not self.ssh_key_name and not self.ssh_public_keys:
                 raise ValueError(
                     "SSH access is required for Azure Linux VMs. Provide either "
