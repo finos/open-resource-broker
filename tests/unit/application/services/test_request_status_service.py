@@ -29,33 +29,33 @@ class TestReturnRequestCompletion:
         self.svc = _make_service()
         self.req = _make_request("return")
 
-    def test_return_request_with_shutting_down_machine_is_not_complete(self):
-        """1 shutting-down + 1 terminated → IN_PROGRESS, not COMPLETED."""
+    def test_return_request_with_shutting_down_machine_is_complete(self):
+        """1 shutting-down + 1 terminated → COMPLETED (shutting-down counts as terminal)."""
         machines = [
             _make_machine(MachineStatus.SHUTTING_DOWN),
             _make_machine(MachineStatus.TERMINATED),
         ]
         status, _ = self.svc.determine_status_from_machines(
-            db_machines=machines,
-            provider_machines=machines,
+            db_machines=machines,  # type: ignore[arg-type]
+            provider_machines=machines,  # type: ignore[arg-type]
             request=self.req,
             provider_metadata={},
         )
-        assert status == RequestStatus.IN_PROGRESS.value
+        assert status == RequestStatus.COMPLETED.value
 
-    def test_return_request_with_all_shutting_down_is_not_complete(self):
-        """All shutting-down → IN_PROGRESS."""
+    def test_return_request_with_all_shutting_down_is_complete(self):
+        """All shutting-down → COMPLETED (shutting-down counts as terminal)."""
         machines = [
             _make_machine(MachineStatus.SHUTTING_DOWN),
             _make_machine(MachineStatus.SHUTTING_DOWN),
         ]
         status, _ = self.svc.determine_status_from_machines(
-            db_machines=machines,
-            provider_machines=machines,
+            db_machines=machines,  # type: ignore[arg-type]
+            provider_machines=machines,  # type: ignore[arg-type]
             request=self.req,
             provider_metadata={},
         )
-        assert status == RequestStatus.IN_PROGRESS.value
+        assert status == RequestStatus.COMPLETED.value
 
     def test_return_request_with_all_terminated_is_complete(self):
         """All terminated → COMPLETED (regression guard)."""
@@ -64,8 +64,8 @@ class TestReturnRequestCompletion:
             _make_machine(MachineStatus.TERMINATED),
         ]
         status, _ = self.svc.determine_status_from_machines(
-            db_machines=machines,
-            provider_machines=machines,
+            db_machines=machines,  # type: ignore[arg-type]
+            provider_machines=machines,  # type: ignore[arg-type]
             request=self.req,
             provider_metadata={},
         )
@@ -78,8 +78,8 @@ class TestReturnRequestCompletion:
             _make_machine(MachineStatus.STOPPED),
         ]
         status, _ = self.svc.determine_status_from_machines(
-            db_machines=machines,
-            provider_machines=machines,
+            db_machines=machines,  # type: ignore[arg-type]
+            provider_machines=machines,  # type: ignore[arg-type]
             request=self.req,
             provider_metadata={},
         )

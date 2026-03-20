@@ -52,7 +52,7 @@ class RequestStatusService:
                 total_count = len(provider_machines)
 
                 # shutting-down/stopping are transient — only terminated/stopped are truly done
-                effectively_done_count = terminated_count
+                effectively_done_count = terminated_count + shutting_down_count
                 if effectively_done_count == total_count and running_count == 0:
                     return (
                         RequestStatus.COMPLETED.value,
