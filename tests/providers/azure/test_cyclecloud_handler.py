@@ -32,8 +32,8 @@ _CC_TEMPLATE_FIELDS = {
     "cluster_name": "my-cluster",
     "node_array": "execute",
     "cyclecloud_url": "https://cc.example.com",
-    "cyclecloud_username": "admin",
-    "cyclecloud_password": "secret",
+    "cyclecloud_auth_mode": "bearer",
+    "cyclecloud_bearer_token": "tok-123",
     "cyclecloud_verify_ssl": False,
 }
 
@@ -70,14 +70,14 @@ class TestCycleCloudTemplate:
         assert t.node_array == "execute"
         assert t.cyclecloud_url == "https://cc.example.com"
         assert t.cyclecloud_credential_path is None
-        assert t.cyclecloud_username == "admin"
-        assert t.cyclecloud_password == "secret"
+        assert t.cyclecloud_auth_mode == "bearer"
+        assert t.cyclecloud_bearer_token == "tok-123"
         assert t.cyclecloud_verify_ssl is False
 
     def test_cyclecloud_template_accepts_credential_path(self):
         t = _make_template(
-            cyclecloud_username=None,
-            cyclecloud_password=None,
+            cyclecloud_auth_mode=None,
+            cyclecloud_bearer_token=None,
             cyclecloud_credential_path="config/cyclecloud-credentials.json",
         )
         assert t.cyclecloud_credential_path == "config/cyclecloud-credentials.json"
@@ -97,6 +97,13 @@ class TestCycleCloudTemplate:
         t = _make_template()
         assert t.ssh_public_keys == []
         assert t.ssh_key_name is None
+
+    def test_cyclecloud_template_rejects_inline_basic_auth_fields(self):
+        with pytest.raises(ValueError, match="Extra inputs are not permitted"):
+            _make_template(cyclecloud_username="admin")
+
+        with pytest.raises(ValueError, match="Extra inputs are not permitted"):
+            _make_template(cyclecloud_password="secret")
 
     def test_cyclecloud_template_requires_cluster_name(self):
         with pytest.raises(ValueError, match="cluster_name is required"):
@@ -329,8 +336,8 @@ class TestCycleCloudHandlerStatus:
                 "cluster_name": "my-cluster",
                 "node_array": "execute",
                 "cyclecloud_url": "https://cc.example.com",
-                "cyclecloud_username": "admin",
-                "cyclecloud_password": "secret",
+                "cyclecloud_auth_mode": "bearer",
+                "cyclecloud_bearer_token": "tok-123",
             },
         )
 
@@ -372,8 +379,8 @@ class TestCycleCloudHandlerStatus:
                 "operation_id": "op-123",
                 "operation_location": "https://cc.example.com/operations/op-123",
                 "cyclecloud_url": "https://cc.example.com",
-                "cyclecloud_username": "admin",
-                "cyclecloud_password": "secret",
+                "cyclecloud_auth_mode": "bearer",
+                "cyclecloud_bearer_token": "tok-123",
             },
         )
 
@@ -524,8 +531,8 @@ class TestCycleCloudHandlerRelease:
             resource_id="my-cluster",
             context={
                 "cyclecloud_url": "https://cc.example.com",
-                "cyclecloud_username": "admin",
-                "cyclecloud_password": "secret",
+                "cyclecloud_auth_mode": "bearer",
+                "cyclecloud_bearer_token": "tok-123",
             },
         )
 
@@ -563,8 +570,8 @@ class TestCycleCloudHandlerRelease:
             resource_id="my-cluster",
             context={
                 "cyclecloud_url": "https://cc.example.com",
-                "cyclecloud_username": "admin",
-                "cyclecloud_password": "secret",
+                "cyclecloud_auth_mode": "bearer",
+                "cyclecloud_bearer_token": "tok-123",
             },
         )
 
@@ -594,17 +601,15 @@ class TestCycleCloudAuthModes:
         handler = _make_handler()
 
         with patch.object(handler, "_get_azure_bearer_token", return_value="tok-123"):
-            session, base_url = handler._build_cc_session(
+            session_context = handler._build_cc_session(
                 cc_url="https://cc.example.com",
-                cc_user=None,
-                cc_pass=None,
                 verify_ssl=True,
                 metadata={"cyclecloud_auth_mode": "bearer"},
             )
 
-        assert base_url == "https://cc.example.com"
-        assert session.__dict__.get("_cyclecloud_auth_mode") == "bearer"
-        assert session.headers["Authorization"] == "Bearer tok-123"
+        assert session_context.base_url == "https://cc.example.com"
+        assert session_context.auth_mode == "bearer"
+        assert session_context.session.headers["Authorization"] == "Bearer tok-123"
 
     def test_build_session_rejects_ssh_auth_mode(self):
         handler = _make_handler()
@@ -615,8 +620,6 @@ class TestCycleCloudAuthModes:
         ):
             handler._build_cc_session(
                 cc_url="https://cc.example.com",
-                cc_user=None,
-                cc_pass=None,
                 verify_ssl=True,
                 metadata={"cyclecloud_auth_mode": "ssh"},
             )
@@ -628,24 +631,25 @@ class TestCycleCloudAuthModes:
             region="eastus2",
             resource_group="orb-test-rg",
             cyclecloud={
+                "credential_path": "config/cyclecloud-credentials.json",
                 "url": "https://cc.example.com",
-                "username": "cc_admin",
-                "password": "changeme",
                 "verify_ssl": False,
             },
         )
+        with patch.object(
+            handler,
+            "_load_cc_credential_file",
+            return_value={"username": "cc_admin", "password": "changeme"},
+        ):
+            session_context = handler._build_cc_session(
+                cc_url=None,
+                verify_ssl=None,
+            )
 
-        session, base_url = handler._build_cc_session(
-            cc_url=None,
-            cc_user=None,
-            cc_pass=None,
-            verify_ssl=None,
-        )
-
-        assert base_url == "https://cc.example.com"
-        assert session.verify is False
-        assert session.__dict__.get("_cyclecloud_auth_mode") == "basic"
-        assert session.auth == ("cc_admin", "changeme")
+        assert session_context.base_url == "https://cc.example.com"
+        assert session_context.session.verify is False
+        assert session_context.auth_mode == "basic"
+        assert session_context.session.auth == ("cc_admin", "changeme")
 
     def test_build_session_loads_credentials_from_file(self, tmp_path: Path):
         handler = _make_handler()
@@ -661,29 +665,29 @@ class TestCycleCloudAuthModes:
             encoding="utf-8",
         )
 
-        session, base_url = handler._build_cc_session(
+        session_context = handler._build_cc_session(
             cc_url="https://cc.example.com",
-            cc_user=None,
-            cc_pass=None,
             verify_ssl=False,
             metadata={"cyclecloud_credential_path": str(credential_file)},
         )
 
-        assert base_url == "https://cc.example.com"
-        assert session.auth == ("file-admin", "file-secret")
+        assert session_context.base_url == "https://cc.example.com"
+        assert session_context.session.auth == ("file-admin", "file-secret")
 
     def test_build_session_parses_verify_ssl_string_from_metadata(self):
         handler = _make_handler()
 
-        session, _ = handler._build_cc_session(
+        session_context = handler._build_cc_session(
             cc_url="https://cc.example.com",
-            cc_user="file-admin",
-            cc_pass="file-secret",
             verify_ssl=None,
-            metadata={"cyclecloud_verify_ssl": "false"},
+            metadata={
+                "cyclecloud_verify_ssl": "false",
+                "cyclecloud_auth_mode": "bearer",
+                "cyclecloud_bearer_token": "tok-123",
+            },
         )
 
-        assert session.verify is False
+        assert session_context.session.verify is False
 
     def test_build_session_parses_verify_ssl_string_from_credential_file(self, tmp_path: Path):
         handler = _make_handler()
@@ -700,16 +704,14 @@ class TestCycleCloudAuthModes:
             encoding="utf-8",
         )
 
-        session, base_url = handler._build_cc_session(
+        session_context = handler._build_cc_session(
             cc_url=None,
-            cc_user=None,
-            cc_pass=None,
             verify_ssl=None,
             metadata={"cyclecloud_credential_path": str(credential_file)},
         )
 
-        assert base_url == "https://cc.example.com"
-        assert session.verify is False
+        assert session_context.base_url == "https://cc.example.com"
+        assert session_context.session.verify is False
 
     def test_build_session_resolves_credential_path_from_template(self, tmp_path: Path):
         handler = _make_handler()
@@ -724,23 +726,24 @@ class TestCycleCloudAuthModes:
         credential_file.write_text(json.dumps(credential_payload), encoding="utf-8")
         template = _make_template(
             cyclecloud_url=None,
-            cyclecloud_username=None,
-            cyclecloud_password=None,
+            cyclecloud_auth_mode=None,
+            cyclecloud_bearer_token=None,
             cyclecloud_credential_path=str(credential_file),
         )
 
-        session, base_url = handler._build_cc_session(
+        session_context = handler._build_cc_session(
             cc_url=None,
-            cc_user=None,
-            cc_pass=None,
             verify_ssl=None,
             template=template,
         )
 
-        assert base_url == credential_payload["url"]
-        assert session.auth == (credential_payload["username"], credential_payload["password"])
-        assert session.verify is credential_payload["verify_ssl"]
-        assert session.__dict__.get("_cyclecloud_auth_mode") == credential_payload["auth_mode"]
+        assert session_context.base_url == credential_payload["url"]
+        assert session_context.session.auth == (
+            credential_payload["username"],
+            credential_payload["password"],
+        )
+        assert session_context.session.verify is credential_payload["verify_ssl"]
+        assert session_context.auth_mode == credential_payload["auth_mode"]
 
     @patch("providers.azure.infrastructure.handlers.cyclecloud_handler.requests.Session")
     def test_acquire_hosts_persists_credential_path(self, mock_session_cls, tmp_path: Path):
@@ -751,9 +754,69 @@ class TestCycleCloudAuthModes:
             encoding="utf-8",
         )
         template = _make_template(
-            cyclecloud_username=None,
-            cyclecloud_password=None,
+            cyclecloud_auth_mode=None,
+            cyclecloud_bearer_token=None,
             cyclecloud_credential_path=str(credential_file),
+        )
+        request = _make_request(count=1)
+
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+
+        cluster_status_resp = MagicMock()
+        cluster_status_resp.status_code = 200
+        cluster_status_resp.content = b'{"state": "Started"}'
+        cluster_status_resp.json.return_value = {"state": "Started"}
+        cluster_status_resp.raise_for_status = MagicMock()
+
+        node_create_resp = MagicMock()
+        node_create_resp.status_code = 200
+        node_create_resp.content = b'{"operationId": "op-123", "sets": [{"added": 1, "nodes": [{"name": "node-1", "status": "Acquiring"}]}]}'
+        node_create_resp.json.return_value = {
+            "operationId": "op-123",
+            "sets": [{"added": 1, "nodes": [{"name": "node-1", "status": "Acquiring"}]}],
+        }
+        node_create_resp.raise_for_status = MagicMock()
+
+        mock_session.request.side_effect = [cluster_status_resp, node_create_resp]
+
+        result = handler.acquire_hosts(request, template)
+
+        assert result["provider_data"]["cyclecloud_credential_path"] == str(credential_file)
+
+    @patch("providers.azure.infrastructure.handlers.cyclecloud_handler.requests.Session")
+    def test_acquire_hosts_persists_resolved_provider_config_credential_path(
+        self,
+        mock_session_cls,
+        tmp_path: Path,
+    ):
+        handler = _make_handler()
+        credential_file = tmp_path / "cyclecloud-provider-credentials.json"
+        credential_file.write_text(
+            json.dumps(
+                {
+                    "username": "file-admin",
+                    "password": "file-secret",
+                    "url": "https://cc.example.com",
+                    "verify_ssl": False,
+                }
+            ),
+            encoding="utf-8",
+        )
+        handler.azure_client._azure_config = AzureProviderConfig(
+            subscription_id="12345678-1234-1234-1234-123456789012",
+            region="eastus2",
+            cyclecloud={
+                "credential_path": str(credential_file),
+                "url": "https://cc.example.com",
+                "verify_ssl": False,
+            },
+        )
+        template = _make_template(
+            cyclecloud_url=None,
+            cyclecloud_auth_mode=None,
+            cyclecloud_bearer_token=None,
+            cyclecloud_credential_path=None,
         )
         request = _make_request(count=1)
 

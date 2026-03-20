@@ -373,16 +373,6 @@ class AzureTemplate(Template):
         description="Path to a JSON file containing CycleCloud credentials and optional auth overrides.",
         validation_alias=AliasChoices("cyclecloud_credential_path", "cyclecloudCredentialPath"),
     )
-    cyclecloud_username: Optional[str] = Field(
-        default=None,
-        description="CycleCloud API username.",
-        validation_alias=AliasChoices("cyclecloud_username", "cyclecloudUsername"),
-    )
-    cyclecloud_password: Optional[str] = Field(
-        default=None,
-        description="CycleCloud API password.",
-        validation_alias=AliasChoices("cyclecloud_password", "cyclecloudPassword"),
-    )
     cyclecloud_verify_ssl: bool = Field(
         default=True,
         description="Whether to verify SSL certificates for CycleCloud API calls.",

@@ -35,6 +35,9 @@ from providers.azure.exceptions.azure_exceptions import (
     CycleCloudNodeError,
     TerminationError,
 )
+from providers.azure.infrastructure.cyclecloud_session import (
+    CycleCloudSessionContext,
+)
 from providers.azure.infrastructure.handlers.azure_handler import AzureHandler
 
 
@@ -195,13 +198,11 @@ class CycleCloudHandler(AzureHandler):
         self,
         *,
         cc_url: Optional[str],
-        cc_user: Optional[str],
-        cc_pass: Optional[str],
         verify_ssl: Optional[bool],
         template: Optional[AzureTemplate] = None,
         metadata: Optional[dict[str, Any]] = None,
         context: Optional[dict[str, Any]] = None,
-    ) -> tuple[requests.Session, str]:
+    ) -> CycleCloudSessionContext:
         provider_cfg = self._get_provider_cyclecloud_config()
         credential_path = self._resolve_cc_config_value(
             template=template,
@@ -228,36 +229,6 @@ class CycleCloudHandler(AzureHandler):
             provider_path=("cyclecloud", "url"),
         )
         cc_url = cc_url or self._credential_file_value(credential_file_data, "cyclecloud_url", "url")
-        cc_user = cc_user or self._resolve_cc_config_value(
-            template=template,
-            metadata=metadata,
-            context=context,
-            provider_cfg=provider_cfg,
-            template_attr="cyclecloud_username",
-            metadata_key="cyclecloud_username",
-            context_key="cyclecloud_username",
-            provider_path=("cyclecloud", "username"),
-        )
-        cc_user = cc_user or self._credential_file_value(
-            credential_file_data,
-            "cyclecloud_username",
-            "username",
-        )
-        cc_pass = cc_pass or self._resolve_cc_config_value(
-            template=template,
-            metadata=metadata,
-            context=context,
-            provider_cfg=provider_cfg,
-            template_attr="cyclecloud_password",
-            metadata_key="cyclecloud_password",
-            context_key="cyclecloud_password",
-            provider_path=("cyclecloud", "password"),
-        )
-        cc_pass = cc_pass or self._credential_file_value(
-            credential_file_data,
-            "cyclecloud_password",
-            "password",
-        )
 
         if verify_ssl is None:
             verify_resolved = self._resolve_cc_config_value(
@@ -293,6 +264,9 @@ class CycleCloudHandler(AzureHandler):
             "Accept": "application/json",
             "Content-Type": "application/json",
         })
+        resolved_credential_path = (
+            str(credential_path) if credential_path not in (None, "") else None
+        )
 
         auth_mode = self._resolve_cc_config_value(
             template=template,
@@ -349,9 +323,20 @@ class CycleCloudHandler(AzureHandler):
                 url=base_url,
             )
 
+        cc_user = self._credential_file_value(
+            credential_file_data,
+            "cyclecloud_username",
+            "username",
+        )
+        cc_pass = self._credential_file_value(
+            credential_file_data,
+            "cyclecloud_password",
+            "password",
+        )
+        resolved_auth_mode: Optional[str] = None
         if cc_user and cc_pass and auth_mode != "bearer":
             session.auth = (cc_user, cc_pass)
-            session.__dict__["_cyclecloud_auth_mode"] = "basic"
+            resolved_auth_mode = "basic"
         else:
             bearer_token = explicit_bearer
             if not bearer_token:
@@ -363,7 +348,7 @@ class CycleCloudHandler(AzureHandler):
 
             if bearer_token:
                 session.headers["Authorization"] = f"Bearer {bearer_token}"
-                session.__dict__["_cyclecloud_auth_mode"] = "bearer"
+                resolved_auth_mode = "bearer"
             elif auth_mode == "bearer":
                 raise CycleCloudConnectionError(
                     "cyclecloud_auth_mode=bearer requested but no bearer token could be resolved.",
@@ -375,13 +360,16 @@ class CycleCloudHandler(AzureHandler):
                     url=base_url,
                 )
 
-        return session, base_url
+        return CycleCloudSessionContext(
+            session=session,
+            base_url=base_url,
+            auth_mode=resolved_auth_mode,
+            credential_path=resolved_credential_path,
+        )
 
-    def _get_cc_session(self, template: AzureTemplate) -> tuple[requests.Session, str]:
+    def _get_cc_session(self, template: AzureTemplate) -> CycleCloudSessionContext:
         return self._build_cc_session(
             cc_url=template.cyclecloud_url,
-            cc_user=template.cyclecloud_username,
-            cc_pass=template.cyclecloud_password,
             verify_ssl=template.cyclecloud_verify_ssl,
             template=template,
         )
@@ -581,7 +569,9 @@ class CycleCloudHandler(AzureHandler):
             vm_size,
         )
 
-        session, base_url = self._get_cc_session(template)
+        session_context = self._get_cc_session(template)
+        session = session_context.session
+        base_url = session_context.base_url
 
         # Verify the cluster exists
         try:
@@ -698,9 +688,9 @@ class CycleCloudHandler(AzureHandler):
                 "location": template.location,
                 "fleet_errors": fleet_errors,
                 "cyclecloud_url": base_url,
-                "cyclecloud_credential_path": getattr(template, "cyclecloud_credential_path", None),
+                "cyclecloud_credential_path": session_context.credential_path,
                 "cyclecloud_verify_ssl": bool(session.verify),
-                "cyclecloud_auth_mode": session.__dict__.get("_cyclecloud_auth_mode"),
+                "cyclecloud_auth_mode": session_context.auth_mode,
                 "cyclecloud_aad_scope": getattr(template, "cyclecloud_aad_scope", None),
             },
         }
@@ -738,18 +728,16 @@ class CycleCloudHandler(AzureHandler):
 
         # Build a minimal template to get CycleCloud connection info
         cc_url = metadata.get("cyclecloud_url")
-        cc_user = metadata.get("cyclecloud_username")
-        cc_pass = metadata.get("cyclecloud_password")
         cc_verify = metadata.get("cyclecloud_verify_ssl", None)
 
         try:
-            session, base_url = self._build_cc_session(
+            session_context = self._build_cc_session(
                 cc_url=cc_url,
-                cc_user=cc_user,
-                cc_pass=cc_pass,
                 verify_ssl=cc_verify,
                 metadata=metadata,
             )
+            session = session_context.session
+            base_url = session_context.base_url
         except CycleCloudConnectionError as exc:
             self._logger.error(
                 "Failed to build CycleCloud session for status check (cluster '%s'): %s",
@@ -872,25 +860,22 @@ class CycleCloudHandler(AzureHandler):
             machine_ids: Node names/IDs to remove.
             resource_id: The cluster name.
             context: Must contain ``cyclecloud_url`` and optionally
-                ``cyclecloud_username``, ``cyclecloud_password``,
-                ``cyclecloud_verify_ssl``.
+                ``cyclecloud_credential_path``, ``cyclecloud_verify_ssl``.
         """
         context = context or {}
         cluster_name = resource_id
 
         cc_url = context.get("cyclecloud_url")
-        cc_user = context.get("cyclecloud_username")
-        cc_pass = context.get("cyclecloud_password")
         cc_verify = context.get("cyclecloud_verify_ssl", None)
 
         try:
-            session, base_url = self._build_cc_session(
+            session_context = self._build_cc_session(
                 cc_url=cc_url,
-                cc_user=cc_user,
-                cc_pass=cc_pass,
                 verify_ssl=cc_verify,
                 context=context,
             )
+            session = session_context.session
+            base_url = session_context.base_url
         except CycleCloudConnectionError as exc:
             raise TerminationError(
                 f"Failed to build CycleCloud session for release_hosts: {exc}",
