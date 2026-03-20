@@ -497,6 +497,52 @@ class TestTerminateInstances:
             == 2
         )
 
+    def test_terminate_instances_forwards_full_cyclecloud_auth_context(self, azure_config, logger):
+        strategy = AzureProviderStrategy(config=azure_config, logger=logger)
+        strategy.initialize()
+
+        handler = MagicMock()
+        strategy._handlers = {"CycleCloud": handler}
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={
+                "instance_ids": ["node-1"],
+                "provider_api": "CycleCloud",
+                "resource_id": "my-cluster",
+            },
+            context={
+                "cyclecloud_url": "https://cc.example.com",
+                "cyclecloud_credential_path": "config/cc.json",
+                "cyclecloud_username": "admin",
+                "cyclecloud_password": "secret",
+                "cyclecloud_verify_ssl": False,
+                "cyclecloud_auth_mode": "bearer",
+                "cyclecloud_aad_scope": "https://cc.example.com/.default",
+                "cyclecloud_bearer_token": "tok-123",
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert result.success
+        handler.release_hosts.assert_called_once_with(
+            machine_ids=["node-1"],
+            resource_id="my-cluster",
+            context={
+                "resource_group": "test-rg",
+                "resource_id": "my-cluster",
+                "cyclecloud_url": "https://cc.example.com",
+                "cyclecloud_credential_path": "config/cc.json",
+                "cyclecloud_username": "admin",
+                "cyclecloud_password": "secret",
+                "cyclecloud_verify_ssl": False,
+                "cyclecloud_auth_mode": "bearer",
+                "cyclecloud_aad_scope": "https://cc.example.com/.default",
+                "cyclecloud_bearer_token": "tok-123",
+            },
+        )
+
 
 # ---------------------------------------------------------------------------
 # GET_INSTANCE_STATUS (with missing ids → error path)
@@ -765,6 +811,47 @@ class TestDescribeResourceInstances:
             capacity=2,
         )
         assert ("test-rg", "vmss-demo") not in strategy._pending_vmss_termination_reconciliations
+
+    def test_describe_resource_instances_forwards_cyclecloud_request_metadata(self, strategy):
+        handler = MagicMock()
+        handler.check_hosts_status.return_value = []
+        strategy._handlers["CycleCloud"] = handler
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
+            parameters={
+                "resource_ids": ["my-cluster"],
+                "provider_api": "CycleCloud",
+                "resource_group": "test-rg",
+                "template_id": "tmpl-1",
+                "request_metadata": {
+                    "node_array": "execute",
+                    "node_ids": ["node-1"],
+                    "cyclecloud_url": "https://cc.example.com",
+                    "cyclecloud_auth_mode": "bearer",
+                    "cyclecloud_aad_scope": "https://cc.example.com/.default",
+                    "cyclecloud_bearer_token": "tok-123",
+                    "cyclecloud_verify_ssl": False,
+                },
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert result.success
+        forwarded_request = handler.check_hosts_status.call_args.args[0]
+        assert forwarded_request.resource_ids == ["my-cluster"]
+        assert forwarded_request.metadata["cluster_name"] == "my-cluster"
+        assert forwarded_request.metadata["node_array"] == "execute"
+        assert forwarded_request.metadata["node_ids"] == ["node-1"]
+        assert forwarded_request.metadata["cyclecloud_url"] == "https://cc.example.com"
+        assert forwarded_request.metadata["cyclecloud_auth_mode"] == "bearer"
+        assert (
+            forwarded_request.metadata["cyclecloud_aad_scope"]
+            == "https://cc.example.com/.default"
+        )
+        assert forwarded_request.metadata["cyclecloud_bearer_token"] == "tok-123"
+        assert forwarded_request.metadata["cyclecloud_verify_ssl"] is False
 
     def test_dry_run_short_circuits_resource_discovery(self, azure_config, logger):
         strategy = AzureProviderStrategy(config=azure_config, logger=logger)

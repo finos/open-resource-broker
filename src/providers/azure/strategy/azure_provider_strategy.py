@@ -852,21 +852,11 @@ class AzureProviderStrategy(ProviderStrategy):
             if not default_resource_id and grouped_resource_mapping:
                 default_resource_id = next(iter(grouped_resource_mapping.keys()))
 
-            release_context = {
-                "resource_group": resource_group,
-                "resource_id": default_resource_id or "unknown",
-            }
-            operation_context = operation.context or {}
-            for key in (
-                "cyclecloud_url",
-                "cyclecloud_credential_path",
-                "cyclecloud_username",
-                "cyclecloud_password",
-                "cyclecloud_verify_ssl",
-            ):
-                value = operation_context.get(key)
-                if value not in (None, ""):
-                    release_context[key] = value
+            release_context = self._build_cyclecloud_request_metadata(
+                operation=operation,
+                resource_group=resource_group,
+            )
+            release_context["resource_id"] = default_resource_id or "unknown"
 
             provider_api = operation.parameters.get(
                 "provider_api", AzureProviderApi.VMSS.value
@@ -1058,26 +1048,10 @@ class AzureProviderStrategy(ProviderStrategy):
         )
 
         def build_metadata(additional: Optional[dict[str, Any]] = None) -> dict[str, Any]:
-            metadata = {"resource_group": resource_group}
-            for source in (
-                operation.parameters.get("request_metadata", {}) or {},
-                operation.context or {},
-                operation.parameters,
-            ):
-                for key in (
-                    "cluster_name",
-                    "node_array",
-                    "node_ids",
-                    "cyclecloud_url",
-                    "cyclecloud_username",
-                    "cyclecloud_password",
-                    "cyclecloud_verify_ssl",
-                    "cyclecloud_auth_mode",
-                    "cyclecloud_aad_scope",
-                ):
-                    value = source.get(key) if isinstance(source, dict) else None
-                    if value not in (None, ""):
-                        metadata[key] = value
+            metadata = self._build_cyclecloud_request_metadata(
+                operation=operation,
+                resource_group=resource_group,
+            )
             if additional:
                 metadata.update(additional)
             return metadata
@@ -1207,6 +1181,42 @@ class AzureProviderStrategy(ProviderStrategy):
             if candidate_ids & requested:
                 filtered.append(result)
         return filtered
+
+    @staticmethod
+    def _cyclecloud_metadata_keys() -> tuple[str, ...]:
+        return (
+            "cluster_name",
+            "node_array",
+            "node_ids",
+            "cyclecloud_url",
+            "cyclecloud_credential_path",
+            "cyclecloud_username",
+            "cyclecloud_password",
+            "cyclecloud_verify_ssl",
+            "cyclecloud_auth_mode",
+            "cyclecloud_aad_scope",
+            "cyclecloud_bearer_token",
+        )
+
+    def _build_cyclecloud_request_metadata(
+        self,
+        *,
+        operation: ProviderOperation,
+        resource_group: Optional[str],
+    ) -> dict[str, Any]:
+        metadata: dict[str, Any] = {"resource_group": resource_group}
+        for source in (
+            operation.parameters.get("request_metadata", {}) or {},
+            operation.context or {},
+            operation.parameters,
+        ):
+            if not isinstance(source, dict):
+                continue
+            for key in self._cyclecloud_metadata_keys():
+                value = source.get(key)
+                if value not in (None, ""):
+                    metadata[key] = value
+        return metadata
 
     @staticmethod
     def _status_candidate_ids(result: dict[str, Any]) -> set[str]:
@@ -1362,13 +1372,16 @@ class AzureProviderStrategy(ProviderStrategy):
                 provider_type="azure",
                 provider_instance="azure-default",
                 request_id=request_id,
-                metadata={
-                    "resource_group": operation.parameters.get(
+                metadata=self._build_cyclecloud_request_metadata(
+                    operation=operation,
+                    resource_group=operation.parameters.get(
                         "resource_group", self._azure_config.resource_group
                     ),
-                },
+                ),
             )
             request.resource_ids = resource_ids
+            if provider_api_value == AzureProviderApi.CYCLECLOUD.value and resource_ids:
+                request.metadata.setdefault("cluster_name", resource_ids[0])
 
             instance_details = handler.check_hosts_status(request)
             self._maybe_reconcile_pending_vmss_termination(
