@@ -27,7 +27,7 @@ from orb.application.services.orchestration.list_requests import ListRequestsOrc
 from orb.application.services.orchestration.list_return_requests import (
     ListReturnRequestsOrchestrator,
 )
-from orb.application.services.response_formatting_service import ResponseFormattingService
+from orb.interface.response_formatting_service import ResponseFormattingService
 
 
 def _make_namespace(**kwargs) -> argparse.Namespace:

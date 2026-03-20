@@ -51,7 +51,7 @@ class TestStubHandlers:
     async def test_handle_reload_provider_config_returns_interface_response(self):
         from orb.application.dto.interface_response import InterfaceResponse
         from orb.application.services.provider_registry_service import ProviderRegistryService
-        from orb.application.services.response_formatting_service import ResponseFormattingService
+        from orb.interface.response_formatting_service import ResponseFormattingService
         from orb.interface.system_command_handlers import handle_reload_provider_config
 
         mock_formatter = MagicMock(spec=ResponseFormattingService)
@@ -172,7 +172,7 @@ class TestHandleSystemStatus:
     async def test_dispatches_get_system_status_query_with_flags(self):
         from orb.application.dto.interface_response import InterfaceResponse
         from orb.application.queries.system import GetSystemStatusQuery
-        from orb.application.services.response_formatting_service import ResponseFormattingService
+        from orb.interface.response_formatting_service import ResponseFormattingService
         from orb.interface.system_command_handlers import handle_system_status
 
         container, query_bus = _mock_container_with_query_bus(query_return={"healthy": True})
@@ -199,7 +199,7 @@ class TestHandleSystemStatus:
     async def test_detailed_defaults_to_false_when_not_set(self):
         from orb.application.dto.interface_response import InterfaceResponse
         from orb.application.queries.system import GetSystemStatusQuery
-        from orb.application.services.response_formatting_service import ResponseFormattingService
+        from orb.interface.response_formatting_service import ResponseFormattingService
         from orb.interface.system_command_handlers import handle_system_status
 
         container, query_bus = _mock_container_with_query_bus(query_return={})

@@ -22,7 +22,7 @@ from orb.application.services.orchestration.refresh_templates import RefreshTemp
 from orb.application.services.orchestration.return_machines import ReturnMachinesOrchestrator
 from orb.application.services.orchestration.update_template import UpdateTemplateOrchestrator
 from orb.application.services.orchestration.validate_template import ValidateTemplateOrchestrator
-from orb.application.services.response_formatting_service import ResponseFormattingService
+from orb.interface.response_formatting_service import ResponseFormattingService
 from orb.config.schemas.server_schema import ServerConfig
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.infrastructure.di.buses import CommandBus, QueryBus

@@ -20,7 +20,7 @@ from orb.application.services.orchestration.dtos import (
     GetRequestStatusOutput,
 )
 from orb.application.services.orchestration.get_request_status import GetRequestStatusOrchestrator
-from orb.application.services.response_formatting_service import ResponseFormattingService
+from orb.interface.response_formatting_service import ResponseFormattingService
 
 
 def _make_namespace(**kwargs) -> argparse.Namespace:

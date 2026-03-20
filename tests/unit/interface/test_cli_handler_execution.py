@@ -11,7 +11,7 @@ from orb.application.services.orchestration.get_request_status import (
     GetRequestStatusOrchestrator,
 )
 from orb.application.services.orchestration.list_templates import ListTemplatesOrchestrator
-from orb.application.services.response_formatting_service import ResponseFormattingService
+from orb.interface.response_formatting_service import ResponseFormattingService
 from orb.infrastructure.di.buses import QueryBus
 from orb.infrastructure.di.container import DIContainer
 from orb.interface.request_command_handlers import handle_get_request_status

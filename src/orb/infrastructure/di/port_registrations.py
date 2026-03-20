@@ -118,7 +118,7 @@ def register_port_adapters(container):
 
     # Register response formatting service
     from orb.application.ports.scheduler_port import SchedulerPort
-    from orb.application.services.response_formatting_service import ResponseFormattingService
+    from orb.interface.response_formatting_service import ResponseFormattingService
 
     container.register_singleton(
         ResponseFormattingService,

@@ -10,7 +10,7 @@ import json
 from typing import TYPE_CHECKING, Any, Union
 
 from orb.application.dto.interface_response import InterfaceResponse
-from orb.application.services.response_formatting_service import ResponseFormattingService
+from orb.interface.response_formatting_service import ResponseFormattingService
 from orb.domain.base.exceptions import DuplicateError, EntityNotFoundError
 from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions

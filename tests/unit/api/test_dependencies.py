@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from orb.api.dependencies import get_response_formatting_service
-from orb.application.services.response_formatting_service import ResponseFormattingService
+from orb.interface.response_formatting_service import ResponseFormattingService
 
 
 @pytest.mark.unit

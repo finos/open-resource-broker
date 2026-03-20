@@ -42,7 +42,7 @@ def _make_namespace(**kwargs) -> argparse.Namespace:
 def _mock_container(extra: dict | None = None):
     """Return (container, scheduler, formatter, orchestrators...) mocks pre-wired."""
     from orb.application.dto.interface_response import InterfaceResponse
-    from orb.application.services.response_formatting_service import ResponseFormattingService
+    from orb.interface.response_formatting_service import ResponseFormattingService
 
     container = MagicMock()
     scheduler = MagicMock(spec=SchedulerPort)
@@ -102,7 +102,7 @@ class TestHandleRequestMachines:
 
         container, _scheduler, acquire_orch, *_ = _mock_container()
         # get formatter from dispatch map via container
-        from orb.application.services.response_formatting_service import ResponseFormattingService
+        from orb.interface.response_formatting_service import ResponseFormattingService
 
         formatter = container.get(ResponseFormattingService)
 
@@ -127,7 +127,7 @@ class TestHandleRequestMachines:
     async def test_from_input_data(self):
         """input_data dict is passed to scheduler.parse_request_data."""
         from orb.application.dto.interface_response import InterfaceResponse
-        from orb.application.services.response_formatting_service import ResponseFormattingService
+        from orb.interface.response_formatting_service import ResponseFormattingService
 
         container, scheduler, acquire_orch, *_ = _mock_container()
         formatter = container.get(ResponseFormattingService)

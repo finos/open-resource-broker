@@ -26,7 +26,7 @@ class TestStorageCommandHandlers:
         from orb.application.services.orchestration.list_storage_strategies import (
             ListStorageStrategiesOrchestrator,
         )
-        from orb.application.services.response_formatting_service import ResponseFormattingService
+        from orb.interface.response_formatting_service import ResponseFormattingService
 
         args = Namespace(resource="storage", action="list")
 
@@ -61,7 +61,7 @@ class TestStorageCommandHandlers:
         from orb.application.services.orchestration.get_storage_config import (
             GetStorageConfigOrchestrator,
         )
-        from orb.application.services.response_formatting_service import ResponseFormattingService
+        from orb.interface.response_formatting_service import ResponseFormattingService
 
         args = Namespace(resource="storage", action="show")
 
@@ -89,7 +89,7 @@ class TestStorageCommandHandlers:
     async def test_handle_validate_storage_config(self):
         """Test validate storage configuration handler."""
         from orb.application.dto.interface_response import InterfaceResponse
-        from orb.application.services.response_formatting_service import ResponseFormattingService
+        from orb.interface.response_formatting_service import ResponseFormattingService
 
         args = Namespace(resource="storage", action="validate")
 
@@ -118,7 +118,7 @@ class TestStorageCommandHandlers:
     async def test_handle_test_storage(self):
         """Test storage connection test handler."""
         from orb.application.dto.interface_response import InterfaceResponse
-        from orb.application.services.response_formatting_service import ResponseFormattingService
+        from orb.interface.response_formatting_service import ResponseFormattingService
 
         args = Namespace(resource="storage", action="test")
 
@@ -147,7 +147,7 @@ class TestStorageCommandHandlers:
     async def test_handle_storage_health(self):
         """Test storage health check handler."""
         from orb.application.dto.interface_response import InterfaceResponse
-        from orb.application.services.response_formatting_service import ResponseFormattingService
+        from orb.interface.response_formatting_service import ResponseFormattingService
 
         args = Namespace(resource="storage", action="health")
 
@@ -174,7 +174,7 @@ class TestStorageCommandHandlers:
     async def test_handle_storage_metrics(self):
         """Test storage metrics handler."""
         from orb.application.dto.interface_response import InterfaceResponse
-        from orb.application.services.response_formatting_service import ResponseFormattingService
+        from orb.interface.response_formatting_service import ResponseFormattingService
 
         args = Namespace(resource="storage", action="metrics")
 

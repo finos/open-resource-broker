@@ -131,12 +131,32 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
         }
 
     def format_system_status_response(self, raw: dict[str, Any]) -> dict[str, Any]:
-        """Format system status dict for CLI display."""
-        return raw
+        """Format system status dict for CLI display with explicit field extraction."""
+        result: dict[str, Any] = {
+            "status": raw.get("status"),
+            "uptime_seconds": raw.get("uptime_seconds"),
+            "version": raw.get("version"),
+            "environment": raw.get("environment"),
+            "active_connections": raw.get("active_connections"),
+            "memory_usage_mb": raw.get("memory_usage_mb"),
+            "cpu_usage_percent": raw.get("cpu_usage_percent"),
+            "disk_usage_percent": raw.get("disk_usage_percent"),
+            "last_health_check": raw.get("last_health_check"),
+            "components": raw.get("components", {}),
+        }
+        return result
 
     def format_provider_detail_response(self, raw: dict[str, Any]) -> dict[str, Any]:
-        """Format provider detail dict for CLI display."""
-        return raw
+        """Format provider detail dict for CLI display with explicit field extraction."""
+        result: dict[str, Any] = {
+            "name": raw.get("name"),
+            "type": raw.get("type"),
+            "enabled": raw.get("enabled"),
+            "config": raw.get("config", {}),
+        }
+        if "template_defaults" in raw:
+            result["template_defaults"] = raw["template_defaults"]
+        return result
 
     def format_storage_test_response(self, raw: dict[str, Any]) -> dict[str, Any]:
         """Format storage test result dict for CLI display."""

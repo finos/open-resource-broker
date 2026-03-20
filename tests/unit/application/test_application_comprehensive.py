@@ -364,9 +364,7 @@ class TestApplicationDTOsComprehensive:
                     if instance:
                         # Test serialization methods
                         serialization_methods = [
-                            "dict",
                             "model_dump",
-                            "json",
                             "model_dump_json",
                             "__dict__",
                         ]

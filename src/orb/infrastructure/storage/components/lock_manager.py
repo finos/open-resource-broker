@@ -37,7 +37,7 @@ class ReaderWriterLock:
             self._readers -= 1
             self.logger.debug("Read lock released. Active readers: %s", self._readers)
             if self._readers == 0:
-                self._read_ready.notifyAll()
+                self._read_ready.notify_all()
 
     def acquire_write(self) -> None:
         """Acquire write lock."""
@@ -52,9 +52,9 @@ class ReaderWriterLock:
         with self._write_ready:
             self._writers -= 1
             self.logger.debug("Write lock released")
-            self._write_ready.notifyAll()
+            self._write_ready.notify_all()
             with self._read_ready:
-                self._read_ready.notifyAll()
+                self._read_ready.notify_all()
 
     @contextmanager
     def read_lock(self) -> Generator[None, None, None]:

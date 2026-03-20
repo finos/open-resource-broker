@@ -9,6 +9,8 @@ and ensure we're creating valid domain objects correctly.
 import os
 import sys
 
+import pytest
+
 # Add project root to path
 sys.path.insert(0, os.path.abspath("."))
 
@@ -29,19 +31,35 @@ def test_domain_validation():
     try:
         # Basic AWSTemplate creation
         print("\n1. Testing Basic AWSTemplate Creation...")
-        results["aws_template_basic"] = test_aws_template_basic()
+        try:
+            test_aws_template_basic()
+            results["aws_template_basic"] = True
+        except Exception:
+            pass
 
         # SpotFleet AWSTemplate creation
         print("\n2. Testing SpotFleet AWSTemplate Creation...")
-        results["aws_template_spot_fleet"] = test_aws_template_spot_fleet()
+        try:
+            test_aws_template_spot_fleet()
+            results["aws_template_spot_fleet"] = True
+        except Exception:
+            pass
 
         # Request creation
         print("\n3. Testing Request Creation...")
-        results["request_creation"] = test_request_creation()
+        try:
+            test_request_creation()
+            results["request_creation"] = True
+        except Exception:
+            pass
 
         # Base handler validation
         print("\n4. Testing Base Handler Validation...")
-        results["base_handler_validation"] = test_base_handler_validation()
+        try:
+            test_base_handler_validation()
+            results["base_handler_validation"] = True
+        except Exception:
+            pass
 
         # Summary
         print("\n" + "=" * 50)
@@ -59,17 +77,17 @@ def test_domain_validation():
 
         if passed == total:
             print("ALL DOMAIN VALIDATION TESTS PASSED!")
-            return True
+            assert passed == total, f"Only {passed}/{total} domain validation tests passed"
         else:
             print("WARN: Some domain validation tests failed")
-            return False
+            pytest.fail(f"Only {passed}/{total} domain validation tests passed")
 
     except Exception as e:
         print(f"FAIL: Test execution failed: {e!s}")
         import traceback
 
         traceback.print_exc()
-        return False
+        pytest.fail(f"Test execution failed: {e!s}")
 
 
 def test_aws_template_basic():
@@ -80,36 +98,24 @@ def test_aws_template_basic():
 
         print("   Testing basic AWSTemplate creation...")
 
-        # Test minimal template
-        try:
-            template = AWSTemplate(
-                template_id="test-basic",
-                provider_api=ProviderApi.RUN_INSTANCES,
-                instance_type="t2.micro",
-                image_id="ami-12345",
-                subnet_ids=["subnet-12345"],
-                security_group_ids=["sg-12345"],
-            )
+        template = AWSTemplate(
+            template_id="test-basic",
+            provider_api=ProviderApi.RUN_INSTANCES,
+            instance_type="t2.micro",
+            image_id="ami-12345",
+            subnet_ids=["subnet-12345"],
+            security_group_ids=["sg-12345"],
+        )
 
-            print(f"   PASS: Basic template created: {template.template_id}")
-            print(f"   Provider API: {template.provider_api}")
-            print(f"   Instance Type: {template.instance_type}")
-            print(f"   Image ID: {template.image_id}")
-            print(f"   Subnet IDs: {template.subnet_ids}")
-            print(f"   Security Group IDs: {template.security_group_ids}")
-
-            return True
-
-        except Exception as e:
-            print(f"   FAIL: Basic template creation failed: {e!s}")
-            import traceback
-
-            traceback.print_exc()
-            return False
+        print(f"   PASS: Basic template created: {template.template_id}")
+        print(f"   Provider API: {template.provider_api}")
+        print(f"   Instance Type: {template.instance_type}")
+        print(f"   Image ID: {template.image_id}")
+        print(f"   Subnet IDs: {template.subnet_ids}")
+        print(f"   Security Group IDs: {template.security_group_ids}")
 
     except ImportError as e:
-        print(f"   FAIL: Import error: {e!s}")
-        return False
+        pytest.fail(f"Import error: {e!s}")
 
 
 def test_aws_template_spot_fleet():
@@ -123,36 +129,24 @@ def test_aws_template_spot_fleet():
 
         print("   Testing SpotFleet AWSTemplate creation...")
 
-        # Test SpotFleet template
-        try:
-            template = AWSTemplate(
-                template_id="test-spot-fleet",
-                provider_api=ProviderApi.SPOT_FLEET,
-                instance_type="t2.micro",
-                image_id="ami-12345",
-                subnet_ids=["subnet-12345"],
-                security_group_ids=["sg-12345"],
-                fleet_role="AWSServiceRoleForEC2SpotFleet",
-                fleet_type=AWSFleetType.REQUEST,
-            )
+        template = AWSTemplate(
+            template_id="test-spot-fleet",
+            provider_api=ProviderApi.SPOT_FLEET,
+            instance_type="t2.micro",
+            image_id="ami-12345",
+            subnet_ids=["subnet-12345"],
+            security_group_ids=["sg-12345"],
+            fleet_role="AWSServiceRoleForEC2SpotFleet",
+            fleet_type=AWSFleetType.REQUEST,
+        )
 
-            print(f"   PASS: SpotFleet template created: {template.template_id}")
-            print(f"   Provider API: {template.provider_api}")
-            print(f"   Fleet Type: {template.fleet_type}")
-            print(f"   Fleet Role: {template.fleet_role}")
-
-            return True
-
-        except Exception as e:
-            print(f"   FAIL: SpotFleet template creation failed: {e!s}")
-            import traceback
-
-            traceback.print_exc()
-            return False
+        print(f"   PASS: SpotFleet template created: {template.template_id}")
+        print(f"   Provider API: {template.provider_api}")
+        print(f"   Fleet Type: {template.fleet_type}")
+        print(f"   Fleet Role: {template.fleet_role}")
 
     except ImportError as e:
-        print(f"   FAIL: Import error: {e!s}")
-        return False
+        pytest.fail(f"Import error: {e!s}")
 
 
 def test_request_creation():
@@ -163,33 +157,21 @@ def test_request_creation():
 
         print("   Testing Request creation...")
 
-        # Test request creation
-        try:
-            request = Request.create_new_request(
-                request_type=RequestType.ACQUIRE,
-                template_id="test-template",
-                machine_count=2,
-                provider_type="aws",
-            )
+        request = Request.create_new_request(
+            request_type=RequestType.ACQUIRE,
+            template_id="test-template",
+            machine_count=2,
+            provider_type="aws",
+        )
 
-            print(f"   PASS: Request created: {request.request_id}")
-            print(f"   Request Type: {request.request_type}")
-            print(f"   Template ID: {request.template_id}")
-            print(f"   Machine Count: {request.requested_count}")
-            print(f"   Provider Type: {request.provider_type}")
-
-            return True
-
-        except Exception as e:
-            print(f"   FAIL: Request creation failed: {e!s}")
-            import traceback
-
-            traceback.print_exc()
-            return False
+        print(f"   PASS: Request created: {request.request_id}")
+        print(f"   Request Type: {request.request_type}")
+        print(f"   Template ID: {request.template_id}")
+        print(f"   Machine Count: {request.requested_count}")
+        print(f"   Provider Type: {request.provider_type}")
 
     except ImportError as e:
-        print(f"   FAIL: Import error: {e!s}")
-        return False
+        pytest.fail(f"Import error: {e!s}")
 
 
 def test_base_handler_validation():
@@ -205,12 +187,10 @@ def test_base_handler_validation():
 
         print("   Testing base handler validation...")
 
-        # Create a concrete handler for testing (using SpotFleetHandler)
         from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import (
             SpotFleetHandler,
         )
 
-        # Create mocks
         mock_aws_client = Mock()
         mock_logger = Mock()
         mock_aws_ops = Mock()
@@ -223,47 +203,23 @@ def test_base_handler_validation():
             launch_template_manager=mock_launch_template_manager,
         )
 
-        # Test validation with valid template
-        try:
-            template = AWSTemplate(
-                template_id="validation-test",
-                provider_api=ProviderApi.SPOT_FLEET,
-                instance_type="t2.micro",
-                image_id="ami-12345",
-                subnet_ids=["subnet-12345"],
-                security_group_ids=["sg-12345"],
-                fleet_role="AWSServiceRoleForEC2SpotFleet",
-                fleet_type=AWSFleetType.REQUEST,
-            )
+        template = AWSTemplate(
+            template_id="validation-test",
+            provider_api=ProviderApi.SPOT_FLEET,
+            instance_type="t2.micro",
+            image_id="ami-12345",
+            subnet_ids=["subnet-12345"],
+            security_group_ids=["sg-12345"],
+            fleet_role="AWSServiceRoleForEC2SpotFleet",
+            fleet_type=AWSFleetType.REQUEST,
+            machine_types={"t2.micro": 1},
+        )
 
-            # Call the validation method directly
-            handler._validate_prerequisites(template)
-            print("   PASS: Base handler validation passed")
-
-            return True
-
-        except Exception as e:
-            print(f"   FAIL: Base handler validation failed: {e!s}")
-
-            # Try to get more detailed error information
-            if hasattr(e, "errors") and e.errors:
-                print(f"   Validation errors: {e.errors}")
-
-            # Let's also check what fields the template actually has
-            print("   Template fields:")
-            for field_name in dir(template):
-                if not field_name.startswith("_") and not callable(getattr(template, field_name)):
-                    value = getattr(template, field_name)
-                    print(f"      {field_name}: {value}")
-
-            import traceback
-
-            traceback.print_exc()
-            return False
+        handler._validate_prerequisites(template)
+        print("   PASS: Base handler validation passed")
 
     except ImportError as e:
-        print(f"   FAIL: Import error: {e!s}")
-        return False
+        pytest.fail(f"Import error: {e!s}")
 
 
 if __name__ == "__main__":

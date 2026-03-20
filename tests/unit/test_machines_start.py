@@ -35,7 +35,7 @@ async def test_machines_start_specific_ids():
         )
 
         from orb.application.dto.interface_response import InterfaceResponse
-        from orb.application.services.response_formatting_service import ResponseFormattingService
+        from orb.interface.response_formatting_service import ResponseFormattingService
 
         mock_formatter = Mock(spec=ResponseFormattingService)
         mock_formatter.format_success.return_value = InterfaceResponse(
@@ -125,7 +125,7 @@ async def test_machines_start_all():
         )
 
         from orb.application.dto.interface_response import InterfaceResponse
-        from orb.application.services.response_formatting_service import ResponseFormattingService
+        from orb.interface.response_formatting_service import ResponseFormattingService
 
         mock_formatter = Mock(spec=ResponseFormattingService)
         mock_formatter.format_success.return_value = InterfaceResponse(

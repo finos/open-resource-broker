@@ -134,7 +134,7 @@ async def test_requests_list_offset_forwarded_to_orchestrator():
     from orb.application.dto.interface_response import InterfaceResponse
     from orb.application.services.orchestration.dtos import ListRequestsOutput
     from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
-    from orb.application.services.response_formatting_service import ResponseFormattingService
+    from orb.interface.response_formatting_service import ResponseFormattingService
     from orb.interface.request_command_handlers import handle_list_requests
 
     container = MagicMock()
@@ -164,7 +164,7 @@ async def test_requests_list_status_forwarded_to_orchestrator():
     from orb.application.dto.interface_response import InterfaceResponse
     from orb.application.services.orchestration.dtos import ListRequestsOutput
     from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
-    from orb.application.services.response_formatting_service import ResponseFormattingService
+    from orb.interface.response_formatting_service import ResponseFormattingService
     from orb.interface.request_command_handlers import handle_list_requests
 
     container = MagicMock()
@@ -294,7 +294,7 @@ async def test_stop_machines_uses_machine_ids_flag():
 
     from orb.application.services.orchestration.dtos import StopMachinesOutput
     from orb.application.services.orchestration.stop_machines import StopMachinesOrchestrator
-    from orb.application.services.response_formatting_service import ResponseFormattingService
+    from orb.interface.response_formatting_service import ResponseFormattingService
     from orb.interface.machine_command_handlers import handle_stop_machines
 
     orch = AsyncMock(spec=StopMachinesOrchestrator)
@@ -324,7 +324,7 @@ async def test_start_machines_uses_machine_ids_flag():
 
     from orb.application.services.orchestration.dtos import StartMachinesOutput
     from orb.application.services.orchestration.start_machines import StartMachinesOrchestrator
-    from orb.application.services.response_formatting_service import ResponseFormattingService
+    from orb.interface.response_formatting_service import ResponseFormattingService
     from orb.interface.machine_command_handlers import handle_start_machines
 
     orch = AsyncMock(spec=StartMachinesOrchestrator)
@@ -355,7 +355,7 @@ async def test_request_return_machines_uses_machine_ids_flag():
     from orb.application.dto.interface_response import InterfaceResponse
     from orb.application.services.orchestration.dtos import ReturnMachinesOutput
     from orb.application.services.orchestration.return_machines import ReturnMachinesOrchestrator
-    from orb.application.services.response_formatting_service import ResponseFormattingService
+    from orb.interface.response_formatting_service import ResponseFormattingService
     from orb.interface.request_command_handlers import handle_request_return_machines
 
     orch = AsyncMock(spec=ReturnMachinesOrchestrator)

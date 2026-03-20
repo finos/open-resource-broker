@@ -4,7 +4,7 @@ import json
 from typing import Any, Dict, Union
 
 from orb.application.dto.interface_response import InterfaceResponse
-from orb.application.services.response_formatting_service import ResponseFormattingService
+from orb.interface.response_formatting_service import ResponseFormattingService
 from orb.config.platform_dirs import get_config_location
 from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
 from orb.infrastructure.di.container import get_container

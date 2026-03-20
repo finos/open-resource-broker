@@ -70,7 +70,7 @@ class TestCommandQuerySeparation:
         command_methods = [
             method
             for method in dir(command)
-            if not method.startswith("_") and callable(getattr(command, method))
+            if not method.startswith("_") and method not in ("model_fields", "model_computed_fields") and callable(getattr(command, method))
         ]
 
         # Commands should not have "get" methods
@@ -85,7 +85,7 @@ class TestCommandQuerySeparation:
         query_methods = [
             method
             for method in dir(query)
-            if not method.startswith("_") and callable(getattr(query, method))
+            if not method.startswith("_") and method not in ("model_fields", "model_computed_fields") and callable(getattr(query, method))
         ]
 
         # Pydantic internal methods to exclude
@@ -678,7 +678,8 @@ class TestQueryHandlerImplementation:
                 assert len(result["items"]) == 5
                 assert result["total"] == 50
 
-    def test_query_handlers_support_filtering(self):
+    @pytest.mark.asyncio
+    async def test_query_handlers_support_filtering(self):
         """Test that query handlers support filtering with real GetRequestHandler."""
         from unittest.mock import MagicMock, Mock
 
@@ -725,7 +726,7 @@ class TestQueryHandlerImplementation:
 
         # This should work without errors
         try:
-            handler.handle(query)
+            await handler.handle(query)
             # Should call repository with the filtered request ID
             mock_request_repo.find_by_id.assert_called_once()
         except Exception:

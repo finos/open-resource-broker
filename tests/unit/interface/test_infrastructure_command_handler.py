@@ -88,7 +88,7 @@ class TestHandleInfrastructureDiscover:
                 return_value=tmp_path,
             ),
             patch(
-                "orb.infrastructure.di.container.get_container",
+                "orb.interface.infrastructure_command_handler.get_container",
                 return_value=mock_container,
             ),
         ):
@@ -112,7 +112,7 @@ class TestHandleInfrastructureDiscover:
                 return_value=tmp_path,
             ),
             patch(
-                "orb.infrastructure.di.container.get_container",
+                "orb.interface.infrastructure_command_handler.get_container",
                 return_value=mock_container,
             ),
         ):
@@ -230,7 +230,7 @@ class TestHandleInfrastructureValidate:
                 return_value=tmp_path,
             ),
             patch(
-                "orb.infrastructure.di.container.get_container",
+                "orb.interface.infrastructure_command_handler.get_container",
                 return_value=mock_container,
             ),
         ):
@@ -254,7 +254,7 @@ class TestHandleInfrastructureValidate:
                 return_value=tmp_path,
             ),
             patch(
-                "orb.infrastructure.di.container.get_container",
+                "orb.interface.infrastructure_command_handler.get_container",
                 return_value=mock_container,
             ),
         ):

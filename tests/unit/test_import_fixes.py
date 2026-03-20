@@ -6,37 +6,8 @@ import sys
 
 def test_import_fixes():
     """Test that the import fixes are working."""
-    try:
-        # Check that ProviderApi exists in AWS value objects
-        from orb.providers.aws.domain.template.value_objects import ProviderApi
-
-        assert ProviderApi is not None
-
-        # Check that ProviderHandlerType does NOT exist
-        try:
-            return False  # Should not reach here
-        except ImportError:
-            pass  # Expected - ProviderHandlerType should not exist
-
-        # Check that handlers can import ProviderApi
-        try:
-            # This will fail if there are import issues
-            pass
-        except Exception:
-            return False
-
-        try:
-            pass
-        except Exception:
-            return False
-
-        return True
-
-    except Exception:
-        import traceback
-
-        traceback.print_exc()
-        return False
+    from orb.providers.aws.domain.template.value_objects import ProviderApi
+    assert ProviderApi is not None
 
 
 if __name__ == "__main__":

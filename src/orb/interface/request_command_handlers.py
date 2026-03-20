@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING, Any, Union
 
 from orb.application.ports.scheduler_port import SchedulerPort
-from orb.application.services.response_formatting_service import ResponseFormattingService
+from orb.interface.response_formatting_service import ResponseFormattingService
 from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
 

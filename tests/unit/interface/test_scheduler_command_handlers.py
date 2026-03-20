@@ -24,7 +24,7 @@ class TestSchedulerCommandHandlers:
         from orb.application.services.orchestration.list_scheduler_strategies import (
             ListSchedulerStrategiesOrchestrator,
         )
-        from orb.application.services.response_formatting_service import ResponseFormattingService
+        from orb.interface.response_formatting_service import ResponseFormattingService
 
         args = Namespace(resource="scheduler", action="list")
 
@@ -63,7 +63,7 @@ class TestSchedulerCommandHandlers:
         from orb.application.services.orchestration.get_scheduler_config import (
             GetSchedulerConfigOrchestrator,
         )
-        from orb.application.services.response_formatting_service import ResponseFormattingService
+        from orb.interface.response_formatting_service import ResponseFormattingService
 
         args = Namespace(resource="scheduler", action="show")
 

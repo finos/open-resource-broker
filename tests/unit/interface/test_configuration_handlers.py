@@ -73,7 +73,7 @@ class TestProviderConfigHandlers:
         """Test handle_reload_provider_config returns InterfaceResponse when reload unsupported."""
         from orb.application.dto.interface_response import InterfaceResponse
         from orb.application.services.provider_registry_service import ProviderRegistryService
-        from orb.application.services.response_formatting_service import ResponseFormattingService
+        from orb.interface.response_formatting_service import ResponseFormattingService
 
         args = Namespace(resource="provider", action="reload")
 

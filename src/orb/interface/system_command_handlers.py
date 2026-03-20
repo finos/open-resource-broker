@@ -117,7 +117,7 @@ async def handle_provider_metrics(args) -> dict[str, Any]:
 async def handle_reload_provider_config(args) -> InterfaceResponse:
     """Handle reload provider config operations."""
     from orb.application.services.provider_registry_service import ProviderRegistryService
-    from orb.application.services.response_formatting_service import ResponseFormattingService
+    from orb.interface.response_formatting_service import ResponseFormattingService
 
     container = get_container()
     formatter = container.get(ResponseFormattingService)
@@ -134,7 +134,7 @@ async def handle_reload_provider_config(args) -> InterfaceResponse:
 @handle_interface_exceptions(context="system_status", interface_type="cli")
 async def handle_system_status(args) -> InterfaceResponse:
     """Handle system status query."""
-    from orb.application.services.response_formatting_service import ResponseFormattingService
+    from orb.interface.response_formatting_service import ResponseFormattingService
     from orb.infrastructure.di.buses import QueryBus
 
     container = get_container()

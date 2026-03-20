@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.domain.template import Template
 from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
@@ -120,6 +121,109 @@ class TestFormatConversionConsistency:
         assert isinstance(symphony_result, dict)
 
 
+class TestExplicitFieldExtraction:
+    """format_system_status_response and format_provider_detail_response must extract fields explicitly."""
+
+    def test_format_system_status_response_extracts_known_fields(self):
+        """Base strategy must extract all SystemStatusDTO fields explicitly — not passthrough raw."""
+        from orb.infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
+
+        strategy = DefaultSchedulerStrategy()
+        raw = {
+            "status": "healthy",
+            "uptime_seconds": 123.4,
+            "version": "1.0.0",
+            "environment": "test",
+            "active_connections": 5,
+            "memory_usage_mb": 256.0,
+            "cpu_usage_percent": 10.0,
+            "disk_usage_percent": 20.0,
+            "last_health_check": "2026-03-20T00:00:00+00:00",
+            "components": {"db": "ok"},
+            "unknown_internal_field": "should_not_leak",
+        }
+        result = strategy.format_system_status_response(raw)
+
+        assert result["status"] == "healthy"
+        assert result["uptime_seconds"] == 123.4
+        assert result["version"] == "1.0.0"
+        assert result["environment"] == "test"
+        assert result["active_connections"] == 5
+        assert result["memory_usage_mb"] == 256.0
+        assert result["cpu_usage_percent"] == 10.0
+        assert result["disk_usage_percent"] == 20.0
+        assert result["last_health_check"] == "2026-03-20T00:00:00+00:00"
+        assert result["components"] == {"db": "ok"}
+        assert "unknown_internal_field" not in result, "Unknown fields must not leak into wire format"
+
+    def test_format_provider_detail_response_extracts_known_fields(self):
+        """Base strategy must extract provider detail fields explicitly — not passthrough raw."""
+        strategy = DefaultSchedulerStrategy()
+        raw = {
+            "name": "my-provider",
+            "type": "aws",
+            "enabled": True,
+            "config": {"region": "us-east-1"},
+            "template_defaults": {"instance_type": "t3.micro"},
+            "unknown_internal_field": "should_not_leak",
+        }
+        result = strategy.format_provider_detail_response(raw)
+
+        assert result["name"] == "my-provider"
+        assert result["type"] == "aws"
+        assert result["enabled"] is True
+        assert result["config"] == {"region": "us-east-1"}
+        assert result["template_defaults"] == {"instance_type": "t3.micro"}
+        assert "unknown_internal_field" not in result, "Unknown fields must not leak into wire format"
+
+    def test_format_provider_detail_response_omits_template_defaults_when_absent(self):
+        """template_defaults must not appear in output when not present in input."""
+        strategy = DefaultSchedulerStrategy()
+        raw = {"name": "p", "type": "aws", "enabled": True, "config": {}}
+        result = strategy.format_provider_detail_response(raw)
+
+        assert "template_defaults" not in result
+
+
+class TestMachineOperationDelegation:
+    """format_machine_operation must delegate to format_machine_details_response, not a separate method."""
+
+    def test_format_machine_operation_response_not_on_scheduler_port(self):
+        """SchedulerPort must NOT have format_machine_operation_response — it is redundant."""
+        assert not hasattr(SchedulerPort, "format_machine_operation_response"), (
+            "format_machine_operation_response is redundant with format_machine_details_response "
+            "and must not exist on SchedulerPort"
+        )
+
+    def test_format_machine_operation_delegates_to_format_machine_details_response(self):
+        """ResponseFormattingService.format_machine_operation must call format_machine_details_response."""
+        from orb.interface.response_formatting_service import ResponseFormattingService
+
+        scheduler = MagicMock(spec=SchedulerPort)
+        machine_data = {"id": "m-1", "name": "host1", "status": "running", "error": None}
+        scheduler.format_machine_details_response.return_value = machine_data
+
+        formatter = ResponseFormattingService(scheduler)
+        result = formatter.format_machine_operation(machine_data)
+
+        scheduler.format_machine_details_response.assert_called_once_with(machine_data)
+        assert result.data == machine_data
+        assert result.exit_code == 0
+
+    def test_format_machine_operation_exit_code_1_on_error(self):
+        """format_machine_operation must return exit_code=1 when data contains 'error'."""
+        from orb.interface.response_formatting_service import ResponseFormattingService
+
+        scheduler = MagicMock(spec=SchedulerPort)
+        machine_data = {"id": "m-1", "status": "error", "error": "not found"}
+        scheduler.format_machine_details_response.return_value = machine_data
+
+        formatter = ResponseFormattingService(scheduler)
+        result = formatter.format_machine_operation(machine_data)
+
+        assert result.exit_code == 1
+
+
 class TestFormatConversionInHandlers:
     """Test that format conversion is used consistently in handlers."""
 
@@ -146,7 +250,7 @@ class TestFormatConversionInHandlers:
         """Test that format conversion is done using ResponseFormattingService in CLI handlers."""
         import argparse
 
-        from orb.application.services.response_formatting_service import ResponseFormattingService
+        from orb.interface.response_formatting_service import ResponseFormattingService
         from orb.interface.template_command_handlers import handle_list_templates
 
         with patch("orb.interface.template_command_handlers.get_container") as mock_get_container:

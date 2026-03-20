@@ -88,7 +88,6 @@ async def _discover_provider_infrastructure(provider: Dict[str, Any], args) -> D
     """Discover infrastructure for a provider using strategy pattern."""
     try:
         from orb.domain.base.ports.provider_discovery_port import ProviderDiscoveryPort
-        from orb.infrastructure.di.container import get_container
 
         container = get_container()
         provider_strategy = container.get(ProviderDiscoveryPort)
@@ -142,7 +141,6 @@ async def _validate_provider_infrastructure(provider: Dict[str, Any]) -> Dict[st
     """Validate infrastructure for a provider using strategy pattern."""
     try:
         from orb.domain.base.ports.provider_discovery_port import ProviderDiscoveryPort
-        from orb.infrastructure.di.container import get_container
 
         container = get_container()
         provider_strategy = container.get(ProviderDiscoveryPort)
@@ -173,7 +171,6 @@ def _get_active_providers() -> List[Dict[str, Any]]:
 
     if not config_file.exists():
         from orb.application.services.provider_registry_service import ProviderRegistryService
-        from orb.infrastructure.di.container import get_container
 
         registry_service = get_container().get(ProviderRegistryService)
         registered_types = registry_service.get_registered_provider_types()
@@ -199,7 +196,6 @@ def _get_active_providers() -> List[Dict[str, Any]]:
 
     if not active_providers:
         from orb.application.services.provider_registry_service import ProviderRegistryService
-        from orb.infrastructure.di.container import get_container
 
         registry_service = get_container().get(ProviderRegistryService)
         registered_types = registry_service.get_registered_provider_types()
@@ -221,7 +217,6 @@ def _get_active_providers_with_overrides() -> List[Dict[str, Any]]:
     # Apply global overrides
     try:
         from orb.domain.base.ports.configuration_port import ConfigurationPort
-        from orb.infrastructure.di.container import get_container
 
         container = get_container()
         config = container.get(ConfigurationPort)

@@ -31,7 +31,7 @@ class TestBatch:
     async def test_batch_raises_when_not_initialized(self):
         sdk = ORBClient(config={"provider": "aws"})
         with pytest.raises(SDKError, match="not initialized"):
-            await sdk.batch([AsyncMock()()])
+            await sdk.batch([AsyncMock()])
 
     @pytest.mark.asyncio
     async def test_batch_empty_list_returns_empty(self):

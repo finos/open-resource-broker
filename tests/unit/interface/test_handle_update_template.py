@@ -41,7 +41,7 @@ def _mock_command_bus(updated: bool = True) -> MagicMock:
 
 def _patch_container(bus: MagicMock):
     from orb.application.services.orchestration.update_template import UpdateTemplateOrchestrator
-    from orb.application.services.response_formatting_service import ResponseFormattingService
+    from orb.interface.response_formatting_service import ResponseFormattingService
 
     mock_formatter = MagicMock(spec=ResponseFormattingService)
     mock_formatter.format_template_mutation.return_value = {"success": True}

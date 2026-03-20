@@ -9,7 +9,7 @@ from orb.application.dto.interface_response import InterfaceResponse
 from orb.application.ports.scheduler_port import SchedulerPort
 from orb.application.services.orchestration.acquire_machines import AcquireMachinesOrchestrator
 from orb.application.services.orchestration.dtos import AcquireMachinesOutput
-from orb.application.services.response_formatting_service import ResponseFormattingService
+from orb.interface.response_formatting_service import ResponseFormattingService
 
 
 def _make_namespace(**kwargs) -> argparse.Namespace:
