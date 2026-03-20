@@ -150,4 +150,4 @@ def get_refresh_templates_orchestrator() -> RefreshTemplatesOrchestrator:
 
 def get_response_formatting_service() -> ResponseFormattingService:
     """Get ResponseFormattingService from DI container."""
-    return ResponseFormattingService(get_di_container().get(SchedulerPort))
+    return get_di_container().get(ResponseFormattingService)
