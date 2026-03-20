@@ -8,6 +8,7 @@ and ensure we're creating valid domain objects correctly.
 
 import os
 import sys
+import traceback
 
 import pytest
 
@@ -34,32 +35,36 @@ def test_domain_validation():
         try:
             test_aws_template_basic()
             results["aws_template_basic"] = True
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"   FAIL: Basic AWSTemplate creation failed: {e!s}")
+            traceback.print_exc()
 
         # SpotFleet AWSTemplate creation
         print("\n2. Testing SpotFleet AWSTemplate Creation...")
         try:
             test_aws_template_spot_fleet()
             results["aws_template_spot_fleet"] = True
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"   FAIL: SpotFleet AWSTemplate creation failed: {e!s}")
+            traceback.print_exc()
 
         # Request creation
         print("\n3. Testing Request Creation...")
         try:
             test_request_creation()
             results["request_creation"] = True
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"   FAIL: Request creation failed: {e!s}")
+            traceback.print_exc()
 
         # Base handler validation
         print("\n4. Testing Base Handler Validation...")
         try:
             test_base_handler_validation()
             results["base_handler_validation"] = True
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"   FAIL: Base handler validation failed: {e!s}")
+            traceback.print_exc()
 
         # Summary
         print("\n" + "=" * 50)
@@ -77,15 +82,12 @@ def test_domain_validation():
 
         if passed == total:
             print("ALL DOMAIN VALIDATION TESTS PASSED!")
-            assert passed == total, f"Only {passed}/{total} domain validation tests passed"
         else:
             print("WARN: Some domain validation tests failed")
             pytest.fail(f"Only {passed}/{total} domain validation tests passed")
 
     except Exception as e:
         print(f"FAIL: Test execution failed: {e!s}")
-        import traceback
-
         traceback.print_exc()
         pytest.fail(f"Test execution failed: {e!s}")
 

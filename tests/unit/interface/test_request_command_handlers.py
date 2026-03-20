@@ -30,6 +30,7 @@ from orb.interface.request_command_handlers import (
     handle_request_machines,
     handle_request_return_machines,
 )
+from orb.interface.response_formatting_service import ResponseFormattingService
 
 
 def _make_namespace(**kwargs) -> argparse.Namespace:
@@ -101,9 +102,6 @@ class TestHandleRequestMachines:
         from orb.application.dto.interface_response import InterfaceResponse
 
         container, _scheduler, acquire_orch, *_ = _mock_container()
-        # get formatter from dispatch map via container
-        from orb.interface.response_formatting_service import ResponseFormattingService
-
         formatter = container.get(ResponseFormattingService)
 
         acquire_orch.execute.return_value = AcquireMachinesOutput(
