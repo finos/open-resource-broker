@@ -605,6 +605,45 @@ class TestCycleCloudAuthModes:
         assert base_url == "https://cc.example.com"
         assert session.auth == ("file-admin", "file-secret")
 
+    def test_build_session_parses_verify_ssl_string_from_metadata(self):
+        handler = _make_handler()
+
+        session, _ = handler._build_cc_session(
+            cc_url="https://cc.example.com",
+            cc_user="file-admin",
+            cc_pass="file-secret",
+            verify_ssl=None,
+            metadata={"cyclecloud_verify_ssl": "false"},
+        )
+
+        assert session.verify is False
+
+    def test_build_session_parses_verify_ssl_string_from_credential_file(self, tmp_path: Path):
+        handler = _make_handler()
+        credential_file = tmp_path / "cyclecloud-credentials.json"
+        credential_file.write_text(
+            json.dumps(
+                {
+                    "url": "https://cc.example.com",
+                    "username": "file-admin",
+                    "password": "file-secret",
+                    "verify_ssl": "false",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        session, base_url = handler._build_cc_session(
+            cc_url=None,
+            cc_user=None,
+            cc_pass=None,
+            verify_ssl=None,
+            metadata={"cyclecloud_credential_path": str(credential_file)},
+        )
+
+        assert base_url == "https://cc.example.com"
+        assert session.verify is False
+
     def test_build_session_resolves_credential_path_from_template(self, tmp_path: Path):
         handler = _make_handler()
         credential_file = tmp_path / "cyclecloud-credentials.json"

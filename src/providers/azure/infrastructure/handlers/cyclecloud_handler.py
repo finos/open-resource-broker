@@ -58,6 +58,21 @@ def _resolve_cc_state(state: str) -> str:
     return _CC_STATE_MAP.get(state, "unknown")
 
 
+def _coerce_bool(value: Any) -> bool:
+    """Parse common config-style boolean inputs."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes", "y", "on"}:
+            return True
+        if normalized in {"false", "0", "no", "n", "off"}:
+            return False
+    return bool(value)
+
+
 @injectable
 class CycleCloudHandler(AzureHandler):
     """Handler that manages nodes in an Azure CycleCloud cluster.
@@ -263,7 +278,7 @@ class CycleCloudHandler(AzureHandler):
                 )
             if verify_resolved in (None, ""):
                 verify_resolved = True
-            verify_ssl = bool(verify_resolved)
+            verify_ssl = _coerce_bool(verify_resolved)
 
         if not cc_url:
             raise CycleCloudConnectionError(
@@ -273,7 +288,7 @@ class CycleCloudHandler(AzureHandler):
 
         base_url = cc_url.rstrip("/")
         session = requests.Session()
-        session.verify = bool(verify_ssl)
+        session.verify = _coerce_bool(verify_ssl)
         session.headers.update({
             "Accept": "application/json",
             "Content-Type": "application/json",
