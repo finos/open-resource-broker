@@ -139,7 +139,6 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
             # Get instance details based on fleet type
             instances: list[dict[str, Any]] = []
-            instance_details: list[dict[str, Any]] = []
             fleet_type = aws_template.fleet_type
             if not isinstance(fleet_type, AWSFleetType):
                 try:
@@ -149,39 +148,16 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     fleet_type = None
 
             if fleet_type is AWSFleetType.INSTANT:
-                # For instant fleets, instance IDs are in the result dict
+                # For instant fleets, instance IDs are already in the create_fleet response.
+                # Skip describe_instances here — full details (IP, type, etc.) are resolved
+                # lazily by the check_hosts_status / _check_single_fleet_status polling path.
                 instance_ids = fleet_result.get("instance_ids", [])
                 if instance_ids:
-                    instances = self._get_instance_details(
-                        instance_ids,
-                        request_id=str(request.request_id),
-                        resource_id=fleet_id,
-                        provider_api="EC2Fleet",
-                    )
-
-                    # Collect detailed instance information for enhanced monitoring
-                    for instance in instances:
-                        instance_detail = {
-                            "instance_id": instance.get("instance_id"),
-                            "instance_type": instance.get("instance_type"),
-                            "availability_zone": instance.get("availability_zone"),
-                            "launch_time": instance.get("launch_time"),
-                            "state": instance.get("state"),
-                            "private_ip": instance.get("private_ip_address"),
-                            "public_ip": instance.get("public_ip_address"),
-                            "fleet_id": fleet_id,
-                            "fleet_type": aws_template.fleet_type,
-                        }
-                        instance_details.append(instance_detail)
-
-                    # Log detailed instance information for monitoring
+                    instances = [{"instance_id": iid} for iid in instance_ids]
                     self._logger.info(
-                        "EC2Fleet instance details collected",
-                        extra={
-                            "fleet_id": fleet_id,
-                            "instance_count": len(instance_details),
-                            "instance_details": instance_details,
-                        },
+                        "EC2Fleet instant fleet created with %d instance(s): %s",
+                        len(instance_ids),
+                        instance_ids,
                     )
 
             fleet_errors = fleet_result.get("metadata_updates", {}).get("fleet_errors", [])
