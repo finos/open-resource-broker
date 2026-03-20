@@ -11,6 +11,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from application.services.spot_placement_planner import (
+    PlacementScore,
     PlacementPlanEntry,
     SpotPlacementPlanner,
 )
