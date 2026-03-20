@@ -1307,52 +1307,58 @@ class AzureProviderStrategy(ProviderStrategy):
         if not resource_group or not resource_ids:
             return
 
-        vmss_name = str(resource_ids[0])
-        key = (str(resource_group), vmss_name)
-        pending = self._pending_vmss_termination_reconciliations.get(key)
-        if not pending:
-            return
-
-        requested_ids = {str(machine_id) for machine_id in pending.get("machine_ids", [])}
-        if not requested_ids:
-            self._pending_vmss_termination_reconciliations.pop(key, None)
-            return
-
         observed_ids: set[str] = set()
         for instance in instance_details:
             observed_ids.update(self._status_candidate_ids(instance))
 
-        if requested_ids & observed_ids:
-            return
+        seen_vmss_names: set[str] = set()
+        for resource_id in resource_ids:
+            vmss_name = str(resource_id)
+            if not vmss_name or vmss_name in seen_vmss_names:
+                continue
+            seen_vmss_names.add(vmss_name)
 
-        try:
-            target_capacity = int(pending.get("target_capacity", 0))
-            orchestration_mode = str(pending.get("orchestration_mode", "Flexible"))
+            key = (str(resource_group), vmss_name)
+            pending = self._pending_vmss_termination_reconciliations.get(key)
+            if not pending:
+                continue
 
-            if orchestration_mode.lower() == "flexible" and target_capacity > 0:
-                if self.resource_manager:
-                    self.resource_manager.scale_vmss(
-                        resource_group=str(resource_group),
-                        vmss_name=vmss_name,
-                        capacity=target_capacity,
-                    )
+            requested_ids = {str(machine_id) for machine_id in pending.get("machine_ids", [])}
+            if not requested_ids:
+                self._pending_vmss_termination_reconciliations.pop(key, None)
+                continue
 
-            if pending.get("delete_vmss_when_empty"):
-                azure_client = self.azure_client
-                if azure_client:
-                    azure_client.compute_client.virtual_machine_scale_sets.begin_delete(
-                        resource_group_name=str(resource_group),
-                        vm_scale_set_name=vmss_name,
-                    )
+            if requested_ids & observed_ids:
+                continue
 
-            self._pending_vmss_termination_reconciliations.pop(key, None)
-        except Exception as exc:
-            self._logger.warning(
-                "Failed to reconcile pending VMSS termination for '%s' in '%s': %s",
-                vmss_name,
-                resource_group,
-                exc,
-            )
+            try:
+                target_capacity = int(pending.get("target_capacity", 0))
+                orchestration_mode = str(pending.get("orchestration_mode", "Flexible"))
+
+                if orchestration_mode.lower() == "flexible" and target_capacity > 0:
+                    if self.resource_manager:
+                        self.resource_manager.scale_vmss(
+                            resource_group=str(resource_group),
+                            vmss_name=vmss_name,
+                            capacity=target_capacity,
+                        )
+
+                if pending.get("delete_vmss_when_empty"):
+                    azure_client = self.azure_client
+                    if azure_client:
+                        azure_client.compute_client.virtual_machine_scale_sets.begin_delete(
+                            resource_group_name=str(resource_group),
+                            vm_scale_set_name=vmss_name,
+                        )
+
+                self._pending_vmss_termination_reconciliations.pop(key, None)
+            except Exception as exc:
+                self._logger.warning(
+                    "Failed to reconcile pending VMSS termination for '%s' in '%s': %s",
+                    vmss_name,
+                    resource_group,
+                    exc,
+                )
 
     # ------------------------------------------------------------------
     # DESCRIBE_RESOURCE_INSTANCES

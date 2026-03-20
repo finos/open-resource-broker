@@ -7,7 +7,7 @@ initialise, execute each operation type, health checks, capabilities, cleanup.
 import asyncio
 
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 from application.services.spot_placement_planner import (
     PlacementCandidate,
@@ -1133,6 +1133,71 @@ class TestDescribeResourceInstances:
             capacity=2,
         )
         assert ("test-rg", "vmss-demo") not in strategy._pending_vmss_termination_reconciliations
+
+    def test_describe_resource_instances_reconciles_pending_flexible_vmss_scale_down_for_all_resources(
+        self, strategy
+    ):
+        handler = MagicMock()
+        handler.check_hosts_status.return_value = []
+        handler.get_vmss_resource_errors.return_value = []
+        strategy._handlers["VMSS"] = handler
+        strategy._resource_manager = MagicMock()
+        strategy._resource_manager.get_vmss_capacity.side_effect = [
+            {
+                "capacity": 2,
+                "provisioned_instance_count": 0,
+                "provisioning_state": "Updating",
+            },
+            {
+                "capacity": 1,
+                "provisioned_instance_count": 0,
+                "provisioning_state": "Updating",
+            },
+        ]
+        strategy._pending_vmss_termination_reconciliations[("test-rg", "vmss-a")] = {
+            "resource_group": "test-rg",
+            "vmss_name": "vmss-a",
+            "machine_ids": ["vm-a"],
+            "target_capacity": 2,
+            "orchestration_mode": "Flexible",
+            "delete_vmss_when_empty": False,
+        }
+        strategy._pending_vmss_termination_reconciliations[("test-rg", "vmss-b")] = {
+            "resource_group": "test-rg",
+            "vmss_name": "vmss-b",
+            "machine_ids": ["vm-b"],
+            "target_capacity": 1,
+            "orchestration_mode": "Flexible",
+            "delete_vmss_when_empty": False,
+        }
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
+            parameters={
+                "resource_ids": ["vmss-a", "vmss-b"],
+                "provider_api": "VMSS",
+                "template_id": "tmpl-1",
+                "request_metadata": {"resource_group": "test-rg"},
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert result.success
+        assert strategy._resource_manager.scale_vmss.call_args_list == [
+            call(
+                resource_group="test-rg",
+                vmss_name="vmss-a",
+                capacity=2,
+            ),
+            call(
+                resource_group="test-rg",
+                vmss_name="vmss-b",
+                capacity=1,
+            ),
+        ]
+        assert ("test-rg", "vmss-a") not in strategy._pending_vmss_termination_reconciliations
+        assert ("test-rg", "vmss-b") not in strategy._pending_vmss_termination_reconciliations
 
     def test_describe_resource_instances_forwards_cyclecloud_request_metadata(self, strategy):
         handler = MagicMock()
