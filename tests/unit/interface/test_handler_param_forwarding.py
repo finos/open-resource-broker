@@ -19,8 +19,8 @@ def _make_args(**kwargs) -> argparse.Namespace:
 
 
 def _make_container(**orchestrators):
-    from orb.interface.response_formatting_service import ResponseFormattingService
     from orb.infrastructure.di.buses import CommandBus, QueryBus
+    from orb.interface.response_formatting_service import ResponseFormattingService
 
     container = MagicMock()
     formatter = MagicMock(spec=ResponseFormattingService)

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Union
 
-from orb.interface.response_formatting_service import ResponseFormattingService
 from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
+from orb.interface.response_formatting_service import ResponseFormattingService
 
 if TYPE_CHECKING:
     from orb.application.dto.interface_response import InterfaceResponse

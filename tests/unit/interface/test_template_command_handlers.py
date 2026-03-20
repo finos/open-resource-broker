@@ -18,8 +18,8 @@ def _make_container(command_bus=None, query_bus=None, orchestrator=None):
 
     from orb.application.dto.interface_response import InterfaceResponse
     from orb.application.services.orchestration.create_template import CreateTemplateOrchestrator
-    from orb.interface.response_formatting_service import ResponseFormattingService
     from orb.infrastructure.di.buses import CommandBus, QueryBus
+    from orb.interface.response_formatting_service import ResponseFormattingService
 
     mock_formatter = MagicMock(spec=ResponseFormattingService)
     mock_formatter.format_template_mutation.return_value = InterfaceResponse(data={"success": True})
