@@ -103,9 +103,13 @@ class AzureClient:
         connect_timeout = (
             int(azure_provider_config.connect_timeout) if azure_provider_config else 30
         )
+        read_timeout = (
+            int(azure_provider_config.read_timeout) if azure_provider_config else 60
+        )
 
         self._max_retries = max_retries
         self._connect_timeout = connect_timeout
+        self._read_timeout = read_timeout
 
         # Load performance configuration
         self.perf_config = self._load_performance_config()
@@ -141,12 +145,13 @@ class AzureClient:
 
         self._logger.info(
             "Azure client initialised: region=%s, subscription=%s, resource_group=%s, "
-            "retries=%d, timeout=%ds",
+            "retries=%d, connect_timeout=%ds, read_timeout=%ds",
             self.region_name,
             self.subscription_id or "(not set)",
             self.resource_group or "(not set)",
             max_retries,
             connect_timeout,
+            read_timeout,
         )
 
     # ------------------------------------------------------------------
@@ -280,6 +285,24 @@ class AzureClient:
     # Credential management
     # ------------------------------------------------------------------
 
+    def _management_client_kwargs(self) -> dict[str, Any]:
+        """Common azure-core kwargs for management clients."""
+        return {
+            "retry_total": self._max_retries,
+            "connection_timeout": self._connect_timeout,
+            "read_timeout": self._read_timeout,
+        }
+
+    def _management_client_credential(self) -> Any:
+        """Return the credential object to hand to Azure SDK client constructors.
+
+        Internally we type against the small credential interface this module
+        actually uses. The Azure SDK constructors are typed more nominally, so
+        keep that boundary typed as ``Any`` rather than pretending our internal
+        protocol is the SDK's class hierarchy.
+        """
+        return self.credential
+
     @property
     def credential(self) -> AzureCredentialProtocol:
         """Return an Azure ``TokenCredential``, creating it on first access.
@@ -331,8 +354,9 @@ class AzureClient:
                 from azure.mgmt.compute import ComputeManagementClient
 
                 self._compute_client = ComputeManagementClient(
-                    credential=self.credential,
+                    credential=self._management_client_credential(),
                     subscription_id=self.subscription_id,
+                    **self._management_client_kwargs(),
                 )
             except ImportError as exc:
                 raise AzureConfigurationError(
@@ -354,8 +378,9 @@ class AzureClient:
                 from azure.mgmt.network import NetworkManagementClient
 
                 self._network_client = NetworkManagementClient(
-                    credential=self.credential,
+                    credential=self._management_client_credential(),
                     subscription_id=self.subscription_id,
+                    **self._management_client_kwargs(),
                 )
             except ImportError as exc:
                 raise AzureConfigurationError(
@@ -376,8 +401,9 @@ class AzureClient:
                 from azure.mgmt.resource import ResourceManagementClient
 
                 self._resource_client = ResourceManagementClient(
-                    credential=self.credential,
+                    credential=self._management_client_credential(),
                     subscription_id=self.subscription_id,
+                    **self._management_client_kwargs(),
                 )
             except ImportError as exc:
                 raise AzureConfigurationError(
@@ -398,8 +424,9 @@ class AzureClient:
                 from azure.mgmt.msi import ManagedServiceIdentityClient
 
                 self._msi_client = ManagedServiceIdentityClient(
-                    credential=self.credential,
+                    credential=self._management_client_credential(),
                     subscription_id=self.subscription_id,
+                    **self._management_client_kwargs(),
                 )
             except ImportError as exc:
                 raise AzureConfigurationError(
@@ -422,8 +449,9 @@ class AzureClient:
                 from azure.mgmt.authorization import AuthorizationManagementClient
 
                 self._authorization_client = AuthorizationManagementClient(
-                    credential=self.credential,
+                    credential=self._management_client_credential(),
                     subscription_id=self.subscription_id,
+                    **self._management_client_kwargs(),
                 )
             except ImportError as exc:
                 raise AzureConfigurationError(
@@ -444,8 +472,9 @@ class AzureClient:
                 from azure.mgmt.monitor import MonitorManagementClient
 
                 self._monitor_client = MonitorManagementClient(
-                    credential=self.credential,
+                    credential=self._management_client_credential(),
                     subscription_id=self.subscription_id,
+                    **self._management_client_kwargs(),
                 )
             except ImportError as exc:
                 raise AzureConfigurationError(
@@ -466,7 +495,8 @@ class AzureClient:
                 from azure.mgmt.resource.subscriptions import SubscriptionClient
 
                 self._subscription_client = SubscriptionClient(
-                    credential=self.credential,
+                    credential=self._management_client_credential(),
+                    **self._management_client_kwargs(),
                 )
             except ImportError as exc:
                 raise AzureConfigurationError(

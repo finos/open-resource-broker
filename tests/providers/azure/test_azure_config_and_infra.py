@@ -239,6 +239,84 @@ class TestConfigValidation:
 
         fake_ctor.assert_called_once_with()
 
+    def test_azure_client_passes_retry_and_timeout_kwargs_to_compute_client(self):
+        azure_config = AzureProviderConfig(
+            subscription_id="12345678-1234-1234-1234-123456789012",
+            resource_group="rg-explicit",
+            region="westeurope",
+            max_retries=7,
+            connect_timeout=11,
+            read_timeout=22,
+        )
+        config_port = MagicMock()
+        config_port.get_typed.return_value = azure_config
+        config_port.get_provider_config.return_value = None
+
+        client = AzureClient(config=config_port, logger=MagicMock())
+        fake_credential = MagicMock()
+        client._credential = fake_credential
+
+        fake_compute_module = types.ModuleType("azure.mgmt.compute")
+        fake_ctor = MagicMock(return_value=MagicMock())
+        fake_compute_module.ComputeManagementClient = fake_ctor
+
+        with patch.dict(
+            sys.modules,
+            {
+                "azure": types.ModuleType("azure"),
+                "azure.mgmt": types.ModuleType("azure.mgmt"),
+                "azure.mgmt.compute": fake_compute_module,
+            },
+        ):
+            _ = client.compute_client
+
+        fake_ctor.assert_called_once_with(
+            credential=fake_credential,
+            subscription_id="12345678-1234-1234-1234-123456789012",
+            retry_total=7,
+            connection_timeout=11,
+            read_timeout=22,
+        )
+
+    def test_azure_client_passes_retry_and_timeout_kwargs_to_subscription_client(self):
+        azure_config = AzureProviderConfig(
+            subscription_id="12345678-1234-1234-1234-123456789012",
+            resource_group="rg-explicit",
+            region="westeurope",
+            max_retries=4,
+            connect_timeout=9,
+            read_timeout=19,
+        )
+        config_port = MagicMock()
+        config_port.get_typed.return_value = azure_config
+        config_port.get_provider_config.return_value = None
+
+        client = AzureClient(config=config_port, logger=MagicMock())
+        fake_credential = MagicMock()
+        client._credential = fake_credential
+
+        fake_subscription_module = types.ModuleType("azure.mgmt.resource.subscriptions")
+        fake_ctor = MagicMock(return_value=MagicMock())
+        fake_subscription_module.SubscriptionClient = fake_ctor
+
+        with patch.dict(
+            sys.modules,
+            {
+                "azure": types.ModuleType("azure"),
+                "azure.mgmt": types.ModuleType("azure.mgmt"),
+                "azure.mgmt.resource": types.ModuleType("azure.mgmt.resource"),
+                "azure.mgmt.resource.subscriptions": fake_subscription_module,
+            },
+        ):
+            _ = client.subscription_client
+
+        fake_ctor.assert_called_once_with(
+            credential=fake_credential,
+            retry_total=4,
+            connection_timeout=9,
+            read_timeout=19,
+        )
+
 
 class TestAzureAuthStrategy:
     def test_auth_strategy_passes_managed_identity_client_id_when_configured(self):
