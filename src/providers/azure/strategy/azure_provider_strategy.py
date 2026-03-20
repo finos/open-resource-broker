@@ -1239,10 +1239,6 @@ class AzureProviderStrategy(ProviderStrategy):
         self,
         operation: ProviderOperation,
     ) -> Optional[str]:
-        explicit_resource_group = operation.parameters.get("resource_group")
-        if explicit_resource_group not in (None, ""):
-            return str(explicit_resource_group)
-
         request_metadata = operation.parameters.get("request_metadata") or {}
         request_resource_group = request_metadata.get("resource_group")
         if request_resource_group not in (None, ""):

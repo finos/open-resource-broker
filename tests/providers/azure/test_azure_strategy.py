@@ -121,7 +121,7 @@ class TestCapacityMetadata:
             "state": "Updating",
         }
 
-    def test_vmss_capacity_uses_operation_resource_group_when_provided(self, strategy):
+    def test_vmss_capacity_uses_explicit_resource_group_argument_when_provided(self, strategy):
         strategy._resource_manager = MagicMock()
         strategy._resource_manager.get_vmss_capacity.return_value = {
             "capacity": 4,
@@ -164,8 +164,8 @@ class TestCapacityMetadata:
             parameters={
                 "resource_ids": ["vmss-demo"],
                 "provider_api": "VMSS",
-                "resource_group": "test-rg",
                 "template_id": "tmpl-1",
+                "request_metadata": {"resource_group": "test-rg"},
             },
         )
 
@@ -210,8 +210,8 @@ class TestCapacityMetadata:
             parameters={
                 "resource_ids": ["vmss-demo"],
                 "provider_api": "VMSS",
-                "resource_group": "test-rg",
                 "template_id": "tmpl-1",
+                "request_metadata": {"resource_group": "test-rg"},
             },
         )
 
@@ -221,7 +221,9 @@ class TestCapacityMetadata:
         assert result.metadata["capacity_shortfall"]["missing_capacity_units"] == 2
         assert result.metadata["capacity_shortfall"]["likely_causes"] == ["AllocationFailed"]
 
-    def test_describe_resource_instances_uses_operation_resource_group_for_capacity(self, strategy):
+    def test_describe_resource_instances_uses_request_metadata_resource_group_for_capacity(
+        self, strategy
+    ):
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
         handler.get_vmss_resource_errors.return_value = []
@@ -238,8 +240,8 @@ class TestCapacityMetadata:
             parameters={
                 "resource_ids": ["vmss-demo"],
                 "provider_api": "VMSS",
-                "resource_group": "custom-rg",
                 "template_id": "tmpl-1",
+                "request_metadata": {"resource_group": "custom-rg"},
             },
         )
 
@@ -248,6 +250,38 @@ class TestCapacityMetadata:
         assert result.success
         strategy._resource_manager.get_vmss_capacity.assert_called_once_with(
             "custom-rg",
+            "vmss-demo",
+        )
+
+    def test_describe_resource_instances_uses_request_metadata_resource_group_when_present(
+        self, strategy
+    ):
+        handler = MagicMock()
+        handler.check_hosts_status.return_value = []
+        handler.get_vmss_resource_errors.return_value = []
+        strategy._handlers["VMSS"] = handler
+        strategy._resource_manager = MagicMock()
+        strategy._resource_manager.get_vmss_capacity.return_value = {
+            "capacity": 2,
+            "provisioned_instance_count": 0,
+            "provisioning_state": "Updating",
+        }
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
+            parameters={
+                "resource_ids": ["vmss-demo"],
+                "provider_api": "VMSS",
+                "template_id": "tmpl-1",
+                "request_metadata": {"resource_group": "context-rg"},
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert result.success
+        strategy._resource_manager.get_vmss_capacity.assert_called_once_with(
+            "context-rg",
             "vmss-demo",
         )
 
@@ -630,6 +664,44 @@ class TestGetInstanceStatus:
         assert not result.success
         assert result.error_code == "MISSING_INSTANCE_IDS"
 
+    def test_get_instance_status_uses_request_metadata_resource_group(self, strategy):
+        handler = MagicMock()
+        handler.check_hosts_status.return_value = [
+            {
+                "instance_id": "vm-1",
+                "status": "running",
+                "private_ip": "10.0.0.4",
+                "public_ip": None,
+                "launch_time": None,
+                "instance_type": "Standard_D4s_v5",
+                "subnet_id": "subnet-1",
+                "vpc_id": "vnet-1",
+                "provider_type": "azure",
+                "provider_data": {
+                    "resource_group": "context-rg",
+                    "vm_name": "vm-1",
+                },
+            }
+        ]
+        strategy._handlers["SingleVM"] = handler
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
+            parameters={
+                "instance_ids": ["vm-1"],
+                "provider_api": "SingleVM",
+                "request_metadata": {"resource_group": "context-rg"},
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert result.success
+        assert result.data["queried_count"] == 1
+        handler.check_hosts_status.assert_called_once()
+        request = handler.check_hosts_status.call_args.args[0]
+        assert request.metadata["resource_group"] == "context-rg"
+
     def test_dry_run_short_circuits_status_lookup(self, azure_config, logger):
         strategy = AzureProviderStrategy(config=azure_config, logger=logger)
         strategy.initialize()
@@ -673,7 +745,7 @@ class TestGetInstanceStatus:
             parameters={
                 "instance_ids": ["vm-1"],
                 "provider_api": "SingleVM",
-                "resource_group": "test-rg",
+                "request_metadata": {"resource_group": "test-rg"},
             },
         )
 
@@ -728,7 +800,7 @@ class TestGetInstanceStatus:
             parameters={
                 "instance_ids": ["3"],
                 "provider_api": "VMSS",
-                "resource_group": "test-rg",
+                "request_metadata": {"resource_group": "test-rg"},
                 "resource_mapping": {"3": ("vmss-demo", 2)},
             },
         )
@@ -768,7 +840,7 @@ class TestGetInstanceStatus:
             operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
             parameters={
                 "instance_ids": ["3"],
-                "resource_group": "test-rg",
+                "request_metadata": {"resource_group": "test-rg"},
                 "resource_mapping": {"3": ("vmss-demo", 2)},
             },
         )
@@ -796,8 +868,8 @@ class TestGetInstanceStatus:
             parameters={
                 "instance_ids": ["node-1"],
                 "provider_api": "CycleCloud",
-                "resource_group": "test-rg",
                 "resource_id": "my-cluster",
+                "request_metadata": {"resource_group": "test-rg"},
             },
             context={
                 "cyclecloud_url": "https://cc.example.com",
@@ -847,7 +919,10 @@ class TestGetInstanceStatus:
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
-            parameters={"instance_ids": ["vm-1"], "resource_group": "test-rg"},
+            parameters={
+                "instance_ids": ["vm-1"],
+                "request_metadata": {"resource_group": "test-rg"},
+            },
         )
 
         result = _run(strategy.execute_operation(op))
@@ -898,8 +973,8 @@ class TestDescribeResourceInstances:
             parameters={
                 "resource_ids": ["vmss-demo"],
                 "provider_api": "VMSS",
-                "resource_group": "test-rg",
                 "template_id": "tmpl-1",
+                "request_metadata": {"resource_group": "test-rg"},
             },
         )
 
@@ -923,9 +998,9 @@ class TestDescribeResourceInstances:
             parameters={
                 "resource_ids": ["my-cluster"],
                 "provider_api": "CycleCloud",
-                "resource_group": "test-rg",
                 "template_id": "tmpl-1",
                 "request_metadata": {
+                    "resource_group": "test-rg",
                     "node_array": "execute",
                     "node_ids": ["node-1"],
                     "cyclecloud_url": "https://cc.example.com",

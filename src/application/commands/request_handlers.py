@@ -912,6 +912,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                     "template_id": template_id,
                     "provider_api": provider_api,
                     "resource_mapping": resource_mapping,
+                    "request_metadata": request.metadata or {},
                 },
                 context=termination_context,
             )
