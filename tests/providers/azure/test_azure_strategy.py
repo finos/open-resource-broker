@@ -497,6 +497,76 @@ class TestTerminateInstances:
             == 2
         )
 
+    def test_terminate_instances_merges_pending_vmss_reconciliation_for_same_vmss(
+        self, azure_config, logger
+    ):
+        strategy = AzureProviderStrategy(config=azure_config, logger=logger)
+        strategy.initialize()
+
+        handler = MagicMock()
+        handler.release_hosts.side_effect = [
+            {
+                "provider_data": {
+                    "pending_reconciliation": {
+                        "resource_group": "test-rg",
+                        "vmss_name": "vmss-prod-b",
+                        "machine_ids": ["orb-1"],
+                        "target_capacity": 4,
+                        "orchestration_mode": "Flexible",
+                        "delete_vmss_when_empty": False,
+                    }
+                }
+            },
+            {
+                "provider_data": {
+                    "pending_reconciliation": {
+                        "resource_group": "test-rg",
+                        "vmss_name": "vmss-prod-b",
+                        "machine_ids": ["orb-2"],
+                        "target_capacity": 4,
+                        "orchestration_mode": "Flexible",
+                        "delete_vmss_when_empty": False,
+                    }
+                }
+            },
+        ]
+        strategy._handlers = {"VMSS": handler}
+
+        first_op = ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={
+                "instance_ids": ["orb-1"],
+                "provider_api": "VMSS",
+                "resource_mapping": {
+                    "orb-1": ("vmss-prod-b", 1),
+                },
+            },
+        )
+        second_op = ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={
+                "instance_ids": ["orb-2"],
+                "provider_api": "VMSS",
+                "resource_mapping": {
+                    "orb-2": ("vmss-prod-b", 1),
+                },
+            },
+        )
+
+        first_result = _run(strategy.execute_operation(first_op))
+        second_result = _run(strategy.execute_operation(second_op))
+
+        assert first_result.success
+        assert second_result.success
+        assert strategy._pending_vmss_termination_reconciliations[("test-rg", "vmss-prod-b")] == {
+            "resource_group": "test-rg",
+            "vmss_name": "vmss-prod-b",
+            "machine_ids": ["orb-1", "orb-2"],
+            "target_capacity": 4,
+            "orchestration_mode": "Flexible",
+            "delete_vmss_when_empty": False,
+        }
+
     def test_terminate_instances_forwards_full_cyclecloud_auth_context(self, azure_config, logger):
         strategy = AzureProviderStrategy(config=azure_config, logger=logger)
         strategy.initialize()

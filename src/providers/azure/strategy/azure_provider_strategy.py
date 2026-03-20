@@ -1250,13 +1250,31 @@ class AzureProviderStrategy(ProviderStrategy):
             return
 
         key = (str(resource_group), str(vmss_name))
+        new_machine_ids = [str(machine_id) for machine_id in pending.get("machine_ids", [])]
+        merged_machine_ids: list[str] = []
+        for machine_id in (
+            *self._pending_vmss_termination_reconciliations.get(key, {}).get("machine_ids", []),
+            *new_machine_ids,
+        ):
+            if machine_id and machine_id not in merged_machine_ids:
+                merged_machine_ids.append(machine_id)
+
+        existing = self._pending_vmss_termination_reconciliations.get(key, {})
+        existing_target_capacity = existing.get("target_capacity")
+        new_target_capacity = int(pending.get("target_capacity", 0))
+        if existing_target_capacity is None:
+            target_capacity = new_target_capacity
+        else:
+            target_capacity = min(int(existing_target_capacity), new_target_capacity)
+
         self._pending_vmss_termination_reconciliations[key] = {
             "resource_group": str(resource_group),
             "vmss_name": str(vmss_name),
-            "machine_ids": [str(machine_id) for machine_id in pending.get("machine_ids", [])],
-            "target_capacity": int(pending.get("target_capacity", 0)),
+            "machine_ids": merged_machine_ids,
+            "target_capacity": target_capacity,
             "orchestration_mode": str(pending.get("orchestration_mode", "Flexible")),
-            "delete_vmss_when_empty": bool(pending.get("delete_vmss_when_empty", False)),
+            "delete_vmss_when_empty": bool(existing.get("delete_vmss_when_empty", False))
+            or bool(pending.get("delete_vmss_when_empty", False)),
         }
 
     def _maybe_reconcile_pending_vmss_termination(
