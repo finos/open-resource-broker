@@ -224,6 +224,11 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                             provider_errors = provider_data.get("fleet_errors") or []
                             if provider_errors and not request.metadata.get("fleet_errors"):
                                 request.metadata["fleet_errors"] = provider_errors
+                            if (
+                                selection_result.provider_type == "azure"
+                                and provider_data.get("resource_group") not in (None, "")
+                            ):
+                                request.metadata["resource_group"] = provider_data["resource_group"]
 
                         if (
                             request.metadata.get("provider_api") == "CycleCloud"

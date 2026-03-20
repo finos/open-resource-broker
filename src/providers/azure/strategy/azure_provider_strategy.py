@@ -845,9 +845,7 @@ class AzureProviderStrategy(ProviderStrategy):
                     },
                 )
 
-            resource_group = operation.parameters.get(
-                "resource_group", self._azure_config.resource_group
-            )
+            resource_group = self._resolve_operation_resource_group(operation)
             default_resource_id = operation.parameters.get("resource_id")
             if not default_resource_id and grouped_resource_mapping:
                 default_resource_id = next(iter(grouped_resource_mapping.keys()))
@@ -952,10 +950,7 @@ class AzureProviderStrategy(ProviderStrategy):
                     },
                 )
 
-            resource_group = (
-                operation.parameters.get("resource_group")
-                or self._azure_config.resource_group
-            )
+            resource_group = self._resolve_operation_resource_group(operation)
             if not resource_group:
                 return ProviderResult.error_result(
                     "resource_group is required for status query",
@@ -1119,13 +1114,13 @@ class AzureProviderStrategy(ProviderStrategy):
 
     @staticmethod
     def _resolve_status_provider_api(operation: ProviderOperation) -> Optional[Any]:
+        request_metadata = operation.parameters.get("request_metadata") or {}
+        context = operation.context or {}
         for source in (
             operation.parameters,
-            operation.parameters.get("request_metadata", {}) or {},
-            operation.context or {},
+            request_metadata,
+            context,
         ):
-            if not isinstance(source, dict):
-                continue
             provider_api = source.get("provider_api")
             if provider_api not in (None, ""):
                 return provider_api
@@ -1134,13 +1129,13 @@ class AzureProviderStrategy(ProviderStrategy):
     @staticmethod
     def _infer_grouped_status_provider_api(operation: ProviderOperation) -> str:
         """Infer a grouped-resource status handler when provider_api was not persisted."""
+        request_metadata = operation.parameters.get("request_metadata") or {}
+        context = operation.context or {}
         for source in (
-            operation.parameters.get("request_metadata", {}) or {},
-            operation.context or {},
+            request_metadata,
+            context,
             operation.parameters,
         ):
-            if not isinstance(source, dict):
-                continue
             if any(
                 source.get(key) not in (None, "")
                 for key in (
@@ -1207,18 +1202,33 @@ class AzureProviderStrategy(ProviderStrategy):
         resource_group: Optional[str],
     ) -> dict[str, Any]:
         metadata: dict[str, Any] = {"resource_group": resource_group}
+        request_metadata = operation.parameters.get("request_metadata") or {}
+        context = operation.context or {}
         for source in (
-            operation.parameters.get("request_metadata", {}) or {},
-            operation.context or {},
+            request_metadata,
+            context,
             operation.parameters,
         ):
-            if not isinstance(source, dict):
-                continue
             for key in self._cyclecloud_metadata_keys():
                 value = source.get(key)
                 if value not in (None, ""):
                     metadata[key] = value
         return metadata
+
+    def _resolve_operation_resource_group(
+        self,
+        operation: ProviderOperation,
+    ) -> Optional[str]:
+        explicit_resource_group = operation.parameters.get("resource_group")
+        if explicit_resource_group not in (None, ""):
+            return str(explicit_resource_group)
+
+        request_metadata = operation.parameters.get("request_metadata") or {}
+        request_resource_group = request_metadata.get("resource_group")
+        if request_resource_group not in (None, ""):
+            return str(request_resource_group)
+
+        return self._azure_config.resource_group
 
     @staticmethod
     def _status_candidate_ids(result: dict[str, Any]) -> set[str]:
@@ -1385,6 +1395,7 @@ class AzureProviderStrategy(ProviderStrategy):
             request_id = operation.parameters.get("request_id") or (
                 operation.context.get("request_id") if operation.context else None
             )
+            resource_group = self._resolve_operation_resource_group(operation)
             request = Request.create_new_request(
                 request_type=RequestType.ACQUIRE,
                 template_id=operation.parameters.get("template_id", "unknown"),
@@ -1394,9 +1405,7 @@ class AzureProviderStrategy(ProviderStrategy):
                 request_id=request_id,
                 metadata=self._build_cyclecloud_request_metadata(
                     operation=operation,
-                    resource_group=operation.parameters.get(
-                        "resource_group", self._azure_config.resource_group
-                    ),
+                    resource_group=resource_group,
                 ),
             )
             request.resource_ids = resource_ids
@@ -1405,9 +1414,7 @@ class AzureProviderStrategy(ProviderStrategy):
 
             instance_details = handler.check_hosts_status(request)
             self._maybe_reconcile_pending_vmss_termination(
-                resource_group=operation.parameters.get(
-                    "resource_group", self._azure_config.resource_group
-                ),
+                resource_group=resource_group,
                 resource_ids=resource_ids,
                 instance_details=instance_details,
             )
@@ -1424,9 +1431,6 @@ class AzureProviderStrategy(ProviderStrategy):
                     AzureProviderApi.VMSS.value,
                     AzureProviderApi.VMSS_UNIFORM.value,
                 ):
-                    resource_group = operation.parameters.get(
-                        "resource_group", self._azure_config.resource_group
-                    )
                     vmss_errors = []
                     if resource_group and hasattr(handler, "get_vmss_resource_errors"):
                         for resource_id in resource_ids:
@@ -1483,9 +1487,7 @@ class AzureProviderStrategy(ProviderStrategy):
                 self._augment_vmss_capacity_metadata(
                     metadata,
                     resource_ids,
-                    resource_group=operation.parameters.get(
-                        "resource_group", self._azure_config.resource_group
-                    ),
+                    resource_group=resource_group,
                 )
 
             self._augment_shortfall_metadata(metadata)
