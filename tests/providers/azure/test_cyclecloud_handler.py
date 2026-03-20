@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 import pytest
+import requests
 from unittest.mock import MagicMock, patch
 
 from providers.azure.configuration.config import AzureProviderConfig
@@ -351,7 +352,27 @@ class TestCycleCloudHandlerStatus:
             resource_ids=["my-cluster"],
             metadata={"cluster_name": "my-cluster"},
         )
-        assert handler.check_hosts_status(request) == []
+        with pytest.raises(CycleCloudConnectionError, match="cyclecloud_url is required"):
+            handler.check_hosts_status(request)
+
+    @patch("providers.azure.infrastructure.handlers.cyclecloud_handler.requests.Session")
+    def test_check_hosts_status_request_failure_raises(self, mock_session_cls):
+        handler = _make_handler()
+
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+        mock_session.request.side_effect = requests.exceptions.ConnectionError("boom")
+
+        request = _make_request(
+            resource_ids=["my-cluster"],
+            metadata={
+                "cluster_name": "my-cluster",
+                "cyclecloud_url": "https://cc.example.com",
+            },
+        )
+
+        with pytest.raises(CycleCloudConnectionError, match="Cannot connect to CycleCloud"):
+            handler.check_hosts_status(request)
 
     @patch("providers.azure.infrastructure.handlers.cyclecloud_handler.requests.Session")
     def test_check_hosts_status_filters_by_node_array(self, mock_session_cls):

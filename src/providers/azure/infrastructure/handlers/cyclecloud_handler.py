@@ -773,7 +773,7 @@ class CycleCloudHandler(AzureHandler):
                 cluster_name,
                 exc,
             )
-            return []
+            raise
 
         try:
             nodes_response = self._cc_request(
@@ -787,7 +787,7 @@ class CycleCloudHandler(AzureHandler):
                 cluster_name,
                 exc,
             )
-            return []
+            raise
 
         all_nodes = nodes_response.get("nodes", [])
         results: list[dict[str, Any]] = []

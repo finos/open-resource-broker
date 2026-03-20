@@ -18,6 +18,7 @@ from providers.azure.infrastructure.services.spot_placement_score_adapter import
     AzureSpotPlacementScoreAdapter,
 )
 from providers.azure.configuration.config import AzureProviderConfig
+from providers.azure.exceptions.azure_exceptions import CycleCloudConnectionError
 from providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
 from providers.base.strategy import (
     ProviderOperation,
@@ -778,6 +779,36 @@ class TestGetInstanceStatus:
         assert result.metadata["method"] == "handler"
         handler.check_hosts_status.assert_called_once()
         assert [m["instance_id"] for m in result.data["machines"]] == ["3"]
+
+    def test_cyclecloud_status_handler_failure_surfaces_error(self, azure_config, logger):
+        strategy = AzureProviderStrategy(config=azure_config, logger=logger)
+        strategy.initialize()
+
+        handler = MagicMock()
+        handler.check_hosts_status.side_effect = CycleCloudConnectionError(
+            "cyclecloud auth failed",
+            url="https://cc.example.com",
+        )
+        strategy._handlers = {"CycleCloud": handler}
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
+            parameters={
+                "instance_ids": ["node-1"],
+                "provider_api": "CycleCloud",
+                "resource_group": "test-rg",
+                "resource_id": "my-cluster",
+            },
+            context={
+                "cyclecloud_url": "https://cc.example.com",
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert not result.success
+        assert result.error_code == "GET_INSTANCE_STATUS_ERROR"
+        assert "cyclecloud auth failed" in result.error_message
 
     def test_status_populates_network_identity(self, strategy):
         azure_client = MagicMock()
