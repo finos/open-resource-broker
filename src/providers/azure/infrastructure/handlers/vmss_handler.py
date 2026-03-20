@@ -681,13 +681,8 @@ class VMSSHandler(AzureHandler):
         for vm in vms:
             vmss_ref = getattr(vm, "virtual_machine_scale_set", None)
             vmss_ref_id = getattr(vmss_ref, "id", None) if vmss_ref else None
-            if vmss_ref_id:
-                if not str(vmss_ref_id).endswith(vmss_arm_suffix):
-                    continue
-            else:
-                vm_name = getattr(vm, "name", "") or ""
-                if not vm_name.startswith(f"{vmss_name}_"):
-                    continue
+            if not vmss_ref_id or not str(vmss_ref_id).endswith(vmss_arm_suffix):
+                continue
 
             if include_instance_view:
                 try:
