@@ -70,7 +70,9 @@ class TestCommandQuerySeparation:
         command_methods = [
             method
             for method in dir(command)
-            if not method.startswith("_") and method not in ("model_fields", "model_computed_fields") and callable(getattr(command, method))
+            if not method.startswith("_")
+            and method not in ("model_fields", "model_computed_fields")
+            and callable(getattr(command, method))
         ]
 
         # Commands should not have "get" methods
@@ -85,7 +87,9 @@ class TestCommandQuerySeparation:
         query_methods = [
             method
             for method in dir(query)
-            if not method.startswith("_") and method not in ("model_fields", "model_computed_fields") and callable(getattr(query, method))
+            if not method.startswith("_")
+            and method not in ("model_fields", "model_computed_fields")
+            and callable(getattr(query, method))
         ]
 
         # Pydantic internal methods to exclude

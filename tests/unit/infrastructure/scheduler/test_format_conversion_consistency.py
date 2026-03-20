@@ -154,7 +154,9 @@ class TestExplicitFieldExtraction:
         assert result["disk_usage_percent"] == 20.0
         assert result["last_health_check"] == "2026-03-20T00:00:00+00:00"
         assert result["components"] == {"db": "ok"}
-        assert "unknown_internal_field" not in result, "Unknown fields must not leak into wire format"
+        assert "unknown_internal_field" not in result, (
+            "Unknown fields must not leak into wire format"
+        )
 
     def test_format_provider_detail_response_extracts_known_fields(self):
         """Base strategy must extract provider detail fields explicitly — not passthrough raw."""
@@ -174,7 +176,9 @@ class TestExplicitFieldExtraction:
         assert result["enabled"] is True
         assert result["config"] == {"region": "us-east-1"}
         assert result["template_defaults"] == {"instance_type": "t3.micro"}
-        assert "unknown_internal_field" not in result, "Unknown fields must not leak into wire format"
+        assert "unknown_internal_field" not in result, (
+            "Unknown fields must not leak into wire format"
+        )
 
     def test_format_provider_detail_response_omits_template_defaults_when_absent(self):
         """template_defaults must not appear in output when not present in input."""

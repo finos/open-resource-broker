@@ -7,6 +7,7 @@ import sys
 def test_import_fixes():
     """Test that the import fixes are working."""
     from orb.providers.aws.domain.template.value_objects import ProviderApi
+
     assert ProviderApi is not None
 
 
