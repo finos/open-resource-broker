@@ -208,15 +208,15 @@ class FleetGroupingMixin:
     # Abstract hooks for subclasses
     def _collect_groups_from_instances(
         self,
-        instance_ids: list[str],
-        groups: dict[Optional[str], dict[str, Any]],
-        group_ids_to_fetch: set[str],
+        _instance_ids: list[str],
+        _groups: dict[Optional[str], dict[str, Any]],
+        _group_ids_to_fetch: set[str],
     ) -> None:
         """Populate groups using AWS API lookups (implemented by subclasses)."""
         raise NotImplementedError
 
     def _fetch_and_attach_group_details(
-        self, group_ids: set[str], groups: dict[Optional[str], dict[str, Any]]
+        self, _group_ids: set[str], _groups: dict[Optional[str], dict[str, Any]]
     ) -> None:
         """Fetch and attach resource details for grouped identifiers."""
         raise NotImplementedError

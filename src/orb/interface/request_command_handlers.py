@@ -227,6 +227,8 @@ async def handle_request_return_machines(
             machine_ids=machine_ids,
             all_machines=has_all,
             force=getattr(args, "force", False),
+            wait=getattr(args, "wait", False),
+            timeout_seconds=getattr(args, "timeout", 300),
         )
     )
 

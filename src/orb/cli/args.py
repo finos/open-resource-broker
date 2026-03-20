@@ -126,6 +126,12 @@ def add_machine_actions(subparsers):
     machines_return.add_argument(
         "--machine-id", "-m", action="append", dest="machine_ids_flag", help="Machine ID to return"
     )
+    machines_return.add_argument(
+        "--wait", action="store_true", help="Wait for return request to complete"
+    )
+    machines_return.add_argument(
+        "--timeout", type=int, default=300, help="Wait timeout in seconds"
+    )
 
     machines_terminate = subparsers.add_parser("terminate", help="Terminate (return) machines")
     add_global_arguments(machines_terminate)
@@ -137,6 +143,12 @@ def add_machine_actions(subparsers):
         action="append",
         dest="machine_ids_flag",
         help="Machine ID to terminate",
+    )
+    machines_terminate.add_argument(
+        "--wait", action="store_true", help="Wait for terminate request to complete"
+    )
+    machines_terminate.add_argument(
+        "--timeout", type=int, default=300, help="Wait timeout in seconds"
     )
 
     machines_status = subparsers.add_parser("status", help="Check machine status")

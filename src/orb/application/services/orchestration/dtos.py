@@ -63,6 +63,8 @@ class ReturnMachinesInput:
     machine_ids: list[str] = dataclasses.field(default_factory=list)
     all_machines: bool = False
     force: bool = False
+    wait: bool = False
+    timeout_seconds: int = 300
 
 
 @dataclasses.dataclass(frozen=True)
