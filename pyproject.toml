@@ -295,6 +295,7 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
 junit_family = "legacy"
 addopts = "--tb=short --strict-markers --disable-warnings --cov=src/orb --cov-report=term-missing --cov-branch"
 filterwarnings = [
