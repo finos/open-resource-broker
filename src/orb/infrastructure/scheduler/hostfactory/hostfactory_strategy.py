@@ -649,9 +649,10 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "machines": [
                 {
                     # Domain -> HostFactory field mapping using consistent serialization
-                    "instanceId": str(machine.machine_id),
+                    "machineId": str(machine.machine_id),
                     "templateId": str(machine.template_id),
                     "requestId": str(machine.request_id),
+                    "returnRequestId": machine.return_request_id,
                     "vmType": str(machine.instance_type),
                     "imageId": str(machine.image_id),
                     "privateIp": machine.private_ip,
@@ -671,13 +672,12 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
     def format_machine_details_response(self, machine_data: dict) -> dict:
         """Format machine details with hostfactory-specific fields."""
         return {
-            "id": machine_data.get("id"),
             "name": machine_data.get("name"),
             "status": machine_data.get("status"),
-            "provider": "hostfactory",
-            "instance_type": machine_data.get("instance_type"),
+            "provider": machine_data.get("provider_type") or "aws",
             "region": machine_data.get("region"),
-            "instanceId": machine_data.get("id"),
+            "machineId": machine_data.get("machine_id"),
+            "returnRequestId": machine_data.get("return_request_id"),
             "vmType": machine_data.get("instance_type"),
             "imageId": machine_data.get("image_id"),
             "privateIp": machine_data.get("private_ip"),
@@ -819,7 +819,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
                 message = machine.get("message", "")
 
             # Per IBM HF spec, launchtime is mandatory - default to 0 if not available
-            launchtime = int(machine.get("launch_time_timestamp", 0))
+            launchtime = int(machine.get("launch_time") or 0)
 
             # Per IBM HF spec, privateIpAddress must be a valid IP or null (not empty string)
             raw_ip = machine.get("private_ip_address", machine.get("private_ip"))
@@ -837,6 +837,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
                 "message": message,
                 # Per IBM HF spec, cloudHostId must always be present, defaulting to null
                 "cloudHostId": machine.get("cloud_host_id") or None,
+                "returnRequestId": machine.get("return_request_id"),
             }
 
             formatted_machine["publicIpAddress"] = (
@@ -865,7 +866,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             # For return requests: terminated/stopped = success, in-flight = executing
             if status in ["terminated", "stopped"]:
                 return "succeed"
-            elif status in ["shutting-down", "stopping", "pending", "terminating"]:
+            elif status in ["shutting-down", "stopping", "pending", "terminating", "running"]:
                 return "executing"
             else:
                 return "fail"

@@ -9,7 +9,9 @@ from orb.domain.request.request_types import RequestType
 class RequestDTOFactory:
     """Factory for creating RequestDTOs from domain objects."""
 
-    def create_from_domain(self, request: Request, machines: list[Machine] = None) -> RequestDTO:  # type: ignore[assignment]
+    def create_from_domain(
+        self, request: Request, machines: list[Machine] | None = None
+    ) -> RequestDTO:
         """Create RequestDTO from domain objects."""
         if machines is None:
             machines = []
@@ -18,7 +20,13 @@ class RequestDTOFactory:
         machine_references = [
             MachineReferenceDTO(
                 machine_id=str(machine.machine_id.value),
-                name=machine.private_ip or str(machine.machine_id.value),
+                name=(
+                    machine.name
+                    or machine.private_dns_name
+                    or machine.public_dns_name
+                    or machine.private_ip
+                    or str(machine.machine_id.value)
+                ),
                 result=self.map_machine_status_to_result(
                     machine.status.value, request.request_type
                 ),
@@ -26,6 +34,8 @@ class RequestDTOFactory:
                 private_ip_address=machine.private_ip or "",
                 public_ip_address=machine.public_ip,
                 launch_time=int(machine.launch_time.timestamp() if machine.launch_time else 0),
+                cloud_host_id=machine.provider_data.get("cloud_host_id")
+                or str(machine.machine_id.value),
             )
             for machine in machines
         ]
@@ -39,7 +49,7 @@ class RequestDTOFactory:
             # For return requests, terminated is success, pending is executing
             if status in ["terminated", "stopped"]:
                 return "succeed"
-            elif status in ["pending", "terminating", "shutting-down", "stopping"]:
+            elif status in ["pending", "terminating", "shutting-down", "stopping", "running"]:
                 return "executing"
             else:
                 return "fail"

@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
-
-# Module-level set to hold background task references, preventing GC before completion.
-_background_tasks: set[asyncio.Task[None]] = set()
 
 from orb.application.base.handlers import BaseCommandHandler
 from orb.application.decorators import command_handler
@@ -288,13 +284,9 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             command.processed_machines = validation_results["valid_machines"]
             command.skipped_machines = validation_results["skipped_machines"]
 
-            # Spawn deprovisioning as background tasks — one per provider group.
+            # Await deprovisioning sequentially — one per provider group.
             for machine_ids, request, provider_name in pending_deprovision:
-                task = asyncio.create_task(
-                    self._execute_deprovisioning_for_request(machine_ids, request, provider_name)
-                )
-                _background_tasks.add(task)
-                task.add_done_callback(_background_tasks.discard)
+                await self._execute_deprovisioning_for_request(machine_ids, request, provider_name)
 
         except Exception as e:
             self.logger.error(

@@ -125,10 +125,10 @@ def test_hf_machine_result_return_request_terminated(hf_strategy):
 
 
 def test_hf_machine_result_return_request_running(hf_strategy):
-    """For return requests, running machines must map to 'fail' (not yet returned)."""
+    """For return requests, running machines must map to 'executing' (termination in flight)."""
     machines = [{"machine_id": "i-1", "status": "running"}]
     formatted = hf_strategy._format_machines_for_hostfactory(machines, request_type="return")
-    assert formatted[0]["result"] == "fail"
+    assert formatted[0]["result"] == "executing"
 
 
 def test_hf_machine_result_acquire_running(hf_strategy):

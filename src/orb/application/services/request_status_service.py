@@ -169,8 +169,16 @@ class RequestStatusService:
     def map_machine_status_to_result(self, status: str, request_type: RequestType) -> str:
         """Map machine status to result code."""
         if request_type == RequestType.RETURN:
-            # For return requests, terminated is success
-            return "succeed" if status in ["terminated", "stopped"] else "fail"
+            if status in ["terminated", "stopped"]:
+                return "succeed"
+            elif status in ["pending", "terminating", "shutting-down", "stopping", "running"]:
+                return "executing"
+            else:
+                return "fail"
         else:
-            # For acquire requests, running is success
-            return "succeed" if status == "running" else "fail"
+            if status == "running":
+                return "succeed"
+            elif status in ["pending", "launching"]:
+                return "executing"
+            else:
+                return "fail"
