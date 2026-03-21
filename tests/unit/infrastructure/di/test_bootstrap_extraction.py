@@ -1,6 +1,7 @@
 """Tests verifying the composition root lives in orb.bootstrap, not orb.infrastructure.di."""
 
 import subprocess
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -47,7 +48,7 @@ def test_arch_checker_passes():
         ["python", "dev-tools/quality/check_architecture.py"],
         capture_output=True,
         text=True,
-        cwd="/Users/flamurg/src/aws/symphony/open-resource-broker",
+        cwd=Path(__file__).parents[4],
     )
     assert result.returncode == 0, f"Arch checker failed:\n{result.stdout}\n{result.stderr}"
 
