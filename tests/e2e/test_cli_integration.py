@@ -59,7 +59,7 @@ class TestCLIIntegration:
         assert result["config"] == expected_config
 
     @pytest.mark.asyncio
-    @patch("orb.infrastructure.di.services.register_all_services")
+    @patch("orb.bootstrap.services.register_all_services")
     async def test_validate_provider_config_cli_e2e(self, mock_register_services):
         """Test validateProviderConfig CLI operation end-to-end."""
         # Setup mocks
@@ -92,7 +92,7 @@ class TestCLIIntegration:
         assert "provider configuration" in result["message"].lower()
 
     @pytest.mark.asyncio
-    @patch("orb.infrastructure.di.services.register_all_services")
+    @patch("orb.bootstrap.services.register_all_services")
     async def test_reload_provider_config_cli_e2e(self, mock_register_services):
         """Test reloadProviderConfig CLI operation end-to-end."""
         # Setup mocks

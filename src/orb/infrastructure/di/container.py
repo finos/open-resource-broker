@@ -304,6 +304,20 @@ _container_instance: Optional[DIContainer] = None
 _container_lock = threading.Lock()
 _container_ready = threading.Event()
 
+# Composition root factory hook — set by orb.bootstrap at import time
+_container_factory: Optional[Any] = None
+
+
+def set_container_factory(fn: Any) -> None:
+    """Register the composition root factory.
+
+    Must be called (by importing orb.bootstrap) before get_container() is
+    first invoked.  The factory receives the bare DIContainer and is
+    responsible for registering all services.
+    """
+    global _container_factory
+    _container_factory = fn
+
 
 def get_container() -> DIContainer:
     """Get the singleton DI container instance."""
@@ -325,9 +339,12 @@ def _create_configured_container() -> DIContainer:
     """Create and configure the DI container."""
     container = DIContainer()
 
-    from orb.infrastructure.di.services import register_all_services
+    if _container_factory is None:
+        raise RuntimeError(
+            "No container factory registered. Import orb.bootstrap before calling get_container()."
+        )
 
-    register_all_services(container)
+    _container_factory(container)
 
     # Validate required ports are registered at startup
     from orb.application.ports.command_bus_port import CommandBusPort
@@ -364,5 +381,6 @@ __all__: list[str] = [
     "create_container",
     "get_container",
     "reset_container",
+    "set_container_factory",
     "timed_operation",
 ]

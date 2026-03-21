@@ -1,16 +1,26 @@
-"""Application bootstrap - DI-based architecture."""
+"""Application bootstrap - DI-based architecture.
+
+This package is the composition root: it owns all DI wiring and registers
+the container factory so that orb.infrastructure.di.container can build a
+fully-configured container without importing interface-layer modules itself.
+"""
 
 from __future__ import annotations
 
 from typing import Any, Optional
+
+# Register the composition root factory immediately on import.
+# This must happen before any call to get_container().
+from orb.bootstrap.services import register_all_services
+from orb.infrastructure.di.container import set_container_factory
+
+set_container_factory(register_all_services)
 
 # Import configuration
 from orb.config.schemas.app_schema import AppConfig
 
 # Import logging
 from orb.infrastructure.logging.logger import get_logger, setup_logging
-
-# Import DI container
 
 
 class Application:

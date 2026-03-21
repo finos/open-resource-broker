@@ -14,13 +14,13 @@ if TYPE_CHECKING:
     from orb.infrastructure.di.container import DIContainer
 
 # Import focused service registration modules
-from orb.infrastructure.di.core_services import register_core_services
-from orb.infrastructure.di.domain_services import register_domain_services
-from orb.infrastructure.di.infrastructure_services import register_infrastructure_services
-from orb.infrastructure.di.monitoring_services import register_monitoring_services
-from orb.infrastructure.di.provider_services import register_provider_services
-from orb.infrastructure.di.server_services import register_server_services
-from orb.infrastructure.di.storage_services import register_storage_services
+from orb.bootstrap.core_services import register_core_services
+from orb.bootstrap.domain_services import register_domain_services
+from orb.bootstrap.infrastructure_services import register_infrastructure_services
+from orb.bootstrap.monitoring_services import register_monitoring_services
+from orb.bootstrap.provider_services import register_provider_services
+from orb.bootstrap.server_services import register_server_services
+from orb.bootstrap.storage_services import register_storage_services
 
 
 def register_all_services(container: "DIContainer") -> "DIContainer":
@@ -119,7 +119,7 @@ def _register_services_lazy(container: "DIContainer") -> "DIContainer":
     container.register_singleton(ConfigurationManager, lambda c: ConfigurationManager())
 
     # 2. Register port adapters (now ConfigurationManager is available)
-    from orb.infrastructure.di.port_registrations import register_port_adapters
+    from orb.bootstrap.port_registrations import register_port_adapters
 
     register_port_adapters(container)
 
@@ -133,7 +133,7 @@ def _register_services_lazy(container: "DIContainer") -> "DIContainer":
     register_storage_services(container)
 
     # 6. Register registry services
-    from orb.infrastructure.di.registry_services import register_registry_services
+    from orb.bootstrap.registry_services import register_registry_services
 
     register_registry_services(container)
 
@@ -144,7 +144,7 @@ def _register_services_lazy(container: "DIContainer") -> "DIContainer":
     register_infrastructure_services(container)
 
     # 9b. Register orchestrators
-    from orb.infrastructure.di.orchestrator_registry import register_orchestrators
+    from orb.bootstrap.orchestrator_registry import register_orchestrators
 
     register_orchestrators(container)
 
@@ -176,7 +176,7 @@ def _register_services_eager(container: "DIContainer") -> "DIContainer":
     register_all_storage_types()
     register_all_provider_types()
 
-    from orb.infrastructure.di.port_registrations import register_port_adapters
+    from orb.bootstrap.port_registrations import register_port_adapters
 
     register_port_adapters(container)
     register_core_services(container)
@@ -184,7 +184,7 @@ def _register_services_eager(container: "DIContainer") -> "DIContainer":
     setup_cqrs_infrastructure(container)
     register_provider_services(container)
     register_infrastructure_services(container)
-    from orb.infrastructure.di.orchestrator_registry import register_orchestrators
+    from orb.bootstrap.orchestrator_registry import register_orchestrators
 
     register_orchestrators(container)
     register_monitoring_services(container)

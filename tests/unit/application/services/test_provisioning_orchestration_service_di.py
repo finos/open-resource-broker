@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-import orb.infrastructure.di.infrastructure_services as _infra_svc_mod
+import orb.bootstrap.infrastructure_services as _infra_svc_mod
 from orb.application.services.provisioning_orchestration_service import (
     ProvisioningOrchestrationService,
 )

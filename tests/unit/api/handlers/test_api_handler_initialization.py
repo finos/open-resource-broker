@@ -80,8 +80,8 @@ class TestAPIHandlerRegistration:
         """register_server_services calls _register_orchestrators when server is enabled."""
         from unittest.mock import patch
 
+        from orb.bootstrap.server_services import register_server_services
         from orb.config.schemas.server_schema import ServerConfig
-        from orb.infrastructure.di.server_services import register_server_services
 
         container = MagicMock()
         config_manager = MagicMock()
@@ -91,10 +91,8 @@ class TestAPIHandlerRegistration:
         container.get.return_value = config_manager
 
         with (
-            patch(
-                "orb.infrastructure.di.server_services._register_fastapi_services"
-            ) as mock_fastapi,
-            patch("orb.infrastructure.di.server_services._register_orchestrators") as mock_orch,
+            patch("orb.bootstrap.server_services._register_fastapi_services") as mock_fastapi,
+            patch("orb.bootstrap.server_services._register_orchestrators") as mock_orch,
         ):
             register_server_services(container)
             mock_fastapi.assert_called_once_with(container, server_config)
@@ -104,8 +102,8 @@ class TestAPIHandlerRegistration:
         """register_server_services skips registration when server is disabled."""
         from unittest.mock import patch
 
+        from orb.bootstrap.server_services import register_server_services
         from orb.config.schemas.server_schema import ServerConfig
-        from orb.infrastructure.di.server_services import register_server_services
 
         container = MagicMock()
         config_manager = MagicMock()
@@ -114,6 +112,6 @@ class TestAPIHandlerRegistration:
         config_manager.get_typed.return_value = server_config
         container.get.return_value = config_manager
 
-        with patch("orb.infrastructure.di.server_services._register_orchestrators") as mock_orch:
+        with patch("orb.bootstrap.server_services._register_orchestrators") as mock_orch:
             register_server_services(container)
             mock_orch.assert_not_called()

@@ -6,10 +6,10 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from orb.bootstrap.monitoring_services import register_monitoring_services
 from orb.domain.base.ports.health_check_port import HealthCheckPort
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.infrastructure.di.container import DIContainer
-from orb.infrastructure.di.monitoring_services import register_monitoring_services
 from orb.monitoring.health import HealthCheck
 
 
@@ -26,7 +26,7 @@ def container() -> Generator[DIContainer, None, None]:
     with (
         patch.object(Path, "mkdir"),
         patch(
-            "orb.infrastructure.di.monitoring_services.get_health_location",
+            "orb.bootstrap.monitoring_services.get_health_location",
             return_value=Path("/tmp/orb-health-test"),
         ),
     ):
@@ -40,7 +40,7 @@ def test_register_monitoring_services_registers_health_check_port(container: DIC
     with (
         patch.object(Path, "mkdir"),
         patch(
-            "orb.infrastructure.di.monitoring_services.get_health_location",
+            "orb.bootstrap.monitoring_services.get_health_location",
             return_value=Path("/tmp/orb-health-test"),
         ),
     ):
@@ -55,7 +55,7 @@ def test_register_monitoring_services_concrete_alias_is_same_instance(
     with (
         patch.object(Path, "mkdir"),
         patch(
-            "orb.infrastructure.di.monitoring_services.get_health_location",
+            "orb.bootstrap.monitoring_services.get_health_location",
             return_value=Path("/tmp/orb-health-test"),
         ),
     ):

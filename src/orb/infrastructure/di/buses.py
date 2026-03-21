@@ -119,7 +119,7 @@ class QueryBus(QueryBusPort):
     def _trigger_lazy_cqrs_setup(self) -> None:
         """Trigger lazy CQRS infrastructure setup."""
         try:
-            from orb.infrastructure.di.services import setup_cqrs_infrastructure
+            from orb.bootstrap.services import setup_cqrs_infrastructure
 
             self.logger.info("Triggering lazy CQRS infrastructure setup")
             setup_cqrs_infrastructure(self.container)
@@ -201,7 +201,7 @@ class CommandBus(CommandBusPort):
     def _trigger_lazy_cqrs_setup(self) -> None:
         """Trigger lazy CQRS infrastructure setup."""
         try:
-            from orb.infrastructure.di.services import setup_cqrs_infrastructure
+            from orb.bootstrap.services import setup_cqrs_infrastructure
 
             self.logger.info("Triggering lazy CQRS infrastructure setup")
             setup_cqrs_infrastructure(self.container)

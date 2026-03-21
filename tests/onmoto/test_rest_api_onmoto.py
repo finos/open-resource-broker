@@ -42,9 +42,9 @@ def fastapi_app(orb_config_dir, moto_aws):
     Injects moto-backed AWS factory so all boto3 calls are intercepted by moto.
     """
     from orb.api.server import create_fastapi_app
+    from orb.bootstrap.server_services import _register_orchestrators
     from orb.config.schemas.server_schema import ServerConfig
     from orb.infrastructure.di.container import get_container
-    from orb.infrastructure.di.server_services import _register_orchestrators
 
     # Bootstrap DI (reads ORB_CONFIG_DIR from env, set by orb_config_dir fixture)
     container = get_container()

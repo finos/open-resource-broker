@@ -132,7 +132,7 @@ class TestLazyLoadingPerformance:
 
     def test_component_registration_performance(self):
         """Test component registration performance."""
-        from orb.infrastructure.di.services import register_all_services
+        from orb.bootstrap.services import register_all_services
 
         container = get_container()
 
@@ -172,8 +172,8 @@ class TestLazyLoadingPerformance:
 
     def test_storage_registration_performance(self):
         """Test storage registration performance."""
+        from orb.bootstrap.storage_services import register_storage_services
         from orb.infrastructure.di.container import get_container
-        from orb.infrastructure.di.storage_services import register_storage_services
 
         container = get_container()
         start_time = time.time()
