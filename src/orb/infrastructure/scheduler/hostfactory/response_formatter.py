@@ -263,6 +263,7 @@ class HostFactoryResponseFormatter:
                 "launchtime": launchtime,
                 "message": message,
                 "cloudHostId": machine.get("cloud_host_id") or None,
+                "requestId": machine.get("request_id"),
                 "returnRequestId": machine.get("return_request_id"),
             }
 

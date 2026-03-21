@@ -37,6 +37,7 @@ class RequestDTOFactory:
                 cloud_host_id=machine.provider_data.get("cloud_host_id")
                 or str(machine.machine_id.value),
                 request_id=machine.request_id,
+                return_request_id=machine.return_request_id,
             )
             for machine in machines
         ]

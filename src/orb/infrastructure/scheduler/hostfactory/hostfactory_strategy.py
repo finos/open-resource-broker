@@ -837,6 +837,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
                 "message": message,
                 # Per IBM HF spec, cloudHostId must always be present, defaulting to null
                 "cloudHostId": machine.get("cloud_host_id") or None,
+                "requestId": machine.get("request_id"),
                 "returnRequestId": machine.get("return_request_id"),
             }
 
