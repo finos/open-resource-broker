@@ -106,10 +106,16 @@ class AWSProviderStrategy(ProviderStrategy):
 
     @classmethod
     def get_defaults_config(cls) -> dict:
-        from importlib.resources import files
         import json
+        from importlib.resources import files
+
         from orb.providers.aws.configuration.config import AWSProviderConfig
-        text = files("orb.providers.aws.config").joinpath("aws_defaults.json").read_text(encoding="utf-8")
+
+        text = (
+            files("orb.providers.aws.config")
+            .joinpath("aws_defaults.json")
+            .read_text(encoding="utf-8")
+        )
         raw = json.loads(text)
         provider_config = raw["provider"]["providers"][0]["config"]
         AWSProviderConfig(**provider_config)  # raises ValidationError if invalid

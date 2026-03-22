@@ -87,6 +87,11 @@ class ConfigurationLoader:
         # Start with default configuration (lowest precedence)
         config = cls._load_default_config()
 
+        # Merge strategy-contributed defaults (after base defaults, before user config)
+        strategy_defaults = cls._load_strategy_defaults(config_manager)
+        if strategy_defaults:
+            cls._merge_config(config, strategy_defaults)
+
         # Load main config.json with correct precedence (scheduler config dir first,
         # then config/)
         main_config = cls._load_config_file(
@@ -136,11 +141,6 @@ class ConfigurationLoader:
                 stacklevel=2,
             )
 
-        # Merge strategy-contributed defaults (after file config, before env overrides)
-        strategy_defaults = cls._load_strategy_defaults(config_manager)
-        if strategy_defaults:
-            cls._merge_config(config, strategy_defaults)
-
         # Override with environment variables (highest precedence)
         cls._load_from_env(config, config_manager)
 
@@ -156,6 +156,7 @@ class ConfigurationLoader:
         merged: dict[str, Any] = {}
         try:
             from orb.providers.registry import get_provider_registry
+
             registry = get_provider_registry()
             registry.ensure_provider_type_registered("aws")
             cls._merge_config(merged, registry.collect_defaults())
@@ -163,6 +164,7 @@ class ConfigurationLoader:
             get_config_logger().warning("Failed to load provider defaults: %s", e)
         try:
             from orb.infrastructure.scheduler.registry import get_scheduler_registry
+
             cls._merge_config(merged, get_scheduler_registry().collect_defaults())
         except Exception as e:
             get_config_logger().warning("Failed to load scheduler defaults: %s", e)
