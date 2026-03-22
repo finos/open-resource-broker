@@ -120,7 +120,7 @@ jobs:
     needs: [config, publish]
 
     permissions:
-      contents: read
+      contents: write
       actions: write
       security-events: write
 
@@ -147,9 +147,10 @@ jobs:
           python-sbom-spdx.json
         retention-days: 180
 
-    - name: Upload SBOM to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v4
+    - name: Upload SBOM to GitHub dependency graph
+      uses: advanced-security/spdx-dependency-submission-action@v0.1.1
       if: always()
       with:
-        sarif_file: python-sbom-cyclonedx.json
+        filePath: "."
+        filePattern: "python-sbom-spdx.json"
       continue-on-error: true

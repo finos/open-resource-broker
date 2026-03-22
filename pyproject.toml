@@ -522,7 +522,7 @@ output_format = "md"
 minor_tags = ["feat"]
 patch_tags = ["fix", "perf"]
 major_tags = ["release"]
-default_bump_level = 0
+default_bump_level = 2
 
 [tool.semantic_release.remote]
 name = "origin"
