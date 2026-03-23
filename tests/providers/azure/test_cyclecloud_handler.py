@@ -51,6 +51,7 @@ def _make_handler():
 
 def _make_request(count=2, resource_ids=None, metadata=None):
     req = MagicMock()
+    req.request_id = "req-12345678-1234-1234-1234-123456789012"
     req.requested_count = count
     req.resource_ids = resource_ids or []
     req.metadata = metadata or {}
@@ -196,12 +197,14 @@ class TestCycleCloudHandlerAcquire:
         result = handler.acquire_hosts(request, template)
 
         assert result["success"] is True
-        assert result["resource_ids"] == ["my-cluster"]
+        assert result["resource_ids"] == ["req-12345678-1234-1234-1234-123456789012"]
         assert result["instances"] == []
         assert result["provider_data"]["cluster_name"] == "my-cluster"
         assert result["provider_data"]["operation_id"] == "op-123"
         assert result["provider_data"]["operation_location"] == "https://cc.example.com/operations/op-123"
         assert result["provider_data"]["added_count"] == 2
+        request_json = mock_session.request.call_args_list[1].kwargs["json"]
+        assert request_json["requestId"] == "req-12345678-1234-1234-1234-123456789012"
 
     @patch("providers.azure.infrastructure.handlers.cyclecloud_handler.requests.Session")
     def test_acquire_hosts_placeholder_nodes(self, mock_session_cls):
@@ -336,7 +339,7 @@ class TestCycleCloudHandlerStatus:
         mock_session.request.return_value = nodes_resp
 
         request = _make_request(
-            resource_ids=["my-cluster"],
+            resource_ids=["req-12345678-1234-1234-1234-123456789012"],
             metadata={
                 "cluster_name": "my-cluster",
                 "node_array": "execute",
@@ -355,15 +358,15 @@ class TestCycleCloudHandlerStatus:
         assert results[1]["status"] == "pending"
 
     @patch("providers.azure.infrastructure.handlers.cyclecloud_handler.requests.Session")
-    def test_check_hosts_status_prefers_operation_location(self, mock_session_cls):
+    def test_check_hosts_status_uses_request_id_filter(self, mock_session_cls):
         handler = _make_handler()
 
         mock_session = MagicMock()
         mock_session_cls.return_value = mock_session
 
-        operation_resp = MagicMock()
-        operation_resp.content = b'{"nodes": [{"Name": "node-1", "NodeId": "id-1", "NodeArray": "execute", "State": "Ready"}]}'
-        operation_resp.json.return_value = {
+        nodes_resp = MagicMock()
+        nodes_resp.content = b'{"nodes": [{"Name": "node-1", "NodeId": "id-1", "NodeArray": "execute", "State": "Ready"}]}'
+        nodes_resp.json.return_value = {
             "nodes": [
                 {
                     "Name": "node-1",
@@ -373,11 +376,11 @@ class TestCycleCloudHandlerStatus:
                 }
             ]
         }
-        operation_resp.raise_for_status = MagicMock()
-        mock_session.request.return_value = operation_resp
+        nodes_resp.raise_for_status = MagicMock()
+        mock_session.request.return_value = nodes_resp
 
         request = _make_request(
-            resource_ids=["my-cluster"],
+            resource_ids=["req-12345678-1234-1234-1234-123456789012"],
             metadata={
                 "cluster_name": "my-cluster",
                 "node_array": "execute",
@@ -395,7 +398,8 @@ class TestCycleCloudHandlerStatus:
         assert results[0]["instance_id"] == "node-1"
         mock_session.request.assert_called_once_with(
             "GET",
-            "https://cc.example.com/operations/op-123",
+            "https://cc.example.com/clusters/my-cluster/nodes",
+            params={"request_id": "req-12345678-1234-1234-1234-123456789012"},
             timeout=30,
         )
 
@@ -407,11 +411,22 @@ class TestCycleCloudHandlerStatus:
     def test_check_hosts_status_no_cc_url(self):
         handler = _make_handler()
         request = _make_request(
-            resource_ids=["my-cluster"],
+            resource_ids=["req-12345678-1234-1234-1234-123456789012"],
             metadata={"cluster_name": "my-cluster"},
         )
         with pytest.raises(CycleCloudConnectionError, match="cyclecloud_url is required"):
             handler.check_hosts_status(request)
+
+    def test_check_hosts_status_requires_cyclecloud_request_identity(self):
+        handler = _make_handler()
+        request = _make_request(
+            resource_ids=[],
+            metadata={
+                "cluster_name": "my-cluster",
+                "cyclecloud_url": "https://cc.example.com",
+            },
+        )
+        assert handler.check_hosts_status(request) == []
 
     @patch("providers.azure.infrastructure.handlers.cyclecloud_handler.requests.Session")
     def test_check_hosts_status_request_failure_raises(self, mock_session_cls):
@@ -422,7 +437,7 @@ class TestCycleCloudHandlerStatus:
         mock_session.request.side_effect = requests.exceptions.ConnectionError("boom")
 
         request = _make_request(
-            resource_ids=["my-cluster"],
+            resource_ids=["req-12345678-1234-1234-1234-123456789012"],
             metadata={
                 "cluster_name": "my-cluster",
                 "cyclecloud_url": "https://cc.example.com",
@@ -451,7 +466,7 @@ class TestCycleCloudHandlerStatus:
         mock_session.request.return_value = nodes_resp
 
         request = _make_request(
-            resource_ids=["my-cluster"],
+            resource_ids=["req-12345678-1234-1234-1234-123456789012"],
             metadata={
                 "cluster_name": "my-cluster",
                 "node_array": "execute",
@@ -488,7 +503,7 @@ class TestCycleCloudHandlerStatus:
         mock_session.request.return_value = nodes_resp
 
         request = _make_request(
-            resource_ids=["my-cluster"],
+            resource_ids=["req-12345678-1234-1234-1234-123456789012"],
             metadata={
                 "cluster_name": "my-cluster",
                 "node_array": "execute",

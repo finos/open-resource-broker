@@ -564,7 +564,9 @@ class CycleCloudHandler(AzureHandler):
         if not template.vm_sizes:
             definition["machineType"] = vm_size
 
+        cyclecloud_request_id = str(request.request_id)
         node_params: dict[str, Any] = {
+            "requestId": cyclecloud_request_id,
             "sets": [
                 {
                     "count": count,
@@ -633,9 +635,8 @@ class CycleCloudHandler(AzureHandler):
             added_count,
         )
 
-        # resource_ids: use cluster_name as the primary resource identifier.
-        # Individual node identities are discovered later via status queries.
-        resource_ids = [cluster_name]
+        # Persist the request-scoped CycleCloud identity durably.
+        resource_ids = [cyclecloud_request_id]
 
         return {
             "success": True,
@@ -666,9 +667,8 @@ class CycleCloudHandler(AzureHandler):
     def check_hosts_status(self, request: Request) -> list[dict[str, Any]]:
         """Check status of nodes in a CycleCloud cluster.
 
-        Uses CycleCloud REST API ``GET /clusters/{cluster}/nodes`` to
-        retrieve the current state of all nodes, then filters to those
-        belonging to the request's resource IDs.
+        Uses CycleCloud REST API ``GET /clusters/{cluster}/nodes`` with the
+        durable request-scoped ``request_id`` filter.
         """
         resource_ids: list[str] = getattr(request, "resource_ids", []) or []
         if not resource_ids:
@@ -679,15 +679,17 @@ class CycleCloudHandler(AzureHandler):
         cluster_name = metadata.get("cluster_name")
         node_array = metadata.get("node_array")
         node_ids = metadata.get("node_ids", [])
-        operation_id = metadata.get("operation_id")
-        operation_location = metadata.get("operation_location")
-
-        if not cluster_name:
-            # resource_ids[0] is the cluster name for CycleCloud
-            cluster_name = resource_ids[0] if resource_ids else None
+        cyclecloud_request_id = resource_ids[0]
 
         if not cluster_name:
             self._logger.error("Cannot determine cluster_name for status check")
+            return []
+
+        if not cyclecloud_request_id:
+            self._logger.error(
+                "Cannot determine CycleCloud request identity for status check in cluster '%s'",
+                cluster_name,
+            )
             return []
 
         # Build a minimal template to get CycleCloud connection info
@@ -710,45 +712,23 @@ class CycleCloudHandler(AzureHandler):
             )
             raise
 
-        all_nodes: list[dict[str, Any]] = []
+        try:
+            nodes_response = self._cc_request(
+                session,
+                "GET",
+                f"{base_url}/clusters/{cluster_name}/nodes",
+                params={"request_id": cyclecloud_request_id},
+            )
+        except CycleCloudConnectionError as exc:
+            self._logger.error(
+                "Failed to get node status for cluster '%s' and request_id '%s': %s",
+                cluster_name,
+                cyclecloud_request_id,
+                exc,
+            )
+            raise
 
-        if operation_location:
-            try:
-                operation_response = self._cc_request(
-                    session,
-                    "GET",
-                    str(operation_location),
-                )
-                if isinstance(operation_response, dict):
-                    all_nodes = operation_response.get("nodes", []) or []
-            except CycleCloudConnectionError as exc:
-                self._logger.debug(
-                    "Failed to query CycleCloud operation URL '%s': %s",
-                    operation_location,
-                    exc,
-                )
-
-        if not all_nodes:
-            try:
-                nodes_url = f"{base_url}/clusters/{cluster_name}/nodes"
-                request_kwargs: dict[str, Any] = {}
-                if operation_id:
-                    request_kwargs["params"] = {"operation": operation_id}
-                nodes_response = self._cc_request(
-                    session,
-                    "GET",
-                    nodes_url,
-                    **request_kwargs,
-                )
-            except CycleCloudConnectionError as exc:
-                self._logger.error(
-                    "Failed to get node status for cluster '%s': %s",
-                    cluster_name,
-                    exc,
-                )
-                raise
-
-            all_nodes = nodes_response.get("nodes", [])
+        all_nodes = nodes_response.get("nodes", [])
         results: list[dict[str, Any]] = []
 
         for node in all_nodes:

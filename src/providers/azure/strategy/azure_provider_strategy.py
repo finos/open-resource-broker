@@ -1106,7 +1106,6 @@ class AzureProviderStrategy(ProviderStrategy):
 
                 extra_metadata: dict[str, Any] = {}
                 if group_provider_api == AzureProviderApi.CYCLECLOUD.value:
-                    extra_metadata["cluster_name"] = resource_id
                     extra_metadata["node_ids"] = mapped_ids
                 request = make_request([resource_id], build_metadata(extra_metadata))
                 for machine in self._filter_status_results(group_handler.check_hosts_status(request), mapped_ids):
@@ -1125,7 +1124,6 @@ class AzureProviderStrategy(ProviderStrategy):
         extra_metadata = {}
         if provider_api_value == AzureProviderApi.CYCLECLOUD.value:
             extra_metadata = {
-                "cluster_name": resource_id,
                 "node_ids": instance_ids,
             }
         request = make_request(
@@ -1447,8 +1445,6 @@ class AzureProviderStrategy(ProviderStrategy):
                 metadata=request_metadata,
             )
             request.resource_ids = resource_ids
-            if provider_api_value == AzureProviderApi.CYCLECLOUD.value and resource_ids:
-                request.metadata.setdefault("cluster_name", resource_ids[0])
 
             instance_details = handler.check_hosts_status(request)
             self._maybe_reconcile_pending_vmss_termination(

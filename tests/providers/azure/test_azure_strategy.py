@@ -1252,11 +1252,12 @@ class TestDescribeResourceInstances:
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
             parameters={
-                "resource_ids": ["my-cluster"],
+                "resource_ids": ["req-12345678-1234-1234-1234-123456789012"],
                 "provider_api": "CycleCloud",
                 "template_id": "tmpl-1",
                 "request_metadata": {
                     "resource_group": "test-rg",
+                    "cluster_name": "my-cluster",
                     "node_array": "execute",
                     "node_ids": ["node-1"],
                     "operation_id": "op-123",
@@ -1273,7 +1274,7 @@ class TestDescribeResourceInstances:
 
         assert result.success
         forwarded_request = handler.check_hosts_status.call_args.args[0]
-        assert forwarded_request.resource_ids == ["my-cluster"]
+        assert forwarded_request.resource_ids == ["req-12345678-1234-1234-1234-123456789012"]
         assert forwarded_request.metadata["cluster_name"] == "my-cluster"
         assert forwarded_request.metadata["node_array"] == "execute"
         assert forwarded_request.metadata["node_ids"] == ["node-1"]
