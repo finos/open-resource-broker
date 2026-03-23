@@ -602,6 +602,15 @@ class TestTerminateInstances:
         assert not result.success
         assert result.error_code == "MISSING_INSTANCE_IDS"
 
+    def test_missing_provider_api_returns_error(self, strategy):
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={"instance_ids": ["orb-1"]},
+        )
+        result = _run(strategy.execute_operation(op))
+        assert not result.success
+        assert result.error_code == "MISSING_PROVIDER_API"
+
     def test_fallback_handler_uses_grouped_resource_ids(self, azure_config, logger):
         strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
         strategy.initialize()
@@ -966,7 +975,7 @@ class TestGetInstanceStatus:
         handler.check_hosts_status.assert_called_once()
         assert [m["instance_id"] for m in result.data["machines"]] == ["3"]
 
-    def test_vmss_resource_mapping_routes_status_via_handler_without_provider_api(self, azure_config, logger):
+    def test_vmss_resource_mapping_routes_status_via_handler_with_provider_api(self, azure_config, logger):
         strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
         strategy.initialize()
 
@@ -994,6 +1003,7 @@ class TestGetInstanceStatus:
             operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
             parameters={
                 "instance_ids": ["3"],
+                "provider_api": "VMSS",
                 "request_metadata": {"resource_group": "test-rg"},
                 "resource_mapping": {"3": ("vmss-demo", 2)},
             },
@@ -1101,6 +1111,15 @@ class TestDescribeResourceInstances:
         result = _run(strategy.execute_operation(op))
         assert not result.success
         assert result.error_code == "MISSING_RESOURCE_IDS"
+
+    def test_missing_provider_api_returns_error(self, strategy):
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
+            parameters={"resource_ids": ["vmss-demo"]},
+        )
+        result = _run(strategy.execute_operation(op))
+        assert not result.success
+        assert result.error_code == "MISSING_PROVIDER_API"
 
     def test_describe_resource_instances_reconciles_pending_flexible_vmss_scale_down(self, strategy):
         handler = MagicMock()

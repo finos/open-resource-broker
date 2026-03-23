@@ -197,10 +197,17 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
         # Prefer resource-level discovery so we don't miss new instances
         if request.resource_ids:
+            provider_api = request.provider_api
+            # Temporary AWS compatibility bypass: some deployed AWS request records still rely on
+            # metadata["provider_api"] being present. Azure now routes from the canonical
+            # request.provider_api field; remove this AWS fallback once its persisted request
+            # state is cleaned up to use the same single-source contract.
+            if not provider_api and request.provider_type == "aws":
+                provider_api = (request.metadata or {}).get("provider_api")
             operation_type = ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES
             parameters = {
                 "resource_ids": request.resource_ids,
-                "provider_api": request.metadata.get("provider_api"),
+                "provider_api": provider_api,
                 "template_id": request.template_id,
                 "request_metadata": request.metadata or {},
             }
@@ -484,7 +491,10 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     updated_machines.append(m)
 
             # Update ASG metadata if this is an ASG request
-            if request.metadata.get("provider_api") == "ASG":
+            provider_api = request.provider_api
+            if not provider_api and request.provider_type == "aws":
+                provider_api = (request.metadata or {}).get("provider_api")
+            if provider_api == "ASG":
                 await self._update_asg_metadata_if_needed(request, updated_machines)
 
             provider_errors = provider_metadata.get("fleet_errors") if isinstance(provider_metadata, dict) else None

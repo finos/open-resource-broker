@@ -880,13 +880,19 @@ class AzureProviderStrategy(ProviderStrategy):
             )
             release_context["resource_id"] = default_resource_id or "unknown"
 
-            provider_api = operation.parameters.get(
-                "provider_api", AzureProviderApi.VMSS.value
-            )
+            provider_api = operation.parameters.get("provider_api")
+            if provider_api in (None, ""):
+                return ProviderResult.error_result(
+                    "provider_api is required for Azure termination",
+                    "MISSING_PROVIDER_API",
+                )
             provider_api_value = provider_api.value if hasattr(provider_api, "value") else provider_api
             handler = self.handlers.get(provider_api_value)
             if not handler:
-                handler = self.handlers.get(AzureProviderApi.VMSS.value)
+                return ProviderResult.error_result(
+                    f"No handler available for provider_api: {provider_api_value}",
+                    "HANDLER_NOT_FOUND",
+                )
 
             if handler:
                 context = dict(release_context)
@@ -1047,10 +1053,7 @@ class AzureProviderStrategy(ProviderStrategy):
         raw_resource_mapping = operation.parameters.get("resource_mapping", {}) or {}
         grouped_resource_mapping = self._group_instance_ids_by_resource(instance_ids, raw_resource_mapping)
 
-        if not provider_api_value and grouped_resource_mapping:
-            provider_api_value = self._infer_grouped_status_provider_api(operation)
-
-        if not provider_api_value and not grouped_resource_mapping:
+        if not provider_api_value:
             return None
 
         handler = self.handlers.get(provider_api_value) if provider_api_value else None
@@ -1140,39 +1143,10 @@ class AzureProviderStrategy(ProviderStrategy):
 
     @staticmethod
     def _resolve_status_provider_api(operation: ProviderOperation) -> Optional[Any]:
-        request_metadata = AzureProviderStrategy._request_metadata(operation)
-        for source in (
-            operation.parameters,
-            request_metadata,
-        ):
-            provider_api = source.get("provider_api")
-            if provider_api not in (None, ""):
-                return provider_api
+        provider_api = operation.parameters.get("provider_api")
+        if provider_api not in (None, ""):
+            return provider_api
         return None
-
-    @staticmethod
-    def _infer_grouped_status_provider_api(operation: ProviderOperation) -> str:
-        """Infer a grouped-resource status handler when provider_api was not persisted."""
-        request_metadata = AzureProviderStrategy._request_metadata(operation)
-        if any(
-            request_metadata.get(key) not in (None, "")
-            for key in (
-                "cluster_name",
-                "node_array",
-                "node_ids",
-                "operation_id",
-                "operation_location",
-                "cyclecloud_url",
-                "cyclecloud_credential_path",
-                "cyclecloud_verify_ssl",
-                "cyclecloud_auth_mode",
-                "cyclecloud_aad_scope",
-            )
-        ):
-            return AzureProviderApi.CYCLECLOUD.value
-
-        # Grouped resource mappings in Azure are most commonly VMSS-backed.
-        return AzureProviderApi.VMSS.value
 
     @staticmethod
     def _filter_status_results(
@@ -1382,9 +1356,7 @@ class AzureProviderStrategy(ProviderStrategy):
     ) -> ProviderResult:
         try:
             resource_ids = operation.parameters.get("resource_ids", [])
-            provider_api = operation.parameters.get(
-                "provider_api", AzureProviderApi.VMSS.value
-            )
+            provider_api = operation.parameters.get("provider_api")
             provider_api_value = (
                 provider_api.value if hasattr(provider_api, "value") else provider_api
             )
@@ -1393,6 +1365,12 @@ class AzureProviderStrategy(ProviderStrategy):
                 return ProviderResult.error_result(
                     "Resource IDs are required for instance discovery",
                     "MISSING_RESOURCE_IDS",
+                )
+
+            if provider_api_value in (None, ""):
+                return ProviderResult.error_result(
+                    "provider_api is required for Azure resource discovery",
+                    "MISSING_PROVIDER_API",
                 )
 
             if bool(operation.context and operation.context.get("dry_run", False)):
@@ -1409,12 +1387,10 @@ class AzureProviderStrategy(ProviderStrategy):
 
             handler = self.handlers.get(provider_api_value)
             if not handler:
-                handler = self.handlers.get(AzureProviderApi.VMSS.value)
-                if not handler:
-                    return ProviderResult.error_result(
-                        f"No handler available for provider_api: {provider_api}",
-                        "HANDLER_NOT_FOUND",
-                    )
+                return ProviderResult.error_result(
+                    f"No handler available for provider_api: {provider_api}",
+                    "HANDLER_NOT_FOUND",
+                )
 
             from domain.request.aggregate import Request
             from domain.request.value_objects import RequestType

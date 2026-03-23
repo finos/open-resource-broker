@@ -318,7 +318,7 @@ class TestCreateMachineRequestHandlerPartial:
         saved_request = mock_uow.requests.save.call_args[0][0]
         assert saved_request.status == RequestStatus.IN_PROGRESS
         assert saved_request.status_message == "Resources created, instances pending"
-        assert saved_request.metadata["provider_api"] == "CycleCloud"
+        assert saved_request.provider_api == "CycleCloud"
         assert saved_request.metadata["cluster_name"] == "my-cluster"
         assert saved_request.metadata["node_array"] == "execute"
         assert saved_request.metadata["operation_id"] == "op-123"
@@ -417,7 +417,7 @@ class TestCreateMachineRequestHandlerPartial:
 
         assert isinstance(result, str)
         saved_request = mock_uow.requests.save.call_args[0][0]
-        assert saved_request.metadata["provider_api"] == "VMSS"
+        assert saved_request.provider_api == "VMSS"
         assert saved_request.metadata["resource_group"] == "custom-rg"
         assert saved_request.status == RequestStatus.IN_PROGRESS
 

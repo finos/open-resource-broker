@@ -181,15 +181,29 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                             type(resource_ids),
                         )
 
-                        # Store provider API information for handler selection
+                        # Persist the selected provider API on the request itself.
+                        selected_provider_api = (
+                            provisioning_result.get("provider_api")
+                            or template.provider_api
+                            or "RunInstances"
+                        )
+                        request.provider_api = selected_provider_api
+
+                        # Keep non-canonical handler details in metadata only.
                         if not hasattr(request, "metadata"):
                             request.metadata = {}
-                        request.metadata["provider_api"] = template.provider_api or "RunInstances"
+                        # Temporary AWS compatibility bypass: deployed AWS request/status flows
+                        # still read provider_api from request.metadata in some paths. Azure has
+                        # been moved to the canonical request.provider_api field, and this AWS
+                        # metadata mirror should be removed once the AWS path is brought into
+                        # alignment with the same single-source design.
+                        if selection_result.provider_type == "aws":
+                            request.metadata["provider_api"] = request.provider_api
                         request.metadata["handler_used"] = provisioning_result.get(
                             "provider_data", {}
                         ).get("handler_used", "RunInstancesHandler")
                         self.logger.info(
-                            "Stored provider API: %s", request.metadata["provider_api"]
+                            "Stored provider API: %s", request.provider_api
                         )
 
                         # Add resource IDs to request
@@ -230,10 +244,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                             ):
                                 request.metadata["resource_group"] = provider_data["resource_group"]
 
-                        if (
-                            request.metadata.get("provider_api") == "CycleCloud"
-                            and isinstance(provider_data, dict)
-                        ):
+                        if request.provider_api == "CycleCloud" and isinstance(provider_data, dict):
                             for key in (
                                 "cluster_name",
                                 "node_array",
@@ -869,7 +880,17 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             # Get scheduler for template formatting
             scheduler = self._container.get(SchedulerPort)
             template_config = scheduler.format_template_for_provider(template)
-            provider_api = template.provider_api
+            provider_api = request.provider_api
+            # Temporary AWS compatibility bypass: older deployed AWS requests may not have
+            # request.provider_api populated durably yet, so fall back to the template while
+            # AWS follow-up flows are migrated to the canonical request field. Remove this once
+            # the AWS request lifecycle is updated to match Azure.
+            if not provider_api and request.provider_type == "aws":
+                provider_api = template.provider_api
+            if not provider_api:
+                raise ValueError(
+                    f"Request {request.request_id} is missing provider_api for termination"
+                )
             self.logger.info("Using %s handler for template %s", provider_api, template_id)
 
             # CycleCloud termination needs connection/auth details in context.
