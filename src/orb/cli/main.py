@@ -14,6 +14,7 @@ import sys
 
 # Re-export for backward compatibility
 from orb.cli.args import parse_args
+from orb.cli.console import print_error, print_info, print_success, print_warning
 from orb.cli.router import execute_command
 from orb.infrastructure.logging.logger import get_logger
 
@@ -69,7 +70,7 @@ async def main() -> None:
                     sys.argv = original_argv
 
             if error_output.strip():
-                print(error_output.strip(), file=sys.stderr)
+                print_error(error_output.strip())
             raise
 
         # Setup environment after arg parse — skip for init (it calls get_config_location() directly)
@@ -183,7 +184,7 @@ async def main() -> None:
                 if result.get("status") == "success":
                     sys.exit(0)
                 else:
-                    print(f"Error: {result.get('message')}", file=sys.stderr)
+                    print_error(f"Error: {result.get('message')}")
                     sys.exit(1)
             except Exception:
                 import traceback
@@ -227,9 +228,9 @@ async def main() -> None:
                 with open(args.output, "w") as f:
                     f.write(formatted_output)
                 if not args.quiet:
-                    print(f"Output written to {args.output}")
+                    print_success(f"Output written to {args.output}")
             else:
-                print(formatted_output)
+                print_info(formatted_output)
 
             if exit_code != 0:
                 sys.exit(exit_code)
@@ -252,7 +253,7 @@ async def main() -> None:
             error_output, exit_code = formatter.format_error(e, output_format)
 
             if not args.quiet:
-                print(error_output)
+                print_error(error_output)
             sys.exit(exit_code)
         finally:
             if scheduler_override_active:
@@ -267,10 +268,10 @@ async def main() -> None:
                     logger.warning("Failed to restore scheduler strategy: %s", e, exc_info=True)
 
     except KeyboardInterrupt:
-        print("\nOperation cancelled by user.")
+        print_warning("\nOperation cancelled by user.")
         sys.exit(130)
     except Exception as e:
-        print(f"Fatal error: {e}")
+        print_error(f"Fatal error: {e}")
         sys.exit(1)
 
 
