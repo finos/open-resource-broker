@@ -18,9 +18,9 @@ class SDKMiddleware(ABC):
     Example:
         class LoggingMiddleware(SDKMiddleware):
             async def process(self, method_name, args, kwargs, next_handler):
-                print(f"Calling {method_name}")
+                logger.debug("Calling %s", method_name)
                 result = await next_handler(args, kwargs)
-                print(f"{method_name} returned: {result}")
+                logger.debug("%s returned: %s", method_name, result)
                 return result
     """
 

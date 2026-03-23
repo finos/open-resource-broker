@@ -109,6 +109,12 @@ def print_newline():
     _console.print()
 
 
+@_console_output
+def print_console(message: str):
+    """Print plain text message with no colour formatting."""
+    _console.print(message)
+
+
 def print_json(data: dict):
     """Print JSON data (always outputs, ignores LOG_CONSOLE_ENABLED)."""
     import json
