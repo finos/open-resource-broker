@@ -39,8 +39,9 @@ def register_provider_services(container: DIContainer) -> None:
     container.register_singleton(
         ProviderCapabilityService,
         lambda c: ProviderCapabilityService(
-            logger=c.get(LoggingPort), provider_registry=None
-        ),  # Optional for now
+            logger=c.get(LoggingPort),
+            provider_registry=None
+        ), # _get_provider_registry() is right but breaks aws, see if this is still the case post merge
     )
 
     # Register provider-specific services conditionally
@@ -49,6 +50,13 @@ def register_provider_services(container: DIContainer) -> None:
 
 # Global flag to prevent duplicate provider registration
 _providers_registered = False
+
+
+def _get_provider_registry():
+    """Get the shared provider registry singleton."""
+    from infrastructure.registry.provider_registry import get_provider_registry
+
+    return get_provider_registry()
 
 
 def _register_providers() -> None:
