@@ -17,6 +17,16 @@ on:
         description: 'Version (for historical releases)'
         required: false
         type: string
+      force_level:
+        description: 'Force a specific bump level (leave empty for auto)'
+        required: false
+        type: choice
+        options:
+          - ''
+          - major
+          - minor
+          - patch
+          - prerelease
 
 permissions:
   contents: write
@@ -54,7 +64,8 @@ jobs:
       - name: Compute next version (dry run)
         id: next_version
         run: |
-          NEXT=$(uv run semantic-release version --print 2>/dev/null || echo "no-release")
+          FORCE_FLAG=${{ inputs.force_level && format('--{0}', inputs.force_level) || '' }}
+          NEXT=$(uv run semantic-release version --print $FORCE_FLAG 2>/dev/null || echo "no-release")
           echo "next_version=$NEXT" >> "$GITHUB_OUTPUT"
           {
             echo "## Semantic Release Preview"
@@ -93,6 +104,7 @@ jobs:
           github_token: ${{ steps.app-token.outputs.token }}
           git_committer_name: "github-actions[bot]"
           git_committer_email: "github-actions[bot]@users.noreply.github.com"
+          force: ${{ inputs.force_level }}
           
       - name: Publish to GitHub Release Assets
         uses: python-semantic-release/publish-action@v10.5.3
