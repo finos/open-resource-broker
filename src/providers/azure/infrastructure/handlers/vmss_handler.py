@@ -76,11 +76,9 @@ def _resolve_power_state(statuses: list[Any]) -> str:
 
 
 def _status_attr(status: Any, attr: str, default: Any = None) -> Any:
-    """Read Azure status attributes from SDK objects or dict-like test doubles."""
+    """Read Azure status attributes from SDK objects or attribute-based test doubles."""
     if hasattr(status, attr):
         return getattr(status, attr)
-    if isinstance(status, dict):
-        return status.get(attr, default)
     return default
 
 

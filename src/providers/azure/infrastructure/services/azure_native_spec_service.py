@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from pydantic import BaseModel, ConfigDict, Field
+
 from application.services.native_spec_service import NativeSpecService
 from domain.base.dependency_injection import injectable
 from domain.base.ports.configuration_port import ConfigurationPort
@@ -11,6 +13,20 @@ from domain.request.aggregate import Request
 from infrastructure.utilities.common.deep_merge import deep_merge
 from infrastructure.utilities.file.json_utils import read_json_file
 from providers.azure.domain.template.azure_template_aggregate import AzureTemplate
+
+
+class _AzureNativeSpecConfig(BaseModel):
+    """Azure native spec extension config owned by the Azure native spec subsystem."""
+
+    spec_file_base_path: str = Field("specs/azure")
+
+
+class _AzureProviderExtensionsConfig(BaseModel):
+    """Azure provider extensions consumed by the Azure native spec subsystem."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    native_spec: _AzureNativeSpecConfig = Field(default_factory=_AzureNativeSpecConfig)
 
 
 @injectable
@@ -61,13 +77,18 @@ class AzureNativeSpecService:
 
     def _load_spec_file(self, file_path: str) -> dict[str, Any]:
         """Load Azure native spec file."""
-        provider_config = self.config_port.get_provider_config() or {}
-        provider_defaults = provider_config.get("provider_defaults", {}).get("azure", {})
-        base_path = (
-            provider_defaults.get("extensions", {})
-            .get("native_spec", {})
-            .get("spec_file_base_path", "specs/azure")
-        )
+        provider_config = self.config_port.get_provider_config()
+        azure_defaults = None
+        if provider_config:
+            azure_defaults = provider_config.provider_defaults.get("azure")
+
+        base_path = _AzureNativeSpecConfig.model_fields["spec_file_base_path"].default
+        if azure_defaults and azure_defaults.extensions:
+            azure_extensions = _AzureProviderExtensionsConfig.model_validate(
+                azure_defaults.extensions
+            )
+            base_path = azure_extensions.native_spec.spec_file_base_path
+
         return read_json_file(f"{base_path}/{file_path}")
 
     def _build_azure_context(self, template: AzureTemplate, request: Request) -> dict[str, Any]:

@@ -623,13 +623,11 @@ class AzureClient:
 
     @staticmethod
     def _sdk_attr(value: Any, attr: str, default: Any = None) -> Any:
-        """Read an SDK-style attribute from an object or dict."""
+        """Read an SDK-style attribute from an Azure SDK model or test double."""
         if value is None:
             return default
         if hasattr(value, attr):
             return getattr(value, attr)
-        if isinstance(value, dict):
-            return value.get(attr, default)
         return default
 
     @classmethod
