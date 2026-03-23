@@ -71,11 +71,7 @@ jobs:
       contents: write
       packages: write
       id-token: write
-    if: |
-      (github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, 'release:')) ||
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && contains(github.event.workflow_run.head_commit.message, 'release:'))
-    
+
     steps:
       - name: Generate GitHub App Token
         id: app-token
