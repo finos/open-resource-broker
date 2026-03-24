@@ -53,6 +53,8 @@ class AzureTemplate(Template):
     Extends the provider-agnostic ``Template`` with every configuration
     knob exposed by the Azure VMSS (Flexible orchestration) API so that
     callers can declaratively describe the desired VM fleet.
+
+    Note that defaults set to None will typically use the provider default in Config.py
     """
 
     model_config = ConfigDict(
@@ -373,8 +375,8 @@ class AzureTemplate(Template):
         description="Path to a JSON file containing CycleCloud credentials and optional auth overrides.",
         validation_alias=AliasChoices("cyclecloud_credential_path", "cyclecloudCredentialPath"),
     )
-    cyclecloud_verify_ssl: bool = Field(
-        default=True,
+    cyclecloud_verify_ssl: Optional[bool] = Field(
+        default=None,
         description="Whether to verify SSL certificates for CycleCloud API calls.",
         validation_alias=AliasChoices("cyclecloud_verify_ssl", "cyclecloudVerifySsl"),
     )

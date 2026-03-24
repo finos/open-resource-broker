@@ -16,6 +16,18 @@ class CycleCloudConfig(BaseModel):
         None,
         description="Path to a JSON file containing CycleCloud credentials and optional auth overrides",
     )
+    verify_ssl: Optional[bool] = Field(
+        None,
+        description="Whether to verify TLS certificates for CycleCloud API calls.",
+    )
+    auth_mode: Optional[str] = Field(
+        None,
+        description="CycleCloud auth mode override, e.g. 'basic' or 'bearer'.",
+    )
+    aad_scope: Optional[str] = Field(
+        None,
+        description="AAD scope used to resolve a bearer token for CycleCloud.",
+    )
 
     @model_validator(mode="before")
     @classmethod

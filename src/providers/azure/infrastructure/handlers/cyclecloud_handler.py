@@ -221,13 +221,25 @@ class CycleCloudHandler(AzureHandler):
         )
         cc_url = cc_url or self._credential_file_value(credential_file_data, "cyclecloud_url", "url")
 
-        if verify_ssl is None:
-            verify_resolved = None
-            if request_state and request_state.get("cyclecloud_verify_ssl") not in (None, ""):
-                verify_resolved = request_state.get("cyclecloud_verify_ssl")
-            if verify_resolved in (None, ""):
-                verify_resolved = True
-            verify_ssl = _coerce_bool(verify_resolved)
+        verify_resolved: Any = verify_ssl
+        if verify_resolved is None:
+            verify_resolved = self._resolve_cc_config_value(
+                template=template,
+                request_state=request_state,
+                provider_cfg=provider_cfg,
+                template_attr="cyclecloud_verify_ssl",
+                request_state_key="cyclecloud_verify_ssl",
+                provider_path=("cyclecloud", "verify_ssl"),
+            )
+        if verify_resolved in (None, ""):
+            verify_resolved = self._credential_file_value(
+                credential_file_data,
+                "cyclecloud_verify_ssl",
+                "verify_ssl",
+            )
+        if verify_resolved in (None, ""):
+            verify_resolved = True
+        verify_ssl = _coerce_bool(verify_resolved)
 
         if not cc_url:
             raise CycleCloudConnectionError(

@@ -78,6 +78,23 @@ class TestAzureProviderConfig:
         assert config.cyclecloud is not None
         assert config.cyclecloud.credential_path == "config/cyclecloud-credentials.json"
 
+    def test_cyclecloud_config_accepts_typed_tls_and_auth_fields(self):
+        config = AzureProviderConfig(
+            subscription_id="12345678-1234-1234-1234-123456789012",
+            cyclecloud={
+                "url": "https://cc.example.com",
+                "credential_path": "config/cyclecloud-credentials.json",
+                "verify_ssl": False,
+                "auth_mode": "bearer",
+                "aad_scope": "https://cc.example.com/.default",
+            },
+        )
+
+        assert config.cyclecloud is not None
+        assert config.cyclecloud.verify_ssl is False
+        assert config.cyclecloud.auth_mode == "bearer"
+        assert config.cyclecloud.aad_scope == "https://cc.example.com/.default"
+
 
 # ---------------------------------------------------------------------------
 # Template validation
