@@ -249,7 +249,15 @@ class AWSTemplate(Template):
 
     @model_validator(mode="after")
     def validate_aws_template(self) -> "AWSTemplate":
-        """AWS-specific template validation."""
+        """AWS-specific template validation.
+
+        NOTE: This validator currently mutates fields via object.__setattr__
+        (fleet_type defaulting, metadata promotion). These are defaulting
+        decisions, not domain invariants, and should be moved to the strategy's
+        template config builder (the AWS equivalent of Azure's
+        _build_azure_template_config) so this validator is purely rejecting.
+        See the Azure provider for the corrected pattern.
+        """
         # AWS-specific required fields — only enforced when values are present
         # (generic/example templates may have empty subnet_ids/image_id, filled at runtime
         # from provider.template_defaults via _coalesce_merge)

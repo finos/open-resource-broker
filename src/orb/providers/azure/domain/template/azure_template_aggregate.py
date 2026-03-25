@@ -442,18 +442,20 @@ class AzureTemplate(Template):
                 raise ValueError(
                     "spot_percentage is not compatible with Low priority VMs; use Spot"
                 )
-            if self.priority == AzurePriority.REGULAR:
-                object.__setattr__(self, "priority", AzurePriority.SPOT)
+            if self.priority != AzurePriority.SPOT:
+                raise ValueError(
+                    "spot_percentage requires Spot priority"
+                )
 
-        # Spot VMs require an eviction policy
+        # Spot VMs require an eviction policy and allocation strategy.
         if self.priority == AzurePriority.SPOT:
             if self.eviction_policy is None:
-                object.__setattr__(self, "eviction_policy", AzureEvictionPolicy.DEALLOCATE)
+                raise ValueError(
+                    "eviction_policy is required for Spot priority VMs"
+                )
             if self.spot_allocation_strategy is None:
-                object.__setattr__(
-                    self,
-                    "spot_allocation_strategy",
-                    AzureAllocationStrategy.CAPACITY_OPTIMIZED,
+                raise ValueError(
+                    "spot_allocation_strategy is required for Spot priority VMs"
                 )
 
         # Non-spot VMs should not have spot-specific settings
@@ -481,9 +483,13 @@ class AzureTemplate(Template):
         # Trusted Launch validation
         if self.security_type == AzureSecurityType.TRUSTED_LAUNCH:
             if self.secure_boot_enabled is None:
-                object.__setattr__(self, "secure_boot_enabled", True)
+                raise ValueError(
+                    "secure_boot_enabled is required when security_type is TrustedLaunch"
+                )
             if self.vtpm_enabled is None:
-                object.__setattr__(self, "vtpm_enabled", True)
+                raise ValueError(
+                    "vtpm_enabled is required when security_type is TrustedLaunch"
+                )
 
         # Upgrade policy must be one of the known values
         valid_upgrade_policies = {"Manual", "Rolling", "Automatic"}
