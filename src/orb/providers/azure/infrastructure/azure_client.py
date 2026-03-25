@@ -564,7 +564,7 @@ class AzureClient:
             Performance configuration dictionary with sensible defaults.
         """
         try:
-            from config import PerformanceConfig
+            from orb.config import PerformanceConfig
 
             perf_config = self._config_manager.get_typed(PerformanceConfig)
             if perf_config:
@@ -592,7 +592,7 @@ class AzureClient:
         except Exception as e:
             self._logger.debug(
                 "Could not load performance config from ConfigurationManager: %s",
-                str(e),
+                e,
             )
 
         # Sensible defaults
