@@ -530,16 +530,21 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         )
         return None
 
-    @staticmethod
-    def _is_machine_already_terminating(machine: Any) -> bool:
+    def _is_machine_already_terminating(self, machine: Any) -> bool:
         """Treat termination-in-flight or terminated machines as unavailable for return."""
         is_terminated = getattr(machine, "is_terminated", None)
         if callable(is_terminated):
             try:
                 if bool(is_terminated()):
                     return True
-            except Exception:
-                pass
+            except Exception as exc:
+                # Machine aggregate may not support is_terminated for all
+                # provider types; treat lookup failures as "not terminated".
+                self.logger.debug(
+                    "is_terminated check failed for machine %s: %s",
+                    getattr(machine, "machine_id", "?"),
+                    exc,
+                )
 
         status = getattr(machine, "status", None)
         status_value = getattr(status, "value", status)

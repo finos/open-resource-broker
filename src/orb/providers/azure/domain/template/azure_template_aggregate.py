@@ -609,6 +609,14 @@ class AzureTemplate(Template):
             )
 
         try:
+            from azure.core.exceptions import HttpResponseError, ResourceNotFoundError
+        except ImportError:
+            # Provide narrow stand-ins so the handler works in test
+            # environments that don't install the full Azure SDK.
+            ResourceNotFoundError = type("ResourceNotFoundError", (Exception,), {})  # type: ignore[misc,assignment]
+            HttpResponseError = type("HttpResponseError", (Exception,), {})  # type: ignore[misc,assignment]
+
+        try:
             ssh_resource = compute_client.ssh_public_keys.get(
                 resource_group_name=self.resource_group,
                 ssh_public_key_name=self.ssh_key_name,
@@ -620,13 +628,18 @@ class AzureTemplate(Template):
                     f"in resource group '{self.resource_group}' exists but "
                     f"contains no public key data."
                 )
-        except AttributeError:
+        except ResourceNotFoundError:
             raise ValueError(
                 f"Azure SSH Public Key resource '{self.ssh_key_name}' "
-                f"in resource group '{self.resource_group}' could not be "
-                f"resolved. Ensure the resource exists and the caller has "
+                f"in resource group '{self.resource_group}' was not found. "
+                f"Ensure the resource exists and the caller has "
                 f"'Microsoft.Compute/sshPublicKeys/read' permission."
             )
+        except HttpResponseError as exc:
+            raise ValueError(
+                f"Failed to resolve Azure SSH Public Key '{self.ssh_key_name}' "
+                f"in resource group '{self.resource_group}': {exc}"
+            ) from exc
 
         # Cache resolved key so downstream serialisation can use it.
         resolved = [key_data]

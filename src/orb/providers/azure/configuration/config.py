@@ -1,5 +1,6 @@
 """Azure configuration provider - single source of truth."""
 
+import re
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -118,7 +119,6 @@ class AzureProviderConfig(BaseProviderConfig):
             return v
         if not (1 <= len(v) <= 90):
             raise ValueError("resource_group must be 1-90 characters")
-        import re
         if not re.match(r"^[a-zA-Z0-9_\-.()\[\]]+$", v):
             raise ValueError(
                 "resource_group contains invalid characters "
@@ -132,7 +132,6 @@ class AzureProviderConfig(BaseProviderConfig):
         """Validate UUID-like subscription ID format."""
         if v is None:
             return v
-        import re
         if not re.match(
             r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
             v,
