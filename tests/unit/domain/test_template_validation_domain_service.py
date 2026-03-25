@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from orb.providers.base.strategy.provider_strategy import ProviderCapabilities, ProviderOperationType
 from orb.domain.base.results import ValidationLevel, ValidationResult
 from orb.domain.services.template_validation_domain_service import (
     TemplateValidationDomainService,
@@ -113,13 +114,13 @@ class TestTemplateValidationDomainService:
         assert len(result.errors) > 0
 
     def test_no_config_fails(self):
-        # Service with no config injected - _initialized attr missing causes AttributeError
-        # before the try/except, so the service raises rather than returning a result.
+        # Service with no config injected should fail validation cleanly.
         svc = TemplateValidationDomainService()
         template = _make_template()
-        with pytest.raises(AttributeError):
-            with patch(PATCH_TARGET, side_effect=_patched_validation_result):
-                svc.validate_template_requirements(template, "aws-prod")
+        with patch(PATCH_TARGET, side_effect=_patched_validation_result):
+            result = svc.validate_template_requirements(template, "aws-prod")
+        assert result.is_valid is False
+        assert any("Validation error" in e for e in result.errors)
 
     def test_instance_limit_exceeded_fails(self):
         caps = _ProviderCapabilities(
@@ -144,3 +145,74 @@ class TestTemplateValidationDomainService:
         result = self._run(template)
         assert result.is_valid is False
         assert any("Validation error" in e for e in result.errors)
+
+    def test_falls_back_to_strategy_capabilities_when_handler_defaults_are_unwired(self):
+        provider_instance_config = MagicMock()
+        provider_instance_config.name = "azure-default"
+        provider_instance_config.type = "azure"
+        provider_instance_config.handlers = None
+        provider_instance_config.handler_overrides = None
+        provider_instance_config.capabilities = None
+        provider_instance_config.get_effective_handlers = MagicMock(return_value={})
+
+        provider_config_root = MagicMock()
+        provider_config_root.provider_defaults = {}
+
+        config = MagicMock()
+        config.get_provider_instance_config.return_value = provider_instance_config
+        config.get_provider_config.return_value = provider_config_root
+
+        strategy = MagicMock()
+        strategy.get_capabilities.return_value = ProviderCapabilities(
+            provider_type="azure",
+            supported_operations=[ProviderOperationType.CREATE_INSTANCES],
+            supported_apis=["VMSS", "SingleVM"],
+            features={
+                "api_capabilities": {
+                    "VMSS": {"supports_spot": True, "supports_on_demand": True},
+                    "SingleVM": {"supports_spot": True, "supports_on_demand": True},
+                }
+            },
+        )
+        provider_registry = MagicMock()
+        provider_registry.is_provider_instance_registered.return_value = False
+        provider_registry.ensure_provider_instance_registered_from_config.return_value = True
+        provider_registry.get_or_create_strategy.return_value = strategy
+
+        self.svc.inject_dependencies(config, self.logger, provider_registry)
+
+        template = _make_template(provider_api="VMSS")
+        result = self._run(template, provider_instance="azure-default")
+
+        assert result.is_valid is True
+        assert result.errors == []
+        provider_registry.ensure_provider_instance_registered_from_config.assert_called_once_with(
+            provider_instance_config
+        )
+
+    def test_explicit_empty_handler_override_does_not_fall_back_to_strategy_capabilities(self):
+        provider_instance_config = MagicMock()
+        provider_instance_config.name = "azure-default"
+        provider_instance_config.type = "azure"
+        provider_instance_config.handlers = None
+        provider_instance_config.handler_overrides = {"VMSS": None}
+        provider_instance_config.capabilities = None
+        provider_instance_config.get_effective_handlers = MagicMock(return_value={})
+
+        provider_config_root = MagicMock()
+        provider_config_root.provider_defaults = {}
+
+        config = MagicMock()
+        config.get_provider_instance_config.return_value = provider_instance_config
+        config.get_provider_config.return_value = provider_config_root
+
+        provider_registry = MagicMock()
+
+        self.svc.inject_dependencies(config, self.logger, provider_registry)
+
+        template = _make_template(provider_api="VMSS")
+        result = self._run(template, provider_instance="azure-default")
+
+        assert result.is_valid is False
+        assert any("Provider does not support API 'VMSS'" in e for e in result.errors)
+        provider_registry.ensure_provider_instance_registered_from_config.assert_not_called()

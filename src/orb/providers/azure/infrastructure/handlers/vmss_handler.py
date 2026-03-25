@@ -229,6 +229,10 @@ class VMSSHandler(AzureHandler):
                     "location": location,
                     "provisioning_state": "creating",
                     "operation_status": "submitted",
+                    # Azure async create returns resource tracking first and instances later.
+                    # Mark the submit attempt as final so generic top-up retry logic does not
+                    # reissue the same create request and duplicate resources.
+                    "fulfillment_final": True,
                 },
             }
 
@@ -367,6 +371,36 @@ class VMSSHandler(AzureHandler):
         elif machine_ids:
             current_capacity = self._get_vmss_capacity(resource_group, vmss_name)
             new_capacity = max(0, current_capacity - len(machine_ids))
+
+            # Native-first cleanup for Flexible VMSS: if this return removes the last
+            # member, delete the scale set
+            if (
+                orchestration_mode == AzureVMSSOrchestrationMode.FLEXIBLE
+                and new_capacity == 0
+            ):
+                self._logger.info(
+                    "Deleting flexible VMSS '%s' directly because return would leave it empty",
+                    vmss_name,
+                )
+                try:
+                    compute.virtual_machine_scale_sets.begin_delete(
+                        resource_group_name=resource_group,
+                        vm_scale_set_name=vmss_name,
+                    )
+                    self._logger.info("Submitted delete for VMSS '%s'", vmss_name)
+                    return {
+                        "provider_data": {
+                            "resource_group": resource_group,
+                            "vmss_name": vmss_name,
+                            "operation_status": "submitted",
+                            "delete_vmss": True,
+                        }
+                    }
+                except Exception as exc:
+                    raise TerminationError(
+                        f"Failed to delete VMSS '{vmss_name}': {exc}",
+                        resource_ids=[vmss_name],
+                    ) from exc
 
             if (
                 orchestration_mode != AzureVMSSOrchestrationMode.FLEXIBLE
@@ -666,12 +700,9 @@ class VMSSHandler(AzureHandler):
             ) from exc
 
         instances: list[dict[str, Any]] = []
-        vmss_arm_suffix = f"/virtualMachineScaleSets/{vmss_name}"
 
         for vm in vms:
-            vmss_ref = getattr(vm, "virtual_machine_scale_set", None)
-            vmss_ref_id = getattr(vmss_ref, "id", None) if vmss_ref else None
-            if not vmss_ref_id or not str(vmss_ref_id).endswith(vmss_arm_suffix):
+            if not self._is_flexible_vmss_member(vm, vmss_name):
                 continue
 
             if include_instance_view:
@@ -691,6 +722,29 @@ class VMSSHandler(AzureHandler):
             instances.append(self._normalise_vm(vm, vmss_name, resource_group))
 
         return instances
+
+    @staticmethod
+    def _is_flexible_vmss_member(vm: Any, vmss_name: str) -> bool:
+        """Best-effort membership check for Flexible VMSS VMs."""
+        vmss_ref = getattr(vm, "virtual_machine_scale_set", None)
+        vmss_ref_id = getattr(vmss_ref, "id", None) if vmss_ref else None
+        vmss_arm_suffix = f"/virtualMachineScaleSets/{vmss_name}"
+        if vmss_ref_id and str(vmss_ref_id).endswith(vmss_arm_suffix):
+            return True
+
+        # Some Azure list responses do not populate virtual_machine_scale_set.
+        # Fall back to the VM naming pattern used for Flexible VMSS members.
+        candidate_ids = (
+            str(getattr(vm, "name", "") or ""),
+            str(getattr(vm, "instance_id", "") or ""),
+        )
+        prefixes = (f"{vmss_name}_", f"{vmss_name}-")
+        return any(
+            candidate.startswith(prefix)
+            for candidate in candidate_ids
+            for prefix in prefixes
+            if candidate
+        )
 
     def _normalise_vm(
         self, vm: Any, vmss_name: str, resource_group: str

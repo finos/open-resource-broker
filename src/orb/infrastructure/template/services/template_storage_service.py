@@ -70,7 +70,7 @@ class TemplateStorageService:
             existing_templates = await self._load_templates_from_file(target_file)
 
             # Convert to scheduler-native format before writing
-            template_dict = template.model_dump(exclude_none=True)
+            template_dict = template.to_template_config()
             template_dict = self.scheduler_strategy.serialize_template_for_storage(template_dict)
 
             # Update or add the template (on-disk entries may use native camelCase keys)

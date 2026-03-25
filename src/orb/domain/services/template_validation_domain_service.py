@@ -1,12 +1,15 @@
 """Template validation domain service."""
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from orb.domain.base.exceptions import ConfigurationError, EntityNotFoundError
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.results import ValidationLevel, ValidationResult
+
+if TYPE_CHECKING:
+    from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 
 
 @dataclass
@@ -30,6 +33,8 @@ class TemplateValidationDomainService:
     def __init__(self):
         self._config = None
         self._logger = None
+        self._provider_registry = None
+        self._initialized = False
 
     @property
     def config(self):
@@ -41,10 +46,16 @@ class TemplateValidationDomainService:
         # Return None if not available - service should handle gracefully
         return self._logger
 
-    def inject_dependencies(self, config: ConfigurationPort, logger: LoggingPort):
+    def inject_dependencies(
+        self,
+        config: ConfigurationPort,
+        logger: LoggingPort,
+        provider_registry: "ProviderRegistryPort | None" = None,
+    ):
         """Inject dependencies after container is ready."""
         self._config = config
         self._logger = logger
+        self._provider_registry = provider_registry
         self._initialized = False
 
     def _ensure_initialized(self):
@@ -126,6 +137,28 @@ class TemplateValidationDomainService:
         effective_handlers = provider_config.get_effective_handlers(provider_defaults)
         supported_apis = list(effective_handlers.keys())
 
+        if not supported_apis:
+            configured_capabilities = list(getattr(provider_config, "capabilities", None) or [])
+            if configured_capabilities:
+                return _ProviderCapabilities(
+                    provider_type=provider_config.type,
+                    supported_apis=configured_capabilities,
+                    features={"api_capabilities": {}},
+                )
+
+            # If this provider instance explicitly overrides handlers, respect the
+            # empty result as a real config choice rather than falling back to
+            # provider-type defaults from the strategy implementation.
+            if getattr(provider_config, "handlers", None) is None and getattr(
+                provider_config, "handler_overrides", None
+            ) is None:
+                fallback_capabilities = self._get_strategy_based_capabilities(
+                    provider_instance,
+                    provider_config,
+                )
+                if fallback_capabilities is not None:
+                    return fallback_capabilities
+
         api_capabilities: dict[str, Any] = {}
         for api_name, handler_cfg in effective_handlers.items():
             extra = getattr(handler_cfg, "model_extra", None) or {}
@@ -142,6 +175,50 @@ class TemplateValidationDomainService:
             supported_apis=supported_apis,
             features={"api_capabilities": api_capabilities},
         )
+
+    def _get_strategy_based_capabilities(
+        self,
+        provider_instance: str,
+        provider_config: Any,
+    ) -> _ProviderCapabilities | None:
+        """Fallback to strategy-reported capabilities when config defaults are absent."""
+        if self._provider_registry is None:
+            return None
+
+        try:
+            if not self._provider_registry.is_provider_instance_registered(provider_instance):
+                registered = self._provider_registry.ensure_provider_instance_registered_from_config(
+                    provider_config
+                )
+                if not registered:
+                    return None
+
+            strategy = self._provider_registry.get_or_create_strategy(provider_instance, provider_config)
+            if strategy is None:
+                return None
+
+            capabilities = strategy.get_capabilities()
+            supported_apis = list(
+                getattr(capabilities, "supported_apis", None)
+                or (getattr(capabilities, "features", {}) or {}).get("supported_apis", [])
+            )
+            features = dict(getattr(capabilities, "features", {}) or {})
+            if supported_apis and "supported_apis" not in features:
+                features["supported_apis"] = supported_apis
+
+            return _ProviderCapabilities(
+                provider_type=provider_config.type,
+                supported_apis=supported_apis,
+                features=features,
+            )
+        except Exception as exc:
+            if self.logger:
+                self.logger.debug(
+                    "Could not resolve strategy capabilities for %s: %s",
+                    provider_instance,
+                    exc,
+                )
+            return None
 
     def _validate_api_support(self, template: Any, capabilities: Any, result: Any) -> None:
         """Validate that provider supports the required API."""

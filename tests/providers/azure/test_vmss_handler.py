@@ -53,6 +53,7 @@ def test_acquire_hosts_submits_native_vmss_create_and_returns_submitted_status()
     assert result["instances"] == []
     assert result["provider_data"]["provisioning_state"] == "creating"
     assert result["provider_data"]["operation_status"] == "submitted"
+    assert result["provider_data"]["fulfillment_final"] is True
     create_call = azure_client.compute_client.virtual_machine_scale_sets.begin_create_or_update.call_args.kwargs
     assert create_call["resource_group_name"] == "test-rg"
     assert create_call["vm_scale_set_name"] == result["provider_data"]["vmss_name"]
@@ -75,6 +76,49 @@ def test_flexible_vmss_status_returns_only_member_vms():
         "/subscriptions/sub/resourceGroups/test-rg/providers/"
         "Microsoft.Compute/virtualMachineScaleSets/vmss-azure-test"
     )
+    member_vm.instance_view.statuses = []
+    member_vm.hardware_profile.vm_size = "Standard_D4s_v5"
+    member_vm.location = "eastus2"
+    member_vm.zones = ["1"]
+
+    member_vm_with_view = MagicMock()
+    member_vm_with_view.name = "vmss-azure-test_abcd1234"
+    member_vm_with_view.instance_id = "vmss-azure-test_abcd1234"
+    member_vm_with_view.vm_id = "vm-guid-1"
+    member_vm_with_view.instance_view.statuses = []
+    member_vm_with_view.hardware_profile.vm_size = "Standard_D4s_v5"
+    member_vm_with_view.location = "eastus2"
+    member_vm_with_view.zones = ["1"]
+
+    other_vm = MagicMock()
+    other_vm.name = "other-vm"
+    other_vm.virtual_machine_scale_set = None
+
+    azure_client.compute_client.virtual_machines.list.return_value = [member_vm, other_vm]
+    azure_client.compute_client.virtual_machines.get.return_value = member_vm_with_view
+
+    request = MagicMock()
+    request.resource_ids = ["vmss-azure-test"]
+    request.metadata = {"resource_group": "test-rg"}
+
+    result = handler.check_hosts_status(request)
+
+    assert len(result) == 1
+    assert result[0]["instance_id"] == "vmss-azure-test_abcd1234"
+
+
+def test_flexible_vmss_status_uses_name_prefix_when_vmss_reference_is_missing():
+    azure_client = MagicMock()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+
+    vmss = MagicMock()
+    vmss.orchestration_mode = AzureVMSSOrchestrationMode.FLEXIBLE.value
+    azure_client.compute_client.virtual_machine_scale_sets.get.return_value = vmss
+
+    member_vm = MagicMock()
+    member_vm.name = "vmss-azure-test_abcd1234"
+    member_vm.virtual_machine_scale_set = None
     member_vm.instance_view.statuses = []
     member_vm.hardware_profile.vm_size = "Standard_D4s_v5"
     member_vm.location = "eastus2"
@@ -140,6 +184,7 @@ def test_single_vm_acquire_hosts_submits_one_batched_deployment_and_returns_subm
     assert len(result["resource_ids"]) == 2
     assert result["instances"] == []
     assert result["provider_data"]["operation_status"] == "submitted"
+    assert result["provider_data"]["fulfillment_final"] is True
     deployment_call = azure_client.resource_client.resources.begin_create_or_update.call_args.kwargs
     deployment_template = deployment_call[
         "parameters"
@@ -491,6 +536,34 @@ def test_vmss_release_returns_reconciliation_metadata_for_flexible_deletes():
     assert result["provider_data"]["pending_reconciliation"]["target_capacity"] == 3
     assert handler.azure_resource_manager.scale_vmss.call_count == 0
     assert azure_client.compute_client.virtual_machines.begin_delete.call_count == 2
+
+
+def test_vmss_release_deletes_flexible_scale_set_directly_when_last_instance_is_returned():
+    azure_client = MagicMock()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+    handler.azure_resource_manager = MagicMock()
+    handler.azure_resource_manager.get_vmss_capacity.return_value = {"capacity": 1}
+
+    vmss = MagicMock()
+    vmss.orchestration_mode = AzureVMSSOrchestrationMode.FLEXIBLE.value
+    azure_client.compute_client.virtual_machine_scale_sets.get.return_value = vmss
+    azure_client.compute_client.virtual_machine_scale_sets.begin_delete.return_value = MagicMock()
+
+    result = handler.release_hosts(
+        machine_ids=["vm-a"],
+        resource_id="vmss-azure-test",
+        context={"resource_group": "test-rg"},
+    )
+
+    assert result["provider_data"]["operation_status"] == "submitted"
+    assert result["provider_data"]["delete_vmss"] is True
+    assert "pending_reconciliation" not in result["provider_data"]
+    azure_client.compute_client.virtual_machine_scale_sets.begin_delete.assert_called_once_with(
+        resource_group_name="test-rg",
+        vm_scale_set_name="vmss-azure-test",
+    )
+    assert azure_client.compute_client.virtual_machines.begin_delete.call_count == 0
 
 
 def test_vmss_release_marks_scale_set_delete_when_capacity_reaches_zero():

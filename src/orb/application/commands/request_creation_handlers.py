@@ -14,6 +14,7 @@ from orb.application.ports.query_bus_port import QueryBusPort
 from orb.application.services.provisioning_orchestration_service import (
     ProvisioningOrchestrationService,
 )
+from orb.application.services.request_follow_up_context import with_request_follow_up_context
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.configuration_service import DomainConfigurationService
 from orb.domain.base.exceptions import ApplicationError, EntityNotFoundError
@@ -26,6 +27,8 @@ from orb.domain.base.ports import (
 )
 from orb.domain.request.request_identifiers import RequestId
 from orb.domain.request.value_objects import RequestType
+from orb.domain.template.factory import TemplateFactoryPort
+from orb.infrastructure.template.dtos import TemplateDTO
 
 
 @command_handler(CreateRequestCommand)  # type: ignore[arg-type]
@@ -131,6 +134,10 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
         if not template:
             raise EntityNotFoundError("Template", template_id)
 
+        if isinstance(template, TemplateDTO):
+            template_factory = self._container.get(TemplateFactoryPort)
+            template = template_factory.create_template(template.to_template_config())
+
         self.logger.debug("Template found: %s (id=%s)", type(template), template.template_id)
         return template
 
@@ -205,12 +212,20 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                 if not machine:
                     raise EntityNotFoundError("Machine", machine_id)
 
-                if machine.return_request_id:
+                if self._is_machine_already_terminating(machine):
+                    from orb.domain.request.exceptions import RequestValidationError
+
+                    raise RequestValidationError(
+                        f"Machine {machine_id} is already terminating or terminated"
+                    )
+
+                active_return_request_id = self._get_active_return_request_id(uow, machine)
+                if active_return_request_id:
                     if not command.force_return:
                         from orb.domain.request.exceptions import RequestValidationError
 
                         raise RequestValidationError(
-                            f"Machine {machine_id} already has pending return request: {machine.return_request_id}"
+                            f"Machine {machine_id} already has pending return request: {active_return_request_id}"
                         )
                     # force_return=True — fall through, cancel handled in execute_command
         # For multiple machines, we'll do filtering in execute_command
@@ -324,12 +339,25 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                     )
                     continue
 
-                if machine.return_request_id:
+                if self._is_machine_already_terminating(machine):
+                    skipped_machines.append(
+                        {
+                            "machine_id": machine_id,
+                            "reason": "Machine is already terminating or terminated",
+                        }
+                    )
+                    continue
+
+                active_return_request_id = self._get_active_return_request_id(uow, machine)
+                if active_return_request_id:
                     if not force_return:
                         skipped_machines.append(
                             {
                                 "machine_id": machine_id,
-                                "reason": f"Machine already has pending return request: {machine.return_request_id}",
+                                "reason": (
+                                    "Machine already has pending return request: "
+                                    f"{active_return_request_id}"
+                                ),
                             }
                         )
                         continue
@@ -429,8 +457,12 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
 
             # Update request status based on result
             if provisioning_result.get("success", False):
+                self._persist_return_follow_up_context(request, provisioning_result)
                 self._update_machines_to_pending(machine_ids)
-                await self._update_request_to_completed(request)
+                await self._update_request_to_in_progress_with_message(
+                    request,
+                    "Termination initiated, waiting for provider confirmation",
+                )
                 self.logger.info("Termination initiated for request %s", request.request_id)
             else:
                 await self._update_request_to_failed(request, provisioning_result.get("errors", []))
@@ -456,7 +488,62 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                     updated_machine = machine.update_status(
                         MachineStatus.SHUTTING_DOWN, "Termination in progress"
                     )
+                    updated_machine = updated_machine.model_copy(update={"return_request_id": None})
                     uow.machines.save(updated_machine)
+
+    def _persist_return_follow_up_context(self, request: Any, provisioning_result: dict[str, Any]) -> None:
+        """Persist durable provider follow-up metadata needed after this process exits."""
+        provider_data = provisioning_result.get("provider_data")
+        if not isinstance(provider_data, dict) or not provider_data:
+            return
+
+        updated_request = with_request_follow_up_context(request, provider_data)
+
+        with self.uow_factory.create_unit_of_work() as uow:
+            events = uow.requests.save(updated_request)
+            for event in events or []:
+                self.event_publisher.publish(event)  # type: ignore[union-attr]
+
+    def _get_active_return_request_id(self, uow: Any, machine: Any) -> str | None:
+        """Return an active return request ID, clearing stale terminal links on the way."""
+        return_request_id = getattr(machine, "return_request_id", None)
+        if not return_request_id:
+            return None
+
+        from orb.domain.request.value_objects import RequestId
+
+        try:
+            request_id = RequestId(value=str(return_request_id))
+        except Exception:
+            linked_request = None
+        else:
+            linked_request = uow.requests.get_by_id(request_id)
+        if linked_request and getattr(linked_request.status, "is_active", lambda: False)():
+            return str(return_request_id)
+
+        cleared_machine = machine.model_copy(update={"return_request_id": None})
+        uow.machines.save(cleared_machine)
+        self.logger.info(
+            "Cleared stale return_request_id %s for machine %s",
+            return_request_id,
+            getattr(getattr(machine, "machine_id", None), "value", getattr(machine, "machine_id", "")),
+        )
+        return None
+
+    @staticmethod
+    def _is_machine_already_terminating(machine: Any) -> bool:
+        """Treat termination-in-flight or terminated machines as unavailable for return."""
+        is_terminated = getattr(machine, "is_terminated", None)
+        if callable(is_terminated):
+            try:
+                if bool(is_terminated()):
+                    return True
+            except Exception:
+                pass
+
+        status = getattr(machine, "status", None)
+        status_value = getattr(status, "value", status)
+        return str(status_value or "").lower() in {"shutting-down", "terminated", "returned"}
 
     async def _update_request_to_failed(self, request: Any, errors: list[str]) -> None:
         """Update request status to failed."""
@@ -485,8 +572,8 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                 exc_info=True,
             )
 
-    async def _update_request_to_completed(self, request: Any) -> None:
-        """Update return request status to completed and persist."""
+    async def _update_request_to_in_progress_with_message(self, request: Any, message: str) -> None:
+        """Persist an in-progress return message after submit without claiming completion."""
         try:
             from orb.application.dto.commands import UpdateRequestStatusCommand
             from orb.application.ports.command_bus_port import CommandBusPort
@@ -494,19 +581,15 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
 
             update_command = UpdateRequestStatusCommand(
                 request_id=str(request.request_id),
-                status=RequestStatus.COMPLETED,
-                message="Return request completed: termination initiated",
+                status=RequestStatus.IN_PROGRESS,
+                message=message,
             )
             command_bus = self._container.get(CommandBusPort)
             await command_bus.execute(update_command)
-            self.logger.info("Updated request %s status to completed", request.request_id)
+            self.logger.info("Updated request %s status to in_progress", request.request_id)
         except Exception as update_error:
             self.logger.error(
-                "Failed to update request status to completed: %s",
+                "Failed to update request status to in_progress: %s",
                 update_error,
                 exc_info=True,
-            )
-            # Ensure the request reaches a terminal status so callers don't poll forever
-            await self._update_request_to_failed(
-                request, [f"Failed to mark completed: {update_error}"]
             )

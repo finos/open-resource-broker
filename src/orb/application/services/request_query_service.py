@@ -36,7 +36,12 @@ class RequestQueryService:
         try:
             with self.uow_factory.create_unit_of_work() as uow:
                 if request.request_type == RequestType.RETURN:
-                    machines = uow.machines.find_by_return_request_id(str(request.request_id.value))
+                    if request.machine_ids:
+                        machines = uow.machines.find_by_ids(request.machine_ids)
+                    else:
+                        machines = uow.machines.find_by_return_request_id(
+                            str(request.request_id.value)
+                        )
                 else:
                     machines = uow.machines.find_by_request_id(str(request.request_id.value))
                 self.logger.debug(

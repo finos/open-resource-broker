@@ -6,6 +6,9 @@ if TYPE_CHECKING:
     from orb.application.services.provider_registry_service import ProviderRegistryService
 
 from orb.application.ports.command_bus_port import CommandBusPort
+from orb.application.services.request_follow_up_context import (
+    merge_request_metadata_with_follow_up_context,
+)
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.logging_port import LoggingPort
@@ -68,11 +71,27 @@ class MachineSyncService:
             # machines being returned — not resource-level discovery which returns all
             # ASG/fleet instances including unrelated ones.
             if request.request_type.value == "return" and request.machine_ids:
+                resource_mapping = {
+                    str(machine.machine_id.value): (str(machine.resource_id), 1)
+                    for machine in db_machines
+                    if getattr(machine, "resource_id", None)
+                }
+                resource_ids = {
+                    str(machine.resource_id)
+                    for machine in db_machines
+                    if getattr(machine, "resource_id", None)
+                }
                 operation_type = ProviderOperationType.GET_INSTANCE_STATUS
                 parameters = {
                     "instance_ids": request.machine_ids,
+                    "provider_api": request.provider_api,
                     "template_id": request.template_id,
+                    "request_metadata": self._build_request_metadata(request),
                 }
+                if resource_mapping:
+                    parameters["resource_mapping"] = resource_mapping
+                if len(resource_ids) == 1:
+                    parameters["resource_id"] = next(iter(resource_ids))
             # Use resource-level discovery for acquire requests (handles scaling/replacement)
             elif request.resource_ids:
                 operation_type = ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES
@@ -80,6 +99,7 @@ class MachineSyncService:
                     "resource_ids": request.resource_ids,
                     "provider_api": request.provider_api,
                     "template_id": request.template_id,
+                    "request_metadata": self._build_request_metadata(request),
                 }
             # Fallback to instance-level discovery for requests without resource tracking
             elif db_machines:
@@ -88,6 +108,7 @@ class MachineSyncService:
                 parameters = {
                     "instance_ids": instance_ids,
                     "template_id": request.template_id,
+                    "request_metadata": self._build_request_metadata(request),
                 }
             else:
                 return [], {}
@@ -144,14 +165,16 @@ class MachineSyncService:
                     except Exception as e:
                         self.logger.warning(f"Failed to create machine from instance data: {e}")
 
-                # For return requests: instances missing from AWS response have been
-                # terminated and purged (~1hr window). Treat them as terminated.
+                # For return requests: instances missing from provider status results
+                # have effectively disappeared from the provider view. Treat them as
+                # terminated so request-status reconciliation can finish.
                 if request.request_type.value == "return":
                     queried_ids = set(parameters.get("instance_ids", []))
                     missing_ids = queried_ids - returned_ids
                     for missing_id in missing_ids:
                         self.logger.info(
-                            f"Instance {missing_id} not found in AWS — treating as terminated"
+                            "Instance %s not found in provider status response — treating as terminated",
+                            missing_id,
                         )
                         existing = next(
                             (m for m in db_machines if m.machine_id.value == missing_id), None
@@ -167,6 +190,11 @@ class MachineSyncService:
         except Exception as e:
             self.logger.error(f"Failed to fetch provider machines: {e}")
             return db_machines, {}
+
+    @staticmethod
+    def _build_request_metadata(request: Request) -> dict:
+        """Merge durable request metadata with persisted provider follow-up context."""
+        return merge_request_metadata_with_follow_up_context(request)
 
     def _create_machine_from_processed_data(
         self, processed_data: dict, request: Request

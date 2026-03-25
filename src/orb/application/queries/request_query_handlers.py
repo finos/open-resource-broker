@@ -54,7 +54,11 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
         self.logger.info("Getting request details for: %s", query.request_id)
 
         try:
-            if self._cache_service and self._cache_service.is_caching_enabled():
+            if (
+                query.lightweight
+                and self._cache_service
+                and self._cache_service.is_caching_enabled()
+            ):
                 cached_result = self._cache_service.get_cached_request(query.request_id)
                 if cached_result:
                     self.logger.info("Cache hit for request: %s", query.request_id)
@@ -103,7 +107,11 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             machine_objects = await self._query_service.get_machines_for_request(request)
             request_dto = self._dto_factory.create_from_domain(request, machine_objects)
 
-            if self._cache_service and self._cache_service.is_caching_enabled():
+            if (
+                query.lightweight
+                and self._cache_service
+                and self._cache_service.is_caching_enabled()
+            ):
                 self._cache_service.cache_request(query.request_id, request_dto)
 
             self.logger.info("Retrieved request: %s", query.request_id)

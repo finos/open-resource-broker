@@ -63,7 +63,10 @@ class AcquireMachinesOrchestrator(OrchestratorBase[AcquireMachinesInput, Acquire
         consecutive_errors = 0
         while elapsed < timeout_seconds:
             try:
-                query = GetRequestQuery(request_id=request_id, lightweight=True)
+                # Waiting for completion must hit the syncing request-status path.
+                # Lightweight reads return stored state only and can leave async
+                # provider requests stuck in pending/in-progress forever.
+                query = GetRequestQuery(request_id=request_id, lightweight=False, verbose=True)
                 result = await self._query_bus.execute(query)
                 consecutive_errors = 0
                 status_val = getattr(result, "status", None)

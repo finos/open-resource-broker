@@ -50,7 +50,7 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, TemplateDTOPort]):
             if not template_dto:
                 raise EntityNotFoundError("Template", query.template_id)
 
-            template_data = template_dto.model_dump()
+            template_data = template_dto.to_template_config()
             template_data.setdefault("template_id", template_dto.template_id)
             template_data.setdefault("name", template_dto.name or template_dto.template_id)
             template_data.setdefault("provider_api", template_dto.provider_api)
@@ -177,7 +177,7 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
 
                     raise EntityNotFoundError("Template", template_id)
 
-                template_config = template_dto.model_dump(exclude_none=True)
+                template_config = template_dto.to_template_config()
                 template_config["template_id"] = template_dto.template_id
 
             except EntityNotFoundError:

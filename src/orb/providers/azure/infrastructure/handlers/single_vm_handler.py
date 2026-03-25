@@ -257,6 +257,10 @@ class SingleVMHandler(AzureHandler):
                 "location": location,
                 "submitted_count": len(created_ids),
                 "operation_status": "submitted",
+                # Azure async create returns resource tracking first and instances later.
+                # Mark the submit attempt as final so generic top-up retry logic does not
+                # resubmit the deployment and create duplicate VMs.
+                "fulfillment_final": True,
                 "deployment_name": submitted_deployment_name,
                 "fleet_errors": [],
                 "submitted_vms": operation_tracking,

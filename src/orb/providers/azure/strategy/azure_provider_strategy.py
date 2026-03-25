@@ -23,6 +23,7 @@ from orb.application.services.spot_placement_execution import (
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
 from orb.providers.azure.configuration.config import AzureProviderConfig
+from orb.providers.azure.configuration.template_extension import AzureTemplateExtensionConfig
 from orb.providers.azure.configuration.validator import validate_azure_template
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
@@ -168,6 +169,32 @@ class AzureProviderStrategy(ProviderStrategy):
             }
         return self._handlers
 
+    def _build_azure_template_config(self, template_config: dict[str, Any]) -> dict[str, Any]:
+        """Coalesce provider-owned and Azure-default fields before AzureTemplate validation."""
+        enhanced_config = dict(template_config)
+
+        raw_subnet_id = enhanced_config.get("subnet_id")
+        if raw_subnet_id and raw_subnet_id != "default-subnet":
+            enhanced_config["subnet_ids"] = [raw_subnet_id]
+        elif enhanced_config.get("subnet_ids") == ["default-subnet"]:
+            enhanced_config.pop("subnet_ids", None)
+
+        azure_defaults = AzureTemplateExtensionConfig().to_template_defaults()
+        for field, value in azure_defaults.items():
+            if enhanced_config.get(field) in (None, ""):
+                enhanced_config[field] = value
+
+        if enhanced_config.get("resource_group") in (None, "") and self._azure_config.resource_group:
+            enhanced_config["resource_group"] = self._azure_config.resource_group
+        if enhanced_config.get("location") in (None, "") and self._azure_config.region:
+            enhanced_config["location"] = self._azure_config.region
+        if enhanced_config.get("subscription_id") in (None, "") and self._azure_config.subscription_id:
+            enhanced_config["subscription_id"] = self._azure_config.subscription_id
+
+        enhanced_config.setdefault("provider_type", "azure")
+        enhanced_config.setdefault("provider_name", self.provider_instance_name)
+        return enhanced_config
+
     @staticmethod
     def _should_use_spot_placement(template: AzureTemplate) -> bool:
         return getattr(template, "allocation_strategy", None) == "spotPlacementScore"
@@ -310,6 +337,12 @@ class AzureProviderStrategy(ProviderStrategy):
         )
 
         provider_data = build_planned_execution_metadata(plan, summary)
+        provider_data["fulfillment_final"] = (
+            bool(summary.resource_ids)
+            and summary.unfulfilled_count == 0
+            and not summary.terminal_error_message
+            and not summary.terminated_early
+        )
 
         if summary.terminal_error_message and not summary.resource_ids and not summary.instances:
             return ProviderResult.error_result(
@@ -678,26 +711,9 @@ class AzureProviderStrategy(ProviderStrategy):
                     "HANDLER_NOT_FOUND",
                 )
 
-            # Build AzureTemplate domain object.
-            # Azure-specific fields (vm_size, resource_group, location, image, …)
-            # may survive the base Template round-trip inside metadata, so merge them
-            # back into the config before constructing AzureTemplate.
-            # Top-level template_config values remain authoritative; metadata only
-            # fills gaps and preserves provider-specific context when those fields
-            # are absent from the normalized template payload.
-            enhanced_config = {
-                **template_config.get("metadata", {}),
-                **template_config,
-            }
-
-            # Map bare subnet_id → subnet_ids so Template.subnet_id @property
-            # returns the real ARM resource ID instead of the "default-subnet" placeholder
-            # injected by GetTemplateHandler.
-            raw_subnet_id = template_config.get("metadata", {}).get("subnet_id")
-            if raw_subnet_id and raw_subnet_id != "default-subnet":
-                enhanced_config["subnet_ids"] = [raw_subnet_id]
-            elif enhanced_config.get("subnet_ids") == ["default-subnet"]:
-                enhanced_config.pop("subnet_ids", None)
+            # Build AzureTemplate domain object from the normalized template payload plus
+            # provider-owned Azure defaults that are still authoritative at request time.
+            enhanced_config = self._build_azure_template_config(template_config)
             try:
                 self._logger.debug("Creating AzureTemplate from config: %s", enhanced_config)
                 azure_template = AzureTemplate.model_validate(enhanced_config)
@@ -1001,12 +1017,29 @@ class AzureProviderStrategy(ProviderStrategy):
                     "MISSING_RESOURCE_GROUP",
                 )
 
+            self._restore_pending_vmss_reconciliations(operation)
+
             handler_machines = self._get_instance_status_via_handlers(
                 operation=operation,
                 instance_ids=instance_ids,
                 resource_group=resource_group,
             )
             if handler_machines is not None:
+                provider_api = self._resolve_status_provider_api(operation)
+                provider_api_value = (
+                    provider_api.value if hasattr(provider_api, "value") else provider_api
+                )
+                if provider_api_value in (
+                    AzureProviderApi.VMSS.value,
+                    AzureProviderApi.VMSS_UNIFORM.value,
+                ):
+                    resource_ids = self._status_resource_ids(operation, instance_ids)
+                    if resource_ids:
+                        self._maybe_reconcile_pending_vmss_termination(
+                            resource_group=resource_group,
+                            resource_ids=resource_ids,
+                            instance_details=handler_machines,
+                        )
                 return ProviderResult.success_result(
                     {"machines": handler_machines, "queried_count": len(instance_ids)},
                     {
@@ -1156,6 +1189,22 @@ class AzureProviderStrategy(ProviderStrategy):
         return dict(operation.parameters.get("request_metadata") or {})
 
     @staticmethod
+    def _status_resource_ids(operation: ProviderOperation, instance_ids: list[str]) -> list[str]:
+        resource_ids: list[str] = []
+        raw_resource_mapping = operation.parameters.get("resource_mapping", {}) or {}
+        for resource_id, mapped_ids in AzureProviderStrategy._group_instance_ids_by_resource(
+            instance_ids,
+            raw_resource_mapping,
+        ).items():
+            if resource_id and mapped_ids and resource_id not in resource_ids:
+                resource_ids.append(resource_id)
+
+        direct_resource_id = operation.parameters.get("resource_id")
+        if direct_resource_id not in (None, "") and str(direct_resource_id) not in resource_ids:
+            resource_ids.append(str(direct_resource_id))
+        return resource_ids
+
+    @staticmethod
     def _resolve_status_provider_api(operation: ProviderOperation) -> Optional[Any]:
         provider_api = operation.parameters.get("provider_api")
         if provider_api not in (None, ""):
@@ -1282,6 +1331,22 @@ class AzureProviderStrategy(ProviderStrategy):
             "delete_vmss_when_empty": bool(existing.get("delete_vmss_when_empty", False))
             or bool(pending.get("delete_vmss_when_empty", False)),
         }
+
+    def _restore_pending_vmss_reconciliations(self, operation: ProviderOperation) -> None:
+        """Rebuild pending VMSS reconciliation state from durable request metadata."""
+        request_metadata = self._request_metadata(operation)
+
+        direct_pending = request_metadata.get("pending_reconciliation")
+        if isinstance(direct_pending, dict):
+            self._record_pending_vmss_reconciliation({"provider_data": request_metadata})
+
+        termination_requests = request_metadata.get("termination_requests")
+        if not isinstance(termination_requests, list):
+            return
+
+        for termination_request in termination_requests:
+            if isinstance(termination_request, dict):
+                self._record_pending_vmss_reconciliation({"provider_data": termination_request})
 
     def _has_pending_vmss_reconciliation(
         self,
@@ -1417,6 +1482,7 @@ class AzureProviderStrategy(ProviderStrategy):
                 operation=operation,
                 resource_group=resource_group,
             )
+            self._restore_pending_vmss_reconciliations(operation)
             if provider_api_value == AzureProviderApi.SINGLE_VM.value:
                 deployment_name = self._request_metadata(operation).get("deployment_name")
                 if deployment_name not in (None, ""):
@@ -1483,7 +1549,6 @@ class AzureProviderStrategy(ProviderStrategy):
                     metadata,
                 )
 
-            formatted_instances = []
             fleet_errors: list[dict[str, Any]] = []
             for inst in instance_details:
                 provider_data = inst.get("provider_data") or {}
@@ -1491,24 +1556,13 @@ class AzureProviderStrategy(ProviderStrategy):
                     for error in provider_data.get("fleet_errors") or []:
                         if error not in fleet_errors:
                             fleet_errors.append(error)
-                formatted_instances.append({
-                    "InstanceId": inst.get("instance_id"),
-                    "State": inst.get("status", "unknown"),
-                    "PrivateIpAddress": inst.get("private_ip"),
-                    "PublicIpAddress": inst.get("public_ip"),
-                    "LaunchTime": inst.get("launch_time"),
-                    "InstanceType": inst.get("instance_type"),
-                    "SubnetId": inst.get("subnet_id"),
-                    "VpcId": inst.get("vpc_id"),
-                    "provider_data": provider_data,
-                })
 
             metadata: dict[str, Any] = {
                 "operation": "describe_resource_instances",
                 "resource_ids": resource_ids,
                 "provider_api": provider_api_value,
                 "handler_used": provider_api_value,
-                "instance_count": len(formatted_instances),
+                "instance_count": len(instance_details),
             }
             if fleet_errors:
                 metadata["fleet_errors"] = fleet_errors
@@ -1527,7 +1581,7 @@ class AzureProviderStrategy(ProviderStrategy):
             self._augment_shortfall_metadata(metadata)
 
             return ProviderResult.success_result(
-                data={"instances": formatted_instances},
+                data={"instances": instance_details},
                 metadata=metadata,
             )
 

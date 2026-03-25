@@ -75,6 +75,7 @@ class DeprovisioningOrchestrator:
             success_count = 0
             error_count = 0
             errors = []
+            provider_data_items: list[dict[str, Any]] = []
 
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
@@ -83,6 +84,9 @@ class DeprovisioningOrchestrator:
                     self.logger.error("Task %s failed: %s", tasks[i].get_name(), result)
                 elif isinstance(result, dict) and result.get("success", False):
                     success_count += 1
+                    provider_data = result.get("provider_data")
+                    if isinstance(provider_data, dict) and provider_data:
+                        provider_data_items.append(provider_data)
                 else:
                     error_count += 1
                     if isinstance(result, dict):
@@ -94,11 +98,24 @@ class DeprovisioningOrchestrator:
                 "Deprovisioning completed: %d successful, %d failed", success_count, error_count
             )
 
+            aggregated_provider_data: dict[str, Any] = {}
+            termination_requests = [
+                item for item in provider_data_items if item.get("termination_requests")
+            ]
+            if termination_requests:
+                aggregated_provider_data["termination_requests"] = [
+                    request
+                    for item in termination_requests
+                    for request in item.get("termination_requests", [])
+                    if isinstance(request, dict)
+                ]
+
             return {
                 "success": error_count == 0,
                 "successful_operations": success_count,
                 "failed_operations": error_count,
                 "errors": errors,
+                "provider_data": aggregated_provider_data,
             }
 
         except Exception as e:
@@ -196,7 +213,11 @@ class DeprovisioningOrchestrator:
                     len(instance_ids),
                     resource_id,
                 )
-                return {"success": True, "terminated_instances": len(instance_ids)}
+                return {
+                    "success": True,
+                    "terminated_instances": len(instance_ids),
+                    "provider_data": result.metadata.get("provider_data", {}),
+                }
             else:
                 self.logger.error(
                     "Termination failed for resource %s: %s", resource_id, result.error_message

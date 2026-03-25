@@ -19,6 +19,7 @@ from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
 from orb.infrastructure.template.dtos import TemplateDTO
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
+from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 
 
 def _make_strategy() -> HostFactorySchedulerStrategy:
@@ -199,3 +200,59 @@ class TestTemplateRoundTrip:
         assert "created_at" in result
         assert result.get("subnet_ids", []) == []
         assert result.get("security_group_ids", []) == []
+
+    def test_azure_vm_size_candidates_survive_template_dto_roundtrip(self):
+        template = AzureTemplate(
+            template_id="azure-spot-placement-score-vmss",
+            name="Azure Spot Placement Score VMSS",
+            provider_type="azure",
+            provider_name="azure-default",
+            provider_api="VMSS",
+            price_type="spot",
+            allocation_strategy="spotPlacementScore",
+            resource_group="orb-test-rg",
+            location="eastus2",
+            vm_size="Standard_D4s_v5",
+            vm_sizes=["Standard_D8s_v5", "Standard_D16s_v5"],
+            image={
+                "publisher": "Canonical",
+                "offer": "0001-com-ubuntu-server-jammy",
+                "sku": "22_04-lts-gen2",
+                "version": "latest",
+            },
+            ssh_public_keys=["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCtest azure@example"],
+        )
+
+        dto = TemplateDTO.from_domain(template)
+        result = dto.to_template_config()
+
+        assert result["vm_size"] == "Standard_D4s_v5"
+        assert result["vm_sizes"] == ["Standard_D8s_v5", "Standard_D16s_v5"]
+        assert result["image"]["publisher"] == "Canonical"
+
+    def test_azure_custom_metadata_does_not_leak_into_provider_config_roundtrip(self):
+        template = AzureTemplate(
+            template_id="azure-custom-metadata-test",
+            provider_type="azure",
+            provider_name="azure-default",
+            provider_api="VMSS",
+            resource_group="orb-test-rg",
+            location="eastus2",
+            vm_size="Standard_D4s_v5",
+            image={
+                "publisher": "Canonical",
+                "offer": "0001-com-ubuntu-server-jammy",
+                "sku": "22_04-lts-gen2",
+                "version": "latest",
+            },
+            ssh_public_keys=["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCtest azure@example"],
+            metadata={"custom_key": "custom-value"},
+        )
+
+        dto = TemplateDTO.from_domain(template)
+        result = dto.to_template_config()
+
+        assert dto.metadata == {"custom_key": "custom-value"}
+        assert "custom_key" not in dto.provider_config
+        assert result["metadata"]["custom_key"] == "custom-value"
+        AzureTemplate.model_validate(result)

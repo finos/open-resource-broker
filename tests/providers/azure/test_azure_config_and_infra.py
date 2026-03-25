@@ -6,7 +6,11 @@ import types
 import pytest
 from unittest.mock import MagicMock, Mock, patch
 
+from orb.bootstrap.infrastructure_services import register_infrastructure_services
 from orb.domain.base.value_objects import InstanceId, InstanceType
+from orb.domain.base.ports.logging_port import LoggingPort
+from orb.domain.template.factory import TemplateFactory
+from orb.infrastructure.di.container import DIContainer
 from orb.domain.machine.aggregate import Machine
 from orb.providers.azure.configuration.config import AzureProviderConfig
 from orb.providers.azure.configuration.validator import (
@@ -200,6 +204,43 @@ class TestConfigValidation:
         assert client.subscription_id == azure_config.subscription_id
         assert client.resource_group == "rg-explicit"
         assert client.region_name == "westeurope"
+
+    def test_bootstrap_template_factory_preserves_azure_image_templates(self):
+        container = DIContainer()
+        container.register_instance(LoggingPort, MagicMock())
+        register_infrastructure_services(container)
+
+        factory = container.get(TemplateFactory)
+        template = factory.create_template({
+            "template_id": "azure-cheapest-vmss",
+            "provider_type": "azure",
+            "provider_api": "VMSS",
+            "vm_size": "Standard_B1s",
+            "resource_group": "orb-test-rg",
+            "location": "eastus2",
+            "image": {
+                "publisher": "Canonical",
+                "offer": "0001-com-ubuntu-server-jammy",
+                "sku": "22_04-lts-gen2",
+                "version": "latest",
+            },
+            "admin_username": "azureuser",
+            "ssh_public_keys": [
+                "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"
+            ],
+            "network_config": {
+                "subnet_id": (
+                    "/subscriptions/a6eb5b32-65bb-47c0-a2b8-34fa90400a4b/"
+                    "resourceGroups/orb-test-rg/providers/Microsoft.Network/"
+                    "virtualNetworks/orb-test-vnet/subnets/default"
+                )
+            },
+        })
+
+        assert factory.supports_provider("azure") is True
+        assert template.provider_type == "azure"
+        assert template.image is not None
+        assert template.image.publisher == "Canonical"
 
     def test_registry_created_strategy_gets_azure_client_resolver(self):
         registry = ProviderRegistry()

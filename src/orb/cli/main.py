@@ -230,6 +230,8 @@ async def main() -> None:
                 if not args.quiet:
                     print_success(f"Output written to {args.output}")
             else:
+                # Rich console output can wrap long structured strings, which may break
+                # consumers that try to parse stdout as exact JSON.
                 print_info(formatted_output)
 
             if exit_code != 0:

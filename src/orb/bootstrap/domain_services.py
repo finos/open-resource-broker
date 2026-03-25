@@ -29,7 +29,8 @@ def register_domain_services(container: DIContainer) -> None:
         # Inject dependencies after creation
         config = c.get(ConfigurationPort)
         logger = c.get(LoggingPort)
-        service.inject_dependencies(config, logger)
+        provider_registry = c.get(ProviderRegistryPort)
+        service.inject_dependencies(config, logger, provider_registry)
         return service
 
     container.register_singleton(

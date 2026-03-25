@@ -14,6 +14,7 @@ from orb.application.services.spot_placement_planner import (
     PlacementPlanEntry,
     PlacementScore,
 )
+from orb.infrastructure.template.dtos import TemplateDTO
 from orb.providers.azure.infrastructure.services.spot_placement_score_adapter import (
     AzureSpotPlacementScoreAdapter,
 )
@@ -256,6 +257,85 @@ class TestCapacityMetadata:
         assert result.metadata["deployment_name"] == "dep-singlevm-1"
         assert result.metadata["deployment_provisioning_state"] == "Failed"
         assert result.metadata["fleet_errors"][0]["error_code"] == "DeploymentFailed"
+
+    def test_describe_resource_instances_returns_canonical_machine_shape(self, strategy):
+        handler = MagicMock()
+        handler.check_hosts_status.return_value = [
+            {
+                "instance_id": "vmss-demo_000001",
+                "status": "running",
+                "private_ip": "10.0.0.4",
+                "public_ip": None,
+                "instance_type": "Standard_B1s",
+                "subnet_id": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet/subnets/default",
+                "vpc_id": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet",
+                "provider_data": {"vmss_name": "vmss-demo"},
+            }
+        ]
+        strategy._handlers["VMSS"] = handler
+        strategy._resource_manager = MagicMock()
+        strategy._resource_manager.get_vmss_capacity.return_value = {
+            "capacity": 1,
+            "provisioned_instance_count": 1,
+            "provisioning_state": "Succeeded",
+        }
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
+            parameters={
+                "resource_ids": ["vmss-demo"],
+                "provider_api": "VMSS",
+                "template_id": "tmpl-1",
+                "request_metadata": {"resource_group": "test-rg"},
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert result.success
+        assert result.data["instances"][0]["instance_id"] == "vmss-demo_000001"
+        assert result.data["instances"][0]["status"] == "running"
+        assert "InstanceId" not in result.data["instances"][0]
+
+    def test_get_instance_status_reconciles_empty_flexible_vmss_return(self, strategy):
+        handler = MagicMock()
+        handler.check_hosts_status.return_value = []
+        strategy._handlers["VMSS"] = handler
+        strategy._pending_vmss_termination_reconciliations[("test-rg", "vmss-demo")] = {
+            "resource_group": "test-rg",
+            "vmss_name": "vmss-demo",
+            "machine_ids": ["vmss-demo_000001"],
+            "target_capacity": 0,
+            "orchestration_mode": "Flexible",
+            "delete_vmss_when_empty": True,
+        }
+
+        compute_client = MagicMock()
+        azure_client = MagicMock()
+        azure_client.compute_client = compute_client
+        strategy._client = azure_client
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
+            parameters={
+                "instance_ids": ["vmss-demo_000001"],
+                "provider_api": "VMSS",
+                "template_id": "tmpl-1",
+                "resource_id": "vmss-demo",
+                "resource_mapping": {"vmss-demo_000001": ("vmss-demo", 1)},
+                "request_metadata": {"resource_group": "test-rg"},
+            },
+        )
+
+        result = strategy._handle_get_instance_status(op)
+
+        assert result.success
+        assert result.data["machines"] == []
+        compute_client.virtual_machine_scale_sets.begin_delete.assert_called_once_with(
+            resource_group_name="test-rg",
+            vm_scale_set_name="vmss-demo",
+        )
+        assert ("test-rg", "vmss-demo") not in strategy._pending_vmss_termination_reconciliations
 
     def test_describe_resource_instances_adds_shortfall_summary(self, strategy):
         handler = MagicMock()
@@ -620,6 +700,111 @@ class TestCreateInstances:
         assert result.success
         assert result.data["resource_ids"] == ["vmss-demo"]
 
+    @pytest.mark.parametrize("provider_api", ["VMSS", "SingleVM"])
+    def test_create_instances_coalesces_azure_defaults_before_validation(
+        self, azure_config, logger, provider_api
+    ):
+        strategy = AzureProviderStrategy(
+            config=azure_config,
+            logger=logger,
+            provider_instance_name="azure-default",
+        )
+        strategy.initialize()
+
+        def acquire_hosts(_request, azure_template):
+            assert azure_template.vm_size == "Standard_D4s_v5"
+            assert azure_template.resource_group == "test-rg"
+            assert azure_template.location == "eastus2"
+            return {
+                "success": True,
+                "resource_ids": ["azure-resource"],
+                "instances": [],
+                "provider_data": {"resource_group": "test-rg"},
+            }
+
+        handler = MagicMock()
+        handler.acquire_hosts.side_effect = acquire_hosts
+        strategy._handlers = {provider_api: handler}
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={
+                "template_config": {
+                    "template_id": "azure-minimal-test",
+                    "provider_api": provider_api,
+                    "ssh_public_keys": [
+                        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"
+                    ],
+                    "image": {
+                        "publisher": "Canonical",
+                        "offer": "0001-com-ubuntu-server-jammy",
+                        "sku": "22_04-lts-gen2",
+                        "version": "latest",
+                    },
+                },
+                "count": 1,
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert result.success
+        assert result.data["resource_ids"] == ["azure-resource"]
+
+    def test_create_instances_uses_image_from_template_dto_metadata_roundtrip(
+        self, azure_config, logger
+    ):
+        strategy = AzureProviderStrategy(
+            config=azure_config,
+            logger=logger,
+            provider_instance_name="azure-default",
+        )
+        strategy.initialize()
+
+        handler = MagicMock()
+        handler.acquire_hosts.return_value = {
+            "success": True,
+            "resource_ids": ["azure-resource"],
+            "instances": [],
+        }
+        strategy._handlers = {"VMSS": handler}
+
+        azure_template = AzureTemplate(
+            template_id="azure-roundtrip-test",
+            provider_api="VMSS",
+            vm_size="Standard_D4s_v5",
+            resource_group="test-rg",
+            location="eastus2",
+            ssh_public_keys=["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCu"],
+            image={
+                "publisher": "Canonical",
+                "offer": "0001-com-ubuntu-server-jammy",
+                "sku": "22_04-lts-gen2",
+                "version": "latest",
+            },
+        )
+        dto = TemplateDTO.from_domain(azure_template)
+        template_config = dto.to_template_config()
+
+        assert "image" not in dto.metadata
+        assert dto.provider_config["image"]["publisher"] == "Canonical"
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={
+                "template_config": template_config,
+                "count": 1,
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert result.success
+        handler.acquire_hosts.assert_called_once()
+        validated_template = handler.acquire_hosts.call_args.args[1]
+        assert validated_template.image is not None
+        assert validated_template.image.publisher == "Canonical"
+
 
 # ---------------------------------------------------------------------------
 # TERMINATE_INSTANCES (with missing ids → error path)
@@ -804,6 +989,58 @@ class TestTerminateInstances:
             "orchestration_mode": "Flexible",
             "delete_vmss_when_empty": False,
         }
+
+    def test_get_instance_status_restores_pending_vmss_reconciliation_from_request_metadata(
+        self, azure_config, logger
+    ):
+        strategy = AzureProviderStrategy(
+            config=azure_config, logger=logger, provider_instance_name="azure-default"
+        )
+        strategy.initialize()
+
+        handler = MagicMock()
+        handler.check_hosts_status.return_value = []
+        strategy._handlers = {"VMSS": handler}
+
+        resource_manager = MagicMock()
+        strategy._resource_manager = resource_manager
+
+        azure_client = MagicMock()
+        strategy._client = azure_client
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
+            parameters={
+                "instance_ids": ["orb-1"],
+                "provider_api": "VMSS",
+                "resource_id": "vmss-prod-b",
+                "resource_mapping": {"orb-1": ("vmss-prod-b", 1)},
+                "request_metadata": {
+                    "resource_group": "test-rg",
+                    "termination_requests": [
+                        {
+                            "pending_reconciliation": {
+                                "resource_group": "test-rg",
+                                "vmss_name": "vmss-prod-b",
+                                "machine_ids": ["orb-1"],
+                                "target_capacity": 0,
+                                "orchestration_mode": "Flexible",
+                                "delete_vmss_when_empty": True,
+                            }
+                        }
+                    ],
+                },
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert result.success
+        azure_client.compute_client.virtual_machine_scale_sets.begin_delete.assert_called_once_with(
+            resource_group_name="test-rg",
+            vm_scale_set_name="vmss-prod-b",
+        )
+        assert ("test-rg", "vmss-prod-b") not in strategy._pending_vmss_termination_reconciliations
 
     def test_terminate_instances_forwards_cyclecloud_secret_reference_request_metadata(self, azure_config, logger):
         strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
@@ -1477,6 +1714,7 @@ class TestSpotPlacementPlanning:
         assert result.success
         assert result.data["resource_ids"] == ["vmss-b"]
         assert result.metadata["method"] == "planned_handler"
+        assert result.metadata["provider_data"]["fulfillment_final"] is True
         assert result.metadata["provider_data"]["unfulfilled_count"] == 0
         assert len(result.metadata["provider_data"]["child_results"]) == 2
         first_request = handler.acquire_hosts.call_args_list[0].args[0]
@@ -1548,6 +1786,7 @@ class TestSpotPlacementPlanning:
         assert result.success
         assert result.data["resource_ids"] == ["vmss-fallback"]
         assert result.metadata["method"] == "planned_handler"
+        assert result.metadata["provider_data"]["fulfillment_final"] is True
         serialized_plan = result.metadata["provider_data"]["placement_plan"]
         assert serialized_plan[0]["instance_type"] == "Standard_D4s_v5"
         assert serialized_plan[0]["planned_count"] == 2

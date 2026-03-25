@@ -934,8 +934,10 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         return self.field_mapper.map_output_fields(internal_dict, copy_unmapped=False)
 
     def format_template_for_provider(self, template: TemplateDTO) -> dict[str, Any]:
-        """Format template for provider operations using internal format (no field mapping)."""
-        return template.to_dict()
+        """Format either a stored template DTO or a domain template for provider operations."""
+        if isinstance(template, TemplateDTO):
+            return template.to_template_config()
+        return template.model_dump(mode="json", exclude_none=True)
 
     def format_machine_for_display(self, machine_dict: dict[str, Any]) -> dict[str, Any]:
         """Format machine dict for display using HostFactory field mapper."""
