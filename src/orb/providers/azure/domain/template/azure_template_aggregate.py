@@ -680,7 +680,8 @@ class AzureTemplate(Template):
 
         # OS profile
         os_profile: dict[str, Any] = {
-            "computerNamePrefix": (self.vmss_name or self.template_id)[:9],            "adminUsername": self.admin_username,
+            "computerNamePrefix": (self.vmss_name or self.template_id)[:9],
+            "adminUsername": self.admin_username,
         }
         if self.custom_data:
             os_profile["customData"] = self.custom_data
