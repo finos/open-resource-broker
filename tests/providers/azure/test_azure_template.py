@@ -160,28 +160,26 @@ class TestAzureTemplateConstruction:
 
 
 class TestSpotValidation:
-    def test_spot_rejects_missing_eviction_policy(self):
-        with pytest.raises(ValueError, match="eviction_policy is required"):
-            AzureTemplate(**_BASE_FIELDS, priority="Spot", spot_allocation_strategy="CapacityOptimized")
+    def test_spot_defaults_eviction_and_strategy(self):
+        """mode='before' validator fills in implied defaults for Spot."""
+        t = AzureTemplate(**_BASE_FIELDS, priority="Spot")
+        assert t.eviction_policy == AzureEvictionPolicy.DEALLOCATE
+        assert t.spot_allocation_strategy == AzureAllocationStrategy.CAPACITY_OPTIMIZED
 
-    def test_spot_rejects_missing_allocation_strategy(self):
-        with pytest.raises(ValueError, match="spot_allocation_strategy is required"):
-            AzureTemplate(**_BASE_FIELDS, priority="Spot", eviction_policy="Deallocate")
-
-    def test_spot_accepts_fully_specified(self):
+    def test_spot_accepts_explicit_values(self):
         t = AzureTemplate(**_BASE_FIELDS, **_SPOT_DEFAULTS)
         assert t.eviction_policy == AzureEvictionPolicy.DEALLOCATE
         assert t.spot_allocation_strategy == AzureAllocationStrategy.CAPACITY_OPTIMIZED
 
-    def test_spot_percentage_rejects_regular_priority(self):
-        with pytest.raises(ValueError, match="spot_percentage requires Spot priority"):
-            AzureTemplate(**_BASE_FIELDS, spot_percentage=70)
+    def test_spot_percentage_promotes_priority_to_spot(self):
+        """mode='before' validator upgrades Regular to Spot when spot_percentage is set."""
+        t = AzureTemplate(**_BASE_FIELDS, spot_percentage=70)
+        assert t.priority == AzurePriority.SPOT
 
     def test_spot_percentage_requires_flexible(self):
         with pytest.raises(ValueError, match="Flexible orchestration mode"):
             AzureTemplate(
                 **_BASE_FIELDS,
-                **_SPOT_DEFAULTS,
                 spot_percentage=70,
                 orchestration_mode=AzureVMSSOrchestrationMode.UNIFORM,
             )
@@ -190,7 +188,6 @@ class TestSpotValidation:
         with pytest.raises(ValueError, match="single_placement_group"):
             AzureTemplate(
                 **_BASE_FIELDS,
-                **_SPOT_DEFAULTS,
                 spot_percentage=70,
                 single_placement_group=True,
             )
@@ -210,15 +207,13 @@ class TestSpotValidation:
 
 
 class TestSecurityValidation:
-    def test_trusted_launch_rejects_missing_secure_boot(self):
-        with pytest.raises(ValueError, match="secure_boot_enabled is required"):
-            AzureTemplate(**_BASE_FIELDS, security_type="TrustedLaunch", vtpm_enabled=True)
+    def test_trusted_launch_defaults(self):
+        """mode='before' validator fills in secure_boot and vtpm for TrustedLaunch."""
+        t = AzureTemplate(**_BASE_FIELDS, security_type="TrustedLaunch")
+        assert t.secure_boot_enabled is True
+        assert t.vtpm_enabled is True
 
-    def test_trusted_launch_rejects_missing_vtpm(self):
-        with pytest.raises(ValueError, match="vtpm_enabled is required"):
-            AzureTemplate(**_BASE_FIELDS, security_type="TrustedLaunch", secure_boot_enabled=True)
-
-    def test_trusted_launch_accepts_fully_specified(self):
+    def test_trusted_launch_accepts_explicit_values(self):
         t = AzureTemplate(
             **_BASE_FIELDS,
             security_type="TrustedLaunch",
@@ -285,7 +280,7 @@ class TestArmPayload:
     def test_spot_arm_payload(self):
         t = AzureTemplate(
             **_BASE_FIELDS,
-            **_SPOT_DEFAULTS,
+            priority="Spot",
             billing_profile_max_price=-1.0,
         )
         arm = t.to_azure_api_format()
@@ -296,8 +291,9 @@ class TestArmPayload:
     def test_vmss_mix_payload_uses_sku_profile(self):
         t = AzureTemplate(
             **_BASE_FIELDS,
-            **_SPOT_DEFAULTS,
             vm_sizes=["Standard_D8s_v5", "Standard_D16s_v5"],
+            priority="Spot",
+            spot_allocation_strategy=AzureAllocationStrategy.CAPACITY_OPTIMIZED,
         )
         arm = t.to_azure_api_format()
 
@@ -313,7 +309,6 @@ class TestArmPayload:
     def test_spot_percentage_populates_priority_mix_policy(self):
         t = AzureTemplate(
             **_BASE_FIELDS,
-            **_SPOT_DEFAULTS,
             vm_sizes=["Standard_D8s_v5"],
             spot_percentage=70,
             base_regular_priority_count=2,

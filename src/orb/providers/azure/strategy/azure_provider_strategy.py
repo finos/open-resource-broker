@@ -191,28 +191,6 @@ class AzureProviderStrategy(ProviderStrategy):
         if enhanced_config.get("subscription_id") in (None, "") and self._azure_config.subscription_id:
             enhanced_config["subscription_id"] = self._azure_config.subscription_id
 
-        # ----- Implied defaults -----
-        # These are defaulting decisions, not domain invariants.  The aggregate
-        # validator will *reject* invalid combinations; the strategy is the
-        # right place to fill in implied values before the aggregate is built.
-
-        # spot_percentage requires Spot priority on the VMSS.
-        if (
-            enhanced_config.get("spot_percentage") is not None
-            and enhanced_config.get("priority") in (None, "Regular")
-        ):
-            enhanced_config["priority"] = "Spot"
-
-        # Spot VMs need an eviction policy and allocation strategy.
-        if enhanced_config.get("priority") == "Spot":
-            enhanced_config.setdefault("eviction_policy", "Deallocate")
-            enhanced_config.setdefault("spot_allocation_strategy", "CapacityOptimized")
-
-        # Trusted Launch implies secure boot and vTPM.
-        if enhanced_config.get("security_type") == "TrustedLaunch":
-            enhanced_config.setdefault("secure_boot_enabled", True)
-            enhanced_config.setdefault("vtpm_enabled", True)
-
         enhanced_config.setdefault("provider_type", "azure")
         enhanced_config.setdefault("provider_name", self.provider_instance_name)
         return enhanced_config

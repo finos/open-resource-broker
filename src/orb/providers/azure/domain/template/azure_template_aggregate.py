@@ -405,6 +405,39 @@ class AzureTemplate(Template):
     # Validators
     # ------------------------------------------------------------------
 
+    @model_validator(mode="before")
+    @classmethod
+    def apply_implied_defaults(cls, data: Any) -> Any:
+        """Normalise input data before construction.
+
+        This is input normalisation, not mutation of a constructed model.
+        The ``mode="after"`` validator below is purely rejecting — it never
+        modifies state.  Conditional defaults that depend on other field
+        values belong here so that every construction path (strategy,
+        factory, test helpers) gets consistent behaviour.
+        """
+        if not isinstance(data, dict):
+            return data
+
+        # spot_percentage requires Spot priority.
+        if (
+            data.get("spot_percentage") is not None
+            and data.get("priority") in (None, "Regular")
+        ):
+            data["priority"] = "Spot"
+
+        # Spot VMs need an eviction policy and allocation strategy.
+        if data.get("priority") == "Spot":
+            data.setdefault("eviction_policy", "Deallocate")
+            data.setdefault("spot_allocation_strategy", "CapacityOptimized")
+
+        # Trusted Launch implies secure boot and vTPM.
+        if data.get("security_type") == "TrustedLaunch":
+            data.setdefault("secure_boot_enabled", True)
+            data.setdefault("vtpm_enabled", True)
+
+        return data
+
     @model_validator(mode="after")
     def validate_azure_template(self) -> "AzureTemplate":
         """Azure-specific template validation."""
