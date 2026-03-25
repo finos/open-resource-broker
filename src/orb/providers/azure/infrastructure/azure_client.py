@@ -28,13 +28,25 @@ import threading
 from typing import TYPE_CHECKING, Any, Optional, Protocol
 
 from orb.domain.base.dependency_injection import injectable
-from orb.domain.base.ports import ConfigurationPort, LoggingPort
+from orb.domain.base.ports import LoggingPort
 from orb.monitoring.metrics import MetricsCollector
 from orb.providers.azure.configuration.config import AzureProviderConfig
 from orb.providers.azure.exceptions.azure_exceptions import (
     AuthenticationError,
     AzureConfigurationError,
 )
+
+class TypedConfigPort(Protocol):
+    """Minimal config interface for AzureClient.
+
+    Only ``get_typed`` is used — the client resolves its
+    ``AzureProviderConfig`` and ``PerformanceConfig`` through this
+    single method.  Implementations include ``AzureInstanceConfigPort``
+    (per-instance shim) and ``ConfigurationManager`` (global).
+    """
+
+    def get_typed(self, config_type: type) -> Any: ...
+
 
 if TYPE_CHECKING:
     from azure.mgmt.authorization import AuthorizationManagementClient
@@ -57,8 +69,8 @@ class AzureClient:
     """Wrapper for Azure API interactions.
 
     * Configuration is resolved once during ``__init__`` via
-      ``ProviderSelectionService`` (primary) or the legacy
-      ``ConfigurationPort.get_typed`` path (fallback).
+      a config port shim (``AzureInstanceConfigPort``) injected at
+      construction time.
     * Azure SDK management clients are created **lazily** on first access
       through ``@property`` accessors, keeping startup cost near zero.
     * An optional :class:`MetricsCollector` can be injected for API-call
@@ -68,7 +80,7 @@ class AzureClient:
 
     def __init__(
         self,
-        config: ConfigurationPort,
+        config: TypedConfigPort,
         logger: LoggingPort,
         metrics: Optional[MetricsCollector] = None,
     ) -> None:
@@ -161,125 +173,27 @@ class AzureClient:
     def _get_selected_azure_provider_config(self) -> Optional[AzureProviderConfig]:
         """Resolve the active Azure provider configuration.
 
-        Primary path: ``ProviderSelectionService`` picks the active provider
-        instance and its ``AzureProviderConfig`` payload.
+        All construction paths (DI factory and ``create_azure_strategy``)
+        wrap the already-resolved ``AzureProviderConfig`` in an
+        ``_AzureInstanceConfigPort`` shim before passing it here.
+        ``get_typed(AzureProviderConfig)`` returns the config directly —
+        no discovery or selection is needed.
 
-        Fallback: ``ConfigurationPort.get_typed(AzureProviderConfig)``.
-
-        The result is cached after the first successful (or failed) attempt
-        so that repeated calls are free.
+        The result is cached after the first call.
         """
         if self._azure_config_loaded:
             return self._azure_config
 
         self._azure_config_loaded = True
 
-        typed_config_fallback: Optional[AzureProviderConfig] = None
         try:
-            typed_config_fallback = self._config_manager.get_typed(AzureProviderConfig)
-            if typed_config_fallback is not None:
-                self._logger.debug("Loaded Azure config from typed configuration fallback")
+            self._azure_config = self._config_manager.get_typed(AzureProviderConfig)
+            if self._azure_config is not None:
+                self._logger.debug("Loaded Azure provider config via configuration port")
         except Exception as e:
-            self._logger.debug(
-                "Could not get Azure config from legacy config: %s", str(e)
-            )
+            self._logger.debug("Could not load Azure provider config: %s", e)
 
-        provider_config = None
-        try:
-            provider_config = self._config_manager.get_provider_config()
-        except Exception as e:
-            self._logger.debug(
-                "Could not get provider config from config manager: %s", str(e)
-            )
-
-        # For per-instance DI shims, the typed Azure config is already authoritative.
-        if provider_config is None and typed_config_fallback is not None:
-            self._azure_config = typed_config_fallback
-            return typed_config_fallback
-
-        # --- Primary: provider selection service --------------------------
-        try:
-            from orb.application.services.provider_registry_service import (
-                ProviderRegistryService,
-            )
-            from orb.infrastructure.di.container import get_container
-
-            container = get_container()
-            selection_service = container.get(ProviderRegistryService)
-            selection_result = selection_service.select_active_provider()
-
-            self._logger.debug(
-                "Provider selection result: type=%s, instance=%s",
-                selection_result.provider_type,
-                selection_result.provider_instance,
-            )
-
-            if selection_result.provider_type not in ("azure", "Azure"):
-                if typed_config_fallback is not None:
-                    self._logger.debug(
-                        "Selected provider is not Azure (%s); using typed Azure config fallback",
-                        selection_result.provider_type,
-                    )
-                    self._azure_config = typed_config_fallback
-                    return typed_config_fallback
-                raise AzureConfigurationError(
-                    f"Selected provider is not Azure: {selection_result.provider_type}"
-                )
-
-            if provider_config:
-                for provider in provider_config.providers:
-                    if provider.name == selection_result.provider_instance:
-                        self._logger.debug(
-                            "Found provider %s, building AzureProviderConfig",
-                            provider.name,
-                        )
-                        if not hasattr(provider, "config") or not provider.config:
-                            self._logger.debug("Provider has no config attribute")
-                            break
-
-                        if isinstance(provider.config, AzureProviderConfig):
-                            self._azure_config = provider.config
-                            return self._azure_config
-
-                        if isinstance(provider.config, dict):
-                            self._azure_config = AzureProviderConfig(**provider.config)
-                            return self._azure_config
-
-                        config_data = None
-                        if hasattr(provider.config, "model_dump"):
-                            config_data = provider.config.model_dump()
-                        elif hasattr(provider.config, "dict"):
-                            config_data = provider.config.dict()
-                        elif hasattr(provider.config, "__dict__"):
-                            config_data = provider.config.__dict__
-
-                        if isinstance(config_data, dict):
-                            self._azure_config = AzureProviderConfig(**config_data)
-                            return self._azure_config
-
-                        self._logger.debug(
-                            "Unsupported provider config type: %s",
-                            type(provider.config),
-                        )
-                        break
-                else:
-                    self._logger.debug(
-                        "Provider %s not found in config",
-                        selection_result.provider_instance,
-                    )
-        except AzureConfigurationError:
-            raise
-        except Exception as e:
-            self._logger.debug(
-                "Could not get Azure config via provider selection: %s", str(e)
-            )
-
-        # --- Fallback: legacy typed config --------------------------------
-        if typed_config_fallback is not None:
-            self._azure_config = typed_config_fallback
-            return typed_config_fallback
-
-        return None
+        return self._azure_config
 
     # ------------------------------------------------------------------
     # Credential management

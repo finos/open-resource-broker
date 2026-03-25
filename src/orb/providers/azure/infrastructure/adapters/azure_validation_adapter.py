@@ -21,8 +21,10 @@ class AzureValidationAdapter(BaseProviderValidationAdapter):
     - Retrieves supported Azure provider APIs.
     - Identifies the provider type as Azure.
 
-    TODO: This isn't really used, but nor is the AWS version
-       how useful is this abstraction?
+    Note: this adapter is not yet registered in ``azure/registration.py``.
+    AWS's equivalent is wired via ``validator_factory`` in the provider
+    registry and used by ``ProviderValidationService``.  Azure should
+    follow the same pattern.
     """
     def __init__(self, config: AzureProviderConfig, logger: LoggingPort) -> None:
         """

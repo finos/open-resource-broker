@@ -17,11 +17,37 @@ from orb.domain.template.factory import TemplateFactory
 from orb.providers.azure.configuration.template_extension import AzureTemplateExtensionConfig
 
 
-def _resolve_azure_client_from_container() -> Any:
-    from orb.infrastructure.di.container import get_container
+class AzureInstanceConfigPort:
+    """Minimal config port that wraps an already-resolved
+    ``AzureProviderConfig``.
+
+    ``AzureClient`` calls ``get_typed(ConfigClass)`` to resolve its
+    config.  This shim ensures the client always receives the correct
+    per-instance config rather than the global ``ConfigurationManager``
+    (which does not carry Azure provider config).
+
+    This deliberately does NOT implement ``ConfigurationPort`` — the
+    client only needs ``get_typed(type) -> Any``, not the full 30+
+    method interface.
+    """
+
+    def __init__(self, cfg: Any) -> None:
+        self._cfg = cfg
+
+    def get_typed(self, config_type: type) -> Any:
+        """Return the wrapped config if the requested type matches."""
+        from orb.providers.azure.configuration.config import AzureProviderConfig
+
+        if config_type == AzureProviderConfig:
+            return self._cfg
+        return None
+
+
+def _create_azure_client(azure_config: Any, logger: Any) -> Any:
+    """Construct an ``AzureClient`` with the per-instance config shim."""
     from orb.providers.azure.infrastructure.azure_client import AzureClient
 
-    return get_container().get(AzureClient)
+    return AzureClient(config=AzureInstanceConfigPort(azure_config), logger=logger)
 
 
 # ------------------------------------------------------------------
@@ -47,7 +73,7 @@ def create_azure_strategy(provider_config: Any, *, provider_instance_name: str) 
             config=azure_config,
             logger=logger,
             provider_instance_name=provider_instance_name,
-            azure_client_resolver=_resolve_azure_client_from_container,
+            azure_client_resolver=lambda: _create_azure_client(azure_config, logger),
         )
 
         return strategy
@@ -205,25 +231,7 @@ def _register_azure_components_with_di(
 
     def azure_client_factory(container_instance: Any) -> Any:
         logger_port = container_instance.get(LoggingPort)
-
-        class AzureInstanceConfigPort:
-            def __init__(self, cfg: Any) -> None:
-                self._cfg = cfg
-
-            def get_typed(self, config_type: type) -> Any:
-                from orb.providers.azure.configuration.config import AzureProviderConfig
-
-                if config_type == AzureProviderConfig:
-                    return self._cfg
-                return None
-
-            def get(self, key: str, default: Any = None) -> Any:
-                return getattr(self._cfg, key, default)
-
-            def get_provider_config(self) -> Any:
-                return None
-
-        client = AzureClient(config=AzureInstanceConfigPort(azure_config), logger=logger_port)
+        client = _create_azure_client(azure_config, logger_port)
         logger_port.info(
             "Azure client initialized for %s: region=%s",
             instance_name,
