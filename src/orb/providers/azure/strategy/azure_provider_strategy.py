@@ -66,8 +66,6 @@ class AzureProviderStrategy(ProviderStrategy):
         config: AzureProviderConfig,
         logger: LoggingPort,
         provider_instance_name: str,
-        azure_provisioning_port: Optional[Any] = None,
-        azure_provisioning_port_resolver: Optional[Callable[[], Any]] = None,
         azure_client_resolver: Optional[Callable[[], AzureClient]] = None,
     ) -> None:
         if not isinstance(config, AzureProviderConfig):
@@ -82,8 +80,6 @@ class AzureProviderStrategy(ProviderStrategy):
         self._resource_manager: Optional[AzureResourceManager] = None
         self._deployment_service: Optional[Any] = None
         self._handlers: dict[str, AzureHandler] = {}
-        self._azure_provisioning_port = azure_provisioning_port
-        self._azure_provisioning_port_resolver = azure_provisioning_port_resolver
         self._spot_placement_planner = SpotPlacementPlanner()
         self._spot_placement_execution = SpotPlacementExecutionService()
         self._pending_vmss_termination_reconciliations: dict[tuple[str, str], dict[str, Any]] = {}
