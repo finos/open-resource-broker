@@ -419,6 +419,13 @@ class AzureTemplate(Template):
         if not isinstance(data, dict):
             return data
 
+        data = dict(data)
+
+        if "max_number" in data:
+            if "max_instances" not in data:
+                data["max_instances"] = data["max_number"]
+            data.pop("max_number", None)
+
         # spot_percentage requires Spot priority.
         if (
             data.get("spot_percentage") is not None

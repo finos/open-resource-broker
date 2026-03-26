@@ -145,6 +145,23 @@ class TestAzureTemplateConstruction:
         t = AzureTemplate.from_azure_format(data)
         assert t.vm_size == "Standard_D2s_v5"
 
+    def test_from_azure_format_accepts_max_number(self):
+        data = {
+            **_BASE_FIELDS,
+            "max_number": 7,
+        }
+        t = AzureTemplate.from_azure_format(data)
+        assert t.max_instances == 7
+
+    def test_from_azure_format_prefers_explicit_max_instances_over_max_number(self):
+        data = {
+            **_BASE_FIELDS,
+            "max_instances": 3,
+            "max_number": 7,
+        }
+        t = AzureTemplate.from_azure_format(data)
+        assert t.max_instances == 3
+
     def test_rejects_both_provider_api_spec_and_file(self):
         with pytest.raises(ValueError, match="provider_api_spec and provider_api_spec_file"):
             AzureTemplate(

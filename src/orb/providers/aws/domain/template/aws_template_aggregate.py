@@ -420,6 +420,13 @@ class AWSTemplate(Template):
                 value=str(data.get("vm_type", data.get("instance_type", "")))
             ),
             "image_id": data.get("image_id"),
+            # Shared runtime templates still use max_instances even though older
+            # config/HostFactory-facing AWS shapes use max_number/maxNumber.
+            # This normalization exists only because the shared model names are
+            # inconsistent; if we reconcile them repo-wide, remove this bridge.
+            # If not, we may want this logic in shared code not replicated in
+            # each template - currently both AWS and Azure use max_instances and
+            # re-write max_number to max_instances.
             "max_instances": data.get("max_number", data.get("max_instances", 1)),
             "subnet_ids": data.get(
                 "subnet_ids", [data.get("subnet_id")] if data.get("subnet_id") else []
