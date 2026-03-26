@@ -39,6 +39,10 @@ from orb.providers.azure.infrastructure.cyclecloud_session import (
     CycleCloudSessionContext,
 )
 from orb.providers.azure.infrastructure.handlers.azure_handler import AzureHandler
+from orb.providers.infrastructure.error_codes import (
+    ProviderErrorEntry,
+    collect_provider_error_codes,
+)
 
 
 # CycleCloud node state → domain status mapping
@@ -482,7 +486,7 @@ class CycleCloudHandler(AzureHandler):
         *,
         cluster_name: str,
         node_array: str,
-    ) -> list[dict[str, Any]]:
+    ) -> list[ProviderErrorEntry]:
         """Extract structured node errors from CycleCloud node payloads."""
         state = str(node.get("State") or node.get("status") or "Unknown")
         message = (
@@ -499,14 +503,16 @@ class CycleCloudHandler(AzureHandler):
             return []
 
         node_id = node.get("name") or node.get("Name") or node.get("nodeId") or node.get("NodeId")
-        return [{
+        node_error: ProviderErrorEntry = {
             "error_code": str(error_code or "CycleCloudNodeError"),
             "error_message": str(message or f"CycleCloud node entered state {state}"),
-            "instance_id": node_id,
             "resource_id": cluster_name,
             "node_array": node_array,
             "cc_state": state,
-        }]
+        }
+        if node_id not in (None, ""):
+            node_error["instance_id"] = str(node_id)
+        return [node_error]
 
     # ------------------------------------------------------------------
     # acquire_hosts
@@ -623,7 +629,7 @@ class CycleCloudHandler(AzureHandler):
         operation_id = result.get("operationId", "")
         operation_location = create_response.get("headers", {}).get("Location")
         created_sets = result.get("sets", [])
-        fleet_errors: list[dict[str, Any]] = []
+        fleet_errors: list[ProviderErrorEntry] = []
         added_count = 0
 
         for node_set in created_sets:
@@ -663,6 +669,7 @@ class CycleCloudHandler(AzureHandler):
                 "added_count": added_count,
                 "resource_group": template.resource_group,
                 "location": template.location,
+                "error_codes": collect_provider_error_codes(fleet_errors),
                 "fleet_errors": fleet_errors,
                 "cyclecloud_url": base_url,
                 "cyclecloud_credential_path": session_context.credential_path,

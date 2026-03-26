@@ -42,6 +42,7 @@ from orb.providers.azure.infrastructure.error_utils import (
     canonical_azure_error_code,
     extract_azure_error_details,
 )
+from orb.providers.infrastructure.error_codes import ProviderErrorEntry
 from orb.providers.azure.infrastructure.handlers.azure_handler import AzureHandler
 from orb.providers.azure.domain.template.value_objects import AzureVMSSOrchestrationMode
 
@@ -229,6 +230,7 @@ class VMSSHandler(AzureHandler):
                     "location": location,
                     "provisioning_state": "creating",
                     "operation_status": "submitted",
+                    "error_codes": [],
                     # Azure async create returns resource tracking first and instances later.
                     # Mark the submit attempt as final so generic top-up retry logic does not
                     # reissue the same create request and duplicate resources.
@@ -841,9 +843,9 @@ class VMSSHandler(AzureHandler):
         *,
         instance_id: str,
         vmss_name: str,
-    ) -> list[dict[str, Any]]:
+    ) -> list[ProviderErrorEntry]:
         """Extract provisioning failures from Azure instance view statuses."""
-        errors: list[dict[str, Any]] = []
+        errors: list[ProviderErrorEntry] = []
 
         for status in statuses:
             code = str(_status_attr(status, "code", "") or "")
@@ -855,14 +857,15 @@ class VMSSHandler(AzureHandler):
             if not is_failure:
                 continue
 
-            errors.append({
+            vm_error: ProviderErrorEntry = {
                 "error_code": "ProvisioningStateFailed",
                 "error_message": str(message or display_status or code or "Azure provisioning failed"),
                 "instance_id": instance_id,
                 "resource_id": vmss_name,
                 "status_code": code,
                 "status_level": level or None,
-            })
+            }
+            errors.append(vm_error)
 
         return errors
 

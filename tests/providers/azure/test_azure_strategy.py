@@ -1648,7 +1648,11 @@ class TestSpotPlacementPlanning:
     def test_create_instances_uses_planned_handler_path(self, strategy, monkeypatch):
         handler = MagicMock()
         handler.acquire_hosts.side_effect = [
-            {"success": False, "error_message": "AllocationFailed: No capacity in selected zone"},
+            {
+                "success": False,
+                "error_message": "AllocationFailed: No capacity in selected zone",
+                "provider_data": {"error_codes": ["AllocationFailed"]},
+            },
             {"success": True, "resource_ids": ["vmss-b"], "instances": []},
         ]
         strategy._handlers["VMSS"] = handler

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import re
 from typing import Any, Callable
 
 from orb.application.services.spot_placement_planner import PlacementPlanEntry
@@ -132,7 +131,9 @@ class SpotPlacementExecutionService:
                     "resource_ids": [],
                     "instances": [],
                     "error_message": self._format_launch_error(exc),
-                    "provider_data": {},
+                    "provider_data": {
+                        "error_codes": [exc.error_code] if getattr(exc, "error_code", None) else [],
+                    },
                 }
             child_result = self._normalize_child_result(
                 plan_entry=plan_entry,
@@ -180,12 +181,7 @@ class SpotPlacementExecutionService:
 
     @staticmethod
     def _format_launch_error(exc: Exception) -> str:
-        """Format a launch exception preserving the error code for extraction.
-
-        Domain exceptions carry an ``error_code`` attribute (e.g.
-        ``AllocationFailed``).  Prefix the message with the code so that
-        ``_extract_error_codes`` can recover it via the Azure-style regex.
-        """
+        """Format a launch exception while keeping the visible error code prefix."""
         error_code = getattr(exc, "error_code", None)
         message = str(exc)
         if error_code and not message.startswith(f"{error_code}:"):
@@ -219,7 +215,6 @@ class SpotPlacementExecutionService:
             "instances": instances,
             "error_message": error_message,
             "error_codes": SpotPlacementExecutionService._extract_error_codes(
-                error_message=error_message,
                 provider_data=provider_data,
             ),
             "provider_data": provider_data,
@@ -227,30 +222,16 @@ class SpotPlacementExecutionService:
 
     @staticmethod
     def _extract_error_codes(
-        error_message: str | None,
         provider_data: dict[str, Any],
     ) -> list[str]:
         error_codes: list[str] = []
 
-        for error_entry in provider_data.get("fleet_errors", []) or []:
-            if isinstance(error_entry, dict) and error_entry.get("error_code"):
-                error_codes.append(str(error_entry["error_code"]))
-
-        for error_entry in provider_data.get("errors", []) or []:
-            if isinstance(error_entry, dict) and error_entry.get("error_code"):
-                error_codes.append(str(error_entry["error_code"]))
-
-        if error_message:
-            aws_match = re.search(r"AWS Error:\s*([A-Za-z0-9._-]+)\s*-", error_message)
-            if aws_match:
-                error_codes.append(aws_match.group(1))
-
-            azure_match = re.match(r"([A-Za-z][A-Za-z0-9._-]+):", error_message)
-            if azure_match:
-                error_codes.append(azure_match.group(1))
-
-            simple_code_match = re.fullmatch(r"[A-Za-z][A-Za-z0-9._-]+", error_message.strip())
-            if simple_code_match:
-                error_codes.append(simple_code_match.group(0))
+        direct_error_codes = provider_data.get("error_codes", [])
+        if isinstance(direct_error_codes, (list, tuple, set)):
+            for error_code in direct_error_codes:
+                if error_code:
+                    error_codes.append(str(error_code))
+        elif direct_error_codes:
+            error_codes.append(str(direct_error_codes))
 
         return list(dict.fromkeys(error_codes))

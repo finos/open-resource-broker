@@ -58,6 +58,10 @@ from orb.providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
 )
 from orb.providers.aws.utilities.aws_operations import AWSOperations
+from orb.providers.infrastructure.error_codes import (
+    ProviderErrorEntry,
+    collect_provider_error_codes,
+)
 
 
 @injectable
@@ -182,6 +186,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     "resource_type": "ec2_fleet",
                     "fleet_type": fleet_type_value,
                     "fleet_errors": fleet_errors,
+                    "error_codes": collect_provider_error_codes(fleet_errors),
                     "fulfillment_final": fleet_type is not AWSFleetType.INSTANT,
                     "capacity_constrained": capacity_constrained,
                 },
@@ -192,6 +197,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 "resource_ids": [],
                 "instances": [],
                 "error_message": str(e),
+                "provider_data": {"error_codes": []},
             }
 
     def _create_fleet_internal(self, request: Request, aws_template: AWSTemplate) -> dict[str, Any]:
@@ -289,38 +295,44 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 instance_ids.append(instance_id)
         return instance_ids
 
-    def _extract_fleet_errors(self, response: dict[str, Any]) -> list[dict[str, Any]]:
+    def _extract_fleet_errors(self, response: dict[str, Any]) -> list[ProviderErrorEntry]:
         """Normalize EC2 Fleet error payloads for logging and persistence."""
         errors = response.get("Errors") or []
         if isinstance(errors, dict):
             errors = [errors]
         if not isinstance(errors, list):
-            return [{"error_code": "Unknown", "error_message": str(errors)}]
+            unknown_error: ProviderErrorEntry = {
+                "error_code": "Unknown",
+                "error_message": str(errors),
+            }
+            return [unknown_error]
 
-        normalized: list[dict[str, Any]] = []
+        normalized: list[ProviderErrorEntry] = []
         for error in errors:
             if not isinstance(error, dict):
-                normalized.append(
-                    {"error_code": "Unknown", "error_message": str(error), "lifecycle": None}
-                )
+                normalized_error: ProviderErrorEntry = {
+                    "error_code": "Unknown",
+                    "error_message": str(error),
+                    "lifecycle": None,
+                }
+                normalized.append(normalized_error)
                 continue
 
             lt_overrides = error.get("LaunchTemplateAndOverrides", {}) or {}
             lt_spec = lt_overrides.get("LaunchTemplateSpecification", {}) or {}
             overrides = lt_overrides.get("Overrides", {}) or {}
 
-            normalized.append(
-                {
-                    "error_code": error.get("ErrorCode", "Unknown"),
-                    "error_message": error.get("ErrorMessage", "No message"),
-                    "lifecycle": error.get("Lifecycle"),
-                    "launch_template_id": lt_spec.get("LaunchTemplateId"),
-                    "launch_template_version": lt_spec.get("Version"),
-                    "subnet_id": overrides.get("SubnetId"),
-                    "instance_type": overrides.get("InstanceType"),
-                    "instance_requirements": overrides.get("InstanceRequirements"),
-                }
-            )
+            normalized_error: ProviderErrorEntry = {
+                "error_code": error.get("ErrorCode", "Unknown"),
+                "error_message": error.get("ErrorMessage", "No message"),
+                "lifecycle": error.get("Lifecycle"),
+                "launch_template_id": lt_spec.get("LaunchTemplateId"),
+                "launch_template_version": lt_spec.get("Version"),
+                "subnet_id": overrides.get("SubnetId"),
+                "instance_type": overrides.get("InstanceType"),
+                "instance_requirements": overrides.get("InstanceRequirements"),
+            }
+            normalized.append(normalized_error)
 
         return normalized
 
@@ -328,7 +340,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         self,
         request: Request,
         fleet_id: str,
-        errors: list[dict[str, Any]],
+        errors: list[ProviderErrorEntry],
         response: dict[str, Any],
         instance_ids: list[str],
     ) -> dict[str, Any]:

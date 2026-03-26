@@ -265,6 +265,7 @@ class SingleVMHandler(AzureHandler):
                 # resubmit the deployment and create duplicate VMs.
                 "fulfillment_final": True,
                 "deployment_name": submitted_deployment_name,
+                "error_codes": [],
                 "fleet_errors": [],
                 "submitted_vms": operation_tracking,
             },

@@ -35,6 +35,7 @@ def test_create_instances_uses_planned_handler_path(monkeypatch):
         {
             "success": False,
             "error_message": "AWS Error: InsufficientInstanceCapacity - no capacity available",
+            "provider_data": {"error_codes": ["InsufficientInstanceCapacity"]},
         },
         {"success": True, "resource_ids": ["fleet-b"], "instances": []},
     ]
