@@ -11,20 +11,15 @@ Important limitation:
 - Azure Flexible VMSS does not expose an AWS-ASG-style "detach these exact
   instances and decrement desired capacity for them" flow.
 - Scaling in first can let Azure choose different victims than the caller
-  requested, so Flexible VMSS termination in this provider submits explicit VM
-  deletes first and reconciles VMSS capacity later.
-- That deferred reconciliation is currently tracked in process memory by the
-  Azure strategy. This is intentional current behavior: a narrow best-effort
-  operational follow-up, not a durable workflow guarantee across process
-  restarts.
-- If we need durable reconciliation later, treat that as explicit future work
-  and persist only the minimal reconciliation reference needed to resume it.
+  requested, so VMSS termination in this provider uses exact-instance deletion
+  and, when needed, a narrow follow-up that deletes the VMSS after it is empty.
 """
 
 from __future__ import annotations
 
 import uuid
-from typing import Any, Optional
+from dataclasses import dataclass
+from typing import Any, Optional, Protocol, cast
 
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.request.aggregate import Request
@@ -83,6 +78,20 @@ def _status_attr(status: Any, attr: str, default: Any = None) -> Any:
     return default
 
 
+class _AzureVmWithIdentity(Protocol):
+    name: Optional[str]
+    vm_id: Optional[str]
+
+
+@dataclass(frozen=True)
+class _AzureVmIdentity:
+    """Normalized identity fields across Azure VM and VMSS VM SDK shapes."""
+
+    instance_id: str
+    vm_id: str
+    vm_name: Optional[str]
+
+
 def _build_vmss_delete_instance_ids(instance_ids: list[str]) -> Any:
     """Build the VMSS delete payload using the SDK model when available."""
     try:
@@ -90,6 +99,26 @@ def _build_vmss_delete_instance_ids(instance_ids: list[str]) -> Any:
     except ImportError:
         return {"instance_ids": instance_ids}
     return VirtualMachineScaleSetVMInstanceRequiredIDs(instance_ids=instance_ids)
+
+
+def _read_vm_identity(vm: Any) -> _AzureVmIdentity:
+    """Normalize VM identity across VMSS VM and regular VM SDK objects.
+
+    Microsoft documents `VirtualMachineScaleSetVM` with `name`, `instance_id`,
+    and `vm_id`, while regular `VirtualMachine` objects expose `name` and
+    `vm_id` but not `instance_id`. Flexible VMSS listing uses regular VM
+    objects, so `name` becomes the stable machine identifier when
+    `instance_id` is absent.
+    """
+    typed_vm = cast(_AzureVmWithIdentity, vm)
+    vm_name = typed_vm.name
+    instance_id = str(_status_attr(vm, "instance_id", "") or vm_name or "")
+    vm_id = str(typed_vm.vm_id or instance_id)
+    return _AzureVmIdentity(
+        instance_id=instance_id,
+        vm_id=vm_id,
+        vm_name=vm_name,
+    )
 
 
 @injectable
@@ -269,7 +298,7 @@ class VMSSHandler(AzureHandler):
 
     def check_hosts_status(self, request: Request) -> list[dict[str, Any]]:
         """Return instance details for every VM in the VMSS(es)."""
-        resource_ids: list[str] = getattr(request, "resource_ids", []) or []
+        resource_ids = request.resource_ids
         if not resource_ids:
             self._logger.warning("check_hosts_status called with no resource_ids")
             return []
@@ -333,23 +362,41 @@ class VMSSHandler(AzureHandler):
         compute = self.azure_client.compute_client
         orchestration_mode = self._get_vmss_orchestration_mode(resource_group, vmss_name)
 
-        delete_vmss = context.get("delete_vmss", False)
+        delete_vmss = bool(context.get("delete_vmss", False))
 
         if delete_vmss:
             if orchestration_mode == AzureVMSSOrchestrationMode.FLEXIBLE:
                 attached_vms = self._list_vmss_instances(
                     resource_group, vmss_name, include_instance_view=False
                 )
-                for vm in attached_vms:
-                    vm_name = vm.get("instance_id")
-                    if not vm_name:
-                        continue
-                    # Fire-and-forget: deletion is async; status is
-                    # reconciled by the caller via check_hosts_status polling.
-                    compute.virtual_machines.begin_delete(
-                        resource_group_name=resource_group,
-                        vm_name=vm_name,
-                    )
+                attached_vm_names = [
+                    str(vm.get("instance_id"))
+                    for vm in attached_vms
+                    if vm.get("instance_id")
+                ]
+                if attached_vm_names:
+                    for vm_name in attached_vm_names:
+                        # Fire-and-forget: deletion is async; status is
+                        # reconciled by the caller via check_hosts_status polling.
+                        compute.virtual_machines.begin_delete(
+                            resource_group_name=resource_group,
+                            vm_name=vm_name,
+                        )
+                    return {
+                        "provider_data": {
+                            "resource_group": resource_group,
+                            "vmss_name": vmss_name,
+                            "operation_status": "submitted",
+                            "submitted_deletions": [
+                                {"vm_name": vm_name} for vm_name in attached_vm_names
+                            ],
+                            "pending_vmss_cleanup": self._build_pending_vmss_cleanup(
+                                resource_group=resource_group,
+                                vmss_name=vmss_name,
+                                machine_ids=attached_vm_names,
+                            ),
+                        }
+                    }
             # Delete the entire VMSS
             self._logger.info(
                 "Deleting entire VMSS '%s' in resource group '%s'",
@@ -377,185 +424,197 @@ class VMSSHandler(AzureHandler):
                     f"Failed to delete VMSS '{vmss_name}': {exc}",
                     resource_ids=[vmss_name],
                 ) from exc
-        elif machine_ids:
-            current_capacity = self._get_vmss_capacity(resource_group, vmss_name)
-            new_capacity = max(0, current_capacity - len(machine_ids))
+        if not machine_ids:
+            return None
 
-            # Native-first cleanup for Flexible VMSS: if this return removes the last
-            # member, delete the scale set
-            if (
-                orchestration_mode == AzureVMSSOrchestrationMode.FLEXIBLE
-                and new_capacity == 0
-            ):
-                self._logger.info(
-                    "Deleting flexible VMSS '%s' directly because return would leave it empty",
-                    vmss_name,
-                )
-                try:
+        delete_vmss_when_empty = self._should_delete_vmss_when_empty(
+            resource_group=resource_group,
+            vmss_name=vmss_name,
+            orchestration_mode=orchestration_mode,
+            machine_ids=machine_ids,
+        )
+
+        self._logger.info(
+            "Deleting %d instance(s) from VMSS '%s'",
+            len(machine_ids),
+            vmss_name,
+        )
+        try:
+            if orchestration_mode == AzureVMSSOrchestrationMode.FLEXIBLE:
+                submitted_deletions: list[dict[str, Any]] = []
+                for vm_name in machine_ids:
                     # Fire-and-forget: deletion is async; the caller
                     # reconciles completion via check_hosts_status polling.
-                    compute.virtual_machine_scale_sets.begin_delete(
+                    compute.virtual_machines.begin_delete(
                         resource_group_name=resource_group,
-                        vm_scale_set_name=vmss_name,
+                        vm_name=str(vm_name),
                     )
-                    self._logger.info("Submitted delete for VMSS '%s'", vmss_name)
-                    return {
-                        "provider_data": {
-                            "resource_group": resource_group,
-                            "vmss_name": vmss_name,
-                            "operation_status": "submitted",
-                            "delete_vmss": True,
-                        }
-                    }
-                except Exception as exc:
-                    raise TerminationError(
-                        f"Failed to delete VMSS '{vmss_name}': {exc}",
-                        resource_ids=[vmss_name],
-                    ) from exc
-
-            if (
-                orchestration_mode != AzureVMSSOrchestrationMode.FLEXIBLE
-                and new_capacity != current_capacity
-            ):
-                self._scale_vmss_capacity(resource_group, vmss_name, new_capacity)
-
-            # Delete specific instances from the VMSS
-            self._logger.info(
-                "Deleting %d instance(s) from VMSS '%s'",
-                len(machine_ids),
-                vmss_name,
+                    submitted_deletions.append({"vm_name": str(vm_name)})
+                self._logger.info(
+                    "Submitted delete for %d flexible VMSS instance(s) from '%s'",
+                    len(machine_ids),
+                    vmss_name,
                 )
-            try:
-                if orchestration_mode == AzureVMSSOrchestrationMode.FLEXIBLE:
-                    submitted_deletions: list[dict[str, Any]] = []
-                    for vm_name in machine_ids:
-                        # Fire-and-forget: deletion is async; the caller
-                        # reconciles completion via check_hosts_status polling.
-                        compute.virtual_machines.begin_delete(
-                            resource_group_name=resource_group,
-                            vm_name=str(vm_name),
-                        )
-                        submitted_deletions.append(
-                            {
-                                "vm_name": str(vm_name),
-                            }
-                        )
-                    self._logger.info(
-                        "Submitted delete for %d flexible VMSS instance(s) from '%s'",
-                        len(machine_ids),
-                        vmss_name,
+                if delete_vmss_when_empty:
+                    self._submit_vmss_delete_if_emptying(
+                        resource_group=resource_group,
+                        vmss_name=vmss_name,
                     )
-                    return {
-                        "provider_data": {
-                            "resource_group": resource_group,
-                            "vmss_name": vmss_name,
-                            "operation_status": "submitted",
-                            "submitted_deletions": submitted_deletions,
-                            "pending_reconciliation": {
-                                "resource_group": resource_group,
-                                "vmss_name": vmss_name,
-                                "machine_ids": [str(machine_id) for machine_id in machine_ids],
-                                "target_capacity": new_capacity,
-                                "orchestration_mode": orchestration_mode.value,
-                                "delete_vmss_when_empty": new_capacity == 0,
-                            },
-                        }
+                return {
+                    "provider_data": {
+                        "resource_group": resource_group,
+                        "vmss_name": vmss_name,
+                        "operation_status": "submitted",
+                        "submitted_deletions": submitted_deletions,
+                        **self._release_cleanup_provider_data(
+                            resource_group=resource_group,
+                            vmss_name=vmss_name,
+                            machine_ids=machine_ids,
+                            delete_vmss_when_empty=delete_vmss_when_empty,
+                        ),
                     }
-                else:
-                    resolved_instance_ids = self._resolve_vmss_instance_ids(
+                }
+
+            resolved_instance_ids = self._resolve_vmss_instance_ids(
+                resource_group=resource_group,
+                vmss_name=vmss_name,
+                machine_ids=machine_ids,
+            )
+            # Fire-and-forget: deletion is async; the caller
+            # reconciles completion via check_hosts_status polling.
+            compute.virtual_machine_scale_sets.begin_delete_instances(
+                resource_group_name=resource_group,
+                vm_scale_set_name=vmss_name,
+                vm_instance_i_ds=_build_vmss_delete_instance_ids(
+                    resolved_instance_ids
+                ),
+            )
+            self._logger.info(
+                "Submitted delete for %d instance(s) from VMSS '%s'",
+                len(resolved_instance_ids),
+                vmss_name,
+            )
+            if delete_vmss_when_empty:
+                self._submit_vmss_delete_if_emptying(
+                    resource_group=resource_group,
+                    vmss_name=vmss_name,
+                )
+            return {
+                "provider_data": {
+                    "resource_group": resource_group,
+                    "vmss_name": vmss_name,
+                    "operation_status": "submitted",
+                    "resolved_instance_ids": resolved_instance_ids,
+                    **self._release_cleanup_provider_data(
                         resource_group=resource_group,
                         vmss_name=vmss_name,
                         machine_ids=machine_ids,
-                    )
-                    # Fire-and-forget: deletion is async; the caller
-                    # reconciles completion via check_hosts_status polling.
-                    compute.virtual_machine_scale_sets.begin_delete_instances(
-                        resource_group_name=resource_group,
-                        vm_scale_set_name=vmss_name,
-                        vm_instance_i_ds=_build_vmss_delete_instance_ids(
-                            resolved_instance_ids
-                        ),
-                    )
-                    self._logger.info(
-                        "Submitted delete for %d instance(s) from VMSS '%s'",
-                        len(resolved_instance_ids),
-                        vmss_name,
-                    )
-                    return {
-                        "provider_data": {
-                            "resource_group": resource_group,
-                            "vmss_name": vmss_name,
-                            "operation_status": "submitted",
-                            "resolved_instance_ids": resolved_instance_ids,
-                            "pending_reconciliation": {
-                                "resource_group": resource_group,
-                                "vmss_name": vmss_name,
-                                "machine_ids": [str(machine_id) for machine_id in machine_ids],
-                                "target_capacity": new_capacity,
-                                "orchestration_mode": orchestration_mode.value,
-                                "delete_vmss_when_empty": new_capacity == 0,
-                            }
-                            if new_capacity == 0
-                            else None,
-                        }
-                    }
-            except Exception as exc:
-                raise TerminationError(
-                    f"Failed to delete instances from VMSS '{vmss_name}': {exc}",
-                    resource_ids=machine_ids,
-                ) from exc
-        return None
+                        delete_vmss_when_empty=delete_vmss_when_empty,
+                    ),
+                }
+            }
+        except Exception as exc:
+            raise TerminationError(
+                f"Failed to delete instances from VMSS '{vmss_name}': {exc}",
+                resource_ids=machine_ids,
+            ) from exc
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _get_vmss_capacity(self, resource_group: str, vmss_name: str) -> int:
-        """Return the current desired VMSS capacity."""
-        if self.azure_resource_manager:
-            capacity_info = self.azure_resource_manager.get_vmss_capacity(
+    @staticmethod
+    def _build_pending_vmss_cleanup(
+        *,
+        resource_group: str,
+        vmss_name: str,
+        machine_ids: list[str],
+    ) -> dict[str, Any]:
+        return {
+            "resource_group": resource_group,
+            "vmss_name": vmss_name,
+            "machine_ids": [str(machine_id) for machine_id in machine_ids],
+            "delete_vmss_when_empty": True,
+        }
+
+    def _release_cleanup_provider_data(
+        self,
+        *,
+        resource_group: str,
+        vmss_name: str,
+        machine_ids: list[str],
+        delete_vmss_when_empty: bool,
+    ) -> dict[str, Any]:
+        if not delete_vmss_when_empty:
+            return {}
+
+        return {
+            "pending_vmss_cleanup": self._build_pending_vmss_cleanup(
                 resource_group=resource_group,
                 vmss_name=vmss_name,
+                machine_ids=machine_ids,
             )
-            return int(capacity_info.get("capacity") or 0)
+        }
 
-        vmss = self.azure_client.compute_client.virtual_machine_scale_sets.get(
-            resource_group_name=resource_group,
-            vm_scale_set_name=vmss_name,
-        )
-        sku = getattr(vmss, "sku", None)
-        return int(getattr(sku, "capacity", 0) or 0)
-
-    def _scale_vmss_capacity(self, resource_group: str, vmss_name: str, capacity: int) -> None:
-        """Scale a VMSS before deleting instances so replacements are not created."""
-        self._logger.info(
-            "Reducing VMSS '%s' capacity to %d before instance deletion",
-            vmss_name,
-            capacity,
-        )
-        if self.azure_resource_manager:
-            self.azure_resource_manager.scale_vmss(
-                resource_group=resource_group,
-                vmss_name=vmss_name,
-                capacity=capacity,
+    def _submit_vmss_delete_if_emptying(
+        self,
+        *,
+        resource_group: str,
+        vmss_name: str,
+    ) -> None:
+        """Best-effort VMSS delete submission when this return should empty the scale set."""
+        try:
+            self.azure_client.compute_client.virtual_machine_scale_sets.begin_delete(
+                resource_group_name=resource_group,
+                vm_scale_set_name=vmss_name,
             )
-            return
+            self._logger.info(
+                "Submitted immediate delete for VMSS '%s' because return should empty it",
+                vmss_name,
+            )
+        except Exception as exc:
+            self._logger.info(
+                "Immediate delete submission for VMSS '%s' did not succeed; async cleanup will retry: %s",
+                vmss_name,
+                exc,
+            )
 
-        vmss = self.azure_client.compute_client.virtual_machine_scale_sets.get(
-            resource_group_name=resource_group,
-            vm_scale_set_name=vmss_name,
+    def _should_delete_vmss_when_empty(
+        self,
+        *,
+        resource_group: str,
+        vmss_name: str,
+        orchestration_mode: AzureVMSSOrchestrationMode,
+        machine_ids: list[str],
+    ) -> bool:
+        """Return whether deleting these exact members would leave the VMSS empty."""
+        if not machine_ids:
+            return False
+
+        current_members = self._list_vmss_instances(
+            resource_group=resource_group,
+            vmss_name=vmss_name,
+            include_instance_view=False,
         )
-        vmss.sku.capacity = capacity
-        self.azure_client.compute_client.virtual_machine_scale_sets.begin_create_or_update(
-            resource_group_name=resource_group,
-            vm_scale_set_name=vmss_name,
-            parameters=vmss,
+        if not current_members:
+            return False
+
+        current_member_count = len(current_members)
+        if orchestration_mode == AzureVMSSOrchestrationMode.FLEXIBLE:
+            requested_ids = {str(machine_id) for machine_id in machine_ids if machine_id not in (None, "")}
+            return bool(requested_ids) and len(requested_ids) == current_member_count
+
+        resolved_instance_ids = self._resolve_vmss_instance_ids(
+            resource_group=resource_group,
+            vmss_name=vmss_name,
+            machine_ids=machine_ids,
         )
-        self._logger.info(
-            "Submitted fallback VMSS scale for '%s' to capacity %d",
-            vmss_name,
-            capacity,
-        )
+        requested_ids = {
+            str(instance_id)
+            for instance_id in resolved_instance_ids
+            if instance_id not in (None, "")
+        }
+        return bool(requested_ids) and len(requested_ids) == current_member_count
 
     def _resolve_vmss_instance_ids(
         self,
@@ -586,7 +645,7 @@ class VMSSHandler(AzureHandler):
                 if vm_id:
                     lookup[str(vm_id)] = vmss_instance_id
 
-                vm_name = getattr(vm, "name", None)
+                vm_name = _read_vm_identity(vm).vm_name
                 if vm_name:
                     lookup[str(vm_name)] = vmss_instance_id
 
@@ -721,16 +780,23 @@ class VMSSHandler(AzureHandler):
                 continue
 
             if include_instance_view:
+                vm_name = _read_vm_identity(vm).vm_name
+                if not vm_name:
+                    self._logger.warning(
+                        "Skipping flexible VMSS VM without a name in '%s'",
+                        vmss_name,
+                    )
+                    continue
                 try:
                     vm = compute.virtual_machines.get(
                         resource_group_name=resource_group,
-                        vm_name=getattr(vm, "name"),
+                        vm_name=vm_name,
                         expand="instanceView",
                     )
                 except Exception as exc:
                     self._logger.warning(
                         "Failed to fetch instance view for flexible VMSS VM '%s': %s",
-                        getattr(vm, "name", "unknown"),
+                        vm_name,
                         exc,
                     )
 
@@ -765,8 +831,7 @@ class VMSSHandler(AzureHandler):
         self, vm: Any, vmss_name: str, resource_group: str
     ) -> dict[str, Any]:
         """Convert an Azure SDK VirtualMachineScaleSetVM to a normalised dict."""
-        instance_id = getattr(vm, "instance_id", None) or getattr(vm, "name", "")
-        vm_id = getattr(vm, "vm_id", instance_id)
+        vm_identity = _read_vm_identity(vm)
 
         # Extract status
         status = "unknown"
@@ -775,7 +840,7 @@ class VMSSHandler(AzureHandler):
             status = _resolve_power_state(instance_view.statuses)
             fleet_errors = self._extract_vm_errors(
                 instance_view.statuses,
-                instance_id=str(instance_id),
+                instance_id=vm_identity.instance_id,
                 vmss_name=vmss_name,
             )
         else:
@@ -813,7 +878,7 @@ class VMSSHandler(AzureHandler):
 
         return {
             # Use VMSS instance_id as canonical machine id (Azure delete_instances expects this shape).
-            "instance_id": str(instance_id),
+            "instance_id": vm_identity.instance_id,
             "status": status,
             "private_ip": private_ip,
             "public_ip": public_ip,
@@ -827,8 +892,9 @@ class VMSSHandler(AzureHandler):
                 "resource_id": vmss_name,
                 "vmss_name": vmss_name,
                 "resource_group": resource_group,
-                "vmss_instance_id": instance_id,
-                "vm_id": vm_id,
+                "vmss_instance_id": vm_identity.instance_id,
+                "vm_id": vm_identity.vm_id,
+                "vm_name": vm_identity.vm_name,
                 "location": location,
                 "nic_id": network_identity["nic_id"],
                 "nic_name": network_identity["nic_name"],

@@ -71,15 +71,11 @@ class MachineSyncService:
             # machines being returned — not resource-level discovery which returns all
             # ASG/fleet instances including unrelated ones.
             if request.request_type.value == "return" and request.machine_ids:
-                resource_mapping = {
-                    str(machine.machine_id.value): (str(machine.resource_id), 1)
-                    for machine in db_machines
-                    if getattr(machine, "resource_id", None)
-                }
+                resource_mapping = self._build_return_resource_mapping(request, db_machines)
                 resource_ids = {
-                    str(machine.resource_id)
-                    for machine in db_machines
-                    if getattr(machine, "resource_id", None)
+                    resource_id
+                    for resource_id, _ordinal in resource_mapping.values()
+                    if resource_id not in (None, "")
                 }
                 operation_type = ProviderOperationType.GET_INSTANCE_STATUS
                 parameters = {
@@ -195,6 +191,49 @@ class MachineSyncService:
     def _build_request_metadata(request: Request) -> dict:
         """Merge durable request metadata with persisted provider follow-up context."""
         return merge_request_metadata_with_follow_up_context(request)
+
+    def _build_return_resource_mapping(
+        self,
+        request: Request,
+        db_machines: list[Machine],
+    ) -> dict[str, tuple[str, int]]:
+        """Map return-request machine IDs to resource IDs using DB state and follow-up context."""
+        mapping: dict[str, tuple[str, int]] = {}
+
+        for machine in db_machines:
+            resource_id = getattr(machine, "resource_id", None)
+            machine_id = getattr(getattr(machine, "machine_id", None), "value", None)
+            if resource_id in (None, "") or machine_id in (None, ""):
+                continue
+            mapping[str(machine_id)] = (str(resource_id), 1)
+
+        request_metadata = self._build_request_metadata(request)
+        termination_requests = request_metadata.get("termination_requests")
+        if not isinstance(termination_requests, list):
+            return mapping
+
+        requested_ids = {str(machine_id) for machine_id in request.machine_ids}
+        for termination_request in termination_requests:
+            if not isinstance(termination_request, dict):
+                continue
+            pending_cleanup = termination_request.get("pending_vmss_cleanup")
+            if not isinstance(pending_cleanup, dict):
+                continue
+
+            vmss_name = pending_cleanup.get("vmss_name")
+            if vmss_name in (None, ""):
+                continue
+
+            pending_machine_ids = pending_cleanup.get("machine_ids", [])
+            if not isinstance(pending_machine_ids, list):
+                continue
+
+            for machine_id in pending_machine_ids:
+                machine_id_str = str(machine_id)
+                if machine_id_str and machine_id_str in requested_ids:
+                    mapping.setdefault(machine_id_str, (str(vmss_name), 1))
+
+        return mapping
 
     def _create_machine_from_processed_data(
         self, processed_data: dict, request: Request

@@ -84,3 +84,27 @@ class TestReturnRequestCompletion:
             provider_metadata={},
         )
         assert status == RequestStatus.COMPLETED.value
+
+    def test_return_request_without_provider_machines_stays_in_progress_while_follow_up_pending(self):
+        status, message = self.svc.determine_status_from_machines(
+            db_machines=[],
+            provider_machines=[],
+            request=self.req,
+            provider_metadata={"termination_follow_up_pending": True},
+        )
+        assert status == RequestStatus.IN_PROGRESS.value
+        assert "follow-up cleanup" in message
+
+    def test_return_request_with_all_terminated_stays_in_progress_while_follow_up_pending(self):
+        machines = [
+            _make_machine(MachineStatus.TERMINATED),
+            _make_machine(MachineStatus.TERMINATED),
+        ]
+        status, message = self.svc.determine_status_from_machines(
+            db_machines=machines,  # type: ignore[arg-type]
+            provider_machines=machines,  # type: ignore[arg-type]
+            request=self.req,
+            provider_metadata={"termination_follow_up_pending": True},
+        )
+        assert status == RequestStatus.IN_PROGRESS.value
+        assert "follow-up cleanup" in message

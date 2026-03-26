@@ -233,12 +233,10 @@ class TestReturnValidationFix:
                 "provider_data": {
                     "termination_requests": [
                         {
-                            "pending_reconciliation": {
+                            "pending_vmss_cleanup": {
                                 "resource_group": "test-rg",
                                 "vmss_name": "vmss-demo",
                                 "machine_ids": ["machine-001"],
-                                "target_capacity": 0,
-                                "orchestration_mode": "Flexible",
                                 "delete_vmss_when_empty": True,
                             }
                         }
@@ -256,7 +254,7 @@ class TestReturnValidationFix:
         request.set_provider_data.assert_called_once()
         persisted_provider_data = request.set_provider_data.call_args.args[0]
         assert persisted_provider_data["follow_up_context"]["termination_requests"][0][
-            "pending_reconciliation"
+            "pending_vmss_cleanup"
         ]["vmss_name"] == "vmss-demo"
         saved_request = self.mock_uow.requests.save.call_args[0][0]
         assert saved_request is updated_request

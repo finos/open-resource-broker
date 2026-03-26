@@ -7,7 +7,7 @@ initialise, execute each operation type, health checks, capabilities, cleanup.
 import asyncio
 
 import pytest
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 from orb.application.services.spot_placement_planner import (
     PlacementCandidate,
@@ -109,6 +109,21 @@ class TestCapabilities:
 
 
 class TestCapacityMetadata:
+    def test_current_vmss_member_count_uses_resource_manager_api(self, strategy):
+        strategy._resource_manager = MagicMock()
+        strategy._resource_manager.get_vmss_member_count.return_value = 3
+
+        member_count = strategy._current_vmss_member_count(
+            resource_group="test-rg",
+            vmss_name="vmss-demo",
+        )
+
+        assert member_count == 3
+        strategy._resource_manager.get_vmss_member_count.assert_called_once_with(
+            resource_group="test-rg",
+            vmss_name="vmss-demo",
+        )
+
     def test_vmss_capacity_uses_provisioned_instance_count(self, strategy):
         strategy._resource_manager = MagicMock()
         strategy._resource_manager.get_vmss_capacity.return_value = {
@@ -301,19 +316,13 @@ class TestCapacityMetadata:
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
         strategy._handlers["VMSS"] = handler
-        strategy._pending_vmss_termination_reconciliations[("test-rg", "vmss-demo")] = {
-            "resource_group": "test-rg",
-            "vmss_name": "vmss-demo",
-            "machine_ids": ["vmss-demo_000001"],
-            "target_capacity": 0,
-            "orchestration_mode": "Flexible",
-            "delete_vmss_when_empty": True,
-        }
 
         compute_client = MagicMock()
         azure_client = MagicMock()
         azure_client.compute_client = compute_client
         strategy._client = azure_client
+        strategy._resource_manager = MagicMock()
+        strategy._resource_manager.get_vmss_member_count.return_value = 0
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
@@ -323,7 +332,19 @@ class TestCapacityMetadata:
                 "template_id": "tmpl-1",
                 "resource_id": "vmss-demo",
                 "resource_mapping": {"vmss-demo_000001": ("vmss-demo", 1)},
-                "request_metadata": {"resource_group": "test-rg"},
+                "request_metadata": {
+                    "resource_group": "test-rg",
+                    "termination_requests": [
+                        {
+                            "pending_vmss_cleanup": {
+                                "resource_group": "test-rg",
+                                "vmss_name": "vmss-demo",
+                                "machine_ids": ["vmss-demo_000001"],
+                                "delete_vmss_when_empty": True,
+                            }
+                        }
+                    ],
+                },
             },
         )
 
@@ -335,7 +356,7 @@ class TestCapacityMetadata:
             resource_group_name="test-rg",
             vm_scale_set_name="vmss-demo",
         )
-        assert ("test-rg", "vmss-demo") not in strategy._pending_vmss_termination_reconciliations
+        assert result.metadata["termination_follow_up_pending"] is True
 
     def test_describe_resource_instances_adds_shortfall_summary(self, strategy):
         handler = MagicMock()
@@ -880,19 +901,17 @@ class TestTerminateInstances:
         assert result.metadata["method"] == "dry_run"
         handler.release_hosts.assert_not_called()
 
-    def test_terminate_instances_records_pending_vmss_reconciliation(self, azure_config, logger):
+    def test_terminate_instances_records_pending_vmss_cleanup(self, azure_config, logger):
         strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
         strategy.initialize()
 
         handler = MagicMock()
         handler.release_hosts.return_value = {
             "provider_data": {
-                "pending_reconciliation": {
+                "pending_vmss_cleanup": {
                     "resource_group": "test-rg",
                     "vmss_name": "vmss-prod-b",
                     "machine_ids": ["orb-1"],
-                    "target_capacity": 2,
-                    "orchestration_mode": "Flexible",
                     "delete_vmss_when_empty": False,
                 }
             }
@@ -913,14 +932,18 @@ class TestTerminateInstances:
         result = _run(strategy.execute_operation(op))
 
         assert result.success
-        assert (
-            strategy._pending_vmss_termination_reconciliations[("test-rg", "vmss-prod-b")][
-                "target_capacity"
-            ]
-            == 2
-        )
+        assert result.metadata["provider_data"]["termination_requests"] == [
+            {
+                "pending_vmss_cleanup": {
+                    "resource_group": "test-rg",
+                    "vmss_name": "vmss-prod-b",
+                    "machine_ids": ["orb-1"],
+                    "delete_vmss_when_empty": False,
+                }
+            }
+        ]
 
-    def test_terminate_instances_merges_pending_vmss_reconciliation_for_same_vmss(
+    def test_terminate_instances_merges_pending_vmss_cleanup_for_same_vmss(
         self, azure_config, logger
     ):
         strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
@@ -930,24 +953,20 @@ class TestTerminateInstances:
         handler.release_hosts.side_effect = [
             {
                 "provider_data": {
-                    "pending_reconciliation": {
+                    "pending_vmss_cleanup": {
                         "resource_group": "test-rg",
                         "vmss_name": "vmss-prod-b",
                         "machine_ids": ["orb-1"],
-                        "target_capacity": 4,
-                        "orchestration_mode": "Flexible",
                         "delete_vmss_when_empty": False,
                     }
                 }
             },
             {
                 "provider_data": {
-                    "pending_reconciliation": {
+                    "pending_vmss_cleanup": {
                         "resource_group": "test-rg",
                         "vmss_name": "vmss-prod-b",
                         "machine_ids": ["orb-2"],
-                        "target_capacity": 4,
-                        "orchestration_mode": "Flexible",
                         "delete_vmss_when_empty": False,
                     }
                 }
@@ -981,16 +1000,28 @@ class TestTerminateInstances:
 
         assert first_result.success
         assert second_result.success
-        assert strategy._pending_vmss_termination_reconciliations[("test-rg", "vmss-prod-b")] == {
-            "resource_group": "test-rg",
-            "vmss_name": "vmss-prod-b",
-            "machine_ids": ["orb-1", "orb-2"],
-            "target_capacity": 4,
-            "orchestration_mode": "Flexible",
-            "delete_vmss_when_empty": False,
-        }
+        assert first_result.metadata["provider_data"]["termination_requests"] == [
+            {
+                "pending_vmss_cleanup": {
+                    "resource_group": "test-rg",
+                    "vmss_name": "vmss-prod-b",
+                    "machine_ids": ["orb-1"],
+                    "delete_vmss_when_empty": False,
+                }
+            }
+        ]
+        assert second_result.metadata["provider_data"]["termination_requests"] == [
+            {
+                "pending_vmss_cleanup": {
+                    "resource_group": "test-rg",
+                    "vmss_name": "vmss-prod-b",
+                    "machine_ids": ["orb-2"],
+                    "delete_vmss_when_empty": False,
+                }
+            }
+        ]
 
-    def test_get_instance_status_restores_pending_vmss_reconciliation_from_request_metadata(
+    def test_get_instance_status_restores_pending_vmss_cleanup_from_request_metadata(
         self, azure_config, logger
     ):
         strategy = AzureProviderStrategy(
@@ -1003,6 +1034,7 @@ class TestTerminateInstances:
         strategy._handlers = {"VMSS": handler}
 
         resource_manager = MagicMock()
+        resource_manager.get_vmss_member_count.return_value = 0
         strategy._resource_manager = resource_manager
 
         azure_client = MagicMock()
@@ -1019,12 +1051,10 @@ class TestTerminateInstances:
                     "resource_group": "test-rg",
                     "termination_requests": [
                         {
-                            "pending_reconciliation": {
+                            "pending_vmss_cleanup": {
                                 "resource_group": "test-rg",
                                 "vmss_name": "vmss-prod-b",
                                 "machine_ids": ["orb-1"],
-                                "target_capacity": 0,
-                                "orchestration_mode": "Flexible",
                                 "delete_vmss_when_empty": True,
                             }
                         }
@@ -1040,7 +1070,7 @@ class TestTerminateInstances:
             resource_group_name="test-rg",
             vm_scale_set_name="vmss-prod-b",
         )
-        assert ("test-rg", "vmss-prod-b") not in strategy._pending_vmss_termination_reconciliations
+        assert result.metadata["termination_follow_up_pending"] is True
 
     def test_terminate_instances_forwards_cyclecloud_secret_reference_request_metadata(self, azure_config, logger):
         strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
@@ -1392,25 +1422,16 @@ class TestDescribeResourceInstances:
         assert not result.success
         assert result.error_code == "MISSING_PROVIDER_API"
 
-    def test_describe_resource_instances_reconciles_pending_flexible_vmss_scale_down(self, strategy):
+    def test_describe_resource_instances_cleans_up_empty_vmss_when_requested_members_are_gone(
+        self, strategy
+    ):
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
         handler.get_vmss_resource_errors.return_value = []
         strategy._handlers["VMSS"] = handler
         strategy._resource_manager = MagicMock()
-        strategy._resource_manager.get_vmss_capacity.return_value = {
-            "capacity": 2,
-            "provisioned_instance_count": 0,
-            "provisioning_state": "Updating",
-        }
-        strategy._pending_vmss_termination_reconciliations[("test-rg", "vmss-demo")] = {
-            "resource_group": "test-rg",
-            "vmss_name": "vmss-demo",
-            "machine_ids": ["vm-a"],
-            "target_capacity": 2,
-            "orchestration_mode": "Flexible",
-            "delete_vmss_when_empty": False,
-        }
+        strategy._resource_manager.get_vmss_member_count.return_value = 0
+        strategy._client = MagicMock()
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
@@ -1418,21 +1439,76 @@ class TestDescribeResourceInstances:
                 "resource_ids": ["vmss-demo"],
                 "provider_api": "VMSS",
                 "template_id": "tmpl-1",
-                "request_metadata": {"resource_group": "test-rg"},
+                "request_metadata": {
+                    "resource_group": "test-rg",
+                    "termination_requests": [
+                        {
+                            "pending_vmss_cleanup": {
+                                "resource_group": "test-rg",
+                                "vmss_name": "vmss-demo",
+                                "machine_ids": ["vm-a"],
+                                "delete_vmss_when_empty": True,
+                            }
+                        }
+                    ],
+                },
             },
         )
 
         result = _run(strategy.execute_operation(op))
 
         assert result.success
-        strategy._resource_manager.scale_vmss.assert_called_once_with(
+        strategy._client.compute_client.virtual_machine_scale_sets.begin_delete.assert_called_once_with(
+            resource_group_name="test-rg",
+            vm_scale_set_name="vmss-demo",
+        )
+        assert result.metadata["termination_follow_up_pending"] is True
+
+    def test_describe_resource_instances_clears_pending_cleanup_after_vmss_is_gone(
+        self, strategy
+    ):
+        handler = MagicMock()
+        handler.check_hosts_status.return_value = []
+        handler.get_vmss_resource_errors.return_value = []
+        strategy._handlers["VMSS"] = handler
+        strategy._resource_manager = MagicMock()
+        strategy._resource_manager.vmss_exists.return_value = False
+        strategy._client = MagicMock()
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
+            parameters={
+                "resource_ids": ["vmss-demo"],
+                "provider_api": "VMSS",
+                "template_id": "tmpl-1",
+                "request_metadata": {
+                    "resource_group": "test-rg",
+                    "termination_requests": [
+                        {
+                            "pending_vmss_cleanup": {
+                                "resource_group": "test-rg",
+                                "vmss_name": "vmss-demo",
+                                "machine_ids": ["vm-a"],
+                                "delete_vmss_when_empty": True,
+                                "delete_submitted": True,
+                            }
+                        }
+                    ],
+                },
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert result.success
+        strategy._resource_manager.vmss_exists.assert_called_once_with(
             resource_group="test-rg",
             vmss_name="vmss-demo",
-            capacity=2,
         )
-        assert ("test-rg", "vmss-demo") not in strategy._pending_vmss_termination_reconciliations
+        strategy._client.compute_client.virtual_machine_scale_sets.begin_delete.assert_not_called()
+        assert result.metadata["termination_follow_up_pending"] is False
 
-    def test_describe_resource_instances_does_not_reconcile_when_strict_vmss_status_fails(
+    def test_describe_resource_instances_does_not_cleanup_when_strict_vmss_status_fails(
         self, strategy
     ):
         handler = MagicMock()
@@ -1441,14 +1517,6 @@ class TestDescribeResourceInstances:
         )
         strategy._handlers["VMSS"] = handler
         strategy._resource_manager = MagicMock()
-        strategy._pending_vmss_termination_reconciliations[("test-rg", "vmss-demo")] = {
-            "resource_group": "test-rg",
-            "vmss_name": "vmss-demo",
-            "machine_ids": ["vm-a"],
-            "target_capacity": 2,
-            "orchestration_mode": "Flexible",
-            "delete_vmss_when_empty": False,
-        }
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
@@ -1456,7 +1524,19 @@ class TestDescribeResourceInstances:
                 "resource_ids": ["vmss-demo"],
                 "provider_api": "VMSS",
                 "template_id": "tmpl-1",
-                "request_metadata": {"resource_group": "test-rg"},
+                "request_metadata": {
+                    "resource_group": "test-rg",
+                    "termination_requests": [
+                        {
+                            "pending_vmss_cleanup": {
+                                "resource_group": "test-rg",
+                                "vmss_name": "vmss-demo",
+                                "machine_ids": ["vm-a"],
+                                "delete_vmss_when_empty": True,
+                            }
+                        }
+                    ],
+                },
             },
         )
 
@@ -1464,12 +1544,11 @@ class TestDescribeResourceInstances:
 
         assert not result.success
         assert result.error_code == "DESCRIBE_RESOURCE_INSTANCES_ERROR"
-        strategy._resource_manager.scale_vmss.assert_not_called()
-        assert ("test-rg", "vmss-demo") in strategy._pending_vmss_termination_reconciliations
+        strategy._resource_manager.get_vmss_member_count.assert_not_called()
         forwarded_request = handler.check_hosts_status.call_args.args[0]
         assert forwarded_request.metadata["fail_on_partial_status_error"] is True
 
-    def test_describe_resource_instances_reconciles_pending_flexible_vmss_scale_down_for_all_resources(
+    def test_describe_resource_instances_leaves_cleanup_pending_when_other_members_remain(
         self, strategy
     ):
         handler = MagicMock()
@@ -1477,62 +1556,40 @@ class TestDescribeResourceInstances:
         handler.get_vmss_resource_errors.return_value = []
         strategy._handlers["VMSS"] = handler
         strategy._resource_manager = MagicMock()
-        strategy._resource_manager.get_vmss_capacity.side_effect = [
-            {
-                "capacity": 2,
-                "provisioned_instance_count": 0,
-                "provisioning_state": "Updating",
-            },
-            {
-                "capacity": 1,
-                "provisioned_instance_count": 0,
-                "provisioning_state": "Updating",
-            },
-        ]
-        strategy._pending_vmss_termination_reconciliations[("test-rg", "vmss-a")] = {
-            "resource_group": "test-rg",
-            "vmss_name": "vmss-a",
-            "machine_ids": ["vm-a"],
-            "target_capacity": 2,
-            "orchestration_mode": "Flexible",
-            "delete_vmss_when_empty": False,
-        }
-        strategy._pending_vmss_termination_reconciliations[("test-rg", "vmss-b")] = {
-            "resource_group": "test-rg",
-            "vmss_name": "vmss-b",
-            "machine_ids": ["vm-b"],
-            "target_capacity": 1,
-            "orchestration_mode": "Flexible",
-            "delete_vmss_when_empty": False,
-        }
+        strategy._resource_manager.get_vmss_member_count.return_value = 1
+        strategy._client = MagicMock()
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
             parameters={
-                "resource_ids": ["vmss-a", "vmss-b"],
+                "resource_ids": ["vmss-b"],
                 "provider_api": "VMSS",
                 "template_id": "tmpl-1",
-                "request_metadata": {"resource_group": "test-rg"},
+                "request_metadata": {
+                    "resource_group": "test-rg",
+                    "termination_requests": [
+                        {
+                            "pending_vmss_cleanup": {
+                                "resource_group": "test-rg",
+                                "vmss_name": "vmss-b",
+                                "machine_ids": ["vm-b"],
+                                "delete_vmss_when_empty": True,
+                            }
+                        }
+                    ],
+                },
             },
         )
 
         result = _run(strategy.execute_operation(op))
 
         assert result.success
-        assert strategy._resource_manager.scale_vmss.call_args_list == [
-            call(
-                resource_group="test-rg",
-                vmss_name="vmss-a",
-                capacity=2,
-            ),
-            call(
-                resource_group="test-rg",
-                vmss_name="vmss-b",
-                capacity=1,
-            ),
-        ]
-        assert ("test-rg", "vmss-a") not in strategy._pending_vmss_termination_reconciliations
-        assert ("test-rg", "vmss-b") not in strategy._pending_vmss_termination_reconciliations
+        strategy._resource_manager.get_vmss_member_count.assert_called_once_with(
+            resource_group="test-rg",
+            vmss_name="vmss-b",
+        )
+        assert result.metadata["termination_follow_up_pending"] is True
+        strategy._client.compute_client.virtual_machine_scale_sets.begin_delete.assert_not_called()
 
     def test_describe_resource_instances_forwards_cyclecloud_request_metadata(self, strategy):
         handler = MagicMock()

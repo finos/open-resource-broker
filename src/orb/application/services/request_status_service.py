@@ -30,11 +30,23 @@ class RequestStatusService:
         """Determine request status from machine states."""
         try:
             db_machine_count = len(db_machines)
+            follow_up_pending_message = (
+                "Return in progress: awaiting provider follow-up cleanup"
+            )
+            termination_follow_up_pending = bool(
+                provider_metadata.get("termination_follow_up_pending", False)
+            )
 
             # Determine new status based on request type
             if request.request_type.value == "return":
-                # For return requests: empty provider_machines means instances are gone from AWS → COMPLETED
+                # For return requests, provider disappearance is only final once
+                # any provider-owned follow-up cleanup has also completed.
                 if not provider_machines:
+                    if termination_follow_up_pending:
+                        return (
+                            RequestStatus.IN_PROGRESS.value,
+                            follow_up_pending_message,
+                        )
                     return (
                         RequestStatus.COMPLETED.value,
                         f"Return request completed: all machines terminated "
@@ -53,6 +65,15 @@ class RequestStatusService:
 
                 # shutting-down/stopping are transient — only terminated/stopped are truly done
                 effectively_done_count = terminated_count
+                if (
+                    effectively_done_count == total_count
+                    and running_count == 0
+                    and termination_follow_up_pending
+                ):
+                    return (
+                        RequestStatus.IN_PROGRESS.value,
+                        follow_up_pending_message,
+                    )
                 if effectively_done_count == total_count and running_count == 0:
                     return (
                         RequestStatus.COMPLETED.value,

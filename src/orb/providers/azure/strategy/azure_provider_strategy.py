@@ -7,8 +7,8 @@ to the appropriate handlers via the VMSS / SingleVM infrastructure layer.
 from __future__ import annotations
 
 import time
-from dataclasses import replace
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING, Any, Callable, Optional, Protocol, cast
 
 from orb.application.services.spot_placement_planner import (
     PlacementScore,
@@ -50,6 +50,58 @@ from orb.providers.base.strategy import (
     ProviderStrategy,
 )
 
+class _AzureVmWithName(Protocol):
+    name: Optional[str]
+
+
+@dataclass
+class PendingVmssCleanup:
+    """Provider-owned follow-up state for empty-VMSS cleanup."""
+
+    resource_group: str
+    vmss_name: str
+    machine_ids: list[str]
+    delete_vmss_when_empty: bool
+    delete_submitted: bool = False
+
+    @classmethod
+    def from_metadata(cls, metadata: dict[str, Any]) -> Optional["PendingVmssCleanup"]:
+        resource_group = metadata.get("resource_group")
+        vmss_name = metadata.get("vmss_name")
+        raw_machine_ids = metadata.get("machine_ids", [])
+        if resource_group in (None, "") or vmss_name in (None, ""):
+            return None
+        if not isinstance(raw_machine_ids, list):
+            return None
+
+        machine_ids = []
+        for machine_id in raw_machine_ids:
+            machine_id_str = str(machine_id)
+            if machine_id_str and machine_id_str not in machine_ids:
+                machine_ids.append(machine_id_str)
+
+        return cls(
+            resource_group=str(resource_group),
+            vmss_name=str(vmss_name),
+            machine_ids=machine_ids,
+            delete_vmss_when_empty=bool(metadata.get("delete_vmss_when_empty", False)),
+            delete_submitted=bool(metadata.get("delete_submitted", False)),
+        )
+
+    def combine_for_same_vmss(self, other: "PendingVmssCleanup") -> "PendingVmssCleanup":
+        merged_machine_ids = list(self.machine_ids)
+        for machine_id in other.machine_ids:
+            if machine_id not in merged_machine_ids:
+                merged_machine_ids.append(machine_id)
+
+        return PendingVmssCleanup(
+            resource_group=self.resource_group,
+            vmss_name=self.vmss_name,
+            machine_ids=merged_machine_ids,
+            delete_vmss_when_empty=self.delete_vmss_when_empty or other.delete_vmss_when_empty,
+            delete_submitted=self.delete_submitted or other.delete_submitted,
+        )
+
 
 @injectable
 class AzureProviderStrategy(ProviderStrategy):
@@ -82,7 +134,7 @@ class AzureProviderStrategy(ProviderStrategy):
         self._handlers: dict[str, AzureHandler] = {}
         self._spot_placement_planner = SpotPlacementPlanner()
         self._spot_placement_execution = SpotPlacementExecutionService()
-        self._pending_vmss_termination_reconciliations: dict[tuple[str, str], dict[str, Any]] = {}
+        self._pending_vmss_cleanups: dict[tuple[str, str], PendingVmssCleanup] = {}
 
     # ------------------------------------------------------------------
     # Lazy-initialised properties
@@ -931,7 +983,7 @@ class AzureProviderStrategy(ProviderStrategy):
                             resource_id=resource_id,
                             context=context,
                         )
-                        self._record_pending_vmss_reconciliation(handler_result)
+                        self._record_pending_vmss_cleanup(handler_result)
                         if isinstance(handler_result, dict):
                             provider_data = handler_result.get("provider_data")
                             if isinstance(provider_data, dict):
@@ -942,7 +994,7 @@ class AzureProviderStrategy(ProviderStrategy):
                         resource_id=default_resource_id or "unknown",
                         context=context,
                     )
-                    self._record_pending_vmss_reconciliation(handler_result)
+                    self._record_pending_vmss_cleanup(handler_result)
                     if isinstance(handler_result, dict):
                         provider_data = handler_result.get("provider_data")
                         if isinstance(provider_data, dict):
@@ -1013,7 +1065,7 @@ class AzureProviderStrategy(ProviderStrategy):
                     "MISSING_RESOURCE_GROUP",
                 )
 
-            self._restore_pending_vmss_reconciliations(operation)
+            self._restore_pending_vmss_cleanups(operation)
 
             handler_machines = self._get_instance_status_via_handlers(
                 operation=operation,
@@ -1025,24 +1077,36 @@ class AzureProviderStrategy(ProviderStrategy):
                 provider_api_value = (
                     provider_api.value if hasattr(provider_api, "value") else provider_api
                 )
+                resource_ids: list[str] = []
                 if provider_api_value in (
                     AzureProviderApi.VMSS.value,
                     AzureProviderApi.VMSS_UNIFORM.value,
                 ):
                     resource_ids = self._status_resource_ids(operation, instance_ids)
                     if resource_ids:
-                        self._maybe_reconcile_pending_vmss_termination(
+                        self._maybe_cleanup_pending_vmss(
                             resource_group=resource_group,
                             resource_ids=resource_ids,
                             instance_details=handler_machines,
                         )
+                metadata = {
+                    "operation": "get_instance_status",
+                    "instance_ids": instance_ids,
+                    "method": "handler",
+                }
+                if provider_api_value in (
+                    AzureProviderApi.VMSS.value,
+                    AzureProviderApi.VMSS_UNIFORM.value,
+                ):
+                    metadata.update(
+                        self._vmss_cleanup_status_metadata(
+                            resource_group=resource_group,
+                            resource_ids=resource_ids,
+                        )
+                    )
                 return ProviderResult.success_result(
                     {"machines": handler_machines, "queried_count": len(instance_ids)},
-                    {
-                        "operation": "get_instance_status",
-                        "instance_ids": instance_ids,
-                        "method": "handler"
-                    },
+                    metadata,
                 )
 
             azure_client = self.azure_client
@@ -1283,7 +1347,7 @@ class AzureProviderStrategy(ProviderStrategy):
         candidate_ids.discard("")
         return candidate_ids
 
-    def _record_pending_vmss_reconciliation(self, handler_result: Any) -> None:
+    def _record_pending_vmss_cleanup(self, handler_result: Any) -> None:
         if not isinstance(handler_result, dict):
             return
 
@@ -1291,50 +1355,27 @@ class AzureProviderStrategy(ProviderStrategy):
         if not isinstance(provider_data, dict):
             return
 
-        pending = provider_data.get("pending_reconciliation")
-        if not isinstance(pending, dict):
+        pending_metadata = provider_data.get("pending_vmss_cleanup")
+        if not isinstance(pending_metadata, dict):
             return
 
-        resource_group = pending.get("resource_group")
-        vmss_name = pending.get("vmss_name")
-        if not resource_group or not vmss_name:
+        pending = PendingVmssCleanup.from_metadata(pending_metadata)
+        if pending is None:
             return
 
-        key = (str(resource_group), str(vmss_name))
-        new_machine_ids = [str(machine_id) for machine_id in pending.get("machine_ids", [])]
-        merged_machine_ids: list[str] = []
-        for machine_id in (
-            *self._pending_vmss_termination_reconciliations.get(key, {}).get("machine_ids", []),
-            *new_machine_ids,
-        ):
-            if machine_id and machine_id not in merged_machine_ids:
-                merged_machine_ids.append(machine_id)
+        key = (pending.resource_group, pending.vmss_name)
+        existing = self._pending_vmss_cleanups.get(key)
+        self._pending_vmss_cleanups[key] = (
+            pending if existing is None else existing.combine_for_same_vmss(pending)
+        )
 
-        existing = self._pending_vmss_termination_reconciliations.get(key, {})
-        existing_target_capacity = existing.get("target_capacity")
-        new_target_capacity = int(pending.get("target_capacity", 0))
-        if existing_target_capacity is None:
-            target_capacity = new_target_capacity
-        else:
-            target_capacity = min(int(existing_target_capacity), new_target_capacity)
-
-        self._pending_vmss_termination_reconciliations[key] = {
-            "resource_group": str(resource_group),
-            "vmss_name": str(vmss_name),
-            "machine_ids": merged_machine_ids,
-            "target_capacity": target_capacity,
-            "orchestration_mode": str(pending.get("orchestration_mode", "Flexible")),
-            "delete_vmss_when_empty": bool(existing.get("delete_vmss_when_empty", False))
-            or bool(pending.get("delete_vmss_when_empty", False)),
-        }
-
-    def _restore_pending_vmss_reconciliations(self, operation: ProviderOperation) -> None:
-        """Rebuild pending VMSS reconciliation state from durable request metadata."""
+    def _restore_pending_vmss_cleanups(self, operation: ProviderOperation) -> None:
+        """Rebuild pending VMSS cleanup state from durable request metadata."""
         request_metadata = self._request_metadata(operation)
 
-        direct_pending = request_metadata.get("pending_reconciliation")
+        direct_pending = request_metadata.get("pending_vmss_cleanup")
         if isinstance(direct_pending, dict):
-            self._record_pending_vmss_reconciliation({"provider_data": request_metadata})
+            self._record_pending_vmss_cleanup({"provider_data": request_metadata})
 
         termination_requests = request_metadata.get("termination_requests")
         if not isinstance(termination_requests, list):
@@ -1342,9 +1383,9 @@ class AzureProviderStrategy(ProviderStrategy):
 
         for termination_request in termination_requests:
             if isinstance(termination_request, dict):
-                self._record_pending_vmss_reconciliation({"provider_data": termination_request})
+                self._record_pending_vmss_cleanup({"provider_data": termination_request})
 
-    def _has_pending_vmss_reconciliation(
+    def _has_pending_vmss_cleanup(
         self,
         *,
         resource_group: Optional[str],
@@ -1355,11 +1396,42 @@ class AzureProviderStrategy(ProviderStrategy):
 
         for resource_id in resource_ids:
             key = (str(resource_group), str(resource_id))
-            if key in self._pending_vmss_termination_reconciliations:
+            if key in self._pending_vmss_cleanups:
                 return True
         return False
 
-    def _maybe_reconcile_pending_vmss_termination(
+    def _vmss_cleanup_status_metadata(
+        self,
+        *,
+        resource_group: Optional[str],
+        resource_ids: list[str],
+    ) -> dict[str, Any]:
+        return {
+            "termination_follow_up_pending": self._has_pending_vmss_cleanup(
+                resource_group=resource_group,
+                resource_ids=resource_ids,
+            )
+        }
+
+    def _current_vmss_member_count(self, *, resource_group: str, vmss_name: str) -> Optional[int]:
+        if not self.resource_manager:
+            return None
+
+        return self.resource_manager.get_vmss_member_count(
+            resource_group=resource_group,
+            vmss_name=vmss_name,
+        )
+
+    def _vmss_exists(self, *, resource_group: str, vmss_name: str) -> Optional[bool]:
+        if not self.resource_manager:
+            return None
+
+        return self.resource_manager.vmss_exists(
+            resource_group=resource_group,
+            vmss_name=vmss_name,
+        )
+
+    def _maybe_cleanup_pending_vmss(
         self,
         *,
         resource_group: Optional[str],
@@ -1381,42 +1453,48 @@ class AzureProviderStrategy(ProviderStrategy):
             seen_vmss_names.add(vmss_name)
 
             key = (str(resource_group), vmss_name)
-            pending = self._pending_vmss_termination_reconciliations.get(key)
+            pending = self._pending_vmss_cleanups.get(key)
             if not pending:
                 continue
 
-            requested_ids = {str(machine_id) for machine_id in pending.get("machine_ids", [])}
+            requested_ids = set(pending.machine_ids)
             if not requested_ids:
-                self._pending_vmss_termination_reconciliations.pop(key, None)
+                self._pending_vmss_cleanups.pop(key, None)
+                continue
+
+            if pending.delete_submitted:
+                vmss_exists = self._vmss_exists(
+                    resource_group=str(resource_group),
+                    vmss_name=vmss_name,
+                )
+                if vmss_exists is False:
+                    self._pending_vmss_cleanups.pop(key, None)
                 continue
 
             if requested_ids & observed_ids:
                 continue
 
             try:
-                target_capacity = int(pending.get("target_capacity", 0))
-                orchestration_mode = str(pending.get("orchestration_mode", "Flexible"))
-
-                if orchestration_mode.lower() == "flexible" and target_capacity > 0:
-                    if self.resource_manager:
-                        self.resource_manager.scale_vmss(
-                            resource_group=str(resource_group),
-                            vmss_name=vmss_name,
-                            capacity=target_capacity,
-                        )
-
-                if pending.get("delete_vmss_when_empty"):
+                if pending.delete_vmss_when_empty:
+                    member_count = self._current_vmss_member_count(
+                        resource_group=str(resource_group),
+                        vmss_name=vmss_name,
+                    )
+                    if member_count is None or member_count > 0:
+                        continue
                     azure_client = self.azure_client
                     if azure_client:
                         azure_client.compute_client.virtual_machine_scale_sets.begin_delete(
                             resource_group_name=str(resource_group),
                             vm_scale_set_name=vmss_name,
                         )
+                        pending.delete_submitted = True
+                        continue
 
-                self._pending_vmss_termination_reconciliations.pop(key, None)
+                self._pending_vmss_cleanups.pop(key, None)
             except Exception as exc:
                 self._logger.warning(
-                    "Failed to reconcile pending VMSS termination for '%s' in '%s': %s",
+                    "Failed to clean up pending VMSS '%s' in '%s': %s",
                     vmss_name,
                     resource_group,
                     exc,
@@ -1478,7 +1556,7 @@ class AzureProviderStrategy(ProviderStrategy):
                 operation=operation,
                 resource_group=resource_group,
             )
-            self._restore_pending_vmss_reconciliations(operation)
+            self._restore_pending_vmss_cleanups(operation)
             if provider_api_value == AzureProviderApi.SINGLE_VM.value:
                 deployment_name = self._request_metadata(operation).get("deployment_name")
                 if deployment_name not in (None, ""):
@@ -1486,7 +1564,7 @@ class AzureProviderStrategy(ProviderStrategy):
             if provider_api_value in (
                 AzureProviderApi.VMSS.value,
                 AzureProviderApi.VMSS_UNIFORM.value,
-            ) and self._has_pending_vmss_reconciliation(
+            ) and self._has_pending_vmss_cleanup(
                 resource_group=resource_group,
                 resource_ids=resource_ids,
             ):
@@ -1503,11 +1581,20 @@ class AzureProviderStrategy(ProviderStrategy):
             request.resource_ids = resource_ids
 
             instance_details = handler.check_hosts_status(request)
-            self._maybe_reconcile_pending_vmss_termination(
+            self._maybe_cleanup_pending_vmss(
                 resource_group=resource_group,
                 resource_ids=resource_ids,
                 instance_details=instance_details,
             )
+            cleanup_metadata: dict[str, Any] = {}
+            if provider_api_value in (
+                AzureProviderApi.VMSS.value,
+                AzureProviderApi.VMSS_UNIFORM.value,
+            ):
+                cleanup_metadata = self._vmss_cleanup_status_metadata(
+                    resource_group=resource_group,
+                    resource_ids=resource_ids,
+                )
 
             if not instance_details:
                 metadata = {
@@ -1516,6 +1603,7 @@ class AzureProviderStrategy(ProviderStrategy):
                     "provider_api": provider_api_value,
                     "handler_used": provider_api_value,
                     "instance_count": 0,
+                    **cleanup_metadata,
                 }
                 if provider_api_value in (
                     AzureProviderApi.VMSS.value,
@@ -1559,6 +1647,7 @@ class AzureProviderStrategy(ProviderStrategy):
                 "provider_api": provider_api_value,
                 "handler_used": provider_api_value,
                 "instance_count": len(instance_details),
+                **cleanup_metadata,
             }
             if fleet_errors:
                 metadata["fleet_errors"] = fleet_errors
@@ -1833,9 +1922,10 @@ class AzureProviderStrategy(ProviderStrategy):
 
         hw = getattr(vm, "hardware_profile", None)
         network_identity = self.azure_client.resolve_network_identity_from_vm(vm)
+        vm_name = cast(_AzureVmWithName, vm).name
 
         return {
-            "instance_id": getattr(vm, "vm_id", getattr(vm, "name", "")),
+            "instance_id": getattr(vm, "vm_id", vm_name or ""),
             "status": status,
             "private_ip": network_identity["private_ip"],
             "public_ip": network_identity["public_ip"],
@@ -1846,7 +1936,7 @@ class AzureProviderStrategy(ProviderStrategy):
             "availability_zone": (getattr(vm, "zones", None) or [None])[0],
             "provider_type": "azure",
             "provider_data": {
-                "vm_name": getattr(vm, "name", None),
+                "vm_name": vm_name,
                 "location": getattr(vm, "location", None),
                 "provisioning_state": getattr(vm, "provisioning_state", None),
                 "nic_id": network_identity["nic_id"],

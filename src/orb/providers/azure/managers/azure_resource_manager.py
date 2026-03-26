@@ -74,7 +74,7 @@ class AzureResourceManager:
             )
             sku = getattr(vmss, "sku", None)
             orchestration_mode = getattr(vmss, "orchestration_mode", None) or "Flexible"
-            provisioned_instance_count = self._get_vmss_instance_count(
+            provisioned_instance_count = self.get_vmss_member_count(
                 resource_group=resource_group,
                 vmss_name=vmss_name,
                 orchestration_mode=str(orchestration_mode),
@@ -94,6 +94,27 @@ class AzureResourceManager:
             raise AzureInfrastructureError(
                 f"Failed to get VMSS capacity: {exc}"
             ) from exc
+
+    def get_vmss_member_count(
+        self,
+        resource_group: str,
+        vmss_name: str,
+        orchestration_mode: Optional[str] = None,
+    ) -> int:
+        """Return the number of provisioned instances currently attached to the VMSS."""
+        resolved_orchestration_mode = orchestration_mode
+        if resolved_orchestration_mode in (None, ""):
+            vmss = self._azure_client.compute_client.virtual_machine_scale_sets.get(
+                resource_group_name=resource_group,
+                vm_scale_set_name=vmss_name,
+            )
+            resolved_orchestration_mode = getattr(vmss, "orchestration_mode", None) or "Flexible"
+
+        return self._get_vmss_instance_count(
+            resource_group=resource_group,
+            vmss_name=vmss_name,
+            orchestration_mode=str(resolved_orchestration_mode),
+        )
 
     def _get_vmss_instance_count(
         self, resource_group: str, vmss_name: str, orchestration_mode: str
@@ -123,6 +144,32 @@ class AzureResourceManager:
                 "Failed to count VMSS instances for %s: %s", vmss_name, exc
             )
             return 0
+
+    def vmss_exists(self, resource_group: str, vmss_name: str) -> Optional[bool]:
+        """Return whether the VMSS still exists, or None if Azure could not be queried."""
+        try:
+            self._azure_client.compute_client.virtual_machine_scale_sets.get(
+                resource_group_name=resource_group,
+                vm_scale_set_name=vmss_name,
+            )
+            return True
+        except Exception as exc:
+            error_code = getattr(exc, "error_code", None)
+            if error_code in {"ResourceNotFound", "NotFound", "VMSSNotFoundError"}:
+                return False
+
+            status_code = getattr(exc, "status_code", None)
+            if status_code == 404:
+                return False
+
+            message = str(exc).lower()
+            if "not found" in message or "could not find" in message:
+                return False
+
+            self._logger.warning(
+                "Failed to determine whether VMSS %s exists: %s", vmss_name, exc
+            )
+            return None
 
     def scale_vmss(
         self, resource_group: str, vmss_name: str, capacity: int
