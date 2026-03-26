@@ -3,7 +3,7 @@
 import re
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from orb.infrastructure.interfaces.provider import BaseProviderConfig
 
@@ -58,7 +58,13 @@ class CycleCloudConfig(BaseModel):
 # ---------------------------------------------------------------------------
 
 class AzureProviderConfig(BaseProviderConfig):
-    """Configuration for the Azure provider (VMSS / Compute Fleet)."""
+    """Configuration for the Azure provider (VMSS / Compute Fleet).
+
+    The shared provider interface uses ``region`` across providers. Azure's
+    platform term is ``location``. This model keeps the shared ``region``
+    field to stay aligned with ``BaseProviderConfig`` while accepting
+    Azure-native ``location`` input at the boundary.
+    """
 
     model_config = ConfigDict(populate_by_name=True, extra="allow")
 
@@ -66,7 +72,11 @@ class AzureProviderConfig(BaseProviderConfig):
     # Provider identity
     # ------------------------------------------------------------------
     provider_type: str = Field("azure", description="Provider type identifier")
-    region: str = Field("eastus2", description="Azure region / location slug")
+    region: str = Field(
+        "eastus2",
+        description="Azure location slug",
+        validation_alias=AliasChoices("location", "region"),
+    )
 
     # ------------------------------------------------------------------
     # Azure subscription & resource targeting
@@ -111,6 +121,31 @@ class AzureProviderConfig(BaseProviderConfig):
     # ------------------------------------------------------------------
     # Validators
     # ------------------------------------------------------------------
+    @model_validator(mode="before")
+    @classmethod
+    def normalise_location_input(cls, data: object) -> object:
+        """Translate Azure-native ``location`` input onto the shared ``region`` field."""
+        if not isinstance(data, dict):
+            return data
+
+        data = dict(data)
+        location = data.get("location")
+        region = data.get("region")
+
+        if (
+            location not in (None, "")
+            and region not in (None, "")
+            and location != region
+        ):
+            raise ValueError(
+                "Azure provider config received conflicting 'location' and 'region' values"
+            )
+
+        if region in (None, "") and location not in (None, ""):
+            data["region"] = location
+
+        return data
+
     @field_validator("resource_group")
     @classmethod
     def validate_resource_group(cls, v: Optional[str]) -> Optional[str]:
@@ -141,3 +176,8 @@ class AzureProviderConfig(BaseProviderConfig):
                 "(xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)"
             )
         return v
+
+    @property
+    def location(self) -> str:
+        """Azure-native accessor for callers operating on Azure concepts."""
+        return self.region

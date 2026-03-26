@@ -45,6 +45,32 @@ from orb.providers.registry import ProviderRegistry
 
 
 class TestAzureProviderConfig:
+    def test_location_alias_populates_region(self):
+        config = AzureProviderConfig(
+            subscription_id="12345678-1234-1234-1234-123456789012",
+            location="westeurope",
+        )
+
+        assert config.region == "westeurope"
+        assert config.location == "westeurope"
+
+    def test_region_still_populates_location_accessor(self):
+        config = AzureProviderConfig(
+            subscription_id="12345678-1234-1234-1234-123456789012",
+            region="westeurope",
+        )
+
+        assert config.region == "westeurope"
+        assert config.location == "westeurope"
+
+    def test_conflicting_location_and_region_are_rejected(self):
+        with pytest.raises(ValueError, match="conflicting 'location' and 'region'"):
+            AzureProviderConfig(
+                subscription_id="12345678-1234-1234-1234-123456789012",
+                location="westeurope",
+                region="eastus2",
+            )
+
     def test_invalid_subscription_id(self):
         with pytest.raises(ValueError, match="subscription_id"):
             AzureProviderConfig(subscription_id="not-a-uuid")
@@ -107,6 +133,31 @@ class TestAzureProviderConfig:
 
 
 class TestTemplateValidation:
+    def test_region_alias_is_accepted_for_location(self):
+        result = validate_azure_template({
+            "template_id": "t1",
+            "vm_size": "Standard_D4s_v5",
+            "resource_group": "rg",
+            "region": "eastus2",
+            "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
+            "image": {"publisher": "C", "offer": "o", "sku": "s"},
+        })
+        assert result["valid"] is True
+
+    def test_conflicting_location_and_region_is_invalid(self):
+        result = validate_azure_template({
+            "template_id": "t1",
+            "vm_size": "Standard_D4s_v5",
+            "resource_group": "rg",
+            "location": "eastus2",
+            "region": "westeurope",
+            "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
+            "image": {"publisher": "C", "offer": "o", "sku": "s"},
+        })
+
+        assert result["valid"] is False
+        assert any("conflicting 'location' and 'region'" in e for e in result["errors"])
+
     def test_valid_template(self):
         result = validate_azure_template({
             "template_id": "t1",

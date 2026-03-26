@@ -78,7 +78,11 @@ class AzureTemplate(Template):
     )
     location: str = Field(
         ...,
-        description="Azure region, e.g. 'eastus2'.",
+        description=(
+            "Azure location, e.g. 'eastus2'. Azure templates use the Azure-native "
+            "term ``location`` even though shared provider config uses ``region``."
+        ),
+        validation_alias=AliasChoices("location", "region"),
     )
     subscription_id: Optional[str] = Field(
         default=None,
@@ -415,11 +419,30 @@ class AzureTemplate(Template):
         modifies state.  Conditional defaults that depend on other field
         values belong here so that every construction path (strategy,
         factory, test helpers) gets consistent behaviour.
+
+        Azure templates use ``location`` as the canonical field because this
+        is the Azure platform term. We still accept ``region`` at this input
+        boundary because provider-level config and some shared call paths use
+        the cross-provider ``region`` name.
         """
         if not isinstance(data, dict):
             return data
 
         data = dict(data)
+
+        location = data.get("location")
+        region = data.get("region")
+        if (
+            location not in (None, "")
+            and region not in (None, "")
+            and location != region
+        ):
+            raise ValueError(
+                "Azure templates received conflicting 'location' and 'region' values"
+            )
+        if location in (None, "") and region not in (None, ""):
+            data["location"] = region
+        data.pop("region", None)
 
         if "max_number" in data:
             if "max_instances" not in data:

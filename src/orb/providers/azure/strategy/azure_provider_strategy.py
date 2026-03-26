@@ -235,6 +235,8 @@ class AzureProviderStrategy(ProviderStrategy):
         if enhanced_config.get("resource_group") in (None, "") and self._azure_config.resource_group:
             enhanced_config["resource_group"] = self._azure_config.resource_group
         if enhanced_config.get("location") in (None, "") and self._azure_config.region:
+            # Provider config follows the shared ``region`` interface, but the
+            # Azure template model is Azure-native and owns ``location``.
             enhanced_config["location"] = self._azure_config.region
         if enhanced_config.get("subscription_id") in (None, "") and self._azure_config.subscription_id:
             enhanced_config["subscription_id"] = self._azure_config.subscription_id
