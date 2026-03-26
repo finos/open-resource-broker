@@ -196,6 +196,21 @@ class TestProviderRegistry:
         assert validator == "mock_validator"
         self.mock_validator_factory.assert_called_once()
 
+    def test_create_validator_passes_config_to_factory(self):
+        """Test validator creation forwards optional config."""
+        self.registry.register_provider(
+            provider_type="test_provider",
+            strategy_factory=self.mock_strategy_factory,
+            config_factory=self.mock_config_factory,
+            validator_factory=self.mock_validator_factory,
+        )
+
+        cfg = {"region": "us-east-1"}
+        validator = self.registry.create_validator("test_provider", cfg)
+
+        assert validator == "mock_validator"
+        self.mock_validator_factory.assert_called_once_with(cfg)
+
     def test_create_validator_no_factory(self):
         """Test validator creation when no factory is registered."""
         self.registry.register_provider(

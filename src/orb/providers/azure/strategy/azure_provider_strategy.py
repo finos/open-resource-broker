@@ -22,6 +22,7 @@ from orb.application.services.spot_placement_execution import (
 )
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
+from orb.providers.azure.capabilities import get_supported_api_capabilities, get_supported_apis
 from orb.providers.azure.configuration.config import AzureProviderConfig
 from orb.providers.azure.configuration.template_extension import AzureTemplateExtensionConfig
 from orb.providers.azure.configuration.validator import validate_azure_template
@@ -521,41 +522,8 @@ class AzureProviderStrategy(ProviderStrategy):
                 ProviderOperationType.HEALTH_CHECK,
             ],
             features={
-                "supported_apis": [
-                    AzureProviderApi.VMSS.value,
-                    AzureProviderApi.VMSS_UNIFORM.value,
-                    AzureProviderApi.SINGLE_VM.value,
-                    AzureProviderApi.CYCLECLOUD.value,
-                ],
-                "api_capabilities": {
-                    AzureProviderApi.VMSS.value: {
-                        "supported_fleet_types": [],
-                        "supports_spot": True,
-                        "supports_on_demand": True,
-                        "max_instances": 1000,
-                    },
-                    AzureProviderApi.VMSS_UNIFORM.value: {
-                        "supported_fleet_types": [],
-                        "supports_spot": True,
-                        "supports_on_demand": True,
-                        "max_instances": 1000,
-                    },
-                    AzureProviderApi.SINGLE_VM.value: {
-                        "supported_fleet_types": [],
-                        "supports_spot": True,
-                        "supports_on_demand": True,
-                        "max_instances": 1000,
-                    },
-                    AzureProviderApi.CYCLECLOUD.value: {
-                        "supported_fleet_types": [],
-                        "supports_spot": False,
-                        "supports_on_demand": True,
-                        "requires_existing_cluster": True,
-                        "required_create_fields": ["cluster_name", "node_array"],
-                        "capacity_limit_source": "cluster_status.maxCount",
-                        "supports_async_operations": True,
-                    },
-                },
+                "supported_apis": get_supported_apis(),
+                "api_capabilities": get_supported_api_capabilities(),
                 "instance_management": True,
                 "spot_instances": True,
                 "fleet_management": True,

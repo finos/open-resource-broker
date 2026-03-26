@@ -152,7 +152,7 @@ class TemplateValidationDomainService:
             if getattr(provider_config, "handlers", None) is None and getattr(
                 provider_config, "handler_overrides", None
             ) is None:
-                fallback_capabilities = self._get_strategy_based_capabilities(
+                fallback_capabilities = self._get_validator_based_capabilities(
                     provider_instance,
                     provider_config,
                 )
@@ -176,45 +176,43 @@ class TemplateValidationDomainService:
             features={"api_capabilities": api_capabilities},
         )
 
-    def _get_strategy_based_capabilities(
+    def _get_validator_based_capabilities(
         self,
         provider_instance: str,
         provider_config: Any,
     ) -> _ProviderCapabilities | None:
-        """Fallback to strategy-reported capabilities when config defaults are absent."""
+        """Fallback to validator-reported capabilities when config defaults are absent."""
         if self._provider_registry is None:
             return None
 
         try:
-            if not self._provider_registry.is_provider_instance_registered(provider_instance):
-                registered = self._provider_registry.ensure_provider_instance_registered_from_config(
-                    provider_config
-                )
-                if not registered:
-                    return None
-
-            strategy = self._provider_registry.get_or_create_strategy(provider_instance, provider_config)
-            if strategy is None:
+            validator = self._provider_registry.create_validator(
+                provider_config.type,
+                provider_config,
+            )
+            if validator is None:
                 return None
 
-            capabilities = strategy.get_capabilities()
-            supported_apis = list(
-                getattr(capabilities, "supported_apis", None)
-                or (getattr(capabilities, "features", {}) or {}).get("supported_apis", [])
-            )
-            features = dict(getattr(capabilities, "features", {}) or {})
-            if supported_apis and "supported_apis" not in features:
-                features["supported_apis"] = supported_apis
+            supported_apis = list(getattr(validator, "get_supported_provider_apis", lambda: [])() or [])
+            if not supported_apis:
+                return None
+
+            api_capabilities: dict[str, Any] = {}
+            for supported_api in supported_apis:
+                capability_resolver = getattr(validator, "get_api_capabilities", None)
+                if capability_resolver is None:
+                    continue
+                api_capabilities[supported_api] = dict(capability_resolver(supported_api) or {})
 
             return _ProviderCapabilities(
                 provider_type=provider_config.type,
                 supported_apis=supported_apis,
-                features=features,
+                features={"api_capabilities": api_capabilities},
             )
         except Exception as exc:
             if self.logger:
                 self.logger.debug(
-                    "Could not resolve strategy capabilities for %s: %s",
+                    "Could not resolve validator capabilities for %s: %s",
                     provider_instance,
                     exc,
                 )

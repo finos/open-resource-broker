@@ -95,6 +95,32 @@ def create_azure_config(data: dict[str, Any]) -> Any:
     except Exception as exc:
         raise RuntimeError(f"Failed to create Azure config: {exc!s}")
 
+
+def create_azure_validator(provider_config: Any = None) -> Any:
+    """Create an Azure template validator."""
+    from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
+    from orb.providers.azure.configuration.config import AzureProviderConfig
+    from orb.providers.azure.infrastructure.adapters.azure_validation_adapter import (
+        AzureValidationAdapter,
+    )
+
+    if provider_config is None:
+        return None
+
+    try:
+        if isinstance(provider_config, AzureProviderConfig):
+            azure_config = provider_config
+        elif hasattr(provider_config, "config"):
+            azure_config = AzureProviderConfig(**provider_config.config)
+        elif isinstance(provider_config, dict):
+            azure_config = AzureProviderConfig(**provider_config)
+        else:
+            return None
+
+        return AzureValidationAdapter(config=azure_config, logger=LoggingAdapter())
+    except Exception as exc:
+        raise RuntimeError(f"Failed to create Azure validator: {exc!s}")
+
 # ------------------------------------------------------------------
 # Provider registration
 # ------------------------------------------------------------------
@@ -110,6 +136,7 @@ def _register_named_azure_provider_instance(registry: "ProviderRegistry", instan
             provider_instance_name=instance_name,
         ),
         config_factory=create_azure_config,
+        validator_factory=create_azure_validator,
     )
 
 
@@ -135,6 +162,7 @@ def register_azure_provider(
                     provider_instance_name="azure-default",
                 ),
                 config_factory=create_azure_config,
+                validator_factory=create_azure_validator,
             )
 
         if logger:

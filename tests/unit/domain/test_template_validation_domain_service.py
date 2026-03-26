@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from orb.providers.base.strategy.provider_strategy import ProviderCapabilities, ProviderOperationType
 from orb.domain.base.results import ValidationLevel, ValidationResult
 from orb.domain.services.template_validation_domain_service import (
     TemplateValidationDomainService,
@@ -146,7 +145,7 @@ class TestTemplateValidationDomainService:
         assert result.is_valid is False
         assert any("Validation error" in e for e in result.errors)
 
-    def test_falls_back_to_strategy_capabilities_when_handler_defaults_are_unwired(self):
+    def test_falls_back_to_validator_capabilities_when_handler_defaults_are_unwired(self):
         provider_instance_config = MagicMock()
         provider_instance_config.name = "azure-default"
         provider_instance_config.type = "azure"
@@ -162,22 +161,14 @@ class TestTemplateValidationDomainService:
         config.get_provider_instance_config.return_value = provider_instance_config
         config.get_provider_config.return_value = provider_config_root
 
-        strategy = MagicMock()
-        strategy.get_capabilities.return_value = ProviderCapabilities(
-            provider_type="azure",
-            supported_operations=[ProviderOperationType.CREATE_INSTANCES],
-            supported_apis=["VMSS", "SingleVM"],
-            features={
-                "api_capabilities": {
-                    "VMSS": {"supports_spot": True, "supports_on_demand": True},
-                    "SingleVM": {"supports_spot": True, "supports_on_demand": True},
-                }
-            },
-        )
+        validator = MagicMock()
+        validator.get_supported_provider_apis.return_value = ["VMSS", "SingleVM"]
+        validator.get_api_capabilities.side_effect = lambda api: {
+            "VMSS": {"supports_spot": True, "supports_on_demand": True, "max_instances": 1000},
+            "SingleVM": {"supports_spot": True, "supports_on_demand": True, "max_instances": 1000},
+        }[api]
         provider_registry = MagicMock()
-        provider_registry.is_provider_instance_registered.return_value = False
-        provider_registry.ensure_provider_instance_registered_from_config.return_value = True
-        provider_registry.get_or_create_strategy.return_value = strategy
+        provider_registry.create_validator.return_value = validator
 
         self.svc.inject_dependencies(config, self.logger, provider_registry)
 
@@ -186,11 +177,48 @@ class TestTemplateValidationDomainService:
 
         assert result.is_valid is True
         assert result.errors == []
-        provider_registry.ensure_provider_instance_registered_from_config.assert_called_once_with(
-            provider_instance_config
+        provider_registry.create_validator.assert_called_once_with(
+            "azure",
+            provider_instance_config,
         )
+        validator.get_api_capabilities.assert_any_call("VMSS")
 
-    def test_explicit_empty_handler_override_does_not_fall_back_to_strategy_capabilities(self):
+    def test_validator_capability_fallback_preserves_spot_validation(self):
+        provider_instance_config = MagicMock()
+        provider_instance_config.name = "azure-default"
+        provider_instance_config.type = "azure"
+        provider_instance_config.handlers = None
+        provider_instance_config.handler_overrides = None
+        provider_instance_config.capabilities = None
+        provider_instance_config.get_effective_handlers = MagicMock(return_value={})
+
+        provider_config_root = MagicMock()
+        provider_config_root.provider_defaults = {}
+
+        config = MagicMock()
+        config.get_provider_instance_config.return_value = provider_instance_config
+        config.get_provider_config.return_value = provider_config_root
+
+        validator = MagicMock()
+        validator.get_supported_provider_apis.return_value = ["VMSS"]
+        validator.get_api_capabilities.return_value = {
+            "supports_spot": True,
+            "supports_on_demand": True,
+            "max_instances": 1000,
+        }
+        provider_registry = MagicMock()
+        provider_registry.create_validator.return_value = validator
+
+        self.svc.inject_dependencies(config, self.logger, provider_registry)
+
+        template = _make_template(provider_api="VMSS", price_type="spot")
+        result = self._run(template, provider_instance="azure-default")
+
+        assert result.is_valid is True
+        assert result.errors == []
+        assert "Pricing: Spot instances" in result.supported_features
+
+    def test_explicit_empty_handler_override_does_not_fall_back_to_validator_capabilities(self):
         provider_instance_config = MagicMock()
         provider_instance_config.name = "azure-default"
         provider_instance_config.type = "azure"
@@ -215,4 +243,4 @@ class TestTemplateValidationDomainService:
 
         assert result.is_valid is False
         assert any("Provider does not support API 'VMSS'" in e for e in result.errors)
-        provider_registry.ensure_provider_instance_registered_from_config.assert_not_called()
+        provider_registry.create_validator.assert_not_called()

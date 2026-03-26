@@ -27,6 +27,7 @@ from orb.providers.azure.infrastructure.azure_client import AzureClient
 from orb.providers.azure.managers.azure_resource_manager import AzureResourceManager
 from orb.providers.azure.registration import (
     create_azure_config,
+    create_azure_validator,
     register_azure_provider,
 )
 from orb.providers.azure.infrastructure.adapters.azure_validation_adapter import (
@@ -561,6 +562,15 @@ class TestAzureValidationAdapter:
         assert adapter.validate_provider_api("AzureFleet") is False
         assert "AzureFleet" not in adapter.get_supported_provider_apis()
 
+    def test_get_api_capabilities_reports_spot_support_for_vmss(self):
+        adapter = AzureValidationAdapter(config=AzureProviderConfig(), logger=MagicMock())
+
+        capabilities = adapter.get_api_capabilities("VMSS")
+
+        assert capabilities["supports_spot"] is True
+        assert capabilities["supports_on_demand"] is True
+        assert capabilities["max_instances"] == 1000
+
     def test_validate_template_configuration_rejects_spot_percentage_for_uniform(self):
         adapter = AzureValidationAdapter(config=AzureProviderConfig(), logger=MagicMock())
 
@@ -578,6 +588,17 @@ class TestAzureValidationAdapter:
 
         assert result["valid"] is False
         assert any("spot_percentage requires Flexible orchestration mode" in error for error in result["errors"])
+
+    def test_create_azure_validator_returns_adapter(self):
+        validator = create_azure_validator(
+            {
+                "subscription_id": "12345678-1234-1234-1234-123456789012",
+                "resource_group": "rg",
+                "region": "eastus2",
+            }
+        )
+
+        assert isinstance(validator, AzureValidationAdapter)
 
 
 class TestAzureMachineAdapter:

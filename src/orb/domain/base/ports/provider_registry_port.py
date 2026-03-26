@@ -80,6 +80,6 @@ class ProviderRegistryPort(ABC):
         pass  # type: ignore[return]
 
     @abstractmethod
-    def create_validator(self, provider_type: str) -> Optional[Any]:
+    def create_validator(self, provider_type: str, config: Any = None) -> Optional[Any]:
         """Create a template validator using the registered factory for the given provider type."""
         pass  # type: ignore[return]

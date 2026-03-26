@@ -4,7 +4,7 @@ from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.ports.provider_validation_port import BaseProviderValidationAdapter
 from orb.providers.azure import AzureProviderConfig
-from orb.providers.azure.domain.template.value_objects import AzureProviderApi
+from orb.providers.azure.capabilities import get_supported_api_capabilities, get_supported_apis
 from orb.providers.azure.configuration.validator import validate_azure_template
 
 
@@ -21,10 +21,9 @@ class AzureValidationAdapter(BaseProviderValidationAdapter):
     - Retrieves supported Azure provider APIs.
     - Identifies the provider type as Azure.
 
-    Note: this adapter is not yet registered in ``azure/registration.py``.
-    AWS's equivalent is wired via ``validator_factory`` in the provider
-    registry and used by ``ProviderValidationService``.  Azure should
-    follow the same pattern.
+    This adapter is wired via ``validator_factory`` in ``azure/registration.py``
+    so validation can use Azure-native capability metadata without
+    constructing the full provider strategy.
     """
     def __init__(self, config: AzureProviderConfig, logger: LoggingPort) -> None:
         """
@@ -52,7 +51,7 @@ class AzureValidationAdapter(BaseProviderValidationAdapter):
             True if the API is supported by azure configuration
         """
         try:
-            supported_apis = {provider_api.value for provider_api in AzureProviderApi}
+            supported_apis = set(get_supported_apis())
             is_valid = api in supported_apis
 
             if not is_valid:
@@ -62,8 +61,8 @@ class AzureValidationAdapter(BaseProviderValidationAdapter):
 
         except Exception as e:
             self._logger.error("Error validating azure provider API %s: %s", api, e)
-            # Fall back to the domain enum so validation still works without config-manager wiring.
-            return api in {provider_api.value for provider_api in AzureProviderApi}
+            # Fall back to canonical API names so validation still works without helper wiring.
+            return api in {"VMSS", "CycleCloud", "SingleVM", "VMSSUniform"}
 
     def get_supported_provider_apis(self) -> list[str]:
         """
@@ -73,11 +72,19 @@ class AzureValidationAdapter(BaseProviderValidationAdapter):
             List of supported azure provider API identifiers
         """
         try:
-            return sorted(provider_api.value for provider_api in AzureProviderApi)
+            return sorted(get_supported_apis())
         except Exception as e:
             self._logger.error("Error getting supported azure APIs: %s", e)
             # Fallback to hardcoded list for safety
             return ["VMSS", "CycleCloud", "SingleVM", "VMSSUniform"]
+
+    @staticmethod
+    def get_api_capabilities(api: str) -> dict[str, Any]:
+        """Get capability metadata for a specific Azure provider API."""
+        capabilities = get_supported_api_capabilities().get(api)
+        if capabilities is None:
+            raise ValueError(f"Unsupported Azure provider API: {api}")
+        return capabilities
 
     def validate_template_configuration(self, template_config: dict[str, Any]) -> dict[str, Any]:
         """Validate a complete Azure template configuration."""
