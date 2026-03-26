@@ -102,4 +102,4 @@ class AWSSpotPlacementScoreAdapter(SpotPlacementScoreAdapter):
     def _normalize_score(raw_score: int) -> float:
         if raw_score <= 0:
             return 0.0
-        return min(max(raw_score / 10.0, 0.0), 1.0)
+        return min(max(raw_score / 100.0, 0.0), 1.0)

@@ -141,3 +141,43 @@ def test_spot_placement_score_adapter_uses_canonical_machine_types():
 
     assert [score.candidate.instance_type for score in scores] == ["m7i.large", "m7i.xlarge"]
     assert ec2_client.get_spot_placement_scores.call_count == 2
+
+
+def test_spot_placement_score_adapter_preserves_aws_score_granularity():
+    ec2_client = MagicMock()
+    ec2_client.get_spot_placement_scores.return_value = {
+        "SpotPlacementScores": [{"Region": "eu-west-1", "Score": 90}]
+    }
+    aws_client = MagicMock()
+    aws_client.ec2_client = ec2_client
+
+    template = AWSTemplate.model_validate(
+        {
+            "template_id": "tmpl-aws",
+            "provider_api": "EC2Fleet",
+            "provider_type": "aws",
+            "provider_name": "aws-default",
+            "image_id": "ami-12345678",
+            "subnet_ids": ["subnet-12345678"],
+            "security_group_ids": ["sg-12345678"],
+            "price_type": "spot",
+            "allocation_strategy": "spotPlacementScore",
+            "machine_types": {
+                "m7i.large": 1,
+                "m7i.xlarge": 1,
+            },
+            "fleet_type": "request",
+        }
+    )
+
+    adapter = AWSSpotPlacementScoreAdapter(
+        aws_client=aws_client,
+        logger=MagicMock(),
+        region="eu-west-1",
+    )
+
+    scores = adapter.score_candidates(requested_count=2, template=template)
+
+    assert len(scores) == 2
+    assert scores[0].raw_score == 90
+    assert scores[0].normalized_score == 0.9
