@@ -35,39 +35,46 @@ class AzureHandlerFactory:
     def azure_client(self) -> AzureClient:
         return self._azure_client
 
-    def create_handler(self, handler_type: str) -> AzureHandler:
+    @staticmethod
+    def _handler_type_key(handler_type: AzureProviderApi | str) -> str:
+        if isinstance(handler_type, AzureProviderApi):
+            return handler_type.value
+        return handler_type
+
+    def create_handler(self, handler_type: AzureProviderApi | str) -> AzureHandler:
         """Create (or return cached) handler for *handler_type*.
 
         Raises:
             AzureValidationError: If *handler_type* is unknown.
         """
-        if handler_type in self._handlers:
-            return self._handlers[handler_type]
+        handler_type_key = self._handler_type_key(handler_type)
+        if handler_type_key in self._handlers:
+            return self._handlers[handler_type_key]
 
         # Validate
         try:
-            AzureProviderApi(handler_type)
+            AzureProviderApi(handler_type_key)
         except ValueError:
-            raise AzureValidationError(f"Invalid Azure handler type: {handler_type}")
+            raise AzureValidationError(f"Invalid Azure handler type: {handler_type_key}")
 
-        if handler_type not in self._handler_classes:
+        if handler_type_key not in self._handler_classes:
             raise AzureValidationError(
-                f"No handler class registered for type: {handler_type}"
+                f"No handler class registered for type: {handler_type_key}"
             )
 
-        handler_class = self._handler_classes[handler_type]
+        handler_class = self._handler_classes[handler_type_key]
         handler = handler_class(
             azure_client=self._azure_client,
             logger=self._logger,
             machine_adapter=self._machine_adapter,
         )
-        self._handlers[handler_type] = handler
-        self._logger.debug("Created Azure handler for type: %s", handler_type)
+        self._handlers[handler_type_key] = handler
+        self._logger.debug("Created Azure handler for type: %s", handler_type_key)
         return handler
 
     def create_handler_for_template(self, template: Template) -> AzureHandler:
         """Create handler appropriate for *template.provider_api*."""
-        handler_type = template.provider_api or AzureProviderApi.VMSS.value
+        handler_type = template.provider_api or AzureProviderApi.VMSS
         return self.create_handler(handler_type)
 
     def _register_handler_classes(self) -> None:

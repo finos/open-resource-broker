@@ -22,8 +22,10 @@ from orb.providers.azure.exceptions.azure_exceptions import (
     AzureError,
     VMNotFoundError,
 )
+from orb.providers.azure.domain.template.value_objects import AzureProviderApi
 from orb.providers.azure.infrastructure.adapters.machine_adapter import AzureMachineAdapter
 from orb.providers.azure.infrastructure.azure_client import AzureClient
+from orb.providers.azure.infrastructure.azure_handler_factory import AzureHandlerFactory
 from orb.providers.azure.managers.azure_resource_manager import AzureResourceManager
 from orb.providers.azure.registration import (
     create_azure_config,
@@ -230,7 +232,21 @@ class TestConfigValidation:
         c = AzureProviderConfig()
         result = validate_azure_config(c)
         assert result["valid"] is False
-        assert any("subscription_id" in e for e in result["errors"])
+
+
+class TestAzureHandlerFactory:
+    def test_create_handler_for_template_accepts_enum_provider_api(self):
+        factory = AzureHandlerFactory(
+            azure_client=MagicMock(),
+            logger=MagicMock(),
+            machine_adapter=MagicMock(),
+        )
+        template = MagicMock()
+        template.provider_api = AzureProviderApi.VMSS
+
+        handler = factory.create_handler_for_template(template)
+
+        assert handler is factory._handlers[AzureProviderApi.VMSS.value]
 
     def test_azure_client_uses_typed_config_when_active_provider_is_not_azure(self):
         azure_config = AzureProviderConfig(

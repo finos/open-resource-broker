@@ -20,6 +20,7 @@ from orb.providers.azure.infrastructure.services.spot_placement_score_adapter im
 )
 from orb.providers.azure.configuration.config import AzureProviderConfig
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
+from orb.providers.azure.domain.template.value_objects import AzureProviderApi
 from orb.providers.azure.exceptions.azure_exceptions import CycleCloudConnectionError
 from orb.providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
 from orb.providers.base.strategy import (
@@ -869,6 +870,55 @@ class TestCreateInstances:
         assert validated_template.image is not None
         assert validated_template.image.publisher == "Canonical"
 
+    def test_create_instances_accepts_enum_provider_api_in_template_config(
+        self, azure_config, logger
+    ):
+        strategy = AzureProviderStrategy(
+            config=azure_config,
+            logger=logger,
+            provider_instance_name="azure-default",
+        )
+        strategy.initialize()
+
+        handler = MagicMock()
+        handler.acquire_hosts.return_value = {
+            "success": True,
+            "resource_ids": ["vmss-demo"],
+            "instances": [],
+        }
+        strategy._handlers = {"VMSS": handler}
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={
+                "template_config": {
+                    "template_id": "azure-vmss-test",
+                    "provider_api": AzureProviderApi.VMSS,
+                    "vm_size": "Standard_D4s_v5",
+                    "resource_group": "test-rg",
+                    "location": "eastus2",
+                    "ssh_public_keys": [
+                        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"
+                    ],
+                    "image": {
+                        "publisher": "Canonical",
+                        "offer": "0001-com-ubuntu-server-jammy",
+                        "sku": "22_04-lts-gen2",
+                        "version": "latest",
+                    },
+                },
+                "count": 1,
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert result.success
+        assert result.data["provider_api"] == "VMSS"
+        handler.acquire_hosts.assert_called_once()
+        request = handler.acquire_hosts.call_args.args[0]
+        assert request.provider_api == "VMSS"
+
 
 # ---------------------------------------------------------------------------
 # TERMINATE_INSTANCES (with missing ids → error path)
@@ -1155,6 +1205,35 @@ class TestTerminateInstances:
             },
         )
 
+    def test_terminate_instances_accepts_enum_provider_api(self, azure_config, logger):
+        strategy = AzureProviderStrategy(
+            config=azure_config,
+            logger=logger,
+            provider_instance_name="azure-default",
+        )
+        strategy.initialize()
+
+        handler = MagicMock()
+        strategy._handlers = {"VMSS": handler}
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={
+                "instance_ids": ["orb-1"],
+                "provider_api": AzureProviderApi.VMSS,
+                "resource_mapping": {"orb-1": ("vmss-prod-b", 1)},
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert result.success
+        handler.release_hosts.assert_called_once_with(
+            machine_ids=["orb-1"],
+            resource_id="vmss-prod-b",
+            context={"resource_group": "test-rg", "resource_id": "vmss-prod-b"},
+        )
+
 
 # ---------------------------------------------------------------------------
 # GET_INSTANCE_STATUS (with missing ids → error path)
@@ -1439,6 +1518,41 @@ class TestGetInstanceStatus:
         assert result.data["machines"][0]["private_ip"] == "10.0.0.4"
         assert result.data["machines"][0]["subnet_id"].endswith("/subnets/default")
         assert result.data["machines"][0]["vpc_id"].endswith("/virtualNetworks/test-vnet")
+
+    def test_get_instance_status_accepts_enum_provider_api(self, azure_config, logger):
+        strategy = AzureProviderStrategy(
+            config=azure_config,
+            logger=logger,
+            provider_instance_name="azure-default",
+        )
+        strategy.initialize()
+
+        handler = MagicMock()
+        handler.check_hosts_status.return_value = [
+            {
+                "instance_id": "3",
+                "status": "running",
+                "provider_type": "azure",
+                "provider_data": {"vmss_instance_id": "3"},
+            }
+        ]
+        strategy._handlers = {"VMSS": handler}
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
+            parameters={
+                "instance_ids": ["3"],
+                "provider_api": AzureProviderApi.VMSS,
+                "request_metadata": {"resource_group": "test-rg"},
+                "resource_mapping": {"3": ("vmss-demo", 2)},
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert result.success
+        assert [m["instance_id"] for m in result.data["machines"]] == ["3"]
+        handler.check_hosts_status.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -1745,6 +1859,29 @@ class TestDescribeResourceInstances:
         assert result.data["instances"] == []
         assert result.metadata["method"] == "dry_run"
         handler.check_hosts_status.assert_not_called()
+
+    def test_describe_resource_instances_accepts_enum_provider_api(self, strategy):
+        handler = MagicMock()
+        handler.check_hosts_status.return_value = []
+        handler.get_vmss_resource_errors.return_value = []
+        strategy._handlers["VMSS"] = handler
+        strategy._resource_manager = MagicMock()
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
+            parameters={
+                "resource_ids": ["vmss-demo"],
+                "provider_api": AzureProviderApi.VMSS,
+                "template_id": "tmpl-1",
+                "request_metadata": {"resource_group": "test-rg"},
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert result.success
+        assert result.metadata["provider_api"] == "VMSS"
+        handler.check_hosts_status.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

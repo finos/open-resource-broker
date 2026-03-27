@@ -55,6 +55,9 @@ class _AzureVmWithName(Protocol):
     name: Optional[str]
 
 
+AzureProviderApiRef = AzureProviderApi | str
+
+
 @dataclass
 class PendingVmssCleanup:
     """Provider-owned follow-up state for empty-VMSS cleanup."""
@@ -359,15 +362,16 @@ class AzureProviderStrategy(ProviderStrategy):
     def _execute_planned_spot_launches(
         self,
         azure_template: AzureTemplate,
-        provider_api: str,
+        provider_api: AzureProviderApiRef,
         count: int,
         template_config: dict[str, Any],
         operation: ProviderOperation,
     ) -> ProviderResult:
-        handler = self.handlers.get(provider_api)
+        provider_api_key = self._provider_api_key(provider_api)
+        handler = self.handlers.get(provider_api_key)
         if not handler:
             return ProviderResult.error_result(
-                f"No handler available for provider_api: {provider_api}",
+                f"No handler available for provider_api: {provider_api_key}",
                 "HANDLER_NOT_FOUND",
             )
 
@@ -394,7 +398,7 @@ class AzureProviderStrategy(ProviderStrategy):
                 count=requested_for_entry,
                 provider_type="azure",
                 provider_name=self.provider_instance_name,
-                provider_api=provider_api,
+                provider_api=provider_api_key,
                 request_metadata=request_metadata,
                 parent_request_id=base_request_id,
                 plan_entry_index=idx,
@@ -420,7 +424,7 @@ class AzureProviderStrategy(ProviderStrategy):
                 {
                     "operation": "create_instances",
                     "template_config": template_config,
-                    "handler_used": provider_api,
+                    "handler_used": provider_api_key,
                     "method": "planned_handler",
                     "provider_data": provider_data,
                 },
@@ -433,7 +437,7 @@ class AzureProviderStrategy(ProviderStrategy):
                 {
                     "operation": "create_instances",
                     "template_config": template_config,
-                    "handler_used": provider_api,
+                    "handler_used": provider_api_key,
                     "method": "planned_handler",
                     "provider_data": provider_data,
                 },
@@ -443,14 +447,14 @@ class AzureProviderStrategy(ProviderStrategy):
             {
                 "resource_ids": summary.resource_ids,
                 "instances": summary.instances,
-                "provider_api": provider_api,
+                "provider_api": provider_api_key,
                 "count": count,
                 "template_id": azure_template.template_id,
             },
             {
                 "operation": "create_instances",
                 "template_config": template_config,
-                "handler_used": provider_api,
+                "handler_used": provider_api_key,
                 "method": "planned_handler",
                 "provider_data": provider_data,
             },
@@ -692,6 +696,18 @@ class AzureProviderStrategy(ProviderStrategy):
         except Exception as exc:
             self._logger.warning("Failed during Azure provider cleanup: %s", exc)
 
+    @staticmethod
+    def _normalize_provider_api_value(provider_api: Any) -> Any:
+        """Prefer the Azure enum internally and keep unknown values unchanged."""
+        if isinstance(provider_api, AzureProviderApi):
+            return provider_api
+        if isinstance(provider_api, str):
+            try:
+                return AzureProviderApi(provider_api)
+            except ValueError:
+                return provider_api
+        return provider_api
+
     # ------------------------------------------------------------------
     # Internal operation dispatch
     # ------------------------------------------------------------------
@@ -746,17 +762,43 @@ class AzureProviderStrategy(ProviderStrategy):
         )
 
     @staticmethod
-    def _resolve_create_provider_api(template_config: dict[str, Any]) -> str:
-        return template_config.get("provider_api", AzureProviderApi.VMSS.value)
+    def _provider_api_key(provider_api: AzureProviderApiRef) -> str:
+        if isinstance(provider_api, AzureProviderApi):
+            return provider_api.value
+        return provider_api
 
-    def _resolve_create_handler(self, provider_api: str) -> ProviderResult | AzureHandler:
+    @staticmethod
+    def _resolve_create_provider_api(
+        template_config: dict[str, Any],
+    ) -> AzureProviderApiRef:
+        provider_api = template_config.get("provider_api", AzureProviderApi.VMSS)
+        return cast(
+            AzureProviderApiRef,
+            AzureProviderStrategy._normalize_provider_api_value(provider_api),
+        )
+
+    @staticmethod
+    def _resolve_operation_provider_api(
+        operation: ProviderOperation,
+    ) -> Optional[AzureProviderApiRef]:
+        provider_api = operation.parameters.get("provider_api")
+        if provider_api in (None, ""):
+            return None
+        return cast(
+            AzureProviderApiRef,
+            AzureProviderStrategy._normalize_provider_api_value(provider_api),
+        )
+
+    def _resolve_create_handler(
+        self, provider_api: AzureProviderApiRef
+    ) -> ProviderResult | AzureHandler:
         """Resolve the concrete create handler for the requested provider API."""
-        handler = self.handlers.get(provider_api)
+        handler = self.handlers.get(self._provider_api_key(provider_api))
         if handler:
             return handler
 
         return ProviderResult.error_result(
-            f"No handler available for provider_api: {provider_api}",
+            f"No handler available for provider_api: {self._provider_api_key(provider_api)}",
             "HANDLER_NOT_FOUND",
         )
 
@@ -781,7 +823,7 @@ class AzureProviderStrategy(ProviderStrategy):
         operation: ProviderOperation,
         azure_template: AzureTemplate,
         count: int,
-        provider_api: str,
+        provider_api: AzureProviderApiRef,
     ) -> Any:
         """Build the domain request object used for create orchestration."""
         from orb.domain.request.aggregate import Request
@@ -800,14 +842,14 @@ class AzureProviderStrategy(ProviderStrategy):
             metadata=request_metadata,
             request_id=request_id,
         )
-        request.provider_api = provider_api
+        request.provider_api = self._provider_api_key(provider_api)
         return request
 
     @staticmethod
     def _normalize_handler_create_result(
         handler_result: Any,
         template_config: dict[str, Any],
-        provider_api: str,
+        provider_api: AzureProviderApiRef,
         count: int,
         template_id: str,
     ) -> ProviderResult:
@@ -826,7 +868,7 @@ class AzureProviderStrategy(ProviderStrategy):
                     {
                         "operation": "create_instances",
                         "template_config": template_config,
-                        "handler_used": provider_api,
+                        "handler_used": AzureProviderStrategy._provider_api_key(provider_api),
                         "method": "handler",
                         "provider_data": provider_data,
                     },
@@ -840,14 +882,14 @@ class AzureProviderStrategy(ProviderStrategy):
             {
                 "resource_ids": resource_ids,
                 "instances": instances,
-                "provider_api": provider_api,
+                "provider_api": AzureProviderStrategy._provider_api_key(provider_api),
                 "count": count,
                 "template_id": template_id,
             },
             {
                 "operation": "create_instances",
                 "template_config": template_config,
-                "handler_used": provider_api,
+                "handler_used": AzureProviderStrategy._provider_api_key(provider_api),
                 "method": "handler",
                 "provider_data": provider_data,
             },
@@ -856,6 +898,8 @@ class AzureProviderStrategy(ProviderStrategy):
     async def _handle_create_instances(
         self, operation: ProviderOperation
     ) -> ProviderResult:
+        template_config: dict[str, Any] = {}
+        provider_api_key: Optional[str] = None
         try:
             template_config = self._get_create_template_config(operation)
             count = self._get_create_count(operation)
@@ -864,6 +908,7 @@ class AzureProviderStrategy(ProviderStrategy):
                 return validation_error
 
             provider_api = self._resolve_create_provider_api(template_config)
+            provider_api_key = self._provider_api_key(provider_api)
             handler = self._resolve_create_handler(provider_api)
             if isinstance(handler, ProviderResult):
                 return handler
@@ -884,14 +929,14 @@ class AzureProviderStrategy(ProviderStrategy):
                     {
                         "resource_ids": ["dry-run-resource-id"],
                         "instances": [],
-                        "provider_api": provider_api,
+                        "provider_api": self._provider_api_key(provider_api),
                         "count": count,
                         "template_id": azure_template.template_id,
                     },
                     {
                         "operation": "create_instances",
                         "template_config": template_config,
-                        "handler_used": provider_api,
+                        "handler_used": self._provider_api_key(provider_api),
                         "method": "dry_run",
                         "provider_data": {"dry_run": True},
                     },
@@ -922,8 +967,8 @@ class AzureProviderStrategy(ProviderStrategy):
                 "CREATE_INSTANCES_ERROR",
                 {
                     "operation": "create_instances",
-                    "template_config": template_config if "template_config" in locals() else {},
-                    "handler_used": provider_api if "provider_api" in locals() else None,
+                    "template_config": template_config,
+                    "handler_used": provider_api_key,
                     "method": "handler",
                     "provider_data": {
                         "fleet_errors": [provider_error],
@@ -1049,17 +1094,17 @@ class AzureProviderStrategy(ProviderStrategy):
             )
             release_context["resource_id"] = default_resource_id or "unknown"
 
-            provider_api = operation.parameters.get("provider_api")
+            provider_api = self._resolve_operation_provider_api(operation)
             if provider_api in (None, ""):
                 return ProviderResult.error_result(
                     "provider_api is required for Azure termination",
                     "MISSING_PROVIDER_API",
                 )
-            provider_api_value = provider_api.value if hasattr(provider_api, "value") else provider_api
-            handler = self.handlers.get(provider_api_value)
+            provider_api_key = self._provider_api_key(provider_api)
+            handler = self.handlers.get(provider_api_key)
             if not handler:
                 return ProviderResult.error_result(
-                    f"No handler available for provider_api: {provider_api_value}",
+                    f"No handler available for provider_api: {provider_api_key}",
                     "HANDLER_NOT_FOUND",
                 )
 
@@ -1139,14 +1184,11 @@ class AzureProviderStrategy(ProviderStrategy):
                 resource_group=resource_group,
             )
             if handler_machines is not None:
-                provider_api = self._resolve_status_provider_api(operation)
-                provider_api_value = (
-                    provider_api.value if hasattr(provider_api, "value") else provider_api
-                )
+                provider_api_value = self._resolve_operation_provider_api(operation)
                 resource_ids: list[str] = []
                 if provider_api_value in (
-                    AzureProviderApi.VMSS.value,
-                    AzureProviderApi.VMSS_UNIFORM.value,
+                    AzureProviderApi.VMSS,
+                    AzureProviderApi.VMSS_UNIFORM,
                 ):
                     resource_ids = self._status_resource_ids(operation, instance_ids)
                     if resource_ids:
@@ -1161,8 +1203,8 @@ class AzureProviderStrategy(ProviderStrategy):
                     "method": "handler",
                 }
                 if provider_api_value in (
-                    AzureProviderApi.VMSS.value,
-                    AzureProviderApi.VMSS_UNIFORM.value,
+                    AzureProviderApi.VMSS,
+                    AzureProviderApi.VMSS_UNIFORM,
                 ):
                     metadata.update(
                         self._vmss_cleanup_status_metadata(
@@ -1217,7 +1259,7 @@ class AzureProviderStrategy(ProviderStrategy):
         self,
         grouped_resource_mapping: dict[str, list[str]],
         handler: Optional[AzureHandler],
-        provider_api_value: str,
+        provider_api_value: AzureProviderApiRef,
         build_metadata: Callable[[Optional[dict[str, Any]]], dict[str, Any]],
         make_request: Callable[[list[str], dict[str, Any]], Any],
     ) -> list[dict[str, Any]]:
@@ -1228,12 +1270,12 @@ class AzureProviderStrategy(ProviderStrategy):
         for resource_id, mapped_ids in grouped_resource_mapping.items():
             group_handler = handler
             if not group_handler and provider_api_value:
-                group_handler = self.handlers.get(provider_api_value)
+                group_handler = self.handlers.get(self._provider_api_key(provider_api_value))
             if not group_handler:
                 continue
 
             extra_metadata: dict[str, Any] = {}
-            if provider_api_value == AzureProviderApi.CYCLECLOUD.value:
+            if provider_api_value == AzureProviderApi.CYCLECLOUD:
                 extra_metadata["node_ids"] = mapped_ids
             request = make_request([resource_id], build_metadata(extra_metadata))
             for machine in self._filter_status_results(group_handler.check_hosts_status(request), mapped_ids):
@@ -1252,16 +1294,15 @@ class AzureProviderStrategy(ProviderStrategy):
         resource_group: str,
     ) -> Optional[list[dict[str, Any]]]:
         """Use Azure handlers for status queries when enough resource context is available."""
-        provider_api = self._resolve_status_provider_api(operation)
-        provider_api_value = provider_api.value if hasattr(provider_api, "value") else provider_api
+        provider_api = self._resolve_operation_provider_api(operation)
         raw_resource_mapping = operation.parameters.get("resource_mapping", {}) or {}
         grouped_resource_mapping = self._group_instance_ids_by_resource(instance_ids, raw_resource_mapping)
 
-        if not provider_api_value:
+        if not provider_api:
             return None
 
-        handler = self.handlers.get(provider_api_value) if provider_api_value else None
-        if not handler and provider_api_value == AzureProviderApi.VMSS_UNIFORM.value:
+        handler = self.handlers.get(self._provider_api_key(provider_api))
+        if not handler and provider_api == AzureProviderApi.VMSS_UNIFORM:
             handler = self.handlers.get(AzureProviderApi.VMSS.value)
         if not handler and not grouped_resource_mapping:
             return None
@@ -1295,13 +1336,13 @@ class AzureProviderStrategy(ProviderStrategy):
             request.resource_ids = resource_ids
             return request
 
-        if provider_api_value == AzureProviderApi.SINGLE_VM.value and handler:
+        if provider_api == AzureProviderApi.SINGLE_VM and handler:
             request = make_request(instance_ids, build_metadata())
             return handler.check_hosts_status(request)
 
         if grouped_resource_mapping:
             results = self._collect_grouped_status(
-                grouped_resource_mapping, handler, provider_api_value,
+                grouped_resource_mapping, handler, provider_api,
                 build_metadata, make_request,
             )
             if results:
@@ -1312,13 +1353,13 @@ class AzureProviderStrategy(ProviderStrategy):
             return None
 
         extra_metadata: dict[str, Any] = {}
-        if provider_api_value == AzureProviderApi.CYCLECLOUD.value:
+        if provider_api == AzureProviderApi.CYCLECLOUD:
             extra_metadata = {"node_ids": instance_ids}
         request = make_request(
-            instance_ids if provider_api_value == AzureProviderApi.SINGLE_VM.value else [resource_id],
+            instance_ids if provider_api == AzureProviderApi.SINGLE_VM else [resource_id],
             build_metadata(extra_metadata),
         )
-        if provider_api_value == AzureProviderApi.SINGLE_VM.value:
+        if provider_api == AzureProviderApi.SINGLE_VM:
             return handler.check_hosts_status(request)
         return self._filter_status_results(handler.check_hosts_status(request), instance_ids)
 
@@ -1341,13 +1382,6 @@ class AzureProviderStrategy(ProviderStrategy):
         if direct_resource_id not in (None, "") and str(direct_resource_id) not in resource_ids:
             resource_ids.append(str(direct_resource_id))
         return resource_ids
-
-    @staticmethod
-    def _resolve_status_provider_api(operation: ProviderOperation) -> Optional[Any]:
-        provider_api = operation.parameters.get("provider_api")
-        if provider_api not in (None, ""):
-            return provider_api
-        return None
 
     @staticmethod
     def _filter_status_results(
@@ -1632,10 +1666,7 @@ class AzureProviderStrategy(ProviderStrategy):
     ) -> ProviderResult:
         try:
             resource_ids = operation.parameters.get("resource_ids", [])
-            provider_api = operation.parameters.get("provider_api")
-            provider_api_value = (
-                provider_api.value if hasattr(provider_api, "value") else provider_api
-            )
+            provider_api = self._resolve_operation_provider_api(operation)
 
             if not resource_ids:
                 return ProviderResult.error_result(
@@ -1643,7 +1674,7 @@ class AzureProviderStrategy(ProviderStrategy):
                     "MISSING_RESOURCE_IDS",
                 )
 
-            if provider_api_value in (None, ""):
+            if provider_api in (None, ""):
                 return ProviderResult.error_result(
                     "provider_api is required for Azure resource discovery",
                     "MISSING_PROVIDER_API",
@@ -1655,16 +1686,17 @@ class AzureProviderStrategy(ProviderStrategy):
                     {
                         "operation": "describe_resource_instances",
                         "resource_ids": resource_ids,
-                        "provider_api": provider_api_value,
+                        "provider_api": self._provider_api_key(provider_api),
                         "method": "dry_run",
                         "provider_data": {"dry_run": True},
                     },
                 )
 
-            handler = self.handlers.get(provider_api_value)
+            provider_api_key = self._provider_api_key(provider_api)
+            handler = self.handlers.get(provider_api_key)
             if not handler:
                 return ProviderResult.error_result(
-                    f"No handler available for provider_api: {provider_api}",
+                    f"No handler available for provider_api: {provider_api_key}",
                     "HANDLER_NOT_FOUND",
                 )
 
@@ -1680,13 +1712,13 @@ class AzureProviderStrategy(ProviderStrategy):
                 resource_group=resource_group,
             )
             self._restore_pending_vmss_cleanups(operation)
-            if provider_api_value == AzureProviderApi.SINGLE_VM.value:
+            if provider_api == AzureProviderApi.SINGLE_VM:
                 deployment_name = self._request_metadata(operation).get("deployment_name")
                 if deployment_name not in (None, ""):
                     request_metadata["deployment_name"] = str(deployment_name)
-            if provider_api_value in (
-                AzureProviderApi.VMSS.value,
-                AzureProviderApi.VMSS_UNIFORM.value,
+            if provider_api in (
+                AzureProviderApi.VMSS,
+                AzureProviderApi.VMSS_UNIFORM,
             ) and self._has_pending_vmss_cleanup(
                 resource_group=resource_group,
                 resource_ids=resource_ids,
@@ -1710,9 +1742,9 @@ class AzureProviderStrategy(ProviderStrategy):
                 instance_details=instance_details,
             )
             cleanup_metadata: dict[str, Any] = {}
-            if provider_api_value in (
-                AzureProviderApi.VMSS.value,
-                AzureProviderApi.VMSS_UNIFORM.value,
+            if provider_api in (
+                AzureProviderApi.VMSS,
+                AzureProviderApi.VMSS_UNIFORM,
             ):
                 cleanup_metadata = self._vmss_cleanup_status_metadata(
                     resource_group=resource_group,
@@ -1723,14 +1755,14 @@ class AzureProviderStrategy(ProviderStrategy):
                 metadata = {
                     "operation": "describe_resource_instances",
                     "resource_ids": resource_ids,
-                    "provider_api": provider_api_value,
-                    "handler_used": provider_api_value,
+                    "provider_api": provider_api_key,
+                    "handler_used": provider_api_key,
                     "instance_count": 0,
                     **cleanup_metadata,
                 }
-                if provider_api_value in (
-                    AzureProviderApi.VMSS.value,
-                    AzureProviderApi.VMSS_UNIFORM.value,
+                if provider_api in (
+                    AzureProviderApi.VMSS,
+                    AzureProviderApi.VMSS_UNIFORM,
                 ):
                     vmss_errors = []
                     if resource_group and hasattr(handler, "get_vmss_resource_errors"):
@@ -1745,7 +1777,7 @@ class AzureProviderStrategy(ProviderStrategy):
                         resource_ids,
                         resource_group=resource_group,
                     )
-                elif provider_api_value == AzureProviderApi.SINGLE_VM.value:
+                elif provider_api == AzureProviderApi.SINGLE_VM:
                     self._augment_single_vm_deployment_metadata(
                         metadata,
                         request_metadata,
@@ -1767,8 +1799,8 @@ class AzureProviderStrategy(ProviderStrategy):
             metadata: dict[str, Any] = {
                 "operation": "describe_resource_instances",
                 "resource_ids": resource_ids,
-                "provider_api": provider_api_value,
-                "handler_used": provider_api_value,
+                "provider_api": provider_api_key,
+                "handler_used": provider_api_key,
                 "instance_count": len(instance_details),
                 **cleanup_metadata,
             }
@@ -1776,9 +1808,9 @@ class AzureProviderStrategy(ProviderStrategy):
                 metadata["fleet_errors"] = fleet_errors
 
             # VMSS capacity info
-            if provider_api_value in (
-                AzureProviderApi.VMSS.value,
-                AzureProviderApi.VMSS_UNIFORM.value,
+            if provider_api in (
+                AzureProviderApi.VMSS,
+                AzureProviderApi.VMSS_UNIFORM,
             ):
                 self._augment_vmss_capacity_metadata(
                     metadata,
