@@ -430,22 +430,18 @@ class AzureProviderStrategy(ProviderStrategy):
             and not summary.terminated_early
         )
 
-        if summary.terminal_error_message and not summary.resource_ids and not summary.instances:
-            return ProviderResult.error_result(
-                f"Provisioning failed: {summary.terminal_error_message}",
-                "PROVISIONING_ADAPTER_ERROR",
-                {
-                    "operation": "create_instances",
-                    "template_config": template_config,
-                    "handler_used": provider_api_key,
-                    "method": "planned_handler",
-                    "provider_data": provider_data,
-                },
+        if (
+            not summary.resource_ids
+            and not summary.instances
+            and (summary.terminal_error_message or summary.unfulfilled_count > 0)
+        ):
+            error_message = (
+                f"Provisioning failed: {summary.terminal_error_message}"
+                if summary.terminal_error_message
+                else "Spot placement plan could not provision any instances"
             )
-
-        if not summary.resource_ids and not summary.instances and summary.unfulfilled_count > 0:
             return ProviderResult.error_result(
-                "Spot placement plan could not provision any instances",
+                error_message,
                 "PROVISIONING_ADAPTER_ERROR",
                 {
                     "operation": "create_instances",

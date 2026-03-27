@@ -2111,6 +2111,132 @@ class TestCleanup:
 
 
 class TestSpotPlacementPlanning:
+    def test_create_instances_returns_generic_planning_error_for_capacity_exhaustion(
+        self, strategy, monkeypatch
+    ):
+        handler = MagicMock()
+        handler.acquire_hosts.return_value = {
+            "success": False,
+            "error_message": "AllocationFailed: No capacity in selected zone",
+            "provider_data": {"error_codes": ["AllocationFailed"]},
+        }
+        strategy._handlers["VMSS"] = handler
+
+        monkeypatch.setattr(
+            strategy,
+            "_build_spot_placement_plan",
+            lambda template, count: [
+                PlacementPlanEntry(
+                    score=PlacementScore(
+                        candidate=PlacementCandidate(
+                            candidate_id="azure:eastus2:1:Standard_D4s_v5",
+                            instance_type="Standard_D4s_v5",
+                            region="eastus2",
+                            zone="1",
+                        ),
+                        raw_score="High",
+                        normalized_score=1.0,
+                    ),
+                    planned_count=2,
+                ),
+            ],
+        )
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={
+                "count": 2,
+                "request_id": "req-11111111-1111-4111-8111-111111111111",
+                "template_config": {
+                    "template_id": "tmpl-1",
+                    "provider_api": "VMSS",
+                    "resource_group": "rg1",
+                    "location": "eastus2",
+                    "image": {
+                        "image_id": "/subscriptions/x/resourceGroups/rg/providers/Microsoft.Compute/images/img"
+                    },
+                    "vm_size": "Standard_D4s_v5",
+                    "vm_sizes": ["Standard_D4s_v5"],
+                    "price_type": "spot",
+                    "priority": "Spot",
+                    "allocation_strategy": "spotPlacementScore",
+                    "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCu"],
+                },
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert not result.success
+        assert result.error_code == "PROVISIONING_ADAPTER_ERROR"
+        assert result.error_message == "Spot placement plan could not provision any instances"
+
+    def test_create_instances_returns_terminal_planning_error_for_non_capacity_failure(
+        self, strategy, monkeypatch
+    ):
+        handler = MagicMock()
+        handler.acquire_hosts.return_value = {
+            "success": False,
+            "error_message": "insufficient capacity",
+            "provider_data": {"error_codes": ["OtherFailure"]},
+        }
+        strategy._handlers["VMSS"] = handler
+
+        monkeypatch.setattr(
+            strategy,
+            "_build_spot_placement_plan",
+            lambda template, count: [
+                PlacementPlanEntry(
+                    score=PlacementScore(
+                        candidate=PlacementCandidate(
+                            candidate_id="azure:eastus2:1:Standard_D4s_v5",
+                            instance_type="Standard_D4s_v5",
+                            region="eastus2",
+                            zone="1",
+                        ),
+                        raw_score="High",
+                        normalized_score=1.0,
+                    ),
+                    planned_count=2,
+                ),
+            ],
+        )
+
+        monkeypatch.setattr(
+            strategy,
+            "_is_capacity_like_failure",
+            lambda result: False,
+        )
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={
+                "count": 2,
+                "request_id": "req-11111111-1111-4111-8111-111111111111",
+                "template_config": {
+                    "template_id": "tmpl-1",
+                    "provider_api": "VMSS",
+                    "resource_group": "rg1",
+                    "location": "eastus2",
+                    "image": {
+                        "image_id": "/subscriptions/x/resourceGroups/rg/providers/Microsoft.Compute/images/img"
+                    },
+                    "vm_size": "Standard_D4s_v5",
+                    "vm_sizes": ["Standard_D4s_v5"],
+                    "price_type": "spot",
+                    "priority": "Spot",
+                    "allocation_strategy": "spotPlacementScore",
+                    "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCu"],
+                },
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert not result.success
+        assert result.error_code == "PROVISIONING_ADAPTER_ERROR"
+        assert result.error_message == "Provisioning failed: insufficient capacity"
+
     def test_create_instances_uses_planned_handler_path(self, strategy, monkeypatch):
         handler = MagicMock()
         handler.acquire_hosts.side_effect = [
@@ -2192,6 +2318,20 @@ class TestSpotPlacementPlanning:
         assert str(first_request.request_id) != "req-11111111-1111-4111-8111-111111111111"
         assert first_request.metadata["parent_request_id"] == "req-11111111-1111-4111-8111-111111111111"
         assert first_request.metadata["spot_placement_plan_entry_index"] == 0
+
+    def test_status_resource_ids_dedupes_direct_resource_id_already_present_in_mapping(self, strategy):
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
+            parameters={
+                "instance_ids": ["orb-1"],
+                "resource_id": "vmss-prod-b",
+                "resource_mapping": {"orb-1": ("vmss-prod-b", 1)},
+            },
+        )
+
+        resource_ids = strategy._status_resource_ids(op, ["orb-1"])
+
+        assert resource_ids == ["vmss-prod-b"]
 
     def test_create_instances_falls_back_when_scores_are_stale(self, strategy, monkeypatch):
         handler = MagicMock()
