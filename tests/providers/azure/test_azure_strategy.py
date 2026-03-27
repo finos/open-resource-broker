@@ -206,6 +206,49 @@ class TestCapacityMetadata:
             },
         }
 
+    def test_vmss_capacity_dedupes_resource_ids_and_marks_mixed_states(self, strategy):
+        strategy._resource_manager = MagicMock()
+        strategy._resource_manager.get_vmss_capacity.side_effect = [
+            {
+                "capacity": 2,
+                "provisioned_instance_count": 1,
+                "provisioning_state": "Updating",
+            },
+            {
+                "capacity": 3,
+                "provisioned_instance_count": 3,
+                "provisioning_state": "Succeeded",
+            },
+        ]
+
+        metadata = {}
+        strategy._augment_vmss_capacity_metadata(
+            metadata,
+            ["vmss-a", "vmss-a", "vmss-b"],
+            resource_group="override-rg",
+        )
+
+        assert metadata["fleet_capacity_fulfilment"] == {
+            "target_capacity_units": 5,
+            "fulfilled_capacity_units": 4,
+            "provisioned_instance_count": 4,
+            "state": "multiple",
+        }
+        assert metadata["fleet_capacity_fulfilment_by_resource"] == {
+            "vmss-a": {
+                "target_capacity_units": 2,
+                "fulfilled_capacity_units": 1,
+                "provisioned_instance_count": 1,
+                "state": "Updating",
+            },
+            "vmss-b": {
+                "target_capacity_units": 3,
+                "fulfilled_capacity_units": 3,
+                "provisioned_instance_count": 3,
+                "state": "Succeeded",
+            },
+        }
+
     def test_describe_resource_instances_surfaces_vmss_errors_without_instances(self, strategy):
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
@@ -1589,6 +1632,48 @@ class TestDescribeResourceInstances:
             vmss_name="vmss-b",
         )
         assert result.metadata["termination_follow_up_pending"] is True
+        strategy._client.compute_client.virtual_machine_scale_sets.begin_delete.assert_not_called()
+
+    def test_describe_resource_instances_clears_pending_cleanup_when_no_delete_is_required(
+        self, strategy
+    ):
+        handler = MagicMock()
+        handler.check_hosts_status.return_value = []
+        handler.get_vmss_resource_errors.return_value = []
+        strategy._handlers["VMSS"] = handler
+        strategy._resource_manager = MagicMock()
+        strategy._client = MagicMock()
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
+            parameters={
+                "resource_ids": ["vmss-demo"],
+                "provider_api": "VMSS",
+                "template_id": "tmpl-1",
+                "request_metadata": {
+                    "resource_group": "test-rg",
+                    "termination_requests": [
+                        {
+                            "pending_vmss_cleanup": {
+                                "resource_group": "test-rg",
+                                "vmss_name": "vmss-demo",
+                                "machine_ids": ["vm-a"],
+                                "delete_vmss_when_empty": False,
+                            }
+                        }
+                    ],
+                },
+            },
+        )
+
+        first_result = _run(strategy.execute_operation(op))
+        second_result = _run(strategy.execute_operation(op))
+
+        assert first_result.success
+        assert first_result.metadata["termination_follow_up_pending"] is False
+        assert second_result.success
+        assert second_result.metadata["termination_follow_up_pending"] is False
+        strategy._resource_manager.get_vmss_member_count.assert_not_called()
         strategy._client.compute_client.virtual_machine_scale_sets.begin_delete.assert_not_called()
 
     def test_describe_resource_instances_forwards_cyclecloud_request_metadata(self, strategy):
