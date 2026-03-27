@@ -189,10 +189,9 @@ class TestSpotValidation:
         assert t.eviction_policy == AzureEvictionPolicy.DEALLOCATE
         assert t.spot_allocation_strategy == AzureAllocationStrategy.CAPACITY_OPTIMIZED
 
-    def test_spot_percentage_promotes_priority_to_spot(self):
-        """mode='before' validator upgrades Regular to Spot when spot_percentage is set."""
-        t = AzureTemplate(**_BASE_FIELDS, spot_percentage=70)
-        assert t.priority == AzurePriority.SPOT
+    def test_spot_percentage_requires_explicit_spot_priority(self):
+        with pytest.raises(ValueError, match="priority='Spot'"):
+            AzureTemplate(**_BASE_FIELDS, spot_percentage=70)
 
     def test_spot_percentage_requires_flexible(self):
         with pytest.raises(ValueError, match="Flexible orchestration mode"):
@@ -328,6 +327,7 @@ class TestArmPayload:
         t = AzureTemplate(
             **_BASE_FIELDS,
             vm_sizes=["Standard_D8s_v5"],
+            priority="Spot",
             spot_percentage=70,
             base_regular_priority_count=2,
         )
@@ -408,6 +408,11 @@ class TestValueObjects:
         assert arm["diskSizeGB"] == 128
         assert arm["deleteOption"] == "Delete"
         assert arm["managedDisk"]["storageAccountType"] == "Premium_LRS"
+
+    def test_ephemeral_os_disk_defaults_placement(self):
+        disk = AzureOSDiskConfig(ephemeral_os_disk=True)
+
+        assert disk.ephemeral_placement == "CacheDisk"
 
     def test_data_disk(self):
         dd = AzureDataDisk(lun=0, disk_size_gb=256)

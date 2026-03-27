@@ -443,13 +443,6 @@ class AzureTemplate(Template):
                 data["max_instances"] = data["max_number"]
             data.pop("max_number", None)
 
-        # spot_percentage requires Spot priority.
-        if (
-            data.get("spot_percentage") is not None
-            and data.get("priority") in (None, "Regular")
-        ):
-            data["priority"] = "Spot"
-
         # Spot VMs need an eviction policy and allocation strategy.
         if data.get("priority") == "Spot":
             data.setdefault("eviction_policy", "Deallocate")
@@ -501,7 +494,7 @@ class AzureTemplate(Template):
                 )
             if self.priority != AzurePriority.SPOT:
                 raise ValueError(
-                    "spot_percentage requires Spot priority"
+                    "spot_percentage requires priority='Spot'"
                 )
 
         # Spot VMs require an eviction policy and allocation strategy.

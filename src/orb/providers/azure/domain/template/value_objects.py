@@ -3,7 +3,7 @@
 from enum import Enum
 from typing import Any, Optional
 
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 from orb.domain.base.value_objects import AllocationStrategy, PriceType, ValueObject
 
@@ -265,13 +265,21 @@ class AzureOSDiskConfig(ValueObject):
     ephemeral_os_disk: bool = False
     ephemeral_placement: Optional[str] = Field(
         default=None,
+        validate_default=True,
         description="Placement for ephemeral OS disk: 'CacheDisk' or 'ResourceDisk'.",
     )
 
+    @field_validator("ephemeral_placement", mode="before")
+    @classmethod
+    def _apply_ephemeral_defaults(
+        cls, value: Optional[str], info: ValidationInfo
+    ) -> Optional[str]:
+        if value is None and info.data.get("ephemeral_os_disk"):
+            return "CacheDisk"
+        return value
+
     @model_validator(mode="after")
     def _validate_ephemeral(self) -> "AzureOSDiskConfig":
-        if self.ephemeral_os_disk and self.ephemeral_placement is None:
-            object.__setattr__(self, "ephemeral_placement", "CacheDisk")
         if not self.ephemeral_os_disk and self.ephemeral_placement is not None:
             raise ValueError("ephemeral_placement requires ephemeral_os_disk=True")
         return self
