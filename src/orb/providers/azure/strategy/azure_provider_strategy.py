@@ -23,7 +23,6 @@ from orb.application.services.spot_placement_execution import (
 )
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
-from orb.providers.azure.capabilities import get_supported_api_capabilities, get_supported_apis
 from orb.providers.azure.configuration.config import AzureProviderConfig
 from orb.providers.azure.configuration.template_extension import AzureTemplateExtensionConfig
 from orb.providers.azure.configuration.validator import validate_azure_template
@@ -43,6 +42,7 @@ from orb.providers.azure.infrastructure.services.spot_placement_score_adapter im
     AzureSpotPlacementScoreAdapter,
 )
 from orb.providers.azure.managers.azure_resource_manager import AzureResourceManager
+from orb.providers.azure.services.capability_service import AzureCapabilityService
 from orb.providers.base.strategy import (
     ProviderCapabilities,
     ProviderHealthStatus,
@@ -157,6 +157,7 @@ class AzureProviderStrategy(ProviderStrategy):
         self._handlers: dict[str, AzureHandler] = {}
         self._spot_placement_planner = SpotPlacementPlanner()
         self._spot_placement_execution = SpotPlacementExecutionService()
+        self._capability_service = AzureCapabilityService()
         self._pending_vmss_cleanups: dict[tuple[str, str], PendingVmssCleanup] = {}
         self._lazy_init_lock = RLock()
         self._pending_vmss_cleanups_lock = RLock()
@@ -536,97 +537,8 @@ class AzureProviderStrategy(ProviderStrategy):
             )
 
     def get_capabilities(self) -> ProviderCapabilities:
-        """
-        Get Azure provider capabilities and features.
-
-        Returns:
-            Comprehensive capabilities information for Azure provider
-        """
-        return ProviderCapabilities(
-            provider_type="azure",
-            supported_operations=[
-                ProviderOperationType.CREATE_INSTANCES,
-                ProviderOperationType.TERMINATE_INSTANCES,
-                ProviderOperationType.GET_INSTANCE_STATUS,
-                ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
-                ProviderOperationType.VALIDATE_TEMPLATE,
-                ProviderOperationType.GET_AVAILABLE_TEMPLATES,
-                ProviderOperationType.HEALTH_CHECK,
-            ],
-            features={
-                "supported_apis": get_supported_apis(),
-                "api_capabilities": get_supported_api_capabilities(),
-                "instance_management": True,
-                "spot_instances": True,
-                "fleet_management": True,
-                # VMSS now has AWS-comparable elastic-group lifecycle behavior in ORB
-                # (group creation, capacity-aware release, and capacity reporting),
-                # even though explicit autoscale-policy management is still not exposed.
-                "auto_scaling": True,
-                # In this repo, "load_balancing" means templates can reference existing
-                # backend-pool-style network attachments in provider payloads. It does not
-                # mean ORB creates or manages Azure load balancers, probes, NAT rules, or
-                # application gateway policy objects.
-                "load_balancing": True,
-                "vpc_support": True,  # VNet
-                "security_groups": True,  # NSG
-                "key_pairs": True,  # SSH keys
-                "tags_support": True,
-                "monitoring": True,
-                # TODO: These are example/common regions, not a dynamically discovered or authoritative region list.
-                "regions": ["eastus", "eastus2", "westus2", "westeurope", "northeurope"],
-                # TODO: These are example/common VM sizes, not a subscription- or region-aware available-sizes query.
-                "instance_types": [
-                    "Standard_D2s_v5",
-                    "Standard_D4s_v5",
-                    "Standard_D8s_v5",
-                    "Standard_E4s_v5",
-                    "Standard_F4s_v2",
-                ],
-                # Rough VMSS-oriented metadata; real Azure ceilings also depend on image type,
-                # quota, throttling, and which handler/provider_api is actually used.
-                "max_instances_per_request": 1000,
-                # Windows is intentionally unsupported for Azure.
-                #
-                # Current provider payload generation does not model a usable Windows auth/bootstrap path.
-                #
-                # If we implement Windows later, the two viable Azure-native
-                # directions we found are:
-                # 1. Bootstrap with a securely supplied local admin password,
-                #    then use Microsoft Entra sign-in for ongoing access:
-                #    https://learn.microsoft.com/en-us/entra/identity/devices/howto-vm-sign-in-azure-ad-windows
-                # 2. Bootstrap Windows OpenSSH, then push/install SSH keys
-                #    after provisioning; Azure docs note keys are not
-                #    auto-provisioned for Windows at deploy time:
-                #    https://learn.microsoft.com/en-us/azure/virtual-machines/windows/connect-ssh
-                #
-                # These are both ugly in comparison to AWS/Linux auth
-                #
-                # Relevant Azure compute schema docs for a future Windows
-                # implementation:
-                # https://learn.microsoft.com/en-us/azure/templates/microsoft.compute/2018-06-01/virtualmachines
-                # https://learn.microsoft.com/en-us/azure/templates/microsoft.compute/2018-04-01/virtualmachinescalesets
-                "supports_windows": False,
-                "supports_linux": True,
-            },
-            limitations={
-                # Repo-local operational metadata, not an external Azure hard limit.
-                "max_concurrent_requests": 100,
-                # Repo-local placeholder; real limits come from ARM + Microsoft.Compute throttling.
-                "rate_limit_per_second": 20,
-                # Repo policy/default, not a known Azure platform lifetime limit.
-                "max_instance_lifetime_hours": 8760,
-                "requires_vpc": True,  # VNet/subnet required for VMSS
-                # True of the repo in it's current state, not a fundamental Azure platform limitation
-                "requires_key_pair": True,
-            },
-            performance_metrics={
-                # Heuristic timing metadata, not measured SLOs or Azure guarantees.
-                "typical_create_time_seconds": 120,
-                "typical_terminate_time_seconds": 60,
-                "health_check_timeout_seconds": 15,
-            },
-        )
+        """Get Azure provider capabilities."""
+        return self._capability_service.get_capabilities()
 
     def check_health(self) -> ProviderHealthStatus:
         start_time = time.time()
@@ -675,26 +587,19 @@ class AzureProviderStrategy(ProviderStrategy):
             )
 
     def generate_provider_name(self, config: dict[str, Any]) -> str:
-        """Generate Azure provider name: {provider_type}_{profile}_{region}"""
-        provider_type = self.provider_type  # Use dynamic provider type
-        profile = config.get("profile", "default")
-        region = config.get("region", "eastus")
-        return f"{provider_type}_{profile}_{region}"
+        """Generate Azure provider name."""
+        return self._capability_service.generate_provider_name(config)
 
     def parse_provider_name(self, provider_name: str) -> dict[str, str]:
-        """Parse Azure provider name back to components."""
-        parts = provider_name.split("_")
-        return {
-            "type": parts[0] if len(parts) > 0 else self.provider_type,
-            "subscription_id": parts[1] if len(parts) > 1 else "default",
-            "region": parts[2] if len(parts) > 2 else "eastus2",
-        }
+        """Parse Azure provider name."""
+        return self._capability_service.parse_provider_name(provider_name)
 
-    # TODO: I think this can be arbitrary as I can't
-    #  find any specific AWS provider name that matches's it's format.
-    #  but I should double check this doesn't need to match some existing Azure standard
     def get_provider_name_pattern(self) -> str:
-        return "{type}_{subscription_id}_{region}"
+        return self._capability_service.get_provider_name_pattern()
+
+    def get_supported_apis(self) -> list[str]:
+        """Get supported Azure provider APIs."""
+        return self._capability_service.get_supported_apis()
 
     def cleanup(self) -> None:
         try:

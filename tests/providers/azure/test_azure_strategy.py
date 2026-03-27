@@ -2042,8 +2042,7 @@ class TestProviderNaming:
             "subscription_id": "12345678-abcd",
             "region": "westeurope",
         })
-        assert name.startswith("azure_")
-        assert "westeurope" in name
+        assert name == "azure_12345678-abcd_westeurope"
 
     def test_parse_provider_name(self, strategy):
         parsed = strategy.parse_provider_name("azure_12345678_westeurope")
