@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 from orb.application.services.spot_placement_planner import PlacementPlanEntry
 from orb.domain.base.exceptions import DomainException
@@ -104,7 +104,7 @@ class SpotPlacementExecutionService:
         total_count: int,
         build_child_template: Callable[[PlacementPlanEntry], Any],
         build_child_request: Callable[[int, int], Any],
-        launch_child: Callable[[Any, Any], Any],
+        launch_child: Callable[[Any, Any], Mapping[str, Any]],
         is_capacity_like_failure: Callable[[dict[str, Any]], bool],
     ) -> SpotPlacementExecutionSummary:
         resource_ids: list[str] = []
@@ -192,20 +192,14 @@ class SpotPlacementExecutionService:
     def _normalize_child_result(
         plan_entry: PlacementPlanEntry,
         requested_count: int,
-        raw_result: Any,
+        raw_result: Mapping[str, Any],
     ) -> dict[str, Any]:
-        if isinstance(raw_result, dict):
-            success = raw_result.get("success", True)
-            error_message = raw_result.get("error_message")
-            resource_ids = raw_result.get("resource_ids", [])
-            instances = raw_result.get("instances", [])
-            provider_data = raw_result.get("provider_data") or {}
-        else:
-            success = bool(raw_result)
-            error_message = None if success else "Provisioning returned no resource id"
-            resource_ids = [raw_result] if raw_result else []
-            instances = []
-            provider_data = {}
+        result = SpotPlacementExecutionService._coerce_child_result_mapping(raw_result)
+        success = result.get("success", True)
+        error_message = result.get("error_message")
+        resource_ids = result.get("resource_ids", [])
+        instances = result.get("instances", [])
+        provider_data = result.get("provider_data") or {}
 
         return {
             "candidate_id": plan_entry.score.candidate.candidate_id,
@@ -219,6 +213,15 @@ class SpotPlacementExecutionService:
             ),
             "provider_data": provider_data,
         }
+
+    @staticmethod
+    def _coerce_child_result_mapping(raw_result: Mapping[str, Any]) -> dict[str, Any]:
+        if not isinstance(raw_result, Mapping):
+            raise TypeError(
+                "Spot placement child launch must return a mapping result with "
+                "'success', 'resource_ids', 'instances', and optional provider metadata"
+            )
+        return dict(raw_result)
 
     @staticmethod
     def _extract_error_codes(
