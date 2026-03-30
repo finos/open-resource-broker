@@ -1,6 +1,8 @@
 """Focused tests for Azure client and auth behavior."""
 
 import sys
+import threading
+import time
 import types
 from unittest.mock import MagicMock, patch
 
@@ -87,6 +89,23 @@ class TestAzureClientOperationalBehavior:
             else PerformanceConfig()
         )
         return AzureClient(config=config_port, logger=logger or MagicMock())
+
+    @staticmethod
+    def _build_partial_client() -> AzureClient:
+        client = object.__new__(AzureClient)
+        client._logger = MagicMock()
+        client._lazy_init_lock = threading.RLock()
+        client._closed = False
+        client._credentials_validated = False
+        client._credential = None
+        client._compute_client = None
+        client._network_client = None
+        client._resource_client = None
+        client._msi_client = None
+        client._authorization_client = None
+        client._monitor_client = None
+        client._subscription_client = None
+        return client
 
     def test_azure_client_uses_typed_config_when_active_provider_is_not_azure(self):
         azure_config = AzureProviderConfig(
@@ -340,9 +359,7 @@ class TestAzureClientOperationalBehavior:
         assert client.perf_config["cache_ttl"] == 300
 
     def test_validate_credentials_returns_false_for_authentication_error(self):
-        client = object.__new__(AzureClient)
-        client._logger = MagicMock()
-        client._credentials_validated = False
+        client = self._build_partial_client()
         type(client).credential = property(
             lambda _self: MagicMock(
                 get_token=MagicMock(side_effect=AuthenticationError("bad credential"))
@@ -355,9 +372,7 @@ class TestAzureClientOperationalBehavior:
             del type(client).credential
 
     def test_validate_credentials_reraises_unexpected_errors(self):
-        client = object.__new__(AzureClient)
-        client._logger = MagicMock()
-        client._credentials_validated = False
+        client = self._build_partial_client()
         type(client).credential = property(
             lambda _self: MagicMock(get_token=MagicMock(side_effect=RuntimeError("boom")))
         )
@@ -371,8 +386,7 @@ class TestAzureClientOperationalBehavior:
     def test_validate_subscription_returns_false_for_known_azure_errors(self):
         from azure.core.exceptions import ResourceNotFoundError
 
-        client = object.__new__(AzureClient)
-        client._logger = MagicMock()
+        client = self._build_partial_client()
         client.subscription_id = "12345678-1234-1234-1234-123456789012"
         client._subscription_client = MagicMock()
         client._subscription_client.subscriptions.get.side_effect = ResourceNotFoundError("missing")
@@ -380,8 +394,7 @@ class TestAzureClientOperationalBehavior:
         assert AzureClient.validate_subscription(client) is False
 
     def test_validate_subscription_reraises_unexpected_errors(self):
-        client = object.__new__(AzureClient)
-        client._logger = MagicMock()
+        client = self._build_partial_client()
         client.subscription_id = "12345678-1234-1234-1234-123456789012"
         client._subscription_client = MagicMock()
         client._subscription_client.subscriptions.get.side_effect = RuntimeError("boom")
@@ -446,6 +459,66 @@ class TestAzureClientOperationalBehavior:
 
         subscription_client.close.assert_called_once_with()
 
+    def test_close_continues_after_subclient_failure_and_marks_client_closed(self):
+        client = self._build_client()
+        failing_subscription_client = MagicMock()
+        failing_subscription_client.close.side_effect = RuntimeError("subscription close failed")
+        compute_client = MagicMock()
+        credential = MagicMock()
+        client._subscription_client = failing_subscription_client
+        client._monitor_client = None
+        client._authorization_client = None
+        client._msi_client = None
+        client._resource_client = None
+        client._network_client = None
+        client._compute_client = compute_client
+        client._credential = credential
+        client._credentials_validated = True
+        client._closed = False
+
+        with pytest.raises(RuntimeError, match="subscription close failed"):
+            AzureClient.close(client)
+
+        compute_client.close.assert_called_once_with()
+        credential.close.assert_called_once_with()
+        assert client._compute_client is None
+        assert client._credential is None
+        assert client._credentials_validated is False
+        assert client._closed is True
+
+    def test_compute_client_lazy_initialization_is_thread_safe(self):
+        client = self._build_client()
+        created_client = MagicMock()
+        build_calls = 0
+        start_barrier = threading.Barrier(5)
+
+        def build_compute_client():
+            nonlocal build_calls
+            build_calls += 1
+            time.sleep(0.02)
+            return created_client
+
+        client._build_compute_client = build_compute_client
+        results: list[object] = []
+        errors: list[Exception] = []
+
+        def access_compute_client():
+            try:
+                start_barrier.wait()
+                results.append(client.compute_client)
+            except Exception as exc:  # pragma: no cover - failure capture for thread assertion
+                errors.append(exc)
+
+        threads = [threading.Thread(target=access_compute_client) for _ in range(5)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        assert not errors
+        assert build_calls == 1
+        assert results == [created_client] * 5
+
     def test_context_manager_closes_owned_resources_on_exit(self):
         client = self._build_client()
         client._subscription_client = None
@@ -470,6 +543,23 @@ class TestAzureClientOperationalBehavior:
 
 
 class TestAzureClientNetworkResolution:
+    @staticmethod
+    def _build_partial_client() -> AzureClient:
+        client = object.__new__(AzureClient)
+        client._logger = MagicMock()
+        client._lazy_init_lock = threading.RLock()
+        client._closed = False
+        client._credentials_validated = False
+        client._credential = None
+        client._compute_client = None
+        client._network_client = None
+        client._resource_client = None
+        client._msi_client = None
+        client._authorization_client = None
+        client._monitor_client = None
+        client._subscription_client = None
+        return client
+
     def test_extract_resource_group_and_name_from_arm_id_rejects_incomplete_ids(self):
         assert (
             AzureClient.extract_resource_group_and_name_from_arm_id(
@@ -517,8 +607,7 @@ class TestAzureClientNetworkResolution:
         )
 
     def test_resolve_network_identity_from_vm_populates_ips_and_subnet(self):
-        azure_client = object.__new__(AzureClient)
-        azure_client._logger = MagicMock()
+        azure_client = self._build_partial_client()
         azure_client._network_client = MagicMock()
 
         nic_ref = MagicMock()
@@ -563,8 +652,7 @@ class TestAzureClientNetworkResolution:
         assert result["nic_name"] == "nic-vm-1"
 
     def test_resolve_network_identity_tolerates_missing_nested_property_bags(self):
-        azure_client = object.__new__(AzureClient)
-        azure_client._logger = MagicMock()
+        azure_client = self._build_partial_client()
         azure_client._network_client = MagicMock()
 
         nic_ref = MagicMock()
@@ -612,8 +700,7 @@ class TestAzureClientNetworkResolution:
     def test_resolve_network_identity_skips_known_nic_lookup_errors(self):
         from azure.core.exceptions import ResourceNotFoundError
 
-        azure_client = object.__new__(AzureClient)
-        azure_client._logger = MagicMock()
+        azure_client = self._build_partial_client()
         azure_client._network_client = MagicMock()
 
         nic_ref = MagicMock()
@@ -639,8 +726,7 @@ class TestAzureClientNetworkResolution:
         }
 
     def test_resolve_network_identity_reraises_unexpected_nic_lookup_errors(self):
-        azure_client = object.__new__(AzureClient)
-        azure_client._logger = MagicMock()
+        azure_client = self._build_partial_client()
         azure_client._network_client = MagicMock()
 
         nic_ref = MagicMock()
@@ -654,4 +740,3 @@ class TestAzureClientNetworkResolution:
 
         with pytest.raises(RuntimeError, match="boom"):
             AzureClient.resolve_network_identity_from_nic_refs(azure_client, [nic_ref])
-

@@ -25,6 +25,7 @@ Note:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from threading import RLock
 from typing import TYPE_CHECKING, Any, Optional, Protocol, cast
 
 from orb.config import PerformanceConfig
@@ -236,6 +237,7 @@ class AzureClient:
         self._subscription_client: Optional[SubscriptionClient] = None
         self._credentials_validated = False
         self._closed = False
+        self._lazy_init_lock = RLock()
 
         # Metrics instrumentation (extension point)
         self._metrics = metrics
@@ -471,19 +473,20 @@ class AzureClient:
         Raises:
             AuthenticationError: If no valid credential can be obtained.
         """
-        self._ensure_open()
-        if self._credential is None:
-            self._logger.debug("Creating Azure credential on first use")
-            try:
-                self._credential = create_default_azure_credential(
-                    client_id=self._azure_config.client_id if self._azure_config else None,
-                    logger=self._logger,
-                )
-            except ImportError as exc:
-                raise AuthenticationError(
-                    "azure-identity package is not installed"
-                ) from exc
-        return self._credential
+        with self._lazy_init_lock:
+            self._ensure_open()
+            if self._credential is None:
+                self._logger.debug("Creating Azure credential on first use")
+                try:
+                    self._credential = create_default_azure_credential(
+                        client_id=self._azure_config.client_id if self._azure_config else None,
+                        logger=self._logger,
+                    )
+                except ImportError as exc:
+                    raise AuthenticationError(
+                        "azure-identity package is not installed"
+                    ) from exc
+            return self._credential
 
     def _close_management_client(
         self,
@@ -517,43 +520,64 @@ class AzureClient:
         clients, so cleanup belongs here rather than in unrelated orchestration
         layers.
         """
-        if self._closed:
-            return
+        close_errors: list[Exception] = []
 
-        subscription_client = self._subscription_client
-        self._subscription_client = None
-        self._close_management_client("subscription_client", subscription_client)
+        with self._lazy_init_lock:
+            if self._closed:
+                return
 
-        monitor_client = self._monitor_client
-        self._monitor_client = None
-        self._close_management_client("monitor_client", monitor_client)
+            def close_resource(close_fn: Any, *close_args: Any) -> None:
+                resource_name = str(close_args[0])
+                resource = close_args[-1]
+                if resource is None:
+                    return
+                try:
+                    close_fn(*close_args)
+                except Exception as exc:  # pragma: no cover - exercised via public close tests
+                    close_errors.append(exc)
+                    self._logger.warning(
+                        "Failed closing Azure resource %s: %s",
+                        resource_name,
+                        exc,
+                    )
 
-        authorization_client = self._authorization_client
-        self._authorization_client = None
-        self._close_management_client("authorization_client", authorization_client)
+            subscription_client = self._subscription_client
+            self._subscription_client = None
+            close_resource(self._close_management_client, "subscription_client", subscription_client)
 
-        msi_client = self._msi_client
-        self._msi_client = None
-        self._close_management_client("msi_client", msi_client)
+            monitor_client = self._monitor_client
+            self._monitor_client = None
+            close_resource(self._close_management_client, "monitor_client", monitor_client)
 
-        resource_client = self._resource_client
-        self._resource_client = None
-        self._close_management_client("resource_client", resource_client)
+            authorization_client = self._authorization_client
+            self._authorization_client = None
+            close_resource(self._close_management_client, "authorization_client", authorization_client)
 
-        network_client = self._network_client
-        self._network_client = None
-        self._close_management_client("network_client", network_client)
+            msi_client = self._msi_client
+            self._msi_client = None
+            close_resource(self._close_management_client, "msi_client", msi_client)
 
-        compute_client = self._compute_client
-        self._compute_client = None
-        self._close_management_client("compute_client", compute_client)
+            resource_client = self._resource_client
+            self._resource_client = None
+            close_resource(self._close_management_client, "resource_client", resource_client)
 
-        credential = self._credential
-        self._credential = None
-        self._close_credential(credential)
+            network_client = self._network_client
+            self._network_client = None
+            close_resource(self._close_management_client, "network_client", network_client)
 
-        self._credentials_validated = False
-        self._closed = True
+            compute_client = self._compute_client
+            self._compute_client = None
+            close_resource(self._close_management_client, "compute_client", compute_client)
+
+            credential = self._credential
+            self._credential = None
+            close_resource(self._close_credential, credential)
+
+            self._credentials_validated = False
+            self._closed = True
+
+        if close_errors:
+            raise close_errors[0]
 
     def __enter__(self) -> AzureClient:
         """Enter a managed Azure client scope."""
@@ -575,9 +599,11 @@ class AzureClient:
         Provides access to VMs, VMSS, Disks, Images, Availability Sets,
         Proximity Placement Groups, and Galleries.
         """
-        if self._compute_client is None:
-            self._compute_client = self._build_compute_client()
-        return self._compute_client
+        with self._lazy_init_lock:
+            self._ensure_open()
+            if self._compute_client is None:
+                self._compute_client = self._build_compute_client()
+            return self._compute_client
 
     @property
     def network_client(self) -> NetworkManagementClient:
@@ -586,9 +612,11 @@ class AzureClient:
         Provides access to VNets, Subnets, NICs, NSGs, Public IPs, and
         Load Balancers.
         """
-        if self._network_client is None:
-            self._network_client = self._build_network_client()
-        return self._network_client
+        with self._lazy_init_lock:
+            self._ensure_open()
+            if self._network_client is None:
+                self._network_client = self._build_network_client()
+            return self._network_client
 
     @property
     def resource_client(self) -> ResourceManagementClient:
@@ -596,9 +624,11 @@ class AzureClient:
 
         Provides access to resource groups, deployments, and providers.
         """
-        if self._resource_client is None:
-            self._resource_client = self._build_resource_client()
-        return self._resource_client
+        with self._lazy_init_lock:
+            self._ensure_open()
+            if self._resource_client is None:
+                self._resource_client = self._build_resource_client()
+            return self._resource_client
 
     @property
     def msi_client(self) -> ManagedServiceIdentityClient:
@@ -606,9 +636,11 @@ class AzureClient:
 
         Provides access to user-assigned managed identities.
         """
-        if self._msi_client is None:
-            self._msi_client = self._build_msi_client()
-        return self._msi_client
+        with self._lazy_init_lock:
+            self._ensure_open()
+            if self._msi_client is None:
+                self._msi_client = self._build_msi_client()
+            return self._msi_client
 
     @property
     def authorization_client(self) -> AuthorizationManagementClient:
@@ -616,9 +648,11 @@ class AzureClient:
 
         Provides access to role definitions and role assignments.
         """
-        if self._authorization_client is None:
-            self._authorization_client = self._build_authorization_client()
-        return self._authorization_client
+        with self._lazy_init_lock:
+            self._ensure_open()
+            if self._authorization_client is None:
+                self._authorization_client = self._build_authorization_client()
+            return self._authorization_client
 
     @property
     def monitor_client(self) -> MonitorManagementClient:
@@ -626,9 +660,11 @@ class AzureClient:
 
         Provides access to metrics, diagnostic settings, and activity logs.
         """
-        if self._monitor_client is None:
-            self._monitor_client = self._build_monitor_client()
-        return self._monitor_client
+        with self._lazy_init_lock:
+            self._ensure_open()
+            if self._monitor_client is None:
+                self._monitor_client = self._build_monitor_client()
+            return self._monitor_client
 
     @property
     def subscription_client(self) -> SubscriptionClient:
@@ -637,9 +673,11 @@ class AzureClient:
         Provides access to subscription and location information.
         Does **not** require ``subscription_id`` at construction time.
         """
-        if self._subscription_client is None:
-            self._subscription_client = self._build_subscription_client()
-        return self._subscription_client
+        with self._lazy_init_lock:
+            self._ensure_open()
+            if self._subscription_client is None:
+                self._subscription_client = self._build_subscription_client()
+            return self._subscription_client
 
     # ------------------------------------------------------------------
     # Validation helpers
