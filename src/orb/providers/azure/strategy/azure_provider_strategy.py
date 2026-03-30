@@ -8,20 +8,15 @@ from __future__ import annotations
 
 import asyncio
 import time
-from dataclasses import dataclass, replace
 from threading import RLock
-from typing import Any, Callable, Optional, Protocol, cast
+from typing import Any, Callable, Optional, cast
 
 from pydantic import ValidationError as PydanticValidationError
 
 from orb.application.services.spot_placement_execution import (
     SpotPlacementExecutionService,
-    build_planned_execution_metadata,
-    create_acquire_request,
 )
 from orb.application.services.spot_placement_planner import (
-    PlacementScore,
-    PlacementPlanEntry,
     SpotPlacementPlanner,
 )
 from orb.domain.base.dependency_injection import injectable
@@ -43,15 +38,37 @@ from orb.providers.azure.infrastructure.handlers.azure_handler import AzureHandl
 from orb.providers.azure.infrastructure.handlers.cyclecloud_handler import CycleCloudHandler
 from orb.providers.azure.infrastructure.handlers.single_vm_handler import SingleVMHandler
 from orb.providers.azure.infrastructure.handlers.vmss_handler import VMSSHandler
-from orb.providers.azure.infrastructure.services.spot_placement_score_adapter import (
-    AzureSpotPlacementScoreAdapter,
-)
 from orb.providers.azure.infrastructure.vmss_cleanup import (
     VmssCleanupCoordinator,
     VmssCleanupCoordinatorFactory,
 )
 from orb.providers.azure.managers.azure_resource_manager import AzureResourceManager
 from orb.providers.azure.services.capability_service import AzureCapabilityService
+from orb.providers.azure.services.health_check_service import AzureHealthCheckService
+from orb.providers.azure.services.inventory_service import (
+    AzureInventoryService,
+    AzureStatusQueryContext,
+)
+from orb.providers.azure.services.machine_conversion_service import (
+    AzureMachineConversionService,
+)
+from orb.providers.azure.services.provisioning_service import (
+    AzureProvisioningService,
+    CreateOperationContext,
+)
+from orb.providers.azure.services.result_factory import AzureStrategyResultFactory
+from orb.providers.azure.services.resource_metadata_service import (
+    AzureResourceMetadataService,
+)
+from orb.providers.azure.services.template_catalog_service import AzureTemplateCatalogService
+from orb.providers.azure.services.termination_service import (
+    AzureTerminationService,
+    TerminationOperationContext,
+)
+from orb.providers.azure.services.termination_dispatch_service import (
+    AzureTerminationDispatchService,
+)
+from orb.providers.azure.services.spot_launch_service import AzureSpotLaunchService
 from orb.providers.base.strategy import (
     ProviderCapabilities,
     ProviderHealthStatus,
@@ -61,44 +78,7 @@ from orb.providers.base.strategy import (
     ProviderStrategy,
 )
 
-
-class _AzureVmWithName(Protocol):
-    name: Optional[str]
-
-
 AzureProviderApiRef = AzureProviderApi | str
-
-
-@dataclass
-class CreateOperationContext:
-    """Typed create-operation inputs after strategy-level resolution."""
-
-    template_config: dict[str, Any]
-    count: int
-    provider_api: AzureProviderApiRef
-    provider_api_key: str
-    handler: AzureHandler
-    azure_template: AzureTemplate
-
-
-@dataclass
-class TerminationOperationContext:
-    """Typed termination-operation inputs after strategy-level resolution."""
-
-    instance_ids: list[str]
-    grouped_resource_mapping: dict[str, list[str]]
-    release_context: dict[str, Any]
-    handler: AzureHandler
-    default_resource_id: str
-
-
-@dataclass
-class StatusOperationContext:
-    """Typed status-operation inputs after strategy-level resolution."""
-
-    instance_ids: list[str]
-    resource_group: str
-    provider_api: Optional[AzureProviderApiRef]
 
 
 class _OperationPreparationFailure(Exception):
@@ -107,24 +87,6 @@ class _OperationPreparationFailure(Exception):
     def __init__(self, result: ProviderResult) -> None:
         super().__init__(result.error_message or "Operation preparation failed")
         self.result = result
-
-
-@dataclass
-class VmssCapacitySnapshot:
-    """Normalized VMSS capacity details for one scale set."""
-
-    target_capacity_units: int
-    fulfilled_capacity_units: int
-    provisioned_instance_count: int
-    state: Optional[str]
-
-    def as_metadata(self) -> dict[str, Any]:
-        return {
-            "target_capacity_units": self.target_capacity_units,
-            "fulfilled_capacity_units": self.fulfilled_capacity_units,
-            "provisioned_instance_count": self.provisioned_instance_count,
-            "state": self.state,
-        }
 
 
 @injectable
@@ -160,6 +122,23 @@ class AzureProviderStrategy(ProviderStrategy):
         self._spot_placement_planner = SpotPlacementPlanner()
         self._spot_placement_execution = SpotPlacementExecutionService()
         self._capability_service = AzureCapabilityService()
+        self._health_check_service = AzureHealthCheckService(config=config, logger=logger)
+        self._inventory_service = AzureInventoryService(logger=logger)
+        self._machine_conversion_service = AzureMachineConversionService(logger=logger)
+        self._provisioning_service = AzureProvisioningService()
+        self._result_factory = AzureStrategyResultFactory()
+        self._resource_metadata_service = AzureResourceMetadataService(
+            default_resource_group=config.resource_group,
+            logger=logger,
+        )
+        self._spot_launch_service = AzureSpotLaunchService(
+            config=config,
+            logger=logger,
+            planner=self._spot_placement_planner,
+            execution_service=self._spot_placement_execution,
+        )
+        self._template_catalog_service = AzureTemplateCatalogService(logger=logger)
+        self._termination_service = AzureTerminationService()
         self._lazy_init_lock = RLock()
         cleanup_coordinator_factory = (
             vmss_cleanup_coordinator_factory or VmssCleanupCoordinatorFactory()
@@ -169,6 +148,10 @@ class AzureProviderStrategy(ProviderStrategy):
             get_vmss_member_count=self._current_vmss_member_count,
             vmss_exists=self._vmss_exists,
             begin_delete_vmss=self._begin_delete_vmss,
+        )
+        self._termination_dispatch_service = AzureTerminationDispatchService(
+            logger=logger,
+            record_pending_cleanup=self._record_pending_vmss_cleanup,
         )
 
     # ------------------------------------------------------------------
@@ -287,99 +270,24 @@ class AzureProviderStrategy(ProviderStrategy):
         enhanced_config.setdefault("provider_name", self.provider_instance_name)
         return enhanced_config
 
-    @staticmethod
-    def _should_use_spot_placement(template: AzureTemplate) -> bool:
-        return getattr(template, "allocation_strategy", None) == "spotPlacementScore"
+    def _should_use_spot_placement(self, template: AzureTemplate) -> bool:
+        return self._spot_launch_service.should_use_spot_placement(template)
 
     def _build_spot_placement_plan(
         self,
         azure_template: AzureTemplate,
         count: int,
-    ) -> list[PlacementPlanEntry]:
-        adapter = AzureSpotPlacementScoreAdapter(
+    ) -> list[Any]:
+        """Compatibility wrapper for tests and callers that patch this seam."""
+        return self._spot_launch_service.build_spot_placement_plan(
+            azure_template=azure_template,
+            count=count,
             azure_client=self.azure_client,
-            logger=self._logger,
-            subscription_id=azure_template.subscription_id or self._azure_config.subscription_id,
-            base_location=azure_template.location.value or self._azure_config.region,
-        )
-        scores = adapter.score_candidates(requested_count=count, template=azure_template)
-        plan = self._spot_placement_planner.create_plan(
-            requested_count=count,
-            scores=scores,
-            split_strategy=azure_template.placement_split_strategy,
-            primary_share_percent=azure_template.placement_primary_share_percent,
-        )
-        if plan:
-            return plan
-
-        if scores:
-            self._logger.warning(
-                "Azure spot placement scores returned no viable candidates; "
-                "falling back to template candidate order"
-            )
-            return self._build_fallback_spot_placement_plan(scores, count)
-
-        return []
-
-    @staticmethod
-    def _build_fallback_spot_placement_plan(
-        scores: list[PlacementScore],
-        requested_count: int,
-    ) -> list[PlacementPlanEntry]:
-        if requested_count <= 0 or not scores:
-            return []
-
-        fallback_scores = [
-            replace(
-                score,
-                approximate=True,
-                metadata={
-                    **score.metadata,
-                    "fallback_reason": "no_viable_provider_scores",
-                },
-            )
-            for score in scores
-        ]
-        return [
-            PlacementPlanEntry(score=fallback_scores[0], planned_count=requested_count),
-            *[
-                PlacementPlanEntry(score=score, planned_count=0)
-                for score in fallback_scores[1:]
-            ],
-        ]
-
-    @staticmethod
-    def _is_capacity_like_failure(child_result: dict[str, Any]) -> bool:
-        error_codes = set(child_result.get("error_codes", []))
-        return bool(
-            error_codes
-            & {
-                "AllocationFailed",
-                "ZonalAllocationFailed",
-                "SkuNotAvailable",
-                "OverconstrainedAllocationRequest",
-            }
         )
 
-    @staticmethod
-    def _clone_template_for_plan_entry(
-            azure_template: AzureTemplate,
-        plan_entry: PlacementPlanEntry,
-    ) -> AzureTemplate:
-        cloned_data = azure_template.model_dump(mode="json", exclude_none=True)
-        selected_vm_size = plan_entry.score.candidate.instance_type
-        cloned_data["vm_size"] = selected_vm_size
-        cloned_data["vm_sizes"] = []
-        cloned_data["allocation_strategy"] = "capacityOptimized"
-        cloned_data["location"] = (
-            plan_entry.score.candidate.region or azure_template.location.value
-        )
-        cloned_data["zones"] = (
-            [plan_entry.score.candidate.zone] if plan_entry.score.candidate.zone else []
-        )
-        cloned_data["placement_regions"] = []
-        cloned_data["placement_zones"] = []
-        return AzureTemplate.model_validate(cloned_data)
+    def _is_capacity_like_failure(self, child_result: dict[str, Any]) -> bool:
+        """Compatibility wrapper for tests and callers that patch this seam."""
+        return self._spot_launch_service.is_capacity_like_failure(child_result)
 
     def _execute_planned_spot_launches(
         self,
@@ -390,92 +298,18 @@ class AzureProviderStrategy(ProviderStrategy):
         operation: ProviderOperation,
     ) -> ProviderResult:
         provider_api_key = self._provider_api_key(provider_api)
-        handler = self.handlers.get(provider_api_key)
-        if not handler:
-            return ProviderResult.error_result(
-                f"No handler available for provider_api: {provider_api_key}",
-                "HANDLER_NOT_FOUND",
-            )
-
-        plan = self._build_spot_placement_plan(azure_template, count)
-        if not plan:
-            return ProviderResult.error_result(
-                "No viable spot placement candidates returned scores",
-                "NO_PLACEMENT_CANDIDATES",
-            )
-
-        request_metadata = dict(operation.parameters.get("request_metadata", {}) or {})
-        base_request_id = operation.parameters.get("request_id") or (
-            operation.context.get("request_id") if operation.context else None
-        )
-
-        summary = self._spot_placement_execution.execute_plan(
-            plan=plan,
-            total_count=count,
-            build_child_template=lambda plan_entry: self._clone_template_for_plan_entry(
-                azure_template, plan_entry
-            ),
-            build_child_request=lambda requested_for_entry, idx: create_acquire_request(
-                template_id=azure_template.template_id,
-                count=requested_for_entry,
-                provider_type="azure",
-                provider_name=self.provider_instance_name,
-                provider_api=provider_api_key,
-                request_metadata=request_metadata,
-                parent_request_id=base_request_id,
-                plan_entry_index=idx,
-            ),
-            launch_child=lambda child_request, child_template: handler.acquire_hosts(
-                child_request, child_template
-            ),
-            is_capacity_like_failure=self._is_capacity_like_failure,
-        )
-
-        provider_data = build_planned_execution_metadata(plan, summary)
-        provider_data["fulfillment_final"] = (
-            bool(summary.resource_ids)
-            and summary.unfulfilled_count == 0
-            and not summary.terminal_error_message
-            and not summary.terminated_early
-        )
-
-        if (
-            not summary.resource_ids
-            and not summary.instances
-            and (summary.terminal_error_message or summary.unfulfilled_count > 0)
-        ):
-            error_message = (
-                f"Provisioning failed: {summary.terminal_error_message}"
-                if summary.terminal_error_message
-                else "Spot placement plan could not provision any instances"
-            )
-            return ProviderResult.error_result(
-                error_message,
-                "PROVISIONING_ADAPTER_ERROR",
-                {
-                    "operation": "create_instances",
-                    "template_config": template_config,
-                    "handler_used": provider_api_key,
-                    "method": "planned_handler",
-                    "provider_data": provider_data,
-                },
-            )
-
-        return ProviderResult.success_result(
-            {
-                "resource_ids": summary.resource_ids,
-                "instances": summary.instances,
-                "provider_api": provider_api_key,
-                "count": count,
-                "template_id": azure_template.template_id,
-            },
-            {
-                "operation": "create_instances",
-                "template_config": template_config,
-                "handler_used": provider_api_key,
-                "method": "planned_handler",
-                "provider_data": provider_data,
-            },
+        return self._spot_launch_service.execute_planned_spot_launches(
+            azure_template=azure_template,
+            provider_api=provider_api,
+            provider_api_key=provider_api_key,
+            count=count,
+            template_config=template_config,
+            operation=operation,
+            provider_instance_name=self.provider_instance_name,
+            handler=self.handlers.get(provider_api_key),
+            azure_client=self.azure_client,
+            plan_override=self._build_spot_placement_plan(azure_template, count),
+            capacity_like_failure_checker=self._is_capacity_like_failure,
         )
 
     # ------------------------------------------------------------------
@@ -498,21 +332,6 @@ class AzureProviderStrategy(ProviderStrategy):
             self._logger.error("Failed to initialize Azure provider strategy: %s", exc)
             return False
 
-    @staticmethod
-    def _validation_error_code(
-        exc: AzureValidationError | DomainValidationError | PydanticValidationError,
-        *,
-        default: str,
-    ) -> str:
-        error_code = getattr(exc, "error_code", None)
-        if isinstance(error_code, str) and error_code:
-            return error_code
-        return default
-
-    @staticmethod
-    def _azure_error_metadata(exc: AzureError) -> dict[str, Any]:
-        return {"provider_error": exc.to_dict()}
-
     def _validation_error_result(
         self,
         *,
@@ -521,14 +340,11 @@ class AzureProviderStrategy(ProviderStrategy):
         default_error_code: str,
         metadata: Optional[dict[str, Any]] = None,
     ) -> ProviderResult:
-        merged_metadata = dict(metadata or {})
-        merged_metadata.setdefault("error_class", exc.__class__.__name__)
-        if isinstance(exc, AzureError):
-            merged_metadata.update(self._azure_error_metadata(exc))
-        return ProviderResult.error_result(
-            message,
-            self._validation_error_code(exc, default=default_error_code),
-            merged_metadata,
+        return self._result_factory.validation_error_result(
+            message=message,
+            exc=exc,
+            default_error_code=default_error_code,
+            metadata=metadata,
         )
 
     def _azure_error_result(
@@ -539,13 +355,11 @@ class AzureProviderStrategy(ProviderStrategy):
         default_error_code: str,
         metadata: Optional[dict[str, Any]] = None,
     ) -> ProviderResult:
-        merged_metadata = dict(metadata or {})
-        merged_metadata.setdefault("error_class", exc.__class__.__name__)
-        merged_metadata.update(self._azure_error_metadata(exc))
-        return ProviderResult.error_result(
-            message,
-            exc.error_code or default_error_code,
-            merged_metadata,
+        return self._result_factory.azure_error_result(
+            message=message,
+            exc=exc,
+            default_error_code=default_error_code,
+            metadata=metadata,
         )
 
     async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
@@ -633,50 +447,7 @@ class AzureProviderStrategy(ProviderStrategy):
         return self._capability_service.get_capabilities()
 
     def check_health(self) -> ProviderHealthStatus:
-        start_time = time.time()
-
-        try:
-            azure_client = self.azure_client
-            if not azure_client:
-                return ProviderHealthStatus.unhealthy(
-                    "Azure client initialization failed",
-                    {"error": "client_initialization_failed"},
-                )
-
-            from orb.infrastructure.mocking.dry_run_context import is_dry_run_active
-
-            if is_dry_run_active():
-                response_time_ms = (time.time() - start_time) * 1000
-                return ProviderHealthStatus.healthy(
-                    f"Azure provider healthy (DRY-RUN) - Region: {self._azure_config.region}",
-                    response_time_ms,
-                )
-
-            # Lightweight subscription list call
-            token = azure_client.credential.get_token("https://management.azure.com/.default")
-
-            # TODO: Is this a good health check?
-            if token is None:
-                response_time_ms = (time.time() - start_time) * 1000
-                return ProviderHealthStatus.unhealthy(
-                    "Azure provider unhealthy - no token found",
-                    {"error": "no_token", "response_time_ms": response_time_ms},
-                )
-
-            # If we got here, the provider is healthy
-            response_time_ms = (time.time() - start_time) * 1000
-            return ProviderHealthStatus.healthy(
-                f"Azure provider healthy - Token fetched successfully in {response_time_ms}, "
-                f"Region: {self._azure_config.region}",
-                response_time_ms,
-            )
-
-        except Exception as exc:
-            response_time_ms = (time.time() - start_time) * 1000
-            return ProviderHealthStatus.unhealthy(
-                f"Health check error: {exc!s}",
-                {"error": str(exc), "response_time_ms": response_time_ms},
-            )
+        return self._health_check_service.check_health(self.azure_client)
 
     def generate_provider_name(self, config: dict[str, Any]) -> str:
         """Generate Azure provider name."""
@@ -749,40 +520,29 @@ class AzureProviderStrategy(ProviderStrategy):
 
     @staticmethod
     def _get_create_template_config(operation: ProviderOperation) -> dict[str, Any]:
-        """Return the raw template config from the operation payload."""
-        return dict(operation.parameters.get("template_config") or {})
+        return AzureProvisioningService.get_create_template_config(operation)
 
     @staticmethod
     def _get_create_count(operation: ProviderOperation) -> int:
-        return operation.parameters.get("count", 1)
+        return AzureProvisioningService.get_create_count(operation)
 
     @staticmethod
     def _validate_create_template_config(
             template_config: dict[str, Any],
     ) -> Optional[ProviderResult]:
-        """Validate required top-level create inputs."""
-        if template_config:
-            return None
-
-        return ProviderResult.error_result(
-            "Template configuration is required for instance creation",
-            "MISSING_TEMPLATE_CONFIG",
-        )
+        return AzureProvisioningService.validate_create_template_config(template_config)
 
     @staticmethod
     def _provider_api_key(provider_api: AzureProviderApiRef) -> str:
-        if isinstance(provider_api, AzureProviderApi):
-            return provider_api.value
-        return provider_api
+        return AzureProvisioningService.provider_api_key(provider_api)
 
     @staticmethod
     def _resolve_create_provider_api(
         template_config: dict[str, Any],
     ) -> AzureProviderApiRef:
-        provider_api = template_config.get("provider_api", AzureProviderApi.VMSS)
-        return cast(
-            AzureProviderApiRef,
-            AzureProviderStrategy._normalize_provider_api_value(provider_api),
+        return AzureProvisioningService.resolve_create_provider_api(
+            template_config,
+            AzureProviderStrategy._normalize_provider_api_value,
         )
 
     @staticmethod
@@ -815,32 +575,15 @@ class AzureProviderStrategy(ProviderStrategy):
     def _build_create_operation_context(
         self, operation: ProviderOperation
     ) -> CreateOperationContext:
-        """Resolve create-time strategy inputs into a typed context object."""
-        template_config = self._get_create_template_config(operation)
-        count = self._get_create_count(operation)
-        validation_error = self._validate_create_template_config(template_config)
-        if validation_error:
-            raise _OperationPreparationFailure(validation_error)
-
-        provider_api = self._resolve_create_provider_api(template_config)
-        provider_api_key = self._provider_api_key(provider_api)
-        handler = self._resolve_create_handler(provider_api)
-        if handler is None:
-            raise _OperationPreparationFailure(
-                ProviderResult.error_result(
-                    f"No handler available for provider_api: {provider_api_key}",
-                    "HANDLER_NOT_FOUND",
-                )
-            )
-
-        return CreateOperationContext(
-            template_config=template_config,
-            count=count,
-            provider_api=provider_api,
-            provider_api_key=provider_api_key,
-            handler=handler,
-            azure_template=self._build_create_template(template_config),
+        create_context = self._provisioning_service.build_create_operation_context(
+            operation=operation,
+            normalize_provider_api=self._normalize_provider_api_value,
+            resolve_handler=self._resolve_create_handler,
+            build_template=self._build_create_template,
         )
+        if isinstance(create_context, ProviderResult):
+            raise _OperationPreparationFailure(create_context)
+        return create_context
 
     def _build_create_request(
         self,
@@ -849,25 +592,13 @@ class AzureProviderStrategy(ProviderStrategy):
         count: int,
         provider_api: AzureProviderApiRef,
     ) -> Any:
-        """Build the domain request object used for create orchestration."""
-        from orb.domain.request.aggregate import Request
-        from orb.domain.request.value_objects import RequestType
-
-        request_metadata = dict(operation.parameters.get("request_metadata", {}) or {})
-        request_id = operation.parameters.get("request_id") or (
-            operation.context.get("request_id") if operation.context else None
+        return self._provisioning_service.build_create_request(
+            operation=operation,
+            azure_template=azure_template,
+            count=count,
+            provider_api=provider_api,
+            provider_instance_name=self.provider_instance_name,
         )
-        request = Request.create_new_request(
-            request_type=RequestType.ACQUIRE,
-            template_id=azure_template.template_id,
-            machine_count=count,
-            provider_type="azure",
-            provider_name=self.provider_instance_name,
-            metadata=request_metadata,
-            request_id=request_id,
-        )
-        request.provider_api = self._provider_api_key(provider_api)
-        return request
 
     @staticmethod
     def _normalize_handler_create_result(
@@ -877,68 +608,19 @@ class AzureProviderStrategy(ProviderStrategy):
         count: int,
         template_id: str,
     ) -> ProviderResult:
-        """Turn a raw handler return value into a ``ProviderResult``."""
-        if isinstance(handler_result, dict):
-            resource_ids = handler_result.get("resource_ids", [])
-            instances = handler_result.get("instances", [])
-            success = handler_result.get("success", False)
-            error_message = handler_result.get("error_message")
-            provider_data = handler_result.get("provider_data") or {}
-
-            if not success:
-                return ProviderResult.error_result(
-                    f"Provisioning failed: {error_message}",
-                    "PROVISIONING_ADAPTER_ERROR",
-                    {
-                        "operation": "create_instances",
-                        "template_config": template_config,
-                        "handler_used": AzureProviderStrategy._provider_api_key(provider_api),
-                        "method": "handler",
-                        "provider_data": provider_data,
-                    },
-                )
-        else:
-            resource_ids = [handler_result] if handler_result else []
-            instances = []
-            provider_data = {}
-
-        return ProviderResult.success_result(
-            {
-                "resource_ids": resource_ids,
-                "instances": instances,
-                "provider_api": AzureProviderStrategy._provider_api_key(provider_api),
-                "count": count,
-                "template_id": template_id,
-            },
-            {
-                "operation": "create_instances",
-                "template_config": template_config,
-                "handler_used": AzureProviderStrategy._provider_api_key(provider_api),
-                "method": "handler",
-                "provider_data": provider_data,
-            },
+        return self._provisioning_service.normalize_handler_create_result(
+            handler_result,
+            template_config=template_config,
+            provider_api=provider_api,
+            count=count,
+            template_id=template_id,
         )
 
     @staticmethod
     def _create_instances_dry_run_result(
         create_context: CreateOperationContext,
     ) -> ProviderResult:
-        return ProviderResult.success_result(
-            {
-                "resource_ids": ["dry-run-resource-id"],
-                "instances": [],
-                "provider_api": create_context.provider_api_key,
-                "count": create_context.count,
-                "template_id": create_context.azure_template.template_id,
-            },
-            {
-                "operation": "create_instances",
-                "template_config": create_context.template_config,
-                "handler_used": create_context.provider_api_key,
-                "method": "dry_run",
-                "provider_data": {"dry_run": True},
-            },
-        )
+        return AzureProvisioningService.create_instances_dry_run_result(create_context)
 
     def _execute_create_handler(
         self,
@@ -946,15 +628,9 @@ class AzureProviderStrategy(ProviderStrategy):
         create_context: CreateOperationContext,
         request: Any,
     ) -> ProviderResult:
-        handler_result = create_context.handler.acquire_hosts(
-            request, create_context.azure_template
-        )
-        return self._normalize_handler_create_result(
-            handler_result,
-            create_context.template_config,
-            create_context.provider_api,
-            create_context.count,
-            create_context.azure_template.template_id,
+        return self._provisioning_service.execute_create_handler(
+            create_context=create_context,
+            request=request,
         )
 
     async def _handle_create_instances(
@@ -1043,134 +719,24 @@ class AzureProviderStrategy(ProviderStrategy):
     # TERMINATE_INSTANCES
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _group_instance_ids_by_resource(
-            instance_ids: list[str],
-        resource_mapping: dict[str, Any],
-    ) -> dict[str, list[str]]:
-        """Normalise resource mappings to {resource_id: [instance_ids]} shape."""
-        grouped: dict[str, list[str]] = {}
-        if not resource_mapping:
-            return grouped
-
-        for key, value in resource_mapping.items():
-            resource_id: Optional[str] = None
-            mapped_ids: list[str] = []
-
-            # Canonical shape from request handler: instance_id -> (resource_id, desired_capacity)
-            if isinstance(value, tuple):
-                if value:
-                    resource_id = value[0] if isinstance(value[0], str) else None
-                mapped_ids = [key]
-            # Alternate shape: instance_id -> resource_id
-            elif isinstance(value, str):
-                resource_id = value
-                mapped_ids = [key]
-            # Legacy shape: resource_id -> [instance_ids]
-            elif isinstance(value, list):
-                if isinstance(key, str):
-                    resource_id = key
-                mapped_ids = [str(v) for v in value if v]
-
-            if not resource_id:
-                continue
-
-            bucket = grouped.setdefault(resource_id, [])
-            for mapped_id in mapped_ids:
-                if mapped_id in instance_ids and mapped_id not in bucket:
-                    bucket.append(mapped_id)
-
-        return grouped
-
-    def _dispatch_termination(
-        self,
-        handler: AzureHandler,
-        instance_ids: list[str],
-        grouped_resource_mapping: dict[str, list[str]],
-        default_resource_id: str,
-        context: dict[str, Any],
-    ) -> list[dict[str, Any]]:
-        """Dispatch release_hosts calls and collect provider data from each."""
-        termination_provider_data: list[dict[str, Any]] = []
-
-        if grouped_resource_mapping:
-            for resource_id, mapped_instance_ids in grouped_resource_mapping.items():
-                handler_result = handler.release_hosts(
-                    machine_ids=mapped_instance_ids,
-                    resource_id=resource_id,
-                    context=context,
-                )
-                self._record_pending_vmss_cleanup(handler_result)
-                if isinstance(handler_result, dict):
-                    provider_data = handler_result.get("provider_data")
-                    if isinstance(provider_data, dict):
-                        termination_provider_data.append(provider_data)
-        else:
-            handler_result = handler.release_hosts(
-                machine_ids=instance_ids,
-                resource_id=default_resource_id,
-                context=context,
-            )
-            self._record_pending_vmss_cleanup(handler_result)
-            if isinstance(handler_result, dict):
-                provider_data = handler_result.get("provider_data")
-                if isinstance(provider_data, dict):
-                    termination_provider_data.append(provider_data)
-
-        return termination_provider_data
-
     def _build_termination_operation_context(
         self, operation: ProviderOperation
     ) -> TerminationOperationContext:
-        instance_ids = operation.parameters.get("instance_ids", [])
-        if not instance_ids:
-            raise _OperationPreparationFailure(
-                ProviderResult.error_result(
-                    "Instance IDs are required for termination",
-                    "MISSING_INSTANCE_IDS",
-                )
-            )
-
-        provider_api = self._resolve_operation_provider_api(operation)
-        if provider_api in (None, ""):
-            raise _OperationPreparationFailure(
-                ProviderResult.error_result(
-                    "provider_api is required for Azure termination",
-                    "MISSING_PROVIDER_API",
-                )
-            )
-        provider_api_key = self._provider_api_key(provider_api)
-        handler = self.handlers.get(provider_api_key)
-        if handler is None:
-            raise _OperationPreparationFailure(
-                ProviderResult.error_result(
-                    f"No handler available for provider_api: {provider_api_key}",
-                    "HANDLER_NOT_FOUND",
-                )
-            )
-
-        raw_resource_mapping = operation.parameters.get("resource_mapping", {})
-        grouped_resource_mapping = self._group_instance_ids_by_resource(
-            instance_ids,
-            raw_resource_mapping,
-        )
-        default_resource_id = operation.parameters.get("resource_id")
-        if not default_resource_id and grouped_resource_mapping:
-            default_resource_id = next(iter(grouped_resource_mapping.keys()))
-
-        release_context = self._build_cyclecloud_request_metadata(
+        termination_context = self._termination_service.build_termination_operation_context(
             operation=operation,
-            resource_group=self._resolve_operation_resource_group(operation),
+            resolve_operation_provider_api=self._resolve_operation_provider_api,
+            provider_api_key=self._provider_api_key,
+            handlers=self.handlers,
+            group_instance_ids_by_resource=self._inventory_service.group_instance_ids_by_resource,
+            build_cyclecloud_request_metadata=self._build_cyclecloud_request_metadata,
+            resolve_operation_resource_group=lambda op: self._inventory_service.resolve_operation_resource_group(
+                op,
+                self._azure_config.resource_group,
+            ),
         )
-        release_context["resource_id"] = default_resource_id or "unknown"
-
-        return TerminationOperationContext(
-            instance_ids=instance_ids,
-            grouped_resource_mapping=grouped_resource_mapping,
-            release_context=release_context,
-            handler=handler,
-            default_resource_id=default_resource_id or "unknown",
-        )
+        if isinstance(termination_context, ProviderResult):
+            raise _OperationPreparationFailure(termination_context)
+        return termination_context
 
     def _handle_terminate_instances(self, operation: ProviderOperation) -> ProviderResult:
         self._logger.debug("_handle_terminate_instances")
@@ -1178,20 +744,11 @@ class AzureProviderStrategy(ProviderStrategy):
             termination_context = self._build_termination_operation_context(operation)
 
             if bool(operation.context and operation.context.get("dry_run", False)):
-                return ProviderResult.success_result(
-                    {
-                        "success": True,
-                        "terminated_count": len(termination_context.instance_ids),
-                    },
-                    {
-                        "operation": "terminate_instances",
-                        "instance_ids": termination_context.instance_ids,
-                        "method": "dry_run",
-                        "provider_data": {"dry_run": True},
-                    },
+                return self._termination_service.terminate_instances_dry_run_result(
+                    termination_context
                 )
 
-            termination_provider_data = self._dispatch_termination(
+            termination_provider_data = self._termination_dispatch_service.dispatch(
                 handler=termination_context.handler,
                 instance_ids=termination_context.instance_ids,
                 grouped_resource_mapping=termination_context.grouped_resource_mapping,
@@ -1199,19 +756,9 @@ class AzureProviderStrategy(ProviderStrategy):
                 context=termination_context.release_context,
             )
 
-            return ProviderResult.success_result(
-                {
-                    "success": True,
-                    "terminated_count": len(termination_context.instance_ids),
-                },
-                {
-                    "operation": "terminate_instances",
-                    "instance_ids": termination_context.instance_ids,
-                    "method": "handler",
-                    "provider_data": {
-                        "termination_requests": termination_provider_data,
-                    } if termination_provider_data else {},
-                },
+            return self._termination_service.terminate_instances_result(
+                instance_ids=termination_context.instance_ids,
+                termination_provider_data=termination_provider_data,
             )
 
         except asyncio.CancelledError:
@@ -1242,7 +789,7 @@ class AzureProviderStrategy(ProviderStrategy):
 
     def _build_status_operation_context(
         self, operation: ProviderOperation
-    ) -> StatusOperationContext:
+    ) -> AzureStatusQueryContext:
         instance_ids = operation.parameters.get("instance_ids", [])
         if not instance_ids:
             raise _OperationPreparationFailure(
@@ -1252,7 +799,10 @@ class AzureProviderStrategy(ProviderStrategy):
                 )
             )
 
-        resource_group = self._resolve_operation_resource_group(operation)
+        resource_group = self._inventory_service.resolve_operation_resource_group(
+            operation,
+            self._azure_config.resource_group,
+        )
         if not resource_group:
             raise _OperationPreparationFailure(
                 ProviderResult.error_result(
@@ -1261,110 +811,10 @@ class AzureProviderStrategy(ProviderStrategy):
                 )
             )
 
-        return StatusOperationContext(
+        return AzureStatusQueryContext(
             instance_ids=instance_ids,
             resource_group=resource_group,
             provider_api=self._resolve_operation_provider_api(operation),
-        )
-
-    @staticmethod
-    def _status_dry_run_result(instance_ids: list[str]) -> ProviderResult:
-        return ProviderResult.success_result(
-            {
-                "instances": [
-                    {
-                        "instance_id": instance_id,
-                        "status": "unknown",
-                        "provider_type": "azure",
-                        "provider_data": {"dry_run": True},
-                    }
-                    for instance_id in instance_ids
-                ],
-                "queried_count": len(instance_ids),
-            },
-            {
-                "operation": "get_instance_status",
-                "instance_ids": instance_ids,
-                "method": "dry_run",
-                "provider_data": {"dry_run": True},
-            },
-        )
-
-    def _status_handler_result(
-        self,
-        *,
-        operation: ProviderOperation,
-        status_context: StatusOperationContext,
-        handler_machines: list[dict[str, Any]],
-    ) -> ProviderResult:
-        resource_ids: list[str] = []
-        metadata = {
-            "operation": "get_instance_status",
-            "instance_ids": status_context.instance_ids,
-            "method": "handler",
-        }
-        if status_context.provider_api in (
-            AzureProviderApi.VMSS,
-            AzureProviderApi.VMSS_UNIFORM,
-        ):
-            resource_ids = self._status_resource_ids(operation, status_context.instance_ids)
-            if resource_ids:
-                self._maybe_cleanup_pending_vmss(
-                    resource_group=status_context.resource_group,
-                    resource_ids=resource_ids,
-                    instance_details=handler_machines,
-                )
-            metadata.update(
-                self._vmss_cleanup_status_metadata(
-                    resource_group=status_context.resource_group,
-                    resource_ids=resource_ids,
-                )
-            )
-
-        return ProviderResult.success_result(
-            {
-                "instances": handler_machines,
-                "queried_count": len(status_context.instance_ids),
-            },
-            metadata,
-        )
-
-    def _sdk_status_result(self, status_context: StatusOperationContext) -> ProviderResult:
-        azure_client = self.azure_client
-        if not azure_client:
-            return ProviderResult.error_result(
-                "Azure client not available", "AZURE_CLIENT_NOT_AVAILABLE"
-            )
-
-        machines: list[dict[str, Any]] = []
-        compute = azure_client.compute_client
-
-        for vm_id in status_context.instance_ids:
-            try:
-                vm = compute.virtual_machines.get(
-                    resource_group_name=status_context.resource_group,
-                    vm_name=vm_id,
-                    expand="instanceView",
-                )
-                machines.append(self._convert_azure_instance_to_machine(vm))
-            except Exception as exc:
-                self._logger.error("Failed to get status for VM '%s': %s", vm_id, exc)
-                machines.append({
-                    "instance_id": vm_id,
-                    "status": "unknown",
-                    "provider_type": "azure",
-                    "error": str(exc),
-                })
-
-        return ProviderResult.success_result(
-            {
-                "instances": machines,
-                "queried_count": len(status_context.instance_ids),
-            },
-            {
-                "operation": "get_instance_status",
-                "instance_ids": status_context.instance_ids,
-            },
         )
 
     def _handle_get_instance_status(self, operation: ProviderOperation) -> ProviderResult:
@@ -1372,23 +822,33 @@ class AzureProviderStrategy(ProviderStrategy):
             status_context = self._build_status_operation_context(operation)
 
             if bool(operation.context and operation.context.get("dry_run", False)):
-                return self._status_dry_run_result(status_context.instance_ids)
+                return self._inventory_service.status_dry_run_result(status_context.instance_ids)
 
             self._restore_pending_vmss_cleanups(operation)
 
-            handler_machines = self._get_instance_status_via_handlers(
+            handler_machines = self._inventory_service.get_instance_status_via_handlers(
                 operation=operation,
                 instance_ids=status_context.instance_ids,
                 resource_group=status_context.resource_group,
+                provider_instance_name=self.provider_instance_name,
+                resolve_operation_provider_api=self._resolve_operation_provider_api,
+                provider_api_key=self._provider_api_key,
+                handlers=self.handlers,
             )
             if handler_machines is not None:
-                return self._status_handler_result(
+                return self._inventory_service.status_handler_result(
                     operation=operation,
                     status_context=status_context,
                     handler_machines=handler_machines,
+                    maybe_cleanup_pending_vmss=self._maybe_cleanup_pending_vmss,
+                    vmss_cleanup_status_metadata=self._vmss_cleanup_status_metadata,
                 )
 
-            return self._sdk_status_result(status_context)
+            return self._inventory_service.sdk_status_result(
+                status_context=status_context,
+                azure_client=self.azure_client,
+                machine_conversion_service=self._machine_conversion_service,
+            )
 
         except asyncio.CancelledError:
             raise
@@ -1412,209 +872,16 @@ class AzureProviderStrategy(ProviderStrategy):
                 "GET_INSTANCE_STATUS_ERROR",
             )
 
-    def _collect_grouped_status(
-        self,
-        grouped_resource_mapping: dict[str, list[str]],
-        handler: Optional[AzureHandler],
-        provider_api_value: AzureProviderApiRef,
-        build_metadata: Callable[[Optional[dict[str, Any]]], dict[str, Any]],
-        make_request: Callable[[list[str], dict[str, Any]], Any],
-    ) -> list[dict[str, Any]]:
-        """Query status for each resource group and deduplicate results."""
-        all_results: list[dict[str, Any]] = []
-        seen_instance_ids: set[str] = set()
-
-        for resource_id, mapped_ids in grouped_resource_mapping.items():
-            group_handler = handler
-            if not group_handler and provider_api_value:
-                group_handler = self.handlers.get(self._provider_api_key(provider_api_value))
-            if not group_handler:
-                continue
-
-            extra_metadata: dict[str, Any] = {}
-            if provider_api_value == AzureProviderApi.CYCLECLOUD:
-                extra_metadata["node_ids"] = mapped_ids
-            request = make_request([resource_id], build_metadata(extra_metadata))
-            for machine in self._filter_status_results(group_handler.check_hosts_status(request), mapped_ids):
-                machine_id = str(machine.get("instance_id"))
-                if machine_id not in seen_instance_ids:
-                    all_results.append(machine)
-                    seen_instance_ids.add(machine_id)
-
-        return all_results
-
-    def _get_instance_status_via_handlers(
-        self,
-        *,
-        operation: ProviderOperation,
-        instance_ids: list[str],
-        resource_group: str,
-    ) -> Optional[list[dict[str, Any]]]:
-        """Use Azure handlers for status queries when enough resource context is available."""
-        provider_api = self._resolve_operation_provider_api(operation)
-        raw_resource_mapping = operation.parameters.get("resource_mapping", {}) or {}
-        grouped_resource_mapping = self._group_instance_ids_by_resource(instance_ids, raw_resource_mapping)
-
-        if not provider_api:
-            return None
-
-        handler = self.handlers.get(self._provider_api_key(provider_api))
-        if not handler and provider_api == AzureProviderApi.VMSS_UNIFORM:
-            handler = self.handlers.get(AzureProviderApi.VMSS.value)
-        if not handler and not grouped_resource_mapping:
-            return None
-
-        from orb.domain.request.aggregate import Request
-        from orb.domain.request.value_objects import RequestType
-
-        request_id = operation.parameters.get("request_id") or (
-            operation.context.get("request_id") if operation.context else None
-        )
-
-        def build_metadata(additional: Optional[dict[str, Any]] = None) -> dict[str, Any]:
-            metadata = self._build_cyclecloud_request_metadata(
-                operation=operation,
-                resource_group=resource_group,
-            )
-            if additional:
-                metadata.update(additional)
-            return metadata
-
-        def make_request(resource_ids: list[str], metadata: dict[str, Any]) -> Request:
-            request = Request.create_new_request(
-                request_type=RequestType.ACQUIRE,
-                template_id=operation.parameters.get("template_id", "unknown"),
-                machine_count=1,
-                provider_type="azure",
-                provider_name=self.provider_instance_name,
-                request_id=request_id,
-                metadata=metadata,
-            )
-            request.resource_ids = resource_ids
-            return request
-
-        if provider_api == AzureProviderApi.SINGLE_VM and handler:
-            request = make_request(instance_ids, build_metadata())
-            return handler.check_hosts_status(request)
-
-        if grouped_resource_mapping:
-            results = self._collect_grouped_status(
-                grouped_resource_mapping, handler, provider_api,
-                build_metadata, make_request,
-            )
-            if results:
-                return results
-
-        resource_id = operation.parameters.get("resource_id")
-        if not handler or not resource_id:
-            return None
-
-        extra_metadata: dict[str, Any] = {}
-        if provider_api == AzureProviderApi.CYCLECLOUD:
-            extra_metadata = {"node_ids": instance_ids}
-        request = make_request(
-            instance_ids if provider_api == AzureProviderApi.SINGLE_VM else [resource_id],
-            build_metadata(extra_metadata),
-        )
-        if provider_api == AzureProviderApi.SINGLE_VM:
-            return handler.check_hosts_status(request)
-        return self._filter_status_results(handler.check_hosts_status(request), instance_ids)
-
-    @staticmethod
-    def _request_metadata(operation: ProviderOperation) -> dict[str, Any]:
-        return dict(operation.parameters.get("request_metadata") or {})
-
-    @staticmethod
-    def _status_resource_ids(operation: ProviderOperation, instance_ids: list[str]) -> list[str]:
-        resource_ids: list[str] = []
-        raw_resource_mapping = operation.parameters.get("resource_mapping", {}) or {}
-        for resource_id, mapped_ids in AzureProviderStrategy._group_instance_ids_by_resource(
-            instance_ids,
-            raw_resource_mapping,
-        ).items():
-            if resource_id and mapped_ids and resource_id not in resource_ids:
-                resource_ids.append(resource_id)
-
-        direct_resource_id = operation.parameters.get("resource_id")
-        if direct_resource_id not in (None, "") and str(direct_resource_id) not in resource_ids:
-            resource_ids.append(str(direct_resource_id))
-        return resource_ids
-
-    @staticmethod
-    def _filter_status_results(
-        results: list[dict[str, Any]],
-        requested_ids: list[str],
-    ) -> list[dict[str, Any]]:
-        """Filter handler status results to the requested IDs using common Azure identifiers."""
-        requested = {str(item) for item in requested_ids}
-        filtered: list[dict[str, Any]] = []
-        for result in results:
-            provider_data = result.get("provider_data") or {}
-            candidate_ids = {
-                str(result.get("instance_id")),
-                str(provider_data.get("vm_id")),
-                str(provider_data.get("vmss_instance_id")),
-                str(provider_data.get("node_id")),
-                str(provider_data.get("vm_name")),
-            }
-            candidate_ids.discard("None")
-            if candidate_ids & requested:
-                filtered.append(result)
-        return filtered
-
-    @staticmethod
-    def _cyclecloud_metadata_keys() -> tuple[str, ...]:
-        return (
-            "cluster_name",
-            "node_array",
-            "node_ids",
-            "operation_id",
-            "operation_location",
-            "cyclecloud_url",
-            "cyclecloud_credential_path",
-            "cyclecloud_verify_ssl",
-            "cyclecloud_auth_mode",
-            "cyclecloud_aad_scope",
-        )
-
     def _build_cyclecloud_request_metadata(
         self,
         *,
         operation: ProviderOperation,
         resource_group: Optional[str],
     ) -> dict[str, Any]:
-        metadata: dict[str, Any] = {"resource_group": resource_group}
-        request_metadata = self._request_metadata(operation)
-        for key in self._cyclecloud_metadata_keys():
-            value = request_metadata.get(key)
-            if value not in (None, ""):
-                metadata[key] = value
-        return metadata
-
-    def _resolve_operation_resource_group(
-        self,
-        operation: ProviderOperation,
-    ) -> Optional[str]:
-        request_metadata = self._request_metadata(operation)
-        request_resource_group = request_metadata.get("resource_group")
-        if request_resource_group not in (None, ""):
-            return str(request_resource_group)
-
-        return self._azure_config.resource_group
-
-    @staticmethod
-    def _status_candidate_ids(result: dict[str, Any]) -> set[str]:
-        provider_data = result.get("provider_data") or {}
-        candidate_ids = {
-            str(result.get("instance_id")),
-            str(provider_data.get("vm_id")),
-            str(provider_data.get("vmss_instance_id")),
-            str(provider_data.get("node_id")),
-            str(provider_data.get("vm_name")),
-        }
-        candidate_ids.discard("None")
-        candidate_ids.discard("")
-        return candidate_ids
+        return self._inventory_service.build_cyclecloud_request_metadata(
+            operation=operation,
+            resource_group=resource_group,
+        )
 
     def _record_pending_vmss_cleanup(self, handler_result: Any) -> None:
         self._vmss_cleanup_coordinator.record(handler_result)
@@ -1622,7 +889,7 @@ class AzureProviderStrategy(ProviderStrategy):
     def _restore_pending_vmss_cleanups(self, operation: ProviderOperation) -> None:
         """Rebuild pending VMSS cleanup state from durable request metadata."""
         self._vmss_cleanup_coordinator.restore_from_request_metadata(
-            self._request_metadata(operation)
+            self._inventory_service.request_metadata(operation)
         )
 
     def _has_pending_vmss_cleanup(
@@ -1684,24 +951,8 @@ class AzureProviderStrategy(ProviderStrategy):
         self._vmss_cleanup_coordinator.reconcile(
             resource_group=resource_group,
             resource_ids=resource_ids,
-            observed_ids=self._observed_status_ids(instance_details),
+            observed_ids=self._inventory_service.observed_status_ids(instance_details),
         )
-
-    @staticmethod
-    def _observed_status_ids(instance_details: list[dict[str, Any]]) -> set[str]:
-        observed_ids: set[str] = set()
-        for instance in instance_details:
-            observed_ids.update(AzureProviderStrategy._status_candidate_ids(instance))
-        return observed_ids
-
-    @staticmethod
-    def _dedupe_resource_ids(resource_ids: list[str]) -> list[str]:
-        deduped: list[str] = []
-        for resource_id in resource_ids:
-            vmss_name = str(resource_id)
-            if vmss_name and vmss_name not in deduped:
-                deduped.append(vmss_name)
-        return deduped
 
     # ------------------------------------------------------------------
     # DESCRIBE_RESOURCE_INSTANCES
@@ -1738,137 +989,23 @@ class AzureProviderStrategy(ProviderStrategy):
                     },
                 )
 
-            provider_api_key = self._provider_api_key(provider_api)
-            handler = self.handlers.get(provider_api_key)
-            if not handler:
-                return ProviderResult.error_result(
-                    f"No handler available for provider_api: {provider_api_key}",
-                    "HANDLER_NOT_FOUND",
-                )
-
-            from orb.domain.request.aggregate import Request
-            from orb.domain.request.value_objects import RequestType
-
-            request_id = operation.parameters.get("request_id") or (
-                operation.context.get("request_id") if operation.context else None
-            )
-            resource_group = self._resolve_operation_resource_group(operation)
-            request_metadata = self._build_cyclecloud_request_metadata(
+            return self._inventory_service.describe_resource_instances(
                 operation=operation,
-                resource_group=resource_group,
-            )
-            self._restore_pending_vmss_cleanups(operation)
-            if provider_api == AzureProviderApi.SINGLE_VM:
-                deployment_name = self._request_metadata(operation).get("deployment_name")
-                if deployment_name not in (None, ""):
-                    request_metadata["deployment_name"] = str(deployment_name)
-            if provider_api in (
-                AzureProviderApi.VMSS,
-                AzureProviderApi.VMSS_UNIFORM,
-            ) and self._has_pending_vmss_cleanup(
-                resource_group=resource_group,
-                resource_ids=resource_ids,
-            ):
-                request_metadata["fail_on_partial_status_error"] = True
-            request = Request.create_new_request(
-                request_type=RequestType.ACQUIRE,
-                template_id=operation.parameters.get("template_id", "unknown"),
-                machine_count=1,
-                provider_type="azure",
-                provider_name=self.provider_instance_name,
-                request_id=request_id,
-                metadata=request_metadata,
-            )
-            request.resource_ids = resource_ids
-
-            instance_details = handler.check_hosts_status(request)
-            self._maybe_cleanup_pending_vmss(
-                resource_group=resource_group,
-                resource_ids=resource_ids,
-                instance_details=instance_details,
-            )
-            cleanup_metadata: dict[str, Any] = {}
-            if provider_api in (
-                AzureProviderApi.VMSS,
-                AzureProviderApi.VMSS_UNIFORM,
-            ):
-                cleanup_metadata = self._vmss_cleanup_status_metadata(
-                    resource_group=resource_group,
-                    resource_ids=resource_ids,
-                )
-
-            if not instance_details:
-                metadata = {
-                    "operation": "describe_resource_instances",
-                    "resource_ids": resource_ids,
-                    "provider_api": provider_api_key,
-                    "handler_used": provider_api_key,
-                    "instance_count": 0,
-                    **cleanup_metadata,
-                }
-                if provider_api in (
-                    AzureProviderApi.VMSS,
-                    AzureProviderApi.VMSS_UNIFORM,
-                ):
-                    vmss_errors = []
-                    if resource_group and hasattr(handler, "get_vmss_resource_errors"):
-                        for resource_id in resource_ids:
-                            for error in handler.get_vmss_resource_errors(resource_group, resource_id):
-                                if error not in vmss_errors:
-                                    vmss_errors.append(error)
-                    if vmss_errors:
-                        metadata["fleet_errors"] = vmss_errors
-                    self._augment_vmss_capacity_metadata(
-                        metadata,
-                        resource_ids,
-                        resource_group=resource_group,
-                    )
-                elif provider_api == AzureProviderApi.SINGLE_VM:
-                    self._augment_single_vm_deployment_metadata(
-                        metadata,
-                        request_metadata,
-                        resource_group=resource_group,
-                    )
-                return ProviderResult.success_result(
-                    {"instances": []},
-                    metadata,
-                )
-
-            fleet_errors: list[dict[str, Any]] = []
-            for inst in instance_details:
-                provider_data = inst.get("provider_data") or {}
-                if isinstance(provider_data, dict):
-                    for error in provider_data.get("fleet_errors") or []:
-                        if error not in fleet_errors:
-                            fleet_errors.append(error)
-
-            metadata: dict[str, Any] = {
-                "operation": "describe_resource_instances",
-                "resource_ids": resource_ids,
-                "provider_api": provider_api_key,
-                "handler_used": provider_api_key,
-                "instance_count": len(instance_details),
-                **cleanup_metadata,
-            }
-            if fleet_errors:
-                metadata["fleet_errors"] = fleet_errors
-
-            # VMSS capacity info
-            if provider_api in (
-                AzureProviderApi.VMSS,
-                AzureProviderApi.VMSS_UNIFORM,
-            ):
-                self._augment_vmss_capacity_metadata(
-                    metadata,
-                    resource_ids,
-                    resource_group=resource_group,
-                )
-
-            self._augment_shortfall_metadata(metadata)
-
-            return ProviderResult.success_result(
-                data={"instances": instance_details},
-                metadata=metadata,
+                handlers=self.handlers,
+                provider_instance_name=self.provider_instance_name,
+                provider_api=provider_api,
+                provider_api_key=self._provider_api_key(provider_api),
+                resource_group=self._inventory_service.resolve_operation_resource_group(
+                    operation,
+                    self._azure_config.resource_group,
+                ),
+                resource_manager=self.resource_manager,
+                deployment_service=self.deployment_service,
+                resource_metadata_service=self._resource_metadata_service,
+                restore_pending_vmss_cleanups=self._restore_pending_vmss_cleanups,
+                has_pending_vmss_cleanup=self._has_pending_vmss_cleanup,
+                maybe_cleanup_pending_vmss=self._maybe_cleanup_pending_vmss,
+                vmss_cleanup_status_metadata=self._vmss_cleanup_status_metadata,
             )
 
         except asyncio.CancelledError:
@@ -1936,7 +1073,7 @@ class AzureProviderStrategy(ProviderStrategy):
 
     def _handle_get_available_templates(self, operation: ProviderOperation) -> ProviderResult:
         try:
-            templates = self._get_azure_templates()
+            templates = self._template_catalog_service.get_available_templates()
             return ProviderResult.success_result(
                 {"templates": templates, "count": len(templates)},
                 {"operation": "get_available_templates"},
@@ -1962,174 +1099,6 @@ class AzureProviderStrategy(ProviderStrategy):
             {"operation": "health_check"},
         )
 
-    # ------------------------------------------------------------------
-    # VMSS capacity metadata
-    # ------------------------------------------------------------------
-
-    def _augment_vmss_capacity_metadata(
-        self,
-        metadata: dict[str, Any],
-        resource_ids: list[str],
-        resource_group: Optional[str] = None,
-    ) -> None:
-        if not resource_ids or not self.resource_manager:
-            return
-
-        resource_group = resource_group or self._azure_config.resource_group
-        if not resource_group:
-            return
-
-        per_resource_capacity = self._collect_vmss_capacity(resource_group, resource_ids)
-        if not per_resource_capacity:
-            return
-
-        aggregate_snapshot = self._aggregate_vmss_capacity(per_resource_capacity)
-        metadata["fleet_capacity_fulfilment"] = aggregate_snapshot.as_metadata()
-        if len(per_resource_capacity) > 1:
-            metadata["fleet_capacity_fulfilment_by_resource"] = {
-                vmss_name: snapshot.as_metadata()
-                for vmss_name, snapshot in per_resource_capacity.items()
-            }
-
-    def _collect_vmss_capacity(
-        self,
-        resource_group: str,
-        resource_ids: list[str],
-    ) -> dict[str, VmssCapacitySnapshot]:
-        per_resource_capacity: dict[str, VmssCapacitySnapshot] = {}
-        for vmss_name in self._dedupe_resource_ids(resource_ids):
-            snapshot = self._get_vmss_capacity_snapshot(resource_group, vmss_name)
-            if snapshot is not None:
-                per_resource_capacity[vmss_name] = snapshot
-        return per_resource_capacity
-
-    def _get_vmss_capacity_snapshot(
-        self,
-        resource_group: str,
-        vmss_name: str,
-    ) -> Optional[VmssCapacitySnapshot]:
-        try:
-            capacity_info = self.resource_manager.get_vmss_capacity(resource_group, vmss_name)
-        except Exception as exc:
-            self._logger.warning("Could not fetch VMSS capacity for %s: %s", vmss_name, exc)
-            return None
-
-        provisioned_instance_count = int(capacity_info.get("provisioned_instance_count", 0) or 0)
-        target_capacity = int(capacity_info.get("capacity", 0) or 0)
-        provisioning_state = capacity_info.get("provisioning_state")
-        return VmssCapacitySnapshot(
-            target_capacity_units=target_capacity,
-            fulfilled_capacity_units=provisioned_instance_count,
-            provisioned_instance_count=provisioned_instance_count,
-            state=str(provisioning_state) if provisioning_state not in (None, "") else None,
-        )
-
-    @staticmethod
-    def _aggregate_vmss_capacity(
-        per_resource_capacity: dict[str, VmssCapacitySnapshot],
-    ) -> VmssCapacitySnapshot:
-        states = [snapshot.state for snapshot in per_resource_capacity.values() if snapshot.state]
-        aggregate_state = None
-        if len(per_resource_capacity) == 1:
-            aggregate_state = next(iter(per_resource_capacity.values())).state
-        elif states:
-            aggregate_state = states[0] if len(set(states)) == 1 else "multiple"
-
-        target_capacity = sum(
-            snapshot.target_capacity_units for snapshot in per_resource_capacity.values()
-        )
-        fulfilled_capacity = sum(
-            snapshot.fulfilled_capacity_units for snapshot in per_resource_capacity.values()
-        )
-        return VmssCapacitySnapshot(
-            target_capacity_units=target_capacity,
-            fulfilled_capacity_units=fulfilled_capacity,
-            provisioned_instance_count=fulfilled_capacity,
-            state=aggregate_state,
-        )
-
-    def _augment_single_vm_deployment_metadata(
-        self,
-        metadata: dict[str, Any],
-        request_metadata: dict[str, Any],
-        *,
-        resource_group: Optional[str],
-    ) -> None:
-        deployment_name = request_metadata.get("deployment_name")
-        if deployment_name in (None, "") or not resource_group or not self.deployment_service:
-            return
-
-        try:
-            deployment_status = self.deployment_service.get_deployment_status(
-                resource_group=str(resource_group),
-                deployment_name=str(deployment_name),
-            )
-        except Exception as exc:
-            self._logger.warning(
-                "Could not fetch SingleVM deployment status for %s: %s",
-                deployment_name,
-                exc,
-            )
-            return
-
-        if not deployment_status:
-            return
-
-        metadata["deployment_name"] = str(deployment_name)
-        provisioning_state = deployment_status.get("provisioning_state")
-        if provisioning_state not in (None, ""):
-            metadata["deployment_provisioning_state"] = provisioning_state
-
-        error_code = deployment_status.get("error_code")
-        error_message = deployment_status.get("error_message")
-        if str(provisioning_state).lower() == "failed" and error_code in (None, ""):
-            error_code = "DeploymentFailed"
-        if error_code not in (None, "") or error_message not in (None, ""):
-            metadata["fleet_errors"] = [
-                {
-                    "error_code": error_code or "DeploymentFailed",
-                    "error_message": (
-                        error_message
-                        or f"ARM deployment '{deployment_name}' failed"
-                    ),
-                    "resource_group": str(resource_group),
-                    "instance_id": str(deployment_name),
-                }
-            ]
-
-    @staticmethod
-    def _augment_shortfall_metadata(metadata: dict[str, Any]) -> None:
-        """Add a concise shortfall summary when target capacity exceeds fulfillment."""
-        capacity = metadata.get("fleet_capacity_fulfilment") or {}
-        target = capacity.get("target_capacity_units")
-        fulfilled = capacity.get("fulfilled_capacity_units")
-        fleet_errors = metadata.get("fleet_errors") or []
-
-        if target is None or fulfilled is None:
-            return
-        if fulfilled >= target and not fleet_errors:
-            return
-
-        missing_capacity = max(int(target) - int(fulfilled), 0)
-        likely_causes: list[str] = []
-        seen_causes: set[str] = set()
-
-        for error in fleet_errors:
-            error_code = str((error or {}).get("error_code") or "")
-            cause = error_code or "Unknown"
-            if cause not in seen_causes:
-                likely_causes.append(cause)
-                seen_causes.add(cause)
-
-        metadata["capacity_shortfall"] = {
-            "missing_capacity_units": missing_capacity,
-            "likely_causes": likely_causes,
-            "summary": (
-                f"Shortfall {fulfilled}/{target}"
-                + (f"; causes={', '.join(likely_causes)}" if likely_causes else "")
-            ),
-        }
-
     @staticmethod
     def _build_provisioning_error_payload(exc: Exception) -> dict[str, Any]:
         """Normalize Azure provisioning errors for request metadata/status handling."""
@@ -2141,133 +1110,6 @@ class AzureProviderStrategy(ProviderStrategy):
             "status_code": error_details["status_code"],
             "raw_error_code": error_details["raw_error_code"],
         }
-
-    # ------------------------------------------------------------------
-    # Instance conversion
-    # ------------------------------------------------------------------
-
-    def _convert_azure_instance_to_machine(self, vm: Any) -> dict[str, Any]:
-        """Convert an Azure SDK VM object to the domain machine dict."""
-        from orb.domain.machine.machine_status import MachineStatus
-
-        status = "unknown"
-        instance_view = getattr(vm, "instance_view", None)
-        if instance_view and hasattr(instance_view, "statuses"):
-            for s in instance_view.statuses:
-                code = getattr(s, "code", "")
-                if code.startswith("PowerState/"):
-                    state_map = {
-                        "PowerState/running": MachineStatus.RUNNING,
-                        "PowerState/starting": MachineStatus.PENDING,
-                        "PowerState/stopping": MachineStatus.STOPPING,
-                        "PowerState/stopped": MachineStatus.STOPPED,
-                        "PowerState/deallocating": MachineStatus.SHUTTING_DOWN,
-                        "PowerState/deallocated": MachineStatus.STOPPED,
-                    }
-                    status = state_map.get(code, MachineStatus.UNKNOWN).value
-                    break
-
-        hw = getattr(vm, "hardware_profile", None)
-        network_identity = self.azure_client.resolve_network_identity_from_vm(vm)
-        vm_name = cast(_AzureVmWithName, vm).name
-
-        return {
-            "instance_id": getattr(vm, "vm_id", vm_name or ""),
-            "status": status,
-            "private_ip": network_identity["private_ip"],
-            "public_ip": network_identity["public_ip"],
-            "launch_time": None,
-            "instance_type": getattr(hw, "vm_size", None) if hw else None,
-            "subnet_id": network_identity["subnet_id"],
-            "vpc_id": network_identity["vnet_id"],
-            "availability_zone": (getattr(vm, "zones", None) or [None])[0],
-            "provider_type": "azure",
-            "provider_data": {
-                "vm_name": vm_name,
-                "location": getattr(vm, "location", None),
-                "provisioning_state": getattr(vm, "provisioning_state", None),
-                "nic_id": network_identity["nic_id"],
-                "nic_name": network_identity["nic_name"],
-                "vnet_id": network_identity["vnet_id"],
-            },
-        }
-
-    # ------------------------------------------------------------------
-    # Template loading
-    # ------------------------------------------------------------------
-
-    def _get_azure_templates(self) -> list[dict[str, Any]]:
-        """Load templates via scheduler strategy, falling back to examples."""
-        try:
-            from orb.infrastructure.scheduler.registry import get_scheduler_registry
-
-            scheduler_registry = get_scheduler_registry()
-            scheduler_strategy = scheduler_registry.get_active_strategy()
-
-            if scheduler_strategy:
-                template_paths = scheduler_strategy.get_template_paths()
-                templates: list[dict[str, Any]] = []
-                for path in template_paths:
-                    try:
-                        templates.extend(scheduler_strategy.load_templates_from_path(path))
-                    except Exception as exc:
-                        self._logger.warning(
-                            "Failed to load templates from %s: %s", path, exc
-                        )
-                return templates
-            else:
-                self._logger.warning(
-                    "No scheduler strategy available, using fallback templates"
-                )
-                return self._get_fallback_templates()
-        except Exception as exc:
-            self._logger.error(
-                "Failed to load templates via scheduler strategy: %s", exc
-            )
-            return self._get_fallback_templates()
-
-    def _get_fallback_templates(self) -> list[dict[str, Any]]:
-        return [
-            {
-                "template_id": "azure-vmss-linux-basic",
-                "name": "Azure VMSS Linux Basic",
-                "description": "VMSS with Ubuntu 22.04 LTS on Standard_D4s_v5",
-                "provider_type": "azure",
-                "provider_api": AzureProviderApi.VMSS.value,
-                "vm_size": "Standard_D4s_v5",
-                "resource_group": "my-resource-group",
-                "location": "eastus2",
-                "ssh_key_name": "my-azure-ssh-key",
-                "image": {
-                    "publisher": "Canonical",
-                    "offer": "0001-com-ubuntu-server-jammy",
-                    "sku": "22_04-lts-gen2",
-                    "version": "latest",
-                },
-                "max_instances": 2,
-            },
-            {
-                "template_id": "azure-vmss-spot",
-                "name": "Azure VMSS Spot Instances",
-                "description": "VMSS with Spot VMs for cost-effective workloads",
-                "provider_type": "azure",
-                "provider_api": AzureProviderApi.VMSS.value,
-                "vm_size": "Standard_D4s_v5",
-                "resource_group": "my-resource-group",
-                "location": "eastus2",
-                "ssh_key_name": "my-azure-ssh-key",
-                "priority": "Spot",
-                "eviction_policy": "Deallocate",
-                "billing_profile_max_price": -1.0,
-                "image": {
-                    "publisher": "Canonical",
-                    "offer": "0001-com-ubuntu-server-jammy",
-                    "sku": "22_04-lts-gen2",
-                    "version": "latest",
-                },
-                "max_instances": 5,
-            },
-        ]
 
     # ------------------------------------------------------------------
     # String representations

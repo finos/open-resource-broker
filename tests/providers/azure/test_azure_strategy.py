@@ -458,7 +458,7 @@ class TestGetAvailableTemplates:
         assert result.data["count"] >= 1
 
     def test_fallback_templates_validate_as_azure_templates(self, strategy):
-        for template in strategy._get_fallback_templates():
+        for template in strategy._template_catalog_service.get_fallback_templates():
             validated = AzureTemplate.model_validate(template)
             assert validated.provider_type == "azure"
             assert validated.provider_api.value == "VMSS"
