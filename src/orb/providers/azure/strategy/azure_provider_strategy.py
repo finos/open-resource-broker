@@ -6,10 +6,13 @@ to the appropriate handlers via the VMSS / SingleVM infrastructure layer.
 
 from __future__ import annotations
 
+import asyncio
 import time
 from dataclasses import dataclass, replace
 from threading import RLock
 from typing import Any, Callable, Optional, Protocol, cast
+
+from pydantic import ValidationError as PydanticValidationError
 
 from orb.application.services.spot_placement_planner import (
     PlacementScore,
@@ -21,6 +24,7 @@ from orb.application.services.spot_placement_execution import (
     build_planned_execution_metadata,
     create_acquire_request,
 )
+from orb.domain.base.exceptions import ValidationError as DomainValidationError
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
 from orb.providers.azure.configuration.config import AzureProviderConfig
@@ -42,6 +46,7 @@ from orb.providers.azure.infrastructure.services.spot_placement_score_adapter im
     AzureSpotPlacementScoreAdapter,
 )
 from orb.providers.azure.managers.azure_resource_manager import AzureResourceManager
+from orb.providers.azure.exceptions.azure_exceptions import AzureError, AzureValidationError
 from orb.providers.azure.services.capability_service import AzureCapabilityService
 from orb.providers.base.strategy import (
     ProviderCapabilities,
@@ -482,9 +487,62 @@ class AzureProviderStrategy(ProviderStrategy):
             self._initialized = True
             self._logger.debug("Azure provider strategy initialized successfully (lazy mode)")
             return True
+        except AzureError as exc:
+            self._logger.error("Failed to initialize Azure provider strategy: %s", exc)
+            return False
         except Exception as exc:
             self._logger.error("Failed to initialize Azure provider strategy: %s", exc)
             return False
+
+    @staticmethod
+    def _validation_error_code(
+        exc: AzureValidationError | DomainValidationError | PydanticValidationError,
+        *,
+        default: str,
+    ) -> str:
+        error_code = getattr(exc, "error_code", None)
+        if isinstance(error_code, str) and error_code:
+            return error_code
+        return default
+
+    @staticmethod
+    def _azure_error_metadata(exc: AzureError) -> dict[str, Any]:
+        return {"provider_error": exc.to_dict()}
+
+    def _validation_error_result(
+        self,
+        *,
+        message: str,
+        exc: AzureValidationError | DomainValidationError | PydanticValidationError,
+        default_error_code: str,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> ProviderResult:
+        merged_metadata = dict(metadata or {})
+        merged_metadata.setdefault("error_class", exc.__class__.__name__)
+        if isinstance(exc, AzureError):
+            merged_metadata.update(self._azure_error_metadata(exc))
+        return ProviderResult.error_result(
+            message,
+            self._validation_error_code(exc, default=default_error_code),
+            merged_metadata,
+        )
+
+    def _azure_error_result(
+        self,
+        *,
+        message: str,
+        exc: AzureError,
+        default_error_code: str,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> ProviderResult:
+        merged_metadata = dict(metadata or {})
+        merged_metadata.setdefault("error_class", exc.__class__.__name__)
+        merged_metadata.update(self._azure_error_metadata(exc))
+        return ProviderResult.error_result(
+            message,
+            exc.error_code or default_error_code,
+            merged_metadata,
+        )
 
     async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
         self._logger.debug(
@@ -523,7 +581,36 @@ class AzureProviderStrategy(ProviderStrategy):
                 "dry_run": is_dry_run,
             })
             return result
-
+        except asyncio.CancelledError:
+            self._logger.info(
+                "Azure operation cancelled: %s",
+                operation.operation_type,
+            )
+            raise
+        except (AzureValidationError, DomainValidationError, PydanticValidationError) as exc:
+            execution_time_ms = int((time.time() - start_time) * 1000)
+            return self._validation_error_result(
+                message=f"Azure operation validation failed: {exc!s}",
+                exc=exc,
+                default_error_code="AZURE_VALIDATION_ERROR",
+                metadata={
+                    "execution_time_ms": execution_time_ms,
+                    "provider": "azure",
+                    "dry_run": is_dry_run,
+                },
+            )
+        except AzureError as exc:
+            execution_time_ms = int((time.time() - start_time) * 1000)
+            return self._azure_error_result(
+                message=f"Azure operation failed: {exc!s}",
+                exc=exc,
+                default_error_code="OPERATION_FAILED",
+                metadata={
+                    "execution_time_ms": execution_time_ms,
+                    "provider": "azure",
+                    "dry_run": is_dry_run,
+                },
+            )
         except Exception as exc:
             execution_time_ms = int((time.time() - start_time) * 1000)
             self._logger.error("Azure operation failed: %s", exc)
@@ -878,6 +965,36 @@ class AzureProviderStrategy(ProviderStrategy):
                 azure_template.template_id,
             )
 
+        except asyncio.CancelledError:
+            raise
+        except (AzureValidationError, DomainValidationError, PydanticValidationError) as exc:
+            return self._validation_error_result(
+                message=f"Failed to create instances: {exc!s}",
+                exc=exc,
+                default_error_code="INVALID_TEMPLATE_CONFIG",
+                metadata={
+                    "operation": "create_instances",
+                    "template_config": template_config,
+                    "handler_used": provider_api_key,
+                    "method": "handler",
+                },
+            )
+        except AzureError as exc:
+            provider_error = self._build_provisioning_error_payload(exc)
+            return self._azure_error_result(
+                message=f"Failed to create instances: {exc!s}",
+                exc=exc,
+                default_error_code="CREATE_INSTANCES_ERROR",
+                metadata={
+                    "operation": "create_instances",
+                    "template_config": template_config,
+                    "handler_used": provider_api_key,
+                    "method": "handler",
+                    "provider_data": {
+                        "fleet_errors": [provider_error],
+                    },
+                },
+            )
         except Exception as exc:
             provider_error = self._build_provisioning_error_payload(exc)
             return ProviderResult.error_result(
@@ -1046,6 +1163,20 @@ class AzureProviderStrategy(ProviderStrategy):
                 },
             )
 
+        except asyncio.CancelledError:
+            raise
+        except (AzureValidationError, DomainValidationError, PydanticValidationError) as exc:
+            return self._validation_error_result(
+                message=f"Failed to terminate instances: {exc!s}",
+                exc=exc,
+                default_error_code="TERMINATE_INSTANCES_ERROR",
+            )
+        except AzureError as exc:
+            return self._azure_error_result(
+                message=f"Failed to terminate instances: {exc!s}",
+                exc=exc,
+                default_error_code="TERMINATE_INSTANCES_ERROR",
+            )
         except Exception as exc:
             return ProviderResult.error_result(
                 f"Failed to terminate instances: {exc!s}",
@@ -1167,6 +1298,20 @@ class AzureProviderStrategy(ProviderStrategy):
                 {"operation": "get_instance_status", "instance_ids": instance_ids},
             )
 
+        except asyncio.CancelledError:
+            raise
+        except (AzureValidationError, DomainValidationError, PydanticValidationError) as exc:
+            return self._validation_error_result(
+                message=f"Failed to get instance status: {exc!s}",
+                exc=exc,
+                default_error_code="GET_INSTANCE_STATUS_ERROR",
+            )
+        except AzureError as exc:
+            return self._azure_error_result(
+                message=f"Failed to get instance status: {exc!s}",
+                exc=exc,
+                default_error_code="GET_INSTANCE_STATUS_ERROR",
+            )
         except Exception as exc:
             return ProviderResult.error_result(
                 f"Failed to get instance status: {exc!s}",
@@ -1762,6 +1907,20 @@ class AzureProviderStrategy(ProviderStrategy):
                 metadata=metadata,
             )
 
+        except asyncio.CancelledError:
+            raise
+        except (AzureValidationError, DomainValidationError, PydanticValidationError) as exc:
+            return self._validation_error_result(
+                message=f"Failed to describe resource instances: {exc!s}",
+                exc=exc,
+                default_error_code="DESCRIBE_RESOURCE_INSTANCES_ERROR",
+            )
+        except AzureError as exc:
+            return self._azure_error_result(
+                message=f"Failed to describe resource instances: {exc!s}",
+                exc=exc,
+                default_error_code="DESCRIBE_RESOURCE_INSTANCES_ERROR",
+            )
         except Exception as exc:
             return ProviderResult.error_result(
                 f"Failed to describe resource instances: {exc!s}",
@@ -1786,6 +1945,20 @@ class AzureProviderStrategy(ProviderStrategy):
             return ProviderResult.success_result(
                 validation_result,
                 {"operation": "validate_template", "template_config": template_config},
+            )
+        except (AzureValidationError, DomainValidationError, PydanticValidationError) as exc:
+            return self._validation_error_result(
+                message=f"Failed to validate template: {exc!s}",
+                exc=exc,
+                default_error_code="VALIDATE_TEMPLATE_ERROR",
+                metadata={"operation": "validate_template"},
+            )
+        except AzureError as exc:
+            return self._azure_error_result(
+                message=f"Failed to validate template: {exc!s}",
+                exc=exc,
+                default_error_code="VALIDATE_TEMPLATE_ERROR",
+                metadata={"operation": "validate_template"},
             )
         except Exception as exc:
             return ProviderResult.error_result(

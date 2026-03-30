@@ -23,7 +23,11 @@ from orb.providers.azure.infrastructure.services.spot_placement_score_adapter im
 from orb.providers.azure.configuration.config import AzureProviderConfig
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
-from orb.providers.azure.exceptions.azure_exceptions import CycleCloudConnectionError
+from orb.providers.azure.exceptions.azure_exceptions import (
+    AzureValidationError,
+    CycleCloudConnectionError,
+    TerminationError,
+)
 import orb.providers.azure.strategy.azure_provider_strategy as azure_strategy_module
 from orb.providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
 from orb.providers.base.strategy import (
@@ -184,6 +188,20 @@ class TestInitialization:
         assert machine_adapter_calls == 1
         assert len({id(handler_map) for handler_map in handler_maps}) == 1
         assert set(handler_maps[0]) == {"VMSS", "VMSSUniform", "SingleVM", "CycleCloud"}
+
+    def test_execute_operation_propagates_cancellation(self, strategy, monkeypatch):
+        async def cancelled(_operation):
+            raise asyncio.CancelledError()
+
+        monkeypatch.setattr(strategy, "_execute_operation_internal", cancelled)
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.HEALTH_CHECK,
+            parameters={},
+        )
+
+        with pytest.raises(asyncio.CancelledError):
+            _run(strategy.execute_operation(op))
 
 
 # ---------------------------------------------------------------------------
@@ -1056,6 +1074,44 @@ class TestCreateInstances:
         request = handler.acquire_hosts.call_args.args[0]
         assert request.provider_api == "VMSS"
 
+    def test_create_instances_preserves_azure_validation_failures(self, strategy):
+        handler = MagicMock()
+        handler.acquire_hosts.side_effect = AzureValidationError(
+            "VM size is not available in this region",
+            error_code="SkuNotAvailable",
+        )
+        strategy._handlers = {"VMSS": handler}
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={
+                "template_config": {
+                    "template_id": "azure-vmss-test",
+                    "provider_api": "VMSS",
+                    "vm_size": "Standard_D4s_v5",
+                    "resource_group": "test-rg",
+                    "location": "eastus2",
+                    "ssh_public_keys": [
+                        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"
+                    ],
+                    "image": {
+                        "publisher": "Canonical",
+                        "offer": "0001-com-ubuntu-server-jammy",
+                        "sku": "22_04-lts-gen2",
+                        "version": "latest",
+                    },
+                },
+                "count": 1,
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert not result.success
+        assert result.error_code == "SkuNotAvailable"
+        assert result.metadata["error_class"] == "AzureValidationError"
+        assert result.metadata["provider_error"]["error_code"] == "SkuNotAvailable"
+
 
 # ---------------------------------------------------------------------------
 # TERMINATE_INSTANCES (with missing ids → error path)
@@ -1250,6 +1306,32 @@ class TestTerminateInstances:
                 }
             }
         ]
+
+    def test_terminate_instances_preserves_provider_failures(self, strategy):
+        handler = MagicMock()
+        handler.release_hosts.side_effect = TerminationError(
+            "Azure rejected the delete request",
+            resource_ids=["vmss-prod-b"],
+        )
+        strategy._handlers = {"VMSS": handler}
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={
+                "instance_ids": ["orb-1"],
+                "provider_api": "VMSS",
+                "resource_mapping": {
+                    "orb-1": ("vmss-prod-b", 1),
+                },
+            },
+        )
+
+        result = _run(strategy.execute_operation(op))
+
+        assert not result.success
+        assert result.error_code == "TerminationError"
+        assert result.metadata["error_class"] == "TerminationError"
+        assert result.metadata["provider_error"]["details"]["resource_ids"] == ["vmss-prod-b"]
 
     def test_get_instance_status_restores_pending_vmss_cleanup_from_request_metadata(
         self, azure_config, logger
@@ -1603,8 +1685,9 @@ class TestGetInstanceStatus:
         result = _run(strategy.execute_operation(op))
 
         assert not result.success
-        assert result.error_code == "GET_INSTANCE_STATUS_ERROR"
+        assert result.error_code == "CycleCloudConnectionError"
         assert "cyclecloud auth failed" in result.error_message
+        assert result.metadata["error_class"] == "CycleCloudConnectionError"
 
     def test_status_populates_network_identity(self, strategy):
         azure_client = MagicMock()
