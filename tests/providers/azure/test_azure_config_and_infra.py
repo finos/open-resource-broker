@@ -791,8 +791,6 @@ class TestAzureClientOperationalBehavior:
         client._compute_client = compute_client
         client._credential = credential
         client._credentials_validated = True
-        client._resource_cache = {"vm": "cached"}
-        client._batch_history = {"describe_vms": [25]}
         client._closed = False
 
         AzureClient.close(client)
@@ -806,8 +804,6 @@ class TestAzureClientOperationalBehavior:
         compute_client.close.assert_called_once_with()
         credential.close.assert_called_once_with()
         assert client._credentials_validated is False
-        assert client._resource_cache == {}
-        assert client._batch_history == {}
         assert client._closed is True
 
         with pytest.raises(RuntimeError, match="AzureClient has been closed"):
@@ -825,8 +821,6 @@ class TestAzureClientOperationalBehavior:
         client._compute_client = None
         client._credential = None
         client._credentials_validated = False
-        client._resource_cache = {}
-        client._batch_history = {}
         client._closed = False
 
         AzureClient.close(client)
@@ -847,8 +841,6 @@ class TestAzureClientOperationalBehavior:
         client._compute_client = None
         client._credential = credential
         client._credentials_validated = False
-        client._resource_cache = {}
-        client._batch_history = {}
         client._closed = False
 
         with client as scoped_client:

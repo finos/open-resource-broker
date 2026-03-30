@@ -457,6 +457,23 @@ class TestArmPayload:
             "id": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/diskEncryptionSets/des-1"
         }
 
+    def test_single_vm_payload_reuses_storage_profile_builder_with_single_vm_defaults(self):
+        t = AzureTemplate(
+            **_BASE_FIELDS,
+            provider_api=AzureProviderApi.SINGLE_VM,
+        )
+
+        params = ArmPayloadMapper.single_vm_payload(
+            template=t,
+            vm_name="vm-test",
+            nic_id="/subscriptions/.../networkInterfaces/nic-vm-test",
+        )
+        storage_profile = params["properties"]["storageProfile"]
+
+        assert storage_profile["imageReference"]["publisher"] == "Canonical"
+        assert storage_profile["osDisk"]["managedDisk"]["storageAccountType"] == "Standard_LRS"
+        assert "caching" not in storage_profile["osDisk"]
+
 
 # ---------------------------------------------------------------------------
 # Value objects

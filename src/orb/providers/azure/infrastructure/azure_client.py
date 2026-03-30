@@ -5,7 +5,6 @@ This module provides a unified wrapper for Azure SDK interactions with:
 - Explicit lifecycle cleanup for owned Azure SDK resources
 - Configuration resolution via ProviderSelectionService / fallback
 - Optional metrics instrumentation
-- Thread-safe resource caching and adaptive batch sizing
 
 Azure SDK clients wrapped:
 - ComputeManagementClient (VMs, VMSS, Disks, Images, Galleries)
@@ -25,7 +24,6 @@ Note:
 
 from __future__ import annotations
 
-import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional, Protocol, cast
 
@@ -166,7 +164,6 @@ class AzureClient:
       through ``@property`` accessors, keeping startup cost near zero.
     * An optional :class:`MetricsCollector` can be injected for API-call
       instrumentation (hooks are left as extension points for now).
-    * Thread-safe caching and batch-sizing state is initialised
     """
 
     def __init__(
@@ -227,15 +224,6 @@ class AzureClient:
 
         # Load performance configuration
         self.perf_config = self._load_performance_config()
-
-        # Thread-safe resource cache
-        self._resource_cache: dict[str, Any] = {}
-        self._cache_lock = threading.RLock()
-
-        # Adaptive batch sizing
-        self._batch_history: dict[str, Any] = {}
-        self._batch_sizes = self.perf_config.get("batch_sizes", {}).copy()
-        self._batch_lock = threading.RLock()
 
         # Lazy Azure SDK client slots
         self._credential: Optional[AzureCredentialProtocol] = None
@@ -565,8 +553,6 @@ class AzureClient:
         self._close_credential(credential)
 
         self._credentials_validated = False
-        self._resource_cache.clear()
-        self._batch_history.clear()
         self._closed = True
 
     def __enter__(self) -> AzureClient:

@@ -166,7 +166,11 @@ class ArmPayloadMapper:
             "location": template.location.value,
             "properties": {
                 "hardwareProfile": {"vmSize": vm_size_override or template.vm_size},
-                "storageProfile": {},
+                "storageProfile": _build_storage_profile(
+                    template,
+                    default_os_disk_storage_account_type=AzureOSDiskType.STANDARD_LRS.value,
+                    include_default_os_disk_caching=False,
+                ),
                 "osProfile": {
                     "computerName": vm_name[:15],  # Azure host name limit
                     "adminUsername": template.admin_username,
@@ -185,30 +189,6 @@ class ArmPayloadMapper:
             },
             "tags": template.tags or {},
         }
-
-        storage = params["properties"]["storageProfile"]
-
-        # Image
-        if template.image:
-            storage["imageReference"] = template.image.to_arm_dict()
-        elif template.image_id:
-            storage["imageReference"] = {"id": template.image_id}
-
-        # OS disk
-        if template.os_disk:
-            storage["osDisk"] = template.os_disk.to_arm_dict()
-        else:
-            storage["osDisk"] = {
-                "createOption": "FromImage",
-                "deleteOption": "Delete",
-                "managedDisk": {"storageAccountType": "Standard_LRS"},
-            }
-
-        # Data disks
-        if template.data_disks:
-            storage["dataDisks"] = [disk.to_arm_dict() for disk in template.data_disks]
-
-        _apply_disk_encryption(template, storage)
 
         # SSH keys
         if template.ssh_public_keys:
@@ -248,9 +228,13 @@ class ArmPayloadMapper:
 # Shared helpers
 # ------------------------------------------------------------------
 
-
-def _build_storage_profile(template: AzureTemplate) -> dict[str, Any]:
-    """Build the storageProfile section common to VMSS payloads."""
+def _build_storage_profile(
+    template: AzureTemplate,
+    *,
+    default_os_disk_storage_account_type: str = AzureOSDiskType.PREMIUM_LRS.value,
+    include_default_os_disk_caching: bool = True,
+) -> dict[str, Any]:
+    """Build the storageProfile section common to Azure compute payloads."""
     storage_profile: dict[str, Any] = {}
 
     if template.image:
@@ -261,14 +245,16 @@ def _build_storage_profile(template: AzureTemplate) -> dict[str, Any]:
     if template.os_disk:
         storage_profile["osDisk"] = template.os_disk.to_arm_dict()
     else:
-        storage_profile["osDisk"] = {
+        default_os_disk: dict[str, Any] = {
             "createOption": "FromImage",
             "deleteOption": "Delete",
-            "caching": AzureCachingType.READ_WRITE.value,
             "managedDisk": {
-                "storageAccountType": AzureOSDiskType.PREMIUM_LRS.value,
+                "storageAccountType": default_os_disk_storage_account_type,
             },
         }
+        if include_default_os_disk_caching:
+            default_os_disk["caching"] = AzureCachingType.READ_WRITE.value
+        storage_profile["osDisk"] = default_os_disk
 
     if template.data_disks:
         storage_profile["dataDisks"] = [d.to_arm_dict() for d in template.data_disks]
