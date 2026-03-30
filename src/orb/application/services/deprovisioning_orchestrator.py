@@ -10,6 +10,9 @@ import asyncio
 from typing import Any
 
 from orb.application.ports.query_bus_port import QueryBusPort
+from orb.application.services.request_follow_up_context import (
+    merge_request_metadata_with_follow_up_context,
+)
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.ports import ContainerPort, LoggingPort, ProviderSelectionPort
 
@@ -191,6 +194,7 @@ class DeprovisioningOrchestrator:
                     "resource_id": resource_id,
                     "resource_mapping": {iid: (resource_id, 1) for iid in instance_ids},
                     "request_id": origin_request_id,
+                    "request_metadata": self._build_request_metadata(request),
                 },
                 context={
                     "correlation_id": str(request.request_id),
@@ -227,3 +231,8 @@ class DeprovisioningOrchestrator:
         except Exception as e:
             self.logger.error("Failed to process resource group %s: %s", resource_id, e)
             return {"success": False, "error_message": str(e)}
+
+    @staticmethod
+    def _build_request_metadata(request: Any) -> dict[str, Any]:
+        """Merge durable request metadata with persisted provider follow-up context."""
+        return merge_request_metadata_with_follow_up_context(request)
