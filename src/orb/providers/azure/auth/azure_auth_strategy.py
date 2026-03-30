@@ -15,14 +15,8 @@ from orb.infrastructure.adapters.ports.auth import (
     AuthStatus,
 )
 from orb.providers.azure.infrastructure.credential_factory import (
-    AzureCredentialProtocol,
-    create_default_azure_credential,
-    get_default_azure_credential_error_types,
-)
-
-EXPECTED_AZURE_AUTH_EXCEPTIONS = (
-    ImportError,
-    *get_default_azure_credential_error_types(),
+    AzureAccessTokenProviderProtocol,
+    DefaultAzureAccessTokenProvider,
 )
 
 
@@ -35,16 +29,14 @@ class AzureAuthStrategy(AuthPort):
         logger: LoggingPort,
         client_id: Optional[str] = None,
         enabled: bool = True,
+        token_provider: Optional[AzureAccessTokenProviderProtocol] = None,
     ) -> None:
         self._logger = logger
         self.client_id = client_id
         self.enabled = enabled
-
-    def _create_credential(self) -> AzureCredentialProtocol:
-        """Create a short-lived Azure credential for one auth operation."""
-        return create_default_azure_credential(
-            client_id=self.client_id,
-            logger=self._logger,
+        self._token_provider = token_provider or DefaultAzureAccessTokenProvider(
+            client_id=client_id,
+            logger=logger,
         )
 
     async def authenticate(self, context: AuthContext) -> AuthResult:
@@ -54,23 +46,20 @@ class AzureAuthStrategy(AuthPort):
                 error_message="Azure auth strategy disabled",
             )
         try:
-            credential = self._create_credential()
-            try:
-                token = credential.get_token("https://management.azure.com/.default")
-            finally:
-                credential.close()
+            token = self._token_provider.get_access_token(
+                "https://management.azure.com/.default"
+            )
 
             return AuthResult(
                 status=AuthStatus.SUCCESS,
                 user_id=self.client_id or "azure-identity",
-                token=token.token,
+                token=token,
                 user_roles=["provider"],
-                permissions=["Microsoft.Compute/*", "Microsoft.Network/*"],
                 metadata={
                     "strategy": "azure_default_credential",
                 },
             )
-        except EXPECTED_AZURE_AUTH_EXCEPTIONS as exc:
+        except self._token_provider.get_auth_error_types() as exc:
             self._logger.error("Azure authentication failed: %s", exc)
             return AuthResult(
                 status=AuthStatus.FAILED,
@@ -88,17 +77,15 @@ class AzureAuthStrategy(AuthPort):
     async def refresh_token(self, refresh_token: str) -> AuthResult:
         """DefaultAzureCredential handles token refresh automatically."""
         try:
-            credential = self._create_credential()
-            try:
-                token = credential.get_token("https://management.azure.com/.default")
-            finally:
-                credential.close()
+            token = self._token_provider.get_access_token(
+                "https://management.azure.com/.default"
+            )
             return AuthResult(
                 status=AuthStatus.SUCCESS,
-                token=token.token,
+                token=token,
                 metadata={"strategy": "azure_default_credential", "refreshed": True},
             )
-        except EXPECTED_AZURE_AUTH_EXCEPTIONS as exc:
+        except self._token_provider.get_auth_error_types() as exc:
             return AuthResult(
                 status=AuthStatus.FAILED,
                 error_message=f"Token refresh failed: {exc}",

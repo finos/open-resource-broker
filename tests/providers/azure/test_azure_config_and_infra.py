@@ -549,16 +549,14 @@ class TestAzureAuthStrategy:
             query_params={},
         )
 
-    def test_auth_strategy_passes_managed_identity_client_id_when_configured(self):
-        from orb.providers.azure.auth.azure_auth_strategy import AzureAuthStrategy
-
-        strategy = AzureAuthStrategy(
-            logger=MagicMock(),
-            client_id="managed-identity-client-id",
+    def test_default_azure_access_token_provider_passes_managed_identity_client_id_when_configured(self):
+        from orb.providers.azure.infrastructure.credential_factory import (
+            DefaultAzureAccessTokenProvider,
         )
 
         fake_identity = types.ModuleType("azure.identity")
         fake_credential = MagicMock()
+        fake_credential.get_token.return_value = types.SimpleNamespace(token="access-token")
         fake_ctor = MagicMock(return_value=fake_credential)
         fake_identity.DefaultAzureCredential = fake_ctor
 
@@ -569,21 +567,27 @@ class TestAzureAuthStrategy:
                 "azure.identity": fake_identity,
             },
         ):
-            credential = strategy._create_credential()
+            provider = DefaultAzureAccessTokenProvider(
+                logger=MagicMock(),
+                client_id="managed-identity-client-id",
+            )
+            token = provider.get_access_token("https://management.azure.com/.default")
 
-        assert credential is fake_credential
+        assert token == "access-token"
 
         fake_ctor.assert_called_once_with(
             managed_identity_client_id="managed-identity-client-id"
         )
+        fake_credential.close.assert_called_once_with()
 
-    def test_auth_strategy_omits_managed_identity_client_id_when_unset(self):
-        from orb.providers.azure.auth.azure_auth_strategy import AzureAuthStrategy
-
-        strategy = AzureAuthStrategy(logger=MagicMock())
+    def test_default_azure_access_token_provider_omits_managed_identity_client_id_when_unset(self):
+        from orb.providers.azure.infrastructure.credential_factory import (
+            DefaultAzureAccessTokenProvider,
+        )
 
         fake_identity = types.ModuleType("azure.identity")
         fake_credential = MagicMock()
+        fake_credential.get_token.return_value = types.SimpleNamespace(token="access-token")
         fake_ctor = MagicMock(return_value=fake_credential)
         fake_identity.DefaultAzureCredential = fake_ctor
 
@@ -594,54 +598,57 @@ class TestAzureAuthStrategy:
                 "azure.identity": fake_identity,
             },
         ):
-            credential = strategy._create_credential()
+            provider = DefaultAzureAccessTokenProvider(
+                logger=MagicMock(),
+                client_id=None,
+            )
+            token = provider.get_access_token("https://management.azure.com/.default")
 
-        assert credential is fake_credential
+        assert token == "access-token"
 
         fake_ctor.assert_called_once_with()
+        fake_credential.close.assert_called_once_with()
 
     @pytest.mark.asyncio
     async def test_auth_strategy_returns_failed_result_for_expected_azure_auth_error(self):
         from orb.providers.azure.auth.azure_auth_strategy import AzureAuthStrategy
-        from orb.providers.azure.infrastructure import credential_factory
-
-        strategy = AzureAuthStrategy(logger=MagicMock())
-        auth_error_type = credential_factory.get_default_azure_credential_error_types()
-        error = (
-            auth_error_type[0]("credential unavailable")
-            if auth_error_type
-            else ImportError("azure-identity package is not installed")
-        )
-
-        with patch.object(strategy, "_create_credential", side_effect=error):
-            result = await strategy.authenticate(self._build_auth_context())
+        token_provider = MagicMock()
+        strategy = AzureAuthStrategy(logger=MagicMock(), token_provider=token_provider)
+        token_provider.get_auth_error_types.return_value = (RuntimeError,)
+        token_provider.get_access_token.side_effect = RuntimeError("credential unavailable")
+        result = await strategy.authenticate(self._build_auth_context())
 
         assert result.status.name == "FAILED"
-        assert "credential unavailable" in result.error_message or "not installed" in result.error_message
+        assert "credential unavailable" in result.error_message
 
     @pytest.mark.asyncio
     async def test_auth_strategy_propagates_unexpected_errors(self):
         from orb.providers.azure.auth.azure_auth_strategy import AzureAuthStrategy
 
-        strategy = AzureAuthStrategy(logger=MagicMock())
-
-        with patch.object(strategy, "_create_credential", side_effect=RuntimeError("boom")):
-            with pytest.raises(RuntimeError, match="boom"):
-                await strategy.authenticate(self._build_auth_context())
+        token_provider = MagicMock()
+        strategy = AzureAuthStrategy(logger=MagicMock(), token_provider=token_provider)
+        token_provider.get_auth_error_types.return_value = (ValueError,)
+        token_provider.get_access_token.side_effect = RuntimeError("boom")
+        with pytest.raises(RuntimeError, match="boom"):
+            await strategy.authenticate(self._build_auth_context())
 
     @pytest.mark.asyncio
-    async def test_auth_strategy_closes_credential_after_authenticate(self):
+    async def test_auth_strategy_delegates_to_token_provider(self):
         from orb.providers.azure.auth.azure_auth_strategy import AzureAuthStrategy
 
-        strategy = AzureAuthStrategy(logger=MagicMock())
-        credential = MagicMock()
-        credential.get_token.return_value = types.SimpleNamespace(token="access-token")
+        token_provider = MagicMock()
+        token_provider.get_auth_error_types.return_value = (RuntimeError,)
+        token_provider.get_access_token.return_value = "access-token"
+        strategy = AzureAuthStrategy(logger=MagicMock(), token_provider=token_provider)
 
-        with patch.object(strategy, "_create_credential", return_value=credential):
-            result = await strategy.authenticate(self._build_auth_context())
+        result = await strategy.authenticate(self._build_auth_context())
 
         assert result.status.name == "SUCCESS"
-        credential.close.assert_called_once_with()
+        assert result.token == "access-token"
+        assert result.permissions == []
+        token_provider.get_access_token.assert_called_once_with(
+            "https://management.azure.com/.default"
+        )
 
 
 class TestAzureClientOperationalBehavior:

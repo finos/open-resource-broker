@@ -15,6 +15,14 @@ class AzureCredentialProtocol(Protocol):
     def close(self) -> None: ...
 
 
+class AzureAccessTokenProviderProtocol(Protocol):
+    """Short-lived Azure token provider used by auth flows."""
+
+    def get_access_token(self, scope: str) -> str: ...
+
+    def get_auth_error_types(self) -> tuple[type[Exception], ...]: ...
+
+
 def get_default_azure_credential_error_types() -> tuple[type[Exception], ...]:
     """Return the expected Azure SDK exception types for credential operations."""
     try:
@@ -45,3 +53,30 @@ def create_default_azure_credential(
     credential = DefaultAzureCredential(**credential_kwargs)
     logger.info("Azure DefaultAzureCredential initialised")
     return credential
+
+
+class DefaultAzureAccessTokenProvider(AzureAccessTokenProviderProtocol):
+    """Resolve Azure access tokens with short-lived credentials."""
+
+    def __init__(
+        self,
+        *,
+        client_id: Optional[str],
+        logger: LoggingPort,
+    ) -> None:
+        self._client_id = client_id
+        self._logger = logger
+
+    def get_access_token(self, scope: str) -> str:
+        credential = create_default_azure_credential(
+            client_id=self._client_id,
+            logger=self._logger,
+        )
+        try:
+            token = credential.get_token(scope)
+            return token.token
+        finally:
+            credential.close()
+
+    def get_auth_error_types(self) -> tuple[type[Exception], ...]:
+        return ImportError, *get_default_azure_credential_error_types()
