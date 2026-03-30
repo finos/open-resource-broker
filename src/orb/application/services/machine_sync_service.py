@@ -143,7 +143,10 @@ class MachineSyncService:
                         processed_data = {
                             **instance_data,
                             "request_id": str(request.request_id),
-                            "resource_id": request.resource_ids[0] if request.resource_ids else "",
+                            "resource_id": self._resolve_instance_resource_id(
+                                instance_data,
+                                request.resource_ids,
+                            ),
                         }
                         terminal_states = {"shutting-down", "terminated", "stopping", "stopped"}
                         instance_status = processed_data.get("status", "")
@@ -191,6 +194,24 @@ class MachineSyncService:
     def _build_request_metadata(request: Request) -> dict:
         """Merge durable request metadata with persisted provider follow-up context."""
         return merge_request_metadata_with_follow_up_context(request)
+
+    @staticmethod
+    def _resolve_instance_resource_id(
+        instance_data: dict,
+        request_resource_ids: list[str],
+    ) -> str:
+        """Prefer instance-owned resource identity over request-level fallback."""
+        provider_data = instance_data.get("provider_data") or {}
+        candidate_resource_ids = (
+            instance_data.get("resource_id"),
+            provider_data.get("resource_id") if isinstance(provider_data, dict) else None,
+            provider_data.get("vmss_name") if isinstance(provider_data, dict) else None,
+            request_resource_ids[0] if request_resource_ids else None,
+        )
+        for resource_id in candidate_resource_ids:
+            if resource_id not in (None, ""):
+                return str(resource_id)
+        return ""
 
     def _build_return_resource_mapping(
         self,

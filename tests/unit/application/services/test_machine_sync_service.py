@@ -165,3 +165,60 @@ async def test_fetch_provider_machines_for_return_rebuilds_vmss_mapping_from_fol
     assert operation.parameters["resource_id"] == "vmss-demo"
     assert operation.parameters["resource_mapping"] == {"vmss-demo_000001": ("vmss-demo", 1)}
     assert operation.parameters["request_metadata"]["resource_group"] == "orb-test-rg"
+
+
+@pytest.mark.unit
+@pytest.mark.application
+@pytest.mark.asyncio
+async def test_fetch_provider_machines_preserves_instance_owned_resource_id_for_multi_resource_requests():
+    command_bus = MagicMock()
+    uow_factory = MagicMock()
+    config_port = MagicMock()
+    config_port.get_provider_instance_config.return_value = MagicMock()
+    logger = MagicMock()
+    provider_registry_service = MagicMock()
+    provider_registry_service.execute_operation = AsyncMock(
+        return_value=MagicMock(
+            success=True,
+            data={
+                "instances": [
+                    {
+                        "instance_id": "vmss-b_000001",
+                        "status": "running",
+                        "instance_type": "Standard_D4s_v5",
+                        "provider_type": "azure",
+                        "provider_data": {
+                            "resource_id": "vmss-b",
+                            "vmss_name": "vmss-b",
+                        },
+                    }
+                ]
+            },
+            metadata={},
+        )
+    )
+
+    service = MachineSyncService(
+        command_bus=command_bus,
+        uow_factory=uow_factory,
+        config_port=config_port,
+        logger=logger,
+        provider_registry_service=provider_registry_service,
+    )
+
+    request = MagicMock()
+    request.request_type.value = "acquire"
+    request.resource_ids = ["vmss-a", "vmss-b"]
+    request.machine_ids = []
+    request.provider_api = "VMSS"
+    request.template_id = "azure-cheapest-vmss"
+    request.request_id = "req-00000000-0000-0000-0000-000000000003"
+    request.provider_name = "azure-default"
+    request.provider_type = "azure"
+    request.metadata = {}
+    request.provider_data = {}
+
+    provider_machines, _metadata = await service.fetch_provider_machines(request, db_machines=[])
+
+    assert len(provider_machines) == 1
+    assert provider_machines[0].resource_id == "vmss-b"
