@@ -16,17 +16,10 @@ Key CycleCloud concepts:
 
 from __future__ import annotations
 
-import json
 from contextlib import AbstractContextManager
-from pathlib import Path
-from typing import Any, Optional
-
-from urllib.parse import urlparse
+from typing import Any, Callable, Optional
 
 import requests
-from azure.core.exceptions import ClientAuthenticationError
-from pydantic import BaseModel
-
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.request.aggregate import Request
 from orb.providers.azure.configuration.config import AzureProviderConfig
@@ -40,7 +33,15 @@ from orb.providers.azure.exceptions.azure_exceptions import (
     TerminationError,
 )
 from orb.providers.azure.infrastructure.cyclecloud_session import (
+    CycleCloudRequestContext,
     CycleCloudSessionContext,
+    CycleCloudSessionSettings,
+)
+from orb.providers.azure.infrastructure.cyclecloud_session_builder import (
+    CycleCloudSessionBuilder,
+)
+from orb.providers.azure.infrastructure.credential_factory import (
+    AzureCredentialAccessTokenProvider,
 )
 from orb.providers.azure.infrastructure.handlers.azure_handler import AzureHandler
 from orb.providers.infrastructure.error_codes import (
@@ -64,37 +65,28 @@ _CC_STATE_MAP: dict[str, str] = {
 }
 
 
-def _resolve_cc_state(state: str) -> str:
+def resolve_cc_state(state: str) -> str:
     """Map a CycleCloud node state to a domain status string."""
     return _CC_STATE_MAP.get(state, "unknown")
-
-
-def _coerce_bool(value: Any) -> bool:
-    """Parse common config-style boolean inputs."""
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return bool(value)
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"true", "1", "yes", "y", "on"}:
-            return True
-        if normalized in {"false", "0", "no", "n", "off"}:
-            return False
-    return bool(value)
 
 
 class _CycleCloudSessionScope(AbstractContextManager[CycleCloudSessionContext]):
     """Own a CycleCloud requests session for the duration of a handler flow."""
 
-    def __init__(self, session_context: CycleCloudSessionContext):
-        self._session_context = session_context
+    def __init__(
+        self,
+        build_session: Callable[[], CycleCloudSessionContext],
+    ):
+        self._build_session = build_session
+        self._session_context: Optional[CycleCloudSessionContext] = None
 
     def __enter__(self) -> CycleCloudSessionContext:
+        self._session_context = self._build_session()
         return self._session_context
 
     def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
-        self._session_context.session.close()
+        if self._session_context is not None:
+            self._session_context.session.close()
         return None
 
 
@@ -117,50 +109,6 @@ class CycleCloudHandler(AzureHandler):
     # Internal: CycleCloud REST API helpers
     # ------------------------------------------------------------------
 
-    def _resolve_cc_config_value(
-        self,
-        *,
-        template: Optional[AzureTemplate],
-        request_state: Optional[dict[str, Any]],
-        provider_cfg: Optional[BaseModel],
-        template_attr: str,
-        request_state_key: str,
-        provider_path: tuple[str, ...],
-        default: Any = None,
-    ) -> Any:
-        if template is not None:
-            value = getattr(template, template_attr, None)
-            if value not in (None, ""):
-                return value
-        if request_state and request_state.get(request_state_key) not in (None, ""):
-            return request_state.get(request_state_key)
-        current: Any = provider_cfg
-        for key in provider_path:
-            if current is None:
-                break
-            current = getattr(current, key, None)
-        return default if current in (None, "") else current
-
-    def _get_azure_bearer_token(self, scopes: list[str]) -> Optional[str]:
-        from azure.identity import CredentialUnavailableError
-
-        try:
-            credential = self.azure_client.credential
-        except AuthenticationError:
-            return None
-
-        for scope in scopes:
-            if not scope:
-                continue
-            try:
-                token = credential.get_token(scope)
-                if getattr(token, "token", None):
-                    self._logger.debug("Resolved CycleCloud bearer token via Azure credential scope=%s", scope)
-                    return token.token
-            except (ClientAuthenticationError, CredentialUnavailableError):
-                continue
-        return None
-
     def _get_provider_cyclecloud_config(self) -> Optional[AzureProviderConfig]:
         loaded_cfg = self.azure_client.get_provider_config()
         if isinstance(loaded_cfg, AzureProviderConfig):
@@ -174,181 +122,36 @@ class CycleCloudHandler(AzureHandler):
         return provider_cfg.connect_timeout, provider_cfg.read_timeout
 
     @staticmethod
-    def _load_cc_credential_file(credential_path: str) -> dict[str, Any]:
-        path = Path(credential_path).expanduser()
-        try:
-            with path.open(encoding="utf-8") as handle:
-                data = json.load(handle)
-        except FileNotFoundError as exc:
-            raise CycleCloudConnectionError(
-                f"CycleCloud credential file not found: {path}",
-                url=None,
-            ) from exc
-        except json.JSONDecodeError as exc:
-            raise CycleCloudConnectionError(
-                f"CycleCloud credential file is not valid JSON: {path}",
-                url=None,
-            ) from exc
-        except OSError as exc:
-            raise CycleCloudConnectionError(
-                f"Failed to read CycleCloud credential file {path}: {exc}",
-                url=None,
-            ) from exc
-
-        if not isinstance(data, dict):
-            raise CycleCloudConnectionError(
-                f"CycleCloud credential file must contain a JSON object: {path}",
-                url=None,
-            )
-
-        return data
-
-    @staticmethod
-    def _credential_file_value(data: dict[str, Any], *keys: str) -> Any:
-        for key in keys:
-            value = data.get(key)
-            if value not in (None, ""):
-                return value
-        return None
-
-    def _resolve_cc_transport_settings(
-        self,
-        *,
-        cc_url: Optional[str],
-        verify_ssl: Optional[bool],
-        template: Optional[AzureTemplate],
-        request_state: Optional[dict[str, Any]],
-        provider_cfg: Optional[AzureProviderConfig],
-        credential_file_data: dict[str, Any],
-    ) -> tuple[str, bool]:
-        resolved_url = cc_url or self._resolve_cc_config_value(
-            template=template,
-            request_state=request_state,
-            provider_cfg=provider_cfg,
-            template_attr="cyclecloud_url",
-            request_state_key="cyclecloud_url",
-            provider_path=("cyclecloud", "url"),
-        )
-        resolved_url = resolved_url or self._credential_file_value(
-            credential_file_data,
-            "cyclecloud_url",
-            "url",
-        )
-
-        verify_resolved: Any = verify_ssl
-        if verify_resolved is None:
-            verify_resolved = self._resolve_cc_config_value(
-                template=template,
-                request_state=request_state,
-                provider_cfg=provider_cfg,
-                template_attr="cyclecloud_verify_ssl",
-                request_state_key="cyclecloud_verify_ssl",
-                provider_path=("cyclecloud", "verify_ssl"),
-            )
-        if verify_resolved in (None, ""):
-            verify_resolved = self._credential_file_value(
-                credential_file_data,
-                "cyclecloud_verify_ssl",
-                "verify_ssl",
-            )
-        if verify_resolved in (None, ""):
-            verify_resolved = True
-
-        if not resolved_url:
-            raise CycleCloudConnectionError(
-                "cyclecloud_url is required in the template, request context, or provider configuration.",
-                url=None,
-            )
-
-        return resolved_url.rstrip("/"), _coerce_bool(verify_resolved)
-
     def _configure_cc_session_auth(
-        self,
-        *,
+            *,
         session: requests.Session,
-        base_url: str,
-        template: Optional[AzureTemplate],
-        request_state: Optional[dict[str, Any]],
-        provider_cfg: Optional[AzureProviderConfig],
-        credential_file_data: dict[str, Any],
+        settings: CycleCloudSessionSettings,
     ) -> Optional[str]:
-        auth_mode = self._resolve_cc_config_value(
-            template=template,
-            request_state=request_state,
-            provider_cfg=provider_cfg,
-            template_attr="cyclecloud_auth_mode",
-            request_state_key="cyclecloud_auth_mode",
-            provider_path=("cyclecloud", "auth_mode"),
-        )
-        auth_mode = auth_mode or self._credential_file_value(
-            credential_file_data,
-            "cyclecloud_auth_mode",
-            "auth_mode",
-        )
-        auth_mode = str(auth_mode).strip().lower() if auth_mode else None
-
-        explicit_bearer = self._credential_file_value(
-            credential_file_data,
-            "cyclecloud_bearer_token",
-            "bearer_token",
-        )
-        aad_scope = self._resolve_cc_config_value(
-            template=template,
-            request_state=request_state,
-            provider_cfg=provider_cfg,
-            template_attr="cyclecloud_aad_scope",
-            request_state_key="cyclecloud_aad_scope",
-            provider_path=("cyclecloud", "aad_scope"),
-        )
-        aad_scope = aad_scope or self._credential_file_value(
-            credential_file_data,
-            "cyclecloud_aad_scope",
-            "aad_scope",
-        )
+        auth_mode = settings.auth_mode
 
         if auth_mode == "ssh":
             raise CycleCloudConnectionError(
                 "cyclecloud_auth_mode=ssh is not supported. Configure CycleCloud API credentials instead.",
-                url=base_url,
+                url=settings.base_url,
             )
 
-        cc_user = self._credential_file_value(
-            credential_file_data,
-            "cyclecloud_username",
-            "username",
-        )
-        cc_pass = self._credential_file_value(
-            credential_file_data,
-            "cyclecloud_password",
-            "password",
-        )
+        cc_user, cc_pass = settings.username, settings.password
         if cc_user and cc_pass and auth_mode != "bearer":
             session.auth = (cc_user, cc_pass)
             return "basic"
 
-        bearer_token = explicit_bearer
-        if not bearer_token:
-            parsed = urlparse(base_url)
-            host_scope = (
-                f"{parsed.scheme}://{parsed.netloc}/.default"
-                if parsed.scheme and parsed.netloc
-                else ""
-            )
-            scopes = [str(aad_scope)] if aad_scope else []
-            scopes.extend([host_scope, "https://management.azure.com/.default"])
-            bearer_token = self._get_azure_bearer_token(scopes)
-
+        bearer_token = settings.bearer_token
         if bearer_token:
             session.headers["Authorization"] = f"Bearer {bearer_token}"
             return "bearer"
         if auth_mode == "bearer":
             raise CycleCloudConnectionError(
                 "cyclecloud_auth_mode=bearer requested but no bearer token could be resolved.",
-                url=base_url,
+                url=settings.base_url,
             )
         raise CycleCloudConnectionError(
             "No CycleCloud auth method resolved. Provide username/password or a bearer token/Azure credential.",
-            url=base_url,
+            url=settings.base_url,
         )
 
     def _build_cc_session(
@@ -357,56 +160,46 @@ class CycleCloudHandler(AzureHandler):
         cc_url: Optional[str],
         verify_ssl: Optional[bool],
         template: Optional[AzureTemplate] = None,
-        request_state: Optional[dict[str, Any]] = None,
+        request_context: Optional[CycleCloudRequestContext] = None,
     ) -> CycleCloudSessionContext:
         provider_cfg = self._get_provider_cyclecloud_config()
-        credential_path = self._resolve_cc_config_value(
-            template=template,
-            request_state=request_state,
-            provider_cfg=provider_cfg,
-            template_attr="cyclecloud_credential_path",
-            request_state_key="cyclecloud_credential_path",
-            provider_path=("cyclecloud", "credential_path"),
-        )
-        credential_file_data: dict[str, Any] = {}
-        if credential_path:
-            credential_file_data = self._load_cc_credential_file(str(credential_path))
-
-        base_url, resolved_verify_ssl = self._resolve_cc_transport_settings(
+        token_provider = None
+        try:
+            credential = self.azure_client.credential
+        except AuthenticationError:
+            credential = None
+        if credential is not None:
+            token_provider = AzureCredentialAccessTokenProvider(credential)
+        settings = CycleCloudSessionBuilder(
             cc_url=cc_url,
             verify_ssl=verify_ssl,
             template=template,
-            request_state=request_state,
+            request_context=request_context,
             provider_cfg=provider_cfg,
-            credential_file_data=credential_file_data,
-        )
-        resolved_credential_path = (
-            str(credential_path) if credential_path not in (None, "") else None
-        )
-        session = requests.Session()
+            token_provider=token_provider,
+        ).build_settings()
+        session: Optional[requests.Session] = None
         try:
-            session.verify = resolved_verify_ssl
+            session = requests.Session()
+            session.verify = settings.verify_ssl
             session.headers.update({
                 "Accept": "application/json",
                 "Content-Type": "application/json",
             })
             resolved_auth_mode = self._configure_cc_session_auth(
                 session=session,
-                base_url=base_url,
-                template=template,
-                request_state=request_state,
-                provider_cfg=provider_cfg,
-                credential_file_data=credential_file_data,
+                settings=settings,
             )
         except Exception:
-            session.close()
+            if session is not None:
+                session.close()
             raise
 
         return CycleCloudSessionContext(
             session=session,
-            base_url=base_url,
+            base_url=settings.base_url,
             auth_mode=resolved_auth_mode,
-            credential_path=resolved_credential_path,
+            credential_path=settings.credential_path,
         )
 
     def _cc_session_scope(
@@ -415,14 +208,14 @@ class CycleCloudHandler(AzureHandler):
         cc_url: Optional[str],
         verify_ssl: Optional[bool],
         template: Optional[AzureTemplate] = None,
-        request_state: Optional[dict[str, Any]] = None,
+        request_context: Optional[CycleCloudRequestContext] = None,
     ) -> AbstractContextManager[CycleCloudSessionContext]:
         return _CycleCloudSessionScope(
-            self._build_cc_session(
+            lambda: self._build_cc_session(
                 cc_url=cc_url,
                 verify_ssl=verify_ssl,
                 template=template,
-                request_state=request_state,
+                request_context=request_context,
             )
         )
 
@@ -756,7 +549,7 @@ class CycleCloudHandler(AzureHandler):
                 "cyclecloud_credential_path": session_context.credential_path,
                 "cyclecloud_verify_ssl": bool(session.verify),
                 "cyclecloud_auth_mode": session_context.auth_mode,
-                "cyclecloud_aad_scope": getattr(template, "cyclecloud_aad_scope", None),
+                "cyclecloud_aad_scope": template.cyclecloud_aad_scope,
             },
         }
 
@@ -770,15 +563,16 @@ class CycleCloudHandler(AzureHandler):
         Uses CycleCloud REST API ``GET /clusters/{cluster}/nodes`` with the
         durable request-scoped ``request_id`` filter.
         """
-        resource_ids: list[str] = getattr(request, "resource_ids", []) or []
+        resource_ids = request.resource_ids
         if not resource_ids:
             self._logger.warning("check_hosts_status called with no resource_ids")
             return []
 
         metadata = request.metadata or {}
-        cluster_name = metadata.get("cluster_name")
-        node_array = metadata.get("node_array")
-        node_ids = metadata.get("node_ids", [])
+        request_context = CycleCloudRequestContext.from_mapping(metadata)
+        cluster_name = request_context.cluster_name
+        node_array = request_context.node_array
+        node_ids = list(request_context.node_ids)
         cyclecloud_request_id = resource_ids[0]
 
         if not cluster_name:
@@ -786,8 +580,8 @@ class CycleCloudHandler(AzureHandler):
             self._logger.error(message)
             raise CycleCloudConnectionError(
                 message,
-                url=metadata.get("cyclecloud_url"),
-                details={"request_id": getattr(request, "request_id", None)},
+                url=request_context.cyclecloud_url,
+                details={"request_id": request.request_id},
             )
 
         if not cyclecloud_request_id:
@@ -797,19 +591,15 @@ class CycleCloudHandler(AzureHandler):
             self._logger.error(message)
             raise CycleCloudConnectionError(
                 message,
-                url=metadata.get("cyclecloud_url"),
+                url=request_context.cyclecloud_url,
                 details={"resource_ids": resource_ids},
             )
 
-        # Build a minimal template to get CycleCloud connection info
-        cc_url = metadata.get("cyclecloud_url")
-        cc_verify = metadata.get("cyclecloud_verify_ssl", None)
-
         try:
             with self._cc_session_scope(
-                cc_url=cc_url,
-                verify_ssl=cc_verify,
-                request_state=metadata,
+                cc_url=request_context.cyclecloud_url,
+                verify_ssl=request_context.cyclecloud_verify_ssl,
+                request_context=request_context,
             ) as session_context:
                 session = session_context.session
                 base_url = session_context.base_url
@@ -853,7 +643,7 @@ class CycleCloudHandler(AzureHandler):
                 continue
 
             cc_state = node.get("State", "Unknown")
-            status = _resolve_cc_state(cc_state)
+            status = resolve_cc_state(cc_state)
             if status == "unknown":
                 self._logger.warning("Unmapped CycleCloud node state: %s", cc_state)
 
@@ -917,16 +707,14 @@ class CycleCloudHandler(AzureHandler):
                 ``cyclecloud_credential_path``, ``cyclecloud_verify_ssl``.
         """
         context = context or {}
+        request_context = CycleCloudRequestContext.from_mapping(context)
         cluster_name = resource_id
-
-        cc_url = context.get("cyclecloud_url")
-        cc_verify = context.get("cyclecloud_verify_ssl", None)
 
         try:
             with self._cc_session_scope(
-                cc_url=cc_url,
-                verify_ssl=cc_verify,
-                request_state=context,
+                cc_url=request_context.cyclecloud_url,
+                verify_ssl=request_context.cyclecloud_verify_ssl,
+                request_context=request_context,
             ) as session_context:
                 session = session_context.session
                 base_url = session_context.base_url

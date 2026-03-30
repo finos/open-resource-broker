@@ -23,6 +23,20 @@ class AzureAccessTokenProviderProtocol(Protocol):
     def get_auth_error_types(self) -> tuple[type[Exception], ...]: ...
 
 
+class AzureCredentialAccessTokenProvider(AzureAccessTokenProviderProtocol):
+    """Adapt an existing Azure credential to the token-provider protocol."""
+
+    def __init__(self, credential: AzureCredentialProtocol) -> None:
+        self._credential = credential
+
+    def get_access_token(self, scope: str) -> str:
+        token = self._credential.get_token(scope)
+        return token.token
+
+    def get_auth_error_types(self) -> tuple[type[Exception], ...]:
+        return get_default_azure_credential_error_types()
+
+
 def get_default_azure_credential_error_types() -> tuple[type[Exception], ...]:
     """Return the expected Azure SDK exception types for credential operations."""
     try:
