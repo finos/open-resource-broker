@@ -26,6 +26,7 @@ Note:
 from __future__ import annotations
 
 import threading
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional, Protocol, cast
 
 from orb.config import PerformanceConfig
@@ -122,6 +123,36 @@ class AzureVmNetworkIdentityProtocol(Protocol):
     """VM surface used to enter the network-identity resolution flow."""
 
     network_profile: Optional[AzureNetworkProfileProtocol]
+
+
+@dataclass(frozen=True)
+class ParsedArmResourceId:
+    """Validated ARM resource identifier components."""
+
+    subscription_id: str
+    resource_group: str
+    provider_namespace: str
+    resource_path_segments: tuple[str, ...]
+
+    @property
+    def resource_name(self) -> str:
+        return self.resource_path_segments[-1]
+
+    @property
+    def resource_type(self) -> str:
+        return self.resource_path_segments[-2]
+
+    def parent_resource_id(self) -> Optional[str]:
+        """Return the parent ARM resource ID for child resources."""
+        if len(self.resource_path_segments) <= 2:
+            return None
+
+        return (
+            f"/subscriptions/{self.subscription_id}"
+            f"/resourceGroups/{self.resource_group}"
+            f"/providers/{self.provider_namespace}/"
+            + "/".join(self.resource_path_segments[:-2])
+        )
 
 
 @injectable
@@ -852,36 +883,72 @@ class AzureClient:
         return cast(AzurePublicIpProtocol, public_ip_resource).ip_address
 
     @classmethod
+    def _parse_arm_resource_id(
+        cls,
+        arm_id: str,
+    ) -> Optional[ParsedArmResourceId]:
+        """Parse an ARM resource ID only when it matches the canonical shape."""
+        raw_arm_id = str(arm_id).strip()
+        if not raw_arm_id:
+            return None
+
+        stripped = raw_arm_id.strip("/")
+        if not stripped:
+            return None
+
+        parts = stripped.split("/")
+        if any(not segment for segment in parts):
+            return None
+
+        if len(parts) < 8:
+            return None
+
+        if parts[0].lower() != "subscriptions" or parts[2].lower() != "resourcegroups":
+            return None
+
+        if parts[4].lower() != "providers":
+            return None
+
+        subscription_id = parts[1]
+        resource_group = parts[3]
+        provider_namespace = parts[5]
+        resource_path_segments = tuple(parts[6:])
+
+        if not subscription_id or not resource_group or not provider_namespace:
+            return None
+
+        if len(resource_path_segments) < 2 or len(resource_path_segments) % 2 != 0:
+            return None
+
+        return ParsedArmResourceId(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            provider_namespace=provider_namespace,
+            resource_path_segments=resource_path_segments,
+        )
+
+    @classmethod
     def extract_resource_group_and_name_from_arm_id(
         cls,
         arm_id: str,
     ) -> Optional[tuple[str, str]]:
         """Extract ``(resource_group, resource_name)`` from an ARM resource ID."""
-        parts = [segment for segment in str(arm_id).split("/") if segment]
-        if len(parts) < 2:
+        parsed_arm_id = cls._parse_arm_resource_id(arm_id)
+        if parsed_arm_id is None:
             return None
+        return parsed_arm_id.resource_group, parsed_arm_id.resource_name
 
-        resource_name = parts[-1]
-        for idx, value in enumerate(parts[:-1]):
-            if value.lower() != "resourcegroups":
-                continue
-
-            resource_group = parts[idx + 1]
-            resource_name = parts[-1]
-            if resource_group and resource_name:
-                return resource_group, resource_name
-
-        return None
-
-    @staticmethod
-    def subnet_id_to_vnet_id(subnet_id: Optional[str]) -> Optional[str]:
+    @classmethod
+    def subnet_id_to_vnet_id(cls, subnet_id: Optional[str]) -> Optional[str]:
         """Return the parent VNet ARM ID from a subnet ARM ID."""
         if not subnet_id:
             return None
-        marker = "/subnets/"
-        if marker not in subnet_id:
+        parsed_arm_id = cls._parse_arm_resource_id(subnet_id)
+        if parsed_arm_id is None:
             return None
-        return subnet_id.split(marker, 1)[0]
+        if parsed_arm_id.resource_type.lower() != "subnets":
+            return None
+        return parsed_arm_id.parent_resource_id()
 
     def resolve_network_identity_from_vm(self, vm: Any) -> dict[str, Any]:
         """Resolve network identity fields from a VM or VMSS VM object."""
