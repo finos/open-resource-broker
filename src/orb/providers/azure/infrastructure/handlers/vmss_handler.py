@@ -593,10 +593,21 @@ class VMSSHandler(AzureHandler):
         if not current_members:
             return False
 
-        current_member_count = len(current_members)
+        current_member_ids = {
+            str(instance_id)
+            for instance_id in (
+                member.get("instance_id")
+                for member in current_members
+                if isinstance(member, dict)
+            )
+            if instance_id not in (None, "")
+        }
+        if len(current_member_ids) != len(current_members):
+            return False
+
         if orchestration_mode == AzureVMSSOrchestrationMode.FLEXIBLE:
             requested_ids = {str(machine_id) for machine_id in machine_ids if machine_id not in (None, "")}
-            return bool(requested_ids) and len(requested_ids) == current_member_count
+            return bool(requested_ids) and requested_ids == current_member_ids
 
         resolved_instance_ids = self._resolve_vmss_instance_ids(
             resource_group=resource_group,
@@ -608,7 +619,7 @@ class VMSSHandler(AzureHandler):
             for instance_id in resolved_instance_ids
             if instance_id not in (None, "")
         }
-        return bool(requested_ids) and len(requested_ids) == current_member_count
+        return bool(requested_ids) and requested_ids == current_member_ids
 
     def _resolve_vmss_instance_ids(
         self,
