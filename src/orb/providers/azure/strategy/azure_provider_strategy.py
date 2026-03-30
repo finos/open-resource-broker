@@ -1271,7 +1271,7 @@ class AzureProviderStrategy(ProviderStrategy):
     def _status_dry_run_result(instance_ids: list[str]) -> ProviderResult:
         return ProviderResult.success_result(
             {
-                "machines": [
+                "instances": [
                     {
                         "instance_id": instance_id,
                         "status": "unknown",
@@ -1323,7 +1323,7 @@ class AzureProviderStrategy(ProviderStrategy):
 
         return ProviderResult.success_result(
             {
-                "machines": handler_machines,
+                "instances": handler_machines,
                 "queried_count": len(status_context.instance_ids),
             },
             metadata,
@@ -1358,7 +1358,7 @@ class AzureProviderStrategy(ProviderStrategy):
 
         return ProviderResult.success_result(
             {
-                "machines": machines,
+                "instances": machines,
                 "queried_count": len(status_context.instance_ids),
             },
             {

@@ -72,7 +72,7 @@ async def test_fetch_provider_machines_for_return_forwards_azure_resource_mappin
     logger = MagicMock()
     provider_registry_service = MagicMock()
     provider_registry_service.execute_operation = AsyncMock(
-        return_value=MagicMock(success=True, data={"machines": []}, metadata={})
+        return_value=MagicMock(success=True, data={"instances": []}, metadata={})
     )
 
     service = MachineSyncService(
@@ -120,7 +120,7 @@ async def test_fetch_provider_machines_for_return_rebuilds_vmss_mapping_from_fol
     logger = MagicMock()
     provider_registry_service = MagicMock()
     provider_registry_service.execute_operation = AsyncMock(
-        return_value=MagicMock(success=True, data={"machines": []}, metadata={})
+        return_value=MagicMock(success=True, data={"instances": []}, metadata={})
     )
 
     service = MachineSyncService(

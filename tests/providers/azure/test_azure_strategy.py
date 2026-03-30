@@ -510,7 +510,7 @@ class TestCapacityMetadata:
         result = strategy._handle_get_instance_status(op)
 
         assert result.success
-        assert result.data["machines"] == []
+        assert result.data["instances"] == []
         compute_client.virtual_machine_scale_sets.begin_delete.assert_called_once_with(
             resource_group_name="test-rg",
             vm_scale_set_name="vmss-demo",
@@ -1602,7 +1602,7 @@ class TestGetInstanceStatus:
 
         assert result.success
         assert result.data["queried_count"] == 2
-        assert [m["instance_id"] for m in result.data["machines"]] == ["vm-1", "vm-2"]
+        assert [m["instance_id"] for m in result.data["instances"]] == ["vm-1", "vm-2"]
         assert result.metadata["method"] == "dry_run"
 
     def test_single_vm_provider_api_routes_status_via_handler(self, azure_config, logger):
@@ -1640,7 +1640,7 @@ class TestGetInstanceStatus:
         assert result.success
         assert result.metadata["method"] == "handler"
         handler.check_hosts_status.assert_called_once()
-        assert result.data["machines"][0]["instance_id"] == "vm-1"
+        assert result.data["instances"][0]["instance_id"] == "vm-1"
 
     def test_vmss_provider_api_routes_status_via_handler_with_resource_mapping(self, azure_config, logger):
         strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
@@ -1696,7 +1696,7 @@ class TestGetInstanceStatus:
         assert result.success
         assert result.metadata["method"] == "handler"
         handler.check_hosts_status.assert_called_once()
-        assert [m["instance_id"] for m in result.data["machines"]] == ["3"]
+        assert [m["instance_id"] for m in result.data["instances"]] == ["3"]
 
     def test_vmss_resource_mapping_routes_status_via_handler_with_provider_api(self, azure_config, logger):
         strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
@@ -1737,7 +1737,7 @@ class TestGetInstanceStatus:
         assert result.success
         assert result.metadata["method"] == "handler"
         handler.check_hosts_status.assert_called_once()
-        assert [m["instance_id"] for m in result.data["machines"]] == ["3"]
+        assert [m["instance_id"] for m in result.data["instances"]] == ["3"]
 
     def test_cyclecloud_status_handler_failure_surfaces_error(self, azure_config, logger):
         strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
@@ -1816,9 +1816,9 @@ class TestGetInstanceStatus:
         result = _run(strategy.execute_operation(op))
 
         assert result.success
-        assert result.data["machines"][0]["private_ip"] == "10.0.0.4"
-        assert result.data["machines"][0]["subnet_id"].endswith("/subnets/default")
-        assert result.data["machines"][0]["vpc_id"].endswith("/virtualNetworks/test-vnet")
+        assert result.data["instances"][0]["private_ip"] == "10.0.0.4"
+        assert result.data["instances"][0]["subnet_id"].endswith("/subnets/default")
+        assert result.data["instances"][0]["vpc_id"].endswith("/virtualNetworks/test-vnet")
 
     def test_sdk_status_fallback_requires_azure_client(self, strategy):
         strategy._client = None
@@ -1869,7 +1869,7 @@ class TestGetInstanceStatus:
         result = _run(strategy.execute_operation(op))
 
         assert result.success
-        assert [m["instance_id"] for m in result.data["machines"]] == ["3"]
+        assert [m["instance_id"] for m in result.data["instances"]] == ["3"]
         handler.check_hosts_status.assert_called_once()
 
 
