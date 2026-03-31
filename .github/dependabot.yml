@@ -77,7 +77,7 @@ updates:
       - "dependencies"
       - "github-actions"
     commit-message:
-      prefix: "chore(ci)"
+      prefix: "ci"
       include: "scope"
     open-pull-requests-limit: 2
     groups:
