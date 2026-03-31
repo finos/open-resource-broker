@@ -93,8 +93,12 @@ class TestTemplateDefaultsService:
         # Verify hierarchical resolution
         assert result["template_id"] == "test-template"
         assert result["image_id"] == "ami-specific"  # Template value (highest priority)
-        assert result["provider_api"] == "SpotFleet"  # Provider instance default (overrides type default)
-        assert result["machine_types"] == {"t3.medium": 1}  # Provider instance default (overrides type default)
+        assert (
+            result["provider_api"] == "SpotFleet"
+        )  # Provider instance default (overrides type default)
+        assert result["machine_types"] == {
+            "t3.medium": 1
+        }  # Provider instance default (overrides type default)
         assert result["security_group_ids"] == ["sg-aws-default"]  # Provider type default
         assert result["price_type"] == "ondemand"  # Global default
 
@@ -172,8 +176,12 @@ class TestTemplateDefaultsService:
         # Should have merged defaults with correct precedence
         assert result["price_type"] == "ondemand"  # Global default
         assert result["image_id"] == "ami-aws-default"  # Provider type default
-        assert result["provider_api"] == "SpotFleet"  # Provider instance default (overrides type default)
-        assert result["machine_types"] == {"t3.medium": 1}  # Provider instance default (overrides type default)
+        assert (
+            result["provider_api"] == "SpotFleet"
+        )  # Provider instance default (overrides type default)
+        assert result["machine_types"] == {
+            "t3.medium": 1
+        }  # Provider instance default (overrides type default)
         assert result["security_group_ids"] == ["sg-aws-default"]  # Provider type default
 
     def test_validate_template_defaults(

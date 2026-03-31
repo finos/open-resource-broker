@@ -26,7 +26,9 @@ def _make_registry(provider, strategy=None) -> ProviderRegistry:
     registry._type_registrations = {}
     registry._instance_registrations = {}
     registry._registry_lock = __import__("threading").RLock()
-    registry.mode = __import__("orb.infrastructure.registry.base_registry", fromlist=["RegistryMode"]).RegistryMode.MULTI_CHOICE
+    registry.mode = __import__(
+        "orb.infrastructure.registry.base_registry", fromlist=["RegistryMode"]
+    ).RegistryMode.MULTI_CHOICE
     registry._factory = None
     registry._initialized = True
     # Initialise ProviderRegistry-specific internals

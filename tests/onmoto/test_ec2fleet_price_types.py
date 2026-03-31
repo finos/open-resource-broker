@@ -165,7 +165,8 @@ class TestAcquirePriceTypes:
     def test_acquire_heterogeneous_price_type_instant(self, handler, subnet_id, sg_id):
         """heterogeneous + instant fleet: acquire succeeds."""
         template = _ec2_fleet_template(
-            [subnet_id], sg_id,
+            [subnet_id],
+            sg_id,
             price_type="heterogeneous",
             fleet_type="instant",
             percent_on_demand=50,
@@ -180,7 +181,8 @@ class TestAcquirePriceTypes:
     def test_acquire_heterogeneous_price_type_maintain(self, handler, subnet_id, sg_id):
         """heterogeneous + maintain fleet: acquire succeeds."""
         template = _ec2_fleet_template(
-            [subnet_id], sg_id,
+            [subnet_id],
+            sg_id,
             price_type="heterogeneous",
             fleet_type="maintain",
             percent_on_demand=50,
@@ -195,7 +197,8 @@ class TestAcquirePriceTypes:
     def test_acquire_heterogeneous_price_type_request(self, handler, subnet_id, sg_id):
         """heterogeneous + request fleet: acquire succeeds."""
         template = _ec2_fleet_template(
-            [subnet_id], sg_id,
+            [subnet_id],
+            sg_id,
             price_type="heterogeneous",
             fleet_type="request",
             percent_on_demand=50,
@@ -424,7 +427,8 @@ class TestTagPropagation:
         """Tags set on the template are present on the created EC2 Fleet resource."""
         handler = _make_handler(moto_vpc_resources)
         template = _ec2_fleet_template(
-            [subnet_id], sg_id,
+            [subnet_id],
+            sg_id,
             price_type="ondemand",
             fleet_type="instant",
             tags={"Env": "test", "Owner": "qa"},

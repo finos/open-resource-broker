@@ -48,7 +48,9 @@ def _make_config_port(providers, selection_policy="FIRST_AVAILABLE"):
     return config_port
 
 
-def _make_registry(providers=None, config_port=None, selection_policy="FIRST_AVAILABLE") -> ProviderRegistry:
+def _make_registry(
+    providers=None, config_port=None, selection_policy="FIRST_AVAILABLE"
+) -> ProviderRegistry:
     registry = cast(ProviderRegistry, ProviderRegistry())
     registry._strategy_cache = {}
     registry._health_states = {}

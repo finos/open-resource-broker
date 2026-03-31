@@ -30,6 +30,7 @@ try:
 
     PRIORITY_AVAILABLE = True
 except ImportError:
+
     class _Priority:
         def __init__(self, value: int | str):
             if not isinstance(value, (int, str)):
@@ -43,6 +44,7 @@ try:
 
     MACHINE_COUNT_AVAILABLE = True
 except ImportError:
+
     class _MachineCount:
         def __init__(self, value: int):
             if not isinstance(value, int) or value < 0:

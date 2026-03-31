@@ -142,6 +142,7 @@ class TestDDDComplianceFixed:
         # Test value objects can be used as dictionary keys
         # frozen=True pydantic models are hashable at runtime; cast to satisfy pyright
         from typing import Hashable, cast
+
         hk1 = cast(Hashable, id1)
         hk2 = cast(Hashable, id2)
         hk3 = cast(Hashable, id3)

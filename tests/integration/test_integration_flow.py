@@ -64,7 +64,9 @@ async def test_aws_provider_strategy_uses_handlers():
     if result.success:
         print(f"   - Resource ID: {result.data.get('resource_id') if result.data else None}")
         print(f"   - Provider API used: {result.data.get('provider_api') if result.data else None}")
-        print(f"   - Handler used: {result.metadata.get('handler_used') if result.metadata else None}")
+        print(
+            f"   - Handler used: {result.metadata.get('handler_used') if result.metadata else None}"
+        )
     else:
         print(f"   - Error: {result.error_message}")
 
@@ -88,8 +90,12 @@ async def test_aws_provider_strategy_uses_handlers():
 
     print(f"PASS: Fallback result: success={result2.success}")
     if result2.success:
-        print(f"   - Provider API used: {result2.data.get('provider_api') if result2.data else None}")
-        print(f"   - Handler used: {result2.metadata.get('handler_used') if result2.metadata else None}")
+        print(
+            f"   - Provider API used: {result2.data.get('provider_api') if result2.data else None}"
+        )
+        print(
+            f"   - Handler used: {result2.metadata.get('handler_used') if result2.metadata else None}"
+        )
 
 
 if __name__ == "__main__":

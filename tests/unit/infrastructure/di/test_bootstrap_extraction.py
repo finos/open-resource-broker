@@ -56,6 +56,7 @@ def test_arch_checker_passes():
 @pytest.mark.unit
 def test_get_container_still_works_after_move():
     import orb.bootstrap  # ensure factory registered
+
     assert orb.bootstrap is not None
     from orb.infrastructure.di.container import get_container, reset_container
 

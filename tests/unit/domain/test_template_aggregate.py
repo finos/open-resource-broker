@@ -19,6 +19,7 @@ try:
 
     TEMPLATE_VALUE_OBJECTS_AVAILABLE = True
 except ImportError:
+
     class _TemplateId:
         def __init__(self, value: str):
             if not isinstance(value, str) or len(value.strip()) == 0:

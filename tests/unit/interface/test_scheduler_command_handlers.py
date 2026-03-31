@@ -34,7 +34,9 @@ class TestSchedulerCommandHandlers:
 
             mock_orch = AsyncMock(spec=ListSchedulerStrategiesOrchestrator)
             mock_orch.execute.return_value = ListSchedulerStrategiesOutput(
-                strategies=[{"name": "simple"}, {"name": "advanced"}], current_strategy="simple", count=2
+                strategies=[{"name": "simple"}, {"name": "advanced"}],
+                current_strategy="simple",
+                count=2,
             )
             mock_formatter = MagicMock(spec=ResponseFormattingService)
             mock_formatter.format_scheduler_strategy_list.return_value = InterfaceResponse(

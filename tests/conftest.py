@@ -58,6 +58,7 @@ except ImportError:
     def mock_aws():  # type: ignore[misc]
         yield
 
+
 import boto3
 
 from orb.config.manager import ConfigurationManager

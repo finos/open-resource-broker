@@ -508,7 +508,9 @@ class TestEC2FleetHandler:
         from orb.domain.request.aggregate import Request
         from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
-        fleet_response = handler._create_fleet_internal(cast(Request, request), cast(AWSTemplate, template))
+        fleet_response = handler._create_fleet_internal(
+            cast(Request, request), cast(AWSTemplate, template)
+        )
         fleet_id = fleet_response["fleet_id"]
 
         assert fleet_id == "fleet-789"
@@ -548,7 +550,9 @@ class TestEC2FleetHandler:
         from orb.domain.request.aggregate import Request
         from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
-        fleet_response = handler._create_fleet_internal(cast(Request, request), cast(AWSTemplate, template))
+        fleet_response = handler._create_fleet_internal(
+            cast(Request, request), cast(AWSTemplate, template)
+        )
         fleet_id = fleet_response["fleet_id"]
 
         assert fleet_id == "fleet-456"
@@ -872,6 +876,7 @@ class TestEC2FleetHandler:
             **{k: v for k, v in kwargs.items() if k != "operation_type"}
         )
         from typing import Any
+
         cast(Any, handler.aws_client.ec2_client).modify_fleet = Mock()
         cast(Any, handler.aws_client.ec2_client).delete_fleets = Mock()
 
@@ -1632,6 +1637,7 @@ class TestSpotFleetHandler:
             **{k: v for k, v in kwargs.items() if k != "operation_type"}
         )
         from typing import Any
+
         cast(Any, handler.aws_client.ec2_client).modify_spot_fleet_request = Mock()  # type: ignore[misc]
         cast(Any, handler.aws_client.ec2_client).cancel_spot_fleet_requests = Mock()  # type: ignore[misc]
         handler._group_instances_by_spot_fleet_from_mapping = Mock(
@@ -1801,9 +1807,13 @@ class TestSpotFleetHandler:
             request_adapter=Mock(),
         )
 
-        object.__setattr__(handler._release_manager, "_retry", lambda func, **kwargs: func(
-            **{k: v for k, v in kwargs.items() if k != "operation_type"}
-        ))
+        object.__setattr__(
+            handler._release_manager,
+            "_retry",
+            lambda func, **kwargs: func(
+                **{k: v for k, v in kwargs.items() if k != "operation_type"}
+            ),
+        )
 
         fleet_details = {
             "SpotFleetRequestId": "sfr-12345",

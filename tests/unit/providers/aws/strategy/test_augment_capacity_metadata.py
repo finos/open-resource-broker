@@ -117,4 +117,3 @@ def test_asg_capacity_data_extraction():
     assert group["DesiredCapacity"] == 10
     assert fulfilled == 7  # 4 + 1 + 2
     assert len(in_service) == 3
-

@@ -65,14 +65,14 @@ class _MotoSpotFleetConfigBuilder(SpotFleetConfigBuilder):
             template=template, request=request, lt_id=lt_id, lt_version=lt_version
         )
         config["TagSpecifications"] = [
-            ts
-            for ts in config.get("TagSpecifications", [])
-            if ts.get("ResourceType") != "instance"
+            ts for ts in config.get("TagSpecifications", []) if ts.get("ResourceType") != "instance"
         ]
         return config
 
 
-def _make_spot_fleet_handler(moto_aws_client: Any, logger: Any, config_port: Any) -> SpotFleetHandler:
+def _make_spot_fleet_handler(
+    moto_aws_client: Any, logger: Any, config_port: Any
+) -> SpotFleetHandler:
     aws_ops = AWSOperations(moto_aws_client, logger, config_port)
     lt_manager = _make_launch_template_manager(moto_aws_client, logger)
     config_builder = _MotoSpotFleetConfigBuilder(None, config_port, logger)
@@ -169,9 +169,7 @@ def vpc_resources(moto_aws: Any) -> dict[str, Any]:
     ec2 = boto3.client("ec2", region_name=REGION)
     vpc = ec2.create_vpc(CidrBlock="10.0.0.0/16")
     vpc_id = vpc["Vpc"]["VpcId"]
-    subnet = ec2.create_subnet(
-        VpcId=vpc_id, CidrBlock="10.0.1.0/24", AvailabilityZone=f"{REGION}a"
-    )
+    subnet = ec2.create_subnet(VpcId=vpc_id, CidrBlock="10.0.1.0/24", AvailabilityZone=f"{REGION}a")
     sg = ec2.create_security_group(
         GroupName="spot-gaps-sg", Description="spot gaps test SG", VpcId=vpc_id
     )
@@ -388,9 +386,7 @@ class TestCheckStatus:
             SpotFleetRequestIds=[fleet_id], TerminateInstances=True
         )
 
-        status_request = _make_request(
-            request_id="spot-status-cancel", resource_ids=[fleet_id]
-        )
+        status_request = _make_request(request_id="spot-status-cancel", resource_ids=[fleet_id])
         status = handler.check_hosts_status(status_request)
 
         assert status == []

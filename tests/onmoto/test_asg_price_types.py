@@ -354,9 +354,7 @@ class TestASGRelease:
 
 
 class TestASGCheckStatus:
-    def test_check_status_asg_in_deleting_state_returns_empty(
-        self, handler, vpc, asg_client
-    ):
+    def test_check_status_asg_in_deleting_state_returns_empty(self, handler, vpc, asg_client):
         """check_hosts_status returns [] when the ASG has been deleted."""
         template = AWSTemplate(
             template_id="tpl-status",
@@ -374,13 +372,9 @@ class TestASGCheckStatus:
         asg_name = result["resource_ids"][0]
 
         # Delete the ASG directly
-        asg_client.delete_auto_scaling_group(
-            AutoScalingGroupName=asg_name, ForceDelete=True
-        )
+        asg_client.delete_auto_scaling_group(AutoScalingGroupName=asg_name, ForceDelete=True)
 
-        status_request = _make_request(
-            request_id="asg-status-001", resource_ids=[asg_name]
-        )
+        status_request = _make_request(request_id="asg-status-001", resource_ids=[asg_name])
         status = handler.check_hosts_status(status_request)
 
         assert status == []
