@@ -108,30 +108,15 @@ def test_flexible_vmss_status_returns_only_member_vms():
 
     member_vm = MagicMock()
     member_vm.name = "vmss-azure-test_abcd1234"
-    member_vm.virtual_machine_scale_set.id = (
-        "/subscriptions/sub/resourceGroups/test-rg/providers/"
-        "Microsoft.Compute/virtualMachineScaleSets/vmss-azure-test"
-    )
+    member_vm.instance_id = "vmss-azure-test_abcd1234"
+    member_vm.vm_id = "vm-guid-1"
     member_vm.instance_view.statuses = []
     member_vm.hardware_profile.vm_size = "Standard_D4s_v5"
     member_vm.location = "eastus2"
     member_vm.zones = ["1"]
 
-    member_vm_with_view = MagicMock()
-    member_vm_with_view.name = "vmss-azure-test_abcd1234"
-    member_vm_with_view.instance_id = "vmss-azure-test_abcd1234"
-    member_vm_with_view.vm_id = "vm-guid-1"
-    member_vm_with_view.instance_view.statuses = []
-    member_vm_with_view.hardware_profile.vm_size = "Standard_D4s_v5"
-    member_vm_with_view.location = "eastus2"
-    member_vm_with_view.zones = ["1"]
-
-    other_vm = MagicMock()
-    other_vm.name = "other-vm"
-    other_vm.virtual_machine_scale_set = None
-
-    azure_client.compute_client.virtual_machines.list.return_value = [member_vm, other_vm]
-    azure_client.compute_client.virtual_machines.get.return_value = member_vm_with_view
+    azure_client.subscription_id = "sub"
+    azure_client.compute_client.virtual_machines.list.return_value = [member_vm]
 
     request = MagicMock()
     request.resource_ids = ["vmss-azure-test"]
@@ -141,9 +126,36 @@ def test_flexible_vmss_status_returns_only_member_vms():
 
     assert len(result) == 1
     assert result[0]["instance_id"] == "vmss-azure-test_abcd1234"
+    azure_client.compute_client.virtual_machines.list.assert_called_once_with(
+        resource_group_name="test-rg",
+        filter="'virtualMachineScaleSet/id' eq '/subscriptions/sub/resourceGroups/test-rg/providers/Microsoft.Compute/virtualMachineScaleSets/vmss-azure-test'",
+        expand="instanceView",
+    )
 
 
-def test_flexible_vmss_status_uses_name_prefix_when_vmss_reference_is_missing():
+def test_flexible_vmss_listing_uses_azure_side_filter_without_client_side_membership_scan():
+    azure_client = MagicMock()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+
+    azure_client.subscription_id = "sub"
+    azure_client.compute_client.virtual_machines.list.return_value = []
+
+    result = handler._list_vmss_instances(
+        resource_group="test-rg",
+        vmss_name="vmss-azure-test",
+        include_instance_view=False,
+        orchestration_mode=AzureVMSSOrchestrationMode.FLEXIBLE,
+    )
+
+    assert result == []
+    azure_client.compute_client.virtual_machines.list.assert_called_once_with(
+        resource_group_name="test-rg",
+        filter="'virtualMachineScaleSet/id' eq '/subscriptions/sub/resourceGroups/test-rg/providers/Microsoft.Compute/virtualMachineScaleSets/vmss-azure-test'",
+    )
+
+
+def test_flexible_vmss_status_uses_filtered_list_result_directly():
     azure_client = MagicMock()
     logger = MagicMock()
     handler = VMSSHandler(azure_client=azure_client, logger=logger)
@@ -154,27 +166,15 @@ def test_flexible_vmss_status_uses_name_prefix_when_vmss_reference_is_missing():
 
     member_vm = MagicMock()
     member_vm.name = "vmss-azure-test_abcd1234"
-    member_vm.virtual_machine_scale_set = None
+    member_vm.instance_id = "vmss-azure-test_abcd1234"
+    member_vm.vm_id = "vm-guid-1"
     member_vm.instance_view.statuses = []
     member_vm.hardware_profile.vm_size = "Standard_D4s_v5"
     member_vm.location = "eastus2"
     member_vm.zones = ["1"]
 
-    member_vm_with_view = MagicMock()
-    member_vm_with_view.name = "vmss-azure-test_abcd1234"
-    member_vm_with_view.instance_id = "vmss-azure-test_abcd1234"
-    member_vm_with_view.vm_id = "vm-guid-1"
-    member_vm_with_view.instance_view.statuses = []
-    member_vm_with_view.hardware_profile.vm_size = "Standard_D4s_v5"
-    member_vm_with_view.location = "eastus2"
-    member_vm_with_view.zones = ["1"]
-
-    other_vm = MagicMock()
-    other_vm.name = "other-vm"
-    other_vm.virtual_machine_scale_set = None
-
-    azure_client.compute_client.virtual_machines.list.return_value = [member_vm, other_vm]
-    azure_client.compute_client.virtual_machines.get.return_value = member_vm_with_view
+    azure_client.subscription_id = "sub"
+    azure_client.compute_client.virtual_machines.list.return_value = [member_vm]
 
     request = MagicMock()
     request.resource_ids = ["vmss-azure-test"]
@@ -184,6 +184,11 @@ def test_flexible_vmss_status_uses_name_prefix_when_vmss_reference_is_missing():
 
     assert len(result) == 1
     assert result[0]["instance_id"] == "vmss-azure-test_abcd1234"
+    azure_client.compute_client.virtual_machines.list.assert_called_once_with(
+        resource_group_name="test-rg",
+        filter="'virtualMachineScaleSet/id' eq '/subscriptions/sub/resourceGroups/test-rg/providers/Microsoft.Compute/virtualMachineScaleSets/vmss-azure-test'",
+        expand="instanceView",
+    )
 
 
 def test_vmss_instance_status_includes_structured_provisioning_errors():

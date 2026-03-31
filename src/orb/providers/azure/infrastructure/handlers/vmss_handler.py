@@ -110,9 +110,8 @@ def _read_vm_identity(vm: Any) -> _AzureVmIdentity:
 
     Microsoft documents `VirtualMachineScaleSetVM` with `name`, `instance_id`,
     and `vm_id`, while regular `VirtualMachine` objects expose `name` and
-    `vm_id` but not `instance_id`. Flexible VMSS listing uses regular VM
-    objects, so `name` becomes the stable machine identifier when
-    `instance_id` is absent.
+    `vm_id` but not `instance_id`. When Azure returns a regular VM object,
+    `name` becomes the stable machine identifier when `instance_id` is absent.
     """
     typed_vm = cast(_AzureVmWithIdentity, vm)
     vm_name = typed_vm.name
@@ -804,9 +803,22 @@ class VMSSHandler(AzureHandler):
         include_instance_view: bool = False,
     ) -> list[dict[str, Any]]:
         compute = self.azure_client.compute_client
+        vmss_resource_id = (
+            f"/subscriptions/{self.azure_client.subscription_id}"
+            f"/resourceGroups/{resource_group}"
+            f"/providers/Microsoft.Compute/virtualMachineScaleSets/{vmss_name}"
+        )
+        # Flexible VMSS membership is queried through the standard VM list API.
+        # Azure rejects the VMSS child .../virtualMachines API for Flexible orchestration.
+        list_kwargs: dict[str, Any] = {
+            "resource_group_name": resource_group,
+            "filter": f"'virtualMachineScaleSet/id' eq '{vmss_resource_id}'",
+        }
+        if include_instance_view:
+            list_kwargs["expand"] = "instanceView"
 
         try:
-            vms = list(compute.virtual_machines.list(resource_group_name=resource_group))
+            vms = list(compute.virtual_machines.list(**list_kwargs))
         except Exception as exc:
             raise VMSSNotFoundError(
                 f"Could not list flexible VMs for VMSS '{vmss_name}': {exc}",
@@ -816,56 +828,9 @@ class VMSSHandler(AzureHandler):
         instances: list[dict[str, Any]] = []
 
         for vm in vms:
-            if not self._is_flexible_vmss_member(vm, vmss_name):
-                continue
-
-            if include_instance_view:
-                vm_name = _read_vm_identity(vm).vm_name
-                if not vm_name:
-                    self._logger.warning(
-                        "Skipping flexible VMSS VM without a name in '%s'",
-                        vmss_name,
-                    )
-                    continue
-                try:
-                    vm = compute.virtual_machines.get(
-                        resource_group_name=resource_group,
-                        vm_name=vm_name,
-                        expand="instanceView",
-                    )
-                except Exception as exc:
-                    self._logger.warning(
-                        "Failed to fetch instance view for flexible VMSS VM '%s': %s",
-                        vm_name,
-                        exc,
-                    )
-
             instances.append(self._normalise_vm(vm, vmss_name, resource_group))
 
         return instances
-
-    @staticmethod
-    def _is_flexible_vmss_member(vm: Any, vmss_name: str) -> bool:
-        """Best-effort membership check for Flexible VMSS VMs."""
-        vmss_ref = getattr(vm, "virtual_machine_scale_set", None)
-        vmss_ref_id = getattr(vmss_ref, "id", None) if vmss_ref else None
-        vmss_arm_suffix = f"/virtualMachineScaleSets/{vmss_name}"
-        if vmss_ref_id and str(vmss_ref_id).endswith(vmss_arm_suffix):
-            return True
-
-        # Some Azure list responses do not populate virtual_machine_scale_set.
-        # Fall back to the VM naming pattern used for Flexible VMSS members.
-        candidate_ids = (
-            str(getattr(vm, "name", "") or ""),
-            str(getattr(vm, "instance_id", "") or ""),
-        )
-        prefixes = (f"{vmss_name}_", f"{vmss_name}-")
-        return any(
-            candidate.startswith(prefix)
-            for candidate in candidate_ids
-            for prefix in prefixes
-            if candidate
-        )
 
     def _normalise_vm(
         self, vm: Any, vmss_name: str, resource_group: str
