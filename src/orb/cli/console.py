@@ -11,8 +11,14 @@ try:
     from rich.console import Console
 
     RICH_AVAILABLE = True
-    _console = Console(no_color=not sys.stdout.isatty(), width=None if sys.stdout.isatty() else 2**31 - 1)
-    _error_console = Console(stderr=True, no_color=not sys.stderr.isatty(), width=None if sys.stderr.isatty() else 2**31 - 1)
+    _console = Console(
+        no_color=not sys.stdout.isatty(), width=None if sys.stdout.isatty() else 2**31 - 1
+    )
+    _error_console = Console(
+        stderr=True,
+        no_color=not sys.stderr.isatty(),
+        width=None if sys.stderr.isatty() else 2**31 - 1,
+    )
 except ImportError:
     RICH_AVAILABLE = False
 
