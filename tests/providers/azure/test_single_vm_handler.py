@@ -357,3 +357,28 @@ def test_resolve_vm_names_maps_vm_ids_via_resource_group_listing():
 
     assert resolved == ["vm-1"]
 
+
+def test_resolve_vm_names_preserves_input_order_for_mixed_vm_names_and_ids():
+    azure_client = MagicMock()
+    handler = SingleVMHandler(azure_client=azure_client, logger=MagicMock())
+
+    vm_1 = MagicMock()
+    vm_1.name = "vm-1"
+    vm_1.vm_id = "11111111-1111-1111-1111-111111111111"
+
+    def _get_vm(*, resource_group_name, vm_name):
+        if resource_group_name == "test-rg" and vm_name == "vm-2":
+            vm = MagicMock()
+            vm.name = "vm-2"
+            return vm
+        raise ResourceNotFoundError("NotFound")
+
+    azure_client.compute_client.virtual_machines.get.side_effect = _get_vm
+    azure_client.compute_client.virtual_machines.list.return_value = [vm_1]
+
+    resolved = handler._resolve_vm_names(
+        "test-rg",
+        ["vm-2", "11111111-1111-1111-1111-111111111111"],
+    )
+
+    assert resolved == ["vm-2", "vm-1"]

@@ -430,13 +430,13 @@ class SingleVMHandler(AzureHandler):
 
         try:
             compute = self.azure_client.compute_client
-            resolved: list[str] = []
-            unresolved_ids: list[str] = []
+            resolved: list[Optional[str]] = [None] * len(machine_ids)
+            unresolved_indices: list[int] = []
 
-            for machine_id in machine_ids:
+            for index, machine_id in enumerate(machine_ids):
                 machine_id_str = str(machine_id)
                 if _looks_like_uuid(machine_id_str):
-                    unresolved_ids.append(machine_id_str)
+                    unresolved_indices.append(index)
                     continue
 
                 try:
@@ -444,11 +444,11 @@ class SingleVMHandler(AzureHandler):
                         resource_group_name=resource_group,
                         vm_name=machine_id_str,
                     )
-                    resolved.append(str(getattr(vm, "name", None) or machine_id_str))
+                    resolved[index] = str(getattr(vm, "name", None) or machine_id_str)
                 except AzureResourceNotFoundError:
-                    unresolved_ids.append(machine_id_str)
+                    unresolved_indices.append(index)
 
-            if unresolved_ids:
+            if unresolved_indices:
                 vms = compute.virtual_machines.list(resource_group_name=resource_group)
 
                 lookup: dict[str, str] = {}
@@ -462,19 +462,23 @@ class SingleVMHandler(AzureHandler):
                     if vm_id:
                         lookup[str(vm_id)] = str(vm_name)
 
-                resolved.extend(
-                    lookup.get(str(machine_id), str(machine_id))
-                    for machine_id in unresolved_ids
-                )
+                for index in unresolved_indices:
+                    machine_id = str(machine_ids[index])
+                    resolved[index] = lookup.get(machine_id, machine_id)
 
-            if resolved != [str(mid) for mid in machine_ids]:
+            ordered_resolved = [
+                resolved_name if resolved_name is not None else str(machine_id)
+                for machine_id, resolved_name in zip(machine_ids, resolved)
+            ]
+
+            if ordered_resolved != [str(mid) for mid in machine_ids]:
                 self._logger.debug(
                     "Resolved SingleVM IDs in resource_group '%s': %s -> %s",
                     resource_group,
                     machine_ids,
-                    resolved,
+                    ordered_resolved,
                 )
-            return resolved
+            return ordered_resolved
         except Exception as exc:
             self._logger.warning(
                 "Failed to resolve VM names, using provided IDs directly: %s",
@@ -482,7 +486,8 @@ class SingleVMHandler(AzureHandler):
             )
             return [str(machine_id) for machine_id in machine_ids]
 
-    def _resolve_subnet_id(self, template: AzureTemplate) -> Optional[str]:
+    @staticmethod
+    def _resolve_subnet_id(template: AzureTemplate) -> Optional[str]:
         """Return the subnet ARM ID from network_config or subnet_ids."""
         if template.network_config and template.network_config.subnet_id:
             return template.network_config.subnet_id
