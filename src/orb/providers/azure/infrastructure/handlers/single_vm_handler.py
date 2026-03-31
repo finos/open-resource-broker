@@ -389,6 +389,7 @@ class SingleVMHandler(AzureHandler):
         compute = self.azure_client.compute_client
         vm_names = self._resolve_vm_names(resource_group, machine_ids)
         submitted_deletions: list[dict[str, Any]] = []
+        failed_deletions: list[dict[str, Any]] = []
         for original_id, vm_name in zip(machine_ids, vm_names):
             try:
                 self._logger.info(
@@ -406,10 +407,29 @@ class SingleVMHandler(AzureHandler):
                 )
             except Exception as exc:
                 self._logger.error("Failed to delete VM '%s': %s", vm_name, exc)
-                raise TerminationError(
-                    f"Failed to delete VM '{vm_name}': {exc}",
-                    resource_ids=[original_id],
-                ) from exc
+                failed_deletions.append(
+                    {
+                        "requested_id": str(original_id),
+                        "vm_name": vm_name,
+                        "error": str(exc),
+                    }
+                )
+
+        if failed_deletions:
+            raise TerminationError(
+                (
+                    f"Failed to submit deletion for {len(failed_deletions)} of "
+                    f"{len(machine_ids)} VM(s)"
+                ),
+                resource_ids=[
+                    deletion["requested_id"] for deletion in failed_deletions
+                ],
+                details={
+                    "resource_group": resource_group,
+                    "submitted_deletions": submitted_deletions,
+                    "failed_deletions": failed_deletions,
+                },
+            )
 
         return {
             "provider_data": {

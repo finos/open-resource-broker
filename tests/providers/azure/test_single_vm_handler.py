@@ -6,7 +6,7 @@ import pytest
 from azure.core.exceptions import ResourceNotFoundError
 
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
-from orb.providers.azure.exceptions.azure_exceptions import LaunchError
+from orb.providers.azure.exceptions.azure_exceptions import LaunchError, TerminationError
 from orb.providers.azure.infrastructure.handlers.single_vm_handler import SingleVMHandler
 
 
@@ -339,6 +339,49 @@ def test_release_uses_direct_vm_name_lookup_without_listing_resource_group():
         {"requested_id": "vm-1", "vm_name": "vm-1"},
     ]
     azure_client.compute_client.virtual_machines.list.assert_not_called()
+
+
+def test_release_attempts_all_deletes_before_raising_aggregated_failure():
+    azure_client = MagicMock()
+    logger = MagicMock()
+    handler = SingleVMHandler(azure_client=azure_client, logger=logger)
+
+    vm_1 = MagicMock()
+    vm_1.name = "vm-1"
+    vm_1.vm_id = "guid-1"
+    vm_2 = MagicMock()
+    vm_2.name = "vm-2"
+    vm_2.vm_id = "guid-2"
+    vm_3 = MagicMock()
+    vm_3.name = "vm-3"
+    vm_3.vm_id = "guid-3"
+    azure_client.compute_client.virtual_machines.list.return_value = [vm_1, vm_2, vm_3]
+    azure_client.compute_client.virtual_machines.get.side_effect = ResourceNotFoundError("NotFound")
+
+    def _begin_delete(*, resource_group_name, vm_name):
+        if vm_name == "vm-2":
+            raise RuntimeError("delete blocked")
+        return MagicMock()
+
+    azure_client.compute_client.virtual_machines.begin_delete.side_effect = _begin_delete
+
+    with pytest.raises(TerminationError) as exc_info:
+        handler.release_hosts(
+            machine_ids=["guid-1", "guid-2", "guid-3"],
+            resource_id="unused",
+            context={"resource_group": "test-rg"},
+        )
+
+    exc = exc_info.value
+    assert exc.resource_ids == ["guid-2"]
+    assert exc.details["submitted_deletions"] == [
+        {"requested_id": "guid-1", "vm_name": "vm-1"},
+        {"requested_id": "guid-3", "vm_name": "vm-3"},
+    ]
+    assert exc.details["failed_deletions"] == [
+        {"requested_id": "guid-2", "vm_name": "vm-2", "error": "delete blocked"},
+    ]
+    assert _deleted_vm_names(azure_client) == ["vm-1", "vm-2", "vm-3"]
 
 
 def test_resolve_vm_names_maps_vm_ids_via_resource_group_listing():
