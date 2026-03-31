@@ -231,29 +231,12 @@ class AzureInventoryService:
         operation: ProviderOperation,
         status_context: AzureStatusQueryContext,
         handler_machines: list[dict[str, Any]],
-        maybe_reconcile_pending_resource_cleanup: Callable[..., None],
-        pending_resource_cleanup_status_metadata: Callable[..., dict[str, Any]],
     ) -> ProviderResult:
-        resource_ids: list[str] = []
         metadata = {
             "operation": "get_instance_status",
             "instance_ids": status_context.instance_ids,
             "method": "handler",
         }
-        if status_context.provider_api in (AzureProviderApi.VMSS, AzureProviderApi.VMSS_UNIFORM):
-            resource_ids = self.status_resource_ids(operation, status_context.instance_ids)
-            if resource_ids:
-                maybe_reconcile_pending_resource_cleanup(
-                    resource_group=status_context.resource_group,
-                    resource_ids=resource_ids,
-                    instance_details=handler_machines,
-                )
-            metadata.update(
-                pending_resource_cleanup_status_metadata(
-                    resource_group=status_context.resource_group,
-                    resource_ids=resource_ids,
-                )
-            )
 
         return ProviderResult.success_result(
             {
@@ -397,10 +380,7 @@ class AzureInventoryService:
         resource_manager: Any,
         deployment_service: Any,
         resource_metadata_service: Any,
-        restore_pending_resource_cleanups: Callable[[ProviderOperation], None],
-        has_pending_resource_cleanup: Callable[..., bool],
-        maybe_reconcile_pending_resource_cleanup: Callable[..., None],
-        pending_resource_cleanup_status_metadata: Callable[..., dict[str, Any]],
+        fail_on_partial_status_error: bool = False,
     ) -> ProviderResult:
         resource_ids = operation.parameters.get("resource_ids", [])
         handler = handlers.get(provider_api_key)
@@ -420,14 +400,11 @@ class AzureInventoryService:
             operation=operation,
             resource_group=resource_group,
         )
-        restore_pending_resource_cleanups(operation)
         if provider_api == AzureProviderApi.SINGLE_VM:
             deployment_name = self.request_metadata(operation).get("deployment_name")
             if deployment_name not in (None, ""):
                 request_metadata["deployment_name"] = str(deployment_name)
-        if provider_api in (AzureProviderApi.VMSS, AzureProviderApi.VMSS_UNIFORM) and (
-            has_pending_resource_cleanup(resource_group=resource_group, resource_ids=resource_ids)
-        ):
+        if fail_on_partial_status_error:
             request_metadata["fail_on_partial_status_error"] = True
 
         request = Request.create_new_request(
@@ -442,18 +419,6 @@ class AzureInventoryService:
         request.resource_ids = resource_ids
 
         instance_details = handler.check_hosts_status(request)
-        maybe_reconcile_pending_resource_cleanup(
-            resource_group=resource_group,
-            resource_ids=resource_ids,
-            instance_details=instance_details,
-        )
-
-        cleanup_metadata: dict[str, Any] = {}
-        if provider_api in (AzureProviderApi.VMSS, AzureProviderApi.VMSS_UNIFORM):
-            cleanup_metadata = pending_resource_cleanup_status_metadata(
-                resource_group=resource_group,
-                resource_ids=resource_ids,
-            )
 
         if not instance_details:
             metadata = {
@@ -462,7 +427,6 @@ class AzureInventoryService:
                 "provider_api": provider_api_key,
                 "handler_used": provider_api_key,
                 "instance_count": 0,
-                **cleanup_metadata,
             }
             if provider_api in (AzureProviderApi.VMSS, AzureProviderApi.VMSS_UNIFORM):
                 vmss_errors = []
@@ -502,7 +466,6 @@ class AzureInventoryService:
             "provider_api": provider_api_key,
             "handler_used": provider_api_key,
             "instance_count": len(instance_details),
-            **cleanup_metadata,
         }
         if fleet_errors:
             metadata["fleet_errors"] = fleet_errors

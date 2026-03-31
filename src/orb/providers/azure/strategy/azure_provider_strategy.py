@@ -836,13 +836,34 @@ class AzureProviderStrategy(ProviderStrategy):
                 handlers=self.handlers,
             )
             if handler_machines is not None:
-                return self._inventory_service.status_handler_result(
+                is_vmss = status_context.provider_api in (
+                    AzureProviderApi.VMSS,
+                    AzureProviderApi.VMSS_UNIFORM,
+                )
+                result = self._inventory_service.status_handler_result(
                     operation=operation,
                     status_context=status_context,
                     handler_machines=handler_machines,
-                    maybe_reconcile_pending_resource_cleanup=self._maybe_reconcile_pending_resource_cleanup,
-                    pending_resource_cleanup_status_metadata=self._pending_resource_cleanup_status_metadata,
                 )
+                if is_vmss:
+                    resource_ids = self._inventory_service.status_resource_ids(
+                        operation, status_context.instance_ids
+                    )
+                    if resource_ids:
+                        self._vmss_cleanup_coordinator.reconcile(
+                            resource_group=status_context.resource_group,
+                            resource_ids=resource_ids,
+                            observed_ids=self._inventory_service.observed_status_ids(
+                                handler_machines
+                            ),
+                        )
+                    result.metadata.update(
+                        self._vmss_cleanup_coordinator.status_metadata(
+                            resource_group=status_context.resource_group,
+                            resource_ids=resource_ids,
+                        )
+                    )
+                return result
 
             return self._inventory_service.sdk_status_result(
                 status_context=status_context,
@@ -892,28 +913,6 @@ class AzureProviderStrategy(ProviderStrategy):
             self._inventory_service.request_metadata(operation)
         )
 
-    def _has_pending_resource_cleanup(
-        self,
-        *,
-        resource_group: Optional[str],
-        resource_ids: list[str],
-    ) -> bool:
-        return self._vmss_cleanup_coordinator.has_pending(
-            resource_group=resource_group,
-            resource_ids=resource_ids,
-        )
-
-    def _pending_resource_cleanup_status_metadata(
-        self,
-        *,
-        resource_group: Optional[str],
-        resource_ids: list[str],
-    ) -> dict[str, Any]:
-        return self._vmss_cleanup_coordinator.status_metadata(
-            resource_group=resource_group,
-            resource_ids=resource_ids,
-        )
-
     def _current_vmss_member_count(self, *, resource_group: str, vmss_name: str) -> Optional[int]:
         if not self.resource_manager:
             return None
@@ -939,19 +938,6 @@ class AzureProviderStrategy(ProviderStrategy):
         azure_client.compute_client.virtual_machine_scale_sets.begin_delete(
             resource_group_name=resource_group,
             vm_scale_set_name=vmss_name,
-        )
-
-    def _maybe_reconcile_pending_resource_cleanup(
-        self,
-        *,
-        resource_group: Optional[str],
-        resource_ids: list[str],
-        instance_details: list[dict[str, Any]],
-    ) -> None:
-        self._vmss_cleanup_coordinator.reconcile(
-            resource_group=resource_group,
-            resource_ids=resource_ids,
-            observed_ids=self._inventory_service.observed_status_ids(instance_details),
         )
 
     # ------------------------------------------------------------------
@@ -989,24 +975,49 @@ class AzureProviderStrategy(ProviderStrategy):
                     },
                 )
 
-            return self._inventory_service.describe_resource_instances(
+            resource_ids = operation.parameters.get("resource_ids", [])
+            provider_api_key = self._provider_api_key(provider_api)
+            resource_group = self._inventory_service.resolve_operation_resource_group(
+                operation,
+                self._azure_config.resource_group,
+            )
+            is_vmss = provider_api in (AzureProviderApi.VMSS, AzureProviderApi.VMSS_UNIFORM)
+
+            self._restore_pending_resource_cleanups(operation)
+            fail_on_partial = is_vmss and self._vmss_cleanup_coordinator.has_pending(
+                resource_group=resource_group,
+                resource_ids=resource_ids,
+            )
+
+            result = self._inventory_service.describe_resource_instances(
                 operation=operation,
                 handlers=self.handlers,
                 provider_instance_name=self.provider_instance_name,
                 provider_api=provider_api,
-                provider_api_key=self._provider_api_key(provider_api),
-                resource_group=self._inventory_service.resolve_operation_resource_group(
-                    operation,
-                    self._azure_config.resource_group,
-                ),
+                provider_api_key=provider_api_key,
+                resource_group=resource_group,
                 resource_manager=self.resource_manager,
                 deployment_service=self.deployment_service,
                 resource_metadata_service=self._resource_metadata_service,
-                restore_pending_resource_cleanups=self._restore_pending_resource_cleanups,
-                has_pending_resource_cleanup=self._has_pending_resource_cleanup,
-                maybe_reconcile_pending_resource_cleanup=self._maybe_reconcile_pending_resource_cleanup,
-                pending_resource_cleanup_status_metadata=self._pending_resource_cleanup_status_metadata,
+                fail_on_partial_status_error=fail_on_partial,
             )
+
+            if result.success:
+                instance_details = result.data.get("instances", []) if result.data else []
+                self._vmss_cleanup_coordinator.reconcile(
+                    resource_group=resource_group,
+                    resource_ids=resource_ids,
+                    observed_ids=self._inventory_service.observed_status_ids(instance_details),
+                )
+                if is_vmss:
+                    result.metadata.update(
+                        self._vmss_cleanup_coordinator.status_metadata(
+                            resource_group=resource_group,
+                            resource_ids=resource_ids,
+                        )
+                    )
+
+            return result
 
         except asyncio.CancelledError:
             raise
