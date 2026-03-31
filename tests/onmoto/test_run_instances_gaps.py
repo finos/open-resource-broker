@@ -216,9 +216,7 @@ class TestRunInstancesGaps:
         instances = [i for r in resp["Reservations"] for i in r["Instances"]]
         assert instances, "No instances returned by describe_instances"
 
-        all_tag_keys = {
-            tag["Key"] for instance in instances for tag in instance.get("Tags", [])
-        }
+        all_tag_keys = {tag["Key"] for instance in instances for tag in instance.get("Tags", [])}
         assert "Env" in all_tag_keys
         assert "Project" in all_tag_keys
 
@@ -246,9 +244,7 @@ class TestRunInstancesGaps:
         assert lt_resp["LaunchTemplates"], f"Launch template '{lt_name}' not found"
         lt_id = lt_resp["LaunchTemplates"][0]["LaunchTemplateId"]
 
-        ltv = ec2.describe_launch_template_versions(
-            LaunchTemplateId=lt_id, Versions=["1"]
-        )
+        ltv = ec2.describe_launch_template_versions(LaunchTemplateId=lt_id, Versions=["1"])
         ltd = ltv["LaunchTemplateVersions"][0]["LaunchTemplateData"]
         encoded = ltd.get("UserData", "")
         assert encoded, "UserData not stored in launch template"
@@ -278,9 +274,7 @@ class TestRunInstancesGaps:
         assert lt_resp["LaunchTemplates"], f"Launch template '{lt_name}' not found"
         lt_id = lt_resp["LaunchTemplates"][0]["LaunchTemplateId"]
 
-        ltv = ec2.describe_launch_template_versions(
-            LaunchTemplateId=lt_id, Versions=["1"]
-        )
+        ltv = ec2.describe_launch_template_versions(LaunchTemplateId=lt_id, Versions=["1"])
         ltd = ltv["LaunchTemplateVersions"][0]["LaunchTemplateData"]
         assert ltd.get("KeyName") == "test-key"
 
@@ -307,9 +301,7 @@ class TestRunInstancesGaps:
         assert lt_resp["LaunchTemplates"], f"Launch template '{lt_name}' not found"
         lt_id = lt_resp["LaunchTemplates"][0]["LaunchTemplateId"]
 
-        ltv = ec2.describe_launch_template_versions(
-            LaunchTemplateId=lt_id, Versions=["1"]
-        )
+        ltv = ec2.describe_launch_template_versions(LaunchTemplateId=lt_id, Versions=["1"])
         ltd = ltv["LaunchTemplateVersions"][0]["LaunchTemplateData"]
         iam_profile = ltd.get("IamInstanceProfile", {})
         # The real LT manager strips the ARN to a name; the mock stores the Name key
@@ -410,9 +402,7 @@ class TestRunInstancesGaps:
         # release_hosts on already-terminated instances must not raise
         handler.release_hosts(instance_ids)
 
-    def test_acquire_invalid_subnet_raises(
-        self, aws_client: AWSClient, sg_id: str
-    ) -> None:
+    def test_acquire_invalid_subnet_raises(self, aws_client: AWSClient, sg_id: str) -> None:
         """acquire_hosts raises when the underlying EC2 call fails due to an invalid subnet.
 
         Moto does not validate subnet IDs, so we construct a handler whose LT

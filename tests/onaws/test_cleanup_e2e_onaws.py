@@ -711,9 +711,7 @@ class TestRunInstancesCleanupE2E:
                 f"Expected 0 running instances after return, "
                 f"but {len(still_running)} still running: {still_running}"
             )
-            log.info(
-                "RunInstances cleanup verified: all %d instances terminated", capacity
-            )
+            log.info("RunInstances cleanup verified: all %d instances terminated", capacity)
 
             # 8. Assert launch templates deleted
             _assert_launch_templates_deleted(request_id)

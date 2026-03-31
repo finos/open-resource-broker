@@ -353,9 +353,7 @@ class TestProviderDataResourceType:
 
 
 class TestLaunchTemplateTags:
-    def test_launch_template_created_with_correct_tags_ec2fleet(
-        self, moto_aws, moto_vpc_resources
-    ):
+    def test_launch_template_created_with_correct_tags_ec2fleet(self, moto_aws, moto_vpc_resources):
         """EC2Fleet handler creates a launch template tagged with orb:request-id and orb:managed-by."""
         subnet_id = moto_vpc_resources["subnet_ids"][0]
         sg_id = moto_vpc_resources["sg_id"]
@@ -375,7 +373,9 @@ class TestLaunchTemplateTags:
             Filters=[{"Name": "tag:orb:request-id", "Values": ["cc-lt-fleet-001"]}]
         )
         templates = resp.get("LaunchTemplates", [])
-        assert len(templates) >= 1, "Expected at least one launch template tagged with the request ID"
+        assert len(templates) >= 1, (
+            "Expected at least one launch template tagged with the request ID"
+        )
 
         tags = {t["Key"]: t["Value"] for t in templates[0].get("Tags", [])}
         assert tags.get("orb:request-id") == "cc-lt-fleet-001"
@@ -403,7 +403,9 @@ class TestLaunchTemplateTags:
             Filters=[{"Name": "tag:orb:request-id", "Values": ["cc-lt-run-001"]}]
         )
         templates = resp.get("LaunchTemplates", [])
-        assert len(templates) >= 1, "Expected at least one launch template tagged with the request ID"
+        assert len(templates) >= 1, (
+            "Expected at least one launch template tagged with the request ID"
+        )
 
         tags = {t["Key"]: t["Value"] for t in templates[0].get("Tags", [])}
         assert tags.get("orb:request-id") == "cc-lt-run-001"
