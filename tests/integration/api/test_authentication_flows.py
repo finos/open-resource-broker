@@ -69,6 +69,7 @@ class TestAuthenticationFlows:
         # Create FastAPI app
         app = create_fastapi_app(server_config)
         from unittest.mock import MagicMock
+
         mock_health_port = MagicMock()
         mock_health_port.get_status.return_value = {"status": "healthy"}
         app.dependency_overrides[deps.get_health_check_port] = lambda: mock_health_port

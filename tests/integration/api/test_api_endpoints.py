@@ -50,6 +50,7 @@ class TestAPIEndpoints:
     def auth_client(self):
         """Create test client with authentication."""
         from unittest.mock import MagicMock
+
         server_config = ServerConfig(  # type: ignore[call-arg]
             enabled=True,
             auth=AuthConfig(  # type: ignore[call-arg]
