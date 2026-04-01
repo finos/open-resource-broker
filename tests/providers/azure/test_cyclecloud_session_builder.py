@@ -267,3 +267,41 @@ def test_build_settings_takes_verify_ssl_from_credential_file(tmp_path: Path):
     assert settings.base_url == "https://cc.example.com"
     assert settings.verify_ssl is False
     assert settings.credential_path == str(credential_file)
+
+
+def test_resolve_cascaded_value_skips_blank_values_and_uses_default():
+    builder = CycleCloudSessionBuilder(
+        cc_url=None,
+        verify_ssl=None,
+        template=None,
+        request_context=CycleCloudRequestContext(),
+        provider_cfg=None,
+    )
+
+    resolved = builder._resolve_cascaded_value(None, "", False, default=True)
+
+    assert resolved is False
+
+
+def test_build_settings_resolves_url_from_request_context_before_provider_config():
+    provider_cfg = AzureProviderConfig(
+        region="eastus2",
+        resource_group="orb-test-rg",
+        cyclecloud={
+            "url": "https://provider.example.com",
+            "verify_ssl": True,
+        },
+    )
+    builder = CycleCloudSessionBuilder(
+        cc_url=None,
+        verify_ssl=None,
+        template=None,
+        request_context=CycleCloudRequestContext.from_mapping(
+            {"cyclecloud_url": "https://request.example.com"}
+        ),
+        provider_cfg=provider_cfg,
+    )
+
+    settings = builder.build_settings()
+
+    assert settings.base_url == "https://request.example.com"

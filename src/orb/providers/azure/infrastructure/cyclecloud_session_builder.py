@@ -76,6 +76,17 @@ class CycleCloudSessionBuilder:
             return None
         return self._provider_cfg.cyclecloud
 
+    @staticmethod
+    def _resolve_cascaded_value(
+            *sources: object,
+        default: object = None,
+    ) -> object:
+        """Return the first configured value from the resolution cascade."""
+        for value in sources:
+            if value not in (None, ""):
+                return value
+        return default
+
     def _get_azure_bearer_token(self, scopes: list[str]) -> Optional[str]:
         if self._token_provider is None:
             return None
@@ -91,16 +102,12 @@ class CycleCloudSessionBuilder:
         return None
 
     def _resolve_credential_path(self) -> Optional[str]:
-        credential_path = None
-        if self._template is not None:
-            credential_path = self._template.cyclecloud_credential_path
-        if credential_path in (None, ""):
-            credential_path = self._request_context.cyclecloud_credential_path
-        if credential_path in (None, ""):
-            provider_cyclecloud = self._provider_cyclecloud()
-            credential_path = (
-                None if provider_cyclecloud is None else provider_cyclecloud.credential_path
-            )
+        provider_cyclecloud = self._provider_cyclecloud()
+        credential_path = self._resolve_cascaded_value(
+            None if self._template is None else self._template.cyclecloud_credential_path,
+            self._request_context.cyclecloud_credential_path,
+            None if provider_cyclecloud is None else provider_cyclecloud.credential_path,
+        )
         if credential_path in (None, ""):
             return None
         return str(credential_path)
@@ -109,31 +116,23 @@ class CycleCloudSessionBuilder:
         self,
         credential_data: CycleCloudCredentialData,
     ) -> tuple[str, bool]:
-        resolved_url = self._cc_url
-        if resolved_url in (None, "") and self._template is not None:
-            resolved_url = self._template.cyclecloud_url
-        if resolved_url in (None, ""):
-            resolved_url = self._request_context.cyclecloud_url
-        if resolved_url in (None, ""):
-            provider_cyclecloud = self._provider_cyclecloud()
-            resolved_url = None if provider_cyclecloud is None else provider_cyclecloud.url
-        resolved_url = resolved_url or credential_data.url
+        provider_cyclecloud = self._provider_cyclecloud()
+        resolved_url = self._resolve_cascaded_value(
+            self._cc_url,
+            None if self._template is None else self._template.cyclecloud_url,
+            self._request_context.cyclecloud_url,
+            None if provider_cyclecloud is None else provider_cyclecloud.url,
+            credential_data.url,
+        )
 
-        verify_resolved = self._verify_ssl
-        if verify_resolved is None:
-            if self._template is not None:
-                verify_resolved = self._template.cyclecloud_verify_ssl
-            if verify_resolved in (None, ""):
-                verify_resolved = self._request_context.cyclecloud_verify_ssl
-            if verify_resolved in (None, ""):
-                provider_cyclecloud = self._provider_cyclecloud()
-                verify_resolved = (
-                    None if provider_cyclecloud is None else provider_cyclecloud.verify_ssl
-                )
-        if verify_resolved in (None, ""):
-            verify_resolved = credential_data.verify_ssl
-        if verify_resolved in (None, ""):
-            verify_resolved = True
+        verify_resolved = self._resolve_cascaded_value(
+            self._verify_ssl,
+            None if self._template is None else self._template.cyclecloud_verify_ssl,
+            self._request_context.cyclecloud_verify_ssl,
+            None if provider_cyclecloud is None else provider_cyclecloud.verify_ssl,
+            credential_data.verify_ssl,
+            default=True,
+        )
 
         if not resolved_url:
             raise CycleCloudConnectionError(
@@ -147,15 +146,13 @@ class CycleCloudSessionBuilder:
         self,
         credential_data: CycleCloudCredentialData,
     ) -> Optional[str]:
-        auth_mode = None
-        if self._template is not None:
-            auth_mode = self._template.cyclecloud_auth_mode
-        if auth_mode in (None, ""):
-            auth_mode = self._request_context.cyclecloud_auth_mode
-        if auth_mode in (None, ""):
-            provider_cyclecloud = self._provider_cyclecloud()
-            auth_mode = None if provider_cyclecloud is None else provider_cyclecloud.auth_mode
-        auth_mode = auth_mode or credential_data.auth_mode
+        provider_cyclecloud = self._provider_cyclecloud()
+        auth_mode = self._resolve_cascaded_value(
+            None if self._template is None else self._template.cyclecloud_auth_mode,
+            self._request_context.cyclecloud_auth_mode,
+            None if provider_cyclecloud is None else provider_cyclecloud.auth_mode,
+            credential_data.auth_mode,
+        )
         return str(auth_mode).strip().lower() if auth_mode else None
 
     def _resolve_bearer_token(
@@ -167,15 +164,13 @@ class CycleCloudSessionBuilder:
         if credential_data.bearer_token:
             return str(credential_data.bearer_token)
 
-        aad_scope = None
-        if self._template is not None:
-            aad_scope = self._template.cyclecloud_aad_scope
-        if aad_scope in (None, ""):
-            aad_scope = self._request_context.cyclecloud_aad_scope
-        if aad_scope in (None, ""):
-            provider_cyclecloud = self._provider_cyclecloud()
-            aad_scope = None if provider_cyclecloud is None else provider_cyclecloud.aad_scope
-        aad_scope = aad_scope or credential_data.aad_scope
+        provider_cyclecloud = self._provider_cyclecloud()
+        aad_scope = self._resolve_cascaded_value(
+            None if self._template is None else self._template.cyclecloud_aad_scope,
+            self._request_context.cyclecloud_aad_scope,
+            None if provider_cyclecloud is None else provider_cyclecloud.aad_scope,
+            credential_data.aad_scope,
+        )
 
         parsed = urlparse(base_url)
         host_scope = (

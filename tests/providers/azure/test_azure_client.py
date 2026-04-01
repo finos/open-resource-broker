@@ -263,6 +263,33 @@ class TestAzureClientOperationalBehavior:
             read_timeout=19,
         )
 
+    def test_build_management_client_maps_missing_package_to_configuration_error(self):
+        client = self._build_client()
+
+        with patch(
+            "orb.providers.azure.infrastructure.azure_client.import_module",
+            side_effect=ImportError("missing azure package"),
+        ):
+            with pytest.raises(
+                AzureConfigurationError,
+                match="azure-mgmt-network package is not installed",
+            ):
+                client._build_management_client(
+                    module_path="azure.mgmt.network",
+                    class_name="NetworkManagementClient",
+                    missing_package_message="azure-mgmt-network package is not installed",
+                    requires_subscription_id=True,
+                )
+
+    def test_collect_error_types_deduplicates_base_and_imported_types(self):
+        error_types = AzureClient._collect_error_types(
+            AuthenticationError,
+            AuthenticationError,
+            optional_error_imports=(),
+        )
+
+        assert error_types == (AuthenticationError,)
+
     def test_azure_client_rejects_non_integer_timeout_values(self):
         with pytest.raises(
             AzureConfigurationError,
