@@ -2186,7 +2186,7 @@ def test_partial_return_terminates_instance_only(setup_host_factory_mock_with_sc
         try:
             # Try graceful return first
             return_response = hfm.request_return_machines(remaining_ids)
-            return_request_id = _extract_request_id(return_response)
+            _return_request_id = _extract_request_id(return_response)  # noqa: F841
 
             # Wait for graceful return with timeout
             log.info("3.2: Waiting for graceful return completion (timeout: 120s)")
