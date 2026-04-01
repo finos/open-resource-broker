@@ -1,0 +1,43 @@
+{
+  "scheduler_type": "hostfactory",
+  "templates": [
+    {
+      "templateId": "tpl-new-001",
+      "maxNumber": 1,
+      "imageId": "ami-12345678",
+      "priceType": "ondemand",
+      "name": "new-template",
+      "providerApi": "ec2_fleet",
+      "is_active": true,
+      "subnetId": "subnet-abc"
+    },
+    {
+      "templateId": "tpl-flow-001",
+      "maxNumber": 1,
+      "imageId": "ami-abc",
+      "priceType": "ondemand",
+      "name": "tpl-flow-001",
+      "providerApi": "ec2_fleet",
+      "is_active": true
+    },
+    {
+      "templateId": "tpl-create-use-001",
+      "maxNumber": 1,
+      "imageId": "ami-12345678",
+      "priceType": "ondemand",
+      "name": "lifecycle-template",
+      "providerApi": "ec2_fleet",
+      "is_active": true,
+      "subnetId": "subnet-abc"
+    },
+    {
+      "templateId": "tpl-no-bus",
+      "maxNumber": 1,
+      "imageId": "ami-abc",
+      "priceType": "ondemand",
+      "name": "tpl-no-bus",
+      "providerApi": "ec2_fleet",
+      "is_active": true
+    }
+  ]
+}

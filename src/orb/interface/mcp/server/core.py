@@ -386,7 +386,7 @@ class OpenResourceBrokerMCPServer:
         }
 
     _TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
-        "check_provider_health": {"properties": {}, "required": []},
+        "check_provider_health": {"properties": {"provider": {"type": "string"}}, "required": []},
         "list_providers": {"properties": {}, "required": []},
         "get_provider_config": {"properties": {}, "required": []},
         "get_provider_metrics": {
@@ -395,6 +395,7 @@ class OpenResourceBrokerMCPServer:
         },
         "list_templates": {
             "properties": {
+                "template_id": {"type": "string"},
                 "provider_name": {"type": "string"},
                 "active_only": {"type": "boolean"},
                 "limit": {"type": "integer"},
@@ -434,9 +435,10 @@ class OpenResourceBrokerMCPServer:
         "request_machines": {
             "properties": {
                 "template_id": {"type": "string"},
+                "count": {"type": "integer"},
                 "machine_count": {"type": "integer"},
             },
-            "required": ["template_id", "machine_count"],
+            "required": ["template_id"],
         },
         "list_return_requests": {"properties": {}, "required": []},
         "return_machines": {

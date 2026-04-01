@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from orb.application.ports.scheduler_port import SchedulerPort
 from orb.application.services.orchestration.acquire_machines import AcquireMachinesOrchestrator
@@ -151,3 +151,10 @@ def get_refresh_templates_orchestrator() -> RefreshTemplatesOrchestrator:
 def get_response_formatting_service() -> ResponseFormattingService:
     """Get ResponseFormattingService from DI container."""
     return get_di_container().get(ResponseFormattingService)
+
+
+def get_health_check_port() -> Any:
+    """Get HealthCheckPort from DI container."""
+    from orb.domain.base.ports.health_check_port import HealthCheckPort
+
+    return get_di_container().get(HealthCheckPort)

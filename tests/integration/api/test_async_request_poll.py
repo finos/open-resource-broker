@@ -102,8 +102,8 @@ class TestRequestMachinesAsync:
 
         assert response.status_code == 202
         body = response.json()
-        assert "request_id" in body
-        assert body["request_id"] == fake_request_id
+        assert "requestId" in body
+        assert body["requestId"] == fake_request_id
 
     def test_request_id_has_req_prefix(self, client, machines_orchestrator):
         """requestId in response must start with 'req-'."""
@@ -116,7 +116,7 @@ class TestRequestMachinesAsync:
         )
 
         body = response.json()
-        assert body["request_id"].startswith("req-")
+        assert body["requestId"].startswith("req-")
 
     def test_missing_template_id_returns_error(self, client):
         """Missing templateId must be rejected before reaching the orchestrator."""

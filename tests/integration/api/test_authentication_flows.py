@@ -18,6 +18,10 @@ class TestAuthenticationFlows:
 
     def test_no_auth_flow(self):
         """Test API access with no authentication."""
+        from unittest.mock import MagicMock
+
+        import orb.api.dependencies as deps
+
         # Create server config with no auth
         server_config = ServerConfig(  # type: ignore[call-arg]
             enabled=True,
@@ -26,6 +30,11 @@ class TestAuthenticationFlows:
 
         # Create FastAPI app
         app = create_fastapi_app(server_config)
+
+        mock_health_port = MagicMock()
+        mock_health_port.get_status.return_value = {"status": "healthy"}
+        app.dependency_overrides[deps.get_health_check_port] = lambda: mock_health_port
+
         client = TestClient(app)
 
         # Test health endpoint (should work without auth)

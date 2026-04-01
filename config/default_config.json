@@ -4,7 +4,15 @@
     "type": "default"
   },
   "provider": {
-    "providers": [],
+    "providers": [
+      {
+        "name": "aws-default",
+        "type": "aws",
+        "enabled": true,
+        "weight": 100,
+        "config": {}
+      }
+    ],
     "selection_policy": "FIRST_AVAILABLE",
     "default_provider_type": "aws",
     "health_check_interval": 60,

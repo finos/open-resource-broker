@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 try:
-    from fastapi import FastAPI
+    from fastapi import Depends, FastAPI
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.middleware.trustedhost import TrustedHostMiddleware
     from fastapi.responses import JSONResponse, Response
@@ -12,6 +12,7 @@ try:
     FASTAPI_AVAILABLE = True
 except ImportError:
     FASTAPI_AVAILABLE = False
+    Depends = None  # type: ignore[assignment,misc]
     FastAPI = None  # type: ignore[assignment,misc]
     CORSMiddleware = None  # type: ignore[assignment,misc]
     TrustedHostMiddleware = None  # type: ignore[assignment,misc]
@@ -19,7 +20,7 @@ except ImportError:
     Response = None  # type: ignore[assignment,misc]
 
 if TYPE_CHECKING:
-    from fastapi import FastAPI
+    from fastapi import Depends, FastAPI
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.middleware.trustedhost import TrustedHostMiddleware
     from fastapi.responses import JSONResponse, Response
@@ -162,14 +163,12 @@ def create_fastapi_app(server_config: Any) -> Any:
             )
 
     # Add health check endpoint
-    @app.get("/health", tags=["System"])
-    async def health_check() -> Any:
-        """Health check endpoint."""
-        from orb.domain.base.ports.health_check_port import HealthCheckPort
-        from orb.infrastructure.di.container import get_container
+    from orb.api.dependencies import get_health_check_port
 
+    @app.get("/health", tags=["System"])
+    async def health_check(health_port: Any = Depends(get_health_check_port)) -> Any:  # type: ignore[misc]
+        """Health check endpoint."""
         try:
-            health_port = get_container().get(HealthCheckPort)
             health_port.run_all_checks()
             status = health_port.get_status()
         except Exception:

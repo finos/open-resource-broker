@@ -29,7 +29,7 @@ class MockRequestDTO:
                 status=m.get("status", ""),
                 private_ip_address=m.get("private_ip", ""),
                 public_ip_address=m.get("public_ip"),
-                launch_time=m.get("launch_time_timestamp"),
+                launch_time=m.get("launch_time") or m.get("launch_time_timestamp"),
                 message="",
             )
             self.machine_references.append(machine_ref)
@@ -45,7 +45,7 @@ class MockRequestDTO:
                     "status": m.status,
                     "private_ip": m.private_ip_address,
                     "public_ip": m.public_ip_address,
-                    "launch_time_timestamp": m.launch_time or 0,
+                    "launch_time": m.launch_time or 0,
                 }
                 for m in self.machine_references
             ],
