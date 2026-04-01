@@ -393,20 +393,27 @@ class TestSDKRequestLifecycle:
                         f"machineId {mid!r} does not look like an EC2 instance ID"
                     )
 
-                # 5. Return machines — response must have a message field
+                # 5. Return machines — response must have created_request_ids
                 return_result = await sdk.create_return_request(machine_ids=machine_ids)
                 assert return_result is not None
-
-                fields = _extract_return_result_fields(return_result)
-                assert fields["message"] is not None, (
-                    f"create_return_request response missing 'message' field: {return_result}"
+                created_ids = (
+                    return_result.get("created_request_ids")
+                    if isinstance(return_result, dict)
+                    else getattr(return_result, "created_request_ids", None)
+                )
+                assert created_ids is not None and len(created_ids) > 0, (
+                    f"create_return_request response missing 'created_request_ids' field: {return_result}"
                 )
 
                 # Poll for return completion
                 import asyncio
                 import time
 
-                return_request_id = fields.get("request_id")
+                return_request_id = (
+                    return_result.get("created_request_ids", [None])[0]
+                    if isinstance(return_result, dict)
+                    else None
+                )
                 if return_request_id:
                     deadline = time.time() + 10
                     while time.time() < deadline:
