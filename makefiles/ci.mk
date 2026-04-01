@@ -18,7 +18,7 @@ ci-quality-radon:  ## Run radon complexity analysis
 
 ci-quality-pyright:  ## Run pyright type checking
 	@echo "Running pyright type check..."
-	$(call run-tool,pyright,src/ tests/)
+	$(call run-tool,pyright,)
 
 # Composite target (for local convenience)
 ci-quality: ci-quality-ruff ci-quality-pyright  ## Run all enforced code quality checks

@@ -463,6 +463,11 @@ pythonPlatform = "Linux"
 include = ["src/orb", "tests"]
 exclude = [
     ".venv", "build", "dist",
+    # These tests intentionally import non-existent modules to verify deleted code is gone
+    "tests/unit/test_asg_stack_deleted.py",
+    "tests/unit/application/test_application_comprehensive.py",
+    "tests/unit/infrastructure/test_infrastructure_comprehensive.py",
+    "tests/unit/providers/test_providers_comprehensive.py",
 ]
 extraPaths = ["."]
 typeCheckingMode = "basic"
