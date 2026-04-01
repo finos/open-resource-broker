@@ -530,13 +530,15 @@ class AzureTemplate(Template):
                 )
 
         # Non-spot VMs should not have spot-specific settings
-        if self.priority == AzurePriority.REGULAR:
-            if self.eviction_policy is not None:
-                raise ValueError("eviction_policy is only valid for Spot or Low priority VMs")
-            if self.billing_profile_max_price is not None:
-                raise ValueError(
-                    "billing_profile_max_price is only valid for Spot priority VMs"
-                )
+        if self.priority == AzurePriority.REGULAR and self.eviction_policy is not None:
+            raise ValueError("eviction_policy is only valid for Spot or Low priority VMs")
+        if (
+            self.priority != AzurePriority.SPOT
+            and self.billing_profile_max_price is not None
+        ):
+            raise ValueError(
+                "billing_profile_max_price is only valid for Spot priority VMs"
+            )
 
         # Zone balance requires zones
         if self.zone_balance and not self.zones:
