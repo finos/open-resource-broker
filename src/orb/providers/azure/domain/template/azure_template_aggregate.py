@@ -476,6 +476,9 @@ class AzureTemplate(Template):
     @model_validator(mode="after")
     def validate_azure_template(self) -> "AzureTemplate":
         """Azure-specific template validation."""
+        if self.provider_api_spec and self.provider_api_spec_file:
+            raise ValueError("Cannot specify both provider_api_spec and provider_api_spec_file")
+
         if self.provider_api == AzureProviderApi.VMSS_UNIFORM:
             if self.orchestration_mode != AzureVMSSOrchestrationMode.UNIFORM:
                 raise ValueError(
@@ -590,13 +593,6 @@ class AzureTemplate(Template):
                     "Specify the name of an existing CycleCloud cluster."
                 )
 
-        return self
-
-    @model_validator(mode="after")
-    def validate_native_spec_mutual_exclusion(self) -> "AzureTemplate":
-        """Validate mutual exclusion of inline and file-based provider specs."""
-        if self.provider_api_spec and self.provider_api_spec_file:
-            raise ValueError("Cannot specify both provider_api_spec and provider_api_spec_file")
         return self
 
     @classmethod
