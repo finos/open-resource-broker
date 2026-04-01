@@ -7,7 +7,6 @@ from unittest.mock import MagicMock, Mock, patch
 
 from orb.bootstrap.infrastructure_services import register_infrastructure_services
 from orb.config import PerformanceConfig
-from orb.domain.base.exceptions import ConfigurationError
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.template.factory import TemplateFactory
 from orb.infrastructure.di.container import DIContainer
@@ -22,7 +21,9 @@ from orb.providers.azure.domain.template.value_objects import AzureProviderApi
 from orb.providers.azure.infrastructure.azure_client import AzureClient
 from orb.providers.azure.infrastructure.azure_handler_factory import AzureHandlerFactory
 from orb.providers.azure.registration import (
+    _build_azure_client_runtime_config,
     create_azure_config,
+    create_azure_strategy,
     register_azure_provider,
 )
 from orb.providers.azure.resilience.azure_retry_strategy import (
@@ -296,34 +297,73 @@ class TestAzureHandlerFactory:
     def test_registry_created_strategy_gets_azure_client_resolver(self):
         registry = ProviderRegistry()
         registry.clear_registrations()
-        register_azure_provider(registry=registry)
-
-        azure_config = AzureProviderConfig(
-            subscription_id="12345678-1234-1234-1234-123456789012",
-            resource_group="rg-explicit",
-            region="westeurope",
+        perf_config = PerformanceConfig(
+            enable_batching=False,
+            enable_parallel=False,
+            max_workers=6,
+            caching={"request_status": {"enabled": False, "ttl_seconds": 17}},
         )
         config_port = MagicMock()
-        config_port.get_typed.return_value = azure_config
-        config_port.get_provider_config.return_value = None
-        azure_client = AzureClient(config=config_port, logger=MagicMock())
-        container = MagicMock()
-        container.get.return_value = azure_client
+        config_port.get_typed.side_effect = (
+            lambda config_type: perf_config if config_type is PerformanceConfig else None
+        )
+        register_azure_provider(registry=registry, config_port=config_port)
 
-        with patch("orb.infrastructure.di.container.get_container", return_value=container):
-            strategy = registry.create_strategy(
-                "azure",
-                {
-                    "provider_type": "azure",
-                    "subscription_id": "12345678-1234-1234-1234-123456789012",
-                    "resource_group": "rg-explicit",
-                    "region": "westeurope",
-                },
-            )
+        strategy = registry.create_strategy(
+            "azure",
+            {
+                "provider_type": "azure",
+                "subscription_id": "12345678-1234-1234-1234-123456789012",
+                "resource_group": "rg-explicit",
+                "region": "westeurope",
+            },
+        )
 
-            assert isinstance(strategy.azure_client, AzureClient)
-            assert strategy.azure_client.subscription_id == "12345678-1234-1234-1234-123456789012"
-            assert strategy.azure_client.resource_group == "rg-explicit"
+        assert isinstance(strategy.azure_client, AzureClient)
+        assert strategy.azure_client.subscription_id == "12345678-1234-1234-1234-123456789012"
+        assert strategy.azure_client.resource_group == "rg-explicit"
+        assert strategy.azure_client.perf_config["max_workers"] == 6
+        assert strategy.azure_client.perf_config["cache_ttl"] == 17
+
+    def test_create_azure_strategy_resolves_performance_config_per_strategy_creation(self):
+        perf_configs = [
+            PerformanceConfig(
+                enable_batching=False,
+                enable_parallel=False,
+                max_workers=6,
+                caching={"request_status": {"enabled": False, "ttl_seconds": 17}},
+            ),
+            PerformanceConfig(
+                enable_batching=True,
+                enable_parallel=True,
+                max_workers=9,
+                caching={"request_status": {"enabled": True, "ttl_seconds": 44}},
+            ),
+        ]
+        config_port = MagicMock()
+        config_port.get_typed.side_effect = list(perf_configs)
+        first_strategy = create_azure_strategy(
+            {
+                "subscription_id": "12345678-1234-1234-1234-123456789012",
+                "resource_group": "rg-explicit",
+                "region": "westeurope",
+            },
+            provider_instance_name="azure-test",
+            config_port=config_port,
+        )
+        second_strategy = create_azure_strategy(
+            {
+                "subscription_id": "12345678-1234-1234-1234-123456789012",
+                "resource_group": "rg-explicit",
+                "region": "westeurope",
+            },
+            provider_instance_name="azure-test",
+            config_port=config_port,
+        )
+
+        assert first_strategy.azure_client.perf_config["max_workers"] == 6
+        assert second_strategy.azure_client.perf_config["max_workers"] == 9
+        assert config_port.get_typed.call_count == 2
 
 
 # ---------------------------------------------------------------------------
@@ -381,6 +421,56 @@ class TestAzureRegistration:
 
             assert created is strategy
             mock_create_strategy.assert_called_once()
+
+    def test_build_azure_client_runtime_config_forwards_performance_config(self):
+        azure_config = AzureProviderConfig(
+            subscription_id="12345678-1234-1234-1234-123456789012",
+            resource_group="rg",
+            region="westeurope",
+        )
+        perf_config = PerformanceConfig(
+            enable_batching=False,
+            enable_parallel=False,
+            max_workers=4,
+            caching={"request_status": {"enabled": False, "ttl_seconds": 21}},
+        )
+        fallback_config = Mock()
+        fallback_config.get_typed.side_effect = (
+            lambda config_type: perf_config if config_type is PerformanceConfig else None
+        )
+
+        runtime_config = _build_azure_client_runtime_config(
+            azure_config,
+            logger=Mock(),
+            config_port=fallback_config,
+        )
+
+        assert runtime_config.azure_config is azure_config
+        assert runtime_config.performance_config is perf_config
+        fallback_config.get_typed.assert_called_once_with(PerformanceConfig)
+
+    def test_create_azure_strategy_forwards_runtime_performance_config_to_client(self):
+        perf_config = PerformanceConfig(
+            enable_batching=False,
+            enable_parallel=False,
+            max_workers=4,
+            caching={"request_status": {"enabled": False, "ttl_seconds": 21}},
+        )
+        strategy = create_azure_strategy(
+            {
+                "subscription_id": "12345678-1234-1234-1234-123456789012",
+                "resource_group": "rg",
+                "region": "westeurope",
+            },
+            provider_instance_name="azure-test",
+            performance_config=perf_config,
+        )
+
+        assert strategy.azure_client.perf_config["enable_batching"] is False
+        assert strategy.azure_client.perf_config["enable_parallel"] is False
+        assert strategy.azure_client.perf_config["max_workers"] == 4
+        assert strategy.azure_client.perf_config["enable_caching"] is False
+        assert strategy.azure_client.perf_config["cache_ttl"] == 21
 
 
 # ---------------------------------------------------------------------------

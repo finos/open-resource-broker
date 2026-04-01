@@ -3,7 +3,7 @@
 This module provides an integrated wrapper for Azure SDK interactions with:
 - Lazy initialization of Azure service clients
 - Explicit lifecycle cleanup for owned Azure SDK resources
-- Configuration resolution via ProviderSelectionService / fallback
+- Explicit runtime config assembly before client construction
 - Optional metrics instrumentation
 
 Azure SDK clients wrapped:
@@ -24,12 +24,11 @@ Note:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from threading import RLock
 from typing import TYPE_CHECKING, Any, Optional, Protocol, cast
 
 from orb.config import PerformanceConfig
-from orb.domain.base.exceptions import ConfigurationError
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
 from orb.monitoring.metrics import MetricsCollector
@@ -42,20 +41,6 @@ from orb.providers.azure.infrastructure.credential_factory import (
     AzureCredentialProtocol,
     create_default_azure_credential,
 )
-
-
-class TypedConfigPort(Protocol):
-    """Minimal config interface for AzureClient.
-
-    Only ``get_typed`` is used — the client resolves its
-    ``AzureProviderConfig`` and ``PerformanceConfig`` through this
-    single method.  Implementations include ``AzureInstanceConfigPort``
-    (per-instance shim) and ``ConfigurationManager`` (global).
-    """
-
-    def get_typed(self, config_type: type) -> Any:
-        """Return a configuration object of the requested type."""
-        ...
 
 
 if TYPE_CHECKING:
@@ -158,13 +143,20 @@ class ParsedArmResourceId:
         )
 
 
+@dataclass(frozen=True)
+class AzureClientRuntimeConfig:
+    """Infrastructure-owned config resolved before AzureClient construction."""
+
+    azure_config: AzureProviderConfig
+    performance_config: PerformanceConfig = field(default_factory=PerformanceConfig)
+
+
 @injectable
 class AzureClient:
     """Wrapper for Azure API interactions.
 
-    * Configuration is resolved once during ``__init__`` via
-      a config port shim (``AzureInstanceConfigPort``) injected at
-      construction time.
+    * Provider and shared runtime config are resolved before construction
+      and passed in as a typed infrastructure object.
     * Azure SDK management clients are created **lazily** on first access
       through ``@property`` accessors, keeping startup cost near zero.
     * An optional :class:`MetricsCollector` can be injected for API-call
@@ -173,52 +165,44 @@ class AzureClient:
 
     def __init__(
         self,
-        config: TypedConfigPort,
+        runtime_config: AzureClientRuntimeConfig,
         logger: LoggingPort,
         metrics: Optional[MetricsCollector] = None,
     ) -> None:
         """Initialise the Azure client wrapper.
 
         Args:
-            config: Configuration port for accessing provider settings.
+            runtime_config: Fully resolved Azure client runtime settings.
             logger: Logger for diagnostic and operational messages.
             metrics: Optional metrics collector for Azure API instrumentation.
         """
-        self._config_manager = config
+        self._runtime_config = runtime_config
         self._logger = logger
-        self._azure_config: Optional[AzureProviderConfig] = None
-        self._azure_config_loaded = False
-
-        # Resolve provider configuration (region, subscription, auth, timeouts…)
-        azure_provider_config = self._get_selected_azure_provider_config()
+        self._azure_config = runtime_config.azure_config
 
         self.region_name: str = (
-            azure_provider_config.region if azure_provider_config and azure_provider_config.region else "eastus2"
+            self._azure_config.region if self._azure_config.region else "eastus2"
         )
-        self.subscription_id: Optional[str] = (
-            azure_provider_config.subscription_id if azure_provider_config else None
-        )
-        self.resource_group: Optional[str] = (
-            azure_provider_config.resource_group if azure_provider_config else None
-        )
+        self.subscription_id: Optional[str] = self._azure_config.subscription_id
+        self.resource_group: Optional[str] = self._azure_config.resource_group
 
         self._logger.debug("Azure client region determined: %s", self.region_name)
 
         max_retries = self._resolve_int_config_value(
             field_name="max_retries",
-            raw_value=azure_provider_config.max_retries if azure_provider_config else None,
+            raw_value=self._azure_config.max_retries,
             default=3,
             minimum=0,
         )
         connect_timeout = self._resolve_int_config_value(
             field_name="connect_timeout",
-            raw_value=azure_provider_config.connect_timeout if azure_provider_config else None,
+            raw_value=self._azure_config.connect_timeout,
             default=30,
             minimum=1,
         )
         read_timeout = self._resolve_int_config_value(
             field_name="read_timeout",
-            raw_value=azure_provider_config.read_timeout if azure_provider_config else None,
+            raw_value=self._azure_config.read_timeout,
             default=60,
             minimum=1,
         )
@@ -227,8 +211,7 @@ class AzureClient:
         self._connect_timeout = connect_timeout
         self._read_timeout = read_timeout
 
-        # Load performance configuration
-        self.perf_config = self._load_performance_config()
+        self.perf_config = self._map_performance_config(runtime_config.performance_config)
 
         # Lazy Azure SDK client slots
         self._credential: Optional[AzureCredentialProtocol] = None
@@ -263,40 +246,9 @@ class AzureClient:
             read_timeout,
         )
 
-    # ------------------------------------------------------------------
-    # Configuration resolution
-    # ------------------------------------------------------------------
-
-    def _get_selected_azure_provider_config(self) -> Optional[AzureProviderConfig]:
-        """Resolve the active Azure provider configuration.
-
-        All construction paths (DI factory and ``create_azure_strategy``)
-        wrap the already-resolved ``AzureProviderConfig`` in an
-        ``_AzureInstanceConfigPort`` shim before passing it here.
-        ``get_typed(AzureProviderConfig)`` returns the config directly —
-        no discovery or selection is needed.
-
-        The result is cached after the first call.
-        """
-        if self._azure_config_loaded:
-            return self._azure_config
-
-        self._azure_config_loaded = True
-
-        try:
-            self._azure_config = self._config_manager.get_typed(AzureProviderConfig)
-        except ConfigurationError as exc:
-            self._logger.debug("Could not load Azure provider config: %s", exc)
-            return None
-
-        if self._azure_config is not None:
-            self._logger.debug("Loaded Azure provider config via configuration port")
-
-        return self._azure_config
-
     def get_provider_config(self) -> Optional[AzureProviderConfig]:
         """Return the active Azure provider configuration, if available."""
-        return self._get_selected_azure_provider_config()
+        return self._azure_config
 
     # ------------------------------------------------------------------
     # Credential management
@@ -767,27 +719,6 @@ class AzureClient:
             }
         )
         return performance_settings
-
-    def _load_performance_config(self) -> dict[str, Any]:
-        """Load performance configuration from the configuration port."""
-        try:
-            perf_config = self._config_manager.get_typed(PerformanceConfig)
-        except ConfigurationError as exc:
-            self._logger.debug(
-                "Could not load performance config from ConfigurationManager: %s",
-                exc,
-            )
-            return self._default_performance_config()
-
-        if not isinstance(perf_config, PerformanceConfig):
-            self._logger.debug(
-                "Ignoring unexpected performance config type: %s",
-                type(perf_config).__name__,
-            )
-            return self._default_performance_config()
-
-        self._logger.debug("Loaded performance configuration from ConfigurationManager")
-        return self._map_performance_config(perf_config)
 
     # ------------------------------------------------------------------
     # Internal helpers

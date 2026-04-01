@@ -9,13 +9,15 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from orb.config import PerformanceConfig
-from orb.domain.base.exceptions import ConfigurationError
 from orb.providers.azure.configuration.config import AzureProviderConfig
 from orb.providers.azure.exceptions.azure_exceptions import (
     AuthenticationError,
     AzureConfigurationError,
 )
-from orb.providers.azure.infrastructure.azure_client import AzureClient
+from orb.providers.azure.infrastructure.azure_client import (
+    AzureClient,
+    AzureClientRuntimeConfig,
+)
 
 
 class TestAzureAuthStrategy:
@@ -77,18 +79,26 @@ class TestAzureAuthStrategy:
 
 class TestAzureClientOperationalBehavior:
     @staticmethod
-    def _build_client(logger: MagicMock | None = None) -> AzureClient:
-        config_port = MagicMock()
-        config_port.get_typed.side_effect = lambda config_type: (
-            AzureProviderConfig(
+    def _build_runtime_config(
+        azure_config: AzureProviderConfig | None = None,
+        perf_config: PerformanceConfig | None = None,
+    ) -> AzureClientRuntimeConfig:
+        return AzureClientRuntimeConfig(
+            azure_config=azure_config
+            or AzureProviderConfig(
                 subscription_id="12345678-1234-1234-1234-123456789012",
                 resource_group="rg-explicit",
                 region="westeurope",
-            )
-            if config_type is AzureProviderConfig
-            else PerformanceConfig()
+            ),
+            performance_config=perf_config or PerformanceConfig(),
         )
-        return AzureClient(config=config_port, logger=logger or MagicMock())
+
+    @classmethod
+    def _build_client(cls, logger: MagicMock | None = None) -> AzureClient:
+        return AzureClient(
+            runtime_config=cls._build_runtime_config(),
+            logger=logger or MagicMock(),
+        )
 
     @staticmethod
     def _build_partial_client() -> AzureClient:
@@ -107,26 +117,16 @@ class TestAzureClientOperationalBehavior:
         client._subscription_client = None
         return client
 
-    def test_azure_client_uses_typed_config_when_active_provider_is_not_azure(self):
+    def test_azure_client_uses_explicit_runtime_config(self):
         azure_config = AzureProviderConfig(
             subscription_id="12345678-1234-1234-1234-123456789012",
             resource_group="rg-explicit",
             region="westeurope",
         )
-        config_port = MagicMock()
-        config_port.get_typed.return_value = azure_config
-        config_port.get_provider_config.return_value = None
-
-        selection_service = MagicMock()
-        selection_service.select_active_provider.return_value = MagicMock(
-            provider_type="aws",
-            provider_instance="aws-default",
+        client = AzureClient(
+            runtime_config=self._build_runtime_config(azure_config=azure_config),
+            logger=MagicMock(),
         )
-        container = MagicMock()
-        container.get.return_value = selection_service
-
-        with patch("orb.infrastructure.di.container.get_container", return_value=container):
-            client = AzureClient(config=config_port, logger=MagicMock())
 
         assert client.subscription_id == azure_config.subscription_id
         assert client.resource_group == "rg-explicit"
@@ -139,11 +139,10 @@ class TestAzureClientOperationalBehavior:
             region="westeurope",
             client_id="managed-identity-client-id",
         )
-        config_port = MagicMock()
-        config_port.get_typed.return_value = azure_config
-        config_port.get_provider_config.return_value = None
-
-        client = AzureClient(config=config_port, logger=MagicMock())
+        client = AzureClient(
+            runtime_config=self._build_runtime_config(azure_config=azure_config),
+            logger=MagicMock(),
+        )
 
         fake_identity = types.ModuleType("azure.identity")
         fake_ctor = MagicMock(return_value=MagicMock())
@@ -168,11 +167,10 @@ class TestAzureClientOperationalBehavior:
             resource_group="rg-explicit",
             region="westeurope",
         )
-        config_port = MagicMock()
-        config_port.get_typed.return_value = azure_config
-        config_port.get_provider_config.return_value = None
-
-        client = AzureClient(config=config_port, logger=MagicMock())
+        client = AzureClient(
+            runtime_config=self._build_runtime_config(azure_config=azure_config),
+            logger=MagicMock(),
+        )
 
         fake_identity = types.ModuleType("azure.identity")
         fake_ctor = MagicMock(return_value=MagicMock())
@@ -198,11 +196,10 @@ class TestAzureClientOperationalBehavior:
             connect_timeout=11,
             read_timeout=22,
         )
-        config_port = MagicMock()
-        config_port.get_typed.return_value = azure_config
-        config_port.get_provider_config.return_value = None
-
-        client = AzureClient(config=config_port, logger=MagicMock())
+        client = AzureClient(
+            runtime_config=self._build_runtime_config(azure_config=azure_config),
+            logger=MagicMock(),
+        )
         fake_credential = MagicMock()
         client._credential = fake_credential
 
@@ -237,11 +234,10 @@ class TestAzureClientOperationalBehavior:
             connect_timeout=9,
             read_timeout=19,
         )
-        config_port = MagicMock()
-        config_port.get_typed.return_value = azure_config
-        config_port.get_provider_config.return_value = None
-
-        client = AzureClient(config=config_port, logger=MagicMock())
+        client = AzureClient(
+            runtime_config=self._build_runtime_config(azure_config=azure_config),
+            logger=MagicMock(),
+        )
         fake_credential = MagicMock()
         client._credential = fake_credential
 
@@ -268,40 +264,44 @@ class TestAzureClientOperationalBehavior:
         )
 
     def test_azure_client_rejects_non_integer_timeout_values(self):
-        config_port = MagicMock()
-        config_port.get_typed.return_value = types.SimpleNamespace(
-            subscription_id="12345678-1234-1234-1234-123456789012",
-            resource_group="rg-explicit",
-            region="westeurope",
-            max_retries=3,
-            connect_timeout="fast",
-            read_timeout=22,
-        )
-        config_port.get_provider_config.return_value = None
-
         with pytest.raises(
             AzureConfigurationError,
             match=r"connect_timeout.*must be an integer",
         ):
-            AzureClient(config=config_port, logger=MagicMock())
+            AzureClient(
+                runtime_config=AzureClientRuntimeConfig(
+                    azure_config=types.SimpleNamespace(
+                        subscription_id="12345678-1234-1234-1234-123456789012",
+                        resource_group="rg-explicit",
+                        region="westeurope",
+                        max_retries=3,
+                        connect_timeout="fast",
+                        read_timeout=22,
+                    ),
+                    performance_config=PerformanceConfig(),
+                ),
+                logger=MagicMock(),
+            )
 
     def test_azure_client_rejects_timeout_values_below_minimum(self):
-        config_port = MagicMock()
-        config_port.get_typed.return_value = types.SimpleNamespace(
-            subscription_id="12345678-1234-1234-1234-123456789012",
-            resource_group="rg-explicit",
-            region="westeurope",
-            max_retries=3,
-            connect_timeout=0,
-            read_timeout=22,
-        )
-        config_port.get_provider_config.return_value = None
-
         with pytest.raises(
             AzureConfigurationError,
             match=r"connect_timeout.*must be >= 1",
         ):
-            AzureClient(config=config_port, logger=MagicMock())
+            AzureClient(
+                runtime_config=AzureClientRuntimeConfig(
+                    azure_config=types.SimpleNamespace(
+                        subscription_id="12345678-1234-1234-1234-123456789012",
+                        resource_group="rg-explicit",
+                        region="westeurope",
+                        max_retries=3,
+                        connect_timeout=0,
+                        read_timeout=22,
+                    ),
+                    performance_config=PerformanceConfig(),
+                ),
+                logger=MagicMock(),
+            )
 
     def test_azure_client_maps_typed_performance_config(self):
         azure_config = AzureProviderConfig(
@@ -315,12 +315,13 @@ class TestAzureClientOperationalBehavior:
             max_workers=3,
             caching={"request_status": {"enabled": False, "ttl_seconds": 42}},
         )
-        config_port = MagicMock()
-        config_port.get_typed.side_effect = lambda config_type: (
-            azure_config if config_type is AzureProviderConfig else perf_config
+        client = AzureClient(
+            runtime_config=self._build_runtime_config(
+                azure_config=azure_config,
+                perf_config=perf_config,
+            ),
+            logger=MagicMock(),
         )
-
-        client = AzureClient(config=config_port, logger=MagicMock())
 
         assert client.perf_config["enable_batching"] is False
         assert client.perf_config["enable_parallel"] is False
@@ -333,24 +334,19 @@ class TestAzureClientOperationalBehavior:
             "describe_vms": 25,
         }
 
-    def test_azure_client_falls_back_to_default_performance_config_on_config_error(self):
+    def test_azure_client_uses_default_performance_config_when_not_overridden(self):
         azure_config = AzureProviderConfig(
             subscription_id="12345678-1234-1234-1234-123456789012",
             resource_group="rg-explicit",
             region="westeurope",
         )
-        config_port = MagicMock()
-
-        def get_typed(config_type):
-            if config_type is AzureProviderConfig:
-                return azure_config
-            if config_type is PerformanceConfig:
-                raise ConfigurationError("perf config missing")
-            raise AssertionError(f"unexpected config type {config_type}")
-
-        config_port.get_typed.side_effect = get_typed
-
-        client = AzureClient(config=config_port, logger=MagicMock())
+        client = AzureClient(
+            runtime_config=self._build_runtime_config(
+                azure_config=azure_config,
+                perf_config=PerformanceConfig(),
+            ),
+            logger=MagicMock(),
+        )
 
         assert client.perf_config["enable_batching"] is True
         assert client.perf_config["enable_parallel"] is True
