@@ -2067,7 +2067,9 @@ def test_partial_return_terminates_instance_only(setup_host_factory_mock_with_sc
     machines = status_response["requests"][0]["machines"]
     machine_ids = [m.get("machineId") or m.get("machine_id") for m in machines]
     if len(machine_ids) < 2:
-        pytest.skip(f"Only {len(machine_ids)} physical instance(s) provisioned (weighted capacity scenario) — need 2+ for partial return test")
+        pytest.skip(
+            f"Only {len(machine_ids)} physical instance(s) provisioned (weighted capacity scenario) — need 2+ for partial return test"
+        )
     log.info("Provisioned %d instances: %s", len(machine_ids), machine_ids)
 
     # === STEP 2: PARTIAL RETURN AND VERIFICATION ===
