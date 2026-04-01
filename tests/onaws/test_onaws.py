@@ -1667,14 +1667,11 @@ def test_get_available_templates_with_overrides(setup_host_factory_mock):
         pytest.fail(f"JSON validation failed: {e}")
 
 
-def _partial_return_cases():
-    """Pick maintain/request fleets and ASG scenarios with capacity > 1.
+def _partial_return_capacity_cases():
+    """Pick maintain fleets and ASG scenarios with capacity > 1.
 
     For maintain fleets (EC2Fleet, SpotFleet) and ASGs, a partial return should
     reduce the backing resource's target capacity.
-
-    For request fleets (EC2Fleet, SpotFleet), returning one instance should NOT
-    cancel the fleet — the remaining instances must stay running.
     """
     if not scenarios.RUN_PARTIAL_RETURN_TESTS:
         return []
@@ -1689,15 +1686,34 @@ def _partial_return_cases():
             cases.append(tc)
         elif provider_api == "ASG":
             cases.append(tc)
-        # request fleet type: return 1 instance, assert fleet is NOT cancelled
-        elif provider_api in ("EC2Fleet", "SpotFleet") and str(fleet_type).lower() == "request":
+    return cases
+
+
+def _partial_return_fire_and_forget_cases():
+    """Pick request fleets and RunInstances scenarios with capacity > 1.
+
+    For request fleets (EC2Fleet, SpotFleet) and RunInstances, a partial return
+    should terminate the instance but leave the fleet intact and capacity unchanged.
+    """
+    if not scenarios.RUN_PARTIAL_RETURN_TESTS:
+        return []
+    cases = []
+    for tc in scenarios.get_test_cases():
+        provider_api = tc.get("overrides", {}).get("providerApi") or tc.get("providerApi")
+        fleet_type = tc.get("overrides", {}).get("fleetType")
+        capacity = tc.get("capacity_to_request", 0)
+        if capacity <= 1:
+            continue
+        if provider_api in ("EC2Fleet", "SpotFleet") and str(fleet_type).lower() == "request":
+            cases.append(tc)
+        elif provider_api == "RunInstances":
             cases.append(tc)
     return cases
 
 
 @pytest.mark.aws
 @pytest.mark.slow
-@pytest.mark.parametrize("test_case", _partial_return_cases(), ids=lambda tc: tc["test_name"])
+@pytest.mark.parametrize("test_case", _partial_return_capacity_cases(), ids=lambda tc: tc["test_name"])
 def test_partial_return_reduces_capacity(setup_host_factory_mock_with_scenario, test_case):
     """
     Test partial return of instances to ensure maintain capacity drops correctly.
@@ -1936,6 +1952,282 @@ def test_partial_return_reduces_capacity(setup_host_factory_mock_with_scenario, 
                     )
         else:
             log.info("✅ All resources successfully cleaned up")
+
+    else:
+        log.info("3.1: No remaining instances to clean up")
+
+    log.info("=== TEST COMPLETED SUCCESSFULLY ===")
+
+
+@pytest.mark.aws
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "test_case", _partial_return_fire_and_forget_cases(), ids=lambda tc: tc["test_name"]
+)
+def test_partial_return_terminates_instance_only(
+    setup_host_factory_mock_with_scenario, test_case
+):
+    """
+    Test partial return of instances for request fleets and RunInstances.
+
+    For request fleets (EC2Fleet, SpotFleet) and RunInstances, returning one instance
+    should terminate that instance but leave the fleet intact and capacity unchanged.
+
+    Steps:
+    1. Provision multiple instances using a request fleet or RunInstances
+    2. Return one instance and verify it is terminated
+    3. Verify remaining instances are still running
+    4. Verify fleet is NOT deleted and capacity is unchanged
+    5. Clean up remaining instances
+    """
+    log.info("=== STEP 0: Test Setup ===")
+    log.info("Partial return (fire-and-forget) test: %s", test_case["test_name"])
+
+    hfm = setup_host_factory_mock_with_scenario
+
+    provider_api = test_case.get("overrides", {}).get("providerApi") or test_case.get("providerApi")
+    fleet_type = (test_case.get("overrides", {}).get("fleetType") or "").lower()
+    is_run_instances = provider_api == "RunInstances"
+    # Instant fleets are deleted by AWS immediately after fulfillment
+    is_instant_fleet = fleet_type == "instant"
+
+    log.info("=== STEP 1: Provision Instances ===")
+
+    # 1.1: Get available templates
+    log.info("1.1: Retrieving available templates")
+    templates_response = hfm.get_available_templates()
+    log.debug("Templates response: %s", json.dumps(templates_response, indent=2))
+
+    # 1.2: Find target template
+    log.info("1.2: Finding target template")
+    template_id = test_case.get("template_id") or test_case["test_name"]
+    template_json = next(
+        (
+            template
+            for template in templates_response["templates"]
+            if template.get("templateId") == template_id
+            or template.get("template_id") == template_id
+        ),
+        None,
+    )
+    if template_json is None:
+        pytest.fail(f"Template {template_id} not found for partial return test")
+    log.info("Found template: %s", template_id)
+
+    # 1.3: Request instances
+    log.info("1.3: Requesting %d instances", test_case["capacity_to_request"])
+    scheduler_type = get_scheduler_from_scenario(test_case)
+
+    request_response = hfm.request_machines(
+        template_json.get("templateId") or template_json.get("template_id"),
+        test_case["capacity_to_request"],
+    )
+    parse_and_print_output(request_response)
+
+    # 1.4: Validate request response
+    log.info("1.4: Validating request response")
+    request_machines_schema = _resolve_request_machines_schema(request_response, scheduler_type)
+    try:
+        validate_json_schema(instance=request_response, schema=request_machines_schema)
+    except ValidationError as e:
+        pytest.fail(
+            f"JSON validation failed for request_machines response json ({scheduler_type} scheduler): {e}"
+        )
+
+    request_id = request_response.get("requestId") or request_response.get("request_id")
+    if "error" in request_response:
+        pytest.fail(
+            f"request_machines returned an error: {request_response['error']}. Full response: {request_response}"
+        )
+    if not request_id:
+        pytest.fail(f"Request ID missing in response: {json.dumps(request_response, indent=2)}")
+    assert REQUEST_ID_RE.match(request_id), (
+        f"request_id {request_id!r} does not match expected format"
+    )
+
+    # 1.5: Wait for provisioning completion
+    log.info("1.5: Waiting for provisioning completion (request_id: %s)", request_id)
+    log.info("Provider API: %s", provider_api)
+
+    status_response = _wait_for_request_completion(hfm, request_id, scheduler_type)
+    _check_request_machines_response_status(status_response)
+    _check_all_ec2_hosts_are_being_provisioned(status_response)
+
+    returned_id = status_response.get("requests", [{}])[0].get("request_id") or status_response.get(
+        "requests", [{}]
+    )[0].get("requestId")
+    assert returned_id == request_id, (
+        f"Status response echoed {returned_id!r}, expected {request_id!r}"
+    )
+
+    log.debug("Final provisioning status: %s", json.dumps(status_response, indent=2))
+
+    # 1.6: Extract provisioned instances
+    log.info("1.6: Extracting provisioned instance information")
+    machines = status_response["requests"][0]["machines"]
+    machine_ids = [m.get("machineId") or m.get("machine_id") for m in machines]
+    assert len(machine_ids) >= 2, "Partial return test requires capacity > 1"
+    log.info("Provisioned %d instances: %s", len(machine_ids), machine_ids)
+
+    # === STEP 2: PARTIAL RETURN AND VERIFICATION ===
+    log.info("=== STEP 2: Partial Return and Verification ===")
+
+    # 2.1: Identify target instance and backing resource
+    log.info("2.1: Identifying target instance and backing resource")
+    first_instance = machine_ids[0]
+    log.info("Target instance for partial return: %s", first_instance)
+
+    resource_ids_from_response = status_response["requests"][0].get("resource_ids") or []
+    resource_id = resource_ids_from_response[0] if resource_ids_from_response else None
+    if not resource_id and not is_run_instances:
+        resource_id = _get_resource_id_from_instance(first_instance, provider_api)
+    if not resource_id and not is_run_instances:
+        pytest.skip(f"Could not determine backing resource for instance {first_instance}")
+    log.info("Backing resource ID: %s", resource_id)
+
+    # 2.2: Record initial capacity (skip for RunInstances — no fleet to query)
+    capacity_before = None
+    if not is_run_instances and resource_id:
+        log.info("2.2: Recording initial capacity")
+        capacity_before = _get_capacity(provider_api, resource_id)
+        log.info("Initial capacity: %d", capacity_before)
+    else:
+        log.info("2.2: Skipping capacity check (RunInstances)")
+
+    # 2.3: Return single instance
+    log.info("2.3: Returning single instance: %s", first_instance)
+    return_response = hfm.request_return_machines([first_instance])
+    log.debug("Return response: %s", json.dumps(return_response, indent=2))
+
+    return_request_id = _extract_request_id(return_response)
+    if not return_request_id:
+        log.warning("Return request ID missing; proceeding with status polling by machine id only")
+
+    # 2.4: Wait for return completion
+    log.info("2.4: Waiting for return completion")
+    _wait_for_return_completion(hfm, [first_instance], return_request_id)
+
+    # 2.5: Verify instance termination
+    log.info("2.5: Verifying instance termination")
+    terminate_start = time.time()
+    while True:
+        state_info = get_instance_state(first_instance)
+        if not state_info["exists"] or state_info["state"] in ["terminated", "shutting-down"]:
+            log.info("Instance %s successfully terminated/terminating", first_instance)
+            break
+        if time.time() - terminate_start > MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC:
+            pytest.fail(f"Instance {first_instance} failed to terminate in time")
+        time.sleep(1)
+
+    # 2.6: Verify remaining instances are still running
+    log.info("2.6: Verifying remaining instances are still running")
+    remaining_ids = machine_ids[1:]
+    for instance_id in remaining_ids:
+        state_info = get_instance_state(instance_id)
+        assert state_info["exists"] and state_info["state"] in ["running", "pending"], (
+            f"Instance {instance_id} expected to be running but is in state: {state_info['state']}"
+        )
+    log.info("All %d remaining instances are still running", len(remaining_ids))
+
+    # 2.7: Verify capacity is unchanged (skip for RunInstances and instant fleets)
+    if not is_run_instances and not is_instant_fleet and resource_id and capacity_before is not None:
+        log.info("2.7: Verifying capacity is unchanged")
+        capacity_after = _get_capacity(provider_api, resource_id)
+        log.info("Capacity after return: %d (expected: %d)", capacity_after, capacity_before)
+        assert capacity_after == capacity_before, (
+            f"Expected capacity to remain {capacity_before}, got {capacity_after}"
+        )
+    else:
+        log.info("2.7: Skipping capacity unchanged check (RunInstances or instant fleet)")
+
+    # 2.8: Verify fleet is NOT deleted (skip for RunInstances and instant fleets)
+    ec2_client, _ = _get_boto_clients()
+    if not is_run_instances and not is_instant_fleet and resource_id:
+        log.info("2.8: Verifying fleet is not deleted")
+        if resource_id.startswith("sfr-"):
+            resp = ec2_client.describe_spot_fleet_requests(SpotFleetRequestIds=[resource_id])
+            configs = resp.get("SpotFleetRequestConfigs") or []
+            assert configs, f"SpotFleet {resource_id} not found after partial return"
+            state = (configs[0].get("SpotFleetRequestState") or "").lower()
+            assert state not in ("cancelled", "cancelled_running", "cancelled_terminating", "failed"), (
+                f"SpotFleet {resource_id} entered unexpected state after partial return: {state}"
+            )
+            log.info("SpotFleet %s is still active (state: %s)", resource_id, state)
+        elif resource_id.startswith("fleet-"):
+            resp = ec2_client.describe_fleets(FleetIds=[resource_id])
+            fleets = resp.get("Fleets") or []
+            assert fleets, f"EC2Fleet {resource_id} not found after partial return"
+            state = (fleets[0].get("FleetState") or "").lower()
+            assert state not in ("deleted", "deleted_running", "deleted_terminating"), (
+                f"EC2Fleet {resource_id} entered deleted state after partial return: {state}"
+            )
+            log.info("EC2Fleet %s is still active (state: %s)", resource_id, state)
+    else:
+        log.info("2.8: Skipping fleet existence check (RunInstances or instant fleet)")
+
+    # === STEP 3: CLEANUP REMAINING INSTANCES ===
+    log.info("=== STEP 3: Cleanup Remaining Instances ===")
+
+    if remaining_ids:
+        log.info(
+            "3.1: Attempting graceful termination of remaining %d instances: %s",
+            len(remaining_ids),
+            remaining_ids,
+        )
+
+        try:
+            # Try graceful return first
+            return_response = hfm.request_return_machines(remaining_ids)
+            return_request_id = _extract_request_id(return_response)
+
+            # Wait for graceful return with timeout
+            log.info("3.2: Waiting for graceful return completion (timeout: 120s)")
+            graceful_start = time.time()
+            graceful_completed = False
+
+            while time.time() - graceful_start < 120:  # 2 minute timeout for graceful return
+                if _check_all_ec2_hosts_are_being_terminated(remaining_ids):
+                    log.info("Graceful return completed successfully")
+                    graceful_completed = True
+                    break
+                time.sleep(10)
+
+            if not graceful_completed:
+                log.warning("Graceful return timed out, proceeding with force cleanup")
+
+        except Exception as e:
+            log.warning("Graceful return failed: %s, proceeding with force cleanup", e)
+
+        # For ASG resources, use comprehensive cleanup
+        if provider_api == "ASG" or (provider_api and "asg" in provider_api.lower()):
+            log.info("3.3: Performing comprehensive ASG cleanup")
+            _cleanup_asg_resources(remaining_ids, provider_api)
+        else:
+            # For non-ASG resources, wait for standard termination
+            log.info("3.3: Waiting for standard termination completion")
+            cleanup_start = time.time()
+            while time.time() - cleanup_start < 300:  # 5 minute timeout
+                if _check_all_ec2_hosts_are_being_terminated(remaining_ids):
+                    log.info("All remaining instances terminated successfully")
+                    break
+                time.sleep(10)
+            else:
+                log.warning("Some instances may not have terminated within timeout")
+
+        # Final verification
+        log.info("3.4: Verifying complete resource cleanup")
+        cleanup_verified = _verify_all_resources_cleaned(remaining_ids, resource_id, provider_api)
+
+        if not cleanup_verified:
+            log.error("Cleanup verification failed - some resources may still exist")
+            for instance_id in remaining_ids:
+                state_info = get_instance_state(instance_id)
+                if state_info["exists"]:
+                    log.error(
+                        "Instance %s still exists in state: %s", instance_id, state_info["state"]
+                    )
+        else:
+            log.info("All resources successfully cleaned up")
 
     else:
         log.info("3.1: No remaining instances to clean up")
