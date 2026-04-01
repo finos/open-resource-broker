@@ -9,7 +9,6 @@ from typing import Any
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
-from orb.providers.azure.infrastructure.services.arm_payload_mapper import ArmPayloadMapper
 
 
 @injectable
@@ -32,11 +31,6 @@ class AzureTemplateAdapter:
     def template_to_dict(template: AzureTemplate) -> dict[str, Any]:
         """Serialise an ``AzureTemplate`` to a plain dict."""
         return template.model_dump(mode="json", by_alias=False, exclude_none=True)
-
-    @staticmethod
-    def template_to_arm(template: AzureTemplate) -> dict[str, Any]:
-        """Serialise an ``AzureTemplate`` to the ARM resource payload."""
-        return ArmPayloadMapper.vmss_payload(template)
 
     def validate_template_data(self, template_data: dict[str, Any]) -> dict[str, Any]:
         """Validate template data by attempting to construct the aggregate.

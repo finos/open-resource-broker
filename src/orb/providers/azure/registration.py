@@ -8,7 +8,6 @@ DI container.
 from typing import TYPE_CHECKING, Any, Optional
 
 from orb.config import PerformanceConfig
-from orb.providers.azure.infrastructure.azure_client_factory import AzureClientFactory
 
 if TYPE_CHECKING:
     from orb.domain.base.ports import LoggingPort
@@ -19,12 +18,29 @@ from orb.domain.template.factory import TemplateFactory
 from orb.providers.azure.configuration.template_extension import AzureTemplateExtensionConfig
 
 
-def _create_azure_client(
-    runtime_config: Any,
+def _resolve_performance_config(
+    config_port: Any,
     logger: Any,
-) -> Any:
-    """Construct an ``AzureClient`` from explicit runtime config."""
-    return AzureClientFactory.create_client(runtime_config, logger)
+) -> PerformanceConfig:
+    """Resolve shared performance config, falling back to defaults."""
+    if config_port is None:
+        logger.debug("No shared config port available; using default Azure performance config")
+        return PerformanceConfig()
+
+    try:
+        perf_config = config_port.get_typed(PerformanceConfig)
+    except Exception as exc:
+        logger.debug("Could not load performance config from shared config port: %s", exc)
+        return PerformanceConfig()
+
+    if not isinstance(perf_config, PerformanceConfig):
+        logger.debug(
+            "Ignoring unexpected performance config type from shared config port: %s",
+            type(perf_config).__name__,
+        )
+        return PerformanceConfig()
+
+    return perf_config
 
 
 def _build_azure_client_runtime_config(
@@ -35,12 +51,23 @@ def _build_azure_client_runtime_config(
     config_port: Any = None,
 ) -> Any:
     """Assemble the explicit runtime config owned by Azure infrastructure."""
-    return AzureClientFactory.build_runtime_config(
-        azure_config,
-        logger,
-        performance_config=performance_config,
-        config_port=config_port,
+    from orb.providers.azure.infrastructure.azure_client import AzureClientRuntimeConfig
+
+    resolved = performance_config or _resolve_performance_config(config_port, logger)
+    return AzureClientRuntimeConfig(
+        azure_config=azure_config,
+        performance_config=resolved,
     )
+
+
+def _create_azure_client(
+    runtime_config: Any,
+    logger: Any,
+) -> Any:
+    """Construct an ``AzureClient`` from explicit runtime config."""
+    from orb.providers.azure.infrastructure.azure_client import AzureClient
+
+    return AzureClient(runtime_config=runtime_config, logger=logger)
 
 
 # ------------------------------------------------------------------
@@ -290,9 +317,6 @@ def _register_azure_components_with_di(
 ) -> None:
     """Register Azure components with DI container for a specific instance."""
     from orb.domain.base.ports import LoggingPort
-    from orb.providers.azure.infrastructure.vmss_cleanup import (
-        VmssCleanupCoordinatorFactory,
-    )
 
     def azure_client_factory(container_instance: Any) -> Any:
         """Factory to create an Azure client with the correct config and logger."""
@@ -313,10 +337,6 @@ def _register_azure_components_with_di(
         return client
 
     container.register_factory(f"AzureClient_{instance_name}", azure_client_factory)
-    container.register_factory(
-        f"VmssCleanupCoordinatorFactory_{instance_name}",
-        lambda _container_instance: VmssCleanupCoordinatorFactory(),
-    )
 
 
 def _create_azure_strategy_with_di(
@@ -327,9 +347,6 @@ def _create_azure_strategy_with_di(
 
     logger = container.get(LoggingPort)
     azure_client = container.get(f"AzureClient_{instance_name}")
-    vmss_cleanup_coordinator_factory = container.get(
-        f"VmssCleanupCoordinatorFactory_{instance_name}"
-    )
 
     from orb.providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
 
@@ -338,7 +355,6 @@ def _create_azure_strategy_with_di(
         logger=logger,
         provider_instance_name=instance_name,
         azure_client_resolver=lambda: azure_client,
-        vmss_cleanup_coordinator_factory=vmss_cleanup_coordinator_factory,
     )
 
 

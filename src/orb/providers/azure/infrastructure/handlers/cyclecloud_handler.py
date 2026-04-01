@@ -572,27 +572,26 @@ class CycleCloudHandler(AzureHandler):
             ) as session_context:
                 session = session_context.session
                 base_url = session_context.base_url
-                try:
-                    nodes_response = self._cc_request(
-                        session,
-                        "GET",
-                        f"{base_url}/clusters/{cluster_name}/nodes",
-                        params={"request_id": cyclecloud_request_id},
-                    )
-                except CycleCloudConnectionError as exc:
-                    self._logger.error(
-                        "Failed to get node status for cluster '%s' and request_id '%s': %s",
-                        cluster_name,
-                        cyclecloud_request_id,
-                        exc,
-                    )
-                    raise
+                nodes_response = self._cc_request(
+                    session,
+                    "GET",
+                    f"{base_url}/clusters/{cluster_name}/nodes",
+                    params={"request_id": cyclecloud_request_id},
+                )
         except CycleCloudConnectionError as exc:
-            self._logger.error(
-                "Failed to build CycleCloud session for status check (cluster '%s'): %s",
-                cluster_name,
-                exc,
-            )
+            if "Cannot connect to CycleCloud" in str(exc):
+                self._logger.error(
+                    "Failed to build CycleCloud session for status check (cluster '%s'): %s",
+                    cluster_name,
+                    exc,
+                )
+            else:
+                self._logger.error(
+                    "Failed to get node status for cluster '%s' and request_id '%s': %s",
+                    cluster_name,
+                    cyclecloud_request_id,
+                    exc,
+                )
             raise
 
         all_nodes = nodes_response.get("nodes", [])

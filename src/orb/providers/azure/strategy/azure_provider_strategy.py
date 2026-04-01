@@ -36,7 +36,7 @@ from orb.providers.azure.infrastructure.handlers.azure_handler import AzureHandl
 from orb.providers.azure.infrastructure.handlers.cyclecloud_handler import CycleCloudHandler
 from orb.providers.azure.infrastructure.handlers.single_vm_handler import SingleVMHandler
 from orb.providers.azure.infrastructure.handlers.vmss_handler import VMSSHandler
-from orb.providers.azure.infrastructure.vmss_cleanup import VmssCleanupCoordinatorFactory
+from orb.providers.azure.infrastructure.vmss_cleanup import VmssCleanupCoordinator
 from orb.providers.azure.managers.azure_resource_manager import AzureResourceManager
 from orb.providers.azure.services.capability_service import AzureCapabilityService
 from orb.providers.azure.services.health_check_service import AzureHealthCheckService
@@ -88,7 +88,7 @@ class AzureProviderStrategy(ProviderStrategy):
         logger: LoggingPort,
         provider_instance_name: str,
         azure_client_resolver: Optional[Callable[[], AzureClient]] = None,
-        vmss_cleanup_coordinator_factory: Optional[VmssCleanupCoordinatorFactory] = None,
+        vmss_cleanup_coordinator: Optional[VmssCleanupCoordinator] = None,
     ) -> None:
         """Initialise the Azure strategy with config, logger, and optional client resolver."""
         if not isinstance(config, AzureProviderConfig):
@@ -123,10 +123,7 @@ class AzureProviderStrategy(ProviderStrategy):
         self._template_catalog_service = AzureTemplateCatalogService(logger=logger)
         self._termination_service = AzureTerminationService()
         self._lazy_init_lock = RLock()
-        cleanup_coordinator_factory = (
-            vmss_cleanup_coordinator_factory or VmssCleanupCoordinatorFactory()
-        )
-        self._vmss_cleanup_coordinator = cleanup_coordinator_factory.create(
+        self._vmss_cleanup_coordinator = vmss_cleanup_coordinator or VmssCleanupCoordinator(
             logger=self._logger,
             get_vmss_member_count=self._current_vmss_member_count,
             vmss_exists=self._vmss_exists,

@@ -442,30 +442,3 @@ class VmssCleanupCoordinator:
             raise
 
 
-class VmssCleanupCoordinatorFactory:
-    """Provider-owned factory for VMSS cleanup coordinators."""
-
-    def create(
-        self,
-        *,
-        logger: _VmssCleanupLogger,
-        get_vmss_member_count: GetVmssMemberCount,
-        vmss_exists: VmssExists,
-        begin_delete_vmss: BeginDeleteVmss,
-    ) -> VmssCleanupCoordinator:
-        """Create a new VmssCleanupCoordinator instance.
-
-        Args:
-            logger (_VmssCleanupLogger): Logger for warnings.
-            get_vmss_member_count (GetVmssMemberCount): Function to get VMSS member count.
-            vmss_exists (VmssExists): Function to check if VMSS exists.
-            begin_delete_vmss (BeginDeleteVmss): Function to begin VMSS deletion.
-        Returns:
-            VmssCleanupCoordinator: The constructed coordinator instance.
-        """
-        return VmssCleanupCoordinator(
-            logger=logger,
-            get_vmss_member_count=get_vmss_member_count,
-            vmss_exists=vmss_exists,
-            begin_delete_vmss=begin_delete_vmss,
-        )

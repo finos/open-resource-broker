@@ -506,6 +506,12 @@ class TestCycleCloudHandlerStatus:
         with pytest.raises(CycleCloudConnectionError, match="Cannot connect to CycleCloud"):
             handler.check_hosts_status(request)
 
+        assert handler._logger.error.call_count == 1
+        assert handler._logger.error.call_args.args[0] == (
+            "Failed to build CycleCloud session for status check (cluster '%s'): %s"
+        )
+        assert handler._logger.error.call_args.args[1] == "my-cluster"
+
     @patch("orb.providers.azure.infrastructure.handlers.cyclecloud_handler.requests.Session")
     def test_check_hosts_status_filters_by_node_array(self, mock_session_cls):
         handler = _make_handler()
