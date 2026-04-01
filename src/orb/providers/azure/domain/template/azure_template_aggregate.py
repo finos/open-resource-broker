@@ -61,6 +61,8 @@ class AzureTemplate(Template):
         arbitrary_types_allowed=True,
         populate_by_name=True,
         extra="forbid",
+        frozen=True,
+        validate_assignment=True,
     )
 
     # ------------------------------------------------------------------
@@ -448,6 +450,13 @@ class AzureTemplate(Template):
             if "max_instances" not in data:
                 data["max_instances"] = data["max_number"]
             data.pop("max_number", None)
+
+        if data.get("allocation_strategy") in (None, ""):
+            data["allocation_strategy"] = (
+                AllocationStrategy.PRICE_CAPACITY_OPTIMIZED.value
+                if data.get("price_type") == "spot"
+                else AllocationStrategy.LOWEST_PRICE.value
+            )
 
         if data.get("spot_percentage") is not None and data.get("priority") in (None, ""):
             data["priority"] = "Spot"

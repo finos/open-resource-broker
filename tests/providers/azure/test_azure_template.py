@@ -1,6 +1,7 @@
 """Tests for the Azure domain template aggregate, value objects, and ARM mapper."""
 
 import pytest
+from pydantic import ValidationError
 
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.domain.template.value_objects import (
@@ -218,6 +219,12 @@ class TestAzureTemplateConstruction:
     def test_provider_type_forced_to_azure(self):
         t = AzureTemplate(**_BASE_FIELDS, provider_type="wrong")
         assert t.provider_type == "azure"
+
+    def test_template_is_frozen_after_construction(self):
+        template = AzureTemplate(**_BASE_FIELDS)
+
+        with pytest.raises(ValidationError):
+            template.vm_size = "Standard_D8s_v5"
 
     def test_from_azure_format(self):
         data = {

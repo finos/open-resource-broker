@@ -530,8 +530,10 @@ class AzureProviderStrategy(ProviderStrategy):
     def _handle_terminate_instances(self, operation: ProviderOperation) -> ProviderResult:
         self._logger.debug("_handle_terminate_instances")
         try:
+            is_dry_run = bool(operation.context and operation.context.get("dry_run", False))
             termination_context = self._termination_service.build_termination_operation_context(
                 operation=operation,
+                is_dry_run=is_dry_run,
                 resolve_operation_provider_api=self._resolve_operation_provider_api,
                 provider_api_key=self._provider_api_key,
                 handlers=self.handlers,
@@ -544,7 +546,7 @@ class AzureProviderStrategy(ProviderStrategy):
             if isinstance(termination_context, ProviderResult):
                 return termination_context
 
-            if bool(operation.context and operation.context.get("dry_run", False)):
+            if is_dry_run:
                 return self._termination_service.terminate_instances_dry_run_result(
                     termination_context
                 )

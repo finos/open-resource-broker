@@ -23,10 +23,11 @@ class TerminationOperationContext:
 class AzureTerminationService:
     """Own Azure termination preparation and result shaping."""
 
+    @staticmethod
     def build_termination_operation_context(
-        self,
-        *,
+            *,
         operation: ProviderOperation,
+        is_dry_run: bool,
         resolve_operation_provider_api: Callable[[ProviderOperation], Optional[Any]],
         provider_api_key: Callable[[Any], str],
         handlers: dict[str, AzureHandler],
@@ -62,7 +63,7 @@ class AzureTerminationService:
         default_resource_id = operation.parameters.get("resource_id")
         if not default_resource_id and grouped_resource_mapping:
             default_resource_id = next(iter(grouped_resource_mapping.keys()))
-        if not default_resource_id:
+        if not default_resource_id and not is_dry_run:
             return ProviderResult.error_result(
                 "resource_id or resource_mapping is required for Azure termination",
                 "MISSING_RESOURCE_ID",
@@ -72,14 +73,15 @@ class AzureTerminationService:
             operation=operation,
             resource_group=resolve_operation_resource_group(operation),
         )
-        release_context["resource_id"] = default_resource_id
+        if default_resource_id:
+            release_context["resource_id"] = default_resource_id
 
         return TerminationOperationContext(
             instance_ids=instance_ids,
             grouped_resource_mapping=grouped_resource_mapping,
             release_context=release_context,
             handler=handler,
-            default_resource_id=default_resource_id,
+            default_resource_id=default_resource_id or "",
         )
 
     @staticmethod
