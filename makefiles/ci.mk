@@ -84,15 +84,15 @@ ci-tests-unit:  ## Run unit tests only (matches ci.yml unit-tests job)
 
 ci-tests-integration:  ## Run integration tests only (matches ci.yml integration-tests job)
 	@echo "Running integration tests..."
-	$(call run-tool,pytest,$(TESTS_INTEGRATION) $(PYTEST_ARGS) --junitxml=junit-integration.xml)
+	$(call run-tool,pytest,$(TESTS_INTEGRATION) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-integration.xml --junitxml=junit-integration.xml)
 
 ci-tests-e2e:  ## Run end-to-end tests only (matches ci.yml e2e-tests job)
 	@echo "Running end-to-end tests..."
-	$(call run-tool,pytest,$(TESTS_E2E) $(PYTEST_ARGS) --junitxml=junit-e2e.xml)
+	$(call run-tool,pytest,$(TESTS_E2E) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-e2e.xml --junitxml=junit-e2e.xml)
 
 ci-tests-onmoto:  ## Run onmoto (mocked AWS) tests only (matches ci.yml onmoto-tests job)
 	@echo "Running onmoto tests..."
-	$(call run-tool,pytest,$(TESTS_ONMOTO) $(PYTEST_ARGS) --junitxml=junit-onmoto.xml)
+	$(call run-tool,pytest,$(TESTS_ONMOTO) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-onmoto.xml --junitxml=junit-onmoto.xml)
 
 ci-tests-matrix:  ## Run comprehensive test matrix (matches test-matrix.yml workflow)
 	@echo "Running comprehensive test matrix..."
@@ -100,7 +100,15 @@ ci-tests-matrix:  ## Run comprehensive test matrix (matches test-matrix.yml work
 
 ci-tests-performance:  ## Run performance tests only (matches ci.yml performance-tests job)
 	@echo "Running performance tests..."
-	$(call run-tool,pytest,$(TESTS_PERFORMANCE) $(PYTEST_ARGS) --junitxml=junit-performance.xml)
+	$(call run-tool,pytest,$(TESTS_PERFORMANCE) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-performance.xml --junitxml=junit-performance.xml)
+
+ci-tests-providers:  ## Run providers tests only (matches ci.yml providers-tests job)
+	@echo "Running providers tests..."
+	$(call run-tool,pytest,$(TESTS_PROVIDERS) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-providers.xml --junitxml=junit-providers.xml)
+
+ci-tests-infrastructure:  ## Run infrastructure tests only (matches ci.yml infrastructure-tests job)
+	@echo "Running infrastructure tests..."
+	$(call run-tool,pytest,$(TESTS_INFRASTRUCTURE) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-infrastructure.xml --junitxml=junit-infrastructure.xml)
 
 ci-check:  ## Run comprehensive CI checks (matches GitHub Actions exactly)
 	@echo "Running comprehensive CI checks that match GitHub Actions pipeline..."

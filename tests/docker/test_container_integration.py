@@ -27,6 +27,18 @@ class TestContainerIntegration:
     def built_image(self, project_root, test_image_name):
         """Build test image for integration tests."""
         try:
+            # Rebuild wheel from current source before building image
+            build_result = subprocess.run(
+                ["uv", "build", "--wheel"],
+                check=False,
+                capture_output=True,
+                text=True,
+                cwd=str(project_root),
+                timeout=120,
+            )
+            if build_result.returncode != 0:
+                pytest.skip(f"uv build failed: {build_result.stderr}")
+
             result = subprocess.run(
                 [
                     "docker",

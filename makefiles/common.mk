@@ -44,6 +44,8 @@ TESTS_INTEGRATION := $(TESTS)/integration
 TESTS_E2E := $(TESTS)/e2e
 TESTS_ONMOTO := $(TESTS)/onmoto
 TESTS_PERFORMANCE := $(TESTS)/performance
+TESTS_INFRASTRUCTURE := $(TESTS)/infrastructure
+TESTS_PROVIDERS := $(TESTS)/providers
 CONFIG := config/config.json
 
 # Coverage settings
