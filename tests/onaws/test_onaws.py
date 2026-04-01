@@ -1713,7 +1713,9 @@ def _partial_return_fire_and_forget_cases():
 
 @pytest.mark.aws
 @pytest.mark.slow
-@pytest.mark.parametrize("test_case", _partial_return_capacity_cases(), ids=lambda tc: tc["test_name"])
+@pytest.mark.parametrize(
+    "test_case", _partial_return_capacity_cases(), ids=lambda tc: tc["test_name"]
+)
 def test_partial_return_reduces_capacity(setup_host_factory_mock_with_scenario, test_case):
     """
     Test partial return of instances to ensure maintain capacity drops correctly.
@@ -1964,9 +1966,7 @@ def test_partial_return_reduces_capacity(setup_host_factory_mock_with_scenario, 
 @pytest.mark.parametrize(
     "test_case", _partial_return_fire_and_forget_cases(), ids=lambda tc: tc["test_name"]
 )
-def test_partial_return_terminates_instance_only(
-    setup_host_factory_mock_with_scenario, test_case
-):
+def test_partial_return_terminates_instance_only(setup_host_factory_mock_with_scenario, test_case):
     """
     Test partial return of instances for request fleets and RunInstances.
 
@@ -2130,7 +2130,12 @@ def test_partial_return_terminates_instance_only(
     log.info("All %d remaining instances are still running", len(remaining_ids))
 
     # 2.7: Verify capacity is unchanged (skip for RunInstances and instant fleets)
-    if not is_run_instances and not is_instant_fleet and resource_id and capacity_before is not None:
+    if (
+        not is_run_instances
+        and not is_instant_fleet
+        and resource_id
+        and capacity_before is not None
+    ):
         log.info("2.7: Verifying capacity is unchanged")
         capacity_after = _get_capacity(provider_api, resource_id)
         log.info("Capacity after return: %d (expected: %d)", capacity_after, capacity_before)
@@ -2149,9 +2154,12 @@ def test_partial_return_terminates_instance_only(
             configs = resp.get("SpotFleetRequestConfigs") or []
             assert configs, f"SpotFleet {resource_id} not found after partial return"
             state = (configs[0].get("SpotFleetRequestState") or "").lower()
-            assert state not in ("cancelled", "cancelled_running", "cancelled_terminating", "failed"), (
-                f"SpotFleet {resource_id} entered unexpected state after partial return: {state}"
-            )
+            assert state not in (
+                "cancelled",
+                "cancelled_running",
+                "cancelled_terminating",
+                "failed",
+            ), f"SpotFleet {resource_id} entered unexpected state after partial return: {state}"
             log.info("SpotFleet %s is still active (state: %s)", resource_id, state)
         elif resource_id.startswith("fleet-"):
             resp = ec2_client.describe_fleets(FleetIds=[resource_id])
