@@ -24,10 +24,9 @@ Note:
 
 from __future__ import annotations
 
-from importlib import import_module
 from dataclasses import dataclass, field
 from threading import RLock
-from typing import TYPE_CHECKING, Any, Optional, Protocol, cast
+from typing import TYPE_CHECKING, Any, Callable, Optional, Protocol, cast
 
 from orb.config import PerformanceConfig
 from orb.domain.base.dependency_injection import injectable
@@ -322,17 +321,16 @@ class AzureClient:
     def _build_management_client(
         self,
         *,
-        module_path: str,
-        class_name: str,
+        loader: Callable[[], Any],
+        client_name: str,
         missing_package_message: str,
         requires_subscription_id: bool,
     ) -> Any:
         """Construct a lazily imported Azure SDK management client."""
         self._ensure_open()
-        self._logger.debug("Initialising %s on first use", class_name)
+        self._logger.debug("Initialising %s on first use", client_name)
         try:
-            # getattr: the Azure SDK class name is selected from a fixed internal mapping.
-            client_class = getattr(import_module(module_path), class_name)
+            client_class = loader()
         except ImportError as exc:
             raise AzureConfigurationError(missing_package_message) from exc
         return client_class(
@@ -344,8 +342,8 @@ class AzureClient:
     def _build_compute_client(self) -> ComputeManagementClient:
         """Construct a Compute management client."""
         return self._build_management_client(
-            module_path="azure.mgmt.compute",
-            class_name="ComputeManagementClient",
+            loader=self._load_compute_management_client,
+            client_name="ComputeManagementClient",
             missing_package_message="azure-mgmt-compute package is not installed",
             requires_subscription_id=True,
         )
@@ -353,8 +351,8 @@ class AzureClient:
     def _build_network_client(self) -> NetworkManagementClient:
         """Construct a Network management client."""
         return self._build_management_client(
-            module_path="azure.mgmt.network",
-            class_name="NetworkManagementClient",
+            loader=self._load_network_management_client,
+            client_name="NetworkManagementClient",
             missing_package_message="azure-mgmt-network package is not installed",
             requires_subscription_id=True,
         )
@@ -362,8 +360,8 @@ class AzureClient:
     def _build_resource_client(self) -> ResourceManagementClient:
         """Construct a Resource management client."""
         return self._build_management_client(
-            module_path="azure.mgmt.resource",
-            class_name="ResourceManagementClient",
+            loader=self._load_resource_management_client,
+            client_name="ResourceManagementClient",
             missing_package_message="azure-mgmt-resource package is not installed",
             requires_subscription_id=True,
         )
@@ -371,8 +369,8 @@ class AzureClient:
     def _build_msi_client(self) -> ManagedServiceIdentityClient:
         """Construct a Managed Service Identity client."""
         return self._build_management_client(
-            module_path="azure.mgmt.msi",
-            class_name="ManagedServiceIdentityClient",
+            loader=self._load_managed_service_identity_client,
+            client_name="ManagedServiceIdentityClient",
             missing_package_message="azure-mgmt-msi package is not installed",
             requires_subscription_id=True,
         )
@@ -380,8 +378,8 @@ class AzureClient:
     def _build_authorization_client(self) -> AuthorizationManagementClient:
         """Construct an Authorization management client."""
         return self._build_management_client(
-            module_path="azure.mgmt.authorization",
-            class_name="AuthorizationManagementClient",
+            loader=self._load_authorization_management_client,
+            client_name="AuthorizationManagementClient",
             missing_package_message="azure-mgmt-authorization package is not installed",
             requires_subscription_id=True,
         )
@@ -389,8 +387,8 @@ class AzureClient:
     def _build_monitor_client(self) -> MonitorManagementClient:
         """Construct a Monitor management client."""
         return self._build_management_client(
-            module_path="azure.mgmt.monitor",
-            class_name="MonitorManagementClient",
+            loader=self._load_monitor_management_client,
+            client_name="MonitorManagementClient",
             missing_package_message="azure-mgmt-monitor package is not installed",
             requires_subscription_id=True,
         )
@@ -398,8 +396,8 @@ class AzureClient:
     def _build_subscription_client(self) -> SubscriptionClient:
         """Construct a Subscription client."""
         return self._build_management_client(
-            module_path="azure.mgmt.resource.subscriptions",
-            class_name="SubscriptionClient",
+            loader=self._load_subscription_client_class,
+            client_name="SubscriptionClient",
             missing_package_message="azure-mgmt-resource package is not installed",
             requires_subscription_id=False,
         )
@@ -723,17 +721,16 @@ class AzureClient:
     @staticmethod
     def _collect_error_types(
         *base_error_types: type[BaseException],
-        optional_error_imports: tuple[tuple[str, str], ...],
+        optional_error_loaders: tuple[Callable[[], Any], ...],
     ) -> tuple[type[BaseException], ...]:
         """Build a de-duplicated exception tuple with optional lazy imports."""
         error_types: list[type[BaseException]] = list(base_error_types)
-        for module_path, class_name in optional_error_imports:
+        for loader in optional_error_loaders:
             try:
-                # getattr: exception names are loaded from an explicit internal import list.
-                error_type = getattr(import_module(module_path), class_name)
+                error_type = loader()
             except ImportError:
                 continue
-            error_types.append(cast(type[BaseException], error_type))
+            error_types.append(error_type)
         return tuple(dict.fromkeys(error_types))
 
     @classmethod
@@ -741,9 +738,9 @@ class AzureClient:
         """Return errors that should result in a soft credential validation failure."""
         return cls._collect_error_types(
             AuthenticationError,
-            optional_error_imports=(
-                ("azure.core.exceptions", "AzureError"),
-                ("azure.core.exceptions", "ClientAuthenticationError"),
+            optional_error_loaders=(
+                cls._load_azure_error_type,
+                cls._load_client_authentication_error_type,
             ),
         )
 
@@ -753,7 +750,7 @@ class AzureClient:
         return cls._collect_error_types(
             AzureConfigurationError,
             *cls._credential_validation_error_types(),
-            optional_error_imports=(),
+            optional_error_loaders=(),
         )
 
     @classmethod
@@ -761,8 +758,62 @@ class AzureClient:
         """Return Azure/network lookup errors that should not abort status enrichment."""
         return cls._collect_error_types(
             AzureConfigurationError,
-            optional_error_imports=(("azure.core.exceptions", "AzureError"),),
+            optional_error_loaders=(cls._load_azure_error_type,),
         )
+
+    @staticmethod
+    def _load_compute_management_client() -> Any:
+        from azure.mgmt.compute import ComputeManagementClient
+
+        return ComputeManagementClient
+
+    @staticmethod
+    def _load_network_management_client() -> Any:
+        from azure.mgmt.network import NetworkManagementClient
+
+        return NetworkManagementClient
+
+    @staticmethod
+    def _load_resource_management_client() -> Any:
+        from azure.mgmt.resource import ResourceManagementClient
+
+        return ResourceManagementClient
+
+    @staticmethod
+    def _load_managed_service_identity_client() -> Any:
+        from azure.mgmt.msi import ManagedServiceIdentityClient
+
+        return ManagedServiceIdentityClient
+
+    @staticmethod
+    def _load_authorization_management_client() -> Any:
+        from azure.mgmt.authorization import AuthorizationManagementClient
+
+        return AuthorizationManagementClient
+
+    @staticmethod
+    def _load_monitor_management_client() -> Any:
+        from azure.mgmt.monitor import MonitorManagementClient
+
+        return MonitorManagementClient
+
+    @staticmethod
+    def _load_subscription_client_class() -> Any:
+        from azure.mgmt.resource.subscriptions import SubscriptionClient
+
+        return SubscriptionClient
+
+    @staticmethod
+    def _load_azure_error_type() -> Any:
+        from azure.core.exceptions import AzureError
+
+        return AzureError
+
+    @staticmethod
+    def _load_client_authentication_error_type() -> Any:
+        from azure.core.exceptions import ClientAuthenticationError
+
+        return ClientAuthenticationError
 
     @staticmethod
     def _network_profile_from_vm(vm: Any) -> Optional[AzureNetworkProfileProtocol]:
