@@ -12,6 +12,7 @@ def test_pending_vmss_cleanup_round_trips_metadata():
         vmss_name="vmss-demo",
         machine_ids=["vm-a", "vm-a", "vm-b"],
         delete_vmss_when_empty=True,
+        member_delete_submitted=True,
         delete_retry_pending=True,
         last_delete_error="transient delete failure",
     )
@@ -24,6 +25,7 @@ def test_pending_vmss_cleanup_round_trips_metadata():
         "vmss_name": "vmss-demo",
         "machine_ids": ["vm-a", "vm-b"],
         "delete_vmss_when_empty": True,
+        "member_delete_submitted": True,
         "delete_submission_semantics": "best_effort_without_reverification",
         "delete_submitted": False,
         "delete_retry_pending": True,
@@ -38,6 +40,7 @@ def test_pending_vmss_cleanup_merge_preserves_ids_and_retry_state():
             "vmss_name": "vmss-demo",
             "machine_ids": ["vm-a"],
             "delete_vmss_when_empty": True,
+            "member_delete_submitted": True,
         }
     )
     update = PendingVmssCleanup.from_metadata(
@@ -61,6 +64,7 @@ def test_pending_vmss_cleanup_merge_preserves_ids_and_retry_state():
         "vmss_name": "vmss-demo",
         "machine_ids": ["vm-a", "vm-b"],
         "delete_vmss_when_empty": True,
+        "member_delete_submitted": True,
         "delete_submission_semantics": "best_effort_without_reverification",
         "delete_submitted": False,
         "delete_retry_pending": True,
@@ -107,6 +111,7 @@ def test_vmss_cleanup_coordinator_reconciles_delete_retry_state():
                 "vmss_name": "vmss-demo",
                 "machine_ids": ["vm-a"],
                 "delete_vmss_when_empty": True,
+                "member_delete_submitted": True,
                 "delete_submission_semantics": "best_effort_without_reverification",
                 "delete_submitted": False,
                 "delete_retry_pending": True,
@@ -151,6 +156,7 @@ def test_vmss_cleanup_coordinator_restores_pending_state_from_request_metadata()
             "vmss_name": "vmss-demo",
             "machine_ids": ["vm-a"],
             "delete_vmss_when_empty": True,
+            "member_delete_submitted": True,
             "delete_submission_semantics": "best_effort_without_reverification",
             "delete_submitted": False,
             "delete_retry_pending": False,
@@ -222,9 +228,25 @@ def test_vmss_cleanup_coordinator_submits_delete_when_vmss_is_empty():
                 "vmss_name": "vmss-demo",
                 "machine_ids": ["vm-a"],
                 "delete_vmss_when_empty": True,
+                "member_delete_submitted": True,
                 "delete_submission_semantics": "best_effort_without_reverification",
                 "delete_submitted": True,
                 "delete_retry_pending": False,
             }
         ],
     }
+
+
+def test_pending_vmss_cleanup_defaults_member_delete_submission_for_legacy_metadata():
+    restored = PendingVmssCleanup.from_metadata(
+        {
+            "resource_group": "test-rg",
+            "vmss_name": "vmss-demo",
+            "machine_ids": ["vm-a"],
+            "delete_vmss_when_empty": True,
+            "delete_retry_pending": True,
+        }
+    )
+
+    assert restored is not None
+    assert restored.member_delete_submitted is True

@@ -26,6 +26,7 @@ class PendingVmssCleanup:
     vmss_name: str
     machine_ids: list[str]
     delete_vmss_when_empty: bool
+    member_delete_submitted: bool = False
     delete_submitted: bool = False
     delete_retry_pending: bool = False
     last_delete_error: Optional[str] = None
@@ -61,6 +62,7 @@ class PendingVmssCleanup:
             vmss_name=str(vmss_name),
             machine_ids=machine_ids,
             delete_vmss_when_empty=bool(metadata.get("delete_vmss_when_empty", False)),
+            member_delete_submitted=bool(metadata.get("member_delete_submitted", True)),
             delete_submitted=bool(metadata.get("delete_submitted", False)),
             delete_retry_pending=bool(metadata.get("delete_retry_pending", False)),
             last_delete_error=(
@@ -81,6 +83,7 @@ class PendingVmssCleanup:
         vmss_name: str,
         machine_ids: list[str],
         delete_vmss_when_empty: bool,
+        member_delete_submitted: bool = False,
         delete_submitted: bool = False,
         delete_retry_pending: bool = False,
         last_delete_error: Optional[str] = None,
@@ -92,6 +95,7 @@ class PendingVmssCleanup:
             vmss_name (str): The VMSS name.
             machine_ids (list[str]): List of machine IDs.
             delete_vmss_when_empty (bool): Whether to delete VMSS when empty.
+            member_delete_submitted (bool): Whether member delete has been submitted.
             delete_submitted (bool): Whether delete has been submitted.
             delete_retry_pending (bool): Whether a retry is pending.
             last_delete_error (Optional[str]): Last error message, if any.
@@ -103,6 +107,7 @@ class PendingVmssCleanup:
             vmss_name=str(vmss_name),
             machine_ids=[str(machine_id) for machine_id in machine_ids],
             delete_vmss_when_empty=delete_vmss_when_empty,
+            member_delete_submitted=member_delete_submitted,
             delete_submitted=delete_submitted,
             delete_retry_pending=delete_retry_pending,
             last_delete_error=(
@@ -128,6 +133,7 @@ class PendingVmssCleanup:
             vmss_name=self.vmss_name,
             machine_ids=merged_machine_ids,
             delete_vmss_when_empty=self.delete_vmss_when_empty or other.delete_vmss_when_empty,
+            member_delete_submitted=self.member_delete_submitted or other.member_delete_submitted,
             delete_submitted=self.delete_submitted or other.delete_submitted,
             delete_retry_pending=self.delete_retry_pending or other.delete_retry_pending,
             last_delete_error=other.last_delete_error or self.last_delete_error,
@@ -162,6 +168,7 @@ class PendingVmssCleanup:
             "vmss_name": self.vmss_name,
             "machine_ids": list(self.machine_ids),
             "delete_vmss_when_empty": self.delete_vmss_when_empty,
+            "member_delete_submitted": self.member_delete_submitted,
             "delete_submission_semantics": self.delete_submission_semantics,
             "delete_submitted": self.delete_submitted,
             "delete_retry_pending": self.delete_retry_pending,
@@ -440,5 +447,4 @@ class VmssCleanupCoordinator:
                 if current is not None:
                     current.mark_delete_retry_pending(exc)
             raise
-
 
