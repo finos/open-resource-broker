@@ -90,6 +90,10 @@ ci-tests-e2e:  ## Run end-to-end tests only (matches ci.yml e2e-tests job)
 	@echo "Running end-to-end tests..."
 	$(call run-tool,pytest,$(TESTS_E2E) $(PYTEST_ARGS) --junitxml=junit-e2e.xml)
 
+ci-tests-onmoto:  ## Run onmoto (mocked AWS) tests only (matches ci.yml onmoto-tests job)
+	@echo "Running onmoto tests..."
+	$(call run-tool,pytest,$(TESTS_ONMOTO) $(PYTEST_ARGS) --junitxml=junit-onmoto.xml)
+
 ci-tests-matrix:  ## Run comprehensive test matrix (matches test-matrix.yml workflow)
 	@echo "Running comprehensive test matrix..."
 	$(call run-tool,pytest,$(TESTS) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-matrix.xml --junitxml=junit-matrix.xml)

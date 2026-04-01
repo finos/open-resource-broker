@@ -36,16 +36,20 @@ class TestCLIIntegration:
         """Test getProviderConfig CLI operation end-to-end."""
         # Setup mocks
         mock_container = Mock()
-        mock_query_bus = Mock()
 
         expected_config = {"type": "aws", "region": "us-east-1"}
 
-        # Make execute return an awaitable
-        async def mock_execute(query):
-            return expected_config
+        # Make execute return an awaitable with the expected output attributes
+        mock_output = Mock()
+        mock_output.config = expected_config
+        mock_output.message = "Provider configuration retrieved successfully"
 
-        mock_query_bus.execute = mock_execute
-        mock_container.get.return_value = mock_query_bus
+        async def mock_execute(_query):
+            return mock_output
+
+        mock_orchestrator = Mock()
+        mock_orchestrator.execute = mock_execute
+        mock_container.get.return_value = mock_orchestrator
         mock_get_container.return_value = mock_container
 
         # Test async function-based handler
@@ -92,26 +96,36 @@ class TestCLIIntegration:
         assert "provider configuration" in result["message"].lower()
 
     @pytest.mark.asyncio
-    @patch("orb.bootstrap.services.register_all_services")
-    async def test_reload_provider_config_cli_e2e(self, mock_register_services):
+    @patch("orb.interface.system_command_handlers.get_container")
+    async def test_reload_provider_config_cli_e2e(self, mock_get_container):
         """Test reloadProviderConfig CLI operation end-to-end."""
-        # Setup mocks
+        from orb.application.dto.interface_response import InterfaceResponse
+        from orb.application.services.provider_registry_service import ProviderRegistryService
+        from orb.interface.response_formatting_service import ResponseFormattingService
+
         mock_container = Mock()
-        mock_query_bus = Mock()
-        mock_command_bus = Mock()
 
-        expected_result = {
-            "result": {"status": "reloaded"},
-            "message": "Provider configuration reloaded successfully",
-        }
+        mock_registry = Mock(spec=ProviderRegistryService)
 
-        mock_command_bus.execute.return_value = expected_result
-        mock_container.get.side_effect = lambda cls: {
-            "QueryBus": mock_query_bus,
-            "CommandBus": mock_command_bus,
-        }.get(cls.__name__ if hasattr(cls, "__name__") else str(cls), Mock())
+        async def mock_reload():
+            pass
 
-        mock_register_services.return_value = mock_container
+        mock_registry.reload = mock_reload
+
+        mock_formatter = Mock(spec=ResponseFormattingService)
+        mock_formatter.format_success.return_value = InterfaceResponse(
+            data={"message": "Provider configuration reloaded"}, exit_code=0
+        )
+
+        def container_get(cls):
+            if cls is ResponseFormattingService:
+                return mock_formatter
+            if cls is ProviderRegistryService:
+                return mock_registry
+            return Mock()
+
+        mock_container.get.side_effect = container_get
+        mock_get_container.return_value = mock_container
 
         # Test async function-based handler
         from orb.interface.command_handlers import handle_reload_provider_config
@@ -123,7 +137,7 @@ class TestCLIIntegration:
 
         result = await handle_reload_provider_config(mock_command)
 
-        assert "provider configuration" in result["message"].lower()
+        assert "provider configuration" in result.data["message"].lower()
 
     def test_migrate_provider_config_cli_e2e(self):
         """Test migrateProviderConfig CLI operation end-to-end."""

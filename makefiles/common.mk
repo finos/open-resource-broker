@@ -42,6 +42,7 @@ TESTS := tests
 TESTS_UNIT := $(TESTS)/unit
 TESTS_INTEGRATION := $(TESTS)/integration
 TESTS_E2E := $(TESTS)/e2e
+TESTS_ONMOTO := $(TESTS)/onmoto
 TESTS_PERFORMANCE := $(TESTS)/performance
 CONFIG := config/config.json
 
