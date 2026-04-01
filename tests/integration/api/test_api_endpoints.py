@@ -71,7 +71,6 @@ class TestAPIEndpoints:
         """Test health check endpoint."""
         from unittest.mock import MagicMock
 
-        import orb.api.dependencies as deps
 
         mock_health_port = MagicMock()
         mock_health_port.get_status.return_value = {"status": "healthy"}
@@ -161,7 +160,6 @@ class TestAPIEndpoints:
         """Test that request ID header is added to responses."""
         from unittest.mock import MagicMock
 
-        import orb.api.dependencies as deps
 
         mock_health_port = MagicMock()
         mock_health_port.get_status.return_value = {"status": "healthy"}
@@ -239,7 +237,6 @@ class TestAPIEndpoints:
         """Test security headers are present."""
         from unittest.mock import MagicMock
 
-        import orb.api.dependencies as deps
 
         mock_health_port = MagicMock()
         mock_health_port.get_status.return_value = {"status": "healthy"}
