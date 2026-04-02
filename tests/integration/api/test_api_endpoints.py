@@ -37,6 +37,7 @@ class TestAPIEndpoints:
     @pytest.fixture
     def client(self):
         """Create test client with no authentication."""
+        from unittest.mock import MagicMock
         server_config = ServerConfig(  # type: ignore[call-arg]
             enabled=True,
             auth=AuthConfig(enabled=False, strategy="replace"),  # type: ignore[call-arg]
@@ -44,6 +45,9 @@ class TestAPIEndpoints:
         with patch("orb.api.server._register_routers") as mock_register:
             mock_register.side_effect = self._install_stub_routes
             app = create_fastapi_app(server_config)
+        mock_health_port = MagicMock()
+        mock_health_port.get_status.return_value = {"status": "healthy"}
+        app.dependency_overrides[deps.get_health_check_port] = lambda: mock_health_port
         return TestClient(app)
 
     @pytest.fixture
