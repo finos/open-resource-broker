@@ -357,18 +357,24 @@ class VmssCleanupCoordinator:
             observed_ids (set[str]): Set of observed instance IDs.
         """
         key = (resource_group, vmss_name)
+
+        # Snapshot state under the lock. Between this read and later
+        # mutations another thread may call record() which replaces the
+        # dict entry, so mutations below must re-check identity.
         with self._lock:
             pending = self._pending_cleanups.get(key)
-        if pending is None:
-            return
+            if pending is None:
+                return
+            requested_ids = set(pending.machine_ids)
+            delete_submitted = pending.delete_submitted
 
-        requested_ids = set(pending.machine_ids)
         if not requested_ids:
             with self._lock:
-                self._pending_cleanups.pop(key, None)
+                if self._pending_cleanups.get(key) is pending:
+                    self._pending_cleanups.pop(key, None)
             return
 
-        if pending.delete_submitted:
+        if delete_submitted:
             self._clear_if_vmss_is_gone(resource_group=resource_group, vmss_name=vmss_name)
             return
 
@@ -379,7 +385,8 @@ class VmssCleanupCoordinator:
             if self._submit_vmss_delete_if_empty(key=key, pending=pending):
                 return
             with self._lock:
-                self._pending_cleanups.pop(key, None)
+                if self._pending_cleanups.get(key) is pending:
+                    self._pending_cleanups.pop(key, None)
         except Exception as exc:
             with self._lock:
                 current = self._pending_cleanups.get(key)
