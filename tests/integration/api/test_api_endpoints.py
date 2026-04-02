@@ -38,6 +38,7 @@ class TestAPIEndpoints:
     def client(self):
         """Create test client with no authentication."""
         from unittest.mock import MagicMock
+
         server_config = ServerConfig(  # type: ignore[call-arg]
             enabled=True,
             auth=AuthConfig(enabled=False, strategy="replace"),  # type: ignore[call-arg]
