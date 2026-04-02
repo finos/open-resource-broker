@@ -244,6 +244,9 @@ class TestCycleCloudHandlerAcquire:
         assert result["provider_data"]["operation_id"] == "op-123"
         assert result["provider_data"]["operation_location"] == "https://cc.example.com/operations/op-123"
         assert result["provider_data"]["added_count"] == 2
+        assert result["provider_data"]["submitted_count"] == 2
+        assert result["provider_data"]["operation_status"] == "submitted"
+        assert result["provider_data"]["fulfillment_final"] is True
         request_json = mock_session.request.call_args_list[1].kwargs["json"]
         assert request_json["requestId"] == "req-12345678-1234-1234-1234-123456789012"
         mock_session.close.assert_called_once_with()

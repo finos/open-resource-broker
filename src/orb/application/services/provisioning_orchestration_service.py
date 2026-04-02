@@ -255,17 +255,19 @@ class ProvisioningOrchestrationService:
             result = await self._provider_selection_port.execute_operation(
                 selection_result.provider_name, operation
             )
+            result_data = result.data if isinstance(result.data, dict) else {}
+            result_metadata = result.metadata if isinstance(result.metadata, dict) else {}
 
             if result.success:
                 self._logger.info("Provider result.data: %s", result.data)
                 self._logger.info("Provider result.metadata: %s", result.metadata)
 
-                resource_ids = result.data.get("resource_ids", [])
-                instances = result.data.get("instances", [])
+                resource_ids = result_data.get("resource_ids", [])
+                instances = result_data.get("instances", [])
 
-                provider_data = result.data.get("provider_data", None) or (
-                    result.metadata or {}
-                ).get("provider_data", {})
+                provider_data = result_data.get("provider_data", None) or result_metadata.get(
+                    "provider_data", {}
+                )
                 fulfillment_final = provider_data.get("fulfillment_final", False)
                 has_capacity_error = provider_data.get("capacity_constrained", False)
 
@@ -273,7 +275,7 @@ class ProvisioningOrchestrationService:
                 return ProvisioningResult(
                     success=True,
                     resource_ids=resource_ids,
-                    machine_ids=result.data.get("instance_ids", []),
+                    machine_ids=result_data.get("instance_ids", []),
                     instances=instances,
                     provider_data=provider_data,
                     fulfilled_count=len(instances),
@@ -281,9 +283,9 @@ class ProvisioningOrchestrationService:
                     or fulfillment_final,
                 )
             else:
-                provider_data = result.data.get("provider_data", None) or (
-                    result.metadata or {}
-                ).get("provider_data", {})
+                provider_data = result_data.get("provider_data", None) or result_metadata.get(
+                    "provider_data", {}
+                )
                 return ProvisioningResult(
                     success=False,
                     resource_ids=[],

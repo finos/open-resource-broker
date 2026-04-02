@@ -195,3 +195,64 @@ async def test_planned_async_submitted_create_is_not_retried():
         "fulfillment_final": True,
     }
     assert provider_selection_port.execute_operation.await_count == 1
+
+
+@pytest.mark.unit
+@pytest.mark.application
+@pytest.mark.asyncio
+async def test_provider_failure_without_data_preserves_original_error_message():
+    container = MagicMock()
+    scheduler = MagicMock()
+    scheduler.format_template_for_provider.return_value = {
+        "template_id": "azure-cyclecloud-test",
+        "provider_api": "CycleCloud",
+    }
+    container.get.return_value = scheduler
+
+    provider_selection_port = MagicMock()
+    provider_selection_port.execute_operation = AsyncMock(
+        return_value=OperationResult.error_result(
+            error_message="Provisioning failed: missing cluster_name",
+            error_code="PROVISIONING_ADAPTER_ERROR",
+            metadata={"provider_data": {"cluster_name": "my-cluster"}},
+        )
+    )
+
+    provider_config_port = MagicMock()
+    config_port = MagicMock()
+    config_port.get_request_config.return_value = {
+        "fulfillment_max_retries": 3,
+        "fulfillment_timeout_seconds": 300,
+        "fulfillment_batch_size": 1000,
+    }
+
+    service = ProvisioningOrchestrationService(
+        container=container,
+        logger=MagicMock(),
+        provider_selection_port=provider_selection_port,
+        provider_config_port=provider_config_port,
+        config_port=config_port,
+        circuit_breaker_factory=lambda _key: MagicMock(has_state=MagicMock(return_value=False)),
+    )
+
+    request = Request.create_new_request(
+        request_type=RequestType.ACQUIRE,
+        template_id="azure-cyclecloud-test",
+        machine_count=1,
+        provider_type="azure",
+        provider_name="azure-default",
+        request_id="req-12345678-1234-1234-1234-123456789012",
+    )
+    template = MagicMock()
+    template.template_id = "azure-cyclecloud-test"
+    selection_result = ProviderSelectionResult(
+        provider_type="azure",
+        provider_name="azure-default",
+        selection_reason="test",
+    )
+
+    result = await service.execute_provisioning(template, request, selection_result)
+
+    assert result.success is False
+    assert result.error_message == "Provisioning failed: missing cluster_name"
+    assert result.provider_data == {"cluster_name": "my-cluster"}
