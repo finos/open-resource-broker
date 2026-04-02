@@ -14,7 +14,10 @@ from orb.application.ports.query_bus_port import QueryBusPort
 from orb.application.services.provisioning_orchestration_service import (
     ProvisioningOrchestrationService,
 )
-from orb.application.services.request_follow_up_context import with_request_follow_up_context
+from orb.application.services.request_follow_up_context import (
+    get_request_follow_up_context,
+    with_request_follow_up_context,
+)
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.configuration_service import DomainConfigurationService
 from orb.domain.base.exceptions import ApplicationError, EntityNotFoundError
@@ -272,6 +275,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                     metadata=command.metadata or {},
                     request_id=return_request_id,
                 )
+                request = self._seed_return_follow_up_context(request, machine_ids)
 
                 # Persist request and update machines
                 self._persist_return_request(request, machine_ids)
@@ -378,6 +382,9 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
 
     def _persist_return_request(self, request: Any, machine_ids: list[str]) -> None:
         """Persist return request and update machine records."""
+        follow_up_context = get_request_follow_up_context(request)
+        cyclecloud_cluster_name = follow_up_context.get("cluster_name")
+
         with self.uow_factory.create_unit_of_work() as uow:
             events = uow.requests.save(request)
 
@@ -385,13 +392,42 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             for machine_id in machine_ids:
                 machine = uow.machines.get_by_id(machine_id)
                 if machine:
-                    updated_machine = machine.model_copy(
-                        update={"return_request_id": str(request.request_id)}
-                    )
+                    update_fields = {"return_request_id": str(request.request_id)}
+                    if (
+                        getattr(machine, "provider_api", None) == "CycleCloud"
+                        and cyclecloud_cluster_name not in (None, "")
+                    ):
+                        update_fields["resource_id"] = str(cyclecloud_cluster_name)
+                    updated_machine = machine.model_copy(update=update_fields)
                     uow.machines.save(updated_machine)
 
             for event in events or []:
                 self.event_publisher.publish(event)  # type: ignore[union-attr]
+
+    def _seed_return_follow_up_context(self, request: Any, machine_ids: list[str]) -> Any:
+        """Copy durable provider follow-up context from the original acquire request(s)."""
+        merged_context: dict[str, Any] = {}
+
+        with self.uow_factory.create_unit_of_work() as uow:
+            for machine_id in machine_ids:
+                machine = uow.machines.get_by_id(machine_id)
+                source_request_id = getattr(machine, "request_id", None) if machine else None
+                if source_request_id in (None, ""):
+                    continue
+
+                source_request = uow.requests.get_by_id(RequestId(value=str(source_request_id)))
+                if not source_request:
+                    continue
+
+                source_context = get_request_follow_up_context(source_request)
+                for key, value in source_context.items():
+                    if value not in (None, "") and key not in merged_context:
+                        merged_context[key] = value
+
+        if not merged_context:
+            return request
+
+        return with_request_follow_up_context(request, merged_context)
 
     async def _update_request_to_in_progress(self, request: Any) -> None:
         """Update return request status to in_progress."""

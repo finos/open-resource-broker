@@ -397,7 +397,9 @@ class TestCycleCloudHandlerStatus:
         results = handler.check_hosts_status(request)
 
         assert len(results) == 2
-        assert results[0]["instance_id"] == "node-1"
+        assert results[0]["instance_id"] == "id-1"
+        assert results[0]["name"] == "node-1"
+        assert results[0]["resource_id"] == "my-cluster"
         assert results[0]["status"] == "running"
         assert results[0]["private_ip"] == "10.0.0.1"
         assert results[1]["status"] == "pending"
@@ -445,7 +447,7 @@ class TestCycleCloudHandlerStatus:
         results = handler.check_hosts_status(request)
 
         assert len(results) == 1
-        assert results[0]["instance_id"] == "node-1"
+        assert results[0]["instance_id"] == "id-1"
         mock_session.request.assert_called_once_with(
             "GET",
             "https://cc.example.com/clusters/my-cluster/nodes",
@@ -547,6 +549,91 @@ class TestCycleCloudHandlerStatus:
         assert results[0]["instance_id"] == "node-1"
 
     @patch("orb.providers.azure.infrastructure.handlers.cyclecloud_handler.requests.Session")
+    def test_check_hosts_status_accepts_lowercase_node_fields(self, mock_session_cls):
+        handler = _make_handler()
+
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+
+        nodes_resp = MagicMock()
+        nodes_resp.content = b'{"nodes": []}'
+        nodes_resp.json.return_value = {
+            "nodes": [
+                {
+                    "name": "node-1",
+                    "nodeId": "id-1",
+                    "nodearray": "execute",
+                    "state": "Ready",
+                    "privateIp": "10.0.0.1",
+                    "machineType": "Standard_D4s_v5",
+                }
+            ]
+        }
+        nodes_resp.raise_for_status = MagicMock()
+        mock_session.request.return_value = nodes_resp
+
+        request = _make_request(
+            resource_ids=["req-12345678-1234-1234-1234-123456789012"],
+            metadata={
+                "cluster_name": "my-cluster",
+                "node_array": "execute",
+                "cyclecloud_url": "https://cc.example.com",
+            },
+        )
+
+        results = handler.check_hosts_status(request)
+
+        assert len(results) == 1
+        assert results[0]["instance_id"] == "id-1"
+        assert results[0]["name"] == "node-1"
+        assert results[0]["status"] == "running"
+        assert results[0]["private_ip"] == "10.0.0.1"
+        assert results[0]["provider_data"]["node_id"] == "id-1"
+
+    @patch("orb.providers.azure.infrastructure.handlers.cyclecloud_handler.requests.Session")
+    def test_check_hosts_status_accepts_template_and_status_fields(self, mock_session_cls):
+        handler = _make_handler()
+
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+
+        nodes_resp = MagicMock()
+        nodes_resp.content = b'{"nodes": []}'
+        nodes_resp.json.return_value = {
+            "nodes": [
+                {
+                    "Name": "dynamic-1",
+                    "NodeId": "id-1",
+                    "Template": "dynamic",
+                    "Status": "Ready",
+                    "State": "Started",
+                    "IpAddress": "10.0.1.5",
+                    "MachineType": "Standard_F2s_v2",
+                }
+            ]
+        }
+        nodes_resp.raise_for_status = MagicMock()
+        mock_session.request.return_value = nodes_resp
+
+        request = _make_request(
+            resource_ids=["req-12345678-1234-1234-1234-123456789012"],
+            metadata={
+                "cluster_name": "my-cluster",
+                "node_array": "dynamic",
+                "cyclecloud_url": "https://cc.example.com",
+            },
+        )
+
+        results = handler.check_hosts_status(request)
+
+        assert len(results) == 1
+        assert results[0]["instance_id"] == "id-1"
+        assert results[0]["name"] == "dynamic-1"
+        assert results[0]["status"] == "running"
+        assert results[0]["private_ip"] == "10.0.1.5"
+        assert results[0]["provider_data"]["node_array"] == "dynamic"
+
+    @patch("orb.providers.azure.infrastructure.handlers.cyclecloud_handler.requests.Session")
     def test_check_hosts_status_includes_failed_node_errors(self, mock_session_cls):
         handler = _make_handler()
 
@@ -624,12 +711,12 @@ class TestCycleCloudHandlerRelease:
             },
         )
 
-        # Verify lookup + deallocate + remove calls were made
-        assert mock_session.request.call_count == 3
+        # Verify lookup + terminate call were made
+        assert mock_session.request.call_count == 2
         calls = mock_session.request.call_args_list
         assert "nodes" in calls[0].args[1]
-        assert "deallocate" in calls[1].args[1]
-        assert "remove" in calls[2].args[1]
+        assert "terminate" in calls[1].args[1]
+        assert calls[1].kwargs["json"] == {"ids": ["node-1", "node-2"]}
         mock_session.close.assert_called_once_with()
 
     @patch("orb.providers.azure.infrastructure.handlers.cyclecloud_handler.requests.Session")
@@ -652,7 +739,7 @@ class TestCycleCloudHandlerRelease:
         empty_resp.content = b""
         empty_resp.raise_for_status = MagicMock()
 
-        mock_session.request.side_effect = [nodes_resp, empty_resp, empty_resp]
+        mock_session.request.side_effect = [nodes_resp, empty_resp]
 
         handler.release_hosts(
             machine_ids=["cluster-dynamic-op-0"],
@@ -664,11 +751,80 @@ class TestCycleCloudHandlerRelease:
             },
         )
 
-        assert mock_session.request.call_count == 3
+        assert mock_session.request.call_count == 2
         calls = mock_session.request.call_args_list
         assert calls[0].args[0] == "GET"
-        assert calls[1].kwargs["json"] == {"names": ["dynamic-1"]}
-        assert calls[2].kwargs["json"] == {"names": ["dynamic-1"]}
+        assert calls[1].kwargs["json"] == {"ids": ["cluster-dynamic-op-0"]}
+
+    @patch("orb.providers.azure.infrastructure.handlers.cyclecloud_handler.requests.Session")
+    def test_release_hosts_resolves_lowercase_node_id_to_node_name(self, mock_session_cls):
+        handler = _make_handler()
+
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+
+        nodes_resp = MagicMock()
+        nodes_resp.content = b'{"nodes": [{"name": "dynamic-1", "nodeId": "cluster-dynamic-op-0"}]}'
+        nodes_resp.json.return_value = {
+            "nodes": [
+                {"name": "dynamic-1", "nodeId": "cluster-dynamic-op-0"},
+            ]
+        }
+        nodes_resp.raise_for_status = MagicMock()
+
+        empty_resp = MagicMock()
+        empty_resp.content = b""
+        empty_resp.raise_for_status = MagicMock()
+
+        mock_session.request.side_effect = [nodes_resp, empty_resp]
+
+        handler.release_hosts(
+            machine_ids=["cluster-dynamic-op-0"],
+            resource_id="my-cluster",
+            context={
+                "cyclecloud_url": "https://cc.example.com",
+                "cyclecloud_auth_mode": "bearer",
+                "cyclecloud_aad_scope": "https://cc.example.com/.default",
+            },
+        )
+
+        calls = mock_session.request.call_args_list
+        assert calls[1].kwargs["json"] == {"ids": ["cluster-dynamic-op-0"]}
+
+    @patch("orb.providers.azure.infrastructure.handlers.cyclecloud_handler.requests.Session")
+    def test_release_hosts_prefers_context_cluster_name(self, mock_session_cls):
+        handler = _make_handler()
+
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+
+        nodes_resp = MagicMock()
+        nodes_resp.content = b'{"nodes": [{"Name": "dynamic-1", "NodeId": "cluster-dynamic-op-0"}]}'
+        nodes_resp.json.return_value = {
+            "nodes": [{"Name": "dynamic-1", "NodeId": "cluster-dynamic-op-0"}]
+        }
+        nodes_resp.raise_for_status = MagicMock()
+
+        empty_resp = MagicMock()
+        empty_resp.content = b""
+        empty_resp.raise_for_status = MagicMock()
+
+        mock_session.request.side_effect = [nodes_resp, empty_resp]
+
+        handler.release_hosts(
+            machine_ids=["cluster-dynamic-op-0"],
+            resource_id="req-legacy-resource-id",
+            context={
+                "cluster_name": "my-cluster",
+                "cyclecloud_url": "https://cc.example.com",
+                "cyclecloud_auth_mode": "bearer",
+                "cyclecloud_aad_scope": "https://cc.example.com/.default",
+            },
+        )
+
+        calls = mock_session.request.call_args_list
+        assert calls[0].args[1] == "https://cc.example.com/clusters/my-cluster/nodes"
+        assert calls[1].args[1] == "https://cc.example.com/clusters/my-cluster/nodes/terminate"
 
     def test_release_hosts_missing_url(self):
         handler = _make_handler()

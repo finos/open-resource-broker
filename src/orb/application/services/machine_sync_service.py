@@ -228,6 +228,12 @@ class MachineSyncService:
             mapping[str(machine_id)] = (str(resource_id), 1)
 
         request_metadata = self._build_request_metadata(request)
+        if request.provider_api == "CycleCloud":
+            cluster_name = request_metadata.get("cluster_name")
+            if cluster_name not in (None, ""):
+                for machine_id in request.machine_ids:
+                    mapping[str(machine_id)] = (str(cluster_name), 1)
+
         termination_requests = request_metadata.get("termination_requests")
         if not isinstance(termination_requests, list):
             return mapping
@@ -330,6 +336,7 @@ class MachineSyncService:
                         or existing.private_ip != provider_machine.private_ip
                         or existing.public_ip != provider_machine.public_ip
                         or existing.name != provider_machine.name
+                        or existing.resource_id != provider_machine.resource_id
                         or existing.private_dns_name != provider_machine.private_dns_name
                         or existing.public_dns_name != provider_machine.public_dns_name
                         or existing.price_type != provider_machine.price_type
@@ -350,6 +357,7 @@ class MachineSyncService:
                         machine_data["private_ip"] = provider_machine.private_ip
                         machine_data["public_ip"] = provider_machine.public_ip
                         machine_data["name"] = provider_machine.name
+                        machine_data["resource_id"] = provider_machine.resource_id
                         machine_data["private_dns_name"] = provider_machine.private_dns_name
                         machine_data["public_dns_name"] = provider_machine.public_dns_name
                         machine_data["price_type"] = provider_machine.price_type

@@ -158,8 +158,16 @@ class RequestStatusService:
                 fleet_errors = provider_metadata.get("fleet_errors") or []
 
                 instance_target = request.requested_count
-                if (running_count >= instance_target and failed_count == 0) or (
-                    effective_fulfilled >= effective_target and failed_count == 0
+                if running_count >= instance_target and failed_count == 0:
+                    return RequestStatus.COMPLETED.value, "All instances running successfully"
+
+                # Capacity metadata can confirm that the provider fulfilled the requested
+                # count, but it must not promote the request to complete while any
+                # instance is still in a pending/starting state.
+                if (
+                    pending_count == 0
+                    and effective_fulfilled >= effective_target
+                    and failed_count == 0
                 ):
                     return RequestStatus.COMPLETED.value, "All instances running successfully"
                 elif fulfillment_final and pending_count == 0:
@@ -203,10 +211,11 @@ class RequestStatusService:
         """Update request status."""
         try:
             status_enum = RequestStatus(status)
-            updated_request = request.update_status(status_enum, message)
 
             # Save updated request
             with self.uow_factory.create_unit_of_work() as uow:
+                current_request = uow.requests.get_by_id(request.request_id) or request
+                updated_request = current_request.update_status(status_enum, message)
                 uow.requests.save(updated_request)
 
             self.logger.info(f"Updated request {request.request_id.value} status to {status}")
