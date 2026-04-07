@@ -170,6 +170,45 @@ def test_acquire_request_with_pending_machine_does_not_complete_from_fulfillment
     assert status == RequestStatus.IN_PROGRESS.value
     assert message == "0/1 instances running, waiting for 1 more"
 
+
+def test_acquire_request_with_terminal_planned_shortfall_becomes_partial():
+    svc = _make_service()
+    req = _make_request("acquire")
+    req.requested_count = 2
+
+    running_machine = _make_machine(MachineStatus.RUNNING)
+    status, message = svc.determine_status_from_machines(
+        db_machines=[],
+        provider_machines=[running_machine],  # type: ignore[arg-type]
+        request=req,
+        provider_metadata={
+            "terminal_error_message": "OperationNotAllowed: quota exceeded",
+            "unfulfilled_count": 1,
+        },
+    )
+
+    assert status == RequestStatus.PARTIAL.value
+    assert message == "1/2 instances running: OperationNotAllowed: quota exceeded"
+
+
+def test_acquire_request_with_terminal_planned_shortfall_and_no_instances_becomes_failed():
+    svc = _make_service()
+    req = _make_request("acquire")
+    req.requested_count = 2
+
+    status, message = svc.determine_status_from_machines(
+        db_machines=[],
+        provider_machines=[],
+        request=req,
+        provider_metadata={
+            "terminal_error_message": "OperationNotAllowed: quota exceeded",
+            "unfulfilled_count": 2,
+        },
+    )
+
+    assert status == RequestStatus.FAILED.value
+    assert message == "OperationNotAllowed: quota exceeded"
+
     def test_return_request_with_all_terminated_stays_in_progress_while_follow_up_pending(self):
         machines = [
             _make_machine(MachineStatus.TERMINATED),

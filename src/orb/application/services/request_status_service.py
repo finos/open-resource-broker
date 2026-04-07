@@ -102,6 +102,11 @@ class RequestStatusService:
                 fleet_errors = provider_metadata.get("fleet_errors") or []
                 fleet_capacity = provider_metadata.get("fleet_capacity_fulfilment") or {}
                 capacity_state = str(fleet_capacity.get("state") or "").lower()
+                terminal_error_message = provider_metadata.get("terminal_error_message")
+                unfulfilled_count = provider_metadata.get("unfulfilled_count")
+                planned_terminal_shortfall = bool(terminal_error_message) and (
+                    unfulfilled_count is None or int(unfulfilled_count) > 0
+                )
 
                 if not machines_to_check:
                     if fleet_errors:
@@ -129,6 +134,9 @@ class RequestStatusService:
                             RequestStatus.FAILED.value,
                             "Provider reported failed state before any instances were visible",
                         )
+
+                    if planned_terminal_shortfall:
+                        return RequestStatus.FAILED.value, str(terminal_error_message)
 
                     return None, None
 
@@ -170,6 +178,13 @@ class RequestStatusService:
                     and failed_count == 0
                 ):
                     return RequestStatus.COMPLETED.value, "All instances running successfully"
+                elif planned_terminal_shortfall and pending_count == 0:
+                    if running_count > 0:
+                        return (
+                            RequestStatus.PARTIAL.value,
+                            f"{running_count}/{instance_target} instances running: {terminal_error_message}",
+                        )
+                    return RequestStatus.FAILED.value, str(terminal_error_message)
                 elif fulfillment_final and pending_count == 0:
                     error_detail = (
                         f": {'; '.join(e.get('error_code', '') for e in fleet_errors if e.get('error_code'))}"
