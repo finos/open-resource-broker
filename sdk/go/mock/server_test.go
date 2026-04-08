@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/awslabs/open-resource-broker/mock"
-	"github.com/awslabs/open-resource-broker/orb"
+	"github.com/awslabs/open-resource-broker/sdk/go/mock"
+	"github.com/awslabs/open-resource-broker/sdk/go/orb"
 )
 
 func TestMockServerListTemplates(t *testing.T) {

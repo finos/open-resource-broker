@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/awslabs/open-resource-broker/orb"
+	"github.com/awslabs/open-resource-broker/sdk/go/orb"
 )
 
 // TestWithSchedulerAppendsFlag verifies that WithScheduler(SchedulerHostFactory)

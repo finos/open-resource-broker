@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/awslabs/open-resource-broker/internal/process"
+	"github.com/awslabs/open-resource-broker/sdk/go/internal/process"
 )
 
 func TestManagerMarksUnhealthyAfterThreeFailures(t *testing.T) {

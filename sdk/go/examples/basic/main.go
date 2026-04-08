@@ -19,7 +19,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/awslabs/open-resource-broker/orb"
+	"github.com/awslabs/open-resource-broker/sdk/go/orb"
 )
 
 func main() {

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/awslabs/open-resource-broker/orb"
+	"github.com/awslabs/open-resource-broker/sdk/go/orb"
 )
 
 // StartORB starts a real ORB process on a Unix domain socket and returns a connected client.
