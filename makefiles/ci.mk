@@ -225,6 +225,18 @@ sdk-go-build:  ## Build Go SDK
 sdk-go-generate:  ## Regenerate Go SDK from OpenAPI spec
 	cd sdk/go && go generate ./...
 
+sdk-go-export-spec:  ## Export OpenAPI spec from running ORB server into sdk/go/openapi.json
+	orb system serve --socket-path /tmp/orb-spec.sock &
+	@for i in $$(seq 1 30); do \
+		if curl -sf --unix-socket /tmp/orb-spec.sock http://localhost/health | python3 -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('status') in ('healthy','degraded') else 1)" 2>/dev/null; then \
+			break; \
+		fi; \
+		sleep 1; \
+	done
+	curl --fail --unix-socket /tmp/orb-spec.sock http://localhost/openapi.json > sdk/go/openapi.json
+	python3 -c "import json,sys; d=json.load(open('sdk/go/openapi.json')); assert d.get('openapi'), 'Invalid OpenAPI spec'"
+	kill %1 || true
+
 ci-git-setup:  ## Setup git configuration for CI automated commits
 	git config --local user.name "github-actions[bot]"
 	git config --local user.email "github-actions[bot]@users.noreply.github.com"

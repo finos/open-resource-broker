@@ -164,7 +164,7 @@ class TestSchedulerHeaderNotWiredInRoutes:
     @pytest.fixture
     def app_with_real_routes(self):
         """FastAPI app with real routers and overridden dependencies."""
-        import orb.api.dependencies as deps  # noqa: F401 — needed for dependency_overrides key
+        from orb.api import dependencies as deps
         from orb.api.server import create_fastapi_app
         from orb.config.schemas.server_schema import AuthConfig, ServerConfig
 

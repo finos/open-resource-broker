@@ -476,8 +476,8 @@ reportMissingTypeStubs = false
 reportUnusedVariable = true
 reportUnusedImport = true
 reportPrivateUsage = false
-# rich_argparse is an optional dependency used only when available
-ignorePackages = ["rich_argparse"]
+# rich and rich_argparse are optional dependencies used only when available
+ignorePackages = ["rich_argparse", "rich"]
 venvPath = "."
 venv = ".venv"
 

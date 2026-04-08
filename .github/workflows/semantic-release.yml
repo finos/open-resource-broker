@@ -116,11 +116,7 @@ jobs:
 
       - name: Export OpenAPI spec for Go SDK
         if: steps.release.outputs.released == 'true'
-        run: |
-          orb system serve --socket-path /tmp/orb-spec.sock &
-          sleep 5
-          curl --unix-socket /tmp/orb-spec.sock http://localhost/openapi.json > sdk/go/openapi.json
-          kill %1 || true
+        run: make sdk-go-export-spec
 
       - name: Update Go SDK version
         if: steps.release.outputs.released == 'true'
