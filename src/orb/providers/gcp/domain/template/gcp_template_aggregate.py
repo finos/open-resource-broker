@@ -64,6 +64,8 @@ class GCPTemplate(Template):
         elif self.provider_api == GCPProviderApi.SINGLE_VM:
             if self.max_instances != 1:
                 raise ValueError("SingleVM templates require max_instances == 1")
+            if len(self.zones) != 1:
+                raise ValueError("SingleVM templates require exactly one explicit zone")
 
         if not self.source_image and not (
             self.source_image_family and self.source_image_project

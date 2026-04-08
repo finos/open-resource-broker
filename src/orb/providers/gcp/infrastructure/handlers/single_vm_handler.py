@@ -26,7 +26,7 @@ class GCPSingleVMHandler(GCPHandler):
     """Create and manage standalone Compute Engine instances."""
 
     def acquire_hosts(self, request: Request, template: GCPTemplate) -> GCPCreateHandlerResult:
-        zone = str(template.zones[0]) if template.zones else f"{template.region}-a"
+        zone = self._template_zone(template)
         instances: list[GCPInstanceStatus] = []
         resource_ids: list[str] = []
 
@@ -132,7 +132,7 @@ class GCPSingleVMHandler(GCPHandler):
 
         disk_type = template.boot_disk_type or "pd-balanced"
         disk_size = template.boot_disk_size_gb or 50
-        zone = str(template.zones[0]) if template.zones else f"{template.region}-a"
+        zone = self._template_zone(template)
         normalized_disk_type = normalize_boot_disk_type(disk_type, zone=zone)
         machine_type = (
             template.instance_type
@@ -183,3 +183,9 @@ class GCPSingleVMHandler(GCPHandler):
         if not zone:
             raise ValueError("zone is required for SingleVM operations")
         return str(zone)
+
+    @staticmethod
+    def _template_zone(template: GCPTemplate) -> str:
+        if len(template.zones) != 1:
+            raise ValueError("SingleVM templates require exactly one explicit zone")
+        return str(template.zones[0])

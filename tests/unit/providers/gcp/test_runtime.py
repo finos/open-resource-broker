@@ -49,12 +49,14 @@ class _ComputeClientStub:
         )
 
 
-def _config() -> GCPProviderConfig:
-    return GCPProviderConfig(
-        project_id="orb-example-12345",
-        region="us-central1",
-        zones=["us-central1-a", "us-central1-b"],
-    )
+def _config(**overrides: object) -> GCPProviderConfig:
+    payload: dict[str, object] = {
+        "project_id": "orb-example-12345",
+        "region": "us-central1",
+        "zones": ["us-central1-a", "us-central1-b"],
+    }
+    payload.update(overrides)
+    return GCPProviderConfig(**payload)
 
 
 def test_handler_factory_creates_singlevm_and_mig_handlers() -> None:
@@ -180,6 +182,34 @@ async def test_strategy_create_instances_delegates_to_handler() -> None:
     assert result.success is True
     assert result.data["resource_ids"] == ["mig-demo"]
     assert result.metadata["provider_data"] == {"scope": "regional"}
+
+
+@pytest.mark.asyncio
+async def test_strategy_create_singlevm_rejects_missing_zone() -> None:
+    strategy = GCPProviderStrategy(config=_config(zones=[]), logger=MagicMock(), provider_name="gcp-default")
+    assert strategy.initialize() is True
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={
+                "count": 1,
+                "template_config": {
+                    "template_id": "gcp-single",
+                    "provider_type": "gcp",
+                    "provider_api": "SingleVM",
+                    "project_id": "orb-example-12345",
+                    "region": "us-central1",
+                    "instance_type": "e2-standard-4",
+                    "source_image_family": "debian-12",
+                    "source_image_project": "debian-cloud",
+                },
+            },
+        )
+    )
+
+    assert result.success is False
+    assert "SingleVM templates require exactly one explicit zone" in result.error_message
 
 
 @pytest.mark.asyncio
