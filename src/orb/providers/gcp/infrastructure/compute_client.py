@@ -22,6 +22,17 @@ if TYPE_CHECKING:
     )
 
 
+# Keep the retryable GCP API failures visible at module scope so reviewers can
+# reason about retry policy without digging through the Retry builder.
+GCP_RETRYABLE_GOOGLE_API_EXCEPTIONS: tuple[str, ...] = (
+    "InternalServerError",
+    "BadGateway",
+    "ServiceUnavailable",
+    "GatewayTimeout",
+    "TooManyRequests",
+)
+
+
 # noinspection PyTypeHints
 # The google-cloud-compute library uses dynamically generated proto classes that are not easily type-annotated.
 class GCPComputeClient:
@@ -39,6 +50,7 @@ class GCPComputeClient:
         self._region_igm_client: Optional[RegionInstanceGroupManagersClient] = None
         self._zone_igm_client: Optional[InstanceGroupManagersClient] = None
         self._images_client: Optional[ImagesClient] = None
+        self._retry_policy: Any | None = None
 
     def create_instance(
         self,
@@ -50,6 +62,7 @@ class GCPComputeClient:
             project=self._config.project_id,
             zone=zone,
             instance_resource=body,
+            **self._request_options(),
         )
         return operation
 
@@ -58,6 +71,7 @@ class GCPComputeClient:
             project=self._config.project_id,
             zone=zone,
             instance=instance_name,
+            **self._request_options(),
         )
         return operation
 
@@ -66,6 +80,7 @@ class GCPComputeClient:
             project=self._config.project_id,
             zone=zone,
             instance=instance_name,
+            **self._request_options(),
         )
         return GCPInstanceRecord(
             name=str(instance.name),
@@ -78,6 +93,7 @@ class GCPComputeClient:
             project=self._config.project_id,
             zone=zone,
             instance=instance_name,
+            **self._request_options(),
         )
         return operation
 
@@ -86,6 +102,7 @@ class GCPComputeClient:
             project=self._config.project_id,
             zone=zone,
             instance=instance_name,
+            **self._request_options(),
         )
         return operation
 
@@ -99,6 +116,7 @@ class GCPComputeClient:
         operation = self._get_instance_templates_client().insert(
             project=self._config.project_id,
             instance_template_resource=body,
+            **self._request_options(),
         )
         return operation
 
@@ -106,6 +124,7 @@ class GCPComputeClient:
         operation = self._get_instance_templates_client().delete(
             project=self._config.project_id,
             instance_template=template_name,
+            **self._request_options(),
         )
         return operation
 
@@ -121,6 +140,7 @@ class GCPComputeClient:
             project=self._config.project_id,
             region=region,
             instance_group_manager_resource=body,
+            **self._request_options(),
         )
         return operation
 
@@ -136,6 +156,7 @@ class GCPComputeClient:
             project=self._config.project_id,
             zone=zone,
             instance_group_manager_resource=body,
+            **self._request_options(),
         )
         return operation
 
@@ -144,6 +165,7 @@ class GCPComputeClient:
             project=self._config.project_id,
             region=region,
             instance_group_manager=mig_name,
+            **self._request_options(),
         )
         return operation
 
@@ -152,6 +174,7 @@ class GCPComputeClient:
             project=self._config.project_id,
             zone=zone,
             instance_group_manager=mig_name,
+            **self._request_options(),
         )
         return operation
 
@@ -165,6 +188,7 @@ class GCPComputeClient:
             project=self._config.project_id,
             region=region,
             instance_group_manager=mig_name,
+            **self._request_options(),
         )
         return [
             GCPManagedInstanceRecord(
@@ -185,6 +209,7 @@ class GCPComputeClient:
             project=self._config.project_id,
             zone=zone,
             instance_group_manager=mig_name,
+            **self._request_options(),
         )
         return [
             GCPManagedInstanceRecord(
@@ -212,6 +237,7 @@ class GCPComputeClient:
                     instances=instance_urls
                 )
             ),
+            **self._request_options(),
         )
         return operation
 
@@ -230,6 +256,7 @@ class GCPComputeClient:
             instance_group_managers_delete_instances_request_resource=(
                 compute_v1.InstanceGroupManagersDeleteInstancesRequest(instances=instance_urls)
             ),
+            **self._request_options(),
         )
         return operation
 
@@ -237,8 +264,53 @@ class GCPComputeClient:
         image = self._get_images_client().get_from_family(
             project=image_project,
             family=family,
+            **self._request_options(),
         )
         return image
+
+    def _request_options(self) -> dict[str, Any]:
+        return {
+            "retry": self._get_retry_policy(),
+            "timeout": (
+                float(self._config.connect_timeout),
+                float(self._config.read_timeout),
+            ),
+        }
+
+    def _get_retry_policy(self) -> Any:
+        if self._config.max_retries == 0:
+            return None
+        if self._retry_policy is None:
+            self._retry_policy = self._build_retry_policy()
+        return self._retry_policy
+
+    def _build_retry_policy(self) -> Any:
+        try:
+            from google.api_core import exceptions as google_exceptions
+            from google.api_core.retry import Retry, if_exception_type
+        except ImportError as exc:
+            raise RuntimeError(
+                "google-api-core is required for GCP retry configuration"
+            ) from exc
+
+        per_attempt_timeout = float(
+            self._config.connect_timeout + self._config.read_timeout
+        )
+        # Keep the reviewed retryable set as string names at module scope for visibility,
+        # then resolve those names to sdk exception classes here for if_exception_type().
+        # getattr use is intentional at this sdk boundary: it keeps the public constant
+        # readable without hiding the actual retry policy inside inline exception references.
+        retryable_exceptions = tuple(
+            getattr(google_exceptions, exception_name)
+            for exception_name in GCP_RETRYABLE_GOOGLE_API_EXCEPTIONS
+        )
+        return Retry(
+            predicate=if_exception_type(*retryable_exceptions),
+            initial=1.0,
+            maximum=max(1.0, float(self._config.read_timeout)),
+            multiplier=2.0,
+            timeout=max(1.0, per_attempt_timeout * float(self._config.max_retries)),
+        )
 
     def _compute_v1(self) -> Any:
         try:
