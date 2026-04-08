@@ -17,8 +17,8 @@ from orb.domain.request.value_objects import RequestStatus
 
 try:
     import rich.console as _rich_console  # type: ignore[import-untyped,import-not-found]
-    from rich_argparse import (
-        RichHelpFormatter as _RichHelpFormatter,  # type: ignore[import-untyped,import-not-found]
+    from rich_argparse import (  # type: ignore[import-untyped,import-not-found]
+        RichHelpFormatter as _RichHelpFormatter,
     )
 
     class _TtyAwareFormatter(_RichHelpFormatter):
