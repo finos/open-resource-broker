@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
 
@@ -56,12 +56,12 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
 
       - name: Install ogen
-        run: go install github.com/ogen-go/ogen/cmd/ogen@latest
+        run: go install github.com/ogen-go/ogen/cmd/ogen@v1.19.0
 
       - name: Regenerate SDK
         run: make sdk-go-generate
@@ -70,6 +70,6 @@ jobs:
         run: |
           if ! git diff --exit-code sdk/go/; then
             echo "Generated Go SDK code is out of sync with openapi.json."
-            echo "Run 'cd sdk/go && go generate ./...' and commit the result."
+            echo "Run 'make sdk-go-generate' and commit the result."
             exit 1
           fi
