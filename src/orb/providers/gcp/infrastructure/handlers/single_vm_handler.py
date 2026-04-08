@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from orb.domain.request.aggregate import Request
 from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
+from orb.providers.gcp.infrastructure.disk_types import normalize_boot_disk_type
 from orb.providers.gcp.infrastructure.handlers.base_handler import GCPHandler
 from orb.providers.gcp.types import (
     GCPCreateHandlerResult,
@@ -132,6 +133,7 @@ class GCPSingleVMHandler(GCPHandler):
         disk_type = template.boot_disk_type or "pd-balanced"
         disk_size = template.boot_disk_size_gb or 50
         zone = str(template.zones[0]) if template.zones else f"{template.region}-a"
+        normalized_disk_type = normalize_boot_disk_type(disk_type, zone=zone)
         machine_type = (
             template.instance_type
             if template.instance_type.startswith("zones/")
@@ -146,7 +148,7 @@ class GCPSingleVMHandler(GCPHandler):
                     auto_delete=True,
                     initialize_params=compute_v1.AttachedDiskInitializeParams(
                         source_image=source_image,
-                        disk_type=f"zones/{zone}/diskTypes/{disk_type}",
+                        disk_type=normalized_disk_type,
                         disk_size_gb=disk_size,
                     ),
                 )
