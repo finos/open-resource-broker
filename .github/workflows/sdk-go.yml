@@ -5,13 +5,15 @@ on:
     branches: [ main, develop ]
     paths:
       - 'sdk/go/**'
-      - 'sdk/go/openapi.json'
+      - 'go.mod'
+      - 'go.sum'
       - '.github/workflows/sdk-go.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'sdk/go/**'
-      - 'sdk/go/openapi.json'
+      - 'go.mod'
+      - 'go.sum'
       - '.github/workflows/sdk-go.yml'
   schedule:
     - cron: '0 2 * * *'
@@ -33,16 +35,13 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: sdk/go/go.mod
-          cache-dependency-path: sdk/go/go.sum
+          go-version-file: go.mod
 
       - name: Build
-        working-directory: sdk/go
-        run: go build ./...
+        run: make sdk-go-build
 
       - name: Test
-        working-directory: sdk/go
-        run: go test ./...
+        run: make sdk-go-test
 
   check-drift:
     name: Check Generated Code Drift
@@ -59,15 +58,13 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: sdk/go/go.mod
-          cache-dependency-path: sdk/go/go.sum
+          go-version-file: go.mod
 
       - name: Install ogen
         run: go install github.com/ogen-go/ogen/cmd/ogen@latest
 
       - name: Regenerate SDK
-        working-directory: sdk/go
-        run: go generate ./...
+        run: make sdk-go-generate
 
       - name: Check for drift
         run: |
