@@ -16,7 +16,7 @@ from orb.domain.machine.machine_status import MachineStatus
 from orb.domain.request.value_objects import RequestStatus
 
 try:
-    import rich.console as _rich_console
+    import rich.console as _rich_console  # type: ignore[import-untyped,import-not-found]
     from rich_argparse import (
         RichHelpFormatter as _RichHelpFormatter,  # type: ignore[import-untyped,import-not-found]
     )
