@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from threading import RLock
-from typing import TYPE_CHECKING, Any, Callable, Optional, Protocol, cast
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from orb.config import PerformanceConfig
 from orb.domain.base.dependency_injection import injectable
@@ -41,6 +41,13 @@ from orb.providers.azure.infrastructure.credential_factory import (
     AzureCredentialProtocol,
     create_default_azure_credential,
 )
+from orb.providers.azure.infrastructure.services.arm_resource_id_parser import (
+    ArmResourceIdParser,
+    ParsedArmResourceId,
+)
+from orb.providers.azure.infrastructure.services.azure_network_identity_resolver import (
+    AzureNetworkIdentityResolver,
+)
 
 
 if TYPE_CHECKING:
@@ -51,96 +58,6 @@ if TYPE_CHECKING:
     from azure.mgmt.network import NetworkManagementClient
     from azure.mgmt.resource import ResourceManagementClient
     from azure.mgmt.resource.subscriptions import SubscriptionClient
-
-class AzureResourceRefProtocol(Protocol):
-    """Minimal ARM resource reference carrying an Azure resource ID."""
-
-    id: Optional[str]
-
-
-class AzureNicReferencePropertiesProtocol(Protocol):
-    """Subset of NIC reference properties used for primary-NIC ordering."""
-
-    primary: Optional[bool]
-
-
-class AzureNicReferenceProtocol(AzureResourceRefProtocol, Protocol):
-    """NIC reference shape exposed from a VM network profile."""
-
-    properties: Optional[AzureNicReferencePropertiesProtocol]
-
-
-class AzureNetworkProfileProtocol(Protocol):
-    """VM network profile surface needed for NIC reference enumeration."""
-
-    network_interfaces: list[AzureNicReferenceProtocol]
-
-
-class AzureIpConfigurationPropertiesProtocol(Protocol):
-    """Fallback property bag exposed by Azure IP configuration objects."""
-
-    private_ip_address: Optional[str]
-    subnet: Optional[AzureResourceRefProtocol]
-    public_ip_address: Optional[AzureResourceRefProtocol]
-
-
-class AzureIpConfigurationProtocol(Protocol):
-    """IP configuration fields used to resolve private/public network identity."""
-
-    private_ip_address: Optional[str]
-    subnet: Optional[AzureResourceRefProtocol]
-    public_ip_address: Optional[AzureResourceRefProtocol]
-    properties: Optional[AzureIpConfigurationPropertiesProtocol]
-
-
-class AzureNicProtocol(Protocol):
-    """NIC surface used to enumerate IP configurations."""
-
-    ip_configurations: list[AzureIpConfigurationProtocol]
-
-
-class AzurePublicIpProtocol(Protocol):
-    """Public IP resource surface used to read the resolved IP address."""
-
-    ip_address: Optional[str]
-
-
-class AzureVmNetworkIdentityProtocol(Protocol):
-    """VM surface used to enter the network-identity resolution flow."""
-
-    network_profile: Optional[AzureNetworkProfileProtocol]
-
-
-@dataclass(frozen=True)
-class ParsedArmResourceId:
-    """Validated ARM resource identifier components."""
-
-    subscription_id: str
-    resource_group: str
-    provider_namespace: str
-    resource_path_segments: tuple[str, ...]
-
-    @property
-    def resource_name(self) -> str:
-        """Return the leaf resource name from the ARM resource path."""
-        return self.resource_path_segments[-1]
-
-    @property
-    def resource_type(self) -> str:
-        """Return the ARM resource type segment (e.g. 'virtualMachines')."""
-        return self.resource_path_segments[-2]
-
-    def parent_resource_id(self) -> Optional[str]:
-        """Return the parent ARM resource ID for child resources."""
-        if len(self.resource_path_segments) <= 2:
-            return None
-
-        return (
-            f"/subscriptions/{self.subscription_id}"
-            f"/resourceGroups/{self.resource_group}"
-            f"/providers/{self.provider_namespace}/"
-            + "/".join(self.resource_path_segments[:-2])
-        )
 
 
 @dataclass(frozen=True)
@@ -225,6 +142,13 @@ class AzureClient:
         self._credentials_validated = False
         self._closed = False
         self._lazy_init_lock = RLock()
+        self._arm_resource_id_parser = ArmResourceIdParser()
+        self._network_identity_resolver = AzureNetworkIdentityResolver(
+            network_client_getter=lambda: self.network_client,
+            logger=logger,
+            arm_resource_id_parser=self._arm_resource_id_parser,
+            network_lookup_error_types=self._network_lookup_error_types,
+        )
 
         # Metrics instrumentation (extension point)
         self._metrics = metrics
@@ -761,6 +685,20 @@ class AzureClient:
             optional_error_loaders=(cls._load_azure_error_type,),
         )
 
+    def _get_network_identity_resolver(self) -> AzureNetworkIdentityResolver:
+        """Return the network identity resolver, creating it for partial test doubles."""
+        # getattr: partial test doubles bypass __init__, so the delegated helper may be absent.
+        resolver = getattr(self, "_network_identity_resolver", None)
+        if resolver is None:
+            resolver = AzureNetworkIdentityResolver(
+                network_client_getter=lambda: self.network_client,
+                logger=self._logger,
+                arm_resource_id_parser=ArmResourceIdParser(),
+                network_lookup_error_types=self._network_lookup_error_types,
+            )
+            self._network_identity_resolver = resolver
+        return resolver
+
     @staticmethod
     def _load_compute_management_client() -> Any:
         from azure.mgmt.compute import ComputeManagementClient
@@ -815,91 +753,13 @@ class AzureClient:
 
         return ClientAuthenticationError
 
-    @staticmethod
-    def _network_interface_refs_from_profile(
-        network_profile: Optional[AzureNetworkProfileProtocol],
-    ) -> list[AzureNicReferenceProtocol]:
-        if network_profile is None:
-            return []
-        return list(network_profile.network_interfaces or [])
-
-    @staticmethod
-    def _is_primary_nic_ref(nic_ref: AzureNicReferenceProtocol) -> bool:
-        nic_properties = nic_ref.properties
-        if nic_properties is None:
-            return False
-        return bool(nic_properties.primary)
-
-    @staticmethod
-    def _subnet_from_ip_config(
-        ip_config: AzureIpConfigurationProtocol,
-    ) -> Optional[AzureResourceRefProtocol]:
-        if ip_config.subnet is not None:
-            return ip_config.subnet
-        ip_properties = ip_config.properties
-        if ip_properties is None:
-            return None
-        return ip_properties.subnet
-
-    @staticmethod
-    def _public_ip_ref_from_ip_config(
-        ip_config: AzureIpConfigurationProtocol,
-    ) -> Optional[AzureResourceRefProtocol]:
-        if ip_config.public_ip_address is not None:
-            return ip_config.public_ip_address
-        ip_properties = ip_config.properties
-        if ip_properties is None:
-            return None
-        return ip_properties.public_ip_address
-
-    @staticmethod
-    def _public_ip_address_from_resource(public_ip_resource: Any) -> Optional[str]:
-        return cast(AzurePublicIpProtocol, public_ip_resource).ip_address
-
     @classmethod
     def _parse_arm_resource_id(
         cls,
         arm_id: str,
     ) -> Optional[ParsedArmResourceId]:
         """Parse an ARM resource ID only when it matches the canonical shape."""
-        raw_arm_id = str(arm_id).strip()
-        if not raw_arm_id:
-            return None
-
-        stripped = raw_arm_id.strip("/")
-        if not stripped:
-            return None
-
-        parts = stripped.split("/")
-        if any(not segment for segment in parts):
-            return None
-
-        if len(parts) < 8:
-            return None
-
-        if parts[0].lower() != "subscriptions" or parts[2].lower() != "resourcegroups":
-            return None
-
-        if parts[4].lower() != "providers":
-            return None
-
-        subscription_id = parts[1]
-        resource_group = parts[3]
-        provider_namespace = parts[5]
-        resource_path_segments = tuple(parts[6:])
-
-        if not subscription_id or not resource_group or not provider_namespace:
-            return None
-
-        if len(resource_path_segments) < 2 or len(resource_path_segments) % 2 != 0:
-            return None
-
-        return ParsedArmResourceId(
-            subscription_id=subscription_id,
-            resource_group=resource_group,
-            provider_namespace=provider_namespace,
-            resource_path_segments=resource_path_segments,
-        )
+        return ArmResourceIdParser.parse(arm_id)
 
     @classmethod
     def extract_resource_group_and_name_from_arm_id(
@@ -907,110 +767,23 @@ class AzureClient:
         arm_id: str,
     ) -> Optional[tuple[str, str]]:
         """Extract ``(resource_group, resource_name)`` from an ARM resource ID."""
-        parsed_arm_id = cls._parse_arm_resource_id(arm_id)
-        if parsed_arm_id is None:
-            return None
-        return parsed_arm_id.resource_group, parsed_arm_id.resource_name
+        return ArmResourceIdParser().extract_resource_group_and_name(arm_id)
 
     @classmethod
     def subnet_id_to_vnet_id(cls, subnet_id: Optional[str]) -> Optional[str]:
         """Return the parent VNet ARM ID from a subnet ARM ID."""
-        if not subnet_id:
-            return None
-        parsed_arm_id = cls._parse_arm_resource_id(subnet_id)
-        if parsed_arm_id is None:
-            return None
-        if parsed_arm_id.resource_type.lower() != "subnets":
-            return None
-        return parsed_arm_id.parent_resource_id()
+        return ArmResourceIdParser().subnet_id_to_vnet_id(subnet_id)
 
     def resolve_network_identity_from_vm(self, vm: Any) -> dict[str, Any]:
         """Resolve network identity fields from a VM or VMSS VM object."""
-        net_profile = cast(AzureVmNetworkIdentityProtocol, vm).network_profile
-        nic_refs = self._network_interface_refs_from_profile(net_profile)
-        return self.resolve_network_identity_from_nic_refs(nic_refs)
+        return self._get_network_identity_resolver().resolve_from_vm(vm)
 
     def resolve_network_identity_from_nic_refs(
         self,
-        nic_refs: list[AzureNicReferenceProtocol],
+        nic_refs: list[Any],
     ) -> dict[str, Any]:
         """Resolve private/public IP and subnet/VNet identity from NIC refs."""
-        network_identity = {
-            "private_ip": None,
-            "public_ip": None,
-            "subnet_id": None,
-            "vnet_id": None,
-            "nic_id": None,
-            "nic_name": None,
-        }
-        if not nic_refs:
-            return network_identity
-
-        ordered_refs = sorted(
-            nic_refs,
-            key=lambda ref: not self._is_primary_nic_ref(ref),
-        )
-
-        for nic_ref in ordered_refs:
-            nic_id = nic_ref.id
-            if not nic_id:
-                continue
-
-            nic_lookup = self.extract_resource_group_and_name_from_arm_id(str(nic_id))
-            if not nic_lookup:
-                continue
-
-            nic_rg, nic_name = nic_lookup
-            try:
-                nic = self.network_client.network_interfaces.get(
-                    resource_group_name=nic_rg,
-                    network_interface_name=nic_name,
-                )
-            except self._network_lookup_error_types() as exc:
-                self._logger.debug("Failed to resolve NIC %s: %s", nic_id, exc)
-                continue
-
-            ip_configs = list(cast(AzureNicProtocol, nic).ip_configurations or [])
-            for ip_cfg in ip_configs:
-                private_ip = ip_cfg.private_ip_address
-                if not private_ip and ip_cfg.properties is not None:
-                    private_ip = ip_cfg.properties.private_ip_address
-                subnet = self._subnet_from_ip_config(ip_cfg)
-                subnet_id = subnet.id if subnet is not None else None
-                public_ip_ref = self._public_ip_ref_from_ip_config(ip_cfg)
-
-                public_ip = None
-                public_ip_id = public_ip_ref.id if public_ip_ref is not None else None
-                if public_ip_id:
-                    public_ip_lookup = self.extract_resource_group_and_name_from_arm_id(
-                        str(public_ip_id)
-                    )
-                    if public_ip_lookup:
-                        pip_rg, pip_name = public_ip_lookup
-                        try:
-                            pip = self.network_client.public_ip_addresses.get(
-                                resource_group_name=pip_rg,
-                                public_ip_address_name=pip_name,
-                            )
-                            public_ip = self._public_ip_address_from_resource(pip)
-                        except self._network_lookup_error_types() as exc:
-                            self._logger.debug(
-                                "Failed to resolve public IP %s: %s", public_ip_id, exc
-                            )
-
-                network_identity.update(
-                    {
-                        "private_ip": private_ip,
-                        "public_ip": public_ip,
-                        "subnet_id": subnet_id,
-                        "vnet_id": self.subnet_id_to_vnet_id(subnet_id),
-                        "nic_id": nic_id,
-                        "nic_name": nic_name,
-                    }
-                )
-                return network_identity
-
-        return network_identity
+        return self._get_network_identity_resolver().resolve_from_nic_refs(nic_refs)
 
     # ------------------------------------------------------------------
     # Metrics / observability

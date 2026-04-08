@@ -579,52 +579,6 @@ class TestAzureClientNetworkResolution:
         client._subscription_client = None
         return client
 
-    def test_extract_resource_group_and_name_from_arm_id_rejects_incomplete_ids(self):
-        assert (
-            AzureClient.extract_resource_group_and_name_from_arm_id(
-                "/subscriptions/sub/resourceGroups"
-            )
-            is None
-        )
-
-    def test_extract_resource_group_and_name_from_arm_id_rejects_malformed_ids(self):
-        assert (
-            AzureClient.extract_resource_group_and_name_from_arm_id(
-                "/subscriptions/sub/resourceGroups/test-rg/providers/"
-                "Microsoft.Network/networkInterfaces//nic-vm-1"
-            )
-            is None
-        )
-        assert (
-            AzureClient.extract_resource_group_and_name_from_arm_id(
-                "/subscriptions/sub/resourceGroups/test-rg/providers/"
-                "Microsoft.Network/networkInterfaces"
-            )
-            is None
-        )
-
-    def test_extract_resource_group_and_name_from_arm_id_accepts_child_resources(self):
-        assert AzureClient.extract_resource_group_and_name_from_arm_id(
-            "/subscriptions/sub/resourceGroups/test-rg/providers/"
-            "Microsoft.Network/virtualNetworks/test-vnet/subnets/default"
-        ) == ("test-rg", "default")
-
-    def test_subnet_id_to_vnet_id_rejects_malformed_or_non_subnet_ids(self):
-        assert (
-            AzureClient.subnet_id_to_vnet_id(
-                "/subscriptions/sub/resourceGroups/test-rg/providers/"
-                "Microsoft.Network/virtualNetworks/test-vnet/subnets"
-            )
-            is None
-        )
-        assert (
-            AzureClient.subnet_id_to_vnet_id(
-                "/subscriptions/sub/resourceGroups/test-rg/providers/"
-                "Microsoft.Network/networkInterfaces/nic-vm-1"
-            )
-            is None
-        )
-
     def test_resolve_network_identity_from_vm_populates_ips_and_subnet(self):
         azure_client = self._build_partial_client()
         azure_client._network_client = MagicMock()

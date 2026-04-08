@@ -48,6 +48,25 @@ class TestGetTypedProviderConfig:
             }
         }
 
+    def _raw_config_with_azure(self) -> dict:
+        return {
+            "provider": {
+                "providers": [
+                    {
+                        "name": "azure-default",
+                        "type": "azure",
+                        "enabled": True,
+                        "config": {
+                            "subscription_id": "12345678-1234-1234-1234-123456789012",
+                            "resource_group": "orb-test-rg",
+                            "location": "eastus2",
+                        },
+                    }
+                ],
+                "active_provider": "azure-default",
+            }
+        }
+
     def test_get_typed_aws_provider_config_via_registry(self):
         """get_typed(AWSProviderConfig) resolves through ProviderSettingsRegistry."""
         # Ensure AWS is registered
@@ -74,6 +93,22 @@ class TestGetTypedProviderConfig:
         converter = type_converter_module.ConfigTypeConverter(raw)
         result = converter.get_typed(PerformanceConfig)
         assert result.max_workers == 8
+
+    def test_get_typed_azure_provider_config_via_registry(self):
+        """get_typed(AzureProviderConfig) resolves through ProviderSettingsRegistry."""
+        from orb.providers.azure.registration import register_azure_provider_settings
+
+        register_azure_provider_settings()
+
+        from orb.providers.azure.configuration.config import AzureProviderConfig
+
+        converter = type_converter_module.ConfigTypeConverter(self._raw_config_with_azure())
+        result = converter.get_typed(AzureProviderConfig)
+
+        assert isinstance(result, AzureProviderConfig)
+        assert result.subscription_id == "12345678-1234-1234-1234-123456789012"
+        assert result.resource_group == "orb-test-rg"
+        assert result.location == "eastus2"
 
     def test_get_typed_provider_config_for_type_uses_provider_type_param(self):
         """_get_provider_config_for_type uses the provider_type param, not literal 'aws'."""

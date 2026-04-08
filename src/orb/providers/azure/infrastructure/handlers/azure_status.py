@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 
-# Unified Azure VM state map.  PowerState/* entries are common to all
+# Azure VM state map.  PowerState/* entries are common to all
 # VM-based handlers; ProvisioningState/* entries provide a fallback when
 # a VM has not yet reached a power state (e.g. still being created).
 AZURE_VM_STATE_MAP: dict[str, str] = {

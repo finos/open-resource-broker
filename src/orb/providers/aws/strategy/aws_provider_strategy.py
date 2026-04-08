@@ -701,6 +701,13 @@ class AWSProviderStrategy(ProviderStrategy):
         """Return AWS keys that belong in provider config, not template_defaults."""
         return {"fleet_role"}
 
+    def get_cli_provider_config(self, args: Any) -> dict[str, Any]:
+        """Extract AWS provider config from init CLI args."""
+        return {
+            "profile": getattr(args, "profile", None) or None,
+            "region": getattr(args, "region", None) or self.get_default_region(),
+        }
+
     def get_cli_infrastructure_defaults(self, args: Any) -> dict[str, Any]:
         """Extract AWS-specific infrastructure defaults from parsed CLI args."""
         result: dict[str, Any] = {}

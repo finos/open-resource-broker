@@ -155,9 +155,11 @@ class ConfigurationLoader:
     def _load_strategy_defaults(cls, config_manager=None) -> dict[str, Any]:
         merged: dict[str, Any] = {}
         try:
+            from orb.providers.registration import register_all_provider_types
             from orb.providers.registry import get_provider_registry
 
             registry = get_provider_registry()
+            register_all_provider_types()
             cls._merge_config(merged, registry.collect_defaults())
         except Exception as e:
             get_config_logger().warning("Failed to load provider defaults: %s", e)

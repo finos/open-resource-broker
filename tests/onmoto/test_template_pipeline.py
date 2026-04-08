@@ -185,9 +185,19 @@ def test_default_strategy_delegates_hf_file_to_hf_strategy(tmp_path):
     registry = get_scheduler_registry()
     # Register both types so delegation can resolve the HF strategy class
     if not registry.is_registered("hostfactory"):
-        registry.register("hostfactory", HostFactorySchedulerStrategy, lambda c: None)
+        registry.register(
+            "hostfactory",
+            HostFactorySchedulerStrategy,
+            lambda c: None,
+            strategy_class=HostFactorySchedulerStrategy,
+        )
     if not registry.is_registered("default"):
-        registry.register("default", DefaultSchedulerStrategy, lambda c: None)
+        registry.register(
+            "default",
+            DefaultSchedulerStrategy,
+            lambda c: None,
+            strategy_class=DefaultSchedulerStrategy,
+        )
 
     tpl_file = tmp_path / "aws_templates.json"
     _write_hf_file(tpl_file, [_MINIMAL_HF_TEMPLATE])

@@ -350,6 +350,14 @@ class ProviderStrategy(ABC):
         """
         return set()
 
+    def get_cli_provider_config(self, args: Any) -> dict[str, Any]:
+        """Extract provider-specific init config from parsed CLI args.
+
+        Override in provider-specific strategies.
+        Default returns empty dict.
+        """
+        return {}
+
     def get_cli_infrastructure_defaults(self, args: Any) -> dict[str, Any]:
         """Extract provider-specific infrastructure defaults from parsed CLI args.
 

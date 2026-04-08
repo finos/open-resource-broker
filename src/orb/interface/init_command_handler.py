@@ -195,11 +195,13 @@ def _interactive_setup() -> Dict[str, Any]:
 
         # Step 1: pre-auth params (e.g. Azure tenant_id)
         auth_requirements = _get_credential_requirements(provider_type)
-        provider_config: Dict[str, Any] = {"type": provider_type}
+        provider_config: Dict[str, Any] = {}
         for param, info in auth_requirements.items():
-            if info.get("required"):
+            if info.get("required") or info.get("prompt"):
                 prompt = f"  {info['description']}: "
-                provider_config[param] = input(prompt).strip()
+                value = input(prompt).strip()
+                if value or info.get("required"):
+                    provider_config[param] = value
 
         # Step 2: select credentials
         console.info("  Discovering credential sources...")
@@ -237,16 +239,17 @@ def _interactive_setup() -> Dict[str, Any]:
         regions = strategy.get_available_regions() if strategy is not None else []
         default_region = strategy.get_default_region() if strategy is not None else ""
         for param, info in op_requirements.items():
-            if info.get("required"):
+            if info.get("required") or info.get("prompt"):
                 if param == "region":
                     provider_config[param] = _pick_region(regions, default_region)
                 else:
                     prompt = f"  {info['description']}: "
-                    provider_config[param] = input(prompt).strip()
+                    value = input(prompt).strip()
+                    if value or info.get("required"):
+                        provider_config[param] = value
 
         # Step 5: extract final values
         region = provider_config.get("region") or default_region
-        profile = provider_config.get("profile") or None
 
         console.info("")
         console.separator(char="-", color="cyan")
@@ -264,14 +267,13 @@ def _interactive_setup() -> Dict[str, Any]:
         if discover_choice in ["y", "yes"]:
             registry = get_container().get(ProviderRegistryPort)
             infrastructure_defaults = _discover_infrastructure(
-                provider_type, region, profile, registry
+                provider_type, provider_config, registry
             )
 
         # Create first provider instance
         first_provider = {
             "type": provider_type,
-            "profile": profile,
-            "region": region,
+            "config": {**provider_config, "region": region},
             "infrastructure_defaults": infrastructure_defaults,
         }
 
@@ -302,7 +304,11 @@ def _interactive_setup() -> Dict[str, Any]:
             console.info("  Which provider should be used as the default?")
             console.info("")
             for i, p in enumerate(providers, 1):
-                console.info(f"  ({i}) {p['type']} - {p['region']} ({p['profile']})")
+                provider_config = p.get("config", {})
+                console.info(
+                    f"  ({i}) {p['type']} - {provider_config.get('region', '')} "
+                    f"({provider_config.get('profile')})"
+                )
             console.info("")
             default_choice = input("  Select default provider (1): ").strip() or "1"
             try:
@@ -359,11 +365,13 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
 
         # Step 1: pre-auth params (e.g. Azure tenant_id)
         auth_requirements = _get_credential_requirements(provider_type)
-        provider_config: Dict[str, Any] = {"type": provider_type}
+        provider_config: Dict[str, Any] = {}
         for param, info in auth_requirements.items():
-            if info.get("required"):
+            if info.get("required") or info.get("prompt"):
                 prompt = f"  {info['description']}: "
-                provider_config[param] = input(prompt).strip()
+                value = input(prompt).strip()
+                if value or info.get("required"):
+                    provider_config[param] = value
 
         # Step 2: select credentials
         console.info("  Discovering credential sources...")
@@ -400,16 +408,17 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
         regions = strategy.get_available_regions() if strategy is not None else []
         default_region = strategy.get_default_region() if strategy is not None else ""
         for param, info in op_requirements.items():
-            if info.get("required"):
+            if info.get("required") or info.get("prompt"):
                 if param == "region":
                     provider_config[param] = _pick_region(regions, default_region)
                 else:
                     prompt = f"  {info['description']}: "
-                    provider_config[param] = input(prompt).strip()
+                    value = input(prompt).strip()
+                    if value or info.get("required"):
+                        provider_config[param] = value
 
         # Step 5: extract final values
         region = provider_config.get("region") or default_region
-        profile = provider_config.get("profile") or None
 
         # Infrastructure discovery
         console.info("")
@@ -421,13 +430,12 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
         if discover_choice in ["y", "yes"]:
             registry = get_container().get(ProviderRegistryPort)
             infrastructure_defaults = _discover_infrastructure(
-                provider_type, region, profile, registry
+                provider_type, provider_config, registry
             )
 
         return {
             "type": provider_type,
-            "profile": provider_config.get("profile") or None,
-            "region": provider_config.get("region") or default_region,
+            "config": {**provider_config, "region": region},
             "infrastructure_defaults": infrastructure_defaults,
         }
 
@@ -502,10 +510,11 @@ def _test_provider_credentials(
     provider_type: str, credential_source: Optional[str], **kwargs
 ) -> tuple[bool, str]:
     """Test provider credentials via strategy."""
-    strategy = _get_provider_strategy(provider_type)
-    if strategy is None:
-        return False, "Provider type not supported"
     try:
+        registry = get_container().get(ProviderRegistryPort)
+        if not registry.ensure_provider_type_registered(provider_type):
+            return False, "Provider type not supported"
+        strategy = registry.create_strategy_by_type(provider_type, kwargs)
         result = strategy.test_credentials(credential_source, **kwargs)
         if result.get("success", False):
             return True, ""
@@ -537,7 +546,7 @@ def _get_operational_requirements(provider_type: str) -> dict:
 
 
 def _discover_infrastructure(
-    provider_type: str, region: str, profile: str | None, registry: ProviderRegistryPort
+    provider_type: str, provider_config: Dict[str, Any], registry: ProviderRegistryPort
 ) -> Dict[str, Any]:
     """Discover infrastructure interactively using provider strategy."""
     console = get_container().get(ConsolePort)
@@ -548,14 +557,14 @@ def _discover_infrastructure(
             return {}
 
         # Create provider config for discovery
-        provider_config = {"region": region, "profile": profile}
+        strategy_config = {k: v for k, v in provider_config.items() if v not in (None, "")}
 
         # Get strategy from registry — bypass cache so discovery uses the correct region/profile
-        strategy = registry.create_strategy_by_type(provider_type, provider_config)
+        strategy = registry.create_strategy_by_type(provider_type, strategy_config)
 
         # Check if provider strategy supports infrastructure discovery
         if hasattr(strategy, "discover_infrastructure_interactive"):
-            full_config = {"type": provider_type, "config": provider_config}
+            full_config = {"type": provider_type, "config": strategy_config}
             return strategy.discover_infrastructure_interactive(full_config)  # type: ignore[union-attr]
         else:
             console.info(
@@ -580,15 +589,18 @@ def _get_default_config(args) -> Dict[str, Any]:
     provider_type = args.provider or default_provider
     strategy = _get_provider_strategy(provider_type)
     default_region = strategy.get_default_region() if strategy is not None else ""
+    provider_config = strategy.get_cli_provider_config(args) if strategy is not None else {}
+    if not provider_config.get("region"):
+        provider_config["region"] = args.region or default_region
     infrastructure_defaults = (
         strategy.get_cli_infrastructure_defaults(args) if strategy is not None else {}
     )
 
     first_provider = {
         "type": provider_type,
-        "profile": args.profile or None,
-        "region": args.region or default_region,
+        "config": provider_config,
         "infrastructure_defaults": infrastructure_defaults,
+        "is_default": True,
     }
 
     return {
@@ -629,17 +641,16 @@ def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
     providers_list = []
     default_provider_name: str | None = None
     for provider_data in user_config.get("providers", []):
-        provider_config = {"profile": provider_data["profile"], "region": provider_data["region"]}
+        provider_config = dict(provider_data.get("config", {}))
+        if not provider_config:
+            provider_config = {
+                "profile": provider_data.get("profile"),
+                "region": provider_data.get("region"),
+            }
         provider_type = provider_data["type"]
 
-        # Generate provider name
-        import re
-
-        profile_for_name = provider_data["profile"] or "instance-profile"
-        sanitized_profile = re.sub(r"[^a-zA-Z0-9\-_]", "-", profile_for_name)
-        provider_name = f"{provider_type}_{sanitized_profile}_{provider_data['region']}"
-
         # Create provider instance
+        provider_name = _generate_provider_instance_name(provider_type, provider_config)
         provider_instance = {
             "name": provider_name,
             "type": provider_type,
@@ -697,6 +708,21 @@ def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
 
     with open(config_file, "w") as f:
         json.dump(config, f, indent=2)
+
+
+def _generate_provider_instance_name(provider_type: str, provider_config: Dict[str, Any]) -> str:
+    """Generate a provider instance name using the provider strategy when available."""
+    try:
+        registry = get_container().get(ProviderRegistryPort)
+        strategy = registry.create_strategy_by_type(provider_type, provider_config)
+        return strategy.generate_provider_name(provider_config)
+    except Exception:
+        import re
+
+        profile_for_name = provider_config.get("profile") or "instance-profile"
+        sanitized_profile = re.sub(r"[^a-zA-Z0-9\-_]", "-", str(profile_for_name))
+        region = provider_config.get("region") or "default"
+        return f"{provider_type}_{sanitized_profile}_{region}"
 
 
 def _copy_scripts(scripts_dir: Path):

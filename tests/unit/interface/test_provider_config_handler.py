@@ -13,12 +13,14 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def register_aws_cli_spec():
-    """Register AWS CLI spec for all tests in this module."""
+def register_provider_cli_specs():
+    """Register provider CLI specs for all tests in this module."""
     from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
     from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec
+    from orb.providers.azure.cli.azure_cli_spec import AzureCLISpec
 
     CLISpecRegistry.register("aws", AWSCLISpec())
+    CLISpecRegistry.register("azure", AzureCLISpec())
     yield
     # Clean up after test
     CLISpecRegistry._specs.clear()
@@ -206,6 +208,49 @@ class TestHandleProviderAdd:
 
         assert result.get("error") is True and result.get("exit_code") == 1
 
+    @pytest.mark.asyncio
+    async def test_azure_success_returns_0_and_writes_config(self, tmp_path):
+        from orb.interface.provider_config_handler import handle_provider_add
+
+        _write_config(tmp_path, _base_config())
+        with (
+            patch(
+                "orb.interface.provider_config_handler.get_config_location",
+                return_value=tmp_path,
+            ),
+            patch(
+                "orb.interface.provider_config_handler._test_provider_credentials",
+                return_value=(True, ""),
+            ),
+        ):
+            args = _ns(
+                provider_type="azure",
+                azure_subscription_id="12345678-1234-1234-1234-123456789012",
+                azure_resource_group="orb-test-rg",
+                azure_location="eastus2",
+                azure_client_id=None,
+                azure_cyclecloud_url="https://cyclecloud.example.com",
+                azure_cyclecloud_credential_path="op://vault/item/cred",
+                azure_cyclecloud_auth_mode="basic",
+                azure_cyclecloud_aad_scope=None,
+                azure_cyclecloud_verify_ssl=False,
+                azure_cyclecloud_no_verify_ssl=True,
+                name=None,
+                discover=False,
+            )
+            result = await handle_provider_add(args)
+
+        assert result.get("error") is not True
+        saved = json.loads((tmp_path / "config.json").read_text())
+        provider = next(p for p in saved["provider"]["providers"] if p["type"] == "azure")
+        assert provider["config"]["subscription_id"] == "12345678-1234-1234-1234-123456789012"
+        assert provider["config"]["resource_group"] == "orb-test-rg"
+        assert provider["config"]["region"] == "eastus2"
+        assert provider["config"]["cyclecloud"]["url"] == "https://cyclecloud.example.com"
+        assert provider["config"]["cyclecloud"]["credential_path"] == "op://vault/item/cred"
+        assert provider["config"]["cyclecloud"]["auth_mode"] == "basic"
+        assert provider["config"]["cyclecloud"]["verify_ssl"] is False
+
 
 # ---------------------------------------------------------------------------
 # handle_provider_remove
@@ -350,6 +395,67 @@ class TestHandleProviderUpdate:
         saved = json.loads((tmp_path / "config.json").read_text())
         provider = next(p for p in saved["provider"]["providers"] if p["name"] == "aws-default")
         assert provider["config"]["region"] == "ap-southeast-1"
+
+    @pytest.mark.asyncio
+    async def test_azure_success_returns_0_and_writes_config(self, tmp_path):
+        from orb.interface.provider_config_handler import handle_provider_update
+
+        config = _base_config(
+            providers=[
+                {
+                    "name": "azure-default",
+                    "type": "azure",
+                    "enabled": True,
+                    "config": {
+                        "subscription_id": "12345678-1234-1234-1234-123456789012",
+                        "resource_group": "orb-test-rg",
+                        "region": "eastus2",
+                        "cyclecloud": {
+                            "url": "https://cyclecloud.example.com",
+                            "credential_path": "op://vault/item/cred",
+                            "verify_ssl": True,
+                        },
+                    },
+                }
+            ]
+        )
+        _write_config(tmp_path, config)
+        with (
+            patch(
+                "orb.interface.provider_config_handler.get_config_location",
+                return_value=tmp_path,
+            ),
+            patch(
+                "orb.interface.provider_config_handler._test_provider_credentials",
+                return_value=(True, ""),
+            ),
+        ):
+            args = _ns(
+                provider_name="azure-default",
+                azure_subscription_id=None,
+                azure_resource_group="orb-updated-rg",
+                azure_location="westeurope",
+                azure_client_id="managed-identity-client-id",
+                azure_cyclecloud_url=None,
+                azure_cyclecloud_credential_path=None,
+                azure_cyclecloud_auth_mode="bearer",
+                azure_cyclecloud_aad_scope="api://cyclecloud/.default",
+                azure_cyclecloud_verify_ssl=False,
+                azure_cyclecloud_no_verify_ssl=True,
+                aws_region=None,
+                aws_profile=None,
+            )
+            result = await handle_provider_update(args)
+
+        assert result.get("error") is not True
+        saved = json.loads((tmp_path / "config.json").read_text())
+        provider = next(p for p in saved["provider"]["providers"] if p["name"] == "azure-default")
+        assert provider["config"]["resource_group"] == "orb-updated-rg"
+        assert provider["config"]["region"] == "westeurope"
+        assert provider["config"]["client_id"] == "managed-identity-client-id"
+        assert provider["config"]["cyclecloud"]["auth_mode"] == "bearer"
+        assert provider["config"]["cyclecloud"]["aad_scope"] == "api://cyclecloud/.default"
+        assert provider["config"]["cyclecloud"]["verify_ssl"] is False
 
 
 # ---------------------------------------------------------------------------

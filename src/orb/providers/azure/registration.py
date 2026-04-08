@@ -409,6 +409,32 @@ def register_azure_extensions(logger: Optional["LoggingPort"] = None) -> None:
         raise
 
 
+def register_azure_provider_settings() -> None:
+    """Register AzureProviderConfig with the provider settings registry."""
+    try:
+        from orb.config.schemas.provider_settings_registry import ProviderSettingsRegistry
+        from orb.providers.azure.configuration.config import AzureProviderConfig
+
+        ProviderSettingsRegistry.register_provider_settings("azure", AzureProviderConfig)
+    except ImportError:
+        pass
+    except Exception as exc:
+        raise RuntimeError(f"Failed to register Azure provider settings: {exc!s}")
+
+
+def register_azure_cli_spec() -> None:
+    """Register Azure CLI spec for provider add/update commands."""
+    try:
+        from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
+        from orb.providers.azure.cli.azure_cli_spec import AzureCLISpec
+
+        CLISpecRegistry.register("azure", AzureCLISpec())
+    except ImportError:
+        pass
+    except Exception as exc:
+        raise RuntimeError(f"Failed to register Azure CLI spec: {exc!s}")
+
+
 def register_azure_template_factory(
     factory: TemplateFactory, logger: Optional["LoggingPort"] = None
 ) -> None:
@@ -439,6 +465,8 @@ def initialize_azure_provider(
     """Initialize Azure provider components at application startup."""
     try:
         register_azure_extensions(logger)
+        register_azure_provider_settings()
+        register_azure_cli_spec()
         if template_factory:
             register_azure_template_factory(template_factory, logger)
         if logger:
@@ -489,6 +517,8 @@ def register_azure_services_with_di(container) -> None:
 
 try:
     register_azure_extensions()
+    register_azure_provider_settings()
+    register_azure_cli_spec()
 except Exception:
     import logging as _logging
 
