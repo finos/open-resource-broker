@@ -22,7 +22,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/awslabs/open-resource-broker/sdk/go/orb"
+	"github.com/awslabs/open-resource-broker/orb"
 )
 
 func main() {

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/awslabs/open-resource-broker/sdk/go/orb"
-	"github.com/awslabs/open-resource-broker/sdk/go/testutil"
+	"github.com/awslabs/open-resource-broker/orb"
+	"github.com/awslabs/open-resource-broker/testutil"
 )
 
 func TestIntegrationListTemplates(t *testing.T) {

@@ -217,13 +217,19 @@ local-clean: ; @$(MAKE) local-workflow clean
 
 # @SECTION Go SDK
 sdk-go-test:  ## Run Go SDK tests
-	cd sdk/go && go test ./...
+	go test ./sdk/go/...
 
 sdk-go-build:  ## Build Go SDK
-	cd sdk/go && go build ./...
+	go build ./sdk/go/...
 
 sdk-go-generate:  ## Regenerate Go SDK from OpenAPI spec
-	cd sdk/go && go generate ./...
+	go generate ./sdk/go/...
+
+sdk-go-update-version:  ## Update Go SDK version file and commit (usage: make sdk-go-update-version VERSION=1.6.0)
+	sed -i "s/MinCompatibleVersion = \".*\"/MinCompatibleVersion = \"$(VERSION)\"/" sdk/go/orb/version.go
+	git add sdk/go/openapi.json sdk/go/orb/version.go
+	git diff --cached --quiet || git commit -m "chore(sdk/go): update for v$(VERSION) [skip ci]"
+	git push
 
 sdk-go-export-spec:  ## Export OpenAPI spec from running ORB server into sdk/go/openapi.json
 	orb system serve --socket-path /tmp/orb-spec.sock &

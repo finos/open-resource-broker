@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/awslabs/open-resource-broker/sdk/go/internal/sse"
+	"github.com/awslabs/open-resource-broker/internal/sse"
 )
 
 func body(s string) io.ReadCloser {

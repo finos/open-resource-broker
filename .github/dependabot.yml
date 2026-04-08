@@ -87,7 +87,7 @@ updates:
 
   # Go dependencies (SDK)
   - package-ecosystem: "gomod"
-    directory: "/sdk/go"
+    directory: "/"
     schedule:
       interval: "weekly"
       day: "sunday"

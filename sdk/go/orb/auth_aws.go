@@ -3,7 +3,7 @@ package orb
 import (
 	"net/http"
 
-	"github.com/awslabs/open-resource-broker/sdk/go/internal/transport"
+	"github.com/awslabs/open-resource-broker/internal/transport"
 )
 
 // AWSCredentials holds static AWS credentials for SigV4 signing.
