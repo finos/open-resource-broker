@@ -433,6 +433,22 @@ class AzureProviderStrategy(ProviderStrategy):
         """Check Azure connectivity and return the current health status."""
         return self._health_check_service.check_health(self.azure_client)
 
+    def get_available_credential_sources(self) -> list[dict]:
+        """Return Azure credential source options."""
+        return [{"name": None, "description": "DefaultAzureCredential / managed identity"}]
+
+    def test_credentials(self, credential_source: Optional[str] = None, **kwargs) -> dict:
+        """Validate Azure credentials by performing a health check."""
+        del credential_source
+        health = self._health_check_service.check_health(self.azure_client)
+        if health.is_healthy:
+            return {"success": True}
+        return {
+            "success": False,
+            "error": health.status_message,
+            "details": health.error_details or {},
+        }
+
     def generate_provider_name(self, config: dict[str, Any]) -> str:
         """Generate Azure provider name."""
         subscription_id = config.get("subscription_id", "default")

@@ -60,6 +60,66 @@ class HostFactoryFieldMappings:
             "instanceProfile": "instance_profile",
             "userDataScript": "user_data",
         },
+        # Azure-specific fields (only mapped when Azure provider is active)
+        "azure": {
+            # Override generic AWS-centric meanings for Azure templates
+            "vmType": "vm_size",
+            "vmTypes": "vm_sizes",
+            "keyName": "ssh_key_name",
+            "subnetId": "network_config.subnet_id",
+            "securityGroupIds": "network_config.network_security_group_id",
+            # Azure resource targeting
+            "resourceGroup": "resource_group",
+            "subscriptionId": "subscription_id",
+            # Azure VMSS / compute configuration
+            "vmSize": "vm_size",
+            "vmSizes": "vm_sizes",
+            "vmssName": "vmss_name",
+            "orchestrationMode": "orchestration_mode",
+            "platformFaultDomainCount": "platform_fault_domain_count",
+            "singlePlacementGroup": "single_placement_group",
+            # Azure pricing / placement
+            "evictionPolicy": "eviction_policy",
+            "billingProfileMaxPrice": "billing_profile_max_price",
+            "spotPercentage": "spot_percentage",
+            "baseRegularPriorityCount": "base_regular_priority_count",
+            "spotAllocationStrategy": "spot_allocation_strategy",
+            "spotRestoreEnabled": "spot_restore_enabled",
+            "spotRestoreTimeout": "spot_restore_timeout",
+            "zoneBalance": "zone_balance",
+            "proximityPlacementGroupId": "proximity_placement_group_id",
+            "capacityReservationGroupId": "capacity_reservation_group_id",
+            # Azure storage / network / security
+            "osDisk": "os_disk",
+            "dataDisks": "data_disks",
+            "networkConfig": "network_config",
+            "securityType": "security_type",
+            "secureBootEnabled": "secure_boot_enabled",
+            "vtpmEnabled": "vtpm_enabled",
+            "encryptionAtHost": "encryption_at_host",
+            "diskEncryptionSetId": "disk_encryption_set_id",
+            # Azure identity / bootstrap
+            "adminUsername": "admin_username",
+            "sshKeyName": "ssh_key_name",
+            "sshPublicKeys": "ssh_public_keys",
+            "userAssignedIdentityIds": "user_assigned_identity_ids",
+            "systemAssignedIdentity": "system_assigned_identity",
+            "customData": "custom_data",
+            "extensionProfile": "extension_profile",
+            "upgradePolicyMode": "upgrade_policy_mode",
+            # Azure native spec / metadata
+            "providerApiSpec": "provider_api_spec",
+            "providerApiSpecFile": "provider_api_spec_file",
+            "nodeAttributes": "node_attributes",
+            # Azure CycleCloud
+            "clusterName": "cluster_name",
+            "nodeArray": "node_array",
+            "cyclecloudUrl": "cyclecloud_url",
+            "cyclecloudCredentialPath": "cyclecloud_credential_path",
+            "cyclecloudVerifySsl": "cyclecloud_verify_ssl",
+            "cyclecloudAuthMode": "cyclecloud_auth_mode",
+            "cyclecloudAadScope": "cyclecloud_aad_scope",
+        },
     }
 
     @classmethod
