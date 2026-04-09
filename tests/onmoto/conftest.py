@@ -57,7 +57,28 @@ def patch_moto_compat():
             instance_ids = result.get("instance_ids") or result.get("resource_ids", [])
             iids = [i for i in instance_ids if i.startswith("i-")]
             if iids:
-                result["instances"] = [{"instance_id": iid} for iid in iids]
+                # Resolve the resource_id (reservation ID) for each instance so that
+                # group_by_resource can group them correctly during return/deprovisioning.
+                # resource_ids contains the reservation ID(s); use the first one.
+                resource_ids = result.get("resource_ids", [])
+                resource_id = next(
+                    (r for r in resource_ids if not r.startswith("i-")),
+                    resource_ids[0] if resource_ids else "",
+                )
+                provider_api = getattr(template, "provider_api", None)
+                provider_api_str = (
+                    (provider_api.value if hasattr(provider_api, "value") else str(provider_api))
+                    if provider_api
+                    else "RunInstances"
+                )
+                result["instances"] = [
+                    {
+                        "instance_id": iid,
+                        "resource_id": resource_id,
+                        "provider_api": provider_api_str,
+                    }
+                    for iid in iids
+                ]
         return result
 
     with (
@@ -263,7 +284,7 @@ def _make_config_port(prefix: str = ""):
 
     config_port = MagicMock()
     config_port.get_resource_prefix.return_value = prefix
-    provider_defaults = ProviderDefaults(cleanup=CleanupConfig(enabled=False).model_dump())
+    provider_defaults = ProviderDefaults(cleanup=CleanupConfig(enabled=True).model_dump())
     provider_config = MagicMock()
     provider_config.provider_defaults = {"aws": provider_defaults}
     config_port.get_provider_config.return_value = provider_config

@@ -196,9 +196,16 @@ class TestASGCleanupOnReturn:
     def _asg_details(self, desired=2, min_size=0):
         return {"DesiredCapacity": desired, "MinSize": min_size}
 
+    def _setup_redescribe(self, handler, desired_after_detach: int) -> None:
+        """Configure the re-describe call that capacity_manager makes after detach."""
+        handler.aws_client.autoscaling_client.describe_auto_scaling_groups.return_value = {
+            "AutoScalingGroups": [{"DesiredCapacity": desired_after_detach, "MinSize": 0}]
+        }
+
     def test_full_return_triggers_lt_cleanup(self):
         config_port = _make_config_port()
         handler = _make_asg_handler(config_port=config_port)
+        self._setup_redescribe(handler, desired_after_detach=0)
 
         with (
             patch.object(handler, "_delete_asg") as mock_delete_asg,
@@ -215,6 +222,7 @@ class TestASGCleanupOnReturn:
     def test_partial_return_does_not_trigger_lt_cleanup(self):
         config_port = _make_config_port()
         handler = _make_asg_handler(config_port=config_port)
+        self._setup_redescribe(handler, desired_after_detach=2)
 
         with (
             patch.object(handler, "_delete_asg") as mock_delete_asg,
@@ -231,6 +239,7 @@ class TestASGCleanupOnReturn:
     def test_asg_cleanup_disabled_skips_lt(self):
         config_port = _make_config_port(asg=False)
         handler = _make_asg_handler(config_port=config_port)
+        self._setup_redescribe(handler, desired_after_detach=0)
 
         with (
             patch.object(handler, "_delete_asg") as mock_delete_asg,
@@ -248,6 +257,7 @@ class TestASGCleanupOnReturn:
         config_port = _make_config_port()
         config_port.get_resource_prefix.return_value = "orb-asg-"
         handler = _make_asg_handler(config_port=config_port)
+        self._setup_redescribe(handler, desired_after_detach=0)
 
         with (
             patch.object(handler, "_delete_asg"),
@@ -595,9 +605,8 @@ def _make_spot_fleet_release_manager(cleanup_fn=None):
         request_adapter=None,
         cleanup_on_zero_capacity_fn=cleanup_fn,
         logger=logger,
+        retry_fn=lambda fn, operation_type="standard", **kw: fn(**kw),
     )
-    # Make _retry call the function directly (no real retry logic needed in unit tests)
-    mgr._aws_ops._retry_with_backoff = None
     return mgr, aws_client, cleanup_fn
 
 
@@ -820,7 +829,10 @@ class TestASGCapacityManagerMissingDetails:
 
     def test_valid_asg_details_at_zero_capacity_calls_delete_and_cleanup(self):
         cleanup_fn = MagicMock()
-        mgr, _aws_client, _ = _make_asg_capacity_manager(cleanup_fn)
+        mgr, aws_client, _ = _make_asg_capacity_manager(cleanup_fn)
+        aws_client.autoscaling_client.describe_auto_scaling_groups.return_value = {
+            "AutoScalingGroups": [{"DesiredCapacity": 0, "MinSize": 0}]
+        }
         delete_fn = MagicMock()
         mgr.set_delete_asg_fn(delete_fn)
         mgr.release_instances(
@@ -833,7 +845,10 @@ class TestASGCapacityManagerMissingDetails:
 
     def test_valid_asg_details_partial_return_no_delete_no_cleanup(self):
         cleanup_fn = MagicMock()
-        mgr, _aws_client, _ = _make_asg_capacity_manager(cleanup_fn)
+        mgr, aws_client, _ = _make_asg_capacity_manager(cleanup_fn)
+        aws_client.autoscaling_client.describe_auto_scaling_groups.return_value = {
+            "AutoScalingGroups": [{"DesiredCapacity": 2, "MinSize": 0}]
+        }
         delete_fn = MagicMock()
         mgr.set_delete_asg_fn(delete_fn)
         mgr.release_instances(

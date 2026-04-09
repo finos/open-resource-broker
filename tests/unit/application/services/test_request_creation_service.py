@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from orb.application.services.request_creation_service import RequestCreationService
+from orb.domain.request.exceptions import RequestValidationError
 from orb.domain.request.request_types import RequestType
 
 
@@ -116,7 +117,7 @@ class TestRequestCreationService:
 
         with patch("orb.application.services.request_creation_service.Request") as MockRequest:
             MockRequest.create_new_request = MagicMock(return_value=fake_request)
-            with pytest.raises(ValueError, match="tmpl-no-api"):
+            with pytest.raises(RequestValidationError, match="tmpl-no-api"):
                 self.svc.create_machine_request(cmd, template, selection)
 
     def test_metadata_includes_dry_run(self):

@@ -179,11 +179,11 @@ class TestCommandQuerySeparation:
             provisioning_service=mock_provisioning_service,
         )
 
-        # Execute command with dry_run to avoid provisioning
+        # Execute command with dry_run — PENDING→COMPLETED is now valid
         command = CreateRequestCommand(template_id="test-template", requested_count=2, dry_run=True)
         await handler.handle(command)
 
-        # Verify state was modified via repository save (called twice: initial persist + dry-run update)
+        # Verify state was modified via repository save
         mock_repository.save.assert_called()
 
     def test_query_handlers_do_not_modify_state(self):
@@ -516,7 +516,7 @@ class TestCommandHandlerImplementation:
             mock_validation_result
         )
 
-        # Should handle valid command without raising
+        # PENDING→COMPLETED is now valid — dry_run should succeed
         await handler.handle(valid_command)
 
         # Invalid command (template doesn't exist)
@@ -595,7 +595,7 @@ class TestCommandHandlerImplementation:
             provisioning_service=Mock(),
         )
 
-        # Execute command with dry_run to avoid provisioning
+        # Execute command with dry_run — PENDING→COMPLETED is now valid
         command = CreateRequestCommand(template_id="test-template", requested_count=2, dry_run=True)
         await handler.handle(command)
 

@@ -93,8 +93,10 @@ class TestRequestStatus:
         assert RequestStatus.CANCELLED.can_transition_to(RequestStatus.COMPLETED) is False
         assert RequestStatus.TIMEOUT.can_transition_to(RequestStatus.FAILED) is False
         assert RequestStatus.PARTIAL.can_transition_to(RequestStatus.ACQUIRING) is False
-        # PENDING cannot jump to COMPLETED
-        assert RequestStatus.PENDING.can_transition_to(RequestStatus.COMPLETED) is False
+
+    def test_can_transition_to_valid_pending_complete(self):
+        # PENDING→COMPLETED is valid for instant provisioning (e.g. RunInstances)
+        assert RequestStatus.PENDING.can_transition_to(RequestStatus.COMPLETED) is True
 
 
 class TestMachineResult:

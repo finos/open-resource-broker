@@ -13,6 +13,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from orb.domain.request.exceptions import RequestValidationError
+
 # Paths to the 4 application service files under test
 _SRC = Path(__file__).parents[4] / "src" / "orb" / "application" / "services"
 _FILES = [
@@ -89,7 +91,7 @@ class TestRequestCreationServiceRaisesOnMissingProviderApi:
 
         with patch("orb.application.services.request_creation_service.Request") as MockRequest:
             MockRequest.create_new_request.return_value = fake_request
-            with pytest.raises(ValueError, match="tmpl-missing-api"):
+            with pytest.raises(RequestValidationError, match="tmpl-missing-api"):
                 self.svc.create_machine_request(
                     self._make_command(), template, self._make_selection()
                 )
@@ -104,7 +106,7 @@ class TestRequestCreationServiceRaisesOnMissingProviderApi:
 
         with patch("orb.application.services.request_creation_service.Request") as MockRequest:
             MockRequest.create_new_request.return_value = fake_request
-            with pytest.raises(ValueError, match="tmpl-empty-api"):
+            with pytest.raises(RequestValidationError, match="tmpl-empty-api"):
                 self.svc.create_machine_request(
                     self._make_command(), template, self._make_selection()
                 )
@@ -161,12 +163,13 @@ class TestMachineGroupingServiceSkipsMissingProviderApi:
 
         self._setup_uow({"i-aaa": m1, "i-bbb": m2})
 
-        result = self.svc.group_by_resource(["i-aaa", "i-bbb"])
+        groups, skipped = self.svc.group_by_resource(["i-aaa", "i-bbb"])
 
         # m2 skipped — only m1 appears in any group
-        all_machines = [m for group in result.values() for m in group]
+        all_machines = [m for group in groups.values() for m in group]
         assert m1 in all_machines
         assert m2 not in all_machines
+        assert "i-bbb" in skipped
         self.logger.warning.assert_called_once()
         assert "i-bbb" in str(self.logger.warning.call_args)
 
@@ -174,10 +177,11 @@ class TestMachineGroupingServiceSkipsMissingProviderApi:
         m = self._make_machine("i-bbb", "aws-prod", None, "asg-1")
         self._setup_uow({"i-bbb": m})
 
-        result = self.svc.group_by_resource(["i-bbb"])
+        groups, skipped = self.svc.group_by_resource(["i-bbb"])
 
         # sole machine skipped — result is empty
-        assert result == {}
+        assert groups == {}
+        assert "i-bbb" in skipped
         self.logger.warning.assert_called_once()
         assert "i-bbb" in str(self.logger.warning.call_args)
 
@@ -185,10 +189,11 @@ class TestMachineGroupingServiceSkipsMissingProviderApi:
         m = self._make_machine("i-bbb", "aws-prod", None, "asg-1")
         self._setup_uow({"i-bbb": m})
 
-        result = self.svc.group_by_resource(["i-bbb"])
+        groups, skipped = self.svc.group_by_resource(["i-bbb"])
 
         # sole machine skipped — result is empty
-        assert result == {}
+        assert groups == {}
+        assert "i-bbb" in skipped
         self.logger.warning.assert_called_once()
         assert "i-bbb" in str(self.logger.warning.call_args)
 
@@ -199,13 +204,14 @@ class TestMachineGroupingServiceSkipsMissingProviderApi:
 
         self._setup_uow({"i-aaa": m1, "i-bbb": m2, "i-ccc": m3})
 
-        result = self.svc.group_by_resource(["i-aaa", "i-bbb", "i-ccc"])
+        groups, skipped = self.svc.group_by_resource(["i-aaa", "i-bbb", "i-ccc"])
 
         # m2 skipped — m1 and m3 present in their respective groups
-        all_machines = [m for group in result.values() for m in group]
+        all_machines = [m for group in groups.values() for m in group]
         assert m1 in all_machines
         assert m3 in all_machines
         assert m2 not in all_machines
+        assert "i-bbb" in skipped
         self.logger.warning.assert_called_once()
         assert "i-bbb" in str(self.logger.warning.call_args)
 

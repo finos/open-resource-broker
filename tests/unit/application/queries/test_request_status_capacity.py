@@ -157,9 +157,8 @@ def test_runinstances_timeout_when_no_instances_after_long_time():
     )
 
     new_status, msg = service.determine_status_from_machines([], [], request, {})
-    # No machines yet — service returns None, None (keep current status)
-    assert new_status is None
-    assert msg is None
+    # No machines yet — service returns IN_PROGRESS (keep polling)
+    assert new_status == RequestStatus.IN_PROGRESS.value
 
 
 @pytest.mark.unit
@@ -195,6 +194,6 @@ def test_provisioning_failure_metadata_forces_failed():
         },
     )
 
-    # No machines, no provider machines — service returns None, None
+    # No machines, no provider machines — service returns IN_PROGRESS (keep polling)
     new_status, _ = service.determine_status_from_machines([], [], request, {})
-    assert new_status is None
+    assert new_status == RequestStatus.IN_PROGRESS.value

@@ -130,15 +130,19 @@ class TestHandleProvisioningFailure:
         prov_result = MagicMock()
         prov_result.error_message = "Provider timeout"
         self.svc._handle_provisioning_failure(req, prov_result)
-        assert req.metadata["error_message"] == "Provider timeout"
-        assert req.metadata["error_type"] == "ProvisioningFailure"
+        req.update_metadata.assert_called_once()
+        call_kwargs = req.update_metadata.call_args[0][0]
+        assert call_kwargs["error_message"] == "Provider timeout"
+        assert call_kwargs["error_type"] == "ProvisioningFailure"
 
     def test_unknown_error_message_fallback(self):
         req = _make_request()
         prov_result = MagicMock()
         prov_result.error_message = None
         self.svc._handle_provisioning_failure(req, prov_result)
-        assert req.metadata["error_message"] == "Provisioning failed (no error details)"
+        req.update_metadata.assert_called_once()
+        call_kwargs = req.update_metadata.call_args[0][0]
+        assert call_kwargs["error_message"] == "Provisioning failed (no error details)"
 
 
 def _make_result(**kwargs) -> ProvisioningResult:

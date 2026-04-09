@@ -3,8 +3,6 @@
 from typing import Any
 from unittest.mock import MagicMock
 
-import pytest
-
 from orb.providers.aws.domain.template.value_objects import AWSFleetType
 from orb.providers.aws.infrastructure.handlers.asg.handler import ASGHandler
 from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
@@ -90,8 +88,8 @@ class TestBuildSystemTags:
 class TestBuildResourceTagsReservedNamespace:
     def test_orb_prefixed_template_tag_raises(self):
         cp = _make_config_port()
-        with pytest.raises(ValueError, match="orb:"):
-            build_resource_tags(
+        with self._assert_warning():
+            tags = build_resource_tags(
                 config_port=cp,
                 request_id="req-1",
                 template_id="tmpl-1",
@@ -99,11 +97,21 @@ class TestBuildResourceTagsReservedNamespace:
                 provider_api="EC2Fleet",
                 template_tags={"orb:request-id": "spoofed"},
             )
+        # orb: key stripped — system tags still present
+        d = _tag_dict(tags)
+        assert d["orb:request-id"] == "req-1"  # system tag wins, not spoofed value
+
+    def _assert_warning(self):
+        import warnings
+
+        return warnings.catch_warnings(record=True)
 
     def test_multiple_orb_prefixed_keys_reported(self):
         cp = _make_config_port()
-        with pytest.raises(ValueError, match="orb:"):
-            build_resource_tags(
+        import warnings
+
+        with warnings.catch_warnings(record=True):
+            tags = build_resource_tags(
                 config_port=cp,
                 request_id="req-1",
                 template_id="tmpl-1",
@@ -111,6 +119,10 @@ class TestBuildResourceTagsReservedNamespace:
                 provider_api="EC2Fleet",
                 template_tags={"orb:managed-by": "x", "orb:template-id": "y"},
             )
+        # Both orb: keys stripped — system tags still present
+        d = _tag_dict(tags)
+        assert d["orb:managed-by"] == "open-resource-broker"
+        assert d["orb:template-id"] == "tmpl-1"
 
     def test_plain_template_tags_are_accepted(self):
         cp = _make_config_port()
@@ -235,20 +247,21 @@ class TestASGHandlerTags:
         assert "env" in keys
 
     def test_tag_asg_orb_prefixed_template_tag_logs_warning(self):
-        # _tag_asg is best-effort: it catches all exceptions and logs a warning.
-        # An orb: tag key in template.tags causes build_resource_tags to raise
-        # ValueError, which _tag_asg catches and logs — it does not re-raise.
+        # build_resource_tags strips orb: keys and warns via the injected LoggingPort.
         handler = self._make_handler()
         template = _make_template()
         template.tags = {"orb:request-id": "spoofed"}
 
-        # Should not raise — the error is swallowed and logged
         handler._tag_asg("asg-test", template, "req-real")
 
-        # Warning was logged with the reserved-namespace message
-        handler._logger.warning.assert_called_once()
-        warning_msg = str(handler._logger.warning.call_args)
-        assert "orb:" in warning_msg or "Failed to tag" in warning_msg
+        # Warning was issued on the handler's LoggingPort mock
+        warning_calls = handler._logger.warning.call_args_list
+        assert any("orb:" in str(call) for call in warning_calls)
+
+    def assertLogs(self, logger_name, level):
+        import unittest
+
+        return unittest.TestCase().assertLogs(logger_name, level)
 
 
 # ---------------------------------------------------------------------------
