@@ -88,15 +88,14 @@ async def request_machines(
             additional_data=request_data.additional_data or {},
         )
     )
+    response_data: dict = {
+        "status": result.status,
+        "machine_ids": result.machine_ids,
+    }
+    if result.request_id:
+        response_data["request_id"] = result.request_id
     return JSONResponse(
-        content=formatter.format_request_operation(
-            {
-                "request_id": result.request_id,
-                "status": result.status,
-                "machine_ids": result.machine_ids,
-            },
-            result.status,
-        ).data,
+        content=formatter.format_request_operation(response_data, result.status).data,
         status_code=202,
     )
 
@@ -125,16 +124,15 @@ async def return_machines(
             force=request_data.force,
         )
     )
+    response_data: dict = {
+        "status": result.status,
+        "message": result.message,
+        "skipped_machines": result.skipped_machines,
+    }
+    if result.request_id:
+        response_data["request_id"] = result.request_id
     return JSONResponse(
-        content=formatter.format_request_operation(
-            {
-                "request_id": result.request_id,
-                "status": result.status,
-                "message": result.message,
-                "skipped_machines": result.skipped_machines,
-            },
-            result.status,
-        ).data
+        content=formatter.format_request_operation(response_data, result.status).data
     )
 
 

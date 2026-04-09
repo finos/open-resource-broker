@@ -145,7 +145,7 @@ def create_fastapi_app(server_config: Any) -> Any:
                     "timestamp": error_response.timestamp.isoformat()
                     if hasattr(error_response.timestamp, "isoformat")
                     else error_response.timestamp,
-                    "request_id": getattr(request.state, "request_id", "unknown"),
+                    "correlation_id": getattr(request.state, "request_id", "unknown"),
                 },
             )
         except Exception as handler_error:
