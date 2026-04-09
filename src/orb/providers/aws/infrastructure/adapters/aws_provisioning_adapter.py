@@ -193,6 +193,8 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
 
     def _resolve_template_image(self, template: Template) -> Template:
         """Resolve SSM parameter paths in template.image_id to real AMI IDs."""
+        if getattr(template, "launch_template_id", None):
+            return template
         image_id = template.image_id
         if not image_id:
             return template

@@ -11,6 +11,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from orb.domain.base.ports.logging_port import LoggingPort
+
 SYSTEM_TAG_PREFIX = "orb:"
 
 MANAGED_BY_TAG: dict[str, str] = {"orb:managed-by": "open-resource-broker"}
@@ -50,6 +52,7 @@ def build_resource_tags(
     resource_prefix_key: str,
     provider_api: str,
     template_tags: dict[str, Any] | None = None,
+    logger: LoggingPort | None = None,
 ) -> list[dict[str, str]]:
     """Build the flat tag list for an AWS resource.
 
@@ -64,6 +67,7 @@ def build_resource_tags(
                              (e.g. ``"fleet"``, ``"spot_fleet"``, ``"asg"``).
         provider_api:       AWS API label for the system tag (e.g. ``"EC2Fleet"``).
         template_tags:      Optional dict of user-supplied tags from the template.
+        logger:             Optional LoggingPort for warnings about stripped keys.
 
     Returns:
         Merged list of ``{"Key": k, "Value": v}`` dicts ready for AWS API calls.
@@ -71,10 +75,13 @@ def build_resource_tags(
     if template_tags:
         reserved = [k for k in template_tags if k.startswith(SYSTEM_TAG_PREFIX)]
         if reserved:
-            raise ValueError(
-                f"Tag keys must not start with '{SYSTEM_TAG_PREFIX}' (reserved for system use): "
-                f"{', '.join(sorted(reserved))}"
-            )
+            if logger is not None:
+                logger.warning(
+                    "Stripping reserved tag key(s) from template_tags (must not start with '%s'): %s",
+                    SYSTEM_TAG_PREFIX,
+                    ", ".join(sorted(reserved)),
+                )
+            template_tags = {k: v for k, v in template_tags.items() if k not in reserved}
 
     prefix = config_port.get_resource_prefix(resource_prefix_key)
     user_tags: list[dict[str, str]] = [{"Key": "Name", "Value": f"{prefix}{request_id}"}]

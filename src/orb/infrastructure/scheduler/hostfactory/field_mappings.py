@@ -54,10 +54,9 @@ class HostFactoryFieldMappings:
             "fleetRole": "fleet_role",
             "spotFleetRequestExpiry": "spot_fleet_request_expiry",
             "poolsCount": "pools_count",
-            # AWS launch template
-            "launchTemplateId": "launch_template_id",
             # AWS instance configuration
             "instanceProfile": "instance_profile",
+            "launchTemplateId": "launch_template_id",
             "userDataScript": "user_data",
         },
     }
@@ -95,6 +94,23 @@ class HostFactoryFieldMappings:
     def get_supported_providers(cls) -> list[str]:
         """Get list of supported providers for HostFactory."""
         return [key for key in cls.MAPPINGS.keys() if key != "generic"]
+
+    @classmethod
+    def apply_aws_defaults(cls, mapped: dict) -> dict:
+        """
+        Apply AWS-specific setdefault logic that depends on launch_template_id.
+
+        When launch_template_id is set the LT already encodes network config,
+        so subnet_ids and security_group_ids should not be defaulted to empty lists.
+        """
+        mapped.setdefault("max_instances", 1)
+        mapped.setdefault("price_type", "ondemand")
+        mapped.setdefault("allocation_strategy", "lowestPrice")
+        if not mapped.get("launch_template_id"):
+            mapped.setdefault("subnet_ids", [])
+            mapped.setdefault("security_group_ids", [])
+        mapped.setdefault("tags", {})
+        return mapped
 
     @classmethod
     def is_provider_specific_field(cls, provider_type: str, field_name: str) -> bool:

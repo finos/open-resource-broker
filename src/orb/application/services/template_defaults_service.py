@@ -100,6 +100,25 @@ class TemplateDefaultsService(TemplateDefaultsPort):
                 )
 
         # 4. Apply template values (highest priority - only for missing fields)
+        if template_dict.get("launch_template_id"):
+            lt_fields = [
+                k
+                for k in (
+                    "image_id",
+                    "subnet_ids",
+                    "security_group_ids",
+                    "machine_types",
+                    "machine_types_ondemand",
+                    "machine_types_priority",
+                )
+                if k in resolved_defaults
+            ]
+            if lt_fields:
+                self.logger.info(
+                    "Template %s has launch_template_id set — suppressing %s from provider defaults",
+                    template_dict.get("template_id", "unknown"),
+                    lt_fields,
+                )
         result = self._coalesce_merge(resolved_defaults, template_dict)
 
         self.logger.debug("Final template has %s fields after default resolution", len(result))
@@ -357,18 +376,6 @@ class TemplateDefaultsService(TemplateDefaultsPort):
                         f"No default configured for essential field: {field}"
                     )
 
-            # Check for AWS-specific defaults in global config
-            global_defaults = self._get_global_template_defaults()
-            aws_specific_patterns = ["ami-", "sg-", "subnet-", "vpc-"]
-            for key, value in global_defaults.items():
-                if isinstance(value, str):
-                    for pattern in aws_specific_patterns:
-                        if pattern in value:
-                            validation_result["warnings"].append(
-                                f"AWS-specific default '{key}: {value}' found in global config. "
-                                f"Consider moving to provider-specific defaults."
-                            )
-
             self.logger.info(
                 "Template defaults validation completed for %s",
                 provider_instance_name or "global",
@@ -579,9 +586,9 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             template = self.resolve_template_with_extensions(template_dict, provider_instance_name)
 
             # Additional validation for domain template
-            if hasattr(template, "validate"):
+            if hasattr(template, "model_validate"):
                 try:
-                    template.validate()  # type: ignore[call-arg]
+                    template.model_validate(template.model_dump())
                     validation_result["domain_validation"] = "passed"
                 except Exception as e:
                     validation_result["warnings"].append(f"Domain validation failed: {e}")

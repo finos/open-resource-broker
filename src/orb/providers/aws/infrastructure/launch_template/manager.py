@@ -5,6 +5,7 @@ This module provides centralized management of AWS launch templates,
 moving AWS-specific logic out of the base handler to maintain clean architecture.
 """
 
+import base64
 import hashlib
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -23,6 +24,22 @@ from orb.providers.aws.exceptions.aws_exceptions import (
 )
 from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.infrastructure.tags import build_system_tags, merge_tags
+
+_OVERRIDE_FIELDS = frozenset(
+    {
+        "image_id",
+        "machine_types",
+        "subnet_ids",
+        "security_group_ids",
+        "key_name",
+        "user_data",
+        "instance_profile",
+        "root_device_volume_size",
+        "iops",
+        "ebs_optimized",
+        "monitoring_enabled",
+    }
+)
 
 
 @dataclass
@@ -82,10 +99,10 @@ class AWSLaunchTemplateManager:
         try:
             # Check if template specifies existing launch template to use
             if aws_template.launch_template_id:
+                if self._has_overrides(aws_template):
+                    return self._handle_existing_lt_with_overrides(aws_template, request)
                 return self._use_existing_template_strategy(aws_template)
 
-            # Determine strategy based on configuration
-            # For now, default to per-request version strategy
             return self._create_per_request_version(aws_template, request)
 
         except ClientError as e:
@@ -133,36 +150,57 @@ class AWSLaunchTemplateManager:
                 LaunchTemplateNames=[launch_template_name]
             )
 
-            # Template exists — reuse the default version, no new version needed for same config
-            template_id = existing_template["LaunchTemplates"][0]["LaunchTemplateId"]
-            default_version = str(existing_template["LaunchTemplates"][0]["DefaultVersionNumber"])
-            self._logger.info(
-                "Launch template %s exists (id=%s), reusing default version %s",
-                launch_template_name,
-                template_id,
-                default_version,
-            )
-            return LaunchTemplateResult(
-                template_id=template_id,
-                version=default_version,
-                template_name=launch_template_name,
-                is_new_template=False,
-                is_new_version=False,
-            )
+            # Template exists — reuse the default version, no new version needed for same config.
+            # Guard against templates that are in a deleting/invalid state by catching
+            # InvalidLaunchTemplateId errors on reuse and falling through to creation.
+            try:
+                template_id = existing_template["LaunchTemplates"][0]["LaunchTemplateId"]
+                default_version = str(
+                    existing_template["LaunchTemplates"][0]["DefaultVersionNumber"]
+                )
+                self._logger.info(
+                    "Launch template %s exists (id=%s), reusing default version %s",
+                    launch_template_name,
+                    template_id,
+                    default_version,
+                )
+                return LaunchTemplateResult(
+                    template_id=template_id,
+                    version=default_version,
+                    template_name=launch_template_name,
+                    is_new_template=False,
+                    is_new_version=False,
+                )
+            except ClientError as reuse_err:
+                reuse_code = reuse_err.response["Error"]["Code"]
+                if reuse_code in (
+                    "InvalidLaunchTemplateId.NotFound",
+                    "InvalidLaunchTemplateId.Malformed",
+                    "InvalidLaunchTemplateId.VersionNotFound",
+                ):
+                    self._logger.warning(
+                        "Launch template %s appears to be in a deleting/invalid state (%s)"
+                        " — falling through to create a new one",
+                        launch_template_name,
+                        reuse_code,
+                    )
+                    # Fall through to creation below
+                else:
+                    raise
 
         except ClientError as e:
-            if e.response["Error"]["Code"] == "InvalidLaunchTemplateName.NotFoundException":
-                # Template doesn't exist, create it
-                return self._create_new_launch_template(
-                    launch_template_name,
-                    launch_template_data,
-                    client_token,
-                    request,
-                    aws_template,
-                )
-            else:
-                # Some other error
+            if e.response["Error"]["Code"] != "InvalidLaunchTemplateName.NotFoundException":
+                # Some other error — propagate
                 raise
+
+        # Template doesn't exist (or was in a deleting state) — create it
+        return self._create_new_launch_template(
+            launch_template_name,
+            launch_template_data,
+            client_token,
+            request,
+            aws_template,
+        )
 
     def _create_or_reuse_base_template(self, aws_template: AWSTemplate) -> LaunchTemplateResult:
         """
@@ -216,6 +254,165 @@ class AWSLaunchTemplateManager:
             else:
                 raise
 
+    def _has_overrides(self, aws_template: AWSTemplate) -> bool:
+        """Return True if any override field is non-None on the template."""
+        return any(getattr(aws_template, field, None) is not None for field in _OVERRIDE_FIELDS)
+
+    def _get_lt_update_failure_mode(self) -> str:
+        """Read on_update_failure from launch_template config, defaulting to 'fail'."""
+        try:
+            if self.config_port is not None:
+                provider_config = self.config_port.get_provider_config()
+                if provider_config and hasattr(provider_config, "launch_template"):
+                    return provider_config.launch_template.on_update_failure
+        except Exception as e:
+            self._logger.debug("Could not read on_update_failure from config: %s", e)
+        return "fail"
+
+    def _create_new_lt_version(
+        self, aws_template: AWSTemplate, request: Request
+    ) -> LaunchTemplateResult:
+        """Create a new version of an existing launch template with override fields applied."""
+        template_id = aws_template.launch_template_id or ""
+
+        # Build data dict from non-None override fields only
+        lt_data: dict[str, Any] = {}
+
+        if aws_template.image_id:
+            lt_data["ImageId"] = aws_template.image_id
+
+        if aws_template.machine_types and len(aws_template.machine_types) == 1:
+            lt_data["InstanceType"] = next(iter(aws_template.machine_types.keys()))
+
+        if aws_template.subnet_ids:
+            network_interface: dict[str, Any] = {
+                "DeviceIndex": 0,
+                "SubnetId": aws_template.subnet_ids[0],
+                "AssociatePublicIpAddress": True,
+            }
+            if aws_template.security_group_ids:
+                network_interface["Groups"] = aws_template.security_group_ids
+            lt_data["NetworkInterfaces"] = [network_interface]
+        elif aws_template.security_group_ids:
+            lt_data["SecurityGroupIds"] = aws_template.security_group_ids
+
+        if aws_template.key_name:
+            lt_data["KeyName"] = aws_template.key_name
+
+        if aws_template.user_data:
+            lt_data["UserData"] = base64.b64encode(aws_template.user_data.encode("utf-8")).decode(
+                "ascii"
+            )
+
+        if aws_template.instance_profile:
+            lt_data["IamInstanceProfile"] = {
+                "Name": self._extract_instance_profile_name(aws_template.instance_profile)
+            }
+
+        ebs_optimized = getattr(aws_template, "ebs_optimized", None)
+        if ebs_optimized is not None:
+            lt_data["EbsOptimized"] = ebs_optimized
+
+        if getattr(aws_template, "monitoring_enabled", None) is not None:
+            lt_data["Monitoring"] = {"Enabled": aws_template.monitoring_enabled}
+
+        root_size = getattr(aws_template, "root_device_volume_size", None)
+        if root_size is not None:
+            volume_type = getattr(aws_template, "volume_type", "gp3")
+            ebs: dict[str, Any] = {
+                "VolumeSize": root_size,
+                "VolumeType": volume_type,
+                "DeleteOnTermination": True,
+            }
+            iops = getattr(aws_template, "iops", None)
+            if iops is not None and volume_type in ["io1", "io2", "gp3"]:
+                ebs["Iops"] = iops
+            lt_data["BlockDeviceMappings"] = [{"DeviceName": "/dev/xvda", "Ebs": ebs}]
+
+        response = self.aws_client.ec2_client.create_launch_template_version(
+            LaunchTemplateId=template_id,
+            VersionDescription=f"Override for request {request.request_id}",
+            LaunchTemplateData=lt_data,
+        )
+
+        version_info = response["LaunchTemplateVersion"]
+        new_version = str(version_info["VersionNumber"])
+        template_name = version_info.get("LaunchTemplateName", template_id)
+
+        self._logger.info(
+            "Created new version %s of launch template %s for request %s",
+            new_version,
+            template_id,
+            request.request_id,
+        )
+
+        self._tag_resource_safe(
+            template_id,
+            self._create_launch_template_tags(aws_template, request),
+            resource_description="launch-template-version",
+        )
+
+        return LaunchTemplateResult(
+            template_id=template_id,
+            version=new_version,
+            template_name=template_name,
+            is_new_template=False,
+            is_new_version=True,
+        )
+
+    def _handle_existing_lt_with_overrides(
+        self, aws_template: AWSTemplate, request: Request
+    ) -> LaunchTemplateResult:
+        """Create a new LT version with overrides; handle failure per config."""
+        override_fields = [
+            f for f in _OVERRIDE_FIELDS if getattr(aws_template, f, None) is not None
+        ]
+        self._logger.info(
+            "Applying overrides %s to existing launch template %s",
+            override_fields,
+            aws_template.launch_template_id,
+        )
+        try:
+            return self._create_new_lt_version(aws_template, request)
+        except Exception as e:
+            failure_mode = self._get_lt_update_failure_mode()
+            if failure_mode == "warn":
+                self._logger.warning(
+                    "Failed to create new launch template version for %s, "
+                    "falling back to existing template: %s",
+                    aws_template.launch_template_id,
+                    e,
+                )
+                return self._use_existing_template_strategy(aws_template)
+            raise
+
+    def _get_tag_failure_mode(self) -> str:
+        """Read on_tag_failure from tagging config, defaulting to 'warn'."""
+        try:
+            if self.config_port is not None:
+                provider_config = self.config_port.get_provider_config()
+                if provider_config and hasattr(provider_config, "tagging"):
+                    return provider_config.tagging.on_tag_failure
+        except Exception as e:
+            self._logger.debug("Could not read on_tag_failure from config: %s", e)
+        return "warn"
+
+    def _tag_resource_safe(
+        self, resource_id: str, tags: list[dict[str, str]], resource_description: str = ""
+    ) -> None:
+        """Apply tags to a resource; behaviour on failure is controlled by on_tag_failure config."""
+        try:
+            self.aws_client.ec2_client.create_tags(Resources=[resource_id], Tags=tags)
+        except Exception as e:
+            if self._get_tag_failure_mode() == "fail":
+                raise
+            self._logger.warning(
+                "Failed to tag resource %s%s: %s",
+                resource_id,
+                f" ({resource_description})" if resource_description else "",
+                e,
+            )
+
     def _create_new_launch_template(
         self,
         template_name: str,
@@ -241,24 +438,28 @@ class AWSLaunchTemplateManager:
             "Launch template %s does not exist. Creating new template.", template_name
         )
 
+        lt_tags = self._create_launch_template_tags(aws_template, request)
+
         response = self.aws_client.ec2_client.create_launch_template(
             LaunchTemplateName=template_name,
             VersionDescription=f"Created for request {request.request_id}",
             LaunchTemplateData=template_data,
             ClientToken=client_token,  # Key for idempotency!
-            TagSpecifications=[
-                {
-                    "ResourceType": "launch-template",
-                    "Tags": self._create_launch_template_tags(aws_template, request),
-                }
-            ],
+            TagSpecifications=[{"ResourceType": "launch-template", "Tags": lt_tags}],
         )
 
         launch_template = response["LaunchTemplate"]
-        self._logger.info("Created launch template %s", launch_template["LaunchTemplateId"])
+        lt_id = launch_template["LaunchTemplateId"]
+        self._logger.info("Created launch template %s", lt_id)
+
+        self._tag_resource_safe(
+            lt_id,
+            self._create_launch_template_tags(aws_template, request),
+            resource_description="launch-template",
+        )
 
         return LaunchTemplateResult(
-            template_id=launch_template["LaunchTemplateId"],
+            template_id=lt_id,
             version=str(launch_template["LatestVersionNumber"]),
             template_name=template_name,
             is_new_template=True,
@@ -408,8 +609,9 @@ class AWSLaunchTemplateManager:
             Dictionary containing launch template data
         """
         # AMI ID is resolved by AWSProvisioningAdapter._resolve_template_image() before this point
+        # When an existing launch_template_id is set, image_id is optional (the LT already has one).
         image_id = aws_template.image_id
-        if not image_id:
+        if not image_id and not aws_template.launch_template_id:
             error_msg = f"Template {aws_template.template_id} has no image_id specified"
             self._logger.error(error_msg)
             raise AWSValidationError(error_msg)
@@ -417,16 +619,7 @@ class AWSLaunchTemplateManager:
         # Log the image_id being used
         self._logger.info("Creating launch template with resolved image_id: %s", image_id)
 
-        # Debug logging for volume parameters
-        self._logger.info(
-            "DEBUG: AWSTemplate attributes: root_device_volume_size=%s, volume_type=%s, hasattr(root_device_volume_size)=%s",
-            getattr(aws_template, "root_device_volume_size", "NOT_SET"),
-            getattr(aws_template, "volume_type", "NOT_SET"),
-            hasattr(aws_template, "root_device_volume_size"),
-        )
-
-        launch_template_data = {
-            "ImageId": image_id,
+        launch_template_data: dict[str, Any] = {
             "InstanceType": (
                 next(iter(aws_template.machine_types.keys()))
                 if aws_template.machine_types
@@ -435,10 +628,13 @@ class AWSLaunchTemplateManager:
             "TagSpecifications": [
                 {
                     "ResourceType": "instance",
-                    "Tags": self._create_instance_tags(aws_template, request),
+                    "Tags": self._create_instance_tags_safe(aws_template, request),
                 }
             ],
         }
+
+        if image_id:
+            launch_template_data["ImageId"] = image_id
 
         # Add optional configurations
         if aws_template.subnet_id:
@@ -457,8 +653,6 @@ class AWSLaunchTemplateManager:
             launch_template_data["KeyName"] = aws_template.key_name
 
         if aws_template.user_data:
-            import base64
-
             # AWS requires user data to be Base64 encoded
             encoded_user_data = base64.b64encode(aws_template.user_data.encode("utf-8")).decode(
                 "ascii"
@@ -517,6 +711,16 @@ class AWSLaunchTemplateManager:
             launch_template_data["BlockDeviceMappings"] = [block_device_mapping]
 
         return launch_template_data
+
+    def _create_instance_tags_safe(
+        self, aws_template: AWSTemplate, request: Request
+    ) -> list[dict[str, str]]:
+        """Return instance tags, falling back to empty list on any failure."""
+        try:
+            return self._create_instance_tags(aws_template, request)
+        except Exception as e:
+            self._logger.warning("Failed to build instance tags, using empty list: %s", e)
+            return []
 
     def _create_instance_tags(
         self, aws_template: AWSTemplate, request: Request, provider_api: str = "LaunchTemplate"
@@ -611,7 +815,9 @@ class AWSLaunchTemplateManager:
             Client token string
         """
         # Generate a deterministic client token based on the request ID, template ID, and image ID
+        # (or launch_template_id when image_id is absent).
         # This ensures idempotency - identical requests will return the same result
-        token_input = f"{request.request_id}:{aws_template.template_id}:{aws_template.image_id}"
+        image_or_lt = aws_template.image_id or aws_template.launch_template_id or ""
+        token_input = f"{request.request_id}:{aws_template.template_id}:{image_or_lt}"
         # Truncate to 32 chars
         return hashlib.sha256(token_input.encode()).hexdigest()[:32]

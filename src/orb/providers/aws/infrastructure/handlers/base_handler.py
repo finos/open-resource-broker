@@ -661,16 +661,16 @@ class AWSHandler(ABC):
         # The actual AWS API call will validate the AMI ID format
 
         # Validate instance type(s)
-        if not template.machine_types:
+        if not template.machine_types and not template.launch_template_id:
             errors["instanceType"] = "machine_types must be specified"
 
         # Validate subnet(s) - subnet_id is a property of subnet_ids, so only
         # check subnet_ids
-        if not template.subnet_ids:
+        if not template.subnet_ids and not template.launch_template_id:
             errors["subnet"] = "At least one subnet must be specified in subnet_ids"
 
         # Validate security groups
-        if not template.security_group_ids:
+        if not template.security_group_ids and not template.launch_template_id:
             errors["securityGroups"] = "At least one security group is required"
 
         if errors:
@@ -740,7 +740,38 @@ class AWSHandler(ABC):
             resource_prefix_key=resource_prefix_key,
             provider_api=provider_api,
             template_tags=template.tags,
+            logger=self._logger,
         )
+
+    def _get_tag_failure_mode(self) -> str:
+        """Read on_tag_failure from tagging config, defaulting to 'warn'."""
+        try:
+            if self.config_port is not None:
+                provider_config = self.config_port.get_provider_config()
+                if provider_config and hasattr(provider_config, "tagging"):
+                    return provider_config.tagging.on_tag_failure
+        except Exception as e:
+            self._logger.debug("Could not read on_tag_failure from config: %s", e)
+        return "warn"
+
+    def _tag_resources_safe(
+        self,
+        resource_ids: list[str],
+        tags: list[dict[str, str]],
+        resource_description: str = "",
+    ) -> None:
+        """Apply tags to resources; behaviour on failure is controlled by on_tag_failure config."""
+        try:
+            self.aws_client.ec2_client.create_tags(Resources=resource_ids, Tags=tags)
+        except Exception as e:
+            if self._get_tag_failure_mode() == "fail":
+                raise
+            self._logger.warning(
+                "Failed to tag resources %s%s: %s",
+                resource_ids,
+                f" ({resource_description})" if resource_description else "",
+                e,
+            )
 
     def _get_cleanup_config(self) -> CleanupConfig:
         """Read cleanup config from AWS provider defaults."""

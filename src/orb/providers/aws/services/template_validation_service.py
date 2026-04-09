@@ -101,8 +101,12 @@ class AWSTemplateValidationService:
         validation_warnings = []
 
         # Required fields validation
-        if "image_id" not in template_config:
-            validation_errors.append("Missing required field: image_id")
+        # image_id is only required when no launch_template_id is provided
+        has_launch_template = bool(template_config.get("launch_template_id"))
+        if not has_launch_template and "image_id" not in template_config:
+            validation_errors.append(
+                "Missing required field: image_id (or provide launch_template_id)"
+            )
 
         has_primary_type = "instance_type" in template_config
         has_multi_types = "instance_types" in template_config
@@ -116,7 +120,8 @@ class AWSTemplateValidationService:
         # AWS-specific validations
         if "image_id" in template_config:
             image_id = template_config["image_id"]
-            if not image_id.startswith("ami-"):
+            # Allow SSM parameter paths (/aws/service/...) and real AMI IDs (ami-)
+            if not image_id.startswith("ami-") and not image_id.startswith("/"):
                 validation_errors.append(f"Invalid AMI ID format: {image_id}")
 
         if "instance_type" in template_config:

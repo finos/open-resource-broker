@@ -12,6 +12,7 @@ from orb.application.dto.responses import MachineDTO
 from orb.application.request.dto import RequestDTO
 from orb.infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
 from orb.infrastructure.scheduler.hostfactory.field_mapper import HostFactoryFieldMapper
+from orb.infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings
 from orb.infrastructure.scheduler.hostfactory.transformations import HostFactoryTransformations
 from orb.infrastructure.template.dtos import TemplateDTO
 from orb.infrastructure.utilities.common.string_utils import extract_provider_type
@@ -139,12 +140,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         if "template_id" in mapped:
             mapped["name"] = template.get("name", mapped["template_id"])
 
-        mapped.setdefault("max_instances", 1)
-        mapped.setdefault("price_type", "ondemand")
-        mapped.setdefault("allocation_strategy", "lowestPrice")
-        mapped.setdefault("subnet_ids", [])
-        mapped.setdefault("security_group_ids", [])
-        mapped.setdefault("tags", {})
+        HostFactoryFieldMappings.apply_aws_defaults(mapped)
 
         mapped["created_at"] = template.get("created_at")
         mapped["updated_at"] = template.get("updated_at")
