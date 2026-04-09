@@ -148,6 +148,7 @@ nav:
       - Traditional Deployment: deployment/traditional.md
       - PyPI Setup: deployment/pypi-setup.md
       - Security: deployment/security.md
+      - IAM Permissions: deployment/iam-permissions.md
       - Monitoring: deployment/monitoring.md
       - Dev Deployment: deployment/dev_deployment_documentation.md
     - Operations:

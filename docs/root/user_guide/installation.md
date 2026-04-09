@@ -168,6 +168,95 @@ If subnets or security groups change after init:
 orb infrastructure discover
 ```
 
+## Directory Layout
+
+These variables control where ORB stores its files. All are optional — ORB derives sensible defaults from the install location automatically.
+
+| Variable | Default | Description |
+|---|---|---|
+| `ORB_ROOT_DIR` | Derived from install type (see below) | Root directory for all ORB data. Setting this overrides all other directory defaults. |
+| `ORB_CONFIG_DIR` | `$ORB_ROOT_DIR/config` | Configuration files (`config.json`, templates). |
+| `ORB_WORK_DIR` | `$ORB_ROOT_DIR/work` | Working data (request state, provider output). |
+| `ORB_LOG_DIR` | `$ORB_ROOT_DIR/logs` | ORB process log files. |
+| `ORB_SCRIPTS_DIR` | `$ORB_ROOT_DIR/scripts` | Provider scripts (e.g. `invoke_provider.sh` for HostFactory). |
+| `ORB_VENV_PATH` | _(unset)_ | Path to a Python virtualenv. When set, `invoke_provider.sh` activates it before running `orb`. |
+| `ORB_HEALTH_DIR` | `$ORB_WORK_DIR/health` | Health-check output files written by `orb system health`. |
+| `ORB_CACHE_DIR` | `$ORB_WORK_DIR/.cache` | Internal cache (template resolution, provider metadata). |
+
+### Default root location by install type
+
+| Install type | Default `ORB_ROOT_DIR` |
+|---|---|
+| virtualenv (standard) | Parent of the venv directory |
+| virtualenv (uv tool / mise) | `~/.orb` |
+| `pip install --user` | `~/.orb` |
+| System install (`/usr`, `/opt`) | `$sys.prefix/orb` (falls back to `~/.orb` if not writable) |
+| Development (pyproject.toml found) | Repository root |
+
+### Install scenarios
+
+#### System install (root)
+
+```bash
+sudo pip install orb-py
+sudo orb init --non-interactive \
+  --provider aws --region us-east-1 \
+  --subnet-ids subnet-aaa111 \
+  --security-group-ids sg-11111111
+```
+
+ORB writes config to `/usr/orb/config/` (or `/opt/orb/config/` depending on your Python prefix). Override with `ORB_ROOT_DIR` if needed:
+
+```bash
+sudo ORB_ROOT_DIR=/etc/orb orb init --non-interactive ...
+```
+
+#### System install (non-root)
+
+When the system prefix is not writable, ORB automatically falls back to `~/.orb`:
+
+```bash
+pip install orb-py          # system Python, no sudo
+orb init                    # writes to ~/.orb/config/
+```
+
+Or pin the location explicitly:
+
+```bash
+export ORB_ROOT_DIR=~/.orb
+orb init --non-interactive --provider aws --region us-east-1 \
+  --subnet-ids subnet-aaa111 --security-group-ids sg-11111111
+```
+
+#### Virtualenv install
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install "orb-py[all]"
+orb init
+```
+
+ORB detects the venv and uses its parent directory as the root, so config lands next to your project:
+
+```
+my-project/
+  .venv/
+  orb/config/config.json   ← written here
+  orb/logs/
+  orb/work/
+```
+
+#### Install with --prefix
+
+```bash
+pip install --prefix /opt/myapp orb-py
+export ORB_ROOT_DIR=/opt/myapp/orb
+export PATH="/opt/myapp/bin:$PATH"
+orb init --non-interactive --provider aws --region us-east-1 \
+  --subnet-ids subnet-aaa111 --security-group-ids sg-11111111
+```
+
 ## Next Steps
 
 - [CLI Reference](../cli/cli-reference.md) — all commands and flags

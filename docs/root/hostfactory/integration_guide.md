@@ -506,3 +506,57 @@ provider:
 - Implement automated backup and recovery procedures
 
 This integration guide provides comprehensive coverage of integrating the Open Resource Broker with IBM Spectrum Symphony Host Factory. For specific deployment scenarios or troubleshooting, refer to the related documentation sections.
+
+## invoke_provider.sh Wiring
+
+ORB ships an `invoke_provider.sh` script that HostFactory calls for each provisioning operation. After `orb init`, the script is copied to `ORB_SCRIPTS_DIR`.
+
+### Environment variables to set in HostFactory
+
+Configure these in your HostFactory provider definition or the environment where the HF daemon runs:
+
+| Variable | Required | Description |
+|---|---|---|
+| `ORB_CONFIG_DIR` | Yes | Points HF to the ORB config directory. |
+| `ORB_WORK_DIR` | Recommended | Separates ORB working data from HF working data. |
+| `ORB_LOG_DIR` | Recommended | ORB process logs (distinct from `HF_LOGDIR`). |
+| `ORB_VENV_PATH` | If using venv | Path to the venv containing `orb`. The script activates it automatically. |
+| `HF_LOGDIR` | Set by HF | HostFactory log directory — `invoke_provider.sh` appends to `$HF_LOGDIR/scripts.log`. Do not set this yourself. |
+| `HF_LOGGING_CONSOLE_ENABLED` | No | Set to `false` (default) to suppress ORB console output in HF script context. |
+| `USE_LOCAL_DEV` | Dev only | Set to `true` to run ORB from source instead of the installed package. |
+
+### Where scripts go
+
+After `orb init`, provider scripts are placed in `ORB_SCRIPTS_DIR` (default: `$ORB_ROOT_DIR/scripts`). Point HostFactory's `providerCommandPath` at this directory:
+
+```json
+{
+  "providerCommandPath": "/opt/myapp/orb/scripts"
+}
+```
+
+The key script is `invoke_provider.sh`. It:
+
+1. Sources `$ORB_VENV_PATH/bin/activate` if `ORB_VENV_PATH` is set.
+2. Locates the `orb` command (installed package or local dev mode).
+3. Passes all HF arguments through verbatim to `orb`.
+4. Appends stdout/stderr to `$HF_LOGDIR/scripts.log`.
+
+### Minimal HF provider config example
+
+```bash
+export ORB_CONFIG_DIR=/opt/myapp/orb/config
+export ORB_WORK_DIR=/opt/myapp/orb/work
+export ORB_LOG_DIR=/opt/myapp/orb/logs
+export ORB_VENV_PATH=/opt/myapp/.venv
+```
+
+Then in your HostFactory `hostProviders` config:
+
+```json
+{
+  "name": "orb-provider",
+  "providerCommandPath": "/opt/myapp/orb/scripts",
+  "providerCommand": "invoke_provider.sh"
+}
+```
