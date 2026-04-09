@@ -6,6 +6,7 @@ from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
 from orb.providers.gcp.configuration.config import GCPProviderConfig
 from orb.providers.gcp.domain.template.value_objects import GCPProviderApi
+from orb.providers.gcp.exceptions import GCPValidationError
 from orb.providers.gcp.infrastructure.compute_client import GCPComputeClient
 from orb.providers.gcp.infrastructure.handlers.base_handler import GCPHandler
 
@@ -35,11 +36,11 @@ class GCPHandlerFactory:
         try:
             GCPProviderApi(handler_key)
         except ValueError as exc:
-            raise ValueError(f"Invalid GCP handler type: {handler_key}") from exc
+            raise GCPValidationError(f"Invalid GCP handler type: {handler_key}") from exc
 
         handler_class = self._handler_classes.get(handler_key)
         if handler_class is None:
-            raise ValueError(f"No handler class registered for type: {handler_key}")
+            raise GCPValidationError(f"No handler class registered for type: {handler_key}")
 
         handler = handler_class(
             compute_client=self._compute_client,

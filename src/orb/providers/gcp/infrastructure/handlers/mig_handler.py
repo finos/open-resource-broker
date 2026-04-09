@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from orb.domain.request.aggregate import Request
 from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
 from orb.providers.gcp.domain.template.value_objects import GCPMIGScope
+from orb.providers.gcp.exceptions import GCPEntityNotFoundError, GCPValidationError
 from orb.providers.gcp.infrastructure.disk_types import normalize_boot_disk_type
 from orb.providers.gcp.infrastructure.handlers.base_handler import GCPHandler
 from orb.providers.gcp.types import (
@@ -304,7 +305,7 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
             return mig_names
         mig_name = context.get("mig_name")
         if not mig_name:
-            raise ValueError("MIG operations require a mig resource id")
+            raise GCPValidationError("MIG operations require a mig resource id")
         return [str(mig_name)]
 
     def _group_instance_urls_by_mig(
@@ -357,9 +358,12 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
                     matches.append((mig_name, instance_url))
 
         if not matches:
-            raise ValueError(f"Could not resolve MIG membership for instance '{requested_value}'")
+            raise GCPEntityNotFoundError(
+                f"Could not resolve MIG membership for instance '{requested_value}'",
+                details={"instance_id": requested_value, "mig_names": mig_names},
+            )
         if len(matches) > 1:
-            raise ValueError(
+            raise GCPValidationError(
                 f"Instance '{requested_value}' matches multiple MIG resources; use fully qualified instance URLs"
             )
         return matches[0]
@@ -368,14 +372,14 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
     def _require_region(context: GCPHandlerContext) -> str:
         region = context.get("region")
         if not region:
-            raise ValueError("region is required for regional MIG operations")
+            raise GCPValidationError("region is required for regional MIG operations")
         return str(region)
 
     @staticmethod
     def _require_zone(context: GCPHandlerContext) -> str:
         zone = context.get("zone")
         if not zone:
-            raise ValueError("zone is required for zonal MIG operations")
+            raise GCPValidationError("zone is required for zonal MIG operations")
         return str(zone)
 
     @staticmethod

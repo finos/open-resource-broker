@@ -23,6 +23,7 @@ from orb.providers.gcp.configuration.template_extension import GCPTemplateExtens
 from orb.providers.gcp.configuration.validator import validate_gcp_template
 from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
 from orb.providers.gcp.domain.template.value_objects import GCPProviderApi
+from orb.providers.gcp.exceptions import GCPError, translate_gcp_exception
 from orb.providers.gcp.infrastructure import (
     GCPComputeClient,
     GCPHandlerFactory,
@@ -100,14 +101,30 @@ class GCPProviderStrategy(ProviderStrategy):
                 }
             )
             return result
-        except Exception as exc:
+        except GCPError as exc:
             self._logger.error("GCP operation failed: %s", exc, exc_info=True)
             return ProviderResult.error_result(
-                f"GCP operation failed: {exc!s}",
-                "OPERATION_FAILED",
+                str(exc),
+                exc.error_code,
                 {
                     "execution_time_ms": int((time.time() - start_time) * 1000),
                     "provider": "gcp",
+                    "details": exc.details,
+                },
+            )
+        except Exception as exc:
+            translated = translate_gcp_exception(
+                exc,
+                operation=operation.operation_type.value,
+            )
+            self._logger.error("GCP operation failed: %s", translated, exc_info=True)
+            return ProviderResult.error_result(
+                str(translated),
+                translated.error_code,
+                {
+                    "execution_time_ms": int((time.time() - start_time) * 1000),
+                    "provider": "gcp",
+                    "details": translated.details,
                 },
             )
 

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from orb.domain.request.aggregate import Request
 from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
+from orb.providers.gcp.exceptions import GCPValidationError
 from orb.providers.gcp.infrastructure.disk_types import normalize_boot_disk_type
 from orb.providers.gcp.infrastructure.handlers.base_handler import GCPHandler
 from orb.providers.gcp.types import (
@@ -181,11 +182,11 @@ class GCPSingleVMHandler(GCPHandler):
     def _require_zone(context: GCPHandlerContext) -> str:
         zone = context.get("zone")
         if not zone:
-            raise ValueError("zone is required for SingleVM operations")
+            raise GCPValidationError("zone is required for SingleVM operations")
         return str(zone)
 
     @staticmethod
     def _template_zone(template: GCPTemplate) -> str:
         if len(template.zones) != 1:
-            raise ValueError("SingleVM templates require exactly one explicit zone")
+            raise GCPValidationError("SingleVM templates require exactly one explicit zone")
         return str(template.zones[0])

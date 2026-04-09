@@ -6,18 +6,26 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from google.api_core import exceptions as google_exceptions
 
 from orb.domain.request.aggregate import Request
 from orb.domain.request.value_objects import RequestType
 from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
 from orb.providers.gcp.configuration.config import GCPProviderConfig
 from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
+from orb.providers.gcp.exceptions import (
+    GCPEntityNotFoundError,
+    GCPRateLimitError,
+    GCPValidationError,
+)
 from orb.providers.gcp.infrastructure.gcp_handler_factory import GCPHandlerFactory
 from orb.providers.gcp.infrastructure.handlers.mig_handler import (
     GCPManagedInstanceGroupHandler,
 )
 from orb.providers.gcp.infrastructure.handlers.single_vm_handler import GCPSingleVMHandler
 from orb.providers.gcp.strategy.gcp_provider_strategy import GCPProviderStrategy
+
+
 class _ComputeClientStub:
     def __init__(self) -> None:
         self.created_instances: list[tuple[str, dict]] = []
@@ -92,6 +100,17 @@ def test_handler_factory_creates_singlevm_and_mig_handlers() -> None:
 
     assert isinstance(single_vm_handler, GCPSingleVMHandler)
     assert isinstance(mig_handler, GCPManagedInstanceGroupHandler)
+
+
+def test_handler_factory_rejects_invalid_handler_type_with_gcp_validation_error() -> None:
+    factory = GCPHandlerFactory(
+        compute_client=_ComputeClientStub(),
+        config=_config(),
+        logger=MagicMock(),
+    )
+
+    with pytest.raises(GCPValidationError, match="Invalid GCP handler type"):
+        factory.create_handler("Bogus")
 
 
 def test_single_vm_handler_acquire_hosts_submits_instance_creation() -> None:
@@ -330,7 +349,116 @@ async def test_strategy_create_singlevm_rejects_missing_zone() -> None:
     )
 
     assert result.success is False
+    assert result.error_code == "GCPValidationError"
     assert "SingleVM templates require exactly one explicit zone" in result.error_message
+
+
+@pytest.mark.asyncio
+async def test_strategy_preserves_direct_gcp_errors() -> None:
+    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    assert strategy.initialize() is True
+
+    handler = MagicMock()
+    handler.acquire_hosts.side_effect = GCPRateLimitError("rate limit exceeded", details={"quota": "api"})
+    strategy._handler_factory = SimpleNamespace(create_handler=lambda _api: handler)
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={
+                "count": 1,
+                "template_config": {
+                    "template_id": "gcp-single",
+                    "provider_type": "gcp",
+                    "provider_api": "SingleVM",
+                    "project_id": "orb-example-12345",
+                    "region": "us-central1",
+                    "zones": ["us-central1-a"],
+                    "instance_type": "e2-standard-4",
+                    "source_image_family": "debian-12",
+                    "source_image_project": "debian-cloud",
+                },
+            },
+        )
+    )
+
+    assert result.success is False
+    assert result.error_code == "GCPRateLimitError"
+    assert result.metadata["details"] == {"quota": "api"}
+
+
+@pytest.mark.asyncio
+async def test_strategy_translates_not_found_failures_to_gcp_entity_errors() -> None:
+    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    assert strategy.initialize() is True
+
+    handler = MagicMock()
+    handler.check_hosts_status.side_effect = google_exceptions.NotFound("instance was not found")
+    strategy._handler_factory = SimpleNamespace(create_handler=lambda _api: handler)
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
+            parameters={
+                "provider_api": "SingleVM",
+                "resource_ids": ["vm-1"],
+                "request_metadata": {"zone": "us-central1-a"},
+            },
+        )
+    )
+
+    assert result.success is False
+    assert result.error_code == "GCPEntityNotFoundError"
+    assert result.metadata["details"]["operation"] == "get_instance_status"
+    assert result.metadata["details"]["source_error_type"] == "NotFound"
+
+
+@pytest.mark.asyncio
+async def test_strategy_translates_resource_exhausted_to_gcp_quota_error() -> None:
+    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    assert strategy.initialize() is True
+
+    handler = MagicMock()
+    handler.check_hosts_status.side_effect = google_exceptions.ResourceExhausted("quota exhausted")
+    strategy._handler_factory = SimpleNamespace(create_handler=lambda _api: handler)
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
+            parameters={
+                "provider_api": "SingleVM",
+                "resource_ids": ["vm-1"],
+                "request_metadata": {"zone": "us-central1-a"},
+            },
+        )
+    )
+
+    assert result.success is False
+    assert result.error_code == "GCPQuotaExceededError"
+
+
+@pytest.mark.asyncio
+async def test_strategy_translates_service_unavailable_to_gcp_network_error() -> None:
+    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    assert strategy.initialize() is True
+
+    handler = MagicMock()
+    handler.check_hosts_status.side_effect = google_exceptions.ServiceUnavailable("service unavailable")
+    strategy._handler_factory = SimpleNamespace(create_handler=lambda _api: handler)
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
+            parameters={
+                "provider_api": "SingleVM",
+                "resource_ids": ["vm-1"],
+                "request_metadata": {"zone": "us-central1-a"},
+            },
+        )
+    )
+
+    assert result.success is False
+    assert result.error_code == "GCPNetworkError"
 
 
 @pytest.mark.asyncio
@@ -377,3 +505,19 @@ async def test_strategy_resolve_image_uses_compute_client() -> None:
 
     assert result.success is True
     assert result.data["resolved_images"]["image_id"].endswith("/debian-12")
+
+
+def test_mig_handler_missing_membership_raises_gcp_entity_not_found() -> None:
+    compute_client = _ComputeClientStub()
+    handler = GCPManagedInstanceGroupHandler(
+        compute_client=compute_client,
+        config=_config(),
+        logger=MagicMock(),
+    )
+
+    with pytest.raises(GCPEntityNotFoundError, match="Could not resolve MIG membership"):
+        handler.terminate_hosts(
+            resource_ids=["mig-a"],
+            instance_ids=["vm-missing"],
+            context={"project_id": "orb-example-12345", "region": "us-central1", "scope": "regional"},
+        )
