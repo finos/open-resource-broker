@@ -7,6 +7,7 @@ from typing import Optional
 from pydantic import ConfigDict, Field, model_validator
 
 from orb.domain.template.template_aggregate import Template
+from orb.providers.gcp.constants import DEFAULT_GCP_SERVICE_ACCOUNT_SCOPES
 from orb.providers.gcp.domain.template.value_objects import (
     GCPMIGScope,
     GCPProjectId,
@@ -31,6 +32,9 @@ class GCPTemplate(Template):
     network: Optional[str] = None
     subnetwork: Optional[str] = None
     service_account_email: Optional[str] = None
+    service_account_scopes: list[str] = Field(
+        default_factory=lambda: list(DEFAULT_GCP_SERVICE_ACCOUNT_SCOPES)
+    )
     labels: dict[str, str] = Field(default_factory=dict)
     network_tags: list[str] = Field(default_factory=list)
     provisioning_model: GCPProvisioningModel = GCPProvisioningModel.STANDARD

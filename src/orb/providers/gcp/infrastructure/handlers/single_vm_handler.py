@@ -167,7 +167,7 @@ class GCPSingleVMHandler(GCPHandler):
             payload.service_accounts = [
                 compute_v1.ServiceAccount(
                     email=template.service_account_email,
-                    scopes=["https://www.googleapis.com/auth/cloud-platform"],
+                    scopes=template.service_account_scopes,
                 )
             ]
         if template.provisioning_model.value == "SPOT":

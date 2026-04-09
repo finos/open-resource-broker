@@ -6,6 +6,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
+from orb.providers.gcp.constants import DEFAULT_GCP_SERVICE_ACCOUNT_SCOPES
+
 
 class GCPTemplateExtensionConfig(BaseModel):
     """GCP-specific template defaults."""
@@ -16,6 +18,10 @@ class GCPTemplateExtensionConfig(BaseModel):
     boot_disk_type: str = Field("pd-balanced", description="Boot disk type")
     service_account_email: Optional[str] = Field(
         None, description="Default service account email"
+    )
+    service_account_scopes: list[str] = Field(
+        default_factory=lambda: list(DEFAULT_GCP_SERVICE_ACCOUNT_SCOPES),
+        description="Default OAuth scopes for attached service accounts",
     )
     network_tags: list[str] = Field(default_factory=list, description="Default network tags")
     labels: dict[str, str] = Field(default_factory=dict, description="Default instance labels")
@@ -47,6 +53,8 @@ class GCPTemplateExtensionConfig(BaseModel):
         }
         if self.service_account_email:
             defaults["instance_profile"] = self.service_account_email
+        if self.service_account_scopes:
+            defaults["service_account_scopes"] = self.service_account_scopes
         if self.network_tags:
             defaults["network_tags"] = self.network_tags
         if self.source_image_family:

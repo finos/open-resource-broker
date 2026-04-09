@@ -25,12 +25,18 @@ def test_extract_config_returns_adc_only_gcp_config() -> None:
             gcp_network="default",
             gcp_subnetwork="default-subnet",
             gcp_service_account_email="orb@example.iam.gserviceaccount.com",
+            gcp_service_account_scopes=(
+                "https://www.googleapis.com/auth/compute.readonly,"
+                "https://www.googleapis.com/auth/devstorage.read_only"
+            ),
         )
     )
 
     assert config["project_id"] == "orb-example-12345"
     assert config["region"] == "us-central1"
     assert config["zones"] == ["us-central1-a", "us-central1-b"]
+    assert "service_account_email" not in config
+    assert "service_account_scopes" not in config
     assert config["use_application_default_credentials"] is True
 
 

@@ -8,7 +8,6 @@ from typing import Optional
 from pydantic import ConfigDict, Field, field_validator, model_validator
 
 from orb.infrastructure.interfaces.provider import BaseProviderConfig
-
 _PROJECT_RE = re.compile(r"^[a-z][a-z0-9-]{4,28}[a-z0-9]$")
 _REGION_RE = re.compile(r"^[a-z]+-[a-z0-9]+[0-9]$")
 _ZONE_RE = re.compile(r"^[a-z]+-[a-z0-9]+[0-9]-[a-z]$")
@@ -26,10 +25,6 @@ class GCPProviderConfig(BaseProviderConfig):
     network: Optional[str] = Field(None, description="Default VPC network self-link or name")
     subnetwork: Optional[str] = Field(
         None, description="Default subnetwork self-link or name"
-    )
-    service_account_email: Optional[str] = Field(
-        None,
-        description="Default service account email attached to created instances",
     )
     max_retries: int = Field(3, ge=0, description="Maximum retry attempts for GCP API calls")
     connect_timeout: int = Field(30, ge=1, description="Connection timeout in seconds")

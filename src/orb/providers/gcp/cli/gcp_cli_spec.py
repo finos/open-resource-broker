@@ -25,6 +25,11 @@ class GCPCLISpec:
             dest="gcp_service_account_email",
             help="Default service account email",
         )
+        parser.add_argument(
+            "--gcp-service-account-scopes",
+            dest="gcp_service_account_scopes",
+            help="Comma-separated OAuth scopes for the attached service account",
+        )
 
     def extract_config(self, args: argparse.Namespace) -> dict[str, Any]:
         # The CLI keeps auth surface aligned with ADC-only provider behavior:
@@ -40,8 +45,6 @@ class GCPCLISpec:
             config["network"] = args.gcp_network
         if args.gcp_subnetwork:
             config["subnetwork"] = args.gcp_subnetwork
-        if args.gcp_service_account_email:
-            config["service_account_email"] = args.gcp_service_account_email
         return config
 
     def extract_partial_config(self, args: argparse.Namespace) -> dict[str, Any]:
@@ -56,8 +59,6 @@ class GCPCLISpec:
             result["network"] = args.gcp_network
         if args.gcp_subnetwork is not None:
             result["subnetwork"] = args.gcp_subnetwork
-        if args.gcp_service_account_email is not None:
-            result["service_account_email"] = args.gcp_service_account_email
         return result
 
     def validate_add(self, args: argparse.Namespace) -> list[str]:
@@ -82,6 +83,5 @@ class GCPCLISpec:
             ("Zones", ", ".join(zones) if zones else "-"),
             ("Network", config.get("network", "-")),
             ("Subnetwork", config.get("subnetwork", "-")),
-            ("ServiceAccount", config.get("service_account_email", "-")),
             ("Auth", "ADC"),
         ]

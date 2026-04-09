@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import time
-from argparse import Namespace
-from typing import Mapping, Optional
+from typing import Any, Mapping, Optional
 
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
@@ -286,7 +285,6 @@ class GCPProviderStrategy(ProviderStrategy):
         merged.setdefault("zones", self._config.zones)
         merged.setdefault("network", self._config.network)
         merged.setdefault("subnetwork", self._config.subnetwork)
-        merged.setdefault("service_account_email", self._config.service_account_email)
         if "instance_type" not in merged and "machine_type" in merged:
             merged["instance_type"] = merged["machine_type"]
         merged.setdefault("instance_type", defaults.machine_type)
@@ -442,16 +440,22 @@ class GCPProviderStrategy(ProviderStrategy):
         return "us-central1"
 
     def get_cli_extra_config_keys(self) -> set[str]:
-        return {"network", "subnetwork", "service_account_email"}
+        return {"network", "subnetwork", "service_account_email", "service_account_scopes"}
 
-    def get_cli_infrastructure_defaults(self, args: Namespace) -> dict[str, str]:
-        result: dict[str, str] = {}
+    def get_cli_infrastructure_defaults(self, args: Any) -> dict[str, Any]:
+        result: dict[str, Any] = {}
         if args.gcp_network:
             result["network"] = args.gcp_network
         if args.gcp_subnetwork:
             result["subnetwork"] = args.gcp_subnetwork
         if args.gcp_service_account_email:
             result["service_account_email"] = args.gcp_service_account_email
+        if args.gcp_service_account_scopes:
+            result["service_account_scopes"] = [
+                scope.strip()
+                for scope in args.gcp_service_account_scopes.split(",")
+                if scope.strip()
+            ]
         return result
 
     def discover_infrastructure(self, provider_config: Mapping[str, object]) -> dict[str, object]:
