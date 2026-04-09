@@ -49,20 +49,17 @@ class UpdateRequestStatusHandler(BaseCommandHandler[UpdateRequestStatusCommand, 
         self.logger.info("Updating request status: %s -> %s", command.request_id, command.status)
 
         try:
-            # Find request in the storage
+            # Find, update, and save within a single UoW to avoid race conditions
             with self.uow_factory.create_unit_of_work() as uow:
                 request = uow.requests.find_by_id(command.request_id)
                 if not request:
                     raise EntityNotFoundError("Request", command.request_id)
 
-            # Update status
-            request = request.update_status(
-                status=command.status,
-                message=command.message or "",
-            )
+                request = request.update_status(
+                    status=command.status,
+                    message=command.message or "",
+                )
 
-            # Save changes and get extracted events
-            with self.uow_factory.create_unit_of_work() as uow:
                 events = uow.requests.save(request)
                 for event in events:
                     self.event_publisher.publish(event)  # type: ignore[union-attr]
@@ -97,13 +94,13 @@ class CancelRequestHandler(BaseCommandHandler[CancelRequestCommand, None]):  # t
 
     def __init__(
         self,
-        request_repository: RequestRepository,
+        uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
     ) -> None:
         super().__init__(logger, event_publisher, error_handler)
-        self._request_repository = request_repository
+        self.uow_factory = uow_factory
 
     async def validate_command(self, command: CancelRequestCommand) -> None:
         """Validate cancel request command."""
@@ -116,15 +113,16 @@ class CancelRequestHandler(BaseCommandHandler[CancelRequestCommand, None]):  # t
         self.logger.info("Canceling request: %s", command.request_id)
 
         try:
-            request = self._request_repository.find_by_id(command.request_id)
-            if not request:
-                raise EntityNotFoundError("Request", command.request_id)
+            with self.uow_factory.create_unit_of_work() as uow:
+                request = uow.requests.find_by_id(command.request_id)
+                if not request:
+                    raise EntityNotFoundError("Request", command.request_id)
 
-            cancelled_request = request.cancel(reason=command.reason)
+                cancelled_request = request.cancel(reason=command.reason)
 
-            events = self._request_repository.save(cancelled_request)
-            for event in events or []:
-                self.event_publisher.publish(event)  # type: ignore[union-attr]
+                events = uow.requests.save(cancelled_request)
+                for event in events or []:
+                    self.event_publisher.publish(event)  # type: ignore[union-attr]
 
             self.logger.info("Request canceled: %s", command.request_id)
             command.cancelled = True

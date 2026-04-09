@@ -172,16 +172,19 @@ class ConfigurationLoader:
 
         cls._merge_config(base, config_dict)
 
-        cls._load_from_env(base, config_manager)
+        # Collect the flat dotted key paths present in the caller-supplied dict so
+        # _load_from_env can warn when an env var silently overrides them.
+        sdk_keys = cls._collect_dotted_keys(config_dict)
+
+        cls._load_from_env(base, config_manager, _sdk_keys=frozenset(sdk_keys))
         result = expand_config_env_vars(base)
 
-        # Hoist provider.provider_defaults to the top level so callers can
-        # inspect strategy defaults without navigating the nested provider key.
-        # Only hoist if not already present at the top level (e.g. from a mock or explicit dict).
-        if "provider_defaults" not in result:
-            provider_section = result.get("provider", {})
-            if "provider_defaults" in provider_section:
-                result["provider_defaults"] = provider_section["provider_defaults"]
+        # Always re-hoist provider_defaults from nested provider section after merge
+        # so that a user config_dict containing provider.provider_defaults always wins
+        # over any top-level provider_defaults that may have been set by an earlier layer.
+        provider_section = result.get("provider", {})
+        if "provider_defaults" in provider_section:
+            result["provider_defaults"] = provider_section["provider_defaults"]
 
         return result
 
@@ -357,31 +360,63 @@ class ConfigurationLoader:
 
     @classmethod
     def _load_from_env(
-        cls, config: dict[str, Any], config_manager: Optional[ConfigurationManager] = None
+        cls,
+        config: dict[str, Any],
+        config_manager: Optional[ConfigurationManager] = None,
+        _sdk_keys: Optional[frozenset] = None,
     ) -> None:
         """
         Apply ORB_* environment variable overrides to the raw config dict.
 
         Only variables that are explicitly set in the environment take effect.
-        Precedence: env var > config file > schema default.
+
+        Precedence order (lowest to highest):
+          1. Package defaults  (default_config.json)
+          2. Strategy defaults (provider/scheduler registry)
+          3. User config_dict  (SDK caller-supplied dict)
+          4. Env vars          (ORB_* — highest precedence)
+
+        When an env var overrides a key that was explicitly set in the SDK
+        config_dict a WARNING is emitted so callers are not surprised.
 
         Args:
             config: Configuration dictionary to update in place
             config_manager: Configuration manager for scheduler directories
+            _sdk_keys: Flat dotted key paths that were present in the original
+                SDK config_dict, used to detect env-var overrides.
         """
+
+        def _warn_if_sdk_override(dotted_key: str, env_var: str, env_val: Any) -> None:
+            if _sdk_keys and dotted_key in _sdk_keys:
+                get_config_logger().warning(
+                    "Env var %s overrides SDK config_dict key '%s' with value: %r",
+                    env_var,
+                    dotted_key,
+                    env_val,
+                )
+
         if val := os.environ.get("ORB_LOG_LEVEL"):
+            _warn_if_sdk_override("logging.level", "ORB_LOG_LEVEL", val)
             config.setdefault("logging", {})["level"] = val
         if val := cls._resolve_console_enabled():
+            _warn_if_sdk_override("logging.console_enabled", "ORB_LOG_CONSOLE_ENABLED", val)
             config.setdefault("logging", {})["console_enabled"] = val.lower() == "true"
         if val := os.environ.get("ORB_DEBUG"):
+            _warn_if_sdk_override("debug", "ORB_DEBUG", val)
             config["debug"] = val.lower() == "true"
         if val := os.environ.get("ORB_ENVIRONMENT"):
+            _warn_if_sdk_override("environment", "ORB_ENVIRONMENT", val)
             config["environment"] = val
         if val := os.environ.get("ORB_REQUEST_TIMEOUT"):
+            _warn_if_sdk_override("request.default_timeout", "ORB_REQUEST_TIMEOUT", val)
             config.setdefault("request", {})["default_timeout"] = int(val)
         if val := os.environ.get("ORB_MAX_MACHINES_PER_REQUEST"):
+            _warn_if_sdk_override(
+                "request.max_machines_per_request", "ORB_MAX_MACHINES_PER_REQUEST", val
+            )
             config.setdefault("request", {})["max_machines_per_request"] = int(val)
         if val := os.environ.get("ORB_CONFIG_FILE"):
+            _warn_if_sdk_override("config_file", "ORB_CONFIG_FILE", val)
             config["config_file"] = val
 
         cls._process_scheduler_directories(config, config_manager)
@@ -415,10 +450,14 @@ class ConfigurationLoader:
 
             # Set up logging path
             if logs_dir:
-                config.setdefault("logging", {})["file_path"] = os.path.join(logs_dir, "app.log")
+                config.setdefault("logging", {})["file_path"] = os.path.join(logs_dir, "orb.log")
                 get_config_logger().debug(
-                    "Set logging file_path to %s", os.path.join(logs_dir, "app.log")
+                    "Set logging file_path to %s", os.path.join(logs_dir, "orb.log")
                 )
+
+            # Propagate scripts_dir written by `orb init` back into the config model
+            if "scripts_dir" in config and config["scripts_dir"]:
+                get_config_logger().debug("scripts_dir from config: %s", config["scripts_dir"])
 
             # Set up storage paths
             if scheduler_dir:
@@ -493,6 +532,18 @@ class ConfigurationLoader:
             else:
                 # Replace for all other types (including arrays)
                 base[key] = value
+
+    @classmethod
+    def _collect_dotted_keys(cls, d: dict[str, Any], prefix: str = "") -> list[str]:
+        """Return all leaf key paths in *d* as dotted strings (e.g. 'request.default_timeout')."""
+        keys: list[str] = []
+        for k, v in d.items():
+            full = f"{prefix}.{k}" if prefix else k
+            if isinstance(v, dict):
+                keys.extend(cls._collect_dotted_keys(v, full))
+            else:
+                keys.append(full)
+        return keys
 
     @classmethod
     def _deep_copy(cls, obj: dict[str, Any]) -> dict[str, Any]:

@@ -13,8 +13,29 @@ from orb.application.services.orchestration.dtos import ReturnMachinesInput, Ret
 from orb.domain.base.exceptions import ApplicationError
 from orb.domain.base.ports.logging_port import LoggingPort
 
-_TERMINAL_STATUSES = {"completed", "complete", "failed", "error", "cancelled", "canceled"}
+_TERMINAL_STATUSES = {
+    "completed",
+    "complete",
+    "failed",
+    "error",
+    "cancelled",
+    "canceled",
+    "partial",
+    "timeout",
+}
 _MAX_CONSECUTIVE_POLL_ERRORS = 3
+
+# Rank semantics: 0=unknown/no-op, 1=completed, 2=failed/cancelled/error, 3=partial/timeout
+_STATUS_RANK = {
+    "completed": 1,
+    "complete": 1,
+    "cancelled": 2,
+    "canceled": 2,
+    "failed": 2,
+    "error": 2,
+    "partial": 3,
+    "timeout": 3,
+}
 
 
 class ReturnMachinesOrchestrator(OrchestratorBase[ReturnMachinesInput, ReturnMachinesOutput]):
@@ -68,14 +89,24 @@ class ReturnMachinesOrchestrator(OrchestratorBase[ReturnMachinesInput, ReturnMac
                 status="no_op",
                 skipped_machines=skipped,
             )
-        request_id = command.created_request_ids[0]
+
+        # Use the first request ID as the primary for the output, but poll ALL
+        # provider-group requests so a failure in any group is not silently ignored.
+        primary_request_id = command.created_request_ids[0]
         status = "pending"
 
         if input.wait:
-            status = await self._poll_until_terminal(request_id, input.timeout_seconds)
+            statuses = await asyncio.gather(
+                *[
+                    self._poll_until_terminal(rid, input.timeout_seconds)
+                    for rid in command.created_request_ids
+                ]
+            )
+            # Return the worst status: failed > partial/timeout > completed
+            status = max(statuses, key=lambda s: _STATUS_RANK.get(s.lower(), 0))
 
         return ReturnMachinesOutput(
-            request_id=request_id,
+            request_id=primary_request_id,
             status=status,
         )
 

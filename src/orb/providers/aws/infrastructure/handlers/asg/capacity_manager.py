@@ -184,10 +184,26 @@ class ASGCapacityManager:
             self._logger.debug("Detached chunk from ASG %s: %s", asg_name, chunk)
         self._logger.info("Detached instances from ASG %s: %s", asg_name, instance_ids)
 
-        # detach_instances with ShouldDecrementDesiredCapacity=True already decremented
-        # the live DesiredCapacity counter in AWS.  Only update MinSize if it would now
-        # exceed the post-detach capacity.
-        new_capacity = max(0, asg_details["DesiredCapacity"] - len(instance_ids))
+        # Re-describe the ASG to get the live DesiredCapacity after detach, since
+        # ShouldDecrementDesiredCapacity=True may have already decremented it in AWS
+        # and the value in asg_details is now stale.
+        try:
+            live_response = self._retry_with_backoff(
+                self._aws_client.autoscaling_client.describe_auto_scaling_groups,
+                operation_type="read_only",
+                AutoScalingGroupNames=[asg_name],
+            )
+            live_groups = live_response.get("AutoScalingGroups", [])
+            live_desired = live_groups[0].get("DesiredCapacity", 0) if live_groups else 0
+        except Exception as exc:
+            self._logger.warning(
+                "Failed to re-describe ASG %s after detach, falling back to computed capacity: %s",
+                asg_name,
+                exc,
+            )
+            live_desired = max(0, asg_details["DesiredCapacity"] - len(instance_ids))
+
+        new_capacity = max(0, live_desired)
 
         if asg_details["MinSize"] > new_capacity:
             self._retry_with_backoff(

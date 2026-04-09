@@ -333,7 +333,13 @@ class RequestRepositoryImpl(StorageRepositoryMixin, RequestRepositoryInterface):
         try:
             pending = self.find_by_status(RequestStatus.PENDING)
             in_progress = self.find_by_status(RequestStatus.IN_PROGRESS)
-            return pending + in_progress
+            seen: set[str] = set()
+            result = []
+            for r in pending + in_progress:
+                if r.request_id not in seen:
+                    seen.add(r.request_id)
+                    result.append(r)
+            return result
         except Exception as e:
             self.logger.error("Failed to find active requests: %s", e)
             raise
@@ -341,22 +347,21 @@ class RequestRepositoryImpl(StorageRepositoryMixin, RequestRepositoryInterface):
     @handle_infrastructure_exceptions(context="request_repository_find_by_date_range")
     def find_by_date_range(self, start_date: datetime, end_date: datetime) -> list[Request]:
         """Find requests within date range."""
+        from datetime import timezone
+
         try:
+            if start_date.tzinfo is None:
+                start_date = start_date.replace(tzinfo=timezone.utc)
+            if end_date.tzinfo is None:
+                end_date = end_date.replace(tzinfo=timezone.utc)
+
             all_requests = self.find_all()
             filtered_requests = []
 
             for request in all_requests:
                 request_date = request.created_at
-
-                if request_date.tzinfo is None and start_date.tzinfo is not None:
-                    from datetime import timezone
-
+                if request_date.tzinfo is None:
                     request_date = request_date.replace(tzinfo=timezone.utc)
-                elif request_date.tzinfo is not None and start_date.tzinfo is None:
-                    from datetime import timezone
-
-                    start_date = start_date.replace(tzinfo=timezone.utc)
-                    end_date = end_date.replace(tzinfo=timezone.utc)
 
                 if start_date <= request_date <= end_date:
                     filtered_requests.append(request)

@@ -58,7 +58,9 @@ class MachineGroupingService:
 
         return dict(provider_groups)
 
-    def group_by_resource(self, machine_ids: list[str]) -> dict[tuple[str, str, str], list[Any]]:
+    def group_by_resource(
+        self, machine_ids: list[str]
+    ) -> tuple[dict[tuple[str, str, str], list[Any]], list[str]]:
         """Group machines by (provider_name, provider_api, resource_id).
 
         This grouping is used for parallel deprovisioning operations where
@@ -68,12 +70,15 @@ class MachineGroupingService:
             machine_ids: List of machine IDs to group
 
         Returns:
-            Dictionary mapping (provider_name, provider_api, resource_id) to list of machine objects
+            Tuple of:
+            - Dictionary mapping (provider_name, provider_api, resource_id) to list of machine objects
+            - List of machine IDs that were skipped (missing provider_api or resource_id)
 
         Raises:
             ValueError: If machine context cannot be determined
         """
         resource_groups: dict[tuple[str, str, str], list[Any]] = defaultdict(list)
+        skipped_ids: list[str] = []
 
         for machine_id in machine_ids:
             try:
@@ -88,6 +93,14 @@ class MachineGroupingService:
                             "Machine %s has no provider_api — skipping",
                             machine_id,
                         )
+                        skipped_ids.append(machine_id)
+                        continue
+                    if not machine.resource_id:
+                        self.logger.warning(
+                            "Machine %s has no resource_id — skipping",
+                            machine_id,
+                        )
+                        skipped_ids.append(machine_id)
                         continue
                     group_key = (
                         machine.provider_name,
@@ -110,4 +123,4 @@ class MachineGroupingService:
             },
         )
 
-        return dict(resource_groups)
+        return dict(resource_groups), skipped_ids

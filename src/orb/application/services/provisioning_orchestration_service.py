@@ -69,6 +69,7 @@ class ProvisioningOrchestrationService:
         started_at = datetime.now(timezone.utc)
         remaining = request.requested_count
         attempt_number = 0
+        consecutive_zero_fulfillments = 0
 
         accumulated_resource_ids: list[str] = []
         accumulated_machine_ids: list[str] = []
@@ -127,6 +128,17 @@ class ProvisioningOrchestrationService:
             fulfilled_this_attempt = last_result.fulfilled_count
             remaining -= fulfilled_this_attempt
 
+            if fulfilled_this_attempt == 0 and last_result.success:
+                consecutive_zero_fulfillments += 1
+                if consecutive_zero_fulfillments >= 3:
+                    self._logger.warning(
+                        "Breaking retry loop after %d consecutive zero-fulfillment attempts",
+                        consecutive_zero_fulfillments,
+                    )
+                    break
+            else:
+                consecutive_zero_fulfillments = 0
+
             # Append to fulfillment_attempts audit trail
             attempt_record = {
                 "attempt": attempt_number,
@@ -156,7 +168,14 @@ class ProvisioningOrchestrationService:
                     request.requested_count,
                     remaining,
                 )
-                request = self._persist_acquiring(request)
+                request, persist_ok = self._persist_acquiring(request)
+                if not persist_ok:
+                    self._logger.warning(
+                        "ACQUIRING persist failed for request %s on attempt %d — "
+                        "continuing retry loop with in-memory state",
+                        request.request_id,
+                        attempt_number,
+                    )
             elif last_result.is_final:
                 # No point retrying
                 break
@@ -175,8 +194,14 @@ class ProvisioningOrchestrationService:
             is_final=last_result.is_final if last_result else True,
         )
 
-    def _persist_acquiring(self, request: Request) -> Request:
-        """Persist request with ACQUIRING status between retry attempts."""
+    def _persist_acquiring(self, request: Request) -> tuple[Request, bool]:
+        """Persist request with ACQUIRING status between retry attempts.
+
+        Returns:
+            (updated_request, success) — success is False when the DB write
+            failed.  The caller should log a warning but continue the retry loop
+            because the in-memory request is still valid.
+        """
         from orb.domain.base import UnitOfWorkFactory
 
         try:
@@ -186,10 +211,10 @@ class ProvisioningOrchestrationService:
             uow_factory = self._container.get(UnitOfWorkFactory)
             with uow_factory.create_unit_of_work() as uow:
                 uow.requests.save(updated)
-            return updated
+            return updated, True
         except Exception as e:
             self._logger.warning("Failed to persist ACQUIRING status: %s", e)
-            return request
+            return request, False
 
     def _record_provider_success(self, provider_name: str) -> None:
         """Reset circuit breaker failure count after a successful dispatch."""
@@ -257,8 +282,8 @@ class ProvisioningOrchestrationService:
             )
 
             if result.success:
-                self._logger.info("Provider result.data: %s", result.data)
-                self._logger.info("Provider result.metadata: %s", result.metadata)
+                self._logger.debug("Provider result.data: %s", result.data)
+                self._logger.debug("Provider result.metadata: %s", result.metadata)
 
                 resource_ids = result.data.get("resource_ids", [])
                 instances = result.data.get("instances", [])

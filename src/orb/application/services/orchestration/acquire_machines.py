@@ -13,7 +13,16 @@ from orb.application.services.orchestration.dtos import AcquireMachinesInput, Ac
 from orb.domain.base.exceptions import ApplicationError
 from orb.domain.base.ports.logging_port import LoggingPort
 
-_TERMINAL_STATUSES = {"completed", "complete", "failed", "error", "cancelled", "canceled"}
+_TERMINAL_STATUSES = {
+    "completed",
+    "complete",
+    "failed",
+    "error",
+    "cancelled",
+    "canceled",
+    "partial",
+    "timeout",
+}
 _MAX_CONSECUTIVE_POLL_ERRORS = 3
 
 

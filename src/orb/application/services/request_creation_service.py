@@ -4,6 +4,7 @@ from orb.application.dto.commands import CreateRequestCommand
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.results import ProviderSelectionResult
 from orb.domain.request.aggregate import Request
+from orb.domain.request.exceptions import RequestValidationError
 from orb.domain.request.value_objects import RequestType
 from orb.domain.template.template_aggregate import Template
 
@@ -56,7 +57,9 @@ class RequestCreationService:
 
         # Store provider API in domain field
         if not template.provider_api:
-            raise ValueError(f"Template {template.template_id} has no provider_api configured")
+            raise RequestValidationError(
+                f"Template {template.template_id} has no provider_api configured"
+            )
         request.provider_api = template.provider_api
 
         self._logger.info(
