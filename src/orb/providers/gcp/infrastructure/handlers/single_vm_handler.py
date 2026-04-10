@@ -13,11 +13,11 @@ from orb.providers.gcp.exceptions import GCPError, GCPValidationError, translate
 from orb.providers.gcp.infrastructure.disk_types import normalize_boot_disk_type
 from orb.providers.gcp.infrastructure.handlers.base_handler import GCPHandler
 from orb.providers.gcp.types import (
-    GCPCreateHandlerResult,
+    GCPCreateOutcome,
     GCPFailedOperation,
     GCPHandlerContext,
     GCPInstanceStatus,
-    GCPMutationResult,
+    GCPMutationOutcome,
 )
 
 if TYPE_CHECKING:
@@ -32,7 +32,7 @@ except ImportError:  # pragma: no cover - exercised only when optional sdk deps 
 class GCPSingleVMHandler(GCPHandler):
     """Create and manage standalone Compute Engine instances."""
 
-    def acquire_hosts(self, request: Request, template: GCPTemplate) -> GCPCreateHandlerResult:
+    def acquire_hosts(self, request: Request, template: GCPTemplate) -> GCPCreateOutcome:
         """Create the requested number of standalone VM instances."""
         zone = self._template_zone(template)
         instances: list[GCPInstanceStatus] = []
@@ -54,12 +54,12 @@ class GCPSingleVMHandler(GCPHandler):
                     details={"instance_id": instance_name, "zone": zone},
                 )
                 failed_operations.append(
-                    {
-                        "target_id": instance_name,
-                        "error_code": translated.error_code,
-                        "error_message": str(translated),
-                        "operation": "create_instance",
-                    }
+                    GCPFailedOperation(
+                        target_id=instance_name,
+                        error_code=translated.error_code,
+                        error_message=str(translated),
+                        operation="create_instance",
+                    )
                 )
                 continue
 
@@ -72,10 +72,10 @@ class GCPSingleVMHandler(GCPHandler):
                 }
             )
 
-        return {
-            "resource_ids": resource_ids,
-            "instances": instances,
-            "provider_data": {
+        return GCPCreateOutcome(
+            resource_ids=resource_ids,
+            instances=instances,
+            provider_data={
                 "zone": zone,
                 "requested_count": request.requested_count,
                 "submitted_count": len(resource_ids),
@@ -83,8 +83,8 @@ class GCPSingleVMHandler(GCPHandler):
                 "operation_status": "submitted",  # type: ignore[typeddict-item]
                 "failed_operations": len(failed_operations),  # type: ignore[typeddict-item]
             },
-            "failed_operations": failed_operations,  # type: ignore[typeddict-item]
-        }
+            failed_operations=failed_operations,
+        )
 
     def terminate_hosts(
         self,
@@ -92,7 +92,7 @@ class GCPSingleVMHandler(GCPHandler):
         resource_ids: list[str],
         instance_ids: list[str],
         context: GCPHandlerContext,
-    ) -> GCPMutationResult:
+    ) -> GCPMutationOutcome:
         """Terminate the targeted standalone VM instances."""
         zone = self._require_zone(context)
         target_ids = instance_ids or resource_ids
@@ -135,7 +135,7 @@ class GCPSingleVMHandler(GCPHandler):
         *,
         instance_ids: list[str],
         context: GCPHandlerContext,
-    ) -> GCPMutationResult:
+    ) -> GCPMutationOutcome:
         """Start the targeted standalone VM instances."""
         zone = self._require_zone(context)
         return self._run_per_instance_mutation(
@@ -152,7 +152,7 @@ class GCPSingleVMHandler(GCPHandler):
         *,
         instance_ids: list[str],
         context: GCPHandlerContext,
-    ) -> GCPMutationResult:
+    ) -> GCPMutationOutcome:
         """Stop the targeted standalone VM instances."""
         zone = self._require_zone(context)
         return self._run_per_instance_mutation(
@@ -240,12 +240,12 @@ class GCPSingleVMHandler(GCPHandler):
         target_ids: list[str],
         operation_name: str,
         mutation: Callable[[str], object],
-    ) -> GCPMutationResult:
-        result: GCPMutationResult = {
-            "successful_ids": [],
-            "operations": [],
-            "results": {},
-        }
+    ) -> GCPMutationOutcome:
+        result = GCPMutationOutcome(
+            attempted_ids=list(target_ids),
+            successful_ids=[],
+            operations=[],
+        )
 
         for instance_name in target_ids:
             try:
@@ -256,26 +256,23 @@ class GCPSingleVMHandler(GCPHandler):
                     operation=operation_name,
                     details={"instance_id": instance_name},
                 )
-                failed_operations = result.setdefault("failed_operations", [])
-                failed_operations.append(
-                    {
-                        "target_id": instance_name,
-                        "error_code": translated.error_code,
-                        "error_message": str(translated),
-                        "operation": operation_name,
-                    }
+                result.failed_operations.append(
+                    GCPFailedOperation(
+                        target_id=instance_name,
+                        error_code=translated.error_code,
+                        error_message=str(translated),
+                        operation=operation_name,
+                    )
                 )
-                result["results"][instance_name] = False
                 continue
 
-            result["operations"].append(
+            result.operations.append(
                 {
                     "instance_id": instance_name,
                     "operation_name": response.name,
                 }
             )
-            result["successful_ids"].append(instance_name)
-            result["results"][instance_name] = True
+            result.successful_ids.append(instance_name)
 
         return result
 

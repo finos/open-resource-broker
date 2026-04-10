@@ -25,6 +25,7 @@ from orb.providers.gcp.infrastructure.handlers.mig_handler import (
 )
 from orb.providers.gcp.infrastructure.handlers.single_vm_handler import GCPSingleVMHandler
 from orb.providers.gcp.strategy.gcp_provider_strategy import GCPProviderStrategy
+from orb.providers.gcp.types import GCPCreateOutcome
 
 
 class _ComputeClientStub:
@@ -168,8 +169,8 @@ def test_single_vm_handler_acquire_hosts_submits_instance_creation() -> None:
 
     result = handler.acquire_hosts(request, template)
 
-    assert len(result["resource_ids"]) == 1
-    assert result["provider_data"]["zone"] == "us-central1-a"
+    assert len(result.resource_ids) == 1
+    assert result.provider_data["zone"] == "us-central1-a"
     assert compute_client.created_instances[0][0] == "us-central1-a"
 
 
@@ -216,11 +217,11 @@ def test_single_vm_handler_acquire_hosts_tracks_partial_failures() -> None:
         )
         result = handler.acquire_hosts(request, template)
 
-    assert result["provider_data"]["partial_failure"] is True
-    assert result["provider_data"]["submitted_count"] == 1
-    assert result["failed_operations"][0]["target_id"] == failing_name
-    assert result["failed_operations"][0]["error_code"] == "GCPQuotaExceededError"
-    assert len(result["resource_ids"]) == 1
+    assert result.provider_data["partial_failure"] is True
+    assert result.provider_data["submitted_count"] == 1
+    assert result.failed_operations[0].target_id == failing_name
+    assert result.failed_operations[0].error_code == "GCPQuotaExceededError"
+    assert len(result.resource_ids) == 1
 
 
 def test_single_vm_handler_start_instances_tracks_partial_failures() -> None:
@@ -237,15 +238,10 @@ def test_single_vm_handler_start_instances_tracks_partial_failures() -> None:
         context={"zone": "us-central1-a"},
     )
 
-    assert result["successful_ids"] == ["vm-a"]
-    assert result["results"] == {"vm-a": True, "vm-b": False}
-    assert result["failed_operations"] == [
-        {
-            "target_id": "vm-b",
-            "error_code": "GCPNetworkError",
-            "error_message": "503 service unavailable",
-            "operation": "start_instance",
-        }
+    assert result.attempted_ids == ["vm-a", "vm-b"]
+    assert result.successful_ids == ["vm-a"]
+    assert [(f.target_id, f.error_code, f.error_message, f.operation) for f in result.failed_operations] == [
+        ("vm-b", "GCPNetworkError", "503 service unavailable", "start_instance")
     ]
 
 
@@ -262,8 +258,10 @@ def test_mig_handler_start_instances_returns_failed_results_for_unsupported_targ
         context={"region": "us-central1", "scope": "regional"},
     )
 
-    assert result["results"] == {"vm-a": False, "vm-b": False}
-    assert result["warning"].startswith("MIG-managed instances follow group policy")
+    assert result.attempted_ids == ["vm-a", "vm-b"]
+    assert result.successful_ids == []
+    assert result.warning is not None
+    assert result.warning.startswith("MIG-managed instances follow group policy")
 
 
 def test_mig_handler_acquire_hosts_submits_template_and_group() -> None:
@@ -297,8 +295,8 @@ def test_mig_handler_acquire_hosts_submits_template_and_group() -> None:
 
     result = handler.acquire_hosts(request, template)
 
-    assert len(result["resource_ids"]) == 1
-    assert result["provider_data"]["target_size"] == 3
+    assert len(result.resource_ids) == 1
+    assert result.provider_data["target_size"] == 3
     assert len(compute_client.created_templates) == 1
     assert len(compute_client.created_migs) == 1
 
@@ -317,7 +315,8 @@ def test_mig_handler_terminates_multiple_resource_ids() -> None:
         context={"region": "us-central1", "scope": "regional"},
     )
 
-    assert result["successful_ids"] == ["mig-a", "mig-b"]
+    assert result.attempted_ids == ["mig-a", "mig-b"]
+    assert result.successful_ids == ["mig-a", "mig-b"]
     assert compute_client.deleted_regional_migs == [
         ("us-central1", "mig-a"),
         ("us-central1", "mig-b"),
@@ -388,7 +387,8 @@ def test_mig_handler_terminates_instances_across_multiple_resource_ids() -> None
         context={"project_id": "orb-example-12345", "region": "us-central1", "scope": "regional"},
     )
 
-    assert result["successful_ids"] == ["vm-a", "vm-b"]
+    assert result.attempted_ids == ["vm-a", "vm-b"]
+    assert result.successful_ids == ["vm-a", "vm-b"]
     assert compute_client.deleted_regional_managed_instances == [
         (
             "us-central1",
@@ -409,11 +409,11 @@ async def test_strategy_create_instances_delegates_to_handler() -> None:
     assert strategy.initialize() is True
 
     handler = MagicMock()
-    handler.acquire_hosts.return_value = {
-        "resource_ids": ["mig-demo"],
-        "instances": [],
-        "provider_data": {"scope": "regional"},
-    }
+    handler.acquire_hosts.return_value = GCPCreateOutcome(
+        resource_ids=["mig-demo"],
+        instances=[],
+        provider_data={"scope": "regional"},
+    )
     strategy._handler_factory = SimpleNamespace(create_handler=lambda _api: handler)
 
     result = await strategy.execute_operation(

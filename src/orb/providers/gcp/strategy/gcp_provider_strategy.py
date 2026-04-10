@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Mapping, Optional
+from typing import Any, Optional
 
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
-from orb.domain.request.aggregate import Request
-from orb.domain.request.value_objects import RequestType
 from orb.providers.base.strategy import (
     ProviderCapabilities,
     ProviderHealthStatus,
@@ -21,15 +19,19 @@ from orb.providers.gcp.capabilities import get_supported_api_capabilities, get_s
 from orb.providers.gcp.configuration.config import GCPProviderConfig
 from orb.providers.gcp.configuration.template_extension import GCPTemplateExtensionConfig
 from orb.providers.gcp.configuration.validator import validate_gcp_template
-from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
-from orb.providers.gcp.domain.template.value_objects import GCPProviderApi
 from orb.providers.gcp.exceptions import GCPError, translate_gcp_exception
 from orb.providers.gcp.infrastructure import (
     GCPComputeClient,
     GCPHandlerFactory,
 )
-from orb.providers.gcp.services.health_check_service import GCPHealthCheckService
-from orb.providers.gcp.types import GCPHandlerContext
+from orb.providers.gcp.services import (
+    GCPExecutionService,
+    GCPHealthCheckService,
+    GCPInventoryService,
+    GCPMutationService,
+    GCPOperationContextService,
+    GCPProvisioningService,
+)
 
 
 @injectable
@@ -49,7 +51,11 @@ class GCPProviderStrategy(ProviderStrategy):
         self._config = config
         self._logger = logger
         self._provider_name = provider_name
+        self._execution_service = GCPExecutionService()
         self._health_service = GCPHealthCheckService(config=config, logger=logger)
+        self._inventory_service = GCPInventoryService()
+        self._mutation_service = GCPMutationService()
+        self._provisioning_service = GCPProvisioningService()
         self._compute_client: Optional[GCPComputeClient] = None
         self._handler_factory: Optional[GCPHandlerFactory] = None
 
@@ -178,101 +184,41 @@ class GCPProviderStrategy(ProviderStrategy):
         )
 
     def _handle_create_instances(self, operation: ProviderOperation) -> ProviderResult:
-        template_config = operation.parameters.get("template_config", {})
-        count = int(operation.parameters.get("count", 1))
-        if not template_config:
-            return ProviderResult.error_result(
-                "template_config is required for create_instances",
-                "MISSING_TEMPLATE_CONFIG",
-            )
-
-        gcp_template = GCPTemplate.model_validate(self._build_gcp_template_config(template_config, count))
-        handler = self._get_handler(gcp_template.provider_api)
-        request = Request.create_new_request(
-            request_type=RequestType.ACQUIRE,
-            template_id=gcp_template.template_id,
-            machine_count=count,
-            provider_type="gcp",
-            provider_name=self._provider_name,
-            metadata=operation.parameters.get("request_metadata", {}),
-            request_id=operation.parameters.get("request_id"),
-        )
-        request.provider_api = gcp_template.provider_api.value
-        handler_result = handler.acquire_hosts(request, gcp_template)
-        failed_operations = handler_result.get("failed_operations", [])
-        return ProviderResult.success_result(
-            {
-                "resource_ids": handler_result.get("resource_ids", []),
-                "instances": handler_result.get("instances", []),
-                "provider_api": gcp_template.provider_api.value,
-                "count": count,
-                "template_id": gcp_template.template_id,
-                "failed_operations": failed_operations,
-                "results": {
-                    **{instance["instance_id"]: True for instance in handler_result.get("instances", [])},
-                    **{failure["target_id"]: False for failure in failed_operations},
-                },
-            },
-            {
-                "operation": "create_instances",
-                "handler_used": gcp_template.provider_api.value,
-                "provider_data": handler_result.get("provider_data", {}),
-                "partial_failure": bool(failed_operations),
-            },
+        create_context = self._get_operation_context_service().build_create_context(operation)
+        if isinstance(create_context, ProviderResult):
+            return create_context
+        outcome = self._execution_service.execute_create(create_context)
+        return self._provisioning_service.build_provider_result(
+            context=create_context,
+            outcome=outcome,
         )
 
     def _handle_terminate_instances(self, operation: ProviderOperation) -> ProviderResult:
-        handler = self._get_handler_for_operation(operation)
-        instance_ids = operation.parameters.get("instance_ids", []) or []
-        resource_ids = operation.parameters.get("resource_ids", []) or []
-        context = self._build_handler_context(operation)
-        result = handler.terminate_hosts(
-            resource_ids=resource_ids,
-            instance_ids=instance_ids,
-            context=context,
-        )
-        successful_ids = result.get("successful_ids", [])
-        failed_operations = result.get("failed_operations", [])
-        mutation_results = result.get("results", {})
-        return ProviderResult.success_result(
-            {
-                "success": not failed_operations,
-                "successful_count": len(successful_ids),
-                "successful_ids": successful_ids,
-                "results": mutation_results,
-                "failed_operations": failed_operations,
-            },
-            {
-                "operation": "terminate_instances",
-                "instance_ids": instance_ids,
-                "resource_ids": resource_ids,
-                "provider_data": result,
-                "partial_failure": bool(failed_operations),
+        mutation_context = self._get_operation_context_service().build_mutation_context(operation)
+        outcome = self._execution_service.execute_terminate(mutation_context)
+        return self._mutation_service.build_provider_result(
+            operation_name="terminate_instances",
+            outcome=outcome,
+            metadata={
+                "instance_ids": mutation_context.instance_ids,
+                "resource_ids": mutation_context.resource_ids,
             },
         )
 
     def _handle_get_instance_status(self, operation: ProviderOperation) -> ProviderResult:
-        handler = self._get_handler_for_operation(operation)
-        instances = handler.check_hosts_status(
-            resource_ids=operation.parameters.get("resource_ids", []) or [],
-            instance_ids=operation.parameters.get("instance_ids", []) or [],
-            context=self._build_handler_context(operation),
-        )
-        return ProviderResult.success_result(
-            {"instances": instances},
-            {"operation": "get_instance_status"},
+        mutation_context = self._get_operation_context_service().build_mutation_context(operation)
+        instances = self._execution_service.execute_status(mutation_context)
+        return self._inventory_service.build_status_result(
+            operation_name="get_instance_status",
+            instances=instances,
         )
 
     def _handle_describe_resource_instances(self, operation: ProviderOperation) -> ProviderResult:
-        handler = self._get_handler_for_operation(operation)
-        instances = handler.check_hosts_status(
-            resource_ids=operation.parameters.get("resource_ids", []) or [],
-            instance_ids=operation.parameters.get("instance_ids", []) or [],
-            context=self._build_handler_context(operation),
-        )
-        return ProviderResult.success_result(
-            {"instances": instances},
-            {"operation": "describe_resource_instances"},
+        mutation_context = self._get_operation_context_service().build_mutation_context(operation)
+        instances = self._execution_service.execute_status(mutation_context)
+        return self._inventory_service.build_status_result(
+            operation_name="describe_resource_instances",
+            instances=instances,
         )
 
     def _handle_resolve_image(self, operation: ProviderOperation) -> ProviderResult:
@@ -293,109 +239,20 @@ class GCPProviderStrategy(ProviderStrategy):
         )
 
     def _handle_start_instances(self, operation: ProviderOperation) -> ProviderResult:
-        handler = self._get_handler_for_operation(operation)
-        result = handler.start_instances(
-            instance_ids=operation.parameters.get("instance_ids", []) or [],
-            context=self._build_handler_context(operation),
-        )
-        return ProviderResult.success_result(
-            result,
-            {
-                "operation": "start_instances",
-                "partial_failure": bool(result.get("failed_operations", [])),
-            },
+        mutation_context = self._get_operation_context_service().build_mutation_context(operation)
+        outcome = self._execution_service.execute_start(mutation_context)
+        return self._mutation_service.build_provider_result(
+            operation_name="start_instances",
+            outcome=outcome,
         )
 
     def _handle_stop_instances(self, operation: ProviderOperation) -> ProviderResult:
-        handler = self._get_handler_for_operation(operation)
-        result = handler.stop_instances(
-            instance_ids=operation.parameters.get("instance_ids", []) or [],
-            context=self._build_handler_context(operation),
+        mutation_context = self._get_operation_context_service().build_mutation_context(operation)
+        outcome = self._execution_service.execute_stop(mutation_context)
+        return self._mutation_service.build_provider_result(
+            operation_name="stop_instances",
+            outcome=outcome,
         )
-        return ProviderResult.success_result(
-            result,
-            {
-                "operation": "stop_instances",
-                "partial_failure": bool(result.get("failed_operations", [])),
-            },
-        )
-
-    def _build_gcp_template_config(
-        self,
-        template_config: Mapping[str, object],
-        count: int,
-    ) -> dict[str, object]:
-        defaults = GCPTemplateExtensionConfig()
-        merged = dict(template_config)
-        merged.setdefault("provider_type", "gcp")
-        merged.setdefault("provider_api", defaults.provider_api)
-        merged.setdefault("project_id", self._config.project_id)
-        merged.setdefault("region", self._config.region)
-        merged.setdefault("zones", self._config.zones)
-        merged.setdefault("network", self._config.network)
-        merged.setdefault("subnetwork", self._config.subnetwork)
-        if "instance_type" not in merged and "machine_type" in merged:
-            merged["instance_type"] = merged["machine_type"]
-        merged.setdefault("instance_type", defaults.machine_type)
-        if "boot_disk_size_gb" not in merged and "root_device_volume_size" in merged:
-            merged["boot_disk_size_gb"] = merged["root_device_volume_size"]
-        merged.setdefault("boot_disk_size_gb", defaults.boot_disk_size_gb)
-        if "boot_disk_type" not in merged and "volume_type" in merged:
-            merged["boot_disk_type"] = merged["volume_type"]
-        merged.setdefault("boot_disk_type", defaults.boot_disk_type)
-        merged.setdefault("source_image_family", defaults.source_image_family)
-        merged.setdefault("source_image_project", defaults.source_image_project)
-        merged.setdefault("provisioning_model", defaults.provisioning_model)
-        merged.setdefault("network_tags", defaults.network_tags)
-        merged.setdefault("labels", defaults.labels)
-        merged.setdefault("instance_template_name_prefix", defaults.instance_template_name_prefix)
-        merged.setdefault("max_instances", count)
-        return merged
-
-    def _get_handler_for_operation(self, operation: ProviderOperation):
-        provider_api = operation.parameters.get("provider_api") or operation.parameters.get(
-            "request_metadata", {}
-        ).get("provider_api")
-        if provider_api is None:
-            provider_api = GCPProviderApi.SINGLE_VM.value
-        return self._get_handler(provider_api)
-
-    def _get_handler(self, provider_api: str | GCPProviderApi):
-        return self._get_handler_factory().create_handler(provider_api)
-
-    def _build_handler_context(self, operation: ProviderOperation) -> GCPHandlerContext:
-        metadata = operation.parameters.get("request_metadata", {}) or {}
-        context: GCPHandlerContext = {}
-        if isinstance(metadata, dict):
-            for key in (
-                "project_id",
-                "region",
-                "zone",
-                "scope",
-                "mig_name",
-                "instance_template_name",
-                "provider_api",
-            ):
-                value = metadata.get(key)
-                if isinstance(value, str):
-                    context[key] = value
-        context.setdefault("project_id", self._config.project_id)
-        region = operation.parameters.get("region", self._config.region)
-        if isinstance(region, str):
-            context.setdefault("region", region)
-        zone = operation.parameters.get("zone")
-        if zone is None:
-            zones = operation.parameters.get("zones") or self._config.zones
-            zone = zones[0] if zones else None
-        if isinstance(zone, str):
-            context.setdefault("zone", zone)
-        resource_ids = operation.parameters.get("resource_ids", []) or []
-        if len(resource_ids) == 1:
-            context.setdefault("mig_name", resource_ids[0])
-        provider_api = operation.parameters.get("provider_api")
-        if isinstance(provider_api, str):
-            context.setdefault("provider_api", provider_api)
-        return context
 
     def _get_compute_client(self) -> GCPComputeClient:
         if self._compute_client is None:
@@ -406,6 +263,13 @@ class GCPProviderStrategy(ProviderStrategy):
         if self._handler_factory is None:
             raise RuntimeError("GCP handler factory not initialized")
         return self._handler_factory
+
+    def _get_operation_context_service(self) -> GCPOperationContextService:
+        return GCPOperationContextService(
+            config=self._config,
+            handler_factory=self._get_handler_factory(),
+            provider_name=self._provider_name,
+        )
 
     def get_capabilities(self) -> ProviderCapabilities:
         """Describe the operations and features supported by the GCP provider."""

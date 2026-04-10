@@ -14,10 +14,10 @@ from orb.providers.gcp.exceptions import GCPEntityNotFoundError, GCPValidationEr
 from orb.providers.gcp.infrastructure.disk_types import normalize_boot_disk_type
 from orb.providers.gcp.infrastructure.handlers.base_handler import GCPHandler
 from orb.providers.gcp.types import (
-    GCPCreateHandlerResult,
+    GCPCreateOutcome,
     GCPHandlerContext,
     GCPInstanceStatus,
-    GCPMutationResult,
+    GCPMutationOutcome,
 )
 
 if TYPE_CHECKING:
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 class GCPManagedInstanceGroupHandler(GCPHandler):
     """Create and manage zonal or regional Managed Instance Groups."""
 
-    def acquire_hosts(self, request: Request, template: GCPTemplate) -> GCPCreateHandlerResult:
+    def acquire_hosts(self, request: Request, template: GCPTemplate) -> GCPCreateOutcome:
         """Create the MIG and backing instance template for a request."""
         mig_name = template.mig_name or f"orb-mig-{template.template_id}-{uuid.uuid4().hex[:8]}"
         template_name = (
@@ -63,10 +63,10 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
             )
             location_context = {"zone": zone, "scope": template.mig_scope.value}
 
-        return {
-            "resource_ids": [mig_name],
-            "instances": [],
-            "provider_data": {
+        return GCPCreateOutcome(
+            resource_ids=[mig_name],
+            instances=[],
+            provider_data={
                 "mig_name": mig_name,
                 "instance_template_name": template_name,
                 "target_size": request.requested_count,
@@ -74,7 +74,7 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
                 "operation_status": "submitted",  # type: ignore[typeddict-item]
                 **location_context,
             },
-        }
+        )
 
     def terminate_hosts(
         self,
@@ -82,7 +82,7 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
         resource_ids: list[str],
         instance_ids: list[str],
         context: GCPHandlerContext,
-    ) -> GCPMutationResult:
+    ) -> GCPMutationOutcome:
         """Delete specific MIG members or tear down whole MIG resources."""
         mig_names = self._require_mig_names(resource_ids, context)
         template_name = context.get("instance_template_name")
@@ -110,11 +110,11 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
                         instance_urls=instance_urls,
                     )
                 operations.append({"operation_name": response.name, "mig_name": mig_name})
-            return {
-                "successful_ids": instance_ids,
-                "operations": operations,
-                "results": {instance_id: True for instance_id in instance_ids},
-            }
+            return GCPMutationOutcome(
+                attempted_ids=instance_ids,
+                successful_ids=instance_ids,
+                operations=operations,
+            )
 
         operations: list[dict[str, str | None]] = []
         successful_ids: list[str] = []
@@ -138,11 +138,11 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
             except Exception:
                 self._logger.debug("Best-effort instance template cleanup failed for %s", template_name)
 
-        return {
-            "successful_ids": successful_ids,
-            "operations": operations,
-            "results": {resource_id: True for resource_id in successful_ids},
-        }
+        return GCPMutationOutcome(
+            attempted_ids=successful_ids,
+            successful_ids=successful_ids,
+            operations=operations,
+        )
 
     def check_hosts_status(
         self,
@@ -189,28 +189,28 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
         *,
         instance_ids: list[str],
         context: GCPHandlerContext,
-    ) -> GCPMutationResult:
+    ) -> GCPMutationOutcome:
         """Report that direct start operations are unsupported for MIG-managed instances."""
-        return {
-            "successful_ids": [],
-            "operations": [],
-            "results": {instance_id: False for instance_id in instance_ids},
-            "warning": "MIG-managed instances follow group policy; start is not supported directly",
-        }
+        return GCPMutationOutcome(
+            attempted_ids=instance_ids,
+            successful_ids=[],
+            operations=[],
+            warning="MIG-managed instances follow group policy; start is not supported directly",
+        )
 
     def stop_instances(
         self,
         *,
         instance_ids: list[str],
         context: GCPHandlerContext,
-    ) -> GCPMutationResult:
+    ) -> GCPMutationOutcome:
         """Report that direct stop operations are unsupported for MIG-managed instances."""
-        return {
-            "successful_ids": [],
-            "operations": [],
-            "results": {instance_id: False for instance_id in instance_ids},
-            "warning": "MIG-managed instances follow group policy; stop is not supported directly",
-        }
+        return GCPMutationOutcome(
+            attempted_ids=instance_ids,
+            successful_ids=[],
+            operations=[],
+            warning="MIG-managed instances follow group policy; stop is not supported directly",
+        )
 
     def _build_instance_template_payload(
         self,

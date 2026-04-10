@@ -10,10 +10,10 @@ from orb.providers.gcp.configuration.config import GCPProviderConfig
 from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
 from orb.providers.gcp.infrastructure.compute_client import GCPComputeClient
 from orb.providers.gcp.types import (
-    GCPCreateHandlerResult,
+    GCPCreateOutcome,
     GCPHandlerContext,
     GCPInstanceStatus,
-    GCPMutationResult,
+    GCPMutationOutcome,
 )
 
 
@@ -31,7 +31,7 @@ class GCPHandler(ABC):
         self._logger = logger
 
     @abstractmethod
-    def acquire_hosts(self, request: Request, template: GCPTemplate) -> GCPCreateHandlerResult:
+    def acquire_hosts(self, request: Request, template: GCPTemplate) -> GCPCreateOutcome:
         """Create capacity for the request."""
 
     @abstractmethod
@@ -41,7 +41,7 @@ class GCPHandler(ABC):
         resource_ids: list[str],
         instance_ids: list[str],
         context: GCPHandlerContext,
-    ) -> GCPMutationResult:
+    ) -> GCPMutationOutcome:
         """Terminate provider-owned resources or instances."""
 
     @abstractmethod
@@ -60,7 +60,7 @@ class GCPHandler(ABC):
         *,
         instance_ids: list[str],
         context: GCPHandlerContext,
-    ) -> GCPMutationResult:
+    ) -> GCPMutationOutcome:
         """Start instances managed by this handler."""
 
     @abstractmethod
@@ -69,5 +69,5 @@ class GCPHandler(ABC):
         *,
         instance_ids: list[str],
         context: GCPHandlerContext,
-    ) -> GCPMutationResult:
+    ) -> GCPMutationOutcome:
         """Stop instances managed by this handler."""
