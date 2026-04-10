@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import sys
+from types import ModuleType
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from orb.providers.gcp.configuration.config import GCPProviderConfig
 from orb.providers.gcp.infrastructure.compute_client import (
     GCPComputeClient,
+    GCP_MUTATION_RETRYABLE_GOOGLE_API_EXCEPTIONS,
+    GCP_READ_RETRYABLE_GOOGLE_API_EXCEPTIONS,
     GCP_RETRYABLE_GOOGLE_API_EXCEPTIONS,
 )
 
@@ -53,7 +57,7 @@ def test_create_instance_passes_configured_retry_and_timeout(monkeypatch) -> Non
     client = GCPComputeClient(config=_config(), logger=MagicMock())
 
     monkeypatch.setattr(client, "_compute_v1", lambda: fake_compute_v1)
-    monkeypatch.setattr(client, "_build_retry_policy", lambda: "retry-policy")
+    monkeypatch.setattr(client, "_build_retry_policy", lambda operation_name: f"{operation_name}-policy")
 
     body = SimpleNamespace(name="vm-1")
     client.create_instance(zone="us-central1-a", body=body)
@@ -63,7 +67,7 @@ def test_create_instance_passes_configured_retry_and_timeout(monkeypatch) -> Non
             "project": "orb-example-12345",
             "zone": "us-central1-a",
             "instance_resource": body,
-            "retry": "retry-policy",
+            "retry": "mutation-policy",
             "timeout": (7.0, 11.0),
         }
     ]
@@ -75,7 +79,7 @@ def test_get_image_from_family_passes_configured_retry_and_timeout(monkeypatch) 
     client = GCPComputeClient(config=_config(), logger=MagicMock())
 
     monkeypatch.setattr(client, "_compute_v1", lambda: fake_compute_v1)
-    monkeypatch.setattr(client, "_build_retry_policy", lambda: "retry-policy")
+    monkeypatch.setattr(client, "_build_retry_policy", lambda operation_name: f"{operation_name}-policy")
 
     client.get_image_from_family(image_project="debian-cloud", family="debian-12")
 
@@ -83,7 +87,7 @@ def test_get_image_from_family_passes_configured_retry_and_timeout(monkeypatch) 
         {
             "project": "debian-cloud",
             "family": "debian-12",
-            "retry": "retry-policy",
+            "retry": "image_read-policy",
             "timeout": (7.0, 11.0),
         }
     ]
@@ -117,3 +121,127 @@ def test_retryable_exception_list_is_explicit() -> None:
         "GatewayTimeout",
         "TooManyRequests",
     )
+    assert GCP_READ_RETRYABLE_GOOGLE_API_EXCEPTIONS == (
+        *GCP_RETRYABLE_GOOGLE_API_EXCEPTIONS,
+        "DeadlineExceeded",
+    )
+    assert GCP_MUTATION_RETRYABLE_GOOGLE_API_EXCEPTIONS == (
+        *GCP_RETRYABLE_GOOGLE_API_EXCEPTIONS,
+        "ResourceExhausted",
+    )
+
+
+def test_retry_policy_is_cached_per_operation_profile(monkeypatch) -> None:
+    client = GCPComputeClient(config=_config(), logger=MagicMock())
+    build_calls: list[str] = []
+
+    def fake_build_retry_policy(operation_name: str) -> str:
+        build_calls.append(operation_name)
+        return f"{operation_name}-policy"
+
+    monkeypatch.setattr(client, "_build_retry_policy", fake_build_retry_policy)
+
+    assert client._get_retry_policy("read") == "read-policy"
+    assert client._get_retry_policy("image_read") == "read-policy"
+    assert client._get_retry_policy("mutation") == "mutation-policy"
+    assert client._get_retry_policy("delete") == "delete-policy"
+    assert build_calls == ["read", "mutation", "delete"]
+
+
+def test_build_retry_policy_uses_profile_specific_exceptions_and_logs(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeRetry:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+    def _fake_if_exception_type(*exc_types: object) -> tuple[object, ...]:
+        return exc_types
+
+    class InternalServerError(Exception):
+        pass
+
+    class BadGateway(Exception):
+        pass
+
+    class ServiceUnavailable(Exception):
+        pass
+
+    class GatewayTimeout(Exception):
+        pass
+
+    class TooManyRequests(Exception):
+        pass
+
+    class DeadlineExceeded(Exception):
+        pass
+
+    class ResourceExhausted(Exception):
+        pass
+
+    google_module = ModuleType("google")
+    api_core_module = ModuleType("google.api_core")
+    exceptions_module = ModuleType("google.api_core.exceptions")
+    retry_module = ModuleType("google.api_core.retry")
+
+    for exc_type in (
+        InternalServerError,
+        BadGateway,
+        ServiceUnavailable,
+        GatewayTimeout,
+        TooManyRequests,
+        DeadlineExceeded,
+        ResourceExhausted,
+    ):
+        setattr(exceptions_module, exc_type.__name__, exc_type)
+
+    retry_module.Retry = _FakeRetry
+    retry_module.if_exception_type = _fake_if_exception_type
+    api_core_module.exceptions = exceptions_module
+    api_core_module.retry = retry_module
+    google_module.api_core = api_core_module
+
+    monkeypatch.setitem(sys.modules, "google", google_module)
+    monkeypatch.setitem(sys.modules, "google.api_core", api_core_module)
+    monkeypatch.setitem(sys.modules, "google.api_core.exceptions", exceptions_module)
+    monkeypatch.setitem(sys.modules, "google.api_core.retry", retry_module)
+
+    logger = MagicMock()
+    client = GCPComputeClient(config=_config(), logger=logger)
+
+    client._build_retry_policy("read")
+
+    assert captured["predicate"] == (
+        InternalServerError,
+        BadGateway,
+        ServiceUnavailable,
+        GatewayTimeout,
+        TooManyRequests,
+        DeadlineExceeded,
+    )
+    assert captured["initial"] == 0.5
+    assert captured["maximum"] == 5.0
+    assert captured["multiplier"] == 1.5
+    assert captured["timeout"] == 72.0
+
+    on_error = captured["on_error"]
+    assert callable(on_error)
+    retry_error = DeadlineExceeded("retry me")
+    on_error(retry_error)  # type: ignore[operator]
+    logger.warning.assert_called_once_with(
+        "Retrying GCP %s operation after %s: %s",
+        "read",
+        "DeadlineExceeded",
+        retry_error,
+    )
+
+
+def test_retry_profile_rejects_unknown_operation() -> None:
+    client = GCPComputeClient(config=_config(), logger=MagicMock())
+
+    try:
+        client._retry_profile_for("unknown")
+    except ValueError as exc:
+        assert "Unsupported GCP retry operation profile" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for unknown retry profile")

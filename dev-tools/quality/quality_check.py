@@ -570,15 +570,19 @@ class CommentChecker(FileChecker):
 
 
 class GetAttrChecker(FileChecker):
-    """Enforce that getattr calls in the Azure provider carry a justifying comment.
+    """Enforce justified ``getattr`` use in Azure and GCP provider code.
 
-    Every ``getattr(...)`` call in ``src/orb/providers/azure/`` must have a
-    comment starting with ``# getattr`` on the same line, on a preceding line
-    within the same scope, or in the enclosing function/method docstring.
-    This keeps defensive SDK access intentional and documented.
+    Every ``getattr(...)`` call in ``src/orb/providers/azure/`` and
+    ``src/orb/providers/gcp/`` must have a comment starting with ``# getattr``
+    on the same line, on a preceding line within the same scope, or in the
+    enclosing function/method docstring. This keeps defensive SDK access
+    intentional and documented at the provider boundary.
     """
 
-    _AZURE_PROVIDER_PREFIX = os.path.join("src", "orb", "providers", "azure")
+    _PROVIDER_PREFIXES = (
+        os.path.join("src", "orb", "providers", "azure"),
+        os.path.join("src", "orb", "providers", "gcp"),
+    )
     _GETATTR_CALL = re.compile(r"\bgetattr\s*\(")
     _JUSTIFICATION_COMMENT = re.compile(r"#\s*getattr\b")
     _JUSTIFICATION_DOCSTRING = re.compile(r"\bgetattr\b")
@@ -589,7 +593,7 @@ class GetAttrChecker(FileChecker):
         if not file_path.endswith(".py"):
             return []
         normalised = os.path.normpath(file_path)
-        if self._AZURE_PROVIDER_PREFIX not in normalised:
+        if not any(prefix in normalised for prefix in self._PROVIDER_PREFIXES):
             return []
 
         violations: list[Violation] = []
