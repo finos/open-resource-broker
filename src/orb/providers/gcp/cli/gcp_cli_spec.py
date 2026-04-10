@@ -11,6 +11,7 @@ class GCPCLISpec:
     """CLI spec for the GCP provider."""
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
+        """Register GCP-specific CLI flags."""
         parser.add_argument("--gcp-project-id", dest="gcp_project_id", help="GCP project ID")
         parser.add_argument("--gcp-region", dest="gcp_region", help="GCP region")
         parser.add_argument(
@@ -32,6 +33,7 @@ class GCPCLISpec:
         )
 
     def extract_config(self, args: argparse.Namespace) -> dict[str, Any]:
+        """Build a provider config payload from required CLI arguments."""
         config = {
             "project_id": args.gcp_project_id,
             "region": args.gcp_region,
@@ -45,6 +47,7 @@ class GCPCLISpec:
         return config
 
     def extract_partial_config(self, args: argparse.Namespace) -> dict[str, Any]:
+        """Build a partial provider config payload from explicitly supplied CLI values."""
         result: dict[str, Any] = {}
         if args.gcp_project_id is not None:
             result["project_id"] = args.gcp_project_id
@@ -59,6 +62,7 @@ class GCPCLISpec:
         return result
 
     def validate_add(self, args: argparse.Namespace) -> list[str]:
+        """Return validation errors for `orb provider add`."""
         errors: list[str] = []
         if not args.gcp_project_id:
             errors.append("--gcp-project-id is required")
@@ -67,12 +71,14 @@ class GCPCLISpec:
         return errors
 
     def generate_name(self, args: argparse.Namespace) -> str:
+        """Generate a stable provider name from the selected project and region."""
         project_id = args.gcp_project_id or "default"
         region = args.gcp_region or "global"
         sanitized_project = re.sub(r"[^a-zA-Z0-9\-_]", "-", project_id)
         return f"gcp_{sanitized_project}_{region}"
 
     def format_display(self, config: dict[str, Any]) -> list[tuple[str, str]]:
+        """Format provider config values for CLI display."""
         zones = config.get("zones") or []
         return [
             ("Project", config.get("project_id", "-")),

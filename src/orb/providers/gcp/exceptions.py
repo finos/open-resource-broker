@@ -137,10 +137,7 @@ def _extract_error_details(exc: Exception) -> dict[str, Any]:
     details: dict[str, Any] = {}
     if google_exceptions is not None and isinstance(exc, google_exceptions.GoogleAPICallError):
         if exc.code is not None:
-            details["google_error_code"] = str(exc.code)
-        status_code = _extract_status_code(exc)
-        if status_code:
-            details["http_status_code"] = status_code
+            details["http_status_code"] = str(exc.code)
         if exc.reason:
             details["reason"] = exc.reason
         if exc.domain:
@@ -152,12 +149,3 @@ def _extract_error_details(exc: Exception) -> dict[str, Any]:
         if exc.details:
             details["rpc_details"] = [str(item) for item in exc.details]
     return details
-
-
-def _extract_status_code(exc: google_exceptions.GoogleAPICallError) -> str | None:
-    response = exc.response
-    if response is not None and hasattr(response, "status_code"):
-        response_status = getattr(response, "status_code")
-        if response_status is not None:
-            return str(response_status)
-    return None

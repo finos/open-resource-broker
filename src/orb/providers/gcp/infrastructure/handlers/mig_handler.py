@@ -28,6 +28,7 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
     """Create and manage zonal or regional Managed Instance Groups."""
 
     def acquire_hosts(self, request: Request, template: GCPTemplate) -> GCPCreateHandlerResult:
+        """Create the MIG and backing instance template for a request."""
         mig_name = template.mig_name or f"orb-mig-{template.template_id}-{uuid.uuid4().hex[:8]}"
         template_name = (
             f"{template.instance_template_name_prefix or 'orb'}-{template.template_id}-{uuid.uuid4().hex[:8]}"
@@ -82,6 +83,7 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
         instance_ids: list[str],
         context: GCPHandlerContext,
     ) -> GCPMutationResult:
+        """Delete specific MIG members or tear down whole MIG resources."""
         mig_names = self._require_mig_names(resource_ids, context)
         template_name = context.get("instance_template_name")
         scope = str(context.get("scope") or GCPMIGScope.REGIONAL.value)
@@ -147,6 +149,7 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
         instance_ids: list[str],
         context: GCPHandlerContext,
     ) -> list[GCPInstanceStatus]:
+        """Describe the current status of instances managed by the MIG."""
         mig_names = self._require_mig_names(resource_ids, context)
         scope = str(context.get("scope") or GCPMIGScope.REGIONAL.value)
         results: list[GCPInstanceStatus] = []
@@ -185,6 +188,7 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
         instance_ids: list[str],
         context: GCPHandlerContext,
     ) -> GCPMutationResult:
+        """Report that direct start operations are unsupported for MIG-managed instances."""
         return {
             "started_instance_ids": [],
             "operations": [],
@@ -197,6 +201,7 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
         instance_ids: list[str],
         context: GCPHandlerContext,
     ) -> GCPMutationResult:
+        """Report that direct stop operations are unsupported for MIG-managed instances."""
         return {
             "stopped_instance_ids": [],
             "operations": [],

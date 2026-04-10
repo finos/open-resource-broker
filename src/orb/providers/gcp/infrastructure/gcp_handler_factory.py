@@ -21,6 +21,7 @@ class GCPHandlerFactory:
         config: GCPProviderConfig,
         logger: LoggingPort,
     ) -> None:
+        """Initialize the handler cache and register supported handler classes."""
         self._compute_client = compute_client
         self._config = config
         self._logger = logger
@@ -29,6 +30,7 @@ class GCPHandlerFactory:
         self._register_handler_classes()
 
     def create_handler(self, handler_type: GCPProviderApi | str) -> GCPHandler:
+        """Return a cached handler instance for the requested GCP API."""
         handler_key = handler_type.value if isinstance(handler_type, GCPProviderApi) else handler_type
         if handler_key in self._handlers:
             return self._handlers[handler_key]

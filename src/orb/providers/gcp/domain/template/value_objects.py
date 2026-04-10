@@ -31,6 +31,7 @@ class _GCPStringValue(ValueObject):
     @model_validator(mode="before")
     @classmethod
     def coerce_string(cls, data: object) -> object:
+        """Accept raw string input for value-object validation."""
         if isinstance(data, str):
             return {"value": data}
         return data
@@ -38,6 +39,7 @@ class _GCPStringValue(ValueObject):
     @field_validator("value")
     @classmethod
     def validate_value(cls, value: str) -> str:
+        """Normalize and validate the wrapped string value."""
         value = value.strip()
         if not value:
             raise ValueError(f"{cls.__name__} cannot be empty")
@@ -47,6 +49,7 @@ class _GCPStringValue(ValueObject):
 
     @model_serializer
     def serialize_model(self) -> str:
+        """Serialize the value object as its scalar string."""
         return self.value
 
     def __str__(self) -> str:

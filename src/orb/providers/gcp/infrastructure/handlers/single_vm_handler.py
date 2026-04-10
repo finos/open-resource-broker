@@ -27,6 +27,7 @@ class GCPSingleVMHandler(GCPHandler):
     """Create and manage standalone Compute Engine instances."""
 
     def acquire_hosts(self, request: Request, template: GCPTemplate) -> GCPCreateHandlerResult:
+        """Create the requested number of standalone VM instances."""
         zone = self._template_zone(template)
         instances: list[GCPInstanceStatus] = []
         resource_ids: list[str] = []
@@ -63,6 +64,7 @@ class GCPSingleVMHandler(GCPHandler):
         instance_ids: list[str],
         context: GCPHandlerContext,
     ) -> GCPMutationResult:
+        """Terminate the targeted standalone VM instances."""
         zone = self._require_zone(context)
         target_ids = instance_ids or resource_ids
         operations: list[dict[str, str | None]] = []
@@ -78,6 +80,7 @@ class GCPSingleVMHandler(GCPHandler):
         instance_ids: list[str],
         context: GCPHandlerContext,
     ) -> list[GCPInstanceStatus]:
+        """Fetch current status for the targeted standalone VM instances."""
         zone = self._require_zone(context)
         target_ids = instance_ids or resource_ids
         results: list[GCPInstanceStatus] = []
@@ -101,6 +104,7 @@ class GCPSingleVMHandler(GCPHandler):
         instance_ids: list[str],
         context: GCPHandlerContext,
     ) -> GCPMutationResult:
+        """Start the targeted standalone VM instances."""
         zone = self._require_zone(context)
         operations: list[dict[str, str | None]] = []
         for instance_name in instance_ids:
@@ -114,6 +118,7 @@ class GCPSingleVMHandler(GCPHandler):
         instance_ids: list[str],
         context: GCPHandlerContext,
     ) -> GCPMutationResult:
+        """Stop the targeted standalone VM instances."""
         zone = self._require_zone(context)
         operations: list[dict[str, str | None]] = []
         for instance_name in instance_ids:

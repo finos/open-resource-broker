@@ -65,6 +65,7 @@ class GCPComputeClient:
         config: GCPProviderConfig,
         logger: LoggingPort,
     ) -> None:
+        """Store provider config and lazily initialized Compute Engine clients."""
         self._config = config
         self._logger = logger
         self._instances_client: Optional[InstancesClient] = None
@@ -80,6 +81,7 @@ class GCPComputeClient:
         zone: str,
         body: Instance,
     ) -> ExtendedOperation:
+        """Create a standalone Compute Engine instance."""
         operation = self._get_instances_client().insert(
             project=self._config.project_id,
             zone=zone,
@@ -89,6 +91,7 @@ class GCPComputeClient:
         return operation
 
     def delete_instance(self, *, zone: str, instance_name: str) -> ExtendedOperation:
+        """Delete a standalone Compute Engine instance."""
         operation = self._get_instances_client().delete(
             project=self._config.project_id,
             zone=zone,
@@ -98,6 +101,7 @@ class GCPComputeClient:
         return operation
 
     def get_instance(self, *, zone: str, instance_name: str) -> GCPInstanceRecord:
+        """Fetch one Compute Engine instance and normalize the response."""
         instance = self._get_instances_client().get(
             project=self._config.project_id,
             zone=zone,
@@ -111,6 +115,7 @@ class GCPComputeClient:
         )
 
     def start_instance(self, *, zone: str, instance_name: str) -> ExtendedOperation:
+        """Start a stopped Compute Engine instance."""
         operation = self._get_instances_client().start(
             project=self._config.project_id,
             zone=zone,
@@ -120,6 +125,7 @@ class GCPComputeClient:
         return operation
 
     def stop_instance(self, *, zone: str, instance_name: str) -> ExtendedOperation:
+        """Stop a running Compute Engine instance."""
         operation = self._get_instances_client().stop(
             project=self._config.project_id,
             zone=zone,
@@ -134,6 +140,7 @@ class GCPComputeClient:
         template_name: str,
         body: InstanceTemplate,
     ) -> ExtendedOperation:
+        """Create an instance template for a managed instance group."""
         body.name = template_name
         operation = self._get_instance_templates_client().insert(
             project=self._config.project_id,
@@ -143,6 +150,7 @@ class GCPComputeClient:
         return operation
 
     def delete_instance_template(self, *, template_name: str) -> ExtendedOperation:
+        """Delete an instance template by name."""
         operation = self._get_instance_templates_client().delete(
             project=self._config.project_id,
             instance_template=template_name,
@@ -157,6 +165,7 @@ class GCPComputeClient:
         mig_name: str,
         body: InstanceGroupManager,
     ) -> ExtendedOperation:
+        """Create a regional managed instance group."""
         body.name = mig_name
         operation = self._get_region_igm_client().insert(
             project=self._config.project_id,
@@ -173,6 +182,7 @@ class GCPComputeClient:
         mig_name: str,
         body: InstanceGroupManager,
     ) -> ExtendedOperation:
+        """Create a zonal managed instance group."""
         body.name = mig_name
         operation = self._get_zone_igm_client().insert(
             project=self._config.project_id,
@@ -183,6 +193,7 @@ class GCPComputeClient:
         return operation
 
     def delete_regional_mig(self, *, region: str, mig_name: str) -> ExtendedOperation:
+        """Delete a regional managed instance group."""
         operation = self._get_region_igm_client().delete(
             project=self._config.project_id,
             region=region,
@@ -192,6 +203,7 @@ class GCPComputeClient:
         return operation
 
     def delete_zonal_mig(self, *, zone: str, mig_name: str) -> ExtendedOperation:
+        """Delete a zonal managed instance group."""
         operation = self._get_zone_igm_client().delete(
             project=self._config.project_id,
             zone=zone,
@@ -206,6 +218,7 @@ class GCPComputeClient:
         region: str,
         mig_name: str,
     ) -> list[GCPManagedInstanceRecord]:
+        """List instances currently tracked by a regional managed instance group."""
         response = self._get_region_igm_client().list_managed_instances(
             project=self._config.project_id,
             region=region,
@@ -227,6 +240,7 @@ class GCPComputeClient:
         zone: str,
         mig_name: str,
     ) -> list[GCPManagedInstanceRecord]:
+        """List instances currently tracked by a zonal managed instance group."""
         response = self._get_zone_igm_client().list_managed_instances(
             project=self._config.project_id,
             zone=zone,
@@ -249,6 +263,7 @@ class GCPComputeClient:
         mig_name: str,
         instance_urls: list[str],
     ) -> ExtendedOperation:
+        """Delete specific instances from a regional managed instance group."""
         compute_v1 = self._compute_v1()
         operation = self._get_region_igm_client().delete_instances(
             project=self._config.project_id,
@@ -270,6 +285,7 @@ class GCPComputeClient:
         mig_name: str,
         instance_urls: list[str],
     ) -> ExtendedOperation:
+        """Delete specific instances from a zonal managed instance group."""
         compute_v1 = self._compute_v1()
         operation = self._get_zone_igm_client().delete_instances(
             project=self._config.project_id,
@@ -283,6 +299,7 @@ class GCPComputeClient:
         return operation
 
     def get_image_from_family(self, *, image_project: str, family: str) -> Image:
+        """Resolve the latest image in a Compute Engine image family."""
         image = self._get_images_client().get_from_family(
             project=image_project,
             family=family,

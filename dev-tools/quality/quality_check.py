@@ -275,7 +275,9 @@ class UnjustifiedGetAttrViolation(Violation):
             content,
             "getattr should only be used when absolutely needed; "
             "justify with a comment starting with '# getattr' on the same "
-            "or a preceding line",
+            "or a preceding line if it is needed, remove getattr if not. Strongly prefer"
+            "removing, use web search to find the real API for external SDK calls. Do not replace"
+            "with an equivalent pattern that avoids getattr but is still the same anti-pattern.",
         )
 
 

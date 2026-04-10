@@ -47,6 +47,7 @@ class GCPTemplate(Template):
     instance_template_name_prefix: Optional[str] = None
 
     def __init__(self, **data):
+        """Force the aggregate provider type to GCP before validation."""
         data["provider_type"] = "gcp"
         super().__init__(**data)
 
