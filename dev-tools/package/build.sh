@@ -34,8 +34,14 @@ if [ "$QUIET" = false ]; then
     echo "INFO: Checking build dependencies..."
 fi
 if ! $RUN_TOOL python -c "import build" 2>/dev/null; then
-    echo "ERROR: 'build' package not found. Ensure 'uv sync --all-extras' has been run." >&2
-    exit 1
+    if [ "$QUIET" = false ]; then
+        echo "INFO: Installing build dependencies..."
+    fi
+    if command -v uv >/dev/null 2>&1; then
+        uv pip install build --quiet
+    else
+        $RUN_TOOL pip install build
+    fi
 fi
 
 # Build package

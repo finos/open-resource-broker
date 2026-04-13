@@ -102,7 +102,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Install ORB
-        run: uv sync --all-extras
+        run: uv sync --all-extras --group ci
 
       - name: Python Semantic Release
         id: release
