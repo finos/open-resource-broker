@@ -13,7 +13,7 @@ _GCP_API_CAPABILITIES: dict[str, dict[str, Any]] = {
         "supports_spot": True,
         "supports_on_demand": True,
         "supports_async_operations": True,
-        "supports_start_stop": True,
+        "supports_start_stop": False,
         "max_instances": 1000,
         "native_cleanup": "managed_instance_group_resize_or_delete",
     },
