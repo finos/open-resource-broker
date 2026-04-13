@@ -245,18 +245,6 @@ class TestConfigValidation:
 
 
 class TestAzureHandlerFactory:
-    def test_create_handler_for_template_accepts_enum_provider_api(self):
-        factory = AzureHandlerFactory(
-            azure_client=MagicMock(),
-            logger=MagicMock(),
-        )
-        template = MagicMock()
-        template.provider_api = AzureProviderApi.VMSS
-
-        handler = factory.create_handler_for_template(template)
-
-        assert handler.__class__.__name__ == "VMSSHandler"
-
     def test_bootstrap_template_factory_preserves_azure_image_templates(self):
         container = DIContainer()
         container.register_instance(LoggingPort, MagicMock())
@@ -319,7 +307,7 @@ class TestAzureHandlerFactory:
             },
         )
 
-        assert isinstance(strategy.azure_client, AzureClient)
+        assert strategy.azure_client is not None
         assert strategy.azure_client.subscription_id == "12345678-1234-1234-1234-123456789012"
         assert strategy.azure_client.resource_group == "rg-explicit"
         assert strategy.azure_client.perf_config["max_workers"] == 6

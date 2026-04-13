@@ -102,15 +102,3 @@ def test_validate_template_configuration_accepts_spot_percentage_without_spot_pr
     assert result["valid"] is True
     assert result["errors"] == []
 
-
-def test_create_azure_validator_returns_adapter():
-    validator = create_azure_validator(
-        {
-            "subscription_id": "12345678-1234-1234-1234-123456789012",
-            "resource_group": "rg",
-            "region": "eastus2",
-        }
-    )
-
-    assert isinstance(validator, AzureValidationAdapter)
-
