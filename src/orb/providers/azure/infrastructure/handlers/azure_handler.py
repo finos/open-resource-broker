@@ -6,13 +6,15 @@ contract and the three core operations
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, NotRequired, Optional, TypedDict
+from dataclasses import dataclass, field
+from typing import Any, NotRequired, Optional, TypeAlias, TypedDict
 
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
 from orb.domain.request.aggregate import Request
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.infrastructure.azure_client import AzureClient
+from orb.providers.azure.infrastructure.cyclecloud_session import CycleCloudRequestContext
 
 
 class AzureAcquireHostsResult(TypedDict):
@@ -65,10 +67,77 @@ class AzureHandlerStatusResult(TypedDict, total=False):
     provider_data: AzureStatusProviderData
 
 
+@dataclass(frozen=True)
+class AzureReleaseContext:
+    """Provider-owned runtime context required for Azure termination flows."""
+
+    resource_group: str | None = None
+    resource_id: str | None = None
+    cyclecloud_request_context: CycleCloudRequestContext = field(
+        default_factory=CycleCloudRequestContext
+    )
+
+
+class AzureSubmittedDeletion(TypedDict, total=False):
+    """One submitted or attempted Azure deletion target."""
+
+    requested_id: str
+    vm_name: str
+    error: str
+
+
+class AzurePendingResourceCleanupMetadata(TypedDict, total=False):
+    """Durable VMSS cleanup metadata persisted for follow-up reconciliation."""
+
+    resource_group: str
+    vmss_name: str
+    machine_ids: list[str]
+    delete_vmss_when_empty: bool
+    member_delete_submitted: bool
+    delete_submitted: bool
+    delete_retry_pending: bool
+    last_delete_error: str
+    delete_submission_semantics: str
+
+
+class AzureVmssReleaseProviderData(TypedDict, total=False):
+    """Provider data returned when a VMSS termination request is submitted."""
+
+    resource_group: str
+    vmss_name: str
+    operation_status: str
+    submitted_deletions: list[AzureSubmittedDeletion]
+    resolved_instance_ids: list[str]
+    pending_resource_cleanup: AzurePendingResourceCleanupMetadata
+
+
+class AzureSingleVmReleaseProviderData(TypedDict, total=False):
+    """Provider data returned when SingleVM termination requests are submitted."""
+
+    resource_group: str
+    operation_status: str
+    submitted_deletions: list[AzureSubmittedDeletion]
+
+
+class AzureCycleCloudReleaseProviderData(TypedDict, total=False):
+    """Provider data returned when CycleCloud termination requests are submitted."""
+
+    cluster_name: str
+    terminate_operation_location: str
+    operation_status: str
+
+
+AzureReleaseProviderData: TypeAlias = (
+    AzureVmssReleaseProviderData
+    | AzureSingleVmReleaseProviderData
+    | AzureCycleCloudReleaseProviderData
+)
+
+
 class AzureReleaseHostsResult(TypedDict, total=False):
     """Normalized termination submission result returned by Azure handlers."""
 
-    provider_data: dict[str, Any]
+    provider_data: AzureReleaseProviderData
 
 
 @injectable
@@ -115,7 +184,7 @@ class AzureHandler(ABC):
         self,
         machine_ids: list[str],
         resource_id: str,
-        context: Optional[dict[str, Any]] = None,
+        context: Optional[AzureReleaseContext] = None,
     ) -> Optional[AzureReleaseHostsResult]:
         """Delete / deallocate cloud resources and optionally return provider metadata."""
 

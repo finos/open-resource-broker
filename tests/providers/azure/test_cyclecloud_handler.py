@@ -22,6 +22,7 @@ from orb.providers.azure.infrastructure.cyclecloud_session import (
     CycleCloudCredentialData,
     CycleCloudRequestContext,
 )
+from orb.providers.azure.infrastructure.handlers.azure_handler import AzureReleaseContext
 from orb.providers.azure.infrastructure.cyclecloud_session_builder import (
     CycleCloudSessionBuilder,
 )
@@ -685,11 +686,13 @@ class TestCycleCloudHandlerRelease:
         handler.release_hosts(
             machine_ids=["node-1", "node-2"],
             resource_id="my-cluster",
-            context={
-                "cyclecloud_url": "https://cc.example.com",
-                "cyclecloud_auth_mode": "bearer",
-                "cyclecloud_aad_scope": "https://cc.example.com/.default",
-            },
+            context=AzureReleaseContext(
+                cyclecloud_request_context=CycleCloudRequestContext(
+                    cyclecloud_url="https://cc.example.com",
+                    cyclecloud_auth_mode="bearer",
+                    cyclecloud_aad_scope="https://cc.example.com/.default",
+                )
+            ),
         )
 
         # Verify lookup + terminate call were made
@@ -725,11 +728,13 @@ class TestCycleCloudHandlerRelease:
         handler.release_hosts(
             machine_ids=["cluster-dynamic-op-0"],
             resource_id="my-cluster",
-            context={
-                "cyclecloud_url": "https://cc.example.com",
-                "cyclecloud_auth_mode": "bearer",
-                "cyclecloud_aad_scope": "https://cc.example.com/.default",
-            },
+            context=AzureReleaseContext(
+                cyclecloud_request_context=CycleCloudRequestContext(
+                    cyclecloud_url="https://cc.example.com",
+                    cyclecloud_auth_mode="bearer",
+                    cyclecloud_aad_scope="https://cc.example.com/.default",
+                )
+            ),
         )
 
         assert mock_session.request.call_count == 2
@@ -760,12 +765,14 @@ class TestCycleCloudHandlerRelease:
         handler.release_hosts(
             machine_ids=["cluster-dynamic-op-0"],
             resource_id="req-legacy-resource-id",
-            context={
-                "cluster_name": "my-cluster",
-                "cyclecloud_url": "https://cc.example.com",
-                "cyclecloud_auth_mode": "bearer",
-                "cyclecloud_aad_scope": "https://cc.example.com/.default",
-            },
+            context=AzureReleaseContext(
+                cyclecloud_request_context=CycleCloudRequestContext(
+                    cluster_name="my-cluster",
+                    cyclecloud_url="https://cc.example.com",
+                    cyclecloud_auth_mode="bearer",
+                    cyclecloud_aad_scope="https://cc.example.com/.default",
+                )
+            ),
         )
 
         calls = mock_session.request.call_args_list
@@ -778,7 +785,7 @@ class TestCycleCloudHandlerRelease:
             handler.release_hosts(
                 machine_ids=["node-1"],
                 resource_id="my-cluster",
-                context={},
+                context=AzureReleaseContext(),
             )
 
 

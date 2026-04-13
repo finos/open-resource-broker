@@ -32,6 +32,7 @@ from orb.providers.azure.infrastructure.handlers.azure_status import resolve_pow
 from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureAcquireHostsResult,
     AzureHandler,
+    AzureReleaseContext,
     AzureHandlerStatusResult,
     AzureReleaseHostsResult,
 )
@@ -355,7 +356,7 @@ class SingleVMHandler(AzureHandler):
         self,
         machine_ids: list[str],
         resource_id: str,
-        context: Optional[dict[str, Any]] = None,
+        context: Optional[AzureReleaseContext] = None,
     ) -> Optional[AzureReleaseHostsResult]:
         """Submit deletion for individual VMs.
 
@@ -363,10 +364,8 @@ class SingleVMHandler(AzureHandler):
         provisioning, so termination can remain submit-and-return without ORB
         performing dependent-resource cleanup.
         """
-        context = context or {}
-        resource_group = (
-            context.get("resource_group") or self.azure_client.resource_group
-        )
+        release_context = context or AzureReleaseContext()
+        resource_group = release_context.resource_group or self.azure_client.resource_group
         if not resource_group:
             raise TerminationError(
                 "resource_group is required for release_hosts",
