@@ -8,6 +8,7 @@ from typing import Any, Callable, Optional, cast
 from orb.domain.request.aggregate import Request
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
+from orb.providers.azure.exceptions import AzureValidationError
 from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureAcquireHostsResult,
     AzureHandler,
@@ -39,13 +40,13 @@ def get_create_count(operation: ProviderOperation) -> int:
 
 def validate_create_template_config(
     template_config: dict[str, Any],
-) -> Optional[ProviderResult]:
+) -> None:
     """Validate that the template configuration is present."""
     if template_config:
-        return None
-    return ProviderResult.error_result(
+        return
+    raise AzureValidationError(
         "Template configuration is required for instance creation",
-        "MISSING_TEMPLATE_CONFIG",
+        error_code="MISSING_TEMPLATE_CONFIG",
     )
 
 def provider_api_key(provider_api: AzureProviderApiRef) -> str:
@@ -94,21 +95,19 @@ class AzureProvisioningService:
         normalize_provider_api: Callable[[Any], Any],
         resolve_handler: Callable[[AzureProviderApiRef], Optional[AzureHandler]],
         build_template: Callable[[dict[str, Any]], AzureTemplate],
-    ) -> CreateOperationContext | ProviderResult:
+    ) -> CreateOperationContext:
         """Build and validate the context required for a create operation."""
         template_config = get_create_template_config(operation)
         count = get_create_count(operation)
-        validation_error = validate_create_template_config(template_config)
-        if validation_error:
-            return validation_error
+        validate_create_template_config(template_config)
 
         provider_api = resolve_create_provider_api(template_config, normalize_provider_api)
         provider_api_value = provider_api_key(provider_api)
         handler = resolve_handler(provider_api)
         if handler is None:
-            return ProviderResult.error_result(
+            raise AzureValidationError(
                 f"No handler available for provider_api: {provider_api_value}",
-                "HANDLER_NOT_FOUND",
+                error_code="HANDLER_NOT_FOUND",
             )
 
         return CreateOperationContext(

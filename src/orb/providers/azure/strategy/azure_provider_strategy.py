@@ -28,6 +28,7 @@ from orb.providers.azure.capabilities import (
 )
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
+from orb.providers.azure.exceptions import AzureValidationError
 from orb.providers.azure.infrastructure.azure_client import AzureClient
 from orb.providers.azure.infrastructure.error_utils import (
     canonical_azure_error_code,
@@ -644,8 +645,6 @@ class AzureProviderStrategy(ProviderStrategy):
                     self._build_azure_template_config(tc)
                 ),
             )
-            if isinstance(create_context, ProviderResult):
-                return create_context
 
             template_config = create_context.template_config
             provider_api_key = create_context.provider_api_key
@@ -685,6 +684,12 @@ class AzureProviderStrategy(ProviderStrategy):
 
         except asyncio.CancelledError:
             raise
+        except AzureValidationError as exc:
+            return self._error_result(
+                str(exc),
+                "CREATE_INSTANCES_ERROR",
+                exc,
+            )
         except Exception as exc:
             error_details = extract_azure_error_details(exc)
             fleet_error = {
@@ -724,8 +729,6 @@ class AzureProviderStrategy(ProviderStrategy):
                     op, self._azure_config.resource_group,
                 ),
             )
-            if isinstance(termination_context, ProviderResult):
-                return termination_context
 
             if is_dry_run:
                 return self._termination_service.terminate_instances_dry_run_result(
@@ -747,6 +750,12 @@ class AzureProviderStrategy(ProviderStrategy):
 
         except asyncio.CancelledError:
             raise
+        except AzureValidationError as exc:
+            return self._error_result(
+                str(exc),
+                "TERMINATE_INSTANCES_ERROR",
+                exc,
+            )
         except Exception as exc:
             return self._error_result(
                 f"Failed to terminate instances: {exc!s}",

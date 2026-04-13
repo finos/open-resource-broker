@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
+from orb.providers.azure.exceptions import AzureValidationError
 from orb.providers.azure.infrastructure.cyclecloud_session import CycleCloudRequestContext
 from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureHandler,
@@ -41,28 +42,28 @@ class AzureTerminationService:
         handlers: dict[str, AzureHandler],
         group_instance_ids_by_resource: Callable[[list[str], dict[str, Any]], dict[str, list[str]]],
         resolve_operation_resource_group: Callable[[ProviderOperation], Optional[str]],
-    ) -> TerminationOperationContext | ProviderResult:
-        """Validate and resolve a termination operation into a dispatch context or an error."""
+    ) -> TerminationOperationContext:
+        """Validate and resolve a termination operation into a dispatch context."""
         instance_ids = operation.parameters.get("instance_ids", [])
         if not instance_ids:
-            return ProviderResult.error_result(
+            raise AzureValidationError(
                 "Instance IDs are required for termination",
-                "MISSING_INSTANCE_IDS",
+                error_code="MISSING_INSTANCE_IDS",
             )
 
         provider_api = resolve_operation_provider_api(operation)
         if provider_api in (None, ""):
-            return ProviderResult.error_result(
+            raise AzureValidationError(
                 "provider_api is required for Azure termination",
-                "MISSING_PROVIDER_API",
+                error_code="MISSING_PROVIDER_API",
             )
 
         provider_api_value = provider_api_key(provider_api)
         handler = handlers.get(provider_api_value)
         if handler is None:
-            return ProviderResult.error_result(
+            raise AzureValidationError(
                 f"No handler available for provider_api: {provider_api_value}",
-                "HANDLER_NOT_FOUND",
+                error_code="HANDLER_NOT_FOUND",
             )
 
         raw_resource_mapping = operation.parameters.get("resource_mapping", {})
@@ -76,9 +77,9 @@ class AzureTerminationService:
             if cyclecloud_cluster_name not in (None, ""):
                 default_resource_id = str(cyclecloud_cluster_name)
         if not default_resource_id and not is_dry_run:
-            return ProviderResult.error_result(
+            raise AzureValidationError(
                 "resource_id or resource_mapping is required for Azure termination",
-                "MISSING_RESOURCE_ID",
+                error_code="MISSING_RESOURCE_ID",
             )
 
         resolved_resource_group = resolve_operation_resource_group(operation)
