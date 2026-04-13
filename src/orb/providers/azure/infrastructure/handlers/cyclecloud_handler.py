@@ -46,6 +46,7 @@ from orb.providers.azure.infrastructure.credential_factory import (
 from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureAcquireHostsResult,
     AzureHandler,
+    AzureReleaseContext,
     AzureHandlerStatusResult,
     AzureReleaseHostsResult,
 )
@@ -749,7 +750,7 @@ class CycleCloudHandler(AzureHandler):
         self,
         machine_ids: list[str],
         resource_id: str,
-        context: Optional[dict[str, Any]] = None,
+        context: Optional[AzureReleaseContext] = None,
     ) -> Optional[AzureReleaseHostsResult]:
         """Remove/terminate nodes from a CycleCloud cluster.
 
@@ -761,9 +762,9 @@ class CycleCloudHandler(AzureHandler):
             context: Must contain ``cyclecloud_url`` and optionally
                 ``cyclecloud_credential_path``, ``cyclecloud_verify_ssl``.
         """
-        context = context or {}
-        request_context = CycleCloudRequestContext.from_mapping(context)
-        cluster_name = str(context.get("cluster_name") or resource_id)
+        release_context = context or AzureReleaseContext()
+        request_context = release_context.cyclecloud_request_context
+        cluster_name = str(request_context.cluster_name or resource_id)
 
         try:
             with self._cc_session_scope(

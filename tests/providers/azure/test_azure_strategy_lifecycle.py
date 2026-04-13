@@ -16,6 +16,8 @@ from orb.providers.azure.exceptions.azure_exceptions import (
     AzureValidationError,
     TerminationError,
 )
+from orb.providers.azure.infrastructure.cyclecloud_session import CycleCloudRequestContext
+from orb.providers.azure.infrastructure.handlers.azure_handler import AzureReleaseContext
 from orb.providers.azure.infrastructure.services.spot_placement_score_adapter import (
     AzureSpotPlacementScoreAdapter,
 )
@@ -397,10 +399,13 @@ class TestTerminateInstances:
         result = run_operation(strategy.execute_operation(op))
 
         assert result.success
-        handler.release_hosts.assert_called_once_with(
-            machine_ids=["orb-1"],
+        handler.release_hosts.assert_called_once()
+        _, kwargs = handler.release_hosts.call_args
+        assert kwargs["machine_ids"] == ["orb-1"]
+        assert kwargs["resource_id"] == "vmss-prod-b"
+        assert kwargs["context"] == AzureReleaseContext(
+            resource_group="test-rg",
             resource_id="vmss-prod-b",
-            context={"resource_group": "test-rg", "resource_id": "vmss-prod-b"},
         )
 
     def test_dry_run_short_circuits_before_release(self, azure_config, logger):
@@ -673,19 +678,21 @@ class TestTerminateInstances:
         result = run_operation(strategy.execute_operation(op))
 
         assert result.success
-        handler.release_hosts.assert_called_once_with(
-            machine_ids=["node-1"],
+        handler.release_hosts.assert_called_once()
+        _, kwargs = handler.release_hosts.call_args
+        assert kwargs["machine_ids"] == ["node-1"]
+        assert kwargs["resource_id"] == "my-cluster"
+        assert kwargs["context"] == AzureReleaseContext(
+            resource_group="test-rg",
             resource_id="my-cluster",
-            context={
-                "resource_group": "test-rg",
-                "cluster_name": "my-cluster",
-                "resource_id": "my-cluster",
-                "cyclecloud_url": "https://cc.example.com",
-                "cyclecloud_credential_path": "config/cc.json",
-                "cyclecloud_verify_ssl": False,
-                "cyclecloud_auth_mode": "bearer",
-                "cyclecloud_aad_scope": "https://cc.example.com/.default",
-            },
+            cyclecloud_request_context=CycleCloudRequestContext(
+                cluster_name="my-cluster",
+                cyclecloud_url="https://cc.example.com",
+                cyclecloud_credential_path="config/cc.json",
+                cyclecloud_verify_ssl=False,
+                cyclecloud_auth_mode="bearer",
+                cyclecloud_aad_scope="https://cc.example.com/.default",
+            ),
         )
 
     def test_terminate_instances_recovers_cyclecloud_context_from_origin_request(self, azure_config, logger):
@@ -725,19 +732,21 @@ class TestTerminateInstances:
         result = run_operation(strategy.execute_operation(op))
 
         assert result.success
-        handler.release_hosts.assert_called_once_with(
-            machine_ids=["node-1"],
+        handler.release_hosts.assert_called_once()
+        _, kwargs = handler.release_hosts.call_args
+        assert kwargs["machine_ids"] == ["node-1"]
+        assert kwargs["resource_id"] == "my-cluster"
+        assert kwargs["context"] == AzureReleaseContext(
+            resource_group="test-rg",
             resource_id="my-cluster",
-            context={
-                "resource_group": "test-rg",
-                "cluster_name": "my-cluster",
-                "resource_id": "my-cluster",
-                "cyclecloud_url": "https://cc.example.com",
-                "cyclecloud_credential_path": "config/cc.json",
-                "cyclecloud_verify_ssl": False,
-                "cyclecloud_auth_mode": "bearer",
-                "cyclecloud_aad_scope": "https://cc.example.com/.default",
-            },
+            cyclecloud_request_context=CycleCloudRequestContext(
+                cluster_name="my-cluster",
+                cyclecloud_url="https://cc.example.com",
+                cyclecloud_credential_path="config/cc.json",
+                cyclecloud_verify_ssl=False,
+                cyclecloud_auth_mode="bearer",
+                cyclecloud_aad_scope="https://cc.example.com/.default",
+            ),
         )
         lookup.assert_called_once_with("req-11111111-1111-4111-8111-111111111111")
 
@@ -764,10 +773,13 @@ class TestTerminateInstances:
         result = run_operation(strategy.execute_operation(op))
 
         assert result.success
-        handler.release_hosts.assert_called_once_with(
-            machine_ids=["orb-1"],
+        handler.release_hosts.assert_called_once()
+        _, kwargs = handler.release_hosts.call_args
+        assert kwargs["machine_ids"] == ["orb-1"]
+        assert kwargs["resource_id"] == "vmss-prod-b"
+        assert kwargs["context"] == AzureReleaseContext(
+            resource_group="test-rg",
             resource_id="vmss-prod-b",
-            context={"resource_group": "test-rg", "resource_id": "vmss-prod-b"},
         )
 
 

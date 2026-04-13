@@ -6,7 +6,12 @@ from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
-from orb.providers.azure.infrastructure.handlers.azure_handler import AzureHandler
+from orb.providers.azure.infrastructure.cyclecloud_session import CycleCloudRequestContext
+from orb.providers.azure.infrastructure.handlers.azure_handler import (
+    AzureHandler,
+    AzureReleaseContext,
+    AzureReleaseProviderData,
+)
 from orb.providers.base.strategy import ProviderOperation, ProviderResult
 
 AzureProviderApiRef = AzureProviderApi | str
@@ -18,7 +23,7 @@ class TerminationOperationContext:
 
     instance_ids: list[str]
     grouped_resource_mapping: dict[str, list[str]]
-    release_context: dict[str, Any]
+    release_context: AzureReleaseContext
     handler: AzureHandler
     default_resource_id: str
 
@@ -35,7 +40,6 @@ class AzureTerminationService:
         provider_api_key: Callable[[AzureProviderApiRef], str],
         handlers: dict[str, AzureHandler],
         group_instance_ids_by_resource: Callable[[list[str], dict[str, Any]], dict[str, list[str]]],
-        build_cyclecloud_request_metadata: Callable[..., dict[str, Any]],
         resolve_operation_resource_group: Callable[[ProviderOperation], Optional[str]],
     ) -> TerminationOperationContext | ProviderResult:
         """Validate and resolve a termination operation into a dispatch context or an error."""
@@ -77,12 +81,14 @@ class AzureTerminationService:
                 "MISSING_RESOURCE_ID",
             )
 
-        release_context = build_cyclecloud_request_metadata(
-            operation=operation,
-            resource_group=resolve_operation_resource_group(operation),
+        resolved_resource_group = resolve_operation_resource_group(operation)
+        request_metadata = operation.parameters.get("request_metadata", {}) or {}
+        cyclecloud_request_context = CycleCloudRequestContext.from_mapping(request_metadata)
+        release_context = AzureReleaseContext(
+            resource_group=resolved_resource_group,
+            resource_id=(default_resource_id or None),
+            cyclecloud_request_context=cyclecloud_request_context,
         )
-        if default_resource_id:
-            release_context["resource_id"] = default_resource_id
 
         return TerminationOperationContext(
             instance_ids=instance_ids,
@@ -114,7 +120,7 @@ class AzureTerminationService:
     def terminate_instances_result(
         *,
         instance_ids: list[str],
-        termination_provider_data: list[dict[str, Any]],
+        termination_provider_data: list[AzureReleaseProviderData],
     ) -> ProviderResult:
         """Build the final termination result from handler responses."""
         return ProviderResult.success_result(

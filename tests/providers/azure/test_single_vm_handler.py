@@ -7,6 +7,7 @@ from azure.core.exceptions import ResourceNotFoundError
 
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.exceptions.azure_exceptions import LaunchError, TerminationError
+from orb.providers.azure.infrastructure.handlers.azure_handler import AzureReleaseContext
 from orb.providers.azure.infrastructure.handlers.single_vm_handler import SingleVMHandler
 
 
@@ -308,7 +309,7 @@ def test_release_returns_submitted_delete_metadata():
     result = handler.release_hosts(
         machine_ids=["guid-1", "guid-2"],
         resource_id="unused",
-        context={"resource_group": "test-rg"},
+        context=AzureReleaseContext(resource_group="test-rg"),
     )
 
     assert result["provider_data"]["operation_status"] == "submitted"
@@ -332,7 +333,7 @@ def test_release_uses_direct_vm_name_lookup_without_listing_resource_group():
     result = handler.release_hosts(
         machine_ids=["vm-1"],
         resource_id="unused",
-        context={"resource_group": "test-rg"},
+        context=AzureReleaseContext(resource_group="test-rg"),
     )
 
     assert result["provider_data"]["submitted_deletions"] == [
@@ -369,7 +370,7 @@ def test_release_attempts_all_deletes_before_raising_aggregated_failure():
         handler.release_hosts(
             machine_ids=["guid-1", "guid-2", "guid-3"],
             resource_id="unused",
-            context={"resource_group": "test-rg"},
+            context=AzureReleaseContext(resource_group="test-rg"),
         )
 
     exc = exc_info.value

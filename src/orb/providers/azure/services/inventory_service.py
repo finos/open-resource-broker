@@ -1,17 +1,23 @@
-"""Azure status query utilities and SDK status fallback."""
+"""Azure read/query utilities and SDK status fallback."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Optional, Protocol, TypedDict
+from dataclasses import dataclass, field
+from typing import Any, Callable, Optional, Protocol, TypedDict, cast
 
 from orb.domain.base.ports import LoggingPort
+from orb.domain.request.aggregate import Request
+from orb.domain.request.value_objects import RequestType
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
+from orb.providers.azure.exceptions.azure_exceptions import AzureValidationError
 from orb.providers.azure.infrastructure.azure_client import AzureClient
+from orb.providers.azure.infrastructure.cyclecloud_session import CycleCloudRequestContext
 from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureHandlerStatusResult,
 )
 from orb.providers.base.strategy import ProviderOperation, ProviderResult
+
+AzureProviderApiRef = AzureProviderApi | str
 
 
 @dataclass
@@ -21,6 +27,25 @@ class AzureStatusQueryContext:
     instance_ids: list[str]
     resource_group: str
     provider_api: Optional[AzureProviderApi | str]
+
+
+@dataclass
+class AzureReadOperationContext:
+    """Provider-owned runtime context for Azure status and describe operations."""
+
+    operation_name: str
+    request_id: str | None
+    template_id: str
+    request_metadata: dict[str, Any]
+    cyclecloud_request_context: CycleCloudRequestContext
+    provider_api: Optional[AzureProviderApiRef]
+    provider_api_key: str | None
+    resource_group: str | None
+    instance_ids: list[str] = field(default_factory=list)
+    resource_ids: list[str] = field(default_factory=list)
+    grouped_resource_mapping: dict[str, list[str]] = field(default_factory=dict)
+    direct_resource_id: str | None = None
+    fail_on_partial_status_error: bool = False
 
 
 class AzureStatusProviderData(TypedDict, total=False):
@@ -97,6 +122,14 @@ def request_metadata(operation: ProviderOperation) -> dict[str, Any]:
     """Extract the request_metadata dict from a provider operation."""
     return dict(operation.parameters.get("request_metadata") or {})
 
+
+def operation_request_id(operation: ProviderOperation) -> str | None:
+    """Extract the request id from operation parameters or context."""
+    return operation.parameters.get("request_id") or (
+        operation.context.get("request_id") if operation.context else None
+    )
+
+
 def resolve_operation_resource_group(
     operation: ProviderOperation,
     default_resource_group: Optional[str],
@@ -143,6 +176,7 @@ def group_instance_ids_by_resource(
 
     return grouped
 
+
 def build_cyclecloud_request_metadata(
     *,
     operation: ProviderOperation,
@@ -156,6 +190,153 @@ def build_cyclecloud_request_metadata(
         if value not in (None, ""):
             metadata[key] = value
     return metadata
+
+
+def resolve_read_provider_api(
+    operation: ProviderOperation,
+    normalize_provider_api: Callable[[Any], Any],
+) -> Optional[AzureProviderApiRef]:
+    """Resolve and normalize the Azure provider API carried by an operation."""
+    provider_api = operation.parameters.get("provider_api")
+    if provider_api in (None, ""):
+        return None
+    normalized_provider_api = normalize_provider_api(provider_api)
+    if isinstance(normalized_provider_api, (AzureProviderApi, str)):
+        return cast(AzureProviderApiRef, normalized_provider_api)
+    return None
+
+
+def collect_status_resource_ids(
+    grouped_resource_mapping: dict[str, list[str]],
+    direct_resource_id: object,
+) -> list[str]:
+    """Collect all Azure resource ids relevant to a status query."""
+    resource_ids: list[str] = []
+    for resource_id, mapped_ids in grouped_resource_mapping.items():
+        if resource_id and mapped_ids and resource_id not in resource_ids:
+            resource_ids.append(resource_id)
+
+    if direct_resource_id not in (None, "") and str(direct_resource_id) not in resource_ids:
+        resource_ids.append(str(direct_resource_id))
+    return resource_ids
+
+
+def build_read_operation_context(
+    *,
+    operation: ProviderOperation,
+    operation_name: str,
+    default_resource_group: Optional[str],
+    normalize_provider_api: Callable[[Any], Any],
+) -> AzureReadOperationContext:
+    """Build the provider-owned runtime context for Azure read operations."""
+    metadata = request_metadata(operation)
+    cyclecloud_request_context = CycleCloudRequestContext.from_mapping(metadata)
+    provider_api = resolve_read_provider_api(operation, normalize_provider_api)
+    provider_api_key = None
+    if isinstance(provider_api, AzureProviderApi):
+        provider_api_key = provider_api.value
+    elif isinstance(provider_api, str):
+        provider_api_key = provider_api
+
+    resource_group = resolve_operation_resource_group(operation, default_resource_group)
+    request_id = operation_request_id(operation)
+    template_id = str(operation.parameters.get("template_id", "unknown"))
+
+    if operation_name == "get_instance_status":
+        instance_ids = list(operation.parameters.get("instance_ids", []) or [])
+        if not instance_ids:
+            raise AzureValidationError(
+                "Instance IDs are required for status query",
+                error_code="MISSING_INSTANCE_IDS",
+            )
+        if not resource_group:
+            raise AzureValidationError(
+                "resource_group is required for status query",
+                error_code="MISSING_RESOURCE_GROUP",
+            )
+
+        grouped_resource_mapping = group_instance_ids_by_resource(
+            instance_ids,
+            operation.parameters.get("resource_mapping", {}) or {},
+        )
+        direct_resource_id = operation.parameters.get("resource_id")
+        if (
+            direct_resource_id in (None, "")
+            and provider_api == AzureProviderApi.CYCLECLOUD
+            and cyclecloud_request_context.cluster_name not in (None, "")
+        ):
+            direct_resource_id = cyclecloud_request_context.cluster_name
+
+        return AzureReadOperationContext(
+            operation_name=operation_name,
+            request_id=str(request_id) if request_id not in (None, "") else None,
+            template_id=template_id,
+            request_metadata=metadata,
+            cyclecloud_request_context=cyclecloud_request_context,
+            provider_api=provider_api,
+            provider_api_key=provider_api_key,
+            resource_group=resource_group,
+            instance_ids=instance_ids,
+            resource_ids=collect_status_resource_ids(grouped_resource_mapping, direct_resource_id),
+            grouped_resource_mapping=grouped_resource_mapping,
+            direct_resource_id=str(direct_resource_id)
+            if direct_resource_id not in (None, "")
+            else None,
+        )
+
+    resource_ids = list(operation.parameters.get("resource_ids", []) or [])
+    if not resource_ids:
+        raise AzureValidationError(
+            "Resource IDs are required for instance discovery",
+            error_code="MISSING_RESOURCE_IDS",
+        )
+    if provider_api in (None, ""):
+        raise AzureValidationError(
+            "provider_api is required for Azure resource discovery",
+            error_code="MISSING_PROVIDER_API",
+        )
+
+    return AzureReadOperationContext(
+        operation_name=operation_name,
+        request_id=str(request_id) if request_id not in (None, "") else None,
+        template_id=template_id,
+        request_metadata=metadata,
+        cyclecloud_request_context=cyclecloud_request_context,
+        provider_api=provider_api,
+        provider_api_key=provider_api_key,
+        resource_group=resource_group,
+        resource_ids=resource_ids,
+        direct_resource_id=resource_ids[0] if len(resource_ids) == 1 else None,
+    )
+
+
+def build_read_handler_request(
+    *,
+    read_context: AzureReadOperationContext,
+    provider_name: str,
+    resource_ids: list[str],
+    additional_metadata: Optional[dict[str, Any]] = None,
+) -> Request:
+    """Build the Request object used for Azure read/query handler calls."""
+    metadata: dict[str, Any] = {"resource_group": read_context.resource_group}
+    metadata.update(read_context.cyclecloud_request_context.to_metadata())
+    if additional_metadata:
+        metadata.update(additional_metadata)
+
+    request = Request.create_new_request(
+        request_type=RequestType.ACQUIRE,
+        template_id=read_context.template_id,
+        machine_count=1,
+        provider_type="azure",
+        provider_name=provider_name,
+        request_id=read_context.request_id,
+        metadata=metadata,
+    )
+    request.resource_ids = resource_ids
+    if read_context.provider_api_key:
+        request.provider_api = read_context.provider_api_key
+    return request
+
 
 def status_candidate_ids(result: AzureStatusResult) -> set[str]:
     """Return all plausible instance identifiers from a status result."""
@@ -196,19 +377,15 @@ def status_resource_ids(
     instance_ids: list[str],
 ) -> list[str]:
     """Resolve the Azure resource IDs relevant to the given instance IDs."""
-    resource_ids: list[str] = []
     raw_resource_mapping = operation.parameters.get("resource_mapping", {}) or {}
-    for resource_id, mapped_ids in group_instance_ids_by_resource(
+    grouped_resource_mapping = group_instance_ids_by_resource(
         instance_ids,
         raw_resource_mapping,
-    ).items():
-        if resource_id and mapped_ids and resource_id not in resource_ids:
-            resource_ids.append(resource_id)
-
-    direct_resource_id = operation.parameters.get("resource_id")
-    if direct_resource_id not in (None, "") and str(direct_resource_id) not in resource_ids:
-        resource_ids.append(str(direct_resource_id))
-    return resource_ids
+    )
+    return collect_status_resource_ids(
+        grouped_resource_mapping,
+        operation.parameters.get("resource_id"),
+    )
 
 def sdk_status_result(
     *,

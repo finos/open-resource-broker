@@ -7,6 +7,8 @@ from typing import Any, Callable
 from orb.domain.base.ports import LoggingPort
 from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureHandler,
+    AzureReleaseContext,
+    AzureReleaseProviderData,
     AzureReleaseHostsResult,
 )
 
@@ -29,10 +31,10 @@ class AzureTerminationDispatchService:
         instance_ids: list[str],
         grouped_resource_mapping: dict[str, list[str]],
         default_resource_id: str,
-        context: dict[str, Any],
-    ) -> list[dict[str, Any]]:
+        context: AzureReleaseContext,
+    ) -> list[AzureReleaseProviderData]:
         """Fan out release_hosts calls per resource group and collect provider data."""
-        termination_provider_data: list[dict[str, Any]] = []
+        termination_provider_data: list[AzureReleaseProviderData] = []
 
         dispatch_groups = grouped_resource_mapping or {default_resource_id: instance_ids}
         for resource_id, mapped_instance_ids in dispatch_groups.items():

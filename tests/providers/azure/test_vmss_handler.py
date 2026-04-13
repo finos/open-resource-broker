@@ -4,8 +4,9 @@ import pytest
 from unittest.mock import MagicMock
 
 import orb.providers.azure.infrastructure.handlers.vmss_handler as vmss_handler_module
-from orb.providers.azure.domain.template.value_objects import AzureVMSSOrchestrationMode
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
+from orb.providers.azure.domain.template.value_objects import AzureVMSSOrchestrationMode
+from orb.providers.azure.infrastructure.handlers.azure_handler import AzureReleaseContext
 from orb.providers.azure.infrastructure.handlers.vmss_handler import VMSSHandler
 
 
@@ -390,7 +391,7 @@ def test_vmss_release_deletes_only_requested_uniform_instances():
     handler.release_hosts(
         machine_ids=["3", "4"],
         resource_id="vmss-azure-test",
-        context={"resource_group": "test-rg"},
+        context=AzureReleaseContext(resource_group="test-rg"),
     )
 
     delete_call = (
@@ -426,7 +427,7 @@ def test_vmss_release_deletes_flexible_members_without_cleanup_metadata_when_vms
     result = handler.release_hosts(
         machine_ids=["vm-a", "vm-b"],
         resource_id="vmss-azure-test",
-        context={"resource_group": "test-rg"},
+        context=AzureReleaseContext(resource_group="test-rg"),
     )
 
     assert result["provider_data"]["operation_status"] == "submitted"
@@ -451,7 +452,7 @@ def test_vmss_release_marks_flexible_vmss_for_cleanup_when_last_instance_is_retu
     result = handler.release_hosts(
         machine_ids=["vm-a"],
         resource_id="vmss-azure-test",
-        context={"resource_group": "test-rg"},
+        context=AzureReleaseContext(resource_group="test-rg"),
     )
 
     assert result["provider_data"]["operation_status"] == "submitted"
@@ -492,7 +493,7 @@ def test_vmss_release_does_not_mark_flexible_vmss_for_cleanup_when_requested_ids
     result = handler.release_hosts(
         machine_ids=["guid-a", "guid-b", "guid-c"],
         resource_id="vmss-azure-test",
-        context={"resource_group": "test-rg"},
+        context=AzureReleaseContext(resource_group="test-rg"),
     )
 
     assert "pending_resource_cleanup" not in result["provider_data"]
@@ -520,7 +521,7 @@ def test_vmss_release_marks_uniform_vmss_for_cleanup_when_last_instance_is_retur
     result = handler.release_hosts(
         machine_ids=["3"],
         resource_id="vmss-azure-test",
-        context={"resource_group": "test-rg"},
+        context=AzureReleaseContext(resource_group="test-rg"),
     )
 
     delete_call = (
@@ -566,7 +567,7 @@ def test_vmss_release_surfaces_retry_pending_when_immediate_empty_vmss_delete_fa
     result = handler.release_hosts(
         machine_ids=["vm-a"],
         resource_id="vmss-azure-test",
-        context={"resource_group": "test-rg"},
+        context=AzureReleaseContext(resource_group="test-rg"),
     )
 
     assert result["provider_data"]["pending_resource_cleanup"] == {

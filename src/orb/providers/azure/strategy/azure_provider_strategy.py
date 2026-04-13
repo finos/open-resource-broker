@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import time
 from threading import Condition, RLock
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Optional
 
 from orb.application.services.spot_placement_execution import (
     SpotPlacementExecutionService,
@@ -19,8 +19,6 @@ from orb.application.services.spot_placement_planner import (
 )
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
-from orb.domain.request.aggregate import Request
-from orb.domain.request.value_objects import RequestType
 from orb.providers.azure.configuration.config import AzureProviderConfig
 from orb.providers.azure.configuration.template_extension import AzureTemplateExtensionConfig
 from orb.providers.azure.configuration.validator import validate_azure_template
@@ -47,17 +45,17 @@ from orb.providers.azure.services.cyclecloud_request_context_service import (
     resolve_cyclecloud_request_metadata,
 )
 from orb.providers.azure.services.inventory_service import (
+    AzureReadOperationContext,
     AzureStatusResult,
     AzureStatusQueryContext,
-    build_cyclecloud_request_metadata,
+    build_read_handler_request,
+    build_read_operation_context,
     filter_status_results,
     group_instance_ids_by_resource,
     normalize_status_results,
     observed_status_ids,
-    request_metadata,
     resolve_operation_resource_group,
     sdk_status_result,
-    status_resource_ids,
 )
 from orb.providers.azure.services.machine_conversion_service import (
     AzureMachineConversionService,
@@ -722,7 +720,6 @@ class AzureProviderStrategy(ProviderStrategy):
                 provider_api_key=self._provider_api_key,
                 handlers=self.handlers,
                 group_instance_ids_by_resource=group_instance_ids_by_resource,
-                build_cyclecloud_request_metadata=build_cyclecloud_request_metadata,
                 resolve_operation_resource_group=lambda op: resolve_operation_resource_group(
                     op, self._azure_config.resource_group,
                 ),
@@ -776,48 +773,13 @@ class AzureProviderStrategy(ProviderStrategy):
     # GET_INSTANCE_STATUS
     # ------------------------------------------------------------------
 
-    def _build_handler_request(
-        self,
-        operation: ProviderOperation,
-        resource_group: Optional[str],
-        resource_ids: list[str],
-        additional_metadata: Optional[dict[str, Any]] = None,
-    ) -> Request:
-
-        metadata = build_cyclecloud_request_metadata(
-            operation=operation,
-            resource_group=resource_group,
-        )
-        if additional_metadata:
-            metadata.update(additional_metadata)
-
-        request_id = operation.parameters.get("request_id") or (
-            operation.context.get("request_id") if operation.context else None
-        )
-        request = Request.create_new_request(
-            request_type=RequestType.ACQUIRE,
-            template_id=operation.parameters.get("template_id", "unknown"),
-            machine_count=1,
-            provider_type="azure",
-            provider_name=self.provider_instance_name,
-            request_id=request_id,
-            metadata=metadata,
-        )
-        request.resource_ids = resource_ids
-        return request
-
     def _get_instance_status_via_handlers(
         self,
         *,
-        operation: ProviderOperation,
-        instance_ids: list[str],
-        resource_group: str,
+        read_context: AzureReadOperationContext,
     ) -> Optional[list[AzureStatusResult]]:
-        provider_api = self._resolve_operation_provider_api(operation)
-        raw_resource_mapping = operation.parameters.get("resource_mapping", {}) or {}
-        grouped_resource_mapping = group_instance_ids_by_resource(
-            instance_ids, raw_resource_mapping
-        )
+        provider_api = read_context.provider_api
+        grouped_resource_mapping = read_context.grouped_resource_mapping
 
         if not provider_api:
             return None
@@ -831,7 +793,11 @@ class AzureProviderStrategy(ProviderStrategy):
         if provider_api == AzureProviderApi.SINGLE_VM and handler:
             return normalize_status_results(
                 handler.check_hosts_status(
-                    self._build_handler_request(operation, resource_group, instance_ids)
+                    build_read_handler_request(
+                        read_context=read_context,
+                        provider_name=self.provider_instance_name,
+                        resource_ids=read_context.instance_ids,
+                    )
                 ),
             )
 
@@ -848,11 +814,15 @@ class AzureProviderStrategy(ProviderStrategy):
                 extra_metadata: dict[str, Any] = {}
                 if provider_api == AzureProviderApi.CYCLECLOUD:
                     extra_metadata["node_ids"] = mapped_ids
-                request = self._build_handler_request(
-                    operation, resource_group, [resource_id], extra_metadata
+                request = build_read_handler_request(
+                    read_context=read_context,
+                    provider_name=self.provider_instance_name,
+                    resource_ids=[resource_id],
+                    additional_metadata=extra_metadata,
                 )
                 for machine in filter_status_results(
-                    group_handler.check_hosts_status(request), mapped_ids
+                    normalize_status_results(group_handler.check_hosts_status(request)),
+                    mapped_ids,
                 ):
                     machine_id = str(machine.get("instance_id"))
                     if machine_id not in seen_instance_ids:
@@ -862,49 +832,47 @@ class AzureProviderStrategy(ProviderStrategy):
             if all_results:
                 return all_results
 
-        resource_id = operation.parameters.get("resource_id")
-        if not resource_id and provider_api == AzureProviderApi.CYCLECLOUD:
-            cyclecloud_cluster_name = request_metadata(operation).get("cluster_name")
-            if cyclecloud_cluster_name not in (None, ""):
-                resource_id = str(cyclecloud_cluster_name)
+        resource_id = read_context.direct_resource_id
         if not handler or not resource_id:
             return None
 
         extra_metadata = {}
         if provider_api == AzureProviderApi.CYCLECLOUD:
-            extra_metadata = {"node_ids": instance_ids}
-        request = self._build_handler_request(
-            operation,
-            resource_group,
-            instance_ids if provider_api == AzureProviderApi.SINGLE_VM else [resource_id],
-            extra_metadata,
+            extra_metadata = {"node_ids": read_context.instance_ids}
+        request = build_read_handler_request(
+            read_context=read_context,
+            provider_name=self.provider_instance_name,
+            resource_ids=(
+                read_context.instance_ids
+                if provider_api == AzureProviderApi.SINGLE_VM
+                else [resource_id]
+            ),
+            additional_metadata=extra_metadata,
         )
         if provider_api == AzureProviderApi.SINGLE_VM:
             return normalize_status_results(handler.check_hosts_status(request))
         return filter_status_results(
-            normalize_status_results(handler.check_hosts_status(request)), instance_ids
+            normalize_status_results(handler.check_hosts_status(request)),
+            read_context.instance_ids,
         )
 
     def _handle_get_instance_status(self, operation: ProviderOperation) -> ProviderResult:
         try:
             operation = self._resolve_cyclecloud_operation(operation)
-            instance_ids = operation.parameters.get("instance_ids", [])
-            if not instance_ids:
-                return ProviderResult.error_result(
-                    "Instance IDs are required for status query",
-                    "MISSING_INSTANCE_IDS",
-                )
-
-            resource_group = resolve_operation_resource_group(
-                operation, self._azure_config.resource_group,
+            read_context = build_read_operation_context(
+                operation=operation,
+                operation_name="get_instance_status",
+                default_resource_group=self._azure_config.resource_group,
+                normalize_provider_api=self._normalize_provider_api_value,
             )
-            if not resource_group:
-                return ProviderResult.error_result(
-                    "resource_group is required for status query",
-                    "MISSING_RESOURCE_GROUP",
-                )
 
-            provider_api = self._resolve_operation_provider_api(operation)
+            resource_group = read_context.resource_group
+            if resource_group is None:
+                raise RuntimeError(
+                    "build_read_operation_context must provide resource_group for status queries"
+                )
+            instance_ids = read_context.instance_ids
+            provider_api = read_context.provider_api
 
             if bool(operation.context and operation.context.get("dry_run", False)):
                 return ProviderResult.success_result(
@@ -928,12 +896,10 @@ class AzureProviderStrategy(ProviderStrategy):
                     },
                 )
 
-            self._restore_pending_resource_cleanups(operation)
+            self._restore_pending_resource_cleanups(read_context.request_metadata)
 
             handler_machines = self._get_instance_status_via_handlers(
-                operation=operation,
-                instance_ids=instance_ids,
-                resource_group=resource_group,
+                read_context=read_context,
             )
             if handler_machines is not None:
                 is_vmss = provider_api in (
@@ -951,20 +917,16 @@ class AzureProviderStrategy(ProviderStrategy):
                         "method": "handler",
                     },
                 )
-                if is_vmss:
-                    vmss_status_resource_ids = status_resource_ids(
-                        operation, instance_ids
+                if is_vmss and read_context.resource_ids:
+                    self._vmss_cleanup_coordinator.reconcile(
+                        resource_group=resource_group,
+                        resource_ids=read_context.resource_ids,
+                        observed_ids=observed_status_ids(handler_machines),
                     )
-                    if vmss_status_resource_ids:
-                        self._vmss_cleanup_coordinator.reconcile(
-                            resource_group=resource_group,
-                            resource_ids=vmss_status_resource_ids,
-                            observed_ids=observed_status_ids(handler_machines),
-                        )
                     result.metadata.update(
                         self._vmss_cleanup_coordinator.status_metadata(
                             resource_group=resource_group,
-                            resource_ids=vmss_status_resource_ids,
+                            resource_ids=read_context.resource_ids,
                         )
                     )
                 return result
@@ -989,11 +951,9 @@ class AzureProviderStrategy(ProviderStrategy):
                 "GET_INSTANCE_STATUS_ERROR", exc,
             )
 
-    def _restore_pending_resource_cleanups(self, operation: ProviderOperation) -> None:
+    def _restore_pending_resource_cleanups(self, metadata: Mapping[str, object]) -> None:
         """Rebuild pending resource cleanup state from durable request metadata."""
-        self._vmss_cleanup_coordinator.restore_from_request_metadata(
-            request_metadata(operation)
-        )
+        self._vmss_cleanup_coordinator.restore_from_request_metadata(metadata)
 
     def _current_vmss_member_count(self, *, resource_group: str, vmss_name: str) -> Optional[int]:
         if not self.resource_manager:
@@ -1029,13 +989,13 @@ class AzureProviderStrategy(ProviderStrategy):
     def _describe_resource_instances(
         self,
         *,
-        operation: ProviderOperation,
-        provider_api: AzureProviderApi | str,
-        provider_api_key: str,
-        resource_group: Optional[str],
-        fail_on_partial_status_error: bool = False,
+        read_context: AzureReadOperationContext,
     ) -> ProviderResult:
-        resource_ids = operation.parameters.get("resource_ids", [])
+        resource_ids = read_context.resource_ids
+        provider_api = read_context.provider_api
+        provider_api_key = read_context.provider_api_key or ""
+        resource_group = read_context.resource_group
+
         handler = self.handlers.get(provider_api_key)
         if not handler:
             return ProviderResult.error_result(
@@ -1045,16 +1005,17 @@ class AzureProviderStrategy(ProviderStrategy):
 
         extra_metadata: dict[str, Any] = {}
         if provider_api == AzureProviderApi.SINGLE_VM:
-            deployment_name = request_metadata(operation).get(
-                "deployment_name"
-            )
+            deployment_name = read_context.request_metadata.get("deployment_name")
             if deployment_name not in (None, ""):
                 extra_metadata["deployment_name"] = str(deployment_name)
-        if fail_on_partial_status_error:
+        if read_context.fail_on_partial_status_error:
             extra_metadata["fail_on_partial_status_error"] = True
 
-        request = self._build_handler_request(
-            operation, resource_group, resource_ids, extra_metadata or None
+        request = build_read_handler_request(
+            read_context=read_context,
+            provider_name=self.provider_instance_name,
+            resource_ids=resource_ids,
+            additional_metadata=extra_metadata or None,
         )
 
         instance_details = handler.check_hosts_status(request)
@@ -1087,7 +1048,7 @@ class AzureProviderStrategy(ProviderStrategy):
             elif provider_api == AzureProviderApi.SINGLE_VM:
                 self._resource_metadata_service.augment_single_vm_deployment_metadata(
                     metadata,
-                    extra_metadata,
+                    read_context.request_metadata,
                     resource_group=resource_group,
                     deployment_service=self.deployment_service,
                 )
@@ -1130,66 +1091,53 @@ class AzureProviderStrategy(ProviderStrategy):
         self, operation: ProviderOperation
     ) -> ProviderResult:
         try:
-            resource_ids = operation.parameters.get("resource_ids", [])
-            provider_api = self._resolve_operation_provider_api(operation)
-
-            if not resource_ids:
-                return ProviderResult.error_result(
-                    "Resource IDs are required for instance discovery",
-                    "MISSING_RESOURCE_IDS",
-                )
-
-            if provider_api in (None, ""):
-                return ProviderResult.error_result(
-                    "provider_api is required for Azure resource discovery",
-                    "MISSING_PROVIDER_API",
-                )
-
+            operation = self._resolve_cyclecloud_operation(operation)
+            read_context = build_read_operation_context(
+                operation=operation,
+                operation_name="describe_resource_instances",
+                default_resource_group=self._azure_config.resource_group,
+                normalize_provider_api=self._normalize_provider_api_value,
+            )
             if bool(operation.context and operation.context.get("dry_run", False)):
                 return ProviderResult.success_result(
                     {"instances": []},
                     {
                         "operation": "describe_resource_instances",
-                        "resource_ids": resource_ids,
-                        "provider_api": self._provider_api_key(provider_api),
+                        "resource_ids": read_context.resource_ids,
+                        "provider_api": read_context.provider_api_key,
                         "method": "dry_run",
                         "provider_data": {"dry_run": True},
                     },
                 )
 
-            provider_api_key = self._provider_api_key(provider_api)
-            resource_group = resolve_operation_resource_group(
-                operation,
-                self._azure_config.resource_group,
-            )
+            provider_api = read_context.provider_api
+            resource_group = read_context.resource_group
             is_vmss = provider_api in (AzureProviderApi.VMSS, AzureProviderApi.VMSS_UNIFORM)
 
-            self._restore_pending_resource_cleanups(operation)
-            fail_on_partial = is_vmss and self._vmss_cleanup_coordinator.has_pending(
-                resource_group=resource_group,
-                resource_ids=resource_ids,
+            self._restore_pending_resource_cleanups(read_context.request_metadata)
+            read_context.fail_on_partial_status_error = bool(
+                is_vmss and self._vmss_cleanup_coordinator.has_pending(
+                    resource_group=resource_group,
+                    resource_ids=read_context.resource_ids,
+                )
             )
 
             result = self._describe_resource_instances(
-                operation=operation,
-                provider_api=provider_api,
-                provider_api_key=provider_api_key,
-                resource_group=resource_group,
-                fail_on_partial_status_error=fail_on_partial,
+                read_context=read_context,
             )
 
-            if result.success:
+            if result.success and is_vmss:
                 instance_details = result.data.get("instances", []) if result.data else []
                 self._vmss_cleanup_coordinator.reconcile(
                     resource_group=resource_group,
-                    resource_ids=resource_ids,
+                    resource_ids=read_context.resource_ids,
                     observed_ids=observed_status_ids(instance_details),
                 )
-                if is_vmss:
+                if result.metadata is not None:
                     result.metadata.update(
                         self._vmss_cleanup_coordinator.status_metadata(
                             resource_group=resource_group,
-                            resource_ids=resource_ids,
+                            resource_ids=read_context.resource_ids,
                         )
                     )
 
