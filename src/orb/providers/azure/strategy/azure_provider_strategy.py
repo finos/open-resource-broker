@@ -29,17 +29,11 @@ from orb.providers.azure.capabilities import (
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
 from orb.providers.azure.exceptions import AzureValidationError
-from orb.providers.azure.infrastructure.azure_client import AzureClient
 from orb.providers.azure.infrastructure.error_utils import (
     canonical_azure_error_code,
     extract_azure_error_details,
 )
-from orb.providers.azure.infrastructure.handlers.azure_handler import AzureHandler
-from orb.providers.azure.infrastructure.handlers.cyclecloud_handler import CycleCloudHandler
-from orb.providers.azure.infrastructure.handlers.single_vm_handler import SingleVMHandler
-from orb.providers.azure.infrastructure.handlers.vmss_handler import VMSSHandler
 from orb.providers.azure.infrastructure.vmss_cleanup import VmssCleanupCoordinator
-from orb.providers.azure.managers.azure_resource_manager import AzureResourceManager
 from orb.providers.azure.services.health_check_service import AzureHealthCheckService
 from orb.providers.azure.services.cyclecloud_request_context_service import (
     CycleCloudRequestLookup,
@@ -85,6 +79,9 @@ from orb.providers.base.strategy import (
 )
 
 if TYPE_CHECKING:
+    from orb.providers.azure.infrastructure.azure_client import AzureClient
+    from orb.providers.azure.infrastructure.handlers.azure_handler import AzureHandler
+    from orb.providers.azure.managers.azure_resource_manager import AzureResourceManager
     from orb.providers.azure.infrastructure.services.azure_deployment_service import (
         AzureDeploymentService,
     )
@@ -107,7 +104,7 @@ class AzureProviderStrategy(ProviderStrategy):
         config: AzureProviderConfig,
         logger: LoggingPort,
         provider_instance_name: str,
-        azure_client_resolver: Optional[Callable[[], AzureClient]] = None,
+        azure_client_resolver: Optional[Callable[[], "AzureClient"]] = None,
         vmss_cleanup_coordinator: Optional[VmssCleanupCoordinator] = None,
         cyclecloud_request_lookup: Optional[CycleCloudRequestLookup] = None,
     ) -> None:
@@ -119,11 +116,11 @@ class AzureProviderStrategy(ProviderStrategy):
         self._logger = logger
         self._azure_config = config
         self._provider_instance_name = provider_instance_name
-        self._client: Optional[AzureClient] = None
+        self._client: Optional["AzureClient"] = None
         self._azure_client_resolver = azure_client_resolver
-        self._resource_manager: Optional[AzureResourceManager] = None
+        self._resource_manager: Optional["AzureResourceManager"] = None
         self._deployment_service: Optional[AzureDeploymentService] = None
-        self._handlers: dict[str, AzureHandler] = {}
+        self._handlers: dict[str, "AzureHandler"] = {}
         self._spot_placement_planner = SpotPlacementPlanner()
         self._spot_placement_execution = SpotPlacementExecutionService()
         self._health_check_service = AzureHealthCheckService(config=config, logger=logger)
@@ -173,7 +170,7 @@ class AzureProviderStrategy(ProviderStrategy):
         return self._provider_instance_name
 
     @property
-    def azure_client(self) -> Optional[AzureClient]:
+    def azure_client(self) -> Optional["AzureClient"]:
         """Get the Azure client with lazy initialisation."""
         with self._lazy_init_lock:
             if self._client is None:
@@ -189,12 +186,14 @@ class AzureProviderStrategy(ProviderStrategy):
             return self._client
 
     @property
-    def resource_manager(self) -> Optional[AzureResourceManager]:
+    def resource_manager(self) -> Optional["AzureResourceManager"]:
         """Get the Azure resource manager with lazy initialisation."""
         with self._lazy_init_lock:
             azure_client = self.azure_client
             if self._resource_manager is None and azure_client:
                 self._logger.debug("Creating Azure resource manager on first access")
+                from orb.providers.azure.managers.azure_resource_manager import AzureResourceManager
+
                 self._resource_manager = AzureResourceManager(
                     azure_client=azure_client,
                     config=self._azure_config,
@@ -219,12 +218,22 @@ class AzureProviderStrategy(ProviderStrategy):
             return self._deployment_service
 
     @property
-    def handlers(self) -> dict[str, AzureHandler]:
+    def handlers(self) -> dict[str, "AzureHandler"]:
         """Get handlers with lazy initialisation."""
         with self._lazy_init_lock:
             azure_client = self.azure_client
             if not self._handlers and azure_client:
                 self._logger.debug("Creating Azure handlers on first access")
+                from orb.providers.azure.infrastructure.handlers.cyclecloud_handler import (
+                    CycleCloudHandler,
+                )
+                from orb.providers.azure.infrastructure.handlers.single_vm_handler import (
+                    SingleVMHandler,
+                )
+                from orb.providers.azure.infrastructure.handlers.vmss_handler import (
+                    VMSSHandler,
+                )
+
                 self._handlers = {
                     AzureProviderApi.VMSS.value: VMSSHandler(
                         azure_client=azure_client,
