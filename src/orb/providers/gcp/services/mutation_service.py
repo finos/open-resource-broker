@@ -10,6 +10,42 @@ class GCPMutationService:
     """Own GCP mutation outcome shaping at the strategy/service boundary."""
 
     @staticmethod
+    def build_dry_run_result(
+        *,
+        operation_name: str,
+        attempted_ids: list[str],
+        metadata: dict[str, object] | None = None,
+        warning: str | None = None,
+    ) -> ProviderResult:
+        """Return a synthetic mutation result without touching live GCP APIs."""
+        response_data: dict[str, object] = {
+            "success": True,
+            "successful_count": len(attempted_ids),
+            "successful_ids": list(attempted_ids),
+            "results": {target_id: True for target_id in attempted_ids},
+            "failed_operations": [],
+        }
+        if warning:
+            response_data["warning"] = warning
+
+        result_metadata: dict[str, object] = {
+            "operation": operation_name,
+            "method": "dry_run",
+            "provider_data": {
+                "dry_run": True,
+                "attempted_ids": list(attempted_ids),
+                "successful_ids": list(attempted_ids),
+                "operations": [],
+                "failed_operations": [],
+                **({"warning": warning} if warning else {}),
+            },
+            "partial_failure": False,
+        }
+        if metadata:
+            result_metadata.update(metadata)
+        return ProviderResult.success_result(response_data, result_metadata)
+
+    @staticmethod
     def build_provider_result(
         *,
         operation_name: str,

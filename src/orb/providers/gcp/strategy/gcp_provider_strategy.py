@@ -100,14 +100,22 @@ class GCPProviderStrategy(ProviderStrategy):
             )
 
         start_time = time.time()
+        is_dry_run = bool(operation.context and operation.context.get("dry_run", False))
         try:
-            result = await self._execute_operation_internal(operation)
+            if is_dry_run:
+                from orb.providers.gcp.infrastructure.dry_run_adapter import gcp_dry_run_context
+
+                with gcp_dry_run_context():
+                    result = await self._execute_operation_internal(operation)
+            else:
+                result = await self._execute_operation_internal(operation)
             if result.metadata is None:
                 result.metadata = {}
             result.metadata.update(
                 {
                     "execution_time_ms": int((time.time() - start_time) * 1000),
                     "provider": "gcp",
+                    "dry_run": is_dry_run,
                 }
             )
             return result
@@ -119,6 +127,7 @@ class GCPProviderStrategy(ProviderStrategy):
                 {
                     "execution_time_ms": int((time.time() - start_time) * 1000),
                     "provider": "gcp",
+                    "dry_run": is_dry_run,
                     "details": exc.details,
                 },
             )
@@ -134,6 +143,7 @@ class GCPProviderStrategy(ProviderStrategy):
                 {
                     "execution_time_ms": int((time.time() - start_time) * 1000),
                     "provider": "gcp",
+                    "dry_run": is_dry_run,
                     "details": translated.details,
                 },
             )
@@ -185,6 +195,8 @@ class GCPProviderStrategy(ProviderStrategy):
 
     def _handle_create_instances(self, operation: ProviderOperation) -> ProviderResult:
         create_context = self._get_operation_context_service().build_create_context(operation)
+        if bool(operation.context and operation.context.get("dry_run", False)):
+            return self._provisioning_service.create_instances_dry_run_result(context=create_context)
         outcome = self._execution_service.execute_create(create_context)
         return self._provisioning_service.build_provider_result(
             context=create_context,
@@ -193,6 +205,16 @@ class GCPProviderStrategy(ProviderStrategy):
 
     def _handle_terminate_instances(self, operation: ProviderOperation) -> ProviderResult:
         mutation_context = self._get_operation_context_service().build_mutation_context(operation)
+        if bool(operation.context and operation.context.get("dry_run", False)):
+            attempted_ids = mutation_context.instance_ids or mutation_context.resource_ids
+            return self._mutation_service.build_dry_run_result(
+                operation_name="terminate_instances",
+                attempted_ids=attempted_ids,
+                metadata={
+                    "instance_ids": mutation_context.instance_ids,
+                    "resource_ids": mutation_context.resource_ids,
+                },
+            )
         outcome = self._execution_service.execute_terminate(mutation_context)
         return self._mutation_service.build_provider_result(
             operation_name="terminate_instances",
@@ -205,6 +227,11 @@ class GCPProviderStrategy(ProviderStrategy):
 
     def _handle_get_instance_status(self, operation: ProviderOperation) -> ProviderResult:
         mutation_context = self._get_operation_context_service().build_mutation_context(operation)
+        if bool(operation.context and operation.context.get("dry_run", False)):
+            return self._inventory_service.build_dry_run_status_result(
+                operation_name="get_instance_status",
+                instance_ids=mutation_context.instance_ids or mutation_context.resource_ids,
+            )
         instances = self._execution_service.execute_status(mutation_context)
         return self._inventory_service.build_status_result(
             operation_name="get_instance_status",
@@ -213,6 +240,11 @@ class GCPProviderStrategy(ProviderStrategy):
 
     def _handle_describe_resource_instances(self, operation: ProviderOperation) -> ProviderResult:
         mutation_context = self._get_operation_context_service().build_mutation_context(operation)
+        if bool(operation.context and operation.context.get("dry_run", False)):
+            return self._inventory_service.build_dry_run_describe_result(
+                resource_ids=mutation_context.resource_ids,
+                provider_api=mutation_context.handler_context.get("provider_api"),
+            )
         instances = self._execution_service.execute_status(mutation_context)
         return self._inventory_service.build_status_result(
             operation_name="describe_resource_instances",
@@ -224,6 +256,23 @@ class GCPProviderStrategy(ProviderStrategy):
         project = operation.parameters.get("source_image_project")
         if not family or not project:
             return ProviderResult.success_result({"resolved_images": {}})
+        if bool(operation.context and operation.context.get("dry_run", False)):
+            return ProviderResult.success_result(
+                {
+                    "resolved_images": {
+                        "image_id": f"projects/{project}/global/images/family/{family}",
+                        "name": str(family),
+                        "family": str(family),
+                        "project": str(project),
+                        "dry_run": True,
+                    }
+                },
+                {
+                    "operation": "resolve_image",
+                    "method": "dry_run",
+                    "provider_data": {"dry_run": True},
+                },
+            )
         image = self._get_compute_client().get_image_from_family(image_project=project, family=family)
         return ProviderResult.success_result(
             {
@@ -238,6 +287,11 @@ class GCPProviderStrategy(ProviderStrategy):
 
     def _handle_start_instances(self, operation: ProviderOperation) -> ProviderResult:
         mutation_context = self._get_operation_context_service().build_mutation_context(operation)
+        if bool(operation.context and operation.context.get("dry_run", False)):
+            return self._mutation_service.build_dry_run_result(
+                operation_name="start_instances",
+                attempted_ids=mutation_context.instance_ids,
+            )
         outcome = self._execution_service.execute_start(mutation_context)
         return self._mutation_service.build_provider_result(
             operation_name="start_instances",
@@ -246,6 +300,11 @@ class GCPProviderStrategy(ProviderStrategy):
 
     def _handle_stop_instances(self, operation: ProviderOperation) -> ProviderResult:
         mutation_context = self._get_operation_context_service().build_mutation_context(operation)
+        if bool(operation.context and operation.context.get("dry_run", False)):
+            return self._mutation_service.build_dry_run_result(
+                operation_name="stop_instances",
+                attempted_ids=mutation_context.instance_ids,
+            )
         outcome = self._execution_service.execute_stop(mutation_context)
         return self._mutation_service.build_provider_result(
             operation_name="stop_instances",

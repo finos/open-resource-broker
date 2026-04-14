@@ -62,6 +62,10 @@ class GCPConfigurationError(GCPError):
     """Raised when the GCP provider is configured incorrectly."""
 
 
+class GCPDryRunBlockedError(GCPError):
+    """Raised when dry-run mode blocks a real GCP API call."""
+
+
 try:
     from google.api_core import exceptions as google_exceptions
 except ImportError:  # pragma: no cover - exercised only when optional sdk deps are absent

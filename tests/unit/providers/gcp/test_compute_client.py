@@ -7,7 +7,11 @@ from types import ModuleType
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
+
+from orb.infrastructure.mocking.dry_run_context import dry_run_context
 from orb.providers.gcp.configuration.config import GCPProviderConfig
+from orb.providers.gcp.exceptions import GCPDryRunBlockedError
 from orb.providers.gcp.infrastructure.compute_client import (
     GCPComputeClient,
     GCP_MUTATION_RETRYABLE_GOOGLE_API_EXCEPTIONS,
@@ -245,3 +249,14 @@ def test_retry_profile_rejects_unknown_operation() -> None:
         assert "Unsupported GCP retry operation profile" in str(exc)
     else:
         raise AssertionError("expected ValueError for unknown retry profile")
+
+
+def test_compute_client_blocks_real_calls_when_dry_run_is_active() -> None:
+    client = GCPComputeClient(config=_config(), logger=MagicMock())
+
+    with dry_run_context(True):
+        with pytest.raises(GCPDryRunBlockedError, match="create_instance"):
+            client.create_instance(zone="us-central1-a", body=SimpleNamespace(name="vm-1"))
+
+        with pytest.raises(GCPDryRunBlockedError, match="get_image_from_family"):
+            client.get_image_from_family(image_project="debian-cloud", family="debian-12")

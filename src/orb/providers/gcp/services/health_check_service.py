@@ -7,6 +7,7 @@ import time
 from typing import Optional
 
 from orb.domain.base.ports import LoggingPort
+from orb.infrastructure.mocking.dry_run_context import is_dry_run_active
 from orb.providers.base.strategy import ProviderHealthStatus
 from orb.providers.gcp.configuration.config import GCPProviderConfig
 
@@ -21,6 +22,12 @@ class GCPHealthCheckService:
     def check_health(self) -> ProviderHealthStatus:
         """Perform a lightweight ADC-oriented health check."""
         start_time = time.time()
+        if is_dry_run_active():
+            response_time_ms = (time.time() - start_time) * 1000
+            return ProviderHealthStatus.healthy(
+                f"GCP provider healthy (DRY-RUN) - Project: {self._config.project_id}",
+                response_time_ms,
+            )
         credential_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
         response_time_ms = (time.time() - start_time) * 1000
         if credential_path or os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GCP_PROJECT"):

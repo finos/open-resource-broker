@@ -9,7 +9,9 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from orb.domain.base.ports import LoggingPort
 from orb.providers.gcp.configuration.config import GCPProviderConfig
+from orb.providers.gcp.exceptions import GCPDryRunBlockedError
 from orb.providers.gcp.types import GCPInstanceRecord, GCPManagedInstanceRecord
+from orb.infrastructure.mocking.dry_run_context import is_dry_run_active
 
 if TYPE_CHECKING:
     from google.api_core.extended_operation import ExtendedOperation
@@ -82,6 +84,7 @@ class GCPComputeClient:
         body: Instance,
     ) -> ExtendedOperation:
         """Create a standalone Compute Engine instance."""
+        self._assert_not_dry_run("create_instance")
         operation = self._get_instances_client().insert(
             project=self._config.project_id,
             zone=zone,
@@ -92,6 +95,7 @@ class GCPComputeClient:
 
     def delete_instance(self, *, zone: str, instance_name: str) -> ExtendedOperation:
         """Delete a standalone Compute Engine instance."""
+        self._assert_not_dry_run("delete_instance")
         operation = self._get_instances_client().delete(
             project=self._config.project_id,
             zone=zone,
@@ -102,6 +106,7 @@ class GCPComputeClient:
 
     def get_instance(self, *, zone: str, instance_name: str) -> GCPInstanceRecord:
         """Fetch one Compute Engine instance and normalize the response."""
+        self._assert_not_dry_run("get_instance")
         instance = self._get_instances_client().get(
             project=self._config.project_id,
             zone=zone,
@@ -116,6 +121,7 @@ class GCPComputeClient:
 
     def start_instance(self, *, zone: str, instance_name: str) -> ExtendedOperation:
         """Start a stopped Compute Engine instance."""
+        self._assert_not_dry_run("start_instance")
         operation = self._get_instances_client().start(
             project=self._config.project_id,
             zone=zone,
@@ -126,6 +132,7 @@ class GCPComputeClient:
 
     def stop_instance(self, *, zone: str, instance_name: str) -> ExtendedOperation:
         """Stop a running Compute Engine instance."""
+        self._assert_not_dry_run("stop_instance")
         operation = self._get_instances_client().stop(
             project=self._config.project_id,
             zone=zone,
@@ -141,6 +148,7 @@ class GCPComputeClient:
         body: InstanceTemplate,
     ) -> ExtendedOperation:
         """Create an instance template for a managed instance group."""
+        self._assert_not_dry_run("create_instance_template")
         body.name = template_name
         operation = self._get_instance_templates_client().insert(
             project=self._config.project_id,
@@ -151,6 +159,7 @@ class GCPComputeClient:
 
     def delete_instance_template(self, *, template_name: str) -> ExtendedOperation:
         """Delete an instance template by name."""
+        self._assert_not_dry_run("delete_instance_template")
         operation = self._get_instance_templates_client().delete(
             project=self._config.project_id,
             instance_template=template_name,
@@ -166,6 +175,7 @@ class GCPComputeClient:
         body: InstanceGroupManager,
     ) -> ExtendedOperation:
         """Create a regional managed instance group."""
+        self._assert_not_dry_run("create_regional_mig")
         body.name = mig_name
         operation = self._get_region_igm_client().insert(
             project=self._config.project_id,
@@ -183,6 +193,7 @@ class GCPComputeClient:
         body: InstanceGroupManager,
     ) -> ExtendedOperation:
         """Create a zonal managed instance group."""
+        self._assert_not_dry_run("create_zonal_mig")
         body.name = mig_name
         operation = self._get_zone_igm_client().insert(
             project=self._config.project_id,
@@ -194,6 +205,7 @@ class GCPComputeClient:
 
     def delete_regional_mig(self, *, region: str, mig_name: str) -> ExtendedOperation:
         """Delete a regional managed instance group."""
+        self._assert_not_dry_run("delete_regional_mig")
         operation = self._get_region_igm_client().delete(
             project=self._config.project_id,
             region=region,
@@ -204,6 +216,7 @@ class GCPComputeClient:
 
     def delete_zonal_mig(self, *, zone: str, mig_name: str) -> ExtendedOperation:
         """Delete a zonal managed instance group."""
+        self._assert_not_dry_run("delete_zonal_mig")
         operation = self._get_zone_igm_client().delete(
             project=self._config.project_id,
             zone=zone,
@@ -219,6 +232,7 @@ class GCPComputeClient:
         mig_name: str,
     ) -> list[GCPManagedInstanceRecord]:
         """List instances currently tracked by a regional managed instance group."""
+        self._assert_not_dry_run("list_regional_managed_instances")
         response = self._get_region_igm_client().list_managed_instances(
             project=self._config.project_id,
             region=region,
@@ -241,6 +255,7 @@ class GCPComputeClient:
         mig_name: str,
     ) -> list[GCPManagedInstanceRecord]:
         """List instances currently tracked by a zonal managed instance group."""
+        self._assert_not_dry_run("list_zonal_managed_instances")
         response = self._get_zone_igm_client().list_managed_instances(
             project=self._config.project_id,
             zone=zone,
@@ -264,6 +279,7 @@ class GCPComputeClient:
         instance_urls: list[str],
     ) -> ExtendedOperation:
         """Delete specific instances from a regional managed instance group."""
+        self._assert_not_dry_run("delete_regional_managed_instances")
         compute_v1 = self._compute_v1()
         operation = self._get_region_igm_client().delete_instances(
             project=self._config.project_id,
@@ -286,6 +302,7 @@ class GCPComputeClient:
         instance_urls: list[str],
     ) -> ExtendedOperation:
         """Delete specific instances from a zonal managed instance group."""
+        self._assert_not_dry_run("delete_zonal_managed_instances")
         compute_v1 = self._compute_v1()
         operation = self._get_zone_igm_client().delete_instances(
             project=self._config.project_id,
@@ -300,12 +317,21 @@ class GCPComputeClient:
 
     def get_image_from_family(self, *, image_project: str, family: str) -> Image:
         """Resolve the latest image in a Compute Engine image family."""
+        self._assert_not_dry_run("get_image_from_family")
         image = self._get_images_client().get_from_family(
             project=image_project,
             family=family,
             **self._request_options("image_read"),
         )
         return image
+
+    @staticmethod
+    def _assert_not_dry_run(operation_name: str) -> None:
+        if is_dry_run_active():
+            raise GCPDryRunBlockedError(
+                f"Dry-run blocked real GCP API call: {operation_name}",
+                details={"operation": operation_name, "dry_run": True},
+            )
 
     def _request_options(self, operation_name: str) -> dict[str, Any]:
         return {

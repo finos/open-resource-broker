@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 from google.api_core import exceptions as google_exceptions
 
+from orb.infrastructure.mocking.dry_run_context import is_dry_run_active
 from orb.domain.request.aggregate import Request
 from orb.domain.request.value_objects import RequestType
 from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
@@ -20,6 +21,8 @@ from orb.providers.gcp.exceptions import (
     GCPValidationError,
 )
 from orb.providers.gcp.infrastructure.gcp_handler_factory import GCPHandlerFactory
+from orb.providers.gcp.infrastructure.handlers.mig_handler import GCPManagedInstanceGroupHandler
+from orb.providers.gcp.infrastructure.handlers.single_vm_handler import GCPSingleVMHandler
 from orb.providers.gcp.strategy.gcp_provider_strategy import GCPProviderStrategy
 from orb.providers.gcp.types import GCPCreateOutcome
 
@@ -424,6 +427,46 @@ async def test_strategy_create_instances_delegates_to_handler() -> None:
 
 
 @pytest.mark.asyncio
+async def test_strategy_create_instances_dry_run_short_circuits_handler_calls() -> None:
+    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    assert strategy.initialize() is True
+
+    handler = MagicMock()
+    handler.acquire_hosts.side_effect = AssertionError("dry-run should not reach acquire_hosts")
+    strategy._handler_factory = SimpleNamespace(create_handler=lambda _api: handler)
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={
+                "count": 2,
+                "template_config": {
+                    "template_id": "gcp-mig",
+                    "provider_type": "gcp",
+                    "provider_api": "MIG",
+                    "project_id": "orb-example-12345",
+                    "region": "us-central1",
+                    "zones": ["us-central1-a", "us-central1-b"],
+                    "mig_scope": "regional",
+                    "instance_type": "e2-standard-4",
+                    "source_image_family": "debian-12",
+                    "source_image_project": "debian-cloud",
+                },
+            },
+            context={"dry_run": True},
+        )
+    )
+
+    assert result.success is True
+    assert result.metadata["dry_run"] is True
+    assert result.metadata["method"] == "dry_run"
+    assert result.data["provider_api"] == "MIG"
+    assert result.data["resource_ids"] == ["dry-run-gcp-mig"]
+    assert result.metadata["provider_data"]["dry_run"] is True
+    assert is_dry_run_active() is False
+
+
+@pytest.mark.asyncio
 async def test_strategy_create_singlevm_rejects_missing_zone() -> None:
     strategy = GCPProviderStrategy(config=_config(zones=[]), logger=MagicMock(), provider_name="gcp-default")
     assert strategy.initialize() is True
@@ -588,6 +631,34 @@ async def test_strategy_terminate_instances_supports_multiple_mig_resource_ids()
 
 
 @pytest.mark.asyncio
+async def test_strategy_terminate_instances_dry_run_short_circuits_handler_calls() -> None:
+    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    assert strategy.initialize() is True
+
+    handler = MagicMock()
+    handler.terminate_hosts.side_effect = AssertionError("dry-run should not reach terminate_hosts")
+    strategy._handler_factory = SimpleNamespace(create_handler=lambda _api: handler)
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={
+                "provider_api": "MIG",
+                "resource_ids": ["mig-a", "mig-b"],
+                "request_metadata": {"region": "us-central1", "scope": "regional"},
+            },
+            context={"dry_run": True},
+        )
+    )
+
+    assert result.success is True
+    assert result.metadata["dry_run"] is True
+    assert result.metadata["method"] == "dry_run"
+    assert result.data["successful_ids"] == ["mig-a", "mig-b"]
+    assert result.data["results"] == {"mig-a": True, "mig-b": True}
+
+
+@pytest.mark.asyncio
 async def test_strategy_start_instances_surfaces_partial_results() -> None:
     strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
     assert strategy.initialize() is True
@@ -616,6 +687,38 @@ async def test_strategy_start_instances_surfaces_partial_results() -> None:
 
 
 @pytest.mark.asyncio
+async def test_strategy_get_instance_status_dry_run_short_circuits_handler_calls() -> None:
+    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    assert strategy.initialize() is True
+
+    handler = MagicMock()
+    handler.check_hosts_status.side_effect = AssertionError(
+        "dry-run should not reach check_hosts_status"
+    )
+    strategy._handler_factory = SimpleNamespace(create_handler=lambda _api: handler)
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
+            parameters={
+                "provider_api": "SingleVM",
+                "instance_ids": ["vm-a", "vm-b"],
+                "request_metadata": {"zone": "us-central1-a"},
+            },
+            context={"dry_run": True},
+        )
+    )
+
+    assert result.success is True
+    assert result.metadata["dry_run"] is True
+    assert result.metadata["method"] == "dry_run"
+    assert result.data["instances"] == [
+        {"instance_id": "vm-a", "status": "DRY_RUN", "provider_data": {"dry_run": True}},
+        {"instance_id": "vm-b", "status": "DRY_RUN", "provider_data": {"dry_run": True}},
+    ]
+
+
+@pytest.mark.asyncio
 async def test_strategy_resolve_image_uses_compute_client() -> None:
     strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
     assert strategy.initialize() is True
@@ -633,6 +736,53 @@ async def test_strategy_resolve_image_uses_compute_client() -> None:
 
     assert result.success is True
     assert result.data["resolved_images"]["image_id"].endswith("/debian-12")
+
+
+@pytest.mark.asyncio
+async def test_strategy_resolve_image_dry_run_short_circuits_compute_client() -> None:
+    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    assert strategy.initialize() is True
+
+    compute_client = MagicMock()
+    compute_client.get_image_from_family.side_effect = AssertionError(
+        "dry-run should not reach get_image_from_family"
+    )
+    strategy._compute_client = compute_client
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.RESOLVE_IMAGE,
+            parameters={
+                "source_image_family": "debian-12",
+                "source_image_project": "debian-cloud",
+            },
+            context={"dry_run": True},
+        )
+    )
+
+    assert result.success is True
+    assert result.metadata["dry_run"] is True
+    assert result.metadata["method"] == "dry_run"
+    assert result.data["resolved_images"]["dry_run"] is True
+    assert result.data["resolved_images"]["image_id"].endswith("/debian-12")
+
+
+def test_health_check_reports_healthy_in_dry_run_mode() -> None:
+    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    assert strategy.initialize() is True
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.delenv("GOOGLE_APPLICATION_CREDENTIALS", raising=False)
+        mp.delenv("GOOGLE_CLOUD_PROJECT", raising=False)
+        mp.delenv("GCP_PROJECT", raising=False)
+
+        from orb.providers.gcp.infrastructure.dry_run_adapter import gcp_dry_run_context
+
+        with gcp_dry_run_context():
+            status = strategy.check_health()
+
+    assert status.is_healthy is True
+    assert "DRY-RUN" in status.status_message
 
 
 def test_mig_handler_missing_membership_raises_gcp_entity_not_found() -> None:
