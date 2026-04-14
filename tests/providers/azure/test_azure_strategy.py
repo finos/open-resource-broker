@@ -6,6 +6,9 @@ import time
 from unittest.mock import MagicMock
 
 import pytest
+from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
+
+from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.infrastructure.services.spot_placement_score_adapter import (
     AzureSpotPlacementScoreAdapter,
 )
@@ -431,6 +434,10 @@ class TestGetAvailableTemplates:
         result = run_operation(strategy.execute_operation(op))
         assert result.success
         assert result.data["count"] >= 1
+
+    def test_fallback_templates_validate_as_azure_templates(self, strategy):
+        for template in strategy._template_catalog_service.get_fallback_templates():
+            AzureTemplate.model_validate(template)
 
 # ---------------------------------------------------------------------------
 # UNSUPPORTED_OPERATION
