@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import time
 from typing import Optional
 
@@ -20,7 +19,7 @@ class GCPHealthCheckService:
         self._logger = logger
 
     def check_health(self) -> ProviderHealthStatus:
-        """Perform a lightweight ADC-oriented health check."""
+        """Verify GCP credentials by refreshing the ADC token."""
         start_time = time.time()
         if is_dry_run_active():
             response_time_ms = (time.time() - start_time) * 1000
@@ -28,23 +27,34 @@ class GCPHealthCheckService:
                 f"GCP provider healthy (DRY-RUN) - Project: {self._config.project_id}",
                 response_time_ms,
             )
-        credential_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-        response_time_ms = (time.time() - start_time) * 1000
-        if credential_path or os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GCP_PROJECT"):
+
+        try:
+            import google.auth
+            import google.auth.transport.requests
+
+            credentials, project = google.auth.default()
+            credentials.refresh(google.auth.transport.requests.Request())
+
+            response_time_ms = (time.time() - start_time) * 1000
             return ProviderHealthStatus.healthy(
-                f"GCP provider ready for project {self._config.project_id}",
+                f"GCP provider healthy - Project: {project or self._config.project_id}",
                 response_time_ms,
             )
-        return ProviderHealthStatus.unhealthy(
-            "No ADC context detected for GCP provider",
-            {
-                "project_id": self._config.project_id,
-                "hint": (
-                    "Set GOOGLE_APPLICATION_CREDENTIALS or run under workload identity / gcloud ADC "
-                    "(https://cloud.google.com/docs/authentication/application-default-credentials)"
-                ),
-            },
-        )
+        except Exception as exc:
+            self._logger.warning("GCP health check failed: %s", exc, exc_info=True)
+            response_time_ms = (time.time() - start_time) * 1000
+            return ProviderHealthStatus.unhealthy(
+                f"GCP credential check failed: {exc!s}",
+                {
+                    "error": str(exc),
+                    "project_id": self._config.project_id,
+                    "response_time_ms": response_time_ms,
+                    "hint": (
+                        "Set GOOGLE_APPLICATION_CREDENTIALS or run under workload identity / gcloud ADC "
+                        "(https://cloud.google.com/docs/authentication/application-default-credentials)"
+                    ),
+                },
+            )
 
     def get_available_credential_sources(self) -> list[dict]:
         """Return supported credential sources."""
