@@ -318,7 +318,9 @@ def test_mig_handler_terminates_multiple_resource_ids() -> None:
     )
 
     assert result.attempted_ids == ["mig-a", "mig-b"]
-    assert result.successful_ids == ["mig-a", "mig-b"]
+    assert result.successful_ids == []
+    assert result.warning is not None
+    assert "completion must be confirmed" in result.warning
     assert compute_client.deleted_regional_migs == [
         ("us-central1", "mig-a"),
         ("us-central1", "mig-b"),
@@ -390,7 +392,9 @@ def test_mig_handler_terminates_instances_across_multiple_resource_ids() -> None
     )
 
     assert result.attempted_ids == ["vm-a", "vm-b"]
-    assert result.successful_ids == ["vm-a", "vm-b"]
+    assert result.successful_ids == []
+    assert result.warning is not None
+    assert "completion must be confirmed" in result.warning
     assert compute_client.deleted_regional_managed_instances == [
         (
             "us-central1",
@@ -644,8 +648,11 @@ async def test_strategy_terminate_instances_supports_multiple_mig_resource_ids()
     )
 
     assert result.success is True
-    assert result.data["successful_count"] == 2
-    assert result.data["successful_ids"] == ["mig-a", "mig-b"]
+    assert result.data["successful_count"] == 0
+    assert result.data["successful_ids"] == []
+    assert result.data["results"] == {"mig-a": False, "mig-b": False}
+    assert "completion must be confirmed" in result.data["warning"]
+    assert "completion must be confirmed" in result.metadata["provider_data"]["warning"]
 
 
 @pytest.mark.asyncio

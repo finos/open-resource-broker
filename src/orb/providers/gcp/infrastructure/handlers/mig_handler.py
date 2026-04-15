@@ -27,6 +27,10 @@ if TYPE_CHECKING:
 class GCPManagedInstanceGroupHandler(GCPHandler):
     """Create and manage zonal or regional Managed Instance Groups."""
 
+    _DELETE_SUBMITTED_WARNING = (
+        "Delete operation submitted to GCP; completion must be confirmed by later polling."
+    )
+
     def acquire_hosts(self, request: Request, template: GCPTemplate) -> GCPCreateOutcome:
         """Create the MIG and backing instance template for a request."""
         mig_name = template.mig_name or f"orb-mig-{template.template_id}-{uuid.uuid4().hex[:8]}"
@@ -115,12 +119,12 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
                 operations.append({"operation_name": response.name, "mig_name": mig_name})
             return GCPMutationOutcome(
                 attempted_ids=instance_ids,
-                successful_ids=instance_ids,
+                successful_ids=[],
                 operations=operations,
+                warning=self._DELETE_SUBMITTED_WARNING,
             )
 
         operations: list[dict[str, str | None]] = []
-        successful_ids: list[str] = []
         for mig_name in mig_names:
             if scope == GCPMIGScope.ZONAL.value:
                 response = self._compute_client.delete_zonal_mig(
@@ -133,7 +137,6 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
                     mig_name=mig_name,
                 )
             operations.append({"operation_name": response.name, "mig_name": mig_name})
-            successful_ids.append(mig_name)
 
         if template_name:
             try:
@@ -146,9 +149,10 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
                 )
 
         return GCPMutationOutcome(
-            attempted_ids=successful_ids,
-            successful_ids=successful_ids,
+            attempted_ids=mig_names,
+            successful_ids=[],
             operations=operations,
+            warning=self._DELETE_SUBMITTED_WARNING,
         )
 
     def check_hosts_status(
