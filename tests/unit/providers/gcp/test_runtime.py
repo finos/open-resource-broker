@@ -39,6 +39,16 @@ class _ComputeClientStub:
         self.fail_start_instance_for: set[str] = set()
         self.fail_stop_instance_for: set[str] = set()
         self.fail_delete_instance_for: set[str] = set()
+        self.template_operation_result_called = False
+
+    class _OperationStub(SimpleNamespace):
+        def __init__(self, owner: "_ComputeClientStub", **kwargs) -> None:
+            super().__init__(**kwargs)
+            self._owner = owner
+
+        def result(self) -> "_ComputeClientStub._OperationStub":
+            self._owner.template_operation_result_called = True
+            return self
 
     def create_instance(self, *, zone: str, body: object) -> object:
         if body.name in self.fail_create_instance_for:
@@ -48,7 +58,12 @@ class _ComputeClientStub:
 
     def create_instance_template(self, *, template_name: str, body: object) -> object:
         self.created_templates.append((template_name, body))
-        return SimpleNamespace(name=f"template-op-{template_name}", status="PENDING", target_link=None)
+        return self._OperationStub(
+            self,
+            name=f"template-op-{template_name}",
+            status="PENDING",
+            target_link=None,
+        )
 
     def create_regional_mig(
         self,
@@ -284,6 +299,7 @@ def test_mig_handler_acquire_hosts_submits_template_and_group() -> None:
     assert len(result.resource_ids) == 1
     assert result.provider_data["target_size"] == 3
     assert len(compute_client.created_templates) == 1
+    assert compute_client.template_operation_result_called is True
     assert len(compute_client.created_migs) == 1
 
 

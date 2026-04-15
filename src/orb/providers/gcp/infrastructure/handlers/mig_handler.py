@@ -33,10 +33,13 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
         template_name = (
             f"{template.instance_template_name_prefix or 'orb'}-{template.template_id}-{uuid.uuid4().hex[:8]}"
         )
-        self._compute_client.create_instance_template(
+        template_operation = self._compute_client.create_instance_template(
             template_name=template_name,
             body=self._build_instance_template_payload(template, template_name),
         )
+        # Wait for the template insert to finish before creating the MIG, otherwise
+        # the subsequent MIG create can race eventual consistency on template lookup.
+        template_operation.result()
 
         if template.mig_scope == GCPMIGScope.REGIONAL:
             region = str(template.region)
