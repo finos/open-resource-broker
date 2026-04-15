@@ -147,6 +147,7 @@ class AzureProviderStrategy(ProviderStrategy):
         self._lifecycle_condition = Condition(self._lifecycle_lock)
         self._active_operations = 0
         self._cleanup_requested = False
+        self._cleanup_wait_timeout_seconds = 30.0
         self._vmss_cleanup_coordinator = vmss_cleanup_coordinator or VmssCleanupCoordinator(
             logger=self._logger,
             get_vmss_member_count=self._current_vmss_member_count,
@@ -588,8 +589,17 @@ class AzureProviderStrategy(ProviderStrategy):
         """Release Azure client resources and reset all lazily initialised state."""
         with self._lifecycle_condition:
             self._cleanup_requested = True
+            deadline = time.monotonic() + self._cleanup_wait_timeout_seconds
             while self._active_operations > 0:
-                self._lifecycle_condition.wait()
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    self._logger.warning(
+                        "Azure provider cleanup timed out with %d active operation(s); "
+                        "leaving strategy in shutdown mode until cleanup is retried",
+                        self._active_operations,
+                    )
+                    return
+                self._lifecycle_condition.wait(timeout=remaining)
 
             client = self._client
             self._client = None
