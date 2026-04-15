@@ -22,6 +22,7 @@ from orb.providers.gcp.types import (
 )
 
 if TYPE_CHECKING:
+    from google.api_core.extended_operation import ExtendedOperation
     from google.cloud.compute_v1.types import Instance
 
 try:
@@ -240,7 +241,7 @@ class GCPSingleVMHandler(GCPHandler):
         *,
         target_ids: list[str],
         operation_name: str,
-        mutation: Callable[[str], object],
+        mutation: Callable[[str], ExtendedOperation],
     ) -> GCPMutationOutcome:
         result = GCPMutationOutcome(
             attempted_ids=list(target_ids),
