@@ -588,6 +588,57 @@ class TestCleanup:
         assert result_holder[0].success is True
         client.close.assert_called_once_with()
 
+    def test_cleanup_times_out_with_in_flight_operation(self, azure_config, logger, monkeypatch):
+        client = MagicMock()
+        strategy = AzureProviderStrategy(
+            config=azure_config,
+            logger=logger,
+            provider_instance_name="azure-default",
+            azure_client_resolver=lambda: client,
+        )
+        strategy.initialize()
+        strategy._client = client
+        strategy._cleanup_wait_timeout_seconds = 0.05
+
+        operation_started = threading.Event()
+        release_operation = threading.Event()
+        cleanup_finished = threading.Event()
+        result_holder: list[ProviderResult] = []
+
+        async def block_operation(_operation):
+            operation_started.set()
+            while not release_operation.is_set():
+                await asyncio.sleep(0.01)
+            return ProviderResult.success_result({"ok": True})
+
+        monkeypatch.setattr(strategy, "_execute_operation_internal", block_operation)
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.HEALTH_CHECK,
+            parameters={},
+        )
+
+        operation_thread = threading.Thread(
+            target=lambda: result_holder.append(run_operation(strategy.execute_operation(op)))
+        )
+        operation_thread.start()
+        assert operation_started.wait(timeout=1)
+
+        cleanup_thread = threading.Thread(
+            target=lambda: (strategy.cleanup(), cleanup_finished.set())
+        )
+        cleanup_thread.start()
+        cleanup_thread.join(timeout=1)
+
+        assert cleanup_finished.is_set()
+        assert strategy._cleanup_requested is True
+        assert strategy._client is client
+        client.close.assert_not_called()
+
+        release_operation.set()
+        operation_thread.join(timeout=1)
+        assert result_holder[0].success is True
+
     def test_cleanup_drops_cached_handler_factory_and_client(self, azure_config, logger):
         client_one = MagicMock()
         client_two = MagicMock()
