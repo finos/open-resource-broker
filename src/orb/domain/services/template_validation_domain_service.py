@@ -188,7 +188,7 @@ class TemplateValidationDomainService:
         try:
             validator = self._provider_registry.create_validator(
                 provider_config.type,
-                provider_config,
+                provider_config.config,
             )
             if validator is None:
                 return None

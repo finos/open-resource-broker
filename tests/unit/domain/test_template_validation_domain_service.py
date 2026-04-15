@@ -149,6 +149,7 @@ class TestTemplateValidationDomainService:
         provider_instance_config = MagicMock()
         provider_instance_config.name = "azure-default"
         provider_instance_config.type = "azure"
+        provider_instance_config.config = {"subscription_id": "sub-123"}
         provider_instance_config.handlers = None
         provider_instance_config.handler_overrides = None
         provider_instance_config.capabilities = None
@@ -179,7 +180,7 @@ class TestTemplateValidationDomainService:
         assert result.errors == []
         provider_registry.create_validator.assert_called_once_with(
             "azure",
-            provider_instance_config,
+            {"subscription_id": "sub-123"},
         )
         validator.get_api_capabilities.assert_any_call("VMSS")
 
@@ -187,6 +188,7 @@ class TestTemplateValidationDomainService:
         provider_instance_config = MagicMock()
         provider_instance_config.name = "azure-default"
         provider_instance_config.type = "azure"
+        provider_instance_config.config = {"subscription_id": "sub-123"}
         provider_instance_config.handlers = None
         provider_instance_config.handler_overrides = None
         provider_instance_config.capabilities = None
@@ -222,6 +224,7 @@ class TestTemplateValidationDomainService:
         provider_instance_config = MagicMock()
         provider_instance_config.name = "azure-default"
         provider_instance_config.type = "azure"
+        provider_instance_config.config = {"subscription_id": "sub-123"}
         provider_instance_config.handlers = None
         provider_instance_config.handler_overrides = {"VMSS": None}
         provider_instance_config.capabilities = None

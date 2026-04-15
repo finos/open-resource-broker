@@ -372,7 +372,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
 
         Args:
             provider_type: Type identifier for the provider
-            config: Optional provider config or provider instance config to pass to the factory
+            config: Optional provider config data to pass to the factory
 
         Returns:
             Created template validator instance or None if not registered
