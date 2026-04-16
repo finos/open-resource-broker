@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import orb.providers.azure.infrastructure.handlers.vmss_handler as vmss_handler_module
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.domain.template.value_objects import AzureVMSSOrchestrationMode
+from orb.providers.azure.exceptions.azure_exceptions import AzureValidationError
 from orb.providers.azure.infrastructure.handlers.azure_handler import AzureReleaseContext
 from orb.providers.azure.infrastructure.handlers.vmss_handler import VMSSHandler
 
@@ -96,6 +97,24 @@ def test_acquire_hosts_does_not_mutate_template_when_network_config_is_derived_f
         "subnet"
     ]["id"]
     assert subnet_id == "/subscriptions/.../subnets/derived"
+
+
+def test_acquire_hosts_raises_validation_error_when_no_subnet_is_available():
+    azure_client = MagicMock()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+
+    request = MagicMock()
+    request.requested_count = 1
+    request.request_id = "req-no-subnet"
+    request.metadata = {}
+
+    template = _make_template(network_config=None, subnet_ids=[])
+
+    with pytest.raises(AzureValidationError, match="No subnet specified"):
+        handler.acquire_hosts(request, template)
+
+    azure_client.compute_client.virtual_machine_scale_sets.begin_create_or_update.assert_not_called()
 
 
 def test_flexible_vmss_status_returns_only_member_vms():

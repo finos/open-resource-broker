@@ -18,6 +18,7 @@ from orb.providers.azure.exceptions.azure_exceptions import (
 )
 from orb.providers.azure.infrastructure.cyclecloud_session import CycleCloudRequestContext
 from orb.providers.azure.infrastructure.handlers.azure_handler import AzureReleaseContext
+from orb.providers.azure.infrastructure.handlers.vmss_handler import VMSSHandler
 from orb.providers.azure.infrastructure.services.spot_placement_score_adapter import (
     AzureSpotPlacementScoreAdapter,
 )
@@ -311,6 +312,49 @@ class TestCreateInstances:
         assert result.error_code == "SkuNotAvailable"
         assert result.metadata["error_class"] == "AzureValidationError"
         assert result.metadata["provider_error"]["error_code"] == "SkuNotAvailable"
+
+    def test_create_instances_reports_missing_vmss_subnet_as_validation_error(
+        self, azure_config, logger
+    ):
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
+        strategy_harness.handlers["VMSS"] = VMSSHandler(
+            azure_client=MagicMock(),
+            logger=logger,
+        )
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={
+                "template_config": {
+                    "template_id": "azure-vmss-test",
+                    "provider_api": "VMSS",
+                    "vm_size": "Standard_D4s_v5",
+                    "resource_group": "test-rg",
+                    "location": "eastus2",
+                    "network_config": None,
+                    "subnet_ids": [],
+                    "ssh_public_keys": [
+                        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"
+                    ],
+                    "image": {
+                        "publisher": "Canonical",
+                        "offer": "0001-com-ubuntu-server-jammy",
+                        "sku": "22_04-lts-gen2",
+                        "version": "latest",
+                    },
+                },
+                "count": 1,
+            },
+        )
+
+        result = run_operation(strategy.execute_operation(op))
+
+        assert not result.success
+        assert result.error_code == "InvalidParameter"
+        assert result.metadata["error_class"] == "AzureValidationError"
+        assert result.metadata["provider_error"]["error_code"] == "InvalidParameter"
+        assert "No subnet specified" in result.error_message
 
 
 # ---------------------------------------------------------------------------

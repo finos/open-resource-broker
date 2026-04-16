@@ -180,11 +180,13 @@ class VMSSHandler(AzureHandler):
                     )
                     self._logger.debug("Auto-created network_config from subnet_id: %s", subnet_id)
                 else:
-                    raise ValueError(
+                    raise AzureValidationError(
                         "No subnet specified. Add 'subnet_id' (full ARM resource ID) "
                         "to the template in subnet_ids or network_config, e.g.: "
                         "/subscriptions/<sub>/resourceGroups/<rg>/providers/"
-                        "Microsoft.Network/virtualNetworks/<vnet>/subnets/<subnet>"
+                        "Microsoft.Network/virtualNetworks/<vnet>/subnets/<subnet>",
+                        details={"template_id": template.template_id},
+                        error_code="InvalidParameter",
                     )
 
             from orb.providers.azure.infrastructure.services.arm_payload_mapper import ArmPayloadMapper
@@ -268,6 +270,8 @@ class VMSSHandler(AzureHandler):
                 },
             }
 
+        except AzureValidationError:
+            raise
         except Exception as exc:
             error_msg = f"Failed to create VMSS '{vmss_name}': {exc}"
             self._logger.error(error_msg)
