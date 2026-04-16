@@ -23,8 +23,9 @@ from orb.providers.gcp.exceptions import (
 from orb.providers.gcp.infrastructure.gcp_handler_factory import GCPHandlerFactory
 from orb.providers.gcp.infrastructure.handlers.mig_handler import GCPManagedInstanceGroupHandler
 from orb.providers.gcp.infrastructure.handlers.single_vm_handler import GCPSingleVMHandler
+from orb.providers.gcp.services.provisioning_service import GCPProvisioningService
 from orb.providers.gcp.strategy.gcp_provider_strategy import GCPProviderStrategy
-from orb.providers.gcp.types import GCPCreateOutcome
+from orb.providers.gcp.types import GCPCreateOperationContext, GCPCreateOutcome, GCPFailedOperation
 
 
 class _ComputeClientStub:
@@ -301,6 +302,60 @@ def test_mig_handler_acquire_hosts_submits_template_and_group() -> None:
     assert len(compute_client.created_templates) == 1
     assert compute_client.template_operation_result_called is True
     assert len(compute_client.created_migs) == 1
+
+
+def test_provisioning_service_projects_failed_operations_into_fleet_errors() -> None:
+    template = GCPTemplate.model_validate(
+        {
+            "template_id": "gcp-single",
+            "provider_type": "gcp",
+            "provider_api": "SingleVM",
+            "project_id": "orb-example-12345",
+            "region": "us-central1",
+            "zones": ["us-central1-a"],
+            "instance_type": "e2-standard-4",
+            "max_instances": 1,
+            "source_image_family": "debian-12",
+            "source_image_project": "debian-cloud",
+        }
+    )
+    request = Request.create_new_request(
+        request_type=RequestType.ACQUIRE,
+        template_id="gcp-single",
+        machine_count=1,
+        provider_type="gcp",
+    )
+    context = GCPCreateOperationContext(
+        template=template,
+        request=request,
+        handler=MagicMock(),
+        count=1,
+    )
+    result = GCPProvisioningService.build_provider_result(
+        context=context,
+        outcome=GCPCreateOutcome(
+            resource_ids=[],
+            instances=[],
+            provider_data={"submitted_count": 0},
+            failed_operations=[
+                GCPFailedOperation(
+                    target_id="vm-a",
+                    error_code="GCPQuotaExceededError",
+                    error_message="Quota exceeded",
+                    operation="create_instance",
+                )
+            ],
+        ),
+    )
+
+    assert result.success is True
+    assert result.metadata["provider_data"]["fleet_errors"] == [
+        {
+            "instance_id": "vm-a",
+            "error_code": "GCPQuotaExceededError",
+            "error_message": "Quota exceeded",
+        }
+    ]
 
 
 def test_mig_handler_terminates_multiple_resource_ids() -> None:

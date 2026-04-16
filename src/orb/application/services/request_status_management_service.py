@@ -141,6 +141,12 @@ class RequestStatusManagementService:
                     f"Partially fulfilled: {instance_count}/{requested_count} instances",
                 )
         else:
+            if has_api_errors:
+                request = request.update_status(
+                    RequestStatus.FAILED,
+                    f"Provisioning failed: {error_summary}",
+                )
+                return request
             request = request.update_status(
                 RequestStatus.IN_PROGRESS,
                 "Resources created, instances pending",

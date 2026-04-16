@@ -3,11 +3,29 @@
 from __future__ import annotations
 
 from orb.providers.base.strategy import ProviderResult
-from orb.providers.gcp.types import GCPCreateOperationContext, GCPCreateOutcome
+from orb.providers.gcp.types import (
+    GCPCreateOperationContext,
+    GCPCreateOutcome,
+    GCPFailedOperation,
+)
 
 
 class GCPProvisioningService:
     """Own GCP create result shaping."""
+
+    @staticmethod
+    def _fleet_errors_from_failures(
+        failed_operations: list[GCPFailedOperation],
+    ) -> list[dict[str, str]]:
+        """Project GCP create failures into the shared fleet error shape."""
+        return [
+            {
+                "instance_id": failure.target_id,
+                "error_code": failure.error_code,
+                "error_message": failure.error_message,
+            }
+            for failure in failed_operations
+        ]
 
     @staticmethod
     def create_instances_dry_run_result(
@@ -107,10 +125,14 @@ class GCPProvisioningService:
     ) -> ProviderResult:
         """Convert a provider-native acquire outcome into the ORB result schema."""
         failed_operations = outcome.failed_operations
+        fleet_errors = GCPProvisioningService._fleet_errors_from_failures(failed_operations)
         results = {
             **{instance["instance_id"]: True for instance in outcome.instances},
             **{failure.target_id: False for failure in failed_operations},
         }
+        provider_data = dict(outcome.provider_data)
+        if fleet_errors:
+            provider_data["fleet_errors"] = fleet_errors
         return ProviderResult.success_result(
             {
                 "resource_ids": outcome.resource_ids,
@@ -124,7 +146,7 @@ class GCPProvisioningService:
             {
                 "operation": "create_instances",
                 "handler_used": context.template.provider_api.value,
-                "provider_data": outcome.provider_data,
+                "provider_data": provider_data,
                 "partial_failure": bool(failed_operations),
             },
         )
