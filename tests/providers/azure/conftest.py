@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from orb.providers.azure.configuration.config import AzureProviderConfig
-from orb.providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
+from tests.providers.azure.strategy_test_support import build_strategy_harness
 
 
 @pytest.fixture
@@ -23,11 +23,10 @@ def logger():
 
 
 @pytest.fixture
-def strategy(azure_config, logger):
-    provider_strategy = AzureProviderStrategy(
-        config=azure_config,
-        logger=logger,
-        provider_instance_name="azure-default",
-    )
-    provider_strategy.initialize()
-    return provider_strategy
+def strategy_harness(azure_config, logger):
+    return build_strategy_harness(config=azure_config, logger=logger)
+
+
+@pytest.fixture
+def strategy(strategy_harness):
+    return strategy_harness.strategy

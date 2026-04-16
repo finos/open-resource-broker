@@ -21,9 +21,8 @@ from orb.providers.azure.infrastructure.handlers.azure_handler import AzureRelea
 from orb.providers.azure.infrastructure.services.spot_placement_score_adapter import (
     AzureSpotPlacementScoreAdapter,
 )
-from orb.providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
 from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
-from tests.providers.azure.strategy_test_support import run_operation
+from tests.providers.azure.strategy_test_support import build_strategy_harness, run_operation
 
 class TestCreateInstances:
     def test_missing_template_config_returns_error(self, strategy):
@@ -65,11 +64,10 @@ class TestCreateInstances:
         assert result.error_code == "HANDLER_NOT_FOUND"
 
     def test_dry_run_short_circuits_before_handler(self, azure_config, logger):
-        strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
-        strategy.initialize()
-
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
         handler = MagicMock()
-        strategy._handlers = {"VMSS": handler}
+        strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.CREATE_INSTANCES,
@@ -107,13 +105,12 @@ class TestCreateInstances:
     def test_create_instances_preserves_named_provider_instance_on_synthesized_request(
         self, azure_config, logger
     ):
-        strategy = AzureProviderStrategy(
+        strategy_harness = build_strategy_harness(
             config=azure_config,
             logger=logger,
             provider_instance_name="azure-test",
         )
-        strategy.initialize()
-
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.acquire_hosts.return_value = {
             "success": True,
@@ -121,7 +118,7 @@ class TestCreateInstances:
             "instances": [],
             "provider_data": {"resource_group": "test-rg"},
         }
-        strategy._handlers = {"VMSS": handler}
+        strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.CREATE_INSTANCES,
@@ -156,13 +153,8 @@ class TestCreateInstances:
     def test_create_instances_coalesces_azure_defaults_before_validation(
         self, azure_config, logger, provider_api
     ):
-        strategy = AzureProviderStrategy(
-            config=azure_config,
-            logger=logger,
-            provider_instance_name="azure-default",
-        )
-        strategy.initialize()
-
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.acquire_hosts.return_value = {
             "success": True,
@@ -170,7 +162,7 @@ class TestCreateInstances:
             "instances": [],
             "provider_data": {"resource_group": "test-rg"},
         }
-        strategy._handlers = {provider_api: handler}
+        strategy_harness.handlers[provider_api] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.CREATE_INSTANCES,
@@ -200,20 +192,15 @@ class TestCreateInstances:
     def test_create_instances_uses_image_from_template_dto_metadata_roundtrip(
         self, azure_config, logger
     ):
-        strategy = AzureProviderStrategy(
-            config=azure_config,
-            logger=logger,
-            provider_instance_name="azure-default",
-        )
-        strategy.initialize()
-
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.acquire_hosts.return_value = {
             "success": True,
             "resource_ids": ["azure-resource"],
             "instances": [],
         }
-        strategy._handlers = {"VMSS": handler}
+        strategy_harness.handlers["VMSS"] = handler
 
         azure_template = AzureTemplate(
             template_id="azure-roundtrip-test",
@@ -248,20 +235,15 @@ class TestCreateInstances:
     def test_create_instances_accepts_enum_provider_api_in_template_config(
         self, azure_config, logger
     ):
-        strategy = AzureProviderStrategy(
-            config=azure_config,
-            logger=logger,
-            provider_instance_name="azure-default",
-        )
-        strategy.initialize()
-
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.acquire_hosts.return_value = {
             "success": True,
             "resource_ids": ["vmss-demo"],
             "instances": [],
         }
-        strategy._handlers = {"VMSS": handler}
+        strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.CREATE_INSTANCES,
@@ -291,13 +273,14 @@ class TestCreateInstances:
         assert result.success
         assert result.data["provider_api"] == "VMSS"
 
-    def test_create_instances_preserves_azure_validation_failures(self, strategy):
+    def test_create_instances_preserves_azure_validation_failures(self, strategy_harness):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.acquire_hosts.side_effect = AzureValidationError(
             "VM size is not available in this region",
             error_code="SkuNotAvailable",
         )
-        strategy._handlers = {"VMSS": handler}
+        strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.CREATE_INSTANCES,
@@ -354,8 +337,9 @@ class TestTerminateInstances:
         assert not result.success
         assert result.error_code == "MISSING_PROVIDER_API"
 
-    def test_missing_resource_id_returns_error(self, strategy):
-        strategy._handlers = {"VMSS": MagicMock()}
+    def test_missing_resource_id_returns_error(self, strategy_harness):
+        strategy = strategy_harness.strategy
+        strategy_harness.handlers["VMSS"] = MagicMock()
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.TERMINATE_INSTANCES,
@@ -379,11 +363,10 @@ class TestTerminateInstances:
         assert result.error_code == "HANDLER_NOT_FOUND"
 
     def test_fallback_handler_uses_grouped_resource_ids(self, azure_config, logger):
-        strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
-        strategy.initialize()
-
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
         handler = MagicMock()
-        strategy._handlers = {"VMSS": handler}
+        strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.TERMINATE_INSTANCES,
@@ -409,11 +392,10 @@ class TestTerminateInstances:
         )
 
     def test_dry_run_short_circuits_before_release(self, azure_config, logger):
-        strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
-        strategy.initialize()
-
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
         handler = MagicMock()
-        strategy._handlers = {"VMSS": handler}
+        strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.TERMINATE_INSTANCES,
@@ -432,9 +414,8 @@ class TestTerminateInstances:
         handler.release_hosts.assert_not_called()
 
     def test_terminate_instances_records_pending_vmss_cleanup(self, azure_config, logger):
-        strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
-        strategy.initialize()
-
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.release_hosts.return_value = {
             "provider_data": {
@@ -450,7 +431,7 @@ class TestTerminateInstances:
                 }
             }
         }
-        strategy._handlers = {"VMSS": handler}
+        strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.TERMINATE_INSTANCES,
@@ -484,9 +465,8 @@ class TestTerminateInstances:
     def test_terminate_instances_merges_pending_vmss_cleanup_for_same_vmss(
         self, azure_config, logger
     ):
-        strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
-        strategy.initialize()
-
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.release_hosts.side_effect = [
             {
@@ -518,7 +498,7 @@ class TestTerminateInstances:
                 }
             },
         ]
-        strategy._handlers = {"VMSS": handler}
+        strategy_harness.handlers["VMSS"] = handler
 
         first_op = ProviderOperation(
             operation_type=ProviderOperationType.TERMINATE_INSTANCES,
@@ -575,13 +555,14 @@ class TestTerminateInstances:
             }
         ]
 
-    def test_terminate_instances_preserves_provider_failures(self, strategy):
+    def test_terminate_instances_preserves_provider_failures(self, strategy_harness):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.release_hosts.side_effect = TerminationError(
             "Azure rejected the delete request",
             resource_ids=["vmss-prod-b"],
         )
-        strategy._handlers = {"VMSS": handler}
+        strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.TERMINATE_INSTANCES,
@@ -604,21 +585,18 @@ class TestTerminateInstances:
     def test_get_instance_status_restores_pending_vmss_cleanup_from_request_metadata(
         self, azure_config, logger
     ):
-        strategy = AzureProviderStrategy(
-            config=azure_config, logger=logger, provider_instance_name="azure-default"
-        )
-        strategy.initialize()
-
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
-        strategy._handlers = {"VMSS": handler}
+        strategy_harness.handlers["VMSS"] = handler
 
         resource_manager = MagicMock()
         resource_manager.get_vmss_member_count.return_value = 0
-        strategy._resource_manager = resource_manager
+        strategy_harness.resource_manager = resource_manager
 
         azure_client = MagicMock()
-        strategy._client = azure_client
+        strategy_harness.azure_client = azure_client
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
@@ -653,11 +631,10 @@ class TestTerminateInstances:
         assert result.metadata["termination_follow_up_pending"] is True
 
     def test_terminate_instances_forwards_cyclecloud_secret_reference_request_metadata(self, azure_config, logger):
-        strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
-        strategy.initialize()
-
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
         handler = MagicMock()
-        strategy._handlers = {"CycleCloud": handler}
+        strategy_harness.handlers["CycleCloud"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.TERMINATE_INSTANCES,
@@ -709,16 +686,15 @@ class TestTerminateInstances:
         }
         lookup = MagicMock(return_value=origin_request)
 
-        strategy = AzureProviderStrategy(
+        strategy_harness = build_strategy_harness(
             config=azure_config,
             logger=logger,
             provider_instance_name="azure-default",
             cyclecloud_request_lookup=lookup,
         )
-        strategy.initialize()
-
+        strategy = strategy_harness.strategy
         handler = MagicMock()
-        strategy._handlers = {"CycleCloud": handler}
+        strategy_harness.handlers["CycleCloud"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.TERMINATE_INSTANCES,
@@ -751,15 +727,10 @@ class TestTerminateInstances:
         lookup.assert_called_once_with("req-11111111-1111-4111-8111-111111111111")
 
     def test_terminate_instances_accepts_enum_provider_api(self, azure_config, logger):
-        strategy = AzureProviderStrategy(
-            config=azure_config,
-            logger=logger,
-            provider_instance_name="azure-default",
-        )
-        strategy.initialize()
-
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
         handler = MagicMock()
-        strategy._handlers = {"VMSS": handler}
+        strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.TERMINATE_INSTANCES,
@@ -785,15 +756,16 @@ class TestTerminateInstances:
 
 class TestSpotPlacementPlanning:
     def test_create_instances_returns_generic_planning_error_for_capacity_exhaustion(
-        self, strategy, monkeypatch
+        self, strategy_harness, monkeypatch
     ):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.acquire_hosts.return_value = {
             "success": False,
             "error_message": "AllocationFailed: No capacity in selected zone",
             "provider_data": {"error_codes": ["AllocationFailed"]},
         }
-        strategy._handlers["VMSS"] = handler
+        strategy_harness.handlers["VMSS"] = handler
 
         monkeypatch.setattr(
             strategy,
@@ -845,15 +817,16 @@ class TestSpotPlacementPlanning:
         assert result.error_message == "Spot placement plan could not provision any instances"
 
     def test_create_instances_returns_terminal_planning_error_for_non_capacity_failure(
-        self, strategy, monkeypatch
+        self, strategy_harness, monkeypatch
     ):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.acquire_hosts.return_value = {
             "success": False,
             "error_message": "insufficient capacity",
             "provider_data": {"error_codes": ["OtherFailure"]},
         }
-        strategy._handlers["VMSS"] = handler
+        strategy_harness.handlers["VMSS"] = handler
 
         monkeypatch.setattr(
             strategy,
@@ -910,7 +883,8 @@ class TestSpotPlacementPlanning:
         assert result.error_code == "PROVISIONING_ADAPTER_ERROR"
         assert result.error_message == "Provisioning failed: insufficient capacity"
 
-    def test_create_instances_uses_planned_handler_path(self, strategy, monkeypatch):
+    def test_create_instances_uses_planned_handler_path(self, strategy_harness, monkeypatch):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.acquire_hosts.side_effect = [
             {
@@ -920,7 +894,7 @@ class TestSpotPlacementPlanning:
             },
             {"success": True, "resource_ids": ["vmss-b"], "instances": []},
         ]
-        strategy._handlers["VMSS"] = handler
+        strategy_harness.handlers["VMSS"] = handler
 
         monkeypatch.setattr(
             strategy,
@@ -986,14 +960,17 @@ class TestSpotPlacementPlanning:
         assert result.metadata["provider_data"]["fulfillment_final"] is True
         assert result.metadata["provider_data"]["unfulfilled_count"] == 0
 
-    def test_create_instances_falls_back_when_scores_are_stale(self, strategy, monkeypatch):
+    def test_create_instances_falls_back_when_scores_are_stale(
+        self, strategy_harness, monkeypatch
+    ):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.acquire_hosts.return_value = {
             "success": True,
             "resource_ids": ["vmss-fallback"],
             "instances": [],
         }
-        strategy._handlers["VMSS"] = handler
+        strategy_harness.handlers["VMSS"] = handler
 
         monkeypatch.setattr(
             AzureSpotPlacementScoreAdapter,

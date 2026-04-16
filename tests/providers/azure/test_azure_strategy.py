@@ -54,7 +54,10 @@ class TestInitialization:
 
 
 class TestCapacityMetadata:
-    def test_describe_resource_instances_surfaces_vmss_errors_without_instances(self, strategy):
+    def test_describe_resource_instances_surfaces_vmss_errors_without_instances(
+        self, strategy_harness
+    ):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
         handler.get_vmss_resource_errors.return_value = [
@@ -63,13 +66,14 @@ class TestCapacityMetadata:
                 "error_message": "VMSS provisioning failed",
             }
         ]
-        strategy._handlers["VMSS"] = handler
-        strategy._resource_manager = MagicMock()
-        strategy._resource_manager.get_vmss_capacity.return_value = {
+        strategy_harness.handlers["VMSS"] = handler
+        resource_manager = MagicMock()
+        resource_manager.get_vmss_capacity.return_value = {
             "capacity": 3,
             "provisioned_instance_count": 0,
             "provisioning_state": "Failed",
         }
+        strategy_harness.resource_manager = resource_manager
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
@@ -87,17 +91,19 @@ class TestCapacityMetadata:
         assert result.metadata["fleet_errors"][0]["error_code"] == "ProvisioningStateFailed"
 
     def test_describe_resource_instances_surfaces_single_vm_deployment_errors_without_instances(
-        self, strategy
+        self, strategy_harness
     ):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
-        strategy._handlers["SingleVM"] = handler
-        strategy._deployment_service = MagicMock()
-        strategy._deployment_service.get_deployment_status.return_value = {
+        strategy_harness.handlers["SingleVM"] = handler
+        deployment_service = MagicMock()
+        deployment_service.get_deployment_status.return_value = {
             "provisioning_state": "Failed",
             "error_code": "DeploymentFailed",
             "error_message": "Deployment failed during validation",
         }
+        strategy_harness.deployment_service = deployment_service
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
@@ -119,7 +125,8 @@ class TestCapacityMetadata:
         assert result.metadata["deployment_provisioning_state"] == "Failed"
         assert result.metadata["fleet_errors"][0]["error_code"] == "DeploymentFailed"
 
-    def test_describe_resource_instances_returns_canonical_machine_shape(self, strategy):
+    def test_describe_resource_instances_returns_canonical_machine_shape(self, strategy_harness):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = [
             {
@@ -133,13 +140,14 @@ class TestCapacityMetadata:
                 "provider_data": {"vmss_name": "vmss-demo"},
             }
         ]
-        strategy._handlers["VMSS"] = handler
-        strategy._resource_manager = MagicMock()
-        strategy._resource_manager.get_vmss_capacity.return_value = {
+        strategy_harness.handlers["VMSS"] = handler
+        resource_manager = MagicMock()
+        resource_manager.get_vmss_capacity.return_value = {
             "capacity": 1,
             "provisioned_instance_count": 1,
             "provisioning_state": "Succeeded",
         }
+        strategy_harness.resource_manager = resource_manager
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
@@ -158,17 +166,19 @@ class TestCapacityMetadata:
         assert result.data["instances"][0]["status"] == "running"
         assert "InstanceId" not in result.data["instances"][0]
 
-    def test_get_instance_status_reconciles_empty_flexible_vmss_return(self, strategy):
+    def test_get_instance_status_reconciles_empty_flexible_vmss_return(self, strategy_harness):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
-        strategy._handlers["VMSS"] = handler
+        strategy_harness.handlers["VMSS"] = handler
 
         compute_client = MagicMock()
         azure_client = MagicMock()
         azure_client.compute_client = compute_client
-        strategy._client = azure_client
-        strategy._resource_manager = MagicMock()
-        strategy._resource_manager.get_vmss_member_count.return_value = 0
+        strategy_harness.azure_client = azure_client
+        resource_manager = MagicMock()
+        resource_manager.get_vmss_member_count.return_value = 0
+        strategy_harness.resource_manager = resource_manager
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
@@ -203,7 +213,8 @@ class TestCapacityMetadata:
         )
         assert result.metadata["termination_follow_up_pending"] is True
 
-    def test_describe_resource_instances_adds_shortfall_summary(self, strategy):
+    def test_describe_resource_instances_adds_shortfall_summary(self, strategy_harness):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = [
             {
@@ -225,13 +236,14 @@ class TestCapacityMetadata:
                 },
             }
         ]
-        strategy._handlers["VMSS"] = handler
-        strategy._resource_manager = MagicMock()
-        strategy._resource_manager.get_vmss_capacity.return_value = {
+        strategy_harness.handlers["VMSS"] = handler
+        resource_manager = MagicMock()
+        resource_manager.get_vmss_capacity.return_value = {
             "capacity": 3,
             "provisioned_instance_count": 1,
             "provisioning_state": "Updating",
         }
+        strategy_harness.resource_manager = resource_manager
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
@@ -250,18 +262,20 @@ class TestCapacityMetadata:
         assert result.metadata["capacity_shortfall"]["likely_causes"] == ["AllocationFailed"]
 
     def test_describe_resource_instances_uses_request_metadata_resource_group_for_capacity(
-        self, strategy
+        self, strategy_harness
     ):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
         handler.get_vmss_resource_errors.return_value = []
-        strategy._handlers["VMSS"] = handler
-        strategy._resource_manager = MagicMock()
-        strategy._resource_manager.get_vmss_capacity.return_value = {
+        strategy_harness.handlers["VMSS"] = handler
+        resource_manager = MagicMock()
+        resource_manager.get_vmss_capacity.return_value = {
             "capacity": 2,
             "provisioned_instance_count": 0,
             "provisioning_state": "Updating",
         }
+        strategy_harness.resource_manager = resource_manager
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
@@ -276,24 +290,26 @@ class TestCapacityMetadata:
         result = run_operation(strategy.execute_operation(op))
 
         assert result.success
-        strategy._resource_manager.get_vmss_capacity.assert_called_once_with(
+        resource_manager.get_vmss_capacity.assert_called_once_with(
             "custom-rg",
             "vmss-demo",
         )
 
     def test_describe_resource_instances_uses_request_metadata_resource_group_when_present(
-        self, strategy
+        self, strategy_harness
     ):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
         handler.get_vmss_resource_errors.return_value = []
-        strategy._handlers["VMSS"] = handler
-        strategy._resource_manager = MagicMock()
-        strategy._resource_manager.get_vmss_capacity.return_value = {
+        strategy_harness.handlers["VMSS"] = handler
+        resource_manager = MagicMock()
+        resource_manager.get_vmss_capacity.return_value = {
             "capacity": 2,
             "provisioned_instance_count": 0,
             "provisioning_state": "Updating",
         }
+        strategy_harness.resource_manager = resource_manager
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
@@ -308,18 +324,21 @@ class TestCapacityMetadata:
         result = run_operation(strategy.execute_operation(op))
 
         assert result.success
-        strategy._resource_manager.get_vmss_capacity.assert_called_once_with(
+        resource_manager.get_vmss_capacity.assert_called_once_with(
             "context-rg",
             "vmss-demo",
         )
 
-    def test_describe_resource_instances_aggregates_capacity_for_multiple_vmss(self, strategy):
+    def test_describe_resource_instances_aggregates_capacity_for_multiple_vmss(
+        self, strategy_harness
+    ):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
         handler.get_vmss_resource_errors.return_value = []
-        strategy._handlers["VMSS"] = handler
-        strategy._resource_manager = MagicMock()
-        strategy._resource_manager.get_vmss_capacity.side_effect = [
+        strategy_harness.handlers["VMSS"] = handler
+        resource_manager = MagicMock()
+        resource_manager.get_vmss_capacity.side_effect = [
             {
                 "capacity": 4,
                 "provisioned_instance_count": 2,
@@ -331,6 +350,7 @@ class TestCapacityMetadata:
                 "provisioning_state": "Updating",
             },
         ]
+        strategy_harness.resource_manager = resource_manager
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
