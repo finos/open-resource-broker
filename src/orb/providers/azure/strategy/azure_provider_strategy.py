@@ -107,9 +107,13 @@ class AzureProviderStrategy(ProviderStrategy):
         config: AzureProviderConfig,
         logger: LoggingPort,
         provider_instance_name: str,
-        azure_client_resolver: Optional[Callable[[], "AzureClient"]] = None,
-        azure_handler_factory_resolver: Optional[Callable[[], "AzureHandlerFactory"]] = None,
-        azure_native_spec_service: Optional["AzureNativeSpecService"] = None,
+        azure_client_resolver: Optional[Callable[[], AzureClient]] = None,
+        azure_handler_factory_resolver: Optional[Callable[[], AzureHandlerFactory]] = None,
+        azure_resource_manager_resolver: Optional[Callable[[], AzureResourceManager | None]] = None,
+        azure_deployment_service_resolver: Optional[
+            Callable[[], AzureDeploymentService | None]
+        ] = None,
+        azure_native_spec_service: Optional[AzureNativeSpecService] = None,
         vmss_cleanup_coordinator: Optional[VmssCleanupCoordinator] = None,
         cyclecloud_request_lookup: Optional[CycleCloudRequestLookup] = None,
     ) -> None:
@@ -121,14 +125,16 @@ class AzureProviderStrategy(ProviderStrategy):
         self._logger = logger
         self._azure_config = config
         self._provider_instance_name = provider_instance_name
-        self._client: Optional["AzureClient"] = None
+        self._client: Optional[AzureClient] = None
         self._azure_client_resolver = azure_client_resolver
         self._azure_handler_factory_resolver = azure_handler_factory_resolver
+        self._azure_resource_manager_resolver = azure_resource_manager_resolver
+        self._azure_deployment_service_resolver = azure_deployment_service_resolver
         self._azure_native_spec_service = azure_native_spec_service
-        self._resource_manager: Optional["AzureResourceManager"] = None
+        self._resource_manager: Optional[AzureResourceManager] = None
         self._deployment_service: Optional[AzureDeploymentService] = None
-        self._handler_factory: Optional["AzureHandlerFactory"] = None
-        self._handlers: dict[str, "AzureHandler"] = {}
+        self._handler_factory: Optional[AzureHandlerFactory] = None
+        self._handlers: dict[str, AzureHandler] = {}
         self._spot_placement_planner = SpotPlacementPlanner()
         self._spot_placement_execution = SpotPlacementExecutionService()
         self._health_check_service = AzureHealthCheckService(config=config, logger=logger)
@@ -179,7 +185,7 @@ class AzureProviderStrategy(ProviderStrategy):
         return self._provider_instance_name
 
     @property
-    def azure_client(self) -> Optional["AzureClient"]:
+    def azure_client(self) -> Optional[AzureClient]:
         """Get the Azure client with lazy initialisation."""
         with self._lazy_init_lock:
             if self._client is None:
@@ -195,10 +201,20 @@ class AzureProviderStrategy(ProviderStrategy):
             return self._client
 
     @property
-    def resource_manager(self) -> Optional["AzureResourceManager"]:
+    def resource_manager(self) -> Optional[AzureResourceManager]:
         """Get the Azure resource manager with lazy initialisation."""
         with self._lazy_init_lock:
             azure_client = self.azure_client
+            if self._resource_manager is None and self._azure_resource_manager_resolver is not None:
+                try:
+                    self._resource_manager = self._azure_resource_manager_resolver()
+                except Exception as exc:
+                    self._logger.warning(
+                        "Failed to resolve AzureResourceManager lazily: %s",
+                        exc,
+                        exc_info=True,
+                    )
+                    self._resource_manager = None
             if self._resource_manager is None and azure_client:
                 self._logger.debug("Creating Azure resource manager on first access")
                 from orb.providers.azure.managers.azure_resource_manager import AzureResourceManager
@@ -211,10 +227,20 @@ class AzureProviderStrategy(ProviderStrategy):
             return self._resource_manager
 
     @property
-    def deployment_service(self) -> Optional["AzureDeploymentService"]:
+    def deployment_service(self) -> Optional[AzureDeploymentService]:
         """Get the ARM deployment service with lazy initialisation."""
         with self._lazy_init_lock:
             azure_client = self.azure_client
+            if self._deployment_service is None and self._azure_deployment_service_resolver is not None:
+                try:
+                    self._deployment_service = self._azure_deployment_service_resolver()
+                except Exception as exc:
+                    self._logger.warning(
+                        "Failed to resolve AzureDeploymentService lazily: %s",
+                        exc,
+                        exc_info=True,
+                    )
+                    self._deployment_service = None
             if self._deployment_service is None and azure_client:
                 from orb.providers.azure.infrastructure.services.azure_deployment_service import (
                     AzureDeploymentService,
@@ -227,7 +253,7 @@ class AzureProviderStrategy(ProviderStrategy):
             return self._deployment_service
 
     @property
-    def handlers(self) -> dict[str, "AzureHandler"]:
+    def handlers(self) -> dict[str, AzureHandler]:
         """Get handler mapping, including any explicit test overrides."""
         with self._lazy_init_lock:
             handlers = dict(self._handlers)
@@ -238,7 +264,7 @@ class AzureProviderStrategy(ProviderStrategy):
             handlers.update(self._handlers)
             return handlers
 
-    def _get_handler_factory(self) -> Optional["AzureHandlerFactory"]:
+    def _get_handler_factory(self) -> Optional[AzureHandlerFactory]:
         """Resolve the Azure handler factory lazily using the strategy-owned client."""
         with self._lazy_init_lock:
             if self._handler_factory is not None:
@@ -278,7 +304,7 @@ class AzureProviderStrategy(ProviderStrategy):
         provider_api: AzureProviderApiRef,
         *,
         allow_vmss_uniform_fallback: bool = False,
-    ) -> Optional["AzureHandler"]:
+    ) -> Optional[AzureHandler]:
         """Resolve one handler from explicit overrides or the canonical factory."""
         provider_api_value = self._provider_api_key(provider_api)
         handler = self._handlers.get(provider_api_value)

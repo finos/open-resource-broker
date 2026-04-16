@@ -6,7 +6,7 @@ from orb.providers.azure.domain.template.value_objects import AzureProviderApi
 from orb.providers.azure.exceptions.azure_exceptions import CycleCloudConnectionError
 from orb.providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
 from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
-from tests.providers.azure.strategy_test_support import run_operation
+from tests.providers.azure.strategy_test_support import build_strategy_harness, run_operation
 
 class TestGetInstanceStatus:
     def test_missing_instance_ids_returns_error(self, strategy):
@@ -40,7 +40,8 @@ class TestGetInstanceStatus:
         assert not result.success
         assert result.error_code == "MISSING_RESOURCE_GROUP"
 
-    def test_get_instance_status_uses_request_metadata_resource_group(self, strategy):
+    def test_get_instance_status_uses_request_metadata_resource_group(self, strategy_harness):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = [
             {
@@ -59,7 +60,7 @@ class TestGetInstanceStatus:
                 },
             }
         ]
-        strategy._handlers["SingleVM"] = handler
+        strategy_harness.handlers["SingleVM"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
@@ -93,9 +94,8 @@ class TestGetInstanceStatus:
         assert result.metadata["method"] == "dry_run"
 
     def test_single_vm_provider_api_routes_status_via_handler(self, azure_config, logger):
-        strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
-        strategy.initialize()
-
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = [
             {
@@ -111,7 +111,7 @@ class TestGetInstanceStatus:
                 "provider_data": {"vm_name": "vm-1"},
             }
         ]
-        strategy._handlers = {"SingleVM": handler}
+        strategy_harness.handlers["SingleVM"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
@@ -130,9 +130,8 @@ class TestGetInstanceStatus:
         assert result.data["instances"][0]["instance_id"] == "vm-1"
 
     def test_vmss_provider_api_routes_status_via_handler_with_resource_mapping(self, azure_config, logger):
-        strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
-        strategy.initialize()
-
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = [
             {
@@ -166,7 +165,7 @@ class TestGetInstanceStatus:
                 },
             },
         ]
-        strategy._handlers = {"VMSS": handler}
+        strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
@@ -186,9 +185,8 @@ class TestGetInstanceStatus:
         assert [m["instance_id"] for m in result.data["instances"]] == ["3"]
 
     def test_vmss_resource_mapping_routes_status_via_handler_with_provider_api(self, azure_config, logger):
-        strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
-        strategy.initialize()
-
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = [
             {
@@ -207,7 +205,7 @@ class TestGetInstanceStatus:
                 },
             }
         ]
-        strategy._handlers = {"VMSS": handler}
+        strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
@@ -227,15 +225,14 @@ class TestGetInstanceStatus:
         assert [m["instance_id"] for m in result.data["instances"]] == ["3"]
 
     def test_cyclecloud_status_handler_failure_surfaces_error(self, azure_config, logger):
-        strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
-        strategy.initialize()
-
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.side_effect = CycleCloudConnectionError(
             "cyclecloud auth failed",
             url="https://cc.example.com",
         )
-        strategy._handlers = {"CycleCloud": handler}
+        strategy_harness.handlers["CycleCloud"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
@@ -257,9 +254,10 @@ class TestGetInstanceStatus:
         assert "cyclecloud auth failed" in result.error_message
         assert result.metadata["error_class"] == "CycleCloudConnectionError"
 
-    def test_status_populates_network_identity(self, strategy):
+    def test_status_populates_network_identity(self, strategy_harness):
+        strategy = strategy_harness.strategy
         azure_client = MagicMock()
-        strategy._client = azure_client
+        strategy_harness.azure_client = azure_client
 
         nic_ref = MagicMock()
         nic_ref.id = (
@@ -307,9 +305,10 @@ class TestGetInstanceStatus:
         assert result.data["instances"][0]["subnet_id"].endswith("/subnets/default")
         assert result.data["instances"][0]["vpc_id"].endswith("/virtualNetworks/test-vnet")
 
-    def test_sdk_status_fallback_requires_azure_client(self, strategy):
-        strategy._client = None
-        strategy._azure_client_resolver = lambda: None
+    def test_sdk_status_fallback_requires_azure_client(self, azure_config, logger):
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
+        strategy_harness.azure_client = None
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
@@ -325,13 +324,8 @@ class TestGetInstanceStatus:
         assert result.error_code == "AZURE_CLIENT_NOT_AVAILABLE"
 
     def test_get_instance_status_accepts_enum_provider_api(self, azure_config, logger):
-        strategy = AzureProviderStrategy(
-            config=azure_config,
-            logger=logger,
-            provider_instance_name="azure-default",
-        )
-        strategy.initialize()
-
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = [
             {
@@ -341,7 +335,7 @@ class TestGetInstanceStatus:
                 "provider_data": {"vmss_instance_id": "3"},
             }
         ]
-        strategy._handlers = {"VMSS": handler}
+        strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
@@ -385,15 +379,18 @@ class TestDescribeResourceInstances:
         assert result.error_code == "MISSING_PROVIDER_API"
 
     def test_describe_resource_instances_cleans_up_empty_vmss_when_requested_members_are_gone(
-        self, strategy
+        self, strategy_harness
     ):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
         handler.get_vmss_resource_errors.return_value = []
-        strategy._handlers["VMSS"] = handler
-        strategy._resource_manager = MagicMock()
-        strategy._resource_manager.get_vmss_member_count.return_value = 0
-        strategy._client = MagicMock()
+        strategy_harness.handlers["VMSS"] = handler
+        resource_manager = MagicMock()
+        resource_manager.get_vmss_member_count.return_value = 0
+        strategy_harness.resource_manager = resource_manager
+        azure_client = MagicMock()
+        strategy_harness.azure_client = azure_client
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
@@ -420,7 +417,7 @@ class TestDescribeResourceInstances:
         result = run_operation(strategy.execute_operation(op))
 
         assert result.success
-        strategy._client.compute_client.virtual_machine_scale_sets.begin_delete.assert_called_once_with(
+        azure_client.compute_client.virtual_machine_scale_sets.begin_delete.assert_called_once_with(
             resource_group_name="test-rg",
             vm_scale_set_name="vmss-demo",
         )
@@ -439,15 +436,18 @@ class TestDescribeResourceInstances:
         ]
 
     def test_describe_resource_instances_clears_pending_cleanup_after_vmss_is_gone(
-        self, strategy
+        self, strategy_harness
     ):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
         handler.get_vmss_resource_errors.return_value = []
-        strategy._handlers["VMSS"] = handler
-        strategy._resource_manager = MagicMock()
-        strategy._resource_manager.vmss_exists.return_value = False
-        strategy._client = MagicMock()
+        strategy_harness.handlers["VMSS"] = handler
+        resource_manager = MagicMock()
+        resource_manager.vmss_exists.return_value = False
+        strategy_harness.resource_manager = resource_manager
+        azure_client = MagicMock()
+        strategy_harness.azure_client = azure_client
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
@@ -475,22 +475,23 @@ class TestDescribeResourceInstances:
         result = run_operation(strategy.execute_operation(op))
 
         assert result.success
-        strategy._resource_manager.vmss_exists.assert_called_once_with(
+        resource_manager.vmss_exists.assert_called_once_with(
             resource_group="test-rg",
             vmss_name="vmss-demo",
         )
-        strategy._client.compute_client.virtual_machine_scale_sets.begin_delete.assert_not_called()
+        azure_client.compute_client.virtual_machine_scale_sets.begin_delete.assert_not_called()
         assert result.metadata["termination_follow_up_pending"] is False
 
     def test_describe_resource_instances_does_not_cleanup_when_strict_vmss_status_fails(
-        self, strategy
+        self, strategy_harness
     ):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.side_effect = RuntimeError(
             "Failed to list instances for VMSS 'vmss-demo': transient ARM failure"
         )
-        strategy._handlers["VMSS"] = handler
-        strategy._resource_manager = MagicMock()
+        strategy_harness.handlers["VMSS"] = handler
+        strategy_harness.resource_manager = MagicMock()
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
@@ -518,20 +519,23 @@ class TestDescribeResourceInstances:
 
         assert not result.success
         assert result.error_code == "DESCRIBE_RESOURCE_INSTANCES_ERROR"
-        strategy._resource_manager.get_vmss_member_count.assert_not_called()
+        strategy_harness.resource_manager.get_vmss_member_count.assert_not_called()
         forwarded_request = handler.check_hosts_status.call_args.args[0]
         assert forwarded_request.metadata["fail_on_partial_status_error"] is True
 
     def test_describe_resource_instances_leaves_cleanup_pending_when_other_members_remain(
-        self, strategy
+        self, strategy_harness
     ):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
         handler.get_vmss_resource_errors.return_value = []
-        strategy._handlers["VMSS"] = handler
-        strategy._resource_manager = MagicMock()
-        strategy._resource_manager.get_vmss_member_count.return_value = 1
-        strategy._client = MagicMock()
+        strategy_harness.handlers["VMSS"] = handler
+        resource_manager = MagicMock()
+        resource_manager.get_vmss_member_count.return_value = 1
+        strategy_harness.resource_manager = resource_manager
+        azure_client = MagicMock()
+        strategy_harness.azure_client = azure_client
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
@@ -558,7 +562,7 @@ class TestDescribeResourceInstances:
         result = run_operation(strategy.execute_operation(op))
 
         assert result.success
-        strategy._resource_manager.get_vmss_member_count.assert_called_once_with(
+        resource_manager.get_vmss_member_count.assert_called_once_with(
             resource_group="test-rg",
             vmss_name="vmss-b",
         )
@@ -575,21 +579,24 @@ class TestDescribeResourceInstances:
                 "delete_submission_semantics": "best_effort_without_reverification",
             }
         ]
-        strategy._client.compute_client.virtual_machine_scale_sets.begin_delete.assert_not_called()
+        azure_client.compute_client.virtual_machine_scale_sets.begin_delete.assert_not_called()
 
     def test_describe_resource_instances_surfaces_retry_pending_when_vmss_delete_retry_fails(
-        self, strategy
+        self, strategy_harness
     ):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
         handler.get_vmss_resource_errors.return_value = []
-        strategy._handlers["VMSS"] = handler
-        strategy._resource_manager = MagicMock()
-        strategy._resource_manager.get_vmss_member_count.return_value = 0
-        strategy._client = MagicMock()
-        strategy._client.compute_client.virtual_machine_scale_sets.begin_delete.side_effect = (
+        strategy_harness.handlers["VMSS"] = handler
+        resource_manager = MagicMock()
+        resource_manager.get_vmss_member_count.return_value = 0
+        strategy_harness.resource_manager = resource_manager
+        azure_client = MagicMock()
+        azure_client.compute_client.virtual_machine_scale_sets.begin_delete.side_effect = (
             RuntimeError("delete still blocked")
         )
+        strategy_harness.azure_client = azure_client
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
@@ -632,14 +639,17 @@ class TestDescribeResourceInstances:
         ]
 
     def test_describe_resource_instances_clears_pending_cleanup_when_no_delete_is_required(
-        self, strategy
+        self, strategy_harness
     ):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
         handler.get_vmss_resource_errors.return_value = []
-        strategy._handlers["VMSS"] = handler
-        strategy._resource_manager = MagicMock()
-        strategy._client = MagicMock()
+        strategy_harness.handlers["VMSS"] = handler
+        resource_manager = MagicMock()
+        strategy_harness.resource_manager = resource_manager
+        azure_client = MagicMock()
+        strategy_harness.azure_client = azure_client
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
@@ -670,13 +680,16 @@ class TestDescribeResourceInstances:
         assert first_result.metadata["termination_follow_up_pending"] is False
         assert second_result.success
         assert second_result.metadata["termination_follow_up_pending"] is False
-        strategy._resource_manager.get_vmss_member_count.assert_not_called()
-        strategy._client.compute_client.virtual_machine_scale_sets.begin_delete.assert_not_called()
+        resource_manager.get_vmss_member_count.assert_not_called()
+        azure_client.compute_client.virtual_machine_scale_sets.begin_delete.assert_not_called()
 
-    def test_describe_resource_instances_forwards_cyclecloud_request_metadata(self, strategy):
+    def test_describe_resource_instances_forwards_cyclecloud_request_metadata(
+        self, strategy_harness
+    ):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
-        strategy._handlers["CycleCloud"] = handler
+        strategy_harness.handlers["CycleCloud"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
@@ -720,7 +733,8 @@ class TestDescribeResourceInstances:
         )
         assert forwarded_request.metadata["cyclecloud_verify_ssl"] is False
 
-    def test_get_instance_status_matches_cyclecloud_node_name_alias(self, strategy):
+    def test_get_instance_status_matches_cyclecloud_node_name_alias(self, strategy_harness):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = [
             {
@@ -735,7 +749,7 @@ class TestDescribeResourceInstances:
                 },
             }
         ]
-        strategy._handlers["CycleCloud"] = handler
+        strategy_harness.handlers["CycleCloud"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
@@ -763,10 +777,13 @@ class TestDescribeResourceInstances:
         assert len(result.data["instances"]) == 1
         assert result.data["instances"][0]["name"] == "dynamic-1"
 
-    def test_get_instance_status_uses_cyclecloud_cluster_name_when_resource_id_missing(self, strategy):
+    def test_get_instance_status_uses_cyclecloud_cluster_name_when_resource_id_missing(
+        self, strategy_harness
+    ):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
-        strategy._handlers["CycleCloud"] = handler
+        strategy_harness.handlers["CycleCloud"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
@@ -806,17 +823,16 @@ class TestDescribeResourceInstances:
         }
         lookup = MagicMock(return_value=origin_request)
 
-        strategy = AzureProviderStrategy(
+        strategy_harness = build_strategy_harness(
             config=azure_config,
             logger=logger,
             provider_instance_name="azure-default",
             cyclecloud_request_lookup=lookup,
         )
-        strategy.initialize()
-
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
-        strategy._handlers["CycleCloud"] = handler
+        strategy_harness.handlers["CycleCloud"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
@@ -837,11 +853,10 @@ class TestDescribeResourceInstances:
         lookup.assert_called_once_with("req-11111111-1111-4111-8111-111111111111")
 
     def test_dry_run_short_circuits_resource_discovery(self, azure_config, logger):
-        strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
-        strategy.initialize()
-
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
         handler = MagicMock()
-        strategy._handlers = {"VMSS": handler}
+        strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
@@ -858,12 +873,13 @@ class TestDescribeResourceInstances:
         assert result.metadata["method"] == "dry_run"
         handler.check_hosts_status.assert_not_called()
 
-    def test_describe_resource_instances_accepts_enum_provider_api(self, strategy):
+    def test_describe_resource_instances_accepts_enum_provider_api(self, strategy_harness):
+        strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status.return_value = []
         handler.get_vmss_resource_errors.return_value = []
-        strategy._handlers["VMSS"] = handler
-        strategy._resource_manager = MagicMock()
+        strategy_harness.handlers["VMSS"] = handler
+        strategy_harness.resource_manager = MagicMock()
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
