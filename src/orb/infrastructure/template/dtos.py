@@ -31,6 +31,7 @@ class TemplateDTO(BaseDTO):
     instance_type: Optional[str] = None
     vm_size: Optional[str] = None
     vm_sizes: list[str] = Field(default_factory=list)
+    vm_size_preferences: list[dict[str, Any]] = Field(default_factory=list)
     image_id: Optional[str] = None
     max_instances: int = 1
 
@@ -117,6 +118,10 @@ class TemplateDTO(BaseDTO):
             instance_type=getattr(template, "instance_type", None),
             vm_size=getattr(template, "vm_size", None),
             vm_sizes=getattr(template, "vm_sizes", []) or [],
+            vm_size_preferences=[
+                preference.model_dump(mode="json")
+                for preference in (getattr(template, "vm_size_preferences", []) or [])
+            ],
             image_id=getattr(template, "image_id", None),
             max_instances=getattr(template, "max_instances", 1),
             # Machine types configuration (unified)

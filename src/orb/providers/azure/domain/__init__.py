@@ -14,6 +14,7 @@ from orb.providers.azure.domain.template import (
     AzureSecurityType,
     AzureTemplate,
     AzureUpgradePolicyMode,
+    AzureVmSizePreference,
     AzureVMSSOrchestrationMode,
 )
 
@@ -31,5 +32,6 @@ __all__: list[str] = [
     "AzureSecurityType",
     "AzureTemplate",
     "AzureUpgradePolicyMode",
+    "AzureVmSizePreference",
     "AzureVMSSOrchestrationMode",
 ]

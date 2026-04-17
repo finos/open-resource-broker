@@ -150,6 +150,7 @@ class AzureSpotLaunchService:
         selected_vm_size = plan_entry.score.candidate.instance_type
         cloned_data["vm_size"] = selected_vm_size
         cloned_data["vm_sizes"] = []
+        cloned_data["vm_size_preferences"] = []
         cloned_data["allocation_strategy"] = "capacityOptimized"
         cloned_data["location"] = (
             plan_entry.score.candidate.region or azure_template.location.value

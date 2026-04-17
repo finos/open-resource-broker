@@ -845,7 +845,7 @@ class TestSpotPlacementPlanning:
                         "image_id": "/subscriptions/x/resourceGroups/rg/providers/Microsoft.Compute/images/img"
                     },
                     "vm_size": "Standard_D4s_v5",
-                    "vm_sizes": ["Standard_D4s_v5"],
+                    "vm_sizes": ["Standard_D8s_v5"],
                     "price_type": "spot",
                     "priority": "Spot",
                     "allocation_strategy": "spotPlacementScore",
@@ -912,7 +912,7 @@ class TestSpotPlacementPlanning:
                         "image_id": "/subscriptions/x/resourceGroups/rg/providers/Microsoft.Compute/images/img"
                     },
                     "vm_size": "Standard_D4s_v5",
-                    "vm_sizes": ["Standard_D4s_v5"],
+                    "vm_sizes": ["Standard_D8s_v5"],
                     "price_type": "spot",
                     "priority": "Spot",
                     "allocation_strategy": "spotPlacementScore",

@@ -109,22 +109,19 @@ class ArmPayloadMapper:
             "name": template.vmss_name or f"vmss-{template.template_id}",
             "location": template.location.value,
             "sku": {
-                "name": "Mix" if template.vm_sizes else template.vm_size,
+                "name": "Mix" if template.uses_vm_size_mix else template.vm_size,
                 "capacity": template.max_instances,
             },
             "properties": properties,
             "tags": template.tags if template.tags else {},
         }
 
-        if template.vm_sizes:
-            sku_profile: dict[str, Any] = {
-                "vmSizes": [
-                    {"name": vm_size}
-                    for vm_size in [template.vm_size, *template.vm_sizes]
-                ]
-            }
-            if template.spot_allocation_strategy:
-                sku_profile["allocationStrategy"] = template.spot_allocation_strategy.to_arm_value()
+        if template.uses_vm_size_mix:
+            sku_profile: dict[str, Any] = {"vmSizes": template.build_vm_size_profile()}
+            if template.vmss_allocation_strategy:
+                sku_profile["allocationStrategy"] = (
+                    template.vmss_allocation_strategy.to_arm_value()
+                )
             resource["skuProfile"] = sku_profile
 
         if template.zones:

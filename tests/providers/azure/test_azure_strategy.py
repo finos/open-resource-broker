@@ -504,7 +504,7 @@ class TestSpotPlacementScoreAdapter:
         adapter._fetch_scores.assert_called_once_with(
             requested_count=2,
             regions=["eastus2"],
-            vm_sizes=["Standard_D4s_v5"],
+            vm_sizes=template.candidate_vm_sizes,
             zones=[],
         )
 

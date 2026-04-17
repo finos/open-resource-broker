@@ -78,14 +78,15 @@ class AzureEvictionPolicy(str, Enum):
 
 
 class AzureAllocationStrategy(str, Enum):
-    """Spot allocation / placement strategy for VMSS.
+    """VMSS allocation / placement strategy for instance mix.
 
     See: https://learn.microsoft.com/en-us/azure/virtual-machine-scale-sets/
-         virtual-machine-scale-sets-use-spot#placement-groups
+         instance-mix-overview
     """
 
     LOWEST_PRICE = "LowestPrice"
     CAPACITY_OPTIMIZED = "CapacityOptimized"
+    PRIORITIZED = "Prioritized"
 
     @classmethod
     def from_core(cls, strategy: AllocationStrategy) -> "AzureAllocationStrategy":
@@ -93,7 +94,7 @@ class AzureAllocationStrategy(str, Enum):
         mapping = {
             AllocationStrategy.LOWEST_PRICE: cls.LOWEST_PRICE,
             AllocationStrategy.CAPACITY_OPTIMIZED: cls.CAPACITY_OPTIMIZED,
-            AllocationStrategy.CAPACITY_OPTIMIZED_PRIORITIZED: cls.CAPACITY_OPTIMIZED,
+            AllocationStrategy.CAPACITY_OPTIMIZED_PRIORITIZED: cls.PRIORITIZED,
             AllocationStrategy.PRICE_CAPACITY_OPTIMIZED: cls.CAPACITY_OPTIMIZED,
             AllocationStrategy.DIVERSIFIED: cls.LOWEST_PRICE,
         }
@@ -102,6 +103,29 @@ class AzureAllocationStrategy(str, Enum):
     def to_arm_value(self) -> str:
         """Return the value expected by the ARM / REST API."""
         return self.value
+
+
+class AzureVmSizePreference(ValueObject):
+    """Additional VM size candidate for Azure instance mix."""
+
+    name: str = Field(..., description="Azure VM size name, e.g. Standard_D8s_v5.")
+    rank: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description=(
+            "Preferred order for Azure Prioritized instance mix. "
+            "Lower values are preferred after the primary vm_size."
+        ),
+    )
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        """Reject empty VM size names."""
+        normalised = value.strip()
+        if not normalised:
+            raise ValueError("AzureVmSizePreference.name cannot be empty")
+        return normalised
 
 
 class AzureOSDiskType(str, Enum):

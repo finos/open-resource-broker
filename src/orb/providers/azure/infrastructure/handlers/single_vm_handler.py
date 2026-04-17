@@ -154,7 +154,7 @@ class SingleVMHandler(AzureHandler):
         if resolved_ssh_keys != list(template.ssh_public_keys):
             template = template.model_copy(update={"ssh_public_keys": resolved_ssh_keys})
 
-        candidate_vm_sizes = [template.vm_size, *(template.vm_sizes or [])]
+        candidate_vm_sizes = template.candidate_vm_sizes
         vm_definitions: list[dict[str, Any]] = []
         for _ in range(count):
             vm_name = f"vm-{template.template_id}-{uuid.uuid4().hex[:8]}"

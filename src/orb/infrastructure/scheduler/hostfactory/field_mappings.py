@@ -77,7 +77,6 @@ class HostFactoryFieldMappings:
         "azure": {
             # Override generic AWS-centric meanings for Azure templates
             "vmType": "vm_size",
-            "vmTypes": "vm_sizes",
             "keyName": "ssh_key_name",
             "subnetId": "network_config.subnet_id",
             "securityGroupIds": "network_config.network_security_group_id",
@@ -86,7 +85,7 @@ class HostFactoryFieldMappings:
             "subscriptionId": "subscription_id",
             # Azure VMSS / compute configuration
             "vmSize": "vm_size",
-            "vmSizes": "vm_sizes",
+            "vmSizePreferences": "vm_size_preferences",
             "vmssName": "vmss_name",
             "orchestrationMode": "orchestration_mode",
             "platformFaultDomainCount": "platform_fault_domain_count",
@@ -96,7 +95,7 @@ class HostFactoryFieldMappings:
             "billingProfileMaxPrice": "billing_profile_max_price",
             "spotPercentage": "spot_percentage",
             "baseRegularPriorityCount": "base_regular_priority_count",
-            "spotAllocationStrategy": "spot_allocation_strategy",
+            "vmssAllocationStrategy": "vmss_allocation_strategy",
             "spotRestoreEnabled": "spot_restore_enabled",
             "spotRestoreTimeout": "spot_restore_timeout",
             "zoneBalance": "zone_balance",

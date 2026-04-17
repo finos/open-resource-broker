@@ -137,22 +137,6 @@ class Template(BaseModel):
             if self.price_type != "spot":
                 raise ValueError("spotPlacementScore allocation strategy requires price_type='spot'")
 
-            candidate_count = 0
-            if self.machine_types:
-                candidate_count = len(self.machine_types)
-            elif self.instance_type:
-                candidate_count = 1
-
-            vm_sizes = self.vm_sizes or []
-            candidate_vm_sizes = [size for size in [self.vm_size, *vm_sizes] if size]
-            if candidate_vm_sizes:
-                candidate_count = max(candidate_count, len(candidate_vm_sizes))
-
-            if candidate_count < 2:
-                raise ValueError(
-                    "spotPlacementScore allocation strategy requires at least two candidate instance types"
-                )
-
         return self
 
     @model_validator(mode="after")

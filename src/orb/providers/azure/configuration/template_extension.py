@@ -18,7 +18,15 @@ class AzureTemplateExtensionConfig(BaseModel):
     )
     vm_sizes: Optional[list[str]] = Field(
         default=None,
-        description="Additional VM size candidates for Spot / flexible allocation",
+        description="Additional Azure VM size candidates for generic instance mix",
+    )
+    vm_size_preferences: Optional[list[dict[str, Any]]] = Field(
+        default=None,
+        description="Ranked Azure VM size candidates for Prioritized VMSS instance mix",
+    )
+    vmss_allocation_strategy: Optional[str] = Field(
+        default=None,
+        description="Azure VMSS instance-mix allocation strategy",
     )
 
     # Pricing
@@ -49,6 +57,10 @@ class AzureTemplateExtensionConfig(BaseModel):
         }
         if self.vm_sizes:
             defaults["vm_sizes"] = self.vm_sizes
+        if self.vm_size_preferences:
+            defaults["vm_size_preferences"] = self.vm_size_preferences
+        if self.vmss_allocation_strategy:
+            defaults["vmss_allocation_strategy"] = self.vmss_allocation_strategy
         if self.os_disk_size_gb is not None:
             defaults["os_disk"] = {
                 "storage_account_type": self.os_disk_type,

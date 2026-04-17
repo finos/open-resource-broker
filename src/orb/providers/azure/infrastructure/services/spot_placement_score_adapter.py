@@ -20,11 +20,11 @@ class AzureSpotPlacementTemplate(Protocol):
     """Structural template interface required for Azure spot placement scoring."""
 
     vm_size: str
-    vm_sizes: list[str]
     location: AzureLocationName
     placement_regions: list[str]
     placement_zones: list[str]
     zones: list[str]
+    candidate_vm_sizes: list[str]
 
 
 class AzureSpotPlacementScoreAdapter(SpotPlacementScoreAdapter):
@@ -54,7 +54,7 @@ class AzureSpotPlacementScoreAdapter(SpotPlacementScoreAdapter):
         self, requested_count: int, template: AzureSpotPlacementTemplate
     ) -> list[PlacementScore]:
         """Fetch and return spot placement scores for all candidate region/zone/VM-size combinations."""
-        vm_sizes = [template.vm_size, *(template.vm_sizes or [])]
+        vm_sizes = template.candidate_vm_sizes
         regions = template.placement_regions or [template.location.value or self._base_location]
         zones = template.placement_zones or template.zones or []
 

@@ -505,7 +505,7 @@ class CycleCloudHandler(AzureHandler):
             definition: dict[str, Any] = {}
             # When multiple VM sizes are provided, let the CycleCloud node array
             # select an eligible bucket instead of pinning a single machine type.
-            if not template.vm_sizes:
+            if not template.uses_vm_size_mix:
                 definition["machineType"] = vm_size
 
             cyclecloud_request_id = str(request.request_id)

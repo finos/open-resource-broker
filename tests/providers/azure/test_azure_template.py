@@ -38,12 +38,9 @@ _BASE_FIELDS = {
     },
 }
 
-# Spot fields that the strategy would normally default before construction.
-# Tests that construct AzureTemplate directly must supply these explicitly.
 _SPOT_DEFAULTS = {
     "priority": "Spot",
     "eviction_policy": "Deallocate",
-    "spot_allocation_strategy": "CapacityOptimized",
 }
 
 
@@ -228,22 +225,19 @@ class TestAzureTemplateConstruction:
 
 
 class TestSpotValidation:
-    def test_spot_defaults_eviction_and_strategy(self):
+    def test_spot_defaults_eviction_policy(self):
         """mode='before' validator fills in implied defaults for Spot."""
         t = AzureTemplate(**_BASE_FIELDS, priority="Spot")
         assert t.eviction_policy == AzureEvictionPolicy.DEALLOCATE
-        assert t.spot_allocation_strategy == AzureAllocationStrategy.CAPACITY_OPTIMIZED
 
     def test_spot_accepts_explicit_values(self):
         t = AzureTemplate(**_BASE_FIELDS, **_SPOT_DEFAULTS)
         assert t.eviction_policy == AzureEvictionPolicy.DEALLOCATE
-        assert t.spot_allocation_strategy == AzureAllocationStrategy.CAPACITY_OPTIMIZED
 
     def test_spot_percentage_implies_spot_priority(self):
         t = AzureTemplate(**_BASE_FIELDS, spot_percentage=70)
         assert t.priority == AzurePriority.SPOT
         assert t.eviction_policy == AzureEvictionPolicy.DEALLOCATE
-        assert t.spot_allocation_strategy == AzureAllocationStrategy.CAPACITY_OPTIMIZED
 
     def test_spot_percentage_requires_flexible(self):
         with pytest.raises(ValueError, match="Flexible orchestration mode"):
@@ -361,8 +355,7 @@ class TestArmPayload:
         t = AzureTemplate(
             **_BASE_FIELDS,
             vm_sizes=["Standard_D8s_v5", "Standard_D16s_v5"],
-            priority="Spot",
-            spot_allocation_strategy=AzureAllocationStrategy.CAPACITY_OPTIMIZED,
+            vmss_allocation_strategy=AzureAllocationStrategy.CAPACITY_OPTIMIZED,
         )
         arm = ArmPayloadMapper.vmss_payload(t)
 
@@ -374,6 +367,58 @@ class TestArmPayload:
         ]
         assert arm["skuProfile"]["allocationStrategy"] == "CapacityOptimized"
         assert "vmSizeProperties" not in arm["properties"]["virtualMachineProfile"]["hardwareProfile"]
+
+    def test_vmss_prioritized_mix_includes_ranks(self):
+        t = AzureTemplate(
+            **_BASE_FIELDS,
+            vm_size_preferences=[
+                {"name": "Standard_D8s_v5", "rank": 2},
+                {"name": "Standard_D16s_v5"},
+            ],
+            vmss_allocation_strategy=AzureAllocationStrategy.PRIORITIZED,
+        )
+
+        arm = ArmPayloadMapper.vmss_payload(t)
+
+        assert arm["sku"]["name"] == "Mix"
+        assert arm["skuProfile"]["allocationStrategy"] == "Prioritized"
+        assert arm["skuProfile"]["vmSizes"] == [
+            {"name": "Standard_D4s_v5", "rank": 0},
+            {"name": "Standard_D8s_v5", "rank": 2},
+            {"name": "Standard_D16s_v5", "rank": 1},
+        ]
+
+    def test_prioritized_mix_requires_ranked_preferences(self):
+        with pytest.raises(ValueError, match="requires at least one vm_size_preference"):
+            AzureTemplate(
+                **_BASE_FIELDS,
+                vm_sizes=["Standard_D8s_v5", "Standard_D16s_v5"],
+                vmss_allocation_strategy=AzureAllocationStrategy.PRIORITIZED,
+            )
+
+    def test_vm_size_preferences_are_rank_only(self):
+        with pytest.raises(ValueError, match="vm_size_preferences is only valid"):
+            AzureTemplate(
+                **_BASE_FIELDS,
+                vm_size_preferences=[{"name": "Standard_D8s_v5"}],
+                vmss_allocation_strategy=AzureAllocationStrategy.CAPACITY_OPTIMIZED,
+            )
+
+    def test_vm_sizes_and_vm_size_preferences_are_mutually_exclusive(self):
+        with pytest.raises(ValueError, match="Specify either vm_sizes or vm_size_preferences"):
+            AzureTemplate(
+                **_BASE_FIELDS,
+                vm_sizes=["Standard_D8s_v5"],
+                vm_size_preferences=[{"name": "Standard_D16s_v5", "rank": 1}],
+                vmss_allocation_strategy=AzureAllocationStrategy.PRIORITIZED,
+            )
+
+    def test_vmss_mix_without_vmss_allocation_strategy_omits_allocation_strategy(self):
+        t = AzureTemplate(**_BASE_FIELDS, priority="Spot", vm_sizes=["Standard_D8s_v5"])
+
+        arm = ArmPayloadMapper.vmss_payload(t)
+
+        assert "allocationStrategy" not in arm["skuProfile"]
 
     def test_spot_percentage_populates_priority_mix_policy(self):
         t = AzureTemplate(

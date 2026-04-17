@@ -42,6 +42,7 @@ from orb.providers.azure.domain.template.value_objects import (
     AzureResourceGroupName,
     AzureSecurityType,
     AzureUpgradePolicyMode,
+    AzureVmSizePreference,
     AzureVMSSOrchestrationMode,
 )
 
@@ -128,10 +129,13 @@ class AzureTemplate(Template):
         description="Primary Azure VM size, e.g. 'Standard_D4s_v5'.",
         validation_alias=AliasChoices("vm_size", "vmSize"),
     )
-    vm_sizes: Optional[list[str]] = Field(
-        default=None,
-        description="Additional VM size candidates for Spot / flexible allocation.",
-        validation_alias=AliasChoices("vm_sizes", "vmSizes"),
+    vm_size_preferences: list[AzureVmSizePreference] = Field(
+        default_factory=list,
+        description=(
+            "Additional Azure VM size candidates for VMSS instance mix. "
+            "The primary vm_size remains the first choice."
+        ),
+        validation_alias=AliasChoices("vm_size_preferences", "vmSizePreferences"),
     )
 
     # ------------------------------------------------------------------
@@ -179,10 +183,13 @@ class AzureTemplate(Template):
             "base_regular_priority_count", "baseRegularPriorityCount"
         ),
     )
-    spot_allocation_strategy: Optional[AzureAllocationStrategy] = Field(
+    vmss_allocation_strategy: Optional[AzureAllocationStrategy] = Field(
         default=None,
-        description="Spot allocation strategy (LowestPrice, CapacityOptimized).",
-        validation_alias=AliasChoices("spot_allocation_strategy", "spotAllocationStrategy"),
+        description=(
+            "Azure VMSS instance-mix allocation strategy "
+            "(LowestPrice, CapacityOptimized, Prioritized)."
+        ),
+        validation_alias=AliasChoices("vmss_allocation_strategy", "vmssAllocationStrategy"),
     )
     spot_restore_enabled: bool = Field(
         default=False,
@@ -461,10 +468,9 @@ class AzureTemplate(Template):
         if data.get("spot_percentage") is not None and data.get("priority") in (None, ""):
             data["priority"] = "Spot"
 
-        # Spot VMs need an eviction policy and allocation strategy.
+        # Spot VMs need an eviction policy.
         if data.get("priority") == "Spot":
             data.setdefault("eviction_policy", "Deallocate")
-            data.setdefault("spot_allocation_strategy", "CapacityOptimized")
 
         # Trusted Launch implies secure boot and vTPM.
         if data.get("security_type") == "TrustedLaunch":
@@ -486,11 +492,66 @@ class AzureTemplate(Template):
                 )
 
         if self.allocation_strategy == AllocationStrategy.SPOT_PLACEMENT_SCORE.value:
-            candidate_sizes = [self.vm_size, *(self.vm_sizes or [])]
+            candidate_sizes = self.candidate_vm_sizes
             if len(candidate_sizes) < 2:
                 raise ValueError(
                     "spotPlacementScore allocation strategy requires at least two candidate vm sizes"
                 )
+
+        if self.vm_sizes and self.vm_size_preferences:
+            raise ValueError(
+                "Specify either vm_sizes or vm_size_preferences for Azure instance mix, not both"
+            )
+
+        if self.vm_sizes:
+            if self.vm_size in self.vm_sizes:
+                raise ValueError("vm_sizes must not repeat the primary vm_size")
+            if len(self.vm_sizes) != len(set(self.vm_sizes)):
+                raise ValueError("vm_sizes must contain unique VM sizes")
+
+        preference_names = [preference.name for preference in self.vm_size_preferences]
+        explicit_ranks = [
+            preference.rank
+            for preference in self.vm_size_preferences
+            if preference.rank is not None
+        ]
+
+        if self.vm_size in preference_names:
+            raise ValueError(
+                "vm_size_preferences must not repeat the primary vm_size"
+            )
+
+        if len(preference_names) != len(set(preference_names)):
+            raise ValueError("vm_size_preferences must contain unique VM sizes")
+
+        if (
+            self.vm_size_preferences
+            and self.vmss_allocation_strategy != AzureAllocationStrategy.PRIORITIZED
+        ):
+            raise ValueError(
+                "vm_size_preferences is only valid with vmss_allocation_strategy='Prioritized'; "
+                "use vm_sizes for unranked Azure instance mix"
+            )
+
+        if (
+            self.vmss_allocation_strategy == AzureAllocationStrategy.PRIORITIZED
+            and not self.vm_size_preferences
+        ):
+            raise ValueError(
+                "vmss_allocation_strategy='Prioritized' requires at least one vm_size_preference"
+            )
+
+        if self.vmss_allocation_strategy != AzureAllocationStrategy.PRIORITIZED:
+            if explicit_ranks:
+                raise ValueError(
+                    "vm_size_preferences ranks are only valid with vmss_allocation_strategy='Prioritized'"
+                )
+
+        if self.vmss_allocation_strategy == AzureAllocationStrategy.PRIORITIZED:
+            if any(rank == 0 for rank in explicit_ranks):
+                raise ValueError("vm_size_preferences ranks must start at 1; primary vm_size is rank 0")
+            if len(explicit_ranks) != len(set(explicit_ranks)):
+                raise ValueError("vm_size_preferences ranks must be unique")
 
         if self.spot_percentage is not None:
             if self.provider_api not in (
@@ -518,15 +579,11 @@ class AzureTemplate(Template):
                     "spot_percentage requires priority='Spot'"
                 )
 
-        # Spot VMs require an eviction policy and allocation strategy.
+        # Spot VMs require an eviction policy.
         if self.priority == AzurePriority.SPOT:
             if self.eviction_policy is None:
                 raise ValueError(
                     "eviction_policy is required for Spot priority VMs"
-                )
-            if self.spot_allocation_strategy is None:
-                raise ValueError(
-                    "spot_allocation_strategy is required for Spot priority VMs"
                 )
 
         # Non-spot VMs should not have spot-specific settings
@@ -596,6 +653,59 @@ class AzureTemplate(Template):
                 )
 
         return self
+
+    @property
+    def candidate_vm_sizes(self) -> list[str]:
+        """Return the ordered VM sizes considered for provisioning."""
+        if self.vm_sizes:
+            return [self.vm_size, *self.vm_sizes]
+        return [self.vm_size, *[preference.name for preference in self.vm_size_preferences]]
+
+    @property
+    def uses_vm_size_mix(self) -> bool:
+        """Return whether the template allows more than one VM size."""
+        return bool(self.vm_sizes or self.vm_size_preferences)
+
+    def build_vm_size_profile(self) -> list[dict[str, Any]]:
+        """Build Azure skuProfile.vmSizes entries for instance mix."""
+        if not self.uses_vm_size_mix:
+            return []
+
+        is_prioritized = (
+            self.vmss_allocation_strategy == AzureAllocationStrategy.PRIORITIZED
+        )
+
+        if self.vm_sizes:
+            return [{"name": vm_size} for vm_size in [self.vm_size, *self.vm_sizes]]
+
+        entries: list[dict[str, Any]] = []
+        primary_entry: dict[str, Any] = {"name": self.vm_size}
+        if is_prioritized:
+            primary_entry["rank"] = 0
+        entries.append(primary_entry)
+
+        used_ranks = {0} if is_prioritized else set()
+        next_rank = 1
+        for preference in self.vm_size_preferences:
+            entry: dict[str, Any] = {"name": preference.name}
+            if is_prioritized:
+                if preference.rank is not None:
+                    entry["rank"] = preference.rank
+                    used_ranks.add(preference.rank)
+            entries.append(entry)
+
+        if is_prioritized:
+            used_ranks = {entry["rank"] for entry in entries if "rank" in entry}
+            for entry in entries[1:]:
+                if "rank" in entry:
+                    continue
+                while next_rank in used_ranks:
+                    next_rank += 1
+                entry["rank"] = next_rank
+                used_ranks.add(next_rank)
+                next_rank += 1
+
+        return entries
 
     @classmethod
     def from_azure_format(cls, data: dict[str, Any]) -> "AzureTemplate":
