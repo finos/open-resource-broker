@@ -22,6 +22,7 @@ from orb.providers.gcp.types import (
     GCPHandlerContext,
     GCPInstanceStatus,
     GCPMutationOutcome,
+    GCPProviderData,
 )
 
 if TYPE_CHECKING:
@@ -86,17 +87,19 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
             )
             location_context = {"zone": zone, "scope": template.mig_scope.value}
 
+        provider_data: GCPProviderData = {
+            "mig_name": mig_name,
+            "instance_template_name": template_name,
+            "target_size": request.requested_count,
+            "operation_name": response.name or "",
+            "operation_status": "submitted",
+            **location_context,
+        }
+
         return GCPCreateOutcome(
             resource_ids=[mig_name],
             instances=[],
-            provider_data={
-                "mig_name": mig_name,
-                "instance_template_name": template_name,
-                "target_size": request.requested_count,
-                "operation_name": response.name or "",
-                "operation_status": "submitted",  # type: ignore[typeddict-item]
-                **location_context,
-            },
+            provider_data=provider_data,
         )
 
     def terminate_hosts(

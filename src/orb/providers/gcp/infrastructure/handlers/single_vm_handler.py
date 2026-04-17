@@ -17,6 +17,7 @@ from orb.providers.gcp.types import (
     GCPHandlerContext,
     GCPInstanceStatus,
     GCPMutationOutcome,
+    GCPProviderData,
 )
 
 if TYPE_CHECKING:
@@ -72,17 +73,19 @@ class GCPSingleVMHandler(GCPHandler):
                 }
             )
 
+        provider_data: GCPProviderData = {
+            "zone": zone,
+            "requested_count": request.requested_count,
+            "submitted_count": len(resource_ids),
+            "partial_failure": bool(failed_operations),
+            "operation_status": "submitted",
+            "failed_operations": len(failed_operations),
+        }
+
         return GCPCreateOutcome(
             resource_ids=resource_ids,
             instances=instances,
-            provider_data={
-                "zone": zone,
-                "requested_count": request.requested_count,
-                "submitted_count": len(resource_ids),
-                "partial_failure": bool(failed_operations),
-                "operation_status": "submitted",  # type: ignore[typeddict-item]
-                "failed_operations": len(failed_operations),  # type: ignore[typeddict-item]
-            },
+            provider_data=provider_data,
             failed_operations=failed_operations,
         )
 
@@ -238,9 +241,9 @@ class GCPSingleVMHandler(GCPHandler):
         return result
 
 
-def _recoverable_gcp_operation_exceptions() -> tuple[type[BaseException], ...]:
+def _recoverable_gcp_operation_exceptions() -> tuple[type[Exception], ...]:
     """Return the exception types that should become per-target provider failures."""
-    exceptions: tuple[type[BaseException], ...] = (GCPError, RuntimeError)
+    exceptions: tuple[type[Exception], ...] = (GCPError, RuntimeError)
     if google_exceptions is not None:
         exceptions = exceptions + (google_exceptions.GoogleAPICallError,)
     return exceptions

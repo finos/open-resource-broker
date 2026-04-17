@@ -50,6 +50,10 @@ class GCPInstanceStatus(TypedDict):
     provider_data: dict[str, str]
 
 
+GCPProviderDataValue = str | int | bool
+GCPProviderData = dict[str, GCPProviderDataValue]
+
+
 @dataclass(frozen=True)
 class GCPFailedOperation:
     """Structured failure record for a per-target GCP batch operation."""
@@ -66,7 +70,7 @@ class GCPCreateOutcome:
 
     resource_ids: list[str] = field(default_factory=list)
     instances: list[GCPInstanceStatus] = field(default_factory=list)
-    provider_data: dict[str, str | int | bool] = field(default_factory=dict)
+    provider_data: GCPProviderData = field(default_factory=dict)
     failed_operations: list[GCPFailedOperation] = field(default_factory=list)
 
 
