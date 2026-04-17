@@ -38,6 +38,51 @@ from orb.providers.gcp.services import (
 class GCPProviderStrategy(ProviderStrategy):
     """GCP implementation of the provider strategy interface."""
 
+    _AVAILABLE_REGIONS: list[tuple[str, str]] = [
+        ("northamerica-northeast1", "Montreal"),
+        ("northamerica-northeast2", "Toronto"),
+        ("northamerica-south1", "Queretaro"),
+        ("us-central1", "Iowa"),
+        ("us-east1", "South Carolina"),
+        ("us-east4", "Northern Virginia"),
+        ("us-east5", "Columbus"),
+        ("us-south1", "Dallas"),
+        ("us-west1", "Oregon"),
+        ("us-west2", "Los Angeles"),
+        ("us-west3", "Salt Lake City"),
+        ("us-west4", "Las Vegas"),
+        ("southamerica-east1", "Sao Paulo"),
+        ("southamerica-west1", "Santiago"),
+        ("europe-central2", "Warsaw"),
+        ("europe-north1", "Finland"),
+        ("europe-north2", "Stockholm"),
+        ("europe-southwest1", "Madrid"),
+        ("europe-west1", "Belgium"),
+        ("europe-west2", "London"),
+        ("europe-west3", "Frankfurt"),
+        ("europe-west4", "Netherlands"),
+        ("europe-west6", "Zurich"),
+        ("europe-west8", "Milan"),
+        ("europe-west9", "Paris"),
+        ("europe-west10", "Berlin"),
+        ("europe-west12", "Turin"),
+        ("asia-east1", "Taiwan"),
+        ("asia-east2", "Hong Kong"),
+        ("asia-northeast1", "Tokyo"),
+        ("asia-northeast2", "Osaka"),
+        ("asia-northeast3", "Seoul"),
+        ("asia-south1", "Mumbai"),
+        ("asia-south2", "Delhi"),
+        ("asia-southeast1", "Singapore"),
+        ("asia-southeast2", "Jakarta"),
+        ("australia-southeast1", "Sydney"),
+        ("australia-southeast2", "Melbourne"),
+        ("me-central1", "Doha"),
+        ("me-central2", "Dammam"),
+        ("me-west1", "Tel Aviv"),
+        ("africa-south1", "Johannesburg"),
+    ]
+
     def __init__(
         self,
         config: GCPProviderConfig,
@@ -342,6 +387,7 @@ class GCPProviderStrategy(ProviderStrategy):
 
     def get_capabilities(self) -> ProviderCapabilities:
         """Describe the operations and features supported by the GCP provider."""
+        regions = [region for region, _label in self._AVAILABLE_REGIONS]
         return ProviderCapabilities(
             provider_type="gcp",
             supported_operations=[
@@ -364,7 +410,7 @@ class GCPProviderStrategy(ProviderStrategy):
                 "fleet_management": True,
                 "load_balancing": True,
                 "tags_support": True,
-                "regions": ["us-central1", "us-east1", "europe-west4"],
+                "regions": regions,
                 "supports_windows": True,
                 "supports_linux": True,
                 "auth_mode": "adc_only",
@@ -420,13 +466,8 @@ class GCPProviderStrategy(ProviderStrategy):
         return self._health_service.get_operational_requirements()
 
     def get_available_regions(self) -> list[tuple[str, str]]:
-        """List representative regions exposed through the CLI surface."""
-        return [
-            ("us-central1", "Iowa"),
-            ("us-east1", "South Carolina"),
-            ("us-west1", "Oregon"),
-            ("europe-west4", "Netherlands"),
-        ]
+        """List available GCP regions exposed through the CLI surface."""
+        return list(self._AVAILABLE_REGIONS)
 
     def get_default_region(self) -> str:
         """Return the default region for new GCP providers."""
