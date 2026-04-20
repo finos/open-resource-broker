@@ -10,7 +10,6 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING, Any, Optional
 
-from azure.core.exceptions import ResourceNotFoundError as AzureResourceNotFoundError
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.request.aggregate import Request
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
@@ -43,6 +42,13 @@ if TYPE_CHECKING:
     from orb.providers.azure.infrastructure.services.azure_native_spec_service import (
         AzureNativeSpecService,
     )
+
+
+def _azure_resource_not_found_error_type() -> type[Exception]:
+    """Resolve the Azure SDK's not-found exception lazily."""
+    from azure.core.exceptions import ResourceNotFoundError
+
+    return ResourceNotFoundError
 
 
 def _looks_like_uuid(value: str) -> bool:
@@ -456,7 +462,7 @@ class SingleVMHandler(AzureHandler):
                         vm_name=machine_id_str,
                     )
                     resolved[index] = str(vm.name or machine_id_str)
-                except AzureResourceNotFoundError:
+                except _azure_resource_not_found_error_type():
                     unresolved_indices.append(index)
 
             if unresolved_indices:

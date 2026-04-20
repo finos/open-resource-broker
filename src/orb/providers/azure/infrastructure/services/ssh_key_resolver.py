@@ -8,7 +8,19 @@ from __future__ import annotations
 
 from typing import Any
 
-from azure.core.exceptions import HttpResponseError, ResourceNotFoundError
+
+def _azure_resource_not_found_error_type() -> type[Exception]:
+    """Resolve the Azure SDK's not-found exception lazily."""
+    from azure.core.exceptions import ResourceNotFoundError
+
+    return ResourceNotFoundError
+
+
+def _azure_http_response_error_type() -> type[Exception]:
+    """Resolve the Azure SDK's HTTP response exception lazily."""
+    from azure.core.exceptions import HttpResponseError
+
+    return HttpResponseError
 
 
 def resolve_ssh_keys(
@@ -59,14 +71,14 @@ def resolve_ssh_keys(
                 f"in resource group '{resource_group}' exists but "
                 f"contains no public key data."
             )
-    except ResourceNotFoundError:
+    except _azure_resource_not_found_error_type():
         raise ValueError(
             f"Azure SSH Public Key resource '{ssh_key_name}' "
             f"in resource group '{resource_group}' was not found. "
             f"Ensure the resource exists and the caller has "
             f"'Microsoft.Compute/sshPublicKeys/read' permission."
         )
-    except HttpResponseError as exc:
+    except _azure_http_response_error_type() as exc:
         raise ValueError(
             f"Failed to resolve Azure SSH Public Key '{ssh_key_name}' "
             f"in resource group '{resource_group}': {exc}"
