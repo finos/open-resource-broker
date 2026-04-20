@@ -100,8 +100,8 @@ class AzureResourceManager:
         resource_group: str,
         vmss_name: str,
         orchestration_mode: Optional[str] = None,
-    ) -> int:
-        """Return the number of provisioned instances currently attached to the VMSS."""
+    ) -> Optional[int]:
+        """Return the attached instance count, or ``None`` when Azure cannot be queried."""
         resolved_orchestration_mode = orchestration_mode
         if resolved_orchestration_mode in (None, ""):
             vmss = self._azure_client.compute_client.virtual_machine_scale_sets.get(
@@ -118,8 +118,8 @@ class AzureResourceManager:
 
     def _get_vmss_instance_count(
         self, resource_group: str, vmss_name: str, orchestration_mode: str
-    ) -> int:
-        """Return the number of provisioned instances currently attached to the VMSS."""
+    ) -> Optional[int]:
+        """Return the attached instance count, or ``None`` when Azure cannot be queried."""
         compute = self._azure_client.compute_client
 
         try:
@@ -143,7 +143,7 @@ class AzureResourceManager:
             self._logger.warning(
                 "Failed to count VMSS instances for %s: %s", vmss_name, exc
             )
-            return 0
+            return None
 
     def vmss_exists(self, resource_group: str, vmss_name: str) -> Optional[bool]:
         """Return whether the VMSS still exists, or None if Azure could not be queried."""

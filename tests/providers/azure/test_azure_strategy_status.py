@@ -581,6 +581,64 @@ class TestDescribeResourceInstances:
         ]
         azure_client.compute_client.virtual_machine_scale_sets.begin_delete.assert_not_called()
 
+    def test_describe_resource_instances_leaves_cleanup_pending_when_member_count_is_unknown(
+        self, strategy_harness
+    ):
+        strategy = strategy_harness.strategy
+        handler = MagicMock()
+        handler.check_hosts_status.return_value = []
+        handler.get_vmss_resource_errors.return_value = []
+        strategy_harness.handlers["VMSS"] = handler
+        resource_manager = MagicMock()
+        resource_manager.get_vmss_member_count.return_value = None
+        strategy_harness.resource_manager = resource_manager
+        azure_client = MagicMock()
+        strategy_harness.azure_client = azure_client
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
+            parameters={
+                "resource_ids": ["vmss-demo"],
+                "provider_api": "VMSS",
+                "template_id": "tmpl-1",
+                "request_metadata": {
+                    "resource_group": "test-rg",
+                    "termination_requests": [
+                        {
+                            "pending_resource_cleanup": {
+                                "resource_group": "test-rg",
+                                "vmss_name": "vmss-demo",
+                                "machine_ids": ["vm-a"],
+                                "delete_vmss_when_empty": True,
+                            }
+                        }
+                    ],
+                },
+            },
+        )
+
+        result = run_operation(strategy.execute_operation(op))
+
+        assert result.success
+        resource_manager.get_vmss_member_count.assert_called_once_with(
+            resource_group="test-rg",
+            vmss_name="vmss-demo",
+        )
+        assert result.metadata["termination_follow_up_pending"] is True
+        assert result.metadata["termination_follow_up_details"] == [
+            {
+                "resource_group": "test-rg",
+                "vmss_name": "vmss-demo",
+                "machine_ids": ["vm-a"],
+                "delete_vmss_when_empty": True,
+                "member_delete_submitted": True,
+                "delete_submitted": False,
+                "delete_retry_pending": False,
+                "delete_submission_semantics": "best_effort_without_reverification",
+            }
+        ]
+        azure_client.compute_client.virtual_machine_scale_sets.begin_delete.assert_not_called()
+
     def test_describe_resource_instances_surfaces_retry_pending_when_vmss_delete_retry_fails(
         self, strategy_harness
     ):

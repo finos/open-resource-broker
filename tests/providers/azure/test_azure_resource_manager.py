@@ -82,11 +82,11 @@ def test_get_vmss_member_count_counts_uniform_instances():
     assert manager.get_vmss_member_count("test-rg", "vmss-1", orchestration_mode="Uniform") == 3
 
 
-def test_get_vmss_member_count_tolerates_count_errors_and_returns_zero():
+def test_get_vmss_member_count_tolerates_count_errors_and_returns_none():
     manager, azure_client, logger = _make_manager()
     azure_client.compute_client.virtual_machine_scale_set_vms.list.side_effect = RuntimeError("boom")
 
-    assert manager.get_vmss_member_count("test-rg", "vmss-1", orchestration_mode="Uniform") == 0
+    assert manager.get_vmss_member_count("test-rg", "vmss-1", orchestration_mode="Uniform") is None
     logger.warning.assert_called_once()
 
 
