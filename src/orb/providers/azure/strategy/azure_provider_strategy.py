@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import time
 from threading import Condition, RLock
-from typing import TYPE_CHECKING, Any, Callable, Mapping, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from orb.application.services.spot_placement_execution import (
     SpotPlacementExecutionService,
@@ -40,18 +40,11 @@ from orb.providers.azure.services.cyclecloud_request_context_service import (
     resolve_cyclecloud_request_metadata,
 )
 from orb.providers.azure.services.inventory_service import (
-    AzureReadOperationContext,
-    AzureStatusResult,
-    AzureStatusQueryContext,
-    build_read_handler_request,
     build_read_operation_context,
-    filter_status_results,
     group_instance_ids_by_resource,
-    normalize_status_results,
-    observed_status_ids,
     resolve_operation_resource_group,
-    sdk_status_result,
 )
+from orb.providers.azure.services.inventory_query_service import AzureInventoryQueryService
 from orb.providers.azure.services.machine_conversion_service import (
     AzureMachineConversionService,
 )
@@ -63,6 +56,7 @@ from orb.providers.azure.services.provisioning_service import (
 from orb.providers.azure.services.resource_metadata_service import (
     AzureResourceMetadataService,
 )
+from orb.providers.azure.services.runtime_dependencies import AzureRuntimeDependencies
 from orb.providers.azure.services.spot_launch_service import AzureSpotLaunchService
 from orb.providers.azure.services.template_catalog_service import AzureTemplateCatalogService
 from orb.providers.azure.services.termination_dispatch_service import (
@@ -125,15 +119,7 @@ class AzureProviderStrategy(ProviderStrategy):
         self._logger = logger
         self._azure_config = config
         self._provider_instance_name = provider_instance_name
-        self._client: Optional[AzureClient] = None
-        self._azure_client_resolver = azure_client_resolver
-        self._azure_handler_factory_resolver = azure_handler_factory_resolver
-        self._azure_resource_manager_resolver = azure_resource_manager_resolver
-        self._azure_deployment_service_resolver = azure_deployment_service_resolver
         self._azure_native_spec_service = azure_native_spec_service
-        self._resource_manager: Optional[AzureResourceManager] = None
-        self._deployment_service: Optional[AzureDeploymentService] = None
-        self._handler_factory: Optional[AzureHandlerFactory] = None
         self._handlers: dict[str, AzureHandler] = {}
         self._spot_placement_planner = SpotPlacementPlanner()
         self._spot_placement_execution = SpotPlacementExecutionService()
@@ -144,6 +130,12 @@ class AzureProviderStrategy(ProviderStrategy):
             default_resource_group=config.resource_group,
             logger=logger,
         )
+        self._inventory_query_service = AzureInventoryQueryService(
+            logger=logger,
+            provider_instance_name=provider_instance_name,
+            machine_conversion_service=self._machine_conversion_service,
+            resource_metadata_service=self._resource_metadata_service,
+        )
         self._spot_launch_service = AzureSpotLaunchService(
             config=config,
             logger=logger,
@@ -152,7 +144,15 @@ class AzureProviderStrategy(ProviderStrategy):
         )
         self._template_catalog_service = AzureTemplateCatalogService(logger=logger)
         self._termination_service = AzureTerminationService()
-        self._lazy_init_lock = RLock()
+        self._runtime = AzureRuntimeDependencies(
+            config=config,
+            logger=logger,
+            azure_client_resolver=azure_client_resolver,
+            azure_handler_factory_resolver=azure_handler_factory_resolver,
+            azure_resource_manager_resolver=azure_resource_manager_resolver,
+            azure_deployment_service_resolver=azure_deployment_service_resolver,
+            azure_native_spec_service=azure_native_spec_service,
+        )
         self._lifecycle_lock = RLock()
         self._lifecycle_condition = Condition(self._lifecycle_lock)
         self._active_operations = 0
@@ -187,117 +187,32 @@ class AzureProviderStrategy(ProviderStrategy):
     @property
     def azure_client(self) -> Optional[AzureClient]:
         """Get the Azure client with lazy initialisation."""
-        with self._lazy_init_lock:
-            if self._client is None:
-                self._logger.debug("Creating Azure client on first access")
-                if self._azure_client_resolver:
-                    try:
-                        self._client = self._azure_client_resolver()
-                    except Exception as exc:
-                        self._logger.warning("Failed to resolve AzureClient lazily: %s", exc, exc_info=True)
-                        self._client = None
-                else:
-                    self._logger.warning("AzureClient resolver not provided")
-            return self._client
+        return self._runtime.azure_client
 
     @property
     def resource_manager(self) -> Optional[AzureResourceManager]:
         """Get the Azure resource manager with lazy initialisation."""
-        with self._lazy_init_lock:
-            azure_client = self.azure_client
-            if self._resource_manager is None and self._azure_resource_manager_resolver is not None:
-                try:
-                    self._resource_manager = self._azure_resource_manager_resolver()
-                except Exception as exc:
-                    self._logger.warning(
-                        "Failed to resolve AzureResourceManager lazily: %s",
-                        exc,
-                        exc_info=True,
-                    )
-                    self._resource_manager = None
-            if self._resource_manager is None and azure_client:
-                self._logger.debug("Creating Azure resource manager on first access")
-                from orb.providers.azure.managers.azure_resource_manager import AzureResourceManager
-
-                self._resource_manager = AzureResourceManager(
-                    azure_client=azure_client,
-                    config=self._azure_config,
-                    logger=self._logger,
-                )
-            return self._resource_manager
+        return self._runtime.resource_manager
 
     @property
     def deployment_service(self) -> Optional[AzureDeploymentService]:
         """Get the ARM deployment service with lazy initialisation."""
-        with self._lazy_init_lock:
-            azure_client = self.azure_client
-            if self._deployment_service is None and self._azure_deployment_service_resolver is not None:
-                try:
-                    self._deployment_service = self._azure_deployment_service_resolver()
-                except Exception as exc:
-                    self._logger.warning(
-                        "Failed to resolve AzureDeploymentService lazily: %s",
-                        exc,
-                        exc_info=True,
-                    )
-                    self._deployment_service = None
-            if self._deployment_service is None and azure_client:
-                from orb.providers.azure.infrastructure.services.azure_deployment_service import (
-                    AzureDeploymentService,
-                )
-
-                self._deployment_service = AzureDeploymentService(
-                    azure_client=azure_client,
-                    logger=self._logger,
-                )
-            return self._deployment_service
+        return self._runtime.deployment_service
 
     @property
     def handlers(self) -> dict[str, AzureHandler]:
         """Get handler mapping, including any explicit test overrides."""
-        with self._lazy_init_lock:
-            handlers = dict(self._handlers)
-            handler_factory = self._get_handler_factory()
-            if handler_factory is None:
-                return handlers
-            handlers.update(handler_factory.get_all_handlers())
-            handlers.update(self._handlers)
+        handlers = dict(self._handlers)
+        handler_factory = self._get_handler_factory()
+        if handler_factory is None:
             return handlers
+        handlers.update(handler_factory.get_all_handlers())
+        handlers.update(self._handlers)
+        return handlers
 
     def _get_handler_factory(self) -> Optional[AzureHandlerFactory]:
         """Resolve the Azure handler factory lazily using the strategy-owned client."""
-        with self._lazy_init_lock:
-            if self._handler_factory is not None:
-                return self._handler_factory
-
-            if self._azure_handler_factory_resolver is not None:
-                try:
-                    self._handler_factory = self._azure_handler_factory_resolver()
-                    return self._handler_factory
-                except Exception as exc:
-                    self._logger.warning(
-                        "Failed to resolve AzureHandlerFactory lazily: %s",
-                        exc,
-                        exc_info=True,
-                    )
-                    self._handler_factory = None
-                    return None
-
-            azure_client = self.azure_client
-            if azure_client is None:
-                return None
-
-            from orb.providers.azure.infrastructure.azure_handler_factory import (
-                AzureHandlerFactory,
-            )
-
-            self._handler_factory = AzureHandlerFactory(
-                azure_client=azure_client,
-                logger=self._logger,
-                azure_native_spec_service=self._azure_native_spec_service,
-                azure_resource_manager=self.resource_manager,
-            )
-            return self._handler_factory
+        return self._runtime.handler_factory
 
     def _resolve_handler(
         self,
@@ -335,7 +250,13 @@ class AzureProviderStrategy(ProviderStrategy):
         elif enhanced_config.get("subnet_ids") == ["default-subnet"]:
             enhanced_config.pop("subnet_ids", None)
 
-        azure_defaults = AzureTemplateExtensionConfig().to_template_defaults()
+        azure_defaults = AzureTemplateExtensionConfig(
+            vm_size="Standard_D4s_v5",
+            priority="Regular",
+            os_disk_type="Premium_LRS",
+            os_disk_size_gb=None,
+            admin_username="azureuser",
+        ).to_template_defaults()
         for field, value in azure_defaults.items():
             if enhanced_config.get(field) in (None, ""):
                 enhanced_config[field] = value
@@ -633,11 +554,7 @@ class AzureProviderStrategy(ProviderStrategy):
                     return
                 self._lifecycle_condition.wait(timeout=remaining)
 
-            client = self._client
-            self._client = None
-            self._resource_manager = None
-            self._deployment_service = None
-            self._handler_factory = None
+            client = self._runtime.clear_cached_runtime()
             self._handlers = {}
             self._vmss_cleanup_coordinator.clear()
             self._initialized = False
@@ -872,93 +789,6 @@ class AzureProviderStrategy(ProviderStrategy):
     # GET_INSTANCE_STATUS
     # ------------------------------------------------------------------
 
-    def _get_instance_status_via_handlers(
-        self,
-        *,
-        read_context: AzureReadOperationContext,
-    ) -> Optional[list[AzureStatusResult]]:
-        provider_api = read_context.provider_api
-        grouped_resource_mapping = read_context.grouped_resource_mapping
-
-        if not provider_api:
-            return None
-
-        handler = self._resolve_handler(
-            provider_api,
-            allow_vmss_uniform_fallback=True,
-        )
-        if not handler and not grouped_resource_mapping:
-            return None
-
-        if provider_api == AzureProviderApi.SINGLE_VM and handler:
-            return normalize_status_results(
-                handler.check_hosts_status(
-                    build_read_handler_request(
-                        read_context=read_context,
-                        provider_name=self.provider_instance_name,
-                        resource_ids=read_context.instance_ids,
-                    )
-                ),
-            )
-
-        if grouped_resource_mapping:
-            all_results: list[AzureStatusResult] = []
-            seen_instance_ids: set[str] = set()
-            for resource_id, mapped_ids in grouped_resource_mapping.items():
-                group_handler = handler
-                if not group_handler and provider_api:
-                    group_handler = self._resolve_handler(
-                        provider_api,
-                        allow_vmss_uniform_fallback=True,
-                    )
-                if not group_handler:
-                    continue
-
-                extra_metadata: dict[str, Any] = {}
-                if provider_api == AzureProviderApi.CYCLECLOUD:
-                    extra_metadata["node_ids"] = mapped_ids
-                request = build_read_handler_request(
-                    read_context=read_context,
-                    provider_name=self.provider_instance_name,
-                    resource_ids=[resource_id],
-                    additional_metadata=extra_metadata,
-                )
-                for machine in filter_status_results(
-                    normalize_status_results(group_handler.check_hosts_status(request)),
-                    mapped_ids,
-                ):
-                    machine_id = str(machine.get("instance_id"))
-                    if machine_id not in seen_instance_ids:
-                        all_results.append(machine)
-                        seen_instance_ids.add(machine_id)
-
-            if all_results:
-                return all_results
-
-        resource_id = read_context.direct_resource_id
-        if not handler or not resource_id:
-            return None
-
-        extra_metadata = {}
-        if provider_api == AzureProviderApi.CYCLECLOUD:
-            extra_metadata = {"node_ids": read_context.instance_ids}
-        request = build_read_handler_request(
-            read_context=read_context,
-            provider_name=self.provider_instance_name,
-            resource_ids=(
-                read_context.instance_ids
-                if provider_api == AzureProviderApi.SINGLE_VM
-                else [resource_id]
-            ),
-            additional_metadata=extra_metadata,
-        )
-        if provider_api == AzureProviderApi.SINGLE_VM:
-            return normalize_status_results(handler.check_hosts_status(request))
-        return filter_status_results(
-            normalize_status_results(handler.check_hosts_status(request)),
-            read_context.instance_ids,
-        )
-
     def _handle_get_instance_status(self, operation: ProviderOperation) -> ProviderResult:
         try:
             operation = self._resolve_cyclecloud_operation(operation)
@@ -969,13 +799,11 @@ class AzureProviderStrategy(ProviderStrategy):
                 normalize_provider_api=self._normalize_provider_api_value,
             )
 
-            resource_group = read_context.resource_group
-            if resource_group is None:
+            if read_context.resource_group is None:
                 raise RuntimeError(
                     "build_read_operation_context must provide resource_group for status queries"
                 )
             instance_ids = read_context.instance_ids
-            provider_api = read_context.provider_api
 
             if bool(operation.context and operation.context.get("dry_run", False)):
                 return ProviderResult.success_result(
@@ -999,51 +827,11 @@ class AzureProviderStrategy(ProviderStrategy):
                     },
                 )
 
-            self._restore_pending_resource_cleanups(read_context.request_metadata)
-
-            handler_machines = self._get_instance_status_via_handlers(
+            return self._inventory_query_service.get_instance_status(
                 read_context=read_context,
-            )
-            if handler_machines is not None:
-                is_vmss = provider_api in (
-                    AzureProviderApi.VMSS,
-                    AzureProviderApi.VMSS_UNIFORM,
-                )
-                result = ProviderResult.success_result(
-                    {
-                        "instances": handler_machines,
-                        "queried_count": len(instance_ids),
-                    },
-                    {
-                        "operation": "get_instance_status",
-                        "instance_ids": instance_ids,
-                        "method": "handler",
-                    },
-                )
-                if is_vmss and read_context.resource_ids:
-                    self._vmss_cleanup_coordinator.reconcile(
-                        resource_group=resource_group,
-                        resource_ids=read_context.resource_ids,
-                        observed_ids=observed_status_ids(handler_machines),
-                    )
-                    result.metadata.update(
-                        self._vmss_cleanup_coordinator.status_metadata(
-                            resource_group=resource_group,
-                            resource_ids=read_context.resource_ids,
-                        )
-                    )
-                return result
-
-            status_context = AzureStatusQueryContext(
-                instance_ids=instance_ids,
-                resource_group=resource_group,
-                provider_api=provider_api,
-            )
-            return sdk_status_result(
-                status_context=status_context,
                 azure_client=self.azure_client,
-                machine_conversion_service=self._machine_conversion_service,
-                logger=self._logger,
+                resolve_handler=self._resolve_handler,
+                vmss_cleanup_coordinator=self._vmss_cleanup_coordinator,
             )
 
         except asyncio.CancelledError:
@@ -1053,10 +841,6 @@ class AzureProviderStrategy(ProviderStrategy):
                 f"Failed to get instance status: {exc!s}",
                 "GET_INSTANCE_STATUS_ERROR", exc,
             )
-
-    def _restore_pending_resource_cleanups(self, metadata: Mapping[str, object]) -> None:
-        """Rebuild pending resource cleanup state from durable request metadata."""
-        self._vmss_cleanup_coordinator.restore_from_request_metadata(metadata)
 
     def _current_vmss_member_count(self, *, resource_group: str, vmss_name: str) -> Optional[int]:
         if not self.resource_manager:
@@ -1089,108 +873,6 @@ class AzureProviderStrategy(ProviderStrategy):
     # DESCRIBE_RESOURCE_INSTANCES
     # ------------------------------------------------------------------
 
-    def _describe_resource_instances(
-        self,
-        *,
-        read_context: AzureReadOperationContext,
-    ) -> ProviderResult:
-        resource_ids = read_context.resource_ids
-        provider_api = read_context.provider_api
-        provider_api_key = read_context.provider_api_key or ""
-        resource_group = read_context.resource_group
-
-        handler = self._resolve_handler(provider_api_key)
-        if not handler:
-            return ProviderResult.error_result(
-                f"No handler available for provider_api: {provider_api_key}",
-                "HANDLER_NOT_FOUND",
-            )
-
-        extra_metadata: dict[str, Any] = {}
-        if provider_api == AzureProviderApi.SINGLE_VM:
-            deployment_name = read_context.request_metadata.get("deployment_name")
-            if deployment_name not in (None, ""):
-                extra_metadata["deployment_name"] = str(deployment_name)
-        if read_context.fail_on_partial_status_error:
-            extra_metadata["fail_on_partial_status_error"] = True
-
-        request = build_read_handler_request(
-            read_context=read_context,
-            provider_name=self.provider_instance_name,
-            resource_ids=resource_ids,
-            additional_metadata=extra_metadata or None,
-        )
-
-        instance_details = handler.check_hosts_status(request)
-
-        if not instance_details:
-            metadata: dict[str, Any] = {
-                "operation": "describe_resource_instances",
-                "resource_ids": resource_ids,
-                "provider_api": provider_api_key,
-                "handler_used": provider_api_key,
-                "instance_count": 0,
-            }
-            if provider_api in (AzureProviderApi.VMSS, AzureProviderApi.VMSS_UNIFORM):
-                vmss_errors: list[dict[str, Any]] = []
-                # getattr: this VMSS-only helper is optional on the handler surface and
-                # may be provided by test doubles rather than the concrete VMSS class.
-                get_vmss_resource_errors = getattr(handler, "get_vmss_resource_errors", None)
-                if resource_group and callable(get_vmss_resource_errors):
-                    for resource_id in resource_ids:
-                        for error in get_vmss_resource_errors(resource_group, resource_id):
-                            if error not in vmss_errors:
-                                vmss_errors.append(error)
-                if vmss_errors:
-                    metadata["fleet_errors"] = vmss_errors
-                self._resource_metadata_service.augment_vmss_capacity_metadata(
-                    metadata,
-                    resource_ids,
-                    resource_manager=self.resource_manager,
-                    resource_group=resource_group,
-                )
-            elif provider_api == AzureProviderApi.SINGLE_VM:
-                self._resource_metadata_service.augment_single_vm_deployment_metadata(
-                    metadata,
-                    read_context.request_metadata,
-                    resource_group=resource_group,
-                    deployment_service=self.deployment_service,
-                )
-            return ProviderResult.success_result({"instances": []}, metadata)
-
-        fleet_errors: list[dict[str, Any]] = []
-        for inst in instance_details:
-            provider_data = inst.get("provider_data") or {}
-            if isinstance(provider_data, dict):
-                for error in provider_data.get("fleet_errors") or []:
-                    if error not in fleet_errors:
-                        fleet_errors.append(error)
-
-        metadata = {
-            "operation": "describe_resource_instances",
-            "resource_ids": resource_ids,
-            "provider_api": provider_api_key,
-            "handler_used": provider_api_key,
-            "instance_count": len(instance_details),
-        }
-        if fleet_errors:
-            metadata["fleet_errors"] = fleet_errors
-
-        if provider_api in (AzureProviderApi.VMSS, AzureProviderApi.VMSS_UNIFORM):
-            self._resource_metadata_service.augment_vmss_capacity_metadata(
-                metadata,
-                resource_ids,
-                resource_manager=self.resource_manager,
-                resource_group=resource_group,
-            )
-
-        self._resource_metadata_service.augment_shortfall_metadata(metadata)
-
-        return ProviderResult.success_result(
-            data={"instances": instance_details},
-            metadata=metadata,
-        )
-
     async def _handle_describe_resource_instances(
         self, operation: ProviderOperation
     ) -> ProviderResult:
@@ -1213,39 +895,13 @@ class AzureProviderStrategy(ProviderStrategy):
                         "provider_data": {"dry_run": True},
                     },
                 )
-
-            provider_api = read_context.provider_api
-            resource_group = read_context.resource_group
-            is_vmss = provider_api in (AzureProviderApi.VMSS, AzureProviderApi.VMSS_UNIFORM)
-
-            self._restore_pending_resource_cleanups(read_context.request_metadata)
-            read_context.fail_on_partial_status_error = bool(
-                is_vmss and self._vmss_cleanup_coordinator.has_pending(
-                    resource_group=resource_group,
-                    resource_ids=read_context.resource_ids,
-                )
-            )
-
-            result = self._describe_resource_instances(
+            return self._inventory_query_service.describe_resource_instances(
                 read_context=read_context,
+                resolve_handler=self._resolve_handler,
+                vmss_cleanup_coordinator=self._vmss_cleanup_coordinator,
+                resource_manager=self.resource_manager,
+                deployment_service=self.deployment_service,
             )
-
-            if result.success and is_vmss:
-                instance_details = result.data.get("instances", []) if result.data else []
-                self._vmss_cleanup_coordinator.reconcile(
-                    resource_group=resource_group,
-                    resource_ids=read_context.resource_ids,
-                    observed_ids=observed_status_ids(instance_details),
-                )
-                if result.metadata is not None:
-                    result.metadata.update(
-                        self._vmss_cleanup_coordinator.status_metadata(
-                            resource_group=resource_group,
-                            resource_ids=read_context.resource_ids,
-                        )
-                    )
-
-            return result
 
         except asyncio.CancelledError:
             raise

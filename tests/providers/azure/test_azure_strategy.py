@@ -550,7 +550,7 @@ class TestCleanup:
             azure_client_resolver=lambda: client,
         )
         strategy.initialize()
-        strategy._client = client
+        assert strategy.azure_client is client
 
         strategy.cleanup()
 
@@ -565,7 +565,7 @@ class TestCleanup:
             azure_client_resolver=lambda: client,
         )
         strategy.initialize()
-        strategy._client = client
+        assert strategy.azure_client is client
 
         operation_started = threading.Event()
         release_operation = threading.Event()
@@ -617,7 +617,7 @@ class TestCleanup:
             azure_client_resolver=lambda: client,
         )
         strategy.initialize()
-        strategy._client = client
+        assert strategy.azure_client is client
         strategy._cleanup_wait_timeout_seconds = 0.05
 
         operation_started = threading.Event()
@@ -652,7 +652,7 @@ class TestCleanup:
 
         assert cleanup_finished.is_set()
         assert strategy._cleanup_requested is True
-        assert strategy._client is client
+        assert strategy._runtime.azure_client is client
         client.close.assert_not_called()
 
         release_operation.set()
@@ -701,7 +701,7 @@ class TestCleanup:
             azure_client_resolver=lambda: client,
         )
         strategy.initialize()
-        strategy._client = client
+        assert strategy.azure_client is client
 
         operation_started = threading.Event()
         release_operation = threading.Event()
