@@ -1,7 +1,7 @@
 """Tests for Azure configuration and registration behavior."""
 
 import pytest
-from unittest.mock import patch
+from unittest.mock import MagicMock, Mock, patch
 
 from orb.bootstrap.infrastructure_services import register_infrastructure_services
 from orb.config import PerformanceConfig

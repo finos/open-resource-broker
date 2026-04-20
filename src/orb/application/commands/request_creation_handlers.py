@@ -497,7 +497,10 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                         skipped_str,
                     )
                 else:
-                    await self._update_request_to_completed(request)
+                    await self._update_request_to_in_progress_with_message(
+                        request,
+                        "Termination initiated, waiting for provider confirmation",
+                    )
                     self.logger.info("Termination initiated for request %s", request.request_id)
             else:
                 await self._update_request_to_failed(request, provisioning_result.get("errors", []))

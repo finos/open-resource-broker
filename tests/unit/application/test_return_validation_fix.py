@@ -78,14 +78,14 @@ class TestReturnValidationFix:
         # Validation should pass (no exception for multiple machines)
         await self.handler.validate_command(command)
 
-        result = self.handler._validate_and_filter_machines(command.machine_ids)
+        valid_machines, skipped_machines = self.handler._filter_machines(command.machine_ids)
 
         # Verify filtering worked correctly
-        assert result["valid_machines"] == ["machine-001", "machine-003"]
+        assert valid_machines == ["machine-001", "machine-003"]
 
-        assert len(result["skipped_machines"]) == 1
-        assert result["skipped_machines"][0]["machine_id"] == "machine-002"
-        assert "pending return request" in result["skipped_machines"][0]["reason"]
+        assert len(skipped_machines) == 1
+        assert skipped_machines[0]["machine_id"] == "machine-002"
+        assert "pending return request" in skipped_machines[0]["reason"]
 
     @pytest.mark.asyncio
     async def test_single_machine_return_still_validates_properly(self):
@@ -132,11 +132,11 @@ class TestReturnValidationFix:
         # Validation should pass (no exception for multiple machines)
         await self.handler.validate_command(command)
 
-        result = self.handler._validate_and_filter_machines(command.machine_ids)
+        valid_machines, skipped_machines = self.handler._filter_machines(command.machine_ids)
 
         # All machines should be filtered out
-        assert result["valid_machines"] == []
-        assert len(result["skipped_machines"]) == 2
+        assert valid_machines == []
+        assert len(skipped_machines) == 2
 
     def test_update_machines_to_pending_sets_shutting_down(self):
         machine = Mock()
@@ -183,7 +183,7 @@ class TestReturnValidationFix:
                 },
             }
         )
-        self.handler._machine_grouping_service.group_by_resource = Mock(return_value={})
+        self.handler._machine_grouping_service.group_by_resource = Mock(return_value=({}, []))
         self.handler._update_machines_to_pending = Mock()
 
         await self.handler._execute_deprovisioning_for_request(
