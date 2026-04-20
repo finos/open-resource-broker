@@ -9,7 +9,7 @@ from typing import Callable, Mapping, Optional, Protocol, TypeAlias, Any
 
 class _VmssCleanupLogger(Protocol):
     """Protocol for logging warnings in the VMSS cleanup coordinator."""
-    def warning(self, msg: str, *args: object) -> None:
+    def warning(self, message: str, *args: object) -> None:
         """A minimal logger protocol for the VMSS cleanup coordinator, focused on warning messages."""
         ...
 
