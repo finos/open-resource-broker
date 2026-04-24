@@ -10,6 +10,7 @@ from orb.providers.azure.exceptions.azure_exceptions import AzureValidationError
 from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureHandler,
     AzureHandlerStatusResult,
+    RAISE_ON_STATUS_ERROR_METADATA_KEY,
 )
 from orb.providers.azure.infrastructure.vmss_cleanup import VmssCleanupCoordinator
 from orb.providers.azure.managers.azure_resource_manager import AzureResourceManager
@@ -315,13 +316,13 @@ class AzureInventoryQueryService:
         read_context: AzureReadOperationContext,
         vmss_cleanup_coordinator: VmssCleanupCoordinator,
     ) -> bool:
-        """Restore VMSS cleanup state and mark whether describe should fail on partial status."""
+        """Restore VMSS cleanup state and set the describe status failure policy."""
         is_vmss = read_context.provider_api in (
             AzureProviderApi.VMSS,
             AzureProviderApi.VMSS_UNIFORM,
         )
         vmss_cleanup_coordinator.restore_from_request_metadata(read_context.request_metadata)
-        read_context.fail_on_partial_status_error = bool(
+        read_context.raise_on_status_error = (
             is_vmss
             and vmss_cleanup_coordinator.has_pending(
                 resource_group=read_context.resource_group,
@@ -341,8 +342,9 @@ class AzureInventoryQueryService:
             deployment_name = read_context.request_metadata.get("deployment_name")
             if deployment_name not in (None, ""):
                 extra_metadata["deployment_name"] = str(deployment_name)
-        if read_context.fail_on_partial_status_error:
-            extra_metadata["fail_on_partial_status_error"] = True
+        extra_metadata[RAISE_ON_STATUS_ERROR_METADATA_KEY] = (
+            read_context.raise_on_status_error
+        )
         return build_read_handler_request(
             read_context=read_context,
             provider_name=self._provider_instance_name,

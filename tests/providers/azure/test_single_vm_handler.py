@@ -6,7 +6,10 @@ import pytest
 from azure.core.exceptions import ResourceNotFoundError
 
 from orb.providers.azure.exceptions.azure_exceptions import LaunchError, TerminationError
-from orb.providers.azure.infrastructure.handlers.azure_handler import AzureReleaseContext
+from orb.providers.azure.infrastructure.handlers.azure_handler import (
+    AzureReleaseContext,
+    RAISE_ON_STATUS_ERROR_METADATA_KEY,
+)
 from orb.providers.azure.infrastructure.handlers.single_vm_handler import SingleVMHandler
 from tests.providers.azure.strategy_test_support import (
     AsyncPager,
@@ -322,6 +325,104 @@ def test_status_still_returns_instance_when_network_identity_resolution_fails():
     assert result[0]["private_ip"] is None
     assert result[0]["provider_data"]["nic_id"] is None
     logger.warning.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_status_best_effort_returns_partial_results_when_one_vm_lookup_fails():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = SingleVMHandler(azure_client=azure_client, logger=logger)
+
+    vm = MagicMock()
+    vm.name = "vm-1"
+    vm.vm_id = "vm-guid-1"
+    vm.instance_view.statuses = []
+    vm.hardware_profile.vm_size = "Standard_D4s_v5"
+    vm.location = "eastus2"
+    vm.zones = ["1"]
+
+    async_compute = MagicMock()
+    async_compute.virtual_machines.get = AsyncMock(side_effect=[vm, RuntimeError("boom")])
+    azure_client.get_async_compute_client = AsyncMock(return_value=async_compute)
+    handler._resolve_vm_names_async = AsyncMock(return_value=["vm-1", "vm-2"])
+    azure_client.resolve_network_identity_from_vm_async = AsyncMock(
+        return_value={
+            "private_ip": None,
+            "public_ip": None,
+            "subnet_id": None,
+            "vnet_id": None,
+            "nic_id": None,
+            "nic_name": None,
+        }
+    )
+
+    request = MagicMock()
+    request.resource_ids = ["vm-1", "vm-2"]
+    request.metadata = {"resource_group": "test-rg"}
+
+    result = await handler.check_hosts_status_async(request)
+
+    assert [entry["instance_id"] for entry in result] == ["vm-1"]
+    logger.error.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_status_strict_mode_raises_when_one_vm_lookup_fails():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = SingleVMHandler(azure_client=azure_client, logger=logger)
+
+    vm = MagicMock()
+    vm.name = "vm-1"
+    vm.vm_id = "vm-guid-1"
+    vm.instance_view.statuses = []
+    vm.hardware_profile.vm_size = "Standard_D4s_v5"
+    vm.location = "eastus2"
+    vm.zones = ["1"]
+
+    async_compute = MagicMock()
+    async_compute.virtual_machines.get = AsyncMock(side_effect=[vm, RuntimeError("boom")])
+    azure_client.get_async_compute_client = AsyncMock(return_value=async_compute)
+    handler._resolve_vm_names_async = AsyncMock(return_value=["vm-1", "vm-2"])
+    azure_client.resolve_network_identity_from_vm_async = AsyncMock(
+        return_value={
+            "private_ip": None,
+            "public_ip": None,
+            "subnet_id": None,
+            "vnet_id": None,
+            "nic_id": None,
+            "nic_name": None,
+        }
+    )
+
+    request = MagicMock()
+    request.resource_ids = ["vm-1", "vm-2"]
+    request.metadata = {
+        "resource_group": "test-rg",
+        RAISE_ON_STATUS_ERROR_METADATA_KEY: True,
+    }
+
+    with pytest.raises(RuntimeError, match="Failed to get status for VM 'vm-2'"):
+        await handler.check_hosts_status_async(request)
+
+
+@pytest.mark.asyncio
+async def test_status_best_effort_raises_when_all_vm_lookups_fail():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = SingleVMHandler(azure_client=azure_client, logger=logger)
+
+    async_compute = MagicMock()
+    async_compute.virtual_machines.get = AsyncMock(side_effect=RuntimeError("boom"))
+    azure_client.get_async_compute_client = AsyncMock(return_value=async_compute)
+    handler._resolve_vm_names_async = AsyncMock(return_value=["vm-1"])
+
+    request = MagicMock()
+    request.resource_ids = ["vm-1"]
+    request.metadata = {"resource_group": "test-rg"}
+
+    with pytest.raises(RuntimeError, match="Failed to get status for VM 'vm-1'"):
+        await handler.check_hosts_status_async(request)
 
 
 @pytest.mark.asyncio

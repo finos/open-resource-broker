@@ -32,7 +32,7 @@ class AzureReadOperationContext:
     resource_ids: list[str] = field(default_factory=list)
     grouped_resource_mapping: dict[str, list[str]] = field(default_factory=dict)
     direct_resource_id: str | None = None
-    fail_on_partial_status_error: bool = False
+    raise_on_status_error: bool = False
 
 
 class AzureStatusProviderData(TypedDict, total=False):

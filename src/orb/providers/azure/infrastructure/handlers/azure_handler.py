@@ -70,6 +70,24 @@ class AzureHandlerStatusResult(TypedDict, total=False):
     provider_data: AzureStatusProviderData
 
 
+RAISE_ON_STATUS_ERROR_METADATA_KEY = "raise_on_status_error"
+
+
+def azure_raise_on_status_error(request: Request) -> bool:
+    """Read the explicit Azure status error policy from request metadata."""
+    metadata = request.metadata or {}
+    value = metadata.get(RAISE_ON_STATUS_ERROR_METADATA_KEY, False)
+    if isinstance(value, bool):
+        return value
+    raise AzureValidationError(
+        (
+            f"Azure status metadata '{RAISE_ON_STATUS_ERROR_METADATA_KEY}' "
+            "must be a boolean"
+        ),
+        error_code="InvalidParameter",
+    )
+
+
 @dataclass(frozen=True)
 class AzureReleaseContext:
     """Provider-owned runtime context required for Azure termination flows."""

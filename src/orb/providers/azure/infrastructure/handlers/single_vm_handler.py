@@ -36,6 +36,7 @@ from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureReleaseHostsResult,
     AzureSingleVmReleaseProviderData,
     AzureStatusProviderData,
+    azure_raise_on_status_error,
 )
 from orb.providers.azure.infrastructure.services.azure_network_identity_resolver import (
     AzureNetworkIdentity,
@@ -319,12 +320,17 @@ class SingleVMHandler(AzureHandler):
     async def check_hosts_status_async(self, request: Request) -> list[AzureHandlerStatusResult]:
         """Async status query for individual VM IDs using the Azure async Compute SDK."""
         resource_ids: list[str] = request.resource_ids or []
+        raise_on_status_error = azure_raise_on_status_error(request)
         resource_group = self._resolve_status_resource_group(request)
         if not resource_group:
-            self._logger.error("Cannot resolve resource_group for status check")
+            message = "Cannot resolve resource_group for status check"
+            self._logger.error(message)
+            if resource_ids:
+                raise RuntimeError(message)
             return []
 
         results: list[AzureHandlerStatusResult] = []
+        status_errors: list[str] = []
         compute = await self.azure_client.get_async_compute_client()
         resolved_vm_names = await self._resolve_vm_names_async(resource_group, resource_ids)
 
@@ -354,7 +360,12 @@ class SingleVMHandler(AzureHandler):
                     )
                 )
             except Exception as exc:
-                self._logger.error("Failed to get status for VM '%s': %s", vm_name, exc)
+                error_message = f"Failed to get status for VM '{vm_name}': {exc}"
+                self._logger.error(error_message)
+                status_errors.append(error_message)
+        all_requested_vms_failed = bool(resolved_vm_names) and not results
+        if status_errors and (raise_on_status_error or all_requested_vms_failed):
+            raise RuntimeError("; ".join(status_errors))
         return results
 
     @staticmethod

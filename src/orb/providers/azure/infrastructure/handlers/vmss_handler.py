@@ -55,6 +55,7 @@ from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureReleaseHostsResult,
     AzureStatusProviderData,
     AzureVmssReleaseProviderData,
+    azure_raise_on_status_error,
 )
 from orb.providers.azure.infrastructure.services.azure_network_identity_resolver import (
     AzureNetworkIdentity,
@@ -295,9 +296,7 @@ class VMSSHandler(AzureHandler):
 
         all_instances: list[AzureHandlerStatusResult] = []
         status_errors: list[str] = []
-        fail_on_partial_status_error = bool(
-            (request.metadata or {}).get("fail_on_partial_status_error", False)
-        )
+        raise_on_status_error = azure_raise_on_status_error(request)
 
         for vmss_name in resource_ids:
             resource_group = (
@@ -305,7 +304,9 @@ class VMSSHandler(AzureHandler):
                 or self.azure_client.resource_group
             )
             if not resource_group:
-                self._logger.error("Cannot resolve resource_group for VMSS '%s'", vmss_name)
+                error_message = f"Cannot resolve resource_group for VMSS '{vmss_name}'"
+                self._logger.error(error_message)
+                status_errors.append(error_message)
                 continue
 
             try:
@@ -318,7 +319,8 @@ class VMSSHandler(AzureHandler):
                 self._logger.error(error_message)
                 status_errors.append(error_message)
 
-        if fail_on_partial_status_error and status_errors:
+        all_requested_vmss_failed = bool(resource_ids) and not all_instances
+        if status_errors and (raise_on_status_error or all_requested_vmss_failed):
             raise RuntimeError("; ".join(status_errors))
 
         return all_instances
@@ -374,6 +376,13 @@ class VMSSHandler(AzureHandler):
                             "vm_name": str(vm_name),
                             "error": str(exc),
                         })
+                self._raise_flexible_release_failures(
+                    machine_ids=machine_ids,
+                    resource_group=resource_group,
+                    vmss_name=vmss_name,
+                    submitted_deletions=submitted_deletions,
+                    failed_deletions=failed_deletions,
+                )
                 if release_plan.delete_vmss_when_empty:
                     cleanup_submission_state = await self._submit_vmss_delete_if_emptying_async(
                         resource_group=resource_group,
@@ -409,6 +418,8 @@ class VMSSHandler(AzureHandler):
                 cleanup_submission_state=cleanup_submission_state,
                 resolved_instance_ids=release_plan.resolved_instance_ids,
             )
+        except TerminationError:
+            raise
         except Exception as exc:
             raise TerminationError(
                 f"Failed to delete instances from VMSS '{vmss_name}': {exc}",
@@ -425,6 +436,38 @@ class VMSSHandler(AzureHandler):
             "Deleting %d instance(s) from VMSS '%s'",
             len(machine_ids),
             vmss_name,
+        )
+
+    @staticmethod
+    def _raise_flexible_release_failures(
+        *,
+        machine_ids: list[str],
+        resource_group: str,
+        vmss_name: str,
+        submitted_deletions: list[AzureSubmittedDeletion],
+        failed_deletions: list[AzureSubmittedDeletion],
+    ) -> None:
+        """Raise when any flexible VMSS member delete submission fails."""
+        if not failed_deletions:
+            return
+
+        failed_requested_ids = [
+            requested_id
+            for deletion in failed_deletions
+            if (requested_id := deletion.get("requested_id")) is not None
+        ]
+        raise TerminationError(
+            (
+                f"Failed to submit deletion for {len(failed_deletions)} of "
+                f"{len(machine_ids)} VMSS member(s)"
+            ),
+            resource_ids=failed_requested_ids,
+            details={
+                "resource_group": resource_group,
+                "vmss_name": vmss_name,
+                "submitted_deletions": submitted_deletions,
+                "failed_deletions": failed_deletions,
+            },
         )
 
     async def _build_release_plan_async(
@@ -692,7 +735,23 @@ class VMSSHandler(AzureHandler):
                 if candidate not in (None, ""):
                     lookup[str(candidate)] = resolved_vm_name
 
-        resolved = [lookup.get(str(machine_id), str(machine_id)) for machine_id in machine_ids]
+        unresolved_ids = [
+            str(machine_id)
+            for machine_id in machine_ids
+            if str(machine_id) not in lookup
+        ]
+        if unresolved_ids:
+            raise TerminationError(
+                f"Could not resolve {len(unresolved_ids)} requested Flexible VMSS member ID(s)",
+                resource_ids=unresolved_ids,
+                details={
+                    "vmss_name": vmss_name,
+                    "unresolved_ids": unresolved_ids,
+                    "available_member_ids": sorted(lookup),
+                },
+            )
+
+        resolved = [lookup[str(machine_id)] for machine_id in machine_ids]
         if resolved != [str(machine_id) for machine_id in machine_ids]:
             logger.debug(
                 "Resolved Flexible VMSS machine IDs for '%s': %s -> %s",
@@ -714,46 +773,49 @@ class VMSSHandler(AzureHandler):
         if not machine_ids:
             return []
 
-        resolved: list[str] = []
+        lookup: dict[str, str] = {}
+        for vm in current_members:
+            if not isinstance(vm, dict):
+                continue
+            vmss_instance_id = str(vm.get("instance_id", "") or "")
+            if not vmss_instance_id:
+                continue
+            lookup[vmss_instance_id] = vmss_instance_id
 
-        try:
-            lookup: dict[str, str] = {}
-            for vm in current_members:
-                if not isinstance(vm, dict):
-                    continue
-                vmss_instance_id = str(vm.get("instance_id", "") or "")
-                if not vmss_instance_id:
-                    continue
-                lookup[vmss_instance_id] = vmss_instance_id
+            provider_data = vm.get("provider_data")
+            vm_id = provider_data.get("vm_id") if isinstance(provider_data, dict) else None
+            if vm_id:
+                lookup[str(vm_id)] = vmss_instance_id
 
-                provider_data = vm.get("provider_data")
-                vm_id = provider_data.get("vm_id") if isinstance(provider_data, dict) else None
-                if vm_id:
-                    lookup[str(vm_id)] = vmss_instance_id
+            vm_name = provider_data.get("vm_name") if isinstance(provider_data, dict) else None
+            if vm_name:
+                lookup[str(vm_name)] = vmss_instance_id
 
-                vm_name = provider_data.get("vm_name") if isinstance(provider_data, dict) else None
-                if vm_name:
-                    lookup[str(vm_name)] = vmss_instance_id
-
-            for machine_id in machine_ids:
-                machine_id_str = str(machine_id)
-                resolved.append(lookup.get(machine_id_str, machine_id_str))
-
-            if resolved != [str(mid) for mid in machine_ids]:
-                logger.debug(
-                    "Resolved VMSS machine IDs for '%s': %s -> %s",
-                    vmss_name,
-                    machine_ids,
-                    resolved,
-                )
-            return resolved
-        except Exception as exc:
-            logger.warning(
-                "Failed to resolve VMSS instance IDs for '%s', using provided IDs: %s",
-                vmss_name,
-                exc,
+        unresolved_ids = [
+            str(machine_id)
+            for machine_id in machine_ids
+            if str(machine_id) not in lookup
+        ]
+        if unresolved_ids:
+            raise TerminationError(
+                f"Could not resolve {len(unresolved_ids)} requested VMSS member ID(s)",
+                resource_ids=unresolved_ids,
+                details={
+                    "vmss_name": vmss_name,
+                    "unresolved_ids": unresolved_ids,
+                    "available_member_ids": sorted(lookup),
+                },
             )
-            return [str(mid) for mid in machine_ids]
+
+        resolved = [lookup[str(machine_id)] for machine_id in machine_ids]
+        if resolved != [str(mid) for mid in machine_ids]:
+            logger.debug(
+                "Resolved VMSS machine IDs for '%s': %s -> %s",
+                vmss_name,
+                machine_ids,
+                resolved,
+            )
+        return resolved
 
     async def _resolve_vmss_instance_ids_async(
         self,

@@ -5,8 +5,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import orb.providers.azure.infrastructure.handlers.vmss_handler as vmss_handler_module
 from orb.providers.azure.domain.template.value_objects import AzureVMSSOrchestrationMode
-from orb.providers.azure.exceptions.azure_exceptions import AzureValidationError
-from orb.providers.azure.infrastructure.handlers.azure_handler import AzureReleaseContext
+from orb.providers.azure.exceptions.azure_exceptions import AzureValidationError, TerminationError
+from orb.providers.azure.infrastructure.handlers.azure_handler import (
+    AzureReleaseContext,
+    RAISE_ON_STATUS_ERROR_METADATA_KEY,
+)
 from orb.providers.azure.infrastructure.handlers.vmss_handler import VMSSHandler
 from tests.providers.azure.strategy_test_support import (
     AsyncPager,
@@ -424,7 +427,7 @@ async def test_release_hosts_async_marks_flexible_vmss_for_cleanup_when_last_ins
 
 
 @pytest.mark.asyncio
-async def test_release_hosts_async_reports_partial_flexible_vmss_delete_failures():
+async def test_release_hosts_async_raises_on_partial_flexible_vmss_delete_failures():
     azure_client = _make_azure_client()
     logger = MagicMock()
     handler = VMSSHandler(azure_client=azure_client, logger=logger)
@@ -440,24 +443,50 @@ async def test_release_hosts_async_reports_partial_flexible_vmss_delete_failures
         return_value=[{"instance_id": "vm-a"}, {"instance_id": "vm-b"}, {"instance_id": "vm-c"}]
     )
 
-    result = await handler.release_hosts_async(
-        machine_ids=["vm-a", "vm-b"],
-        resource_id="vmss-azure-test",
-        context=AzureReleaseContext(resource_group="test-rg"),
+    with pytest.raises(TerminationError) as exc_info:
+        await handler.release_hosts_async(
+            machine_ids=["vm-a", "vm-b"],
+            resource_id="vmss-azure-test",
+            context=AzureReleaseContext(resource_group="test-rg"),
+        )
+
+    exc = exc_info.value
+    assert exc.resource_ids == ["vm-b"]
+    assert exc.details["submitted_deletions"] == [
+        {"requested_id": "vm-a", "vm_name": "vm-a"}
+    ]
+    assert exc.details["failed_deletions"] == [
+        {"requested_id": "vm-b", "vm_name": "vm-b", "error": "delete failed"}
+    ]
+    logger.error.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_release_hosts_async_skips_empty_vmss_delete_after_flexible_member_failure():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+    async_compute = MagicMock()
+    async_compute.virtual_machines.begin_delete = AsyncMock(
+        side_effect=[None, RuntimeError("delete failed")]
+    )
+    async_compute.virtual_machine_scale_sets.begin_delete = AsyncMock()
+    azure_client.get_async_compute_client = AsyncMock(return_value=async_compute)
+    handler._get_vmss_orchestration_mode_async = AsyncMock(
+        return_value=AzureVMSSOrchestrationMode.FLEXIBLE
+    )
+    handler._list_vmss_instances_async = AsyncMock(
+        return_value=[{"instance_id": "vm-a"}, {"instance_id": "vm-b"}]
     )
 
-    assert result == {
-        "provider_data": {
-            "resource_group": "test-rg",
-            "vmss_name": "vmss-azure-test",
-            "operation_status": "submitted",
-            "submitted_deletions": [{"requested_id": "vm-a", "vm_name": "vm-a"}],
-            "failed_deletions": [
-                {"requested_id": "vm-b", "vm_name": "vm-b", "error": "delete failed"}
-            ],
-        }
-    }
-    logger.error.assert_called()
+    with pytest.raises(TerminationError):
+        await handler.release_hosts_async(
+            machine_ids=["vm-a", "vm-b"],
+            resource_id="vmss-azure-test",
+            context=AzureReleaseContext(resource_group="test-rg"),
+        )
+
+    async_compute.virtual_machine_scale_sets.begin_delete.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -483,7 +512,7 @@ async def test_submit_vmss_delete_if_emptying_async_returns_retry_pending_when_d
     }
 
 
-def test_vmss_status_raises_when_strict_mode_and_listing_fails():
+def test_vmss_status_raises_when_explicit_status_errors_are_fatal():
     azure_client = _make_azure_client()
     logger = MagicMock()
     handler = VMSSHandler(azure_client=azure_client, logger=logger)
@@ -494,10 +523,72 @@ def test_vmss_status_raises_when_strict_mode_and_listing_fails():
     request.resource_ids = ["vmss-azure-test"]
     request.metadata = {
         "resource_group": "test-rg",
-        "fail_on_partial_status_error": True,
+        RAISE_ON_STATUS_ERROR_METADATA_KEY: True,
     }
 
     with pytest.raises(RuntimeError, match="Failed to list instances for VMSS 'vmss-azure-test'"):
+        run_operation(handler.check_hosts_status_async(request))
+
+
+def test_vmss_status_rejects_non_boolean_status_error_policy():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+
+    request = MagicMock()
+    request.resource_ids = ["vmss-azure-test"]
+    request.metadata = {
+        "resource_group": "test-rg",
+        RAISE_ON_STATUS_ERROR_METADATA_KEY: "true",
+    }
+
+    with pytest.raises(AzureValidationError, match="must be a boolean"):
+        run_operation(handler.check_hosts_status_async(request))
+
+
+def test_vmss_status_raises_when_best_effort_has_no_successful_observations():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+
+    azure_client.compute_client.virtual_machine_scale_sets.get.side_effect = Exception(
+        "transient ARM failure"
+    )
+
+    request = MagicMock()
+    request.resource_ids = ["vmss-azure-test"]
+    request.metadata = {"resource_group": "test-rg"}
+
+    with pytest.raises(RuntimeError, match="Failed to list instances for VMSS 'vmss-azure-test'"):
+        run_operation(handler.check_hosts_status_async(request))
+
+
+def test_vmss_status_raises_after_partial_success_when_status_errors_are_fatal():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+
+    member_vm = MagicMock()
+    member_vm.instance_id = "1"
+    member_vm.vm_id = "vm-guid-1"
+    member_vm.name = "vmss_1"
+    member_vm.instance_view.statuses = []
+    member_vm.hardware_profile.vm_size = "Standard_D4s_v5"
+    member_vm.location = "eastus2"
+    member_vm.zones = []
+    azure_client.compute_client.virtual_machine_scale_set_vms.list.side_effect = [
+        [member_vm],
+        RuntimeError("transient ARM failure"),
+    ]
+
+    request = MagicMock()
+    request.resource_ids = ["vmss-ok", "vmss-fail"]
+    request.metadata = {
+        "resource_group": "test-rg",
+        RAISE_ON_STATUS_ERROR_METADATA_KEY: True,
+    }
+
+    with pytest.raises(RuntimeError, match="Failed to list instances for VMSS 'vmss-fail'"):
         run_operation(handler.check_hosts_status_async(request))
 
 
@@ -748,7 +839,7 @@ def test_vmss_release_marks_flexible_vmss_for_cleanup_when_last_instance_is_retu
     )
 
 
-def test_vmss_release_does_not_mark_flexible_vmss_for_cleanup_when_requested_ids_do_not_match_members():
+def test_vmss_release_rejects_unresolved_flexible_member_ids():
     azure_client = _make_azure_client()
     logger = MagicMock()
     handler = VMSSHandler(azure_client=azure_client, logger=logger)
@@ -765,22 +856,47 @@ def test_vmss_release_does_not_mark_flexible_vmss_for_cleanup_when_requested_ids
     azure_client.compute_client.virtual_machine_scale_sets.get.return_value = vmss
     azure_client.compute_client.virtual_machines.begin_delete.return_value = MagicMock()
 
-    result = run_operation(
-        handler.release_hosts_async(
-            machine_ids=["guid-a", "guid-b", "guid-c"],
-            resource_id="vmss-azure-test",
-            context=AzureReleaseContext(resource_group="test-rg"),
+    with pytest.raises(TerminationError) as exc_info:
+        run_operation(
+            handler.release_hosts_async(
+                machine_ids=["guid-a", "guid-b", "guid-c"],
+                resource_id="vmss-azure-test",
+                context=AzureReleaseContext(resource_group="test-rg"),
+            )
         )
+
+    exc = exc_info.value
+    assert exc.resource_ids == ["guid-a", "guid-b", "guid-c"]
+    assert exc.details["unresolved_ids"] == ["guid-a", "guid-b", "guid-c"]
+    azure_client.compute_client.virtual_machines.begin_delete.assert_not_called()
+    azure_client.compute_client.virtual_machine_scale_sets.begin_delete.assert_not_called()
+
+
+def test_vmss_release_rejects_unresolved_uniform_member_ids():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+    handler._list_vmss_instances_async = AsyncMock(
+        return_value=[{"instance_id": "3"}, {"instance_id": "4"}]
     )
 
-    assert "pending_resource_cleanup" not in result["provider_data"]
-    assert result["provider_data"]["submitted_deletions"] == [
-        {"requested_id": "guid-a", "vm_name": "guid-a"},
-        {"requested_id": "guid-b", "vm_name": "guid-b"},
-        {"requested_id": "guid-c", "vm_name": "guid-c"},
-    ]
-    assert _deleted_vm_names(azure_client) == ["guid-a", "guid-b", "guid-c"]
-    azure_client.compute_client.virtual_machine_scale_sets.begin_delete.assert_not_called()
+    vmss = MagicMock()
+    vmss.orchestration_mode = AzureVMSSOrchestrationMode.UNIFORM.value
+    azure_client.compute_client.virtual_machine_scale_sets.get.return_value = vmss
+
+    with pytest.raises(TerminationError) as exc_info:
+        run_operation(
+            handler.release_hosts_async(
+                machine_ids=["missing"],
+                resource_id="vmss-azure-test",
+                context=AzureReleaseContext(resource_group="test-rg"),
+            )
+        )
+
+    exc = exc_info.value
+    assert exc.resource_ids == ["missing"]
+    assert exc.details["unresolved_ids"] == ["missing"]
+    azure_client.compute_client.virtual_machine_scale_sets.begin_delete_instances.assert_not_called()
 
 
 def test_vmss_release_resolves_flexible_vm_ids_to_vm_names():

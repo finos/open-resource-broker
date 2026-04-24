@@ -514,7 +514,7 @@ class TestDescribeResourceInstances:
         assert result.error_code == "DESCRIBE_RESOURCE_INSTANCES_ERROR"
         strategy_harness.resource_manager.get_vmss_member_count_async.assert_not_called()
         forwarded_request = handler.check_hosts_status_async.await_args.args[0]
-        assert forwarded_request.metadata["fail_on_partial_status_error"] is True
+        assert forwarded_request.metadata["raise_on_status_error"] is True
 
     def test_describe_resource_instances_leaves_cleanup_pending_when_other_members_remain(
         self, strategy_harness
