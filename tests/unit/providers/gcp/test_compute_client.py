@@ -11,7 +11,7 @@ import pytest
 
 from orb.infrastructure.mocking.dry_run_context import dry_run_context
 from orb.providers.gcp.configuration.config import GCPProviderConfig
-from orb.providers.gcp.exceptions import GCPConfigurationError, GCPDryRunBlockedError
+from orb.providers.gcp.exceptions import GCPDryRunBlockedError
 from orb.providers.gcp.infrastructure.compute_client import (
     GCPComputeClient,
     GCP_MUTATION_RETRYABLE_GOOGLE_API_EXCEPTIONS,
@@ -260,15 +260,3 @@ def test_compute_client_blocks_real_calls_when_dry_run_is_active() -> None:
 
         with pytest.raises(GCPDryRunBlockedError, match="get_image_from_family"):
             client.get_image_from_family(image_project="debian-cloud", family="debian-12")
-
-
-def test_get_instances_client_raises_configuration_error_when_sdk_client_init_returns_none(
-    monkeypatch,
-) -> None:
-    fake_compute_v1 = SimpleNamespace(InstancesClient=lambda: None)
-    client = GCPComputeClient(config=_config(), logger=MagicMock())
-
-    monkeypatch.setattr(client, "_compute_v1", lambda: fake_compute_v1)
-
-    with pytest.raises(GCPConfigurationError, match="Failed to initialize GCP InstancesClient"):
-        client._get_instances_client()

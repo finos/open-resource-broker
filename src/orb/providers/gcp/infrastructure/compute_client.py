@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from orb.domain.base.ports import LoggingPort
 from orb.providers.gcp.configuration.config import GCPProviderConfig
-from orb.providers.gcp.exceptions import GCPConfigurationError, GCPDryRunBlockedError
+from orb.providers.gcp.exceptions import GCPDryRunBlockedError
 from orb.providers.gcp.types import GCPInstanceRecord, GCPManagedInstanceRecord
 from orb.infrastructure.mocking.dry_run_context import is_dry_run_active
 
@@ -429,36 +429,36 @@ class GCPComputeClient:
         return compute_v1
 
     def _get_instances_client(self) -> InstancesClient:
-        if self._instances_client is None:
-            self._instances_client = self._compute_v1().InstancesClient()
-        if self._instances_client is None:
-            raise GCPConfigurationError("Failed to initialize GCP InstancesClient")
-        return self._instances_client
+        client = self._instances_client
+        if client is None:
+            client = self._compute_v1().InstancesClient()
+            self._instances_client = client
+        return client
 
     def _get_instance_templates_client(self) -> InstanceTemplatesClient:
-        if self._instance_templates_client is None:
-            self._instance_templates_client = self._compute_v1().InstanceTemplatesClient()
-        if self._instance_templates_client is None:
-            raise GCPConfigurationError("Failed to initialize GCP InstanceTemplatesClient")
-        return self._instance_templates_client
+        client = self._instance_templates_client
+        if client is None:
+            client = self._compute_v1().InstanceTemplatesClient()
+            self._instance_templates_client = client
+        return client
 
     def _get_region_igm_client(self) -> RegionInstanceGroupManagersClient:
-        if self._region_igm_client is None:
-            self._region_igm_client = self._compute_v1().RegionInstanceGroupManagersClient()
-        if self._region_igm_client is None:
-            raise GCPConfigurationError("Failed to initialize GCP RegionInstanceGroupManagersClient")
-        return self._region_igm_client
+        client = self._region_igm_client
+        if client is None:
+            client = self._compute_v1().RegionInstanceGroupManagersClient()
+            self._region_igm_client = client
+        return client
 
     def _get_zone_igm_client(self) -> InstanceGroupManagersClient:
-        if self._zone_igm_client is None:
-            self._zone_igm_client = self._compute_v1().InstanceGroupManagersClient()
-        if self._zone_igm_client is None:
-            raise GCPConfigurationError("Failed to initialize GCP InstanceGroupManagersClient")
-        return self._zone_igm_client
+        client = self._zone_igm_client
+        if client is None:
+            client = self._compute_v1().InstanceGroupManagersClient()
+            self._zone_igm_client = client
+        return client
 
     def _get_images_client(self) -> ImagesClient:
-        if self._images_client is None:
-            self._images_client = self._compute_v1().ImagesClient()
-        if self._images_client is None:
-            raise GCPConfigurationError("Failed to initialize GCP ImagesClient")
-        return self._images_client
+        client = self._images_client
+        if client is None:
+            client = self._compute_v1().ImagesClient()
+            self._images_client = client
+        return client
