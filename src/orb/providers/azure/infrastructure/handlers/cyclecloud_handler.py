@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from contextlib import asynccontextmanager
+from collections.abc import Awaitable, Callable
 from typing import Any, Optional
 
 import httpx
@@ -320,7 +321,7 @@ def _parse_cyclecloud_node_result(node: dict[str, Any]) -> CycleCloudNode:
 
 def _response_json_or_error(
     *,
-    response: Any,
+    response: httpx.Response,
     url: str,
     decode_error_types: tuple[type[BaseException], ...],
 ) -> Any:
@@ -337,7 +338,7 @@ def _response_json_or_error(
     return body
 
 
-def _response_metadata(response: Any, *, url: str) -> dict[str, Any]:
+def _response_metadata(response: httpx.Response, *, url: str) -> dict[str, Any]:
     """Normalize response metadata returned from sync or async HTTP transports."""
     return {
         "headers": dict(response.headers),
@@ -519,7 +520,7 @@ class CycleCloudHandler(AzureHandler):
     async def _resolve_release_node_targets_via_fetch_async(
         self,
         *,
-        fetch_nodes: Any,
+        fetch_nodes: Callable[[], Awaitable[dict[str, Any]]],
         machine_ids: list[str],
     ) -> dict[str, list[str]]:
         """Async variant of release-target resolution using fetched cluster nodes."""
@@ -667,7 +668,7 @@ class CycleCloudHandler(AzureHandler):
         self,
         *,
         cluster_name: str,
-        fetch_cluster_status: Any,
+        fetch_cluster_status: Callable[[], Awaitable[dict[str, Any]]],
     ) -> None:
         """Async variant of CycleCloud cluster existence validation."""
         try:
@@ -841,8 +842,8 @@ class CycleCloudHandler(AzureHandler):
         *,
         cluster_name: str,
         machine_ids: list[str],
-        resolve_node_targets: Any,
-        submit_terminate: Any,
+        resolve_node_targets: Callable[[], Awaitable[dict[str, list[str]]]],
+        submit_terminate: Callable[[dict[str, Any]], Awaitable[dict[str, Any]]],
     ) -> AzureReleaseHostsResult:
         """Async variant of CycleCloud node termination submission."""
         self._logger.info(
@@ -864,7 +865,7 @@ class CycleCloudHandler(AzureHandler):
         cluster_name: str,
         machine_ids: list[str],
         node_targets: dict[str, list[str]],
-        submit_terminate: Any,
+        submit_terminate: Callable[[dict[str, Any]], Awaitable[dict[str, Any]]],
     ) -> AzureReleaseHostsResult:
         """Submit a prepared CycleCloud termination payload through the async client."""
         try:
