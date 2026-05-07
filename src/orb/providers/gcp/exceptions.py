@@ -24,7 +24,7 @@ class GCPError(InfrastructureError):
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the error to a structured dictionary."""
-        result: dict[str, Any] = super().to_dict()  # type: ignore[attr-defined]
+        result: dict[str, Any] = super().to_dict()
         if self.error_code and self.error_code != self.__class__.__name__:
             result["error_code"] = self.error_code
         return result

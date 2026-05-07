@@ -32,6 +32,15 @@ class AzureTemplateCatalogService:
             from orb.infrastructure.scheduler.registry import get_scheduler_registry
 
             scheduler_registry = get_scheduler_registry()
+            # TODO: SchedulerRegistry.get_active_strategy() does not exist; this
+            # call raises AttributeError at runtime, which the outer try/except
+            # below swallows so we always fall back to hardcoded templates.
+            # Either implement get_active_strategy() on SchedulerRegistry (the
+            # registry advertises SINGLE_CHOICE mode but exposes no accessor for
+            # the active type's strategy instance) or delete this code path and
+            # call get_fallback_templates() directly. Same bug at
+            # aws/services/template_validation_service.py:34. See
+            # provider-quality-comparison.md defect #54.
             scheduler_strategy = cast(
                 SchedulerTemplateStrategy | None,
                 scheduler_registry.get_active_strategy(),  # type: ignore[attr-defined]
