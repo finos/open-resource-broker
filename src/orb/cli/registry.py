@@ -203,6 +203,7 @@ def build_registry() -> None:
         handle_list_requests,
         handle_request_machines,
         handle_request_return_machines,
+        handle_watch_request_status,
     )
 
     register("requests", "show", handle_get_request_status)
@@ -210,6 +211,7 @@ def build_registry() -> None:
     register("requests", "list", handle_list_requests)
     register("requests", "cancel", handle_cancel_request)
     register("requests", "list-returns", handle_get_return_requests)
+    register("requests", "watch", handle_watch_request_status)
 
     # --- machines ---
     from orb.interface.machine_command_handlers import (

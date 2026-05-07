@@ -64,7 +64,6 @@ async def test_list_machines_sync_preserves_unique_ids():
         uow_factory=mock_uow_factory,
         container=MagicMock(),
         command_bus=MagicMock(),
-        timestamp_service=MagicMock(format_with_type=lambda v, f: str(v)),
         generic_filter_service=MagicMock(),
         machine_sync_service=mock_sync,
     )

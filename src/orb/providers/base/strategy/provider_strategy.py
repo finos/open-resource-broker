@@ -60,6 +60,7 @@ class ProviderResult(BaseModel):
     error_message: Optional[str] = None
     error_code: Optional[str] = None
     metadata: dict[str, Any] = {}
+    routing_info: Optional[dict[str, Any]] = None
 
     @model_validator(mode="after")
     def error_message_required_on_failure(self) -> "ProviderResult":

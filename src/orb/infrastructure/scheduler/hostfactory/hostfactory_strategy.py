@@ -424,7 +424,9 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "template_id": raw_data.get("templateId"),
             "name": raw_data.get("name"),
             "description": raw_data.get("description"),
-            # Instance configuration
+            # Instance configuration — vmType/vmTypes mapped to machine_types using
+            # the same logic as _transform_machine_types_input so both code paths
+            # produce identical output.
             "instance_type": raw_data.get("vmType"),
             "image_id": raw_data.get("imageId"),
             "max_instances": raw_data.get("maxNumber", 1),
@@ -445,8 +447,6 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "updated_at": raw_data.get("updatedAt"),
             "is_active": raw_data.get("isActive", True),
             # HostFactory-specific fields
-            "vm_type": raw_data.get("vmType"),
-            "vm_types": raw_data.get("vmTypes", {}),
             "key_name": raw_data.get("keyName"),
             "user_data": raw_data.get("userData"),
             # Native spec fields
@@ -455,6 +455,9 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "provider_api_spec": raw_data.get("provider_api_spec"),
             "provider_api_spec_file": raw_data.get("provider_api_spec_file"),
         }
+
+        # Map vmType/vmTypes → machine_types (same logic as _transform_machine_types_input)
+        domain_data.update(self._transform_machine_types_input(raw_data))
 
         # Create TemplateDTO object with validation
         return cast(TemplateDTO, TemplateDTO.from_dict(domain_data))
@@ -557,6 +560,37 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "total_count": len(formatted_templates),
         }
 
+    def format_return_requests_response(self, requests: list[Any]) -> dict[str, Any]:
+        """HF-spec-compliant getReturnRequests response.
+
+        Flattens each request's machines into individual {machine, gracePeriod}
+        items per IBM Symphony HF 7.3.2 spec. The request-level grace_period
+        applies to every machine in that request.
+        """
+        items: list[dict[str, Any]] = []
+        for r in requests:
+            d = (
+                r
+                if isinstance(r, dict)
+                else (r.to_dict() if hasattr(r, "to_dict") else r.model_dump())
+            )
+            grace_period = int(d.get("grace_period", 0))
+            machines = d.get("machines") or d.get("machine_references") or []
+            for m in machines:
+                m_dict = m if isinstance(m, dict) else (m.to_dict() if hasattr(m, "to_dict") else m)
+                # Fall back to machine_id when hostname is absent so the item
+                # stays non-empty — HF still accepts the entry.
+                identifier = m_dict.get("name") or m_dict.get("machine_id")
+                if identifier:
+                    items.append({"machine": identifier, "gracePeriod": grace_period})
+        return {
+            "status": "complete",
+            "message": "Return requests retrieved successfully."
+            if items
+            else "No machines to return.",
+            "requests": items,
+        }
+
     def _build_hf_attributes(self, instance_type: str) -> dict[str, list[str]]:
         """Build IBM HF attributes dict from an instance type string."""
         from orb.providers.aws.utilities.ec2.instances import derive_cpu_ram_from_instance_type
@@ -565,7 +599,6 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         return {
             "type": ["String", "X86_64"],
             "ncpus": ["Numeric", str(ncpus)],
-            "ncores": ["Numeric", str(ncpus)],
             "nram": ["Numeric", str(nram)],
         }
 
@@ -646,11 +679,12 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
                 {
                     # Domain -> HostFactory field mapping using consistent serialization
                     "machineId": str(machine.machine_id),
-                    "templateId": str(machine.template_id),
-                    "requestId": str(machine.request_id),
+                    "templateId": machine.template_id or "",
+                    "requestId": machine.request_id or "",
                     "returnRequestId": machine.return_request_id,
+                    "cloudHostId": machine.cloud_host_id,
                     "vmType": str(machine.instance_type),
-                    "imageId": str(machine.image_id),
+                    "imageId": machine.image_id or "",
                     "privateIp": machine.private_ip,
                     "publicIp": machine.public_ip,
                     "subnetId": machine.subnet_id,
@@ -671,7 +705,6 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "name": machine_data.get("name"),
             "status": machine_data.get("status"),
             "provider": machine_data.get("provider_type") or "aws",
-            "region": machine_data.get("region"),
             "machineId": machine_data.get("machine_id"),
             "returnRequestId": machine_data.get("return_request_id"),
             "vmType": machine_data.get("instance_type"),
@@ -809,7 +842,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
                     machine.get("status_reason")
                     or machine.get("error")
                     or machine.get("message")
-                    or ""
+                    or "Machine failed (no detail available)"
                 )
             else:
                 message = machine.get("message", "")
@@ -854,11 +887,8 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
                 formatted_machine["instanceType"] = machine["instance_type"]
             if machine.get("price_type"):
                 formatted_machine["priceType"] = machine["price_type"]
-            if machine.get("instance_tags"):
-                tags = machine["instance_tags"]
-                formatted_machine["instanceTags"] = (
-                    json.dumps(tags) if isinstance(tags, dict) else str(tags)
-                )
+            if machine.get("tags"):
+                formatted_machine["instanceTags"] = json.dumps(machine["tags"], sort_keys=True)
 
             formatted_machines.append(formatted_machine)
 

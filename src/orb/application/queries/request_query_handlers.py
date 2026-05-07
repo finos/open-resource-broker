@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from orb.application.base.handlers import BaseQueryHandler
 from orb.application.decorators import query_handler
 from orb.application.dto.queries import (
@@ -54,7 +56,11 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
         self.logger.info("Getting request details for: %s", query.request_id)
 
         try:
-            if self._cache_service and self._cache_service.is_caching_enabled():
+            if (
+                not query.skip_cache
+                and self._cache_service
+                and self._cache_service.is_caching_enabled()
+            ):
                 cached_result = self._cache_service.get_cached_request(query.request_id)
                 if cached_result:
                     self.logger.info("Cache hit for request: %s", query.request_id)
@@ -99,6 +105,13 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     sync_err,
                 )
                 return self._dto_factory.create_from_domain(request, [])
+
+            # Deliberate query-time mutation: record when this request was polled for status.
+            # first_status_check is set once; last_status_check is updated on every poll.
+            updated = request.record_status_check(now=datetime.now(timezone.utc))
+            with self.uow_factory.create_unit_of_work() as uow:
+                uow.requests.save(updated)
+            request = updated
 
             machine_objects = await self._query_service.get_machines_for_request(request)
             request_dto = self._dto_factory.create_from_domain(request, machine_objects)

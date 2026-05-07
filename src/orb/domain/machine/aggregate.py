@@ -1,7 +1,7 @@
 """Machine aggregate - core machine domain logic."""
 
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, ClassVar, Optional
 
 from pydantic import ConfigDict, Field
 
@@ -22,13 +22,25 @@ class Machine(AggregateRoot):
         populate_by_name=True,  # Allow both field names and aliases
     )
 
+    # Fields that are intentionally NOT persisted by MachineSerializer.
+    # Adding anything here is a deliberate decision to drop it on save.
+    # If you add a field to Machine, either add it to MachineSerializer
+    # or add it to this set with a comment explaining why.
+    _SERIALIZATION_EXCLUDED_FIELDS: ClassVar[frozenset[str]] = frozenset(
+        {
+            # Inherited from Entity; used as an internal Pydantic/aggregate identity
+            # key but machine_id is the canonical persisted identifier.
+            "id",
+        }
+    )
+
     # Core machine identification
     machine_id: MachineId
     name: Optional[str] = None
     template_id: str
     request_id: Optional[str] = None
     return_request_id: Optional[str] = None
-    provider_type: str
+    provider_type: str = Field(default="aws")
     provider_name: str
     provider_api: Optional[str] = None
     resource_id: Optional[str] = None
@@ -53,7 +65,15 @@ class Machine(AggregateRoot):
 
     # Lifecycle timestamps
     launch_time: Optional[datetime] = None
-    launched_at: Optional[datetime] = None
+    """AWS-reported timestamp when the instance actually started running.
+    Set when the machine transitions to RUNNING status (sourced from the
+    cloud provider, e.g. EC2 LaunchTime). Used for uptime calculations,
+    DTOs, and external consumers."""
+    provisioning_started_at: Optional[datetime] = None
+    """ORB-internal timestamp recording when this broker initiated the
+    launch sequence (i.e. when start_launching() was called and the
+    machine moved from PENDING → LAUNCHING). Not propagated to DTOs or
+    external consumers — use launch_time for provider-reported start time."""
     termination_time: Optional[datetime] = None
 
     # Tags and metadata
@@ -95,7 +115,7 @@ class Machine(AggregateRoot):
 
         fields = self.model_dump()
         fields["status"] = MachineStatus.LAUNCHING
-        fields["launched_at"] = datetime.now(timezone.utc)
+        fields["provisioning_started_at"] = datetime.now(timezone.utc)
         fields["version"] = self.version + 1
 
         updated_machine = Machine.model_validate(fields)
@@ -112,7 +132,7 @@ class Machine(AggregateRoot):
             reason="Machine launching initiated",
             metadata={
                 "reason": "Machine launching initiated",
-                "timestamp": fields["launched_at"].isoformat(),
+                "timestamp": fields["provisioning_started_at"].isoformat(),
                 "machine_type": str(self.instance_type),
                 "provider_type": self.provider_type,
             },
@@ -220,6 +240,25 @@ class Machine(AggregateRoot):
     def get_provider_data(self, key: str, default: Any = None) -> Any:
         """Get provider-specific data value."""
         return self.provider_data.get(key, default)
+
+    @property
+    def display_name(self) -> str:
+        """Resolve a human-readable name for the machine.
+
+        Resolution chain (first non-empty value wins):
+          1. ``name``            — explicitly set name
+          2. ``private_dns_name`` — AWS-assigned private DNS
+          3. ``public_dns_name``  — AWS-assigned public DNS
+          4. ``private_ip``       — private IP address
+          5. ``str(machine_id)``  — always available fallback
+        """
+        return (
+            self.name
+            or self.private_dns_name
+            or self.public_dns_name
+            or (str(self.private_ip) if self.private_ip else None)
+            or str(self.machine_id)
+        )
 
     @property
     def is_running(self) -> bool:

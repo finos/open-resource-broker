@@ -175,6 +175,35 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
             template_dict, provider_name
         )
 
+    def format_return_requests_response(self, requests: list[Any]) -> dict[str, Any]:
+        """Default permissive shape — human-readable, not wire-constrained."""
+
+        def _d(x: Any) -> dict[str, Any]:
+            if isinstance(x, dict):
+                return x
+            if hasattr(x, "to_dict"):
+                return x.to_dict()
+            if hasattr(x, "model_dump"):
+                return x.model_dump()
+            return {}
+
+        out = []
+        for r in requests:
+            d = _d(r)
+            out.append(
+                {
+                    "request_id": d.get("request_id"),
+                    "status": d.get("status"),
+                    "message": d.get("message"),
+                    "grace_period": d.get("grace_period"),
+                    "machines": [
+                        {"machine_id": _d(m).get("machine_id"), "name": _d(m).get("name")}
+                        for m in (d.get("machines") or d.get("machine_references") or [])
+                    ],
+                }
+            )
+        return {"return_requests": out}
+
     def format_request_status_response(self, requests: list[RequestDTO]) -> dict[str, Any]:
         """Format RequestDTOs passing domain status values through unchanged.
 

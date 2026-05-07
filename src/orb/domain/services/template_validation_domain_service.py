@@ -193,7 +193,11 @@ class TemplateValidationDomainService:
 
         fleet_type = getattr(template, "fleet_type", None)
         if not fleet_type:
-            fleet_type = template.metadata.get("fleet_type") if template.metadata else None
+            fleet_type = (
+                template.provider_data.get("aws", {}).get("fleet_type")
+                if template.provider_data
+                else None
+            )
 
         if not fleet_type:
             return

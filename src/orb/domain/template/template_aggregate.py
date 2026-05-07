@@ -63,6 +63,9 @@ class Template(BaseModel):
     tags: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+    # Provider-specific data (keyed by provider name, e.g. {"aws": {...}})
+    provider_data: dict[str, Any] = Field(default_factory=dict)
+
     # Provider configuration (multi-provider support)
     provider_type: Optional[str] = None
     provider_name: Optional[str] = None
@@ -223,13 +226,6 @@ class Template(BaseModel):
             fields["updated_at"] = datetime.now()
             return self.__class__.model_validate(fields)
         return self
-
-    def set_provider_config(self, config: dict[str, Any]) -> "Template":
-        """Set provider-specific configuration."""
-        fields = self.model_dump(mode="json")
-        fields["provider_config"] = {**self.provider_config, **config}  # type: ignore[attr-defined]
-        fields["updated_at"] = datetime.now()
-        return Template.model_validate(fields)
 
     def __str__(self) -> str:
         """Return string representation of template."""

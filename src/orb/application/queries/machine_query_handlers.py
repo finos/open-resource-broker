@@ -22,7 +22,6 @@ from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.exceptions import EntityNotFoundError
 from orb.domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
 from orb.domain.services.generic_filter_service import GenericFilterService
-from orb.domain.services.timestamp_service import TimestampService
 
 
 @query_handler(GetMachineQuery)
@@ -34,11 +33,9 @@ class GetMachineHandler(BaseQueryHandler[GetMachineQuery, MachineDTO]):
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-        timestamp_service: TimestampService,
     ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
-        self.timestamp_service = timestamp_service
 
     async def execute_query(self, query: GetMachineQuery) -> MachineDTO:
         """Execute get machine query."""
@@ -50,32 +47,7 @@ class GetMachineHandler(BaseQueryHandler[GetMachineQuery, MachineDTO]):
                 if not machine:
                     raise EntityNotFoundError("Machine", query.machine_id)
 
-                machine_dto = MachineDTO(
-                    machine_id=str(machine.machine_id),
-                    name=machine.name or str(machine.machine_id),
-                    status=machine.status.value,
-                    instance_type=str(machine.instance_type),
-                    private_ip=machine.private_ip or "unknown",
-                    public_ip=machine.public_ip,
-                    private_dns_name=machine.private_dns_name,
-                    public_dns_name=machine.public_dns_name,
-                    result=MachineDTO._get_result_status(machine.status.value),
-                    launch_time=self.timestamp_service.format_for_dto(machine.launch_time),
-                    message=machine.status_reason or "",
-                    provider_api=machine.provider_api,
-                    provider_name=machine.provider_name,
-                    provider_type=machine.provider_type,
-                    resource_id=machine.resource_id,
-                    request_id=machine.request_id,
-                    metadata=machine.metadata or {},
-                    template_id=machine.template_id,
-                    image_id=machine.image_id,
-                    subnet_id=machine.subnet_id,
-                    security_group_ids=machine.security_group_ids,
-                    status_reason=machine.status_reason,
-                    termination_time=machine.termination_time,
-                    tags=machine.tags,
-                )
+                machine_dto = MachineDTO.from_domain(machine)
 
                 self.logger.info("Retrieved machine: %s", query.machine_id)
                 return machine_dto
@@ -99,7 +71,6 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, list[MachineDTO]])
         error_handler: ErrorHandlingPort,
         container: ContainerPort,
         command_bus: CommandBusPort,
-        timestamp_service: TimestampService,
         generic_filter_service: GenericFilterService,
         machine_sync_service: MachineSyncService,
     ) -> None:
@@ -107,7 +78,6 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, list[MachineDTO]])
         self.uow_factory = uow_factory
         self.container = container
         self.command_bus = command_bus
-        self.timestamp_service = timestamp_service
         self._generic_filter_service = generic_filter_service
         self._machine_sync_service = machine_sync_service
 
@@ -169,37 +139,8 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, list[MachineDTO]])
                         except Exception as e:
                             self.logger.debug(f"Sync failed for machine {machine.machine_id}: {e}")
 
-                    machine_dto = MachineDTO(
-                        machine_id=str(machine.machine_id),
-                        name=machine.name or str(machine.machine_id),
-                        status=machine.status.value,
-                        instance_type=str(machine.instance_type),
-                        private_ip=machine.private_ip or "unknown",
-                        public_ip=machine.public_ip,
-                        private_dns_name=machine.private_dns_name,
-                        public_dns_name=machine.public_dns_name,
-                        price_type=machine.price_type,
-                        result=MachineDTO._get_result_status(machine.status.value),
-                        launch_time=self.timestamp_service.format_with_type(
-                            machine.launch_time, query.timestamp_format or "auto"
-                        ),
-                        message=machine.status_reason or "",
-                        provider_api=machine.provider_api,
-                        provider_name=machine.provider_name,
-                        provider_type=machine.provider_type,
-                        resource_id=machine.resource_id,
-                        request_id=machine.request_id,
-                        return_request_id=machine.return_request_id,
-                        metadata=machine.metadata or {},
-                        subnet_id=machine.subnet_id,
-                        security_group_ids=machine.security_group_ids or [],
-                        template_id=machine.template_id,
-                        image_id=machine.image_id,
-                        status_reason=machine.status_reason,
-                        termination_time=str(machine.termination_time)
-                        if machine.termination_time is not None
-                        else None,
-                        tags=machine.tags,
+                    machine_dto = MachineDTO.from_domain(
+                        machine, timestamp_format=query.timestamp_format or "auto"
                     )
                     machine_dtos.append(machine_dto)
 

@@ -418,7 +418,10 @@ class TestMCPRequestLifecycle:
         return_request_id = return_payload.get("request_id") or return_payload.get("requestId")
         assert return_request_id, f"No return_request_id from return_machines: {return_payload}"
 
-        # 4. Poll list_return_requests until the entry reaches complete
+        # 4. Poll list_return_requests until our machine appears in the flat items list.
+        # The HF spec shape is: {status, message, requests: [{machine, gracePeriod}, ...]}
+        # The top-level status is always "complete" once the call succeeds; we verify
+        # our machine_id appears in the returned items.
         status_reached = False
         for _ in range(20):
             list_resp = await _send(
@@ -427,18 +430,19 @@ class TestMCPRequestLifecycle:
             assert not _has_error(list_resp), (
                 f"list_return_requests error: {list_resp.get('error')}"
             )
-            entries = _tool_text(list_resp).get("requests", [])
-            for entry in entries:
-                if isinstance(entry, dict):
-                    entry_id = entry.get("request_id") or entry.get("requestId")
-                    if entry_id == return_request_id and entry.get("status") == "complete":
-                        status_reached = True
-                        break
-            if status_reached:
-                break
+            payload = _tool_text(list_resp)
+            # HF spec: top-level status field signals overall call success
+            if payload.get("status") == "complete":
+                entries = payload.get("requests", [])
+                # Each entry is a flat {machine, gracePeriod} item.
+                # Our machine_ids should appear as the "machine" field.
+                returned_machines = {e.get("machine") for e in entries if isinstance(e, dict)}
+                if any(mid in returned_machines for mid in machine_ids):
+                    status_reached = True
+                    break
             await asyncio.sleep(0.5)
 
-        # 5. Assert status == 'complete' was reached within deadline
+        # 5. Assert our machine appeared in the return requests list
         assert status_reached, (
             f"Return request {return_request_id!r} did not reach status 'complete' within deadline"
         )

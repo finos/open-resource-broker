@@ -6,8 +6,10 @@ from typing import Any, Optional
 from pydantic import Field
 
 from orb.application.dto.base import BaseDTO
+from orb.application.machine.result_mapping import map_machine_status_to_result
+from orb.domain.machine.aggregate import Machine
 from orb.domain.request.aggregate import Request
-from orb.domain.request.value_objects import MachineReference
+from orb.domain.request.request_types import RequestType
 
 
 class MachineReferenceDTO(BaseDTO):
@@ -21,7 +23,7 @@ class MachineReferenceDTO(BaseDTO):
     public_ip_address: Optional[str] = None  # Already using the expected API field name
     instance_type: Optional[str] = None
     price_type: Optional[str] = None
-    instance_tags: Optional[str] = None
+    tags: Optional[dict[str, str]] = None
     cloud_host_id: Optional[str] = None
     launch_time: Optional[int] = None
     request_id: Optional[str] = None
@@ -29,32 +31,39 @@ class MachineReferenceDTO(BaseDTO):
     message: str = ""
 
     @classmethod
-    def from_domain(cls, machine_ref: MachineReference) -> "MachineReferenceDTO":
+    def from_machine(cls, machine: Machine, request_type: RequestType) -> "MachineReferenceDTO":
         """
-        Create DTO from domain object.
+        Create DTO from a Machine aggregate and its request type.
+
+        This is the preferred constructor — it populates all HF-required fields
+        directly from the Machine aggregate and computes ``result`` using the
+        correct request-type-aware mapping.
 
         Args:
-            machine_ref: Machine reference domain object
+            machine: Machine aggregate
+            request_type: RequestType of the owning request (drives result mapping)
 
         Returns:
             MachineReferenceDTO instance
         """
-        # Extract fields from metadata if available (MachineReference may not have metadata)
-        metadata: dict = getattr(machine_ref, "metadata", None) or {}
+        status = machine.status.value if hasattr(machine.status, "value") else str(machine.status)
+        rt_str = request_type.value if hasattr(request_type, "value") else str(request_type)
 
         return cls(
-            machine_id=str(machine_ref.machine_id),
-            name=getattr(machine_ref, "name", ""),
-            result=cls.serialize_enum(machine_ref.result) or "",
-            status=cls.serialize_enum(machine_ref.status) or "",
-            private_ip_address=getattr(machine_ref, "private_ip", ""),
-            public_ip_address=getattr(machine_ref, "public_ip", None),
-            instance_type=metadata.get("instance_type"),
-            price_type=metadata.get("price_type"),
-            instance_tags=metadata.get("instance_tags"),
-            cloud_host_id=metadata.get("cloud_host_id"),
-            launch_time=metadata.get("launch_time"),
-            message=getattr(machine_ref, "message", machine_ref.error_message or ""),
+            machine_id=str(machine.machine_id.value),
+            name=machine.display_name,
+            result=map_machine_status_to_result(status, request_type=rt_str),
+            status=status,
+            private_ip_address=machine.private_ip or "",
+            public_ip_address=machine.public_ip,
+            instance_type=str(machine.instance_type) if machine.instance_type else None,
+            price_type=machine.price_type,
+            launch_time=int(machine.launch_time.timestamp()) if machine.launch_time else None,
+            cloud_host_id=machine.provider_data.get("cloud_host_id"),
+            request_id=machine.request_id,
+            return_request_id=machine.return_request_id,
+            tags=machine.tags.tags if machine.tags and machine.tags.tags else None,
+            message=machine.status_reason or "",
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -95,7 +104,6 @@ class RequestDTO(BaseDTO):
     launch_template_version: Optional[str] = None
     metadata: dict[str, Any] = Field(default_factory=dict)
     request_type: str = "acquire"
-    verbose: bool = False  # Flag to indicate whether to include detailed information
     desired_capacity: int = 1
     duration: Optional[int] = None
     success_rate: Optional[float] = None
@@ -134,7 +142,9 @@ class RequestDTO(BaseDTO):
             # Get existing machine references (domain model may not have this field)
             domain_refs = getattr(request, "machine_references", None)
             if domain_refs:
-                machine_refs = [MachineReferenceDTO.from_domain(m) for m in domain_refs]
+                machine_refs = [
+                    MachineReferenceDTO.from_machine(m, request.request_type) for m in domain_refs
+                ]
 
         # Create the DTO with all available fields
         return cls(
@@ -143,8 +153,8 @@ class RequestDTO(BaseDTO):
             template_id=str(request.template_id) if request.template_id else None,
             requested_count=request.requested_count,
             created_at=request.created_at,  # type: ignore[arg-type]
-            last_status_check=None,  # Not available in current domain model
-            first_status_check=None,  # Not available in current domain model
+            last_status_check=request.last_status_check,
+            first_status_check=request.first_status_check,
             machine_references=machine_refs,
             machine_ids=[mid for mid in (request.machine_ids or []) if mid is not None],
             message=request.status_message or "",
@@ -156,7 +166,6 @@ class RequestDTO(BaseDTO):
             launch_template_version=request.provider_data.get("launch_template_version"),
             metadata=request.metadata,
             request_type=cls.serialize_enum(request.request_type) or "",
-            verbose=verbose,
             desired_capacity=request.desired_capacity,
             duration=request.duration,
             success_rate=request.success_rate,
@@ -170,19 +179,18 @@ class RequestDTO(BaseDTO):
             resource_ids=request.resource_ids,
         )
 
-    def to_dict(self, verbose: Optional[bool] = None) -> dict[str, Any]:
+    def to_dict(self, verbose: bool = False) -> dict[str, Any]:
         """
         Convert to dictionary format - returns snake_case for internal use.
         External format conversion should be handled at scheduler strategy level.
 
         Args:
-            verbose: Whether to include detailed information. If None, uses the instance's verbose attribute.
+            verbose: Whether to include detailed information.
 
         Returns:
             Dictionary representation with snake_case keys
         """
-        # Use provided verbose parameter or fall back to instance attribute
-        include_details = self.verbose if verbose is None else verbose
+        include_details = verbose
 
         # Get clean snake_case data using stable API
         result = super().to_dict()

@@ -156,10 +156,11 @@ def test_hf_map_output_vm_type_produces_attributes():
     item = result["templates"][0]
     assert "attributes" in item
     attrs = item["attributes"]
-    for key in ("type", "ncpus", "ncores", "nram"):
+    for key in ("type", "ncpus", "nram"):
         assert key in attrs, f"attributes missing key '{key}'"
         assert isinstance(attrs[key], list)
         assert len(attrs[key]) == 2
+    assert "ncores" not in attrs, "ncores is LSF-only and must not appear in HF attributes"
 
 
 # ---------------------------------------------------------------------------

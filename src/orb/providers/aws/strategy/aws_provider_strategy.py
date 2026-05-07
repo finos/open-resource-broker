@@ -184,16 +184,20 @@ class AWSProviderStrategy(ProviderStrategy):
                 result = await self._execute_operation_internal(operation)
 
             execution_time_ms = int((time.time() - start_time) * 1000)
-            if result.metadata is None:
-                result.metadata = {}
-            result.metadata.update(
-                {
-                    "execution_time_ms": execution_time_ms,
-                    "provider": "aws",
-                    "dry_run": is_dry_run,
+            return result.model_copy(
+                update={
+                    "routing_info": {
+                        "execution_time_ms": execution_time_ms,
+                        "provider": "aws",
+                    },
+                    "metadata": {
+                        **result.metadata,
+                        "dry_run": is_dry_run,
+                        "execution_time_ms": execution_time_ms,
+                        "provider": "aws",
+                    },
                 }
             )
-            return result
 
         except Exception as e:
             execution_time_ms = int((time.time() - start_time) * 1000)
@@ -201,7 +205,14 @@ class AWSProviderStrategy(ProviderStrategy):
             return ProviderResult.error_result(
                 f"AWS operation failed: {e}",
                 "OPERATION_FAILED",
-                {"execution_time_ms": execution_time_ms, "provider": "aws", "dry_run": is_dry_run},
+                {"dry_run": is_dry_run},
+            ).model_copy(
+                update={
+                    "routing_info": {
+                        "execution_time_ms": execution_time_ms,
+                        "provider": "aws",
+                    }
+                }
             )
 
     async def _execute_operation_internal(self, operation: ProviderOperation) -> ProviderResult:

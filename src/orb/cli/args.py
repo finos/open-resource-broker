@@ -233,6 +233,15 @@ def add_request_actions(subparsers):
         "--request-id", "-r", action="append", dest="flag_request_ids", help="Request ID to check"
     )
 
+    requests_watch = subparsers.add_parser("watch", help="Watch request status in real time")
+    add_global_arguments(requests_watch)
+    requests_watch.add_argument(
+        "request_id", nargs="?", help="Request ID to watch (latest if omitted)"
+    )
+    requests_watch.add_argument(
+        "--interval", type=int, default=5, help="Poll interval in seconds (default: 5)"
+    )
+
     requests_list_returns = subparsers.add_parser("list-returns", help="List return requests")
     add_global_arguments(requests_list_returns)
     requests_list_returns.add_argument("--status", help="Filter by return request status")

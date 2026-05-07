@@ -70,8 +70,14 @@ def _make_handler(
     error_handler = Mock(spec=ErrorHandlingPort)
     container = _FakeContainer()  # empty — cache/event publisher will fall back to None/noop
 
-    # UoW factory — not used directly by the handler (query service is injected)
+    # UoW factory — used by record_status_check save; configure context manager support
     uow_factory = Mock()
+    mock_uow = MagicMock()
+    mock_uow.requests = Mock()
+    mock_uow.requests.save = Mock()
+    uow_factory.create_unit_of_work = Mock(return_value=mock_uow)
+    mock_uow.__enter__ = Mock(return_value=mock_uow)
+    mock_uow.__exit__ = Mock(return_value=False)
 
     # Provider registry — not exercised in these tests
     provider_registry_service = Mock()

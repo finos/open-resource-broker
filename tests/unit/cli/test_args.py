@@ -218,3 +218,27 @@ class TestGlobalFlags:
     def test_yes_flag(self):
         ns = _parse(["machines", "return", "id1", "--yes"])
         assert ns.yes is True
+
+
+class TestRequestsWatch:
+    """requests watch positional and flag arguments."""
+
+    def test_watch_with_request_id(self):
+        ns = _parse(["requests", "watch", "req-123"])
+        assert ns.resource == "requests"
+        assert ns.action == "watch"
+        assert ns.request_id == "req-123"
+
+    def test_watch_without_request_id(self):
+        ns = _parse(["requests", "watch"])
+        assert ns.resource == "requests"
+        assert ns.action == "watch"
+        assert ns.request_id is None
+
+    def test_watch_interval_flag(self):
+        ns = _parse(["requests", "watch", "req-123", "--interval", "2"])
+        assert ns.interval == 2
+
+    def test_watch_interval_default(self):
+        ns = _parse(["requests", "watch"])
+        assert ns.interval == 5

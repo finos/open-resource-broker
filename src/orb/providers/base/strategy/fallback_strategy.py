@@ -319,14 +319,16 @@ class FallbackProviderStrategy(ProviderStrategy):
             else:  # IMMEDIATE
                 result = await self._execute_immediate_fallback(operation)
 
-            # Add execution metadata
+            # Populate routing_info for the application layer to stamp as telemetry
             total_time_ms = (time.time() - start_time) * 1000
-            result.metadata.update(
-                {
-                    "fallback_mode": self._config.mode.value,
-                    "total_execution_time_ms": total_time_ms,
-                    "active_strategy": self._current_strategy.provider_type,
-                    "circuit_state": self._circuit_state.state.value,
+            result = result.model_copy(
+                update={
+                    "routing_info": {
+                        "fallback_mode": self._config.mode.value,
+                        "total_execution_time_ms": total_time_ms,
+                        "active_strategy": self._current_strategy.provider_type,
+                        "circuit_state": self._circuit_state.state.value,
+                    }
                 }
             )
 

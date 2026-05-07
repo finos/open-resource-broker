@@ -71,7 +71,11 @@ class PopulateMachineIdsHandler(BaseCommandHandler[PopulateMachineIdsCommand, No
 
             operation = ProviderOperation(
                 operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
-                parameters={"resource_ids": request.resource_ids},
+                parameters={
+                    "resource_ids": request.resource_ids,
+                    "provider_api": request.provider_api,
+                    "template_id": request.template_id,
+                },
             )
 
             from orb.domain.base.ports.configuration_port import ConfigurationPort

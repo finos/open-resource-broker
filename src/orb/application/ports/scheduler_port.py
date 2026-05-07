@@ -53,6 +53,15 @@ class SchedulerPort(ABC):
         """Format request DTOs to scheduler response."""
 
     @abstractmethod
+    def format_return_requests_response(self, requests: list[Any]) -> dict[str, Any]:
+        """Format return-request items for this scheduler's wire protocol.
+
+        Structurally different from format_request_status_response — per IBM
+        Symphony HF 7.3.2 spec, items are flat {machine, gracePeriod} pairs
+        rather than request-status envelopes.
+        """
+
+    @abstractmethod
     def format_request_response(self, request_data: dict[str, Any]) -> dict[str, Any]:
         """Format request creation response to scheduler format."""
 

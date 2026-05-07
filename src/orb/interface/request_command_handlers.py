@@ -169,7 +169,7 @@ async def handle_get_return_requests(
             limit=getattr(args, "limit", 50),
         )
     )
-    return formatter.format_request_status(result.requests)
+    return formatter.format_return_requests(result.requests)
 
 
 @handle_interface_exceptions(context="request_return_machines", interface_type="cli")
@@ -295,3 +295,180 @@ async def handle_cancel_request(
         {"request_id": result.request_id, "status": result.status},
         result.status,
     )
+
+
+@handle_interface_exceptions(context="watch_request_status", interface_type="cli")
+async def handle_watch_request_status(
+    args: "argparse.Namespace",
+) -> Union[dict[str, Any], "InterfaceResponse"]:
+    """Handle watch request status command with progress bar display."""
+    import asyncio
+    from datetime import datetime, timezone
+
+    from rich.console import Group
+    from rich.live import Live
+    from rich.progress import Progress
+
+    from orb.application.services.orchestration.dtos import (
+        WatchRequestStatusInput,
+        WatchRequestStatusOutput,
+    )
+    from orb.application.services.orchestration.watch_request_status import (
+        WatchRequestStatusOrchestrator,
+    )
+    from orb.cli.progress_bar import DotPreciseBar, render_az_bars
+
+    container = get_container()
+    orchestrator = container.get(WatchRequestStatusOrchestrator)
+
+    request_id = getattr(args, "request_id", None)
+    if not request_id:
+        from orb.application.services.orchestration.dtos import ListRequestsInput
+        from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
+
+        list_orchestrator = container.get(ListRequestsOrchestrator)
+        list_result = await list_orchestrator.execute(ListRequestsInput(limit=100))
+        if not list_result.requests:
+            return {"error": "No requests found", "message": "No requests to watch"}
+        latest = max(list_result.requests, key=lambda r: r.get("created_at", ""))
+        request_id = latest.get("request_id")
+
+    interval = getattr(args, "interval", 5)
+    watch_input = WatchRequestStatusInput(
+        request_id=str(request_id),
+    )
+
+    consecutive_errors = 0
+    max_errors = 3
+
+    try:
+        snapshot = await orchestrator.execute(watch_input)
+        total = snapshot.requested_count or 1
+
+        created_at = None
+        if snapshot.created_at:
+            created_at = datetime.fromisoformat(snapshot.created_at)
+
+        def _elapsed() -> str:
+            if not created_at:
+                return ""
+            delta = datetime.now(timezone.utc) - created_at
+            total_secs = int(delta.total_seconds())
+            mins, secs = divmod(total_secs, 60)
+            hours, mins = divmod(mins, 60)
+            if hours:
+                return f"{hours}:{mins:02d}:{secs:02d}"
+            return f"{mins}:{secs:02d}"
+
+        from orb.cli.console import print_info
+
+        print_info(f"Watching: {request_id}")
+
+        from rich.text import Text as RichText
+
+        def _build_stats_line(snap: WatchRequestStatusOutput) -> RichText:
+            line = RichText()
+            if snap.weighted:
+                line.append(f"{snap.fulfilled_capacity}/{total} units", style="bold #4c7aa7")
+                line.append("  ")
+                line.append(f"OD:{snap.od_capacity} units", style="bold bright_green")
+                line.append(" ")
+                line.append(f"SP:{snap.spot_capacity} units", style="bold #ffdb47")
+            else:
+                line.append(f"{snap.fulfilled_count}/{total} machines", style="bold #4c7aa7")
+                line.append("  ")
+                line.append(f"OD:{snap.od_machines} machines", style="bold bright_green")
+                line.append(" ")
+                line.append(f"SP:{snap.spot_machines} machines", style="bold #ffdb47")
+            line.append("  ")
+            line.append(f"{snap.fulfilled_vcpus} vCPUs", style="bold magenta")
+            line.append("  ")
+            line.append(f"{snap.fulfilled_count} machines", style="bold orange3")
+            line.append("  ")
+            line.append(snap.status, style="bold dark_green")
+            line.append("  ")
+            line.append(_elapsed(), style="dim")
+            return line
+
+        top_bar = DotPreciseBar(bar_width=30)
+        progress = Progress(top_bar, auto_refresh=False)
+        bar_completed = (
+            snapshot.fulfilled_capacity if snapshot.weighted else snapshot.fulfilled_count
+        )
+        task = progress.add_task(
+            "",
+            total=total,
+            completed=bar_completed,
+            od_cap=snapshot.od_capacity,
+            spot_cap=snapshot.spot_capacity,
+            od_vcpus=snapshot.od_vcpus,
+            spot_vcpus=snapshot.spot_vcpus,
+            od_machines=snapshot.od_machines,
+            spot_machines=snapshot.spot_machines,
+        )
+
+        def _build_bars_line(snap: WatchRequestStatusOutput) -> RichText:
+            progress.update(
+                task,
+                completed=(snap.fulfilled_capacity if snap.weighted else snap.fulfilled_count),
+                od_cap=snap.od_capacity,
+                spot_cap=snap.spot_capacity,
+                od_vcpus=snap.od_vcpus,
+                spot_vcpus=snap.spot_vcpus,
+                od_machines=snap.od_machines,
+                spot_machines=snap.spot_machines,
+            )
+            az = render_az_bars(snap.az_stats, total)
+            combined = RichText()
+            combined.append_text(top_bar.render(progress.tasks[0]))
+            combined.append(" ")
+            combined.append_text(az)
+            return combined
+
+        with Live(
+            Group(_build_bars_line(snapshot), _build_stats_line(snapshot)),
+            refresh_per_second=2,
+        ) as live:
+            seconds_since_poll = 0
+            while not snapshot.terminal:
+                await asyncio.sleep(1)
+                seconds_since_poll += 1
+                live.update(Group(_build_bars_line(snapshot), _build_stats_line(snapshot)))
+
+                if seconds_since_poll >= interval:
+                    seconds_since_poll = 0
+                    try:
+                        snapshot = await orchestrator.execute(watch_input)
+                        consecutive_errors = 0
+                        live.update(
+                            Group(
+                                _build_bars_line(snapshot),
+                                _build_stats_line(snapshot),
+                            )
+                        )
+                    except Exception as exc:
+                        from orb.infrastructure.logging.logger import get_logger
+
+                        get_logger(__name__).warning(
+                            "Watch poll error (%d/%d): %s",
+                            consecutive_errors + 1,
+                            max_errors,
+                            exc,
+                        )
+                        consecutive_errors += 1
+                        if consecutive_errors >= max_errors:
+                            return {
+                                "request_id": str(request_id),
+                                "status": "error",
+                                "error": str(exc),
+                            }
+
+        return {
+            "request_id": snapshot.request_id,
+            "status": snapshot.status,
+            "fulfilled_count": snapshot.fulfilled_count,
+            "requested_count": snapshot.requested_count,
+            "terminal": snapshot.terminal,
+        }
+    except KeyboardInterrupt:
+        return {"request_id": str(request_id), "status": "cancelled"}

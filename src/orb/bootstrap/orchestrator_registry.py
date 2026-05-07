@@ -54,6 +54,9 @@ def register_orchestrators(container: DIContainer) -> None:
     from orb.application.services.orchestration.validate_template import (
         ValidateTemplateOrchestrator,
     )
+    from orb.application.services.orchestration.watch_request_status import (
+        WatchRequestStatusOrchestrator,
+    )
 
     if not container.is_registered(AcquireMachinesOrchestrator):
         container.register_singleton(
@@ -268,6 +271,14 @@ def register_orchestrators(container: DIContainer) -> None:
         container.register_singleton(
             GetStorageConfigOrchestrator,
             lambda c: GetStorageConfigOrchestrator(
+                query_bus=c.get(QueryBus),
+                logger=c.get(LoggingPort),
+            ),
+        )
+    if not container.is_registered(WatchRequestStatusOrchestrator):
+        container.register_singleton(
+            WatchRequestStatusOrchestrator,
+            lambda c: WatchRequestStatusOrchestrator(
                 query_bus=c.get(QueryBus),
                 logger=c.get(LoggingPort),
             ),

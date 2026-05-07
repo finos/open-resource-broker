@@ -249,11 +249,14 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 return []
 
             all_instances = []
+            request_id = str(request.request_id)
 
             # Process all fleet IDs instead of just the first one
             for fleet_id in request.resource_ids:
                 try:
-                    fleet_instances = self._get_spot_fleet_instances(fleet_id)
+                    fleet_instances = self._get_spot_fleet_instances(
+                        fleet_id, request_id=request_id
+                    )
                     if fleet_instances:
                         formatted_instances = self._format_instance_data(
                             fleet_instances, fleet_id, self._resolve_provider_api(request)

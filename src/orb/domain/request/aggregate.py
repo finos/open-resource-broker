@@ -1,7 +1,7 @@
 """Request aggregate - core request domain logic."""
 
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, ClassVar, Optional
 
 from pydantic import ConfigDict, Field
 
@@ -24,6 +24,21 @@ class Request(AggregateRoot):
         frozen=False,
         validate_assignment=True,
         populate_by_name=True,  # Allow both field names and aliases
+    )
+
+    # Fields intentionally NOT persisted by RequestSerializer.
+    # Adding anything here is a deliberate decision to drop it on save.
+    # If you add a field to Request, either add it to RequestSerializer
+    # or add it to this set with a comment explaining why.
+    _SERIALIZATION_EXCLUDED_FIELDS: ClassVar[frozenset[str]] = frozenset(
+        {
+            # Inherited from Entity; used as an internal Pydantic/aggregate identity
+            # key but request_id is the canonical persisted identifier.
+            "id",
+            # Inherited from Entity; not written by RequestSerializer — the serializer
+            # only persists created_at, started_at, and completed_at.
+            "updated_at",
+        }
     )
 
     # Core request identification
@@ -49,10 +64,11 @@ class Request(AggregateRoot):
 
     # Request state
     status: RequestStatus = Field(default=RequestStatus.PENDING)
+    # Human-readable description of the current status — set by domain methods
+    # (fail, cancel, complete, add_failure, update_status) and surfaced to callers
+    # via RequestDTO.message.  The HF wire-format "message" key is produced by
+    # RequestDTO.from_domain, which maps this field; it is NOT stored separately.
     status_message: Optional[str] = None
-
-    # HF output fields
-    message: Optional[str] = None
 
     # Results
     successful_count: int = 0
@@ -61,6 +77,8 @@ class Request(AggregateRoot):
     # Lifecycle timestamps
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    first_status_check: Optional[datetime] = None
+    last_status_check: Optional[datetime] = None
 
     # Request metadata
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -266,6 +284,19 @@ class Request(AggregateRoot):
     def update_machine_ids(self, machine_ids: list[str]) -> "Request":
         """Update machine IDs (for population)."""
         return self.model_copy(update={"machine_ids": machine_ids})
+
+    def record_status_check(self, now: datetime) -> "Request":
+        """Record that the request was polled for status.
+
+        first_status_check is set on the first poll and never overwritten.
+        last_status_check is updated on every call.
+        """
+        return self.model_copy(
+            update={
+                "first_status_check": self.first_status_check or now,
+                "last_status_check": now,
+            }
+        )
 
     def needs_machine_id_population(self) -> bool:
         """Check if request needs machine ID population."""
