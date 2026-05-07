@@ -46,11 +46,7 @@ from orb.providers.azure.services.inventory_service import (
     AzureInventoryService,
     build_read_operation_context,
 )
-from orb.providers.azure.services.operation_parsing import (
-    group_instance_ids_by_resource,
-    resolve_operation_provider_api,
-    resolve_operation_resource_group,
-)
+from orb.providers.azure.services.operation_parsing import resolve_operation_provider_api
 from orb.providers.azure.services.provisioning_service import (
     AzureProvisioningService,
     create_instances_dry_run_result,
@@ -61,9 +57,6 @@ from orb.providers.azure.services.resource_metadata_service import (
 from orb.providers.azure.services.runtime_dependencies import AzureRuntimeDependencies
 from orb.providers.azure.services.spot_launch_service import AzureSpotLaunchService
 from orb.providers.azure.services.template_catalog_service import AzureTemplateCatalogService
-from orb.providers.azure.services.termination_dispatch_service import (
-    AzureTerminationDispatchService,
-)
 from orb.providers.azure.services.termination_service import AzureTerminationService
 from orb.providers.base.strategy import (
     ProviderCapabilities,
@@ -136,7 +129,6 @@ class AzureProviderStrategy(ProviderStrategy):
             execution_service=self._spot_placement_execution,
         )
         self._template_catalog_service = AzureTemplateCatalogService(logger=logger)
-        self._termination_service = AzureTerminationService()
         self._runtime = AzureRuntimeDependencies(
             config=config,
             logger=logger,
@@ -158,9 +150,11 @@ class AzureProviderStrategy(ProviderStrategy):
             begin_delete_vmss=self._begin_delete_vmss_async,
         )
         self._cyclecloud_request_lookup = cyclecloud_request_lookup
-        self._termination_dispatch_service = AzureTerminationDispatchService(
+        self._termination_service = AzureTerminationService(
             logger=logger,
+            handler_provider=self,
             record_pending_cleanup=self._vmss_cleanup_coordinator.record,
+            default_resource_group=config.resource_group,
         )
         self._inventory_service = AzureInventoryService(
             logger=logger,
@@ -736,33 +730,8 @@ class AzureProviderStrategy(ProviderStrategy):
         try:
             operation = self._resolve_cyclecloud_operation(operation)
             is_dry_run = bool(operation.context and operation.context.get("dry_run", False))
-            termination_context = self._termination_service.build_termination_operation_context(
-                operation=operation,
-                is_dry_run=is_dry_run,
-                resolve_operation_provider_api=resolve_operation_provider_api,
-                resolve_handler=self.resolve_handler,
-                group_instance_ids_by_resource=group_instance_ids_by_resource,
-                resolve_operation_resource_group=lambda op: resolve_operation_resource_group(
-                    op, self._azure_config.resource_group,
-                ),
-            )
-
-            if is_dry_run:
-                return self._termination_service.terminate_instances_dry_run_result(
-                    termination_context
-                )
-
-            termination_provider_data = await self._termination_dispatch_service.dispatch_async(
-                handler=termination_context.handler,
-                instance_ids=termination_context.instance_ids,
-                grouped_resource_mapping=termination_context.grouped_resource_mapping,
-                default_resource_id=termination_context.default_resource_id,
-                context=termination_context.release_context,
-            )
-
-            return self._termination_service.terminate_instances_result(
-                instance_ids=termination_context.instance_ids,
-                termination_provider_data=termination_provider_data,
+            return await self._termination_service.terminate_instances_async(
+                operation, is_dry_run=is_dry_run
             )
 
         except asyncio.CancelledError:
