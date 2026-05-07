@@ -314,18 +314,11 @@ class SingleVMHandler(AzureHandler):
             },
         }
 
-    def _resolve_status_resource_group(self, request: Request) -> Optional[str]:
-        """Resolve the resource group for status checks."""
-        return (
-            (request.metadata or {}).get("resource_group")
-            or self.azure_client.resource_group
-        )
-
     async def check_hosts_status_async(self, request: Request) -> list[AzureHandlerStatusResult]:
         """Async status query for individual VM IDs using the Azure async Compute SDK."""
         resource_ids: list[str] = request.resource_ids or []
         raise_on_status_error = azure_raise_on_status_error(request)
-        resource_group = self._resolve_status_resource_group(request)
+        resource_group = (request.metadata or {}).get("resource_group") or self.azure_client.resource_group
         if not resource_group:
             message = "Cannot resolve resource_group for status check"
             self._logger.error(message)
@@ -479,7 +472,18 @@ class SingleVMHandler(AzureHandler):
         return ordered_resolved
 
     async def _resolve_vm_names_async(self, resource_group: str, machine_ids: list[str]) -> list[str]:
-        """Async resolve mixed IDs (vm_name or Azure vm_id GUID) to VM names."""
+        """Resolve a list of mixed identifiers to canonical Azure VM names.
+
+        Each input is treated as a vm_name first and looked up via a direct
+        ``virtual_machines.get`` (cheap when callers already have names). Inputs
+        that look like Azure ``vm_id`` GUIDs, or that 404 on the direct lookup,
+        are deferred to a single ``virtual_machines.list`` over the resource
+        group and matched by vm_id. The output preserves input order.
+
+        Best-effort: any unhandled error falls back to returning the input list
+        as-is so callers can still attempt downstream operations with the
+        original identifiers.
+        """
         if not machine_ids:
             return []
 

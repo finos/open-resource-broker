@@ -33,8 +33,7 @@ from orb.providers.azure.exceptions.azure_exceptions import (
     VMSSNotFoundError,
 )
 from orb.providers.azure.infrastructure.error_utils import (
-    canonical_azure_error_code,
-    extract_azure_error_details,
+    classify_azure_error,
 )
 from orb.providers.azure.infrastructure.sdk_shapes import (
     AzureVmWithIdentityProtocol,
@@ -270,16 +269,10 @@ class VMSSHandler(AzureHandler):
         except Exception as exc:
             error_msg = f"Failed to create VMSS '{vmss_name}': {exc}"
             self._logger.error(error_msg)
-            error_code = canonical_azure_error_code(exc)
-            error_details = extract_azure_error_details(exc)
-            error_str = str(error_details.get("message") or "").lower()
-            if error_code in {"QuotaExceeded", "OperationNotAllowed", "ResourceQuotaExceeded"} or (
-                "quota" in error_str or "exceeded" in error_str
-            ):
+            category, error_code = classify_azure_error(exc)
+            if category == "quota":
                 raise QuotaExceededError(error_msg, error_code=error_code) from exc
-            if error_code in {"InvalidRequest", "InvalidParameter", "BadRequest"} or (
-                "validation" in error_str or "invalid" in error_str
-            ):
+            if category == "validation":
                 raise AzureValidationError(error_msg, error_code=error_code) from exc
             raise VMSSCreationError(
                 message=error_msg,
@@ -299,11 +292,8 @@ class VMSSHandler(AzureHandler):
         status_errors: list[str] = []
         raise_on_status_error = azure_raise_on_status_error(request)
 
+        resource_group = (request.metadata or {}).get("resource_group") or self.azure_client.resource_group
         for vmss_name in resource_ids:
-            resource_group = (
-                (request.metadata or {}).get("resource_group")
-                or self.azure_client.resource_group
-            )
             if not resource_group:
                 error_message = f"Cannot resolve resource_group for VMSS '{vmss_name}'"
                 self._logger.error(error_message)
@@ -478,7 +468,23 @@ class VMSSHandler(AzureHandler):
         resource_id: str,
         context: Optional[AzureReleaseContext],
     ) -> _VmssReleasePlan:
-        """Build the async VMSS member-release plan before submitting deletes."""
+        """Precompute everything the release submission needs for one VMSS.
+
+        Resolves the resource group, queries the VMSS to determine its
+        orchestration mode, lists current members once, and produces the
+        delete identifiers in the form the SDK expects for that mode:
+
+        - Uniform VMSS deletes by ``instance_id`` — populated from
+          ``current_members``; ``resolved_vm_names`` is empty.
+        - Flexible VMSS deletes individual VMs by ``vm_name`` — populated
+          from ``current_members``; ``resolved_instance_ids`` mirrors the
+          input ``machine_ids`` (Flexible accepts either, but we forward
+          the originals for traceability).
+
+        Splitting plan-building from submission keeps the submission path
+        flat and lets tests exercise the plan shape without mocking the
+        delete calls.
+        """
         resource_group = self._resolve_release_resource_group(
             machine_ids=machine_ids,
             context=context,

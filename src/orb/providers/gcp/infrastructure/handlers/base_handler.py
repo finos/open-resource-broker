@@ -82,7 +82,18 @@ class GCPHandler(ABC):
         machine_type: str,
         zone: str | None,
     ) -> dict[str, Any]:
-        """Build shared Compute Engine instance configuration fields."""
+        """Return a kwargs dict suitable for both ``Instance`` and ``InstanceProperties``.
+
+        The shape is the intersection of what ``compute_v1.Instance`` and
+        ``compute_v1.InstanceProperties`` accept, so a single call can feed
+        either standalone-VM creation (``InstancesClient.insert``) or a MIG
+        instance template (``InstanceTemplatesClient.insert`` via
+        ``InstanceProperties(**...)``).
+
+        ``zone`` is required for standalone instances and used to resolve a
+        zone-scoped boot-disk type; it is ``None`` for regional MIG templates,
+        where the disk type is left in its template form.
+        """
         from google.cloud import compute_v1
 
         disk_type = template.boot_disk_type or "pd-balanced"

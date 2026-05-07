@@ -61,3 +61,32 @@ def canonical_azure_error_code(exc: Exception) -> str:
         return "InvalidRequest"
     return type(exc).__name__
 
+
+_QUOTA_CODES = frozenset({"QuotaExceeded", "OperationNotAllowed", "ResourceQuotaExceeded"})
+_VALIDATION_CODES = frozenset({"InvalidRequest", "InvalidParameter", "BadRequest"})
+
+
+def classify_azure_error(exc: Exception) -> tuple[str, str]:
+    """Classify an Azure exception as ``("quota"|"validation"|"other", error_code)``.
+
+    Canonical Azure error codes take precedence. Message-based string matching
+    is only consulted when the canonical mapping fell back to ``type(exc).__name__``
+    — without that guard, tag or resource names containing "quota" or "exceed"
+    can misclassify unrelated errors.
+    """
+    error_code = canonical_azure_error_code(exc)
+
+    if error_code in _QUOTA_CODES:
+        return ("quota", error_code)
+    if error_code in _VALIDATION_CODES:
+        return ("validation", error_code)
+
+    if error_code == type(exc).__name__:
+        message = extract_azure_error_details(exc)["message"].lower()
+        if "quota" in message or "exceeded" in message:
+            return ("quota", error_code)
+        if "validation" in message or "invalid" in message:
+            return ("validation", error_code)
+
+    return ("other", error_code)
+

@@ -1028,19 +1028,18 @@ def test_vmss_release_surfaces_retry_pending_when_immediate_empty_vmss_delete_fa
     }
 
 
-def test_acquire_hosts_handles_missing_azure_error_message_without_key_error(monkeypatch):
+def test_acquire_hosts_classifies_quota_runtime_error_as_quota_exceeded():
+    """A RuntimeError whose message implies a quota fault classifies as QuotaExceededError.
+
+    The classifier falls back to message-based string matching only when no canonical
+    Azure error code is available — which is exactly the case for a generic RuntimeError.
+    """
     azure_client = _make_azure_client()
     logger = MagicMock()
     handler = VMSSHandler(azure_client=azure_client, logger=logger)
 
     azure_client.compute_client.virtual_machine_scale_sets.begin_create_or_update.side_effect = (
         RuntimeError("quota exceeded")
-    )
-
-    monkeypatch.setattr(
-        vmss_handler_module,
-        "extract_azure_error_details",
-        lambda exc: {"raw_error_code": None, "status_code": None},
     )
 
     request = MagicMock()
@@ -1052,3 +1051,40 @@ def test_acquire_hosts_handles_missing_azure_error_message_without_key_error(mon
         run_operation(handler.acquire_hosts_async(request, _make_template()))
 
     assert exc_info.type.__name__ == "QuotaExceededError"
+
+
+def test_acquire_hosts_does_not_misclassify_unrelated_error_with_quota_in_resource_name():
+    """The fix the classifier guards against: tag/resource-name collisions.
+
+    Before the canonical-code-first refactor, an exception whose canonical code was
+    a real, non-quota Azure error would still be misclassified as a quota fault if the
+    surfaced message happened to contain the substring "quota" or "exceeded" — e.g.
+    because a resource name, tag, or correlation id contained those tokens.
+    """
+    from azure.core.exceptions import HttpResponseError
+
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+
+    fake_error = MagicMock()
+    fake_error.code = "InvalidParameter"
+    fake_error.message = "subnet 'team-quota-subnet-1' does not exist"
+
+    response = MagicMock()
+    response.status_code = 400
+
+    exc = HttpResponseError(response=response)
+    exc.error = fake_error
+
+    azure_client.compute_client.virtual_machine_scale_sets.begin_create_or_update.side_effect = exc
+
+    request = MagicMock()
+    request.requested_count = 1
+    request.request_id = "req-quota-in-name"
+    request.metadata = {}
+
+    with pytest.raises(Exception) as exc_info:
+        run_operation(handler.acquire_hosts_async(request, _make_template()))
+
+    assert exc_info.type.__name__ == "AzureValidationError"
