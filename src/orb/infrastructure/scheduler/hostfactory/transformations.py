@@ -1,8 +1,13 @@
 """HostFactory-specific field transformations."""
 
+import os
 from typing import Any
 
+from orb.infrastructure.constants import MAX_FILE_SIZE_BYTES
 from orb.infrastructure.logging.logger import get_logger
+from orb.infrastructure.utilities.file.text_utils import read_text_file
+
+_PATH_MAX = 4096
 
 
 class HostFactoryTransformations:
@@ -55,49 +60,41 @@ class HostFactoryTransformations:
     @staticmethod
     def transform_user_data(value: Any) -> str | None:
         """
-        Transform HostFactory user_data field by reading file content if it's a file path.
+        Read file content if `value` is a path to an existing file, else return `value` unchanged.
 
-        If the value is a file path (starts with / or contains .sh/.ps1/.bat),
-        read the file content. Otherwise, return the value as-is.
+        Idempotent: running twice on already-read content returns it unchanged, because
+        multi-line script content cannot be a valid filesystem path.
         """
         if not isinstance(value, str) or not value.strip():
             return value
 
-        # Check if it looks like a file path
-        if (
-            value.startswith("/")
-            or value.endswith(".sh")
-            or value.endswith(".ps1")
-            or value.endswith(".bat")
-            or "/" in value
-        ):
-            try:
-                import os
+        # Fast reject: values that cannot structurally be a filesystem path.
+        if "\n" in value or "\x00" in value or len(value) > _PATH_MAX:
+            return value
 
-                # Convert to absolute path if relative
-                if not os.path.isabs(value):
-                    # Assume relative to current working directory
-                    value = os.path.abspath(value)
+        logger = get_logger(__name__)
+        candidate = os.path.expanduser(os.path.expandvars(value))
 
-                if os.path.isfile(value):
-                    with open(value, encoding="utf-8") as f:
-                        content = f.read()
-                    logger = get_logger(__name__)
-                    logger.info(
-                        "Read user data script from file: %s (%d bytes)", value, len(content)
-                    )
-                    return content
-                else:
-                    logger = get_logger(__name__)
-                    logger.warning("User data file not found: %s", value)
-                    return value  # Return original value if file doesn't exist
-            except Exception as e:
-                logger = get_logger(__name__)
-                logger.error("Failed to read user data file %s: %s", value, e, exc_info=True)
-                return value  # Return original value on error
-
-        # Return as-is if it doesn't look like a file path
-        return value
+        try:
+            if not os.path.isfile(candidate):
+                return value
+            size = os.path.getsize(candidate)
+            if size > MAX_FILE_SIZE_BYTES:
+                logger.warning(
+                    "User data file exceeds size limit (%d > %d bytes), using literal value: %s",
+                    size,
+                    MAX_FILE_SIZE_BYTES,
+                    candidate,
+                )
+                return value
+            file_content = read_text_file(candidate)
+            logger.info(
+                "Read user data script from file: %s (%d bytes)", candidate, len(file_content)
+            )
+            return file_content
+        except (OSError, UnicodeDecodeError) as e:
+            logger.error("Failed to read user data file %s: %s", candidate, e)
+            return value
 
     @staticmethod
     def ensure_instance_type_consistency(mapped_data: dict[str, Any]) -> dict[str, Any]:
