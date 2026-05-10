@@ -42,6 +42,7 @@ from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.exceptions.aws_exceptions import (
     AWSConfigurationError,
     AWSInfrastructureError,
+    AWSValidationError,
 )
 from orb.providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from orb.providers.aws.infrastructure.aws_client import AWSClient
@@ -49,6 +50,7 @@ from orb.providers.aws.infrastructure.handlers.base_handler import AWSHandler
 from orb.providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
 from orb.providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
+    LTNetworkingState,
 )
 from orb.providers.aws.infrastructure.tags import build_system_tags, merge_tags
 from orb.providers.aws.utilities.aws_operations import AWSOperations
@@ -331,19 +333,36 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             # Use first machine type for RunInstances (single instance type only)
             params["InstanceType"] = next(iter(aws_template.machine_types.keys()))
 
-        # Networking override policy is config-driven. When respect_lt_networking
-        # is True (default), the LT owns networking and we never pass
-        # SubnetId/SecurityGroupIds at the API level — AWS rejects combining
-        # instance-level subnet with NetworkInterfaces inside the LT.
-        # Set launch_template.respect_lt_networking=false to opt in to overrides.
-        if not self._respect_lt_networking() and aws_template.launch_template_id:
-            if getattr(aws_template, "subnet_id", None):
-                params["SubnetId"] = aws_template.subnet_id
-            elif aws_template.subnet_ids and len(aws_template.subnet_ids) == 1:
-                params["SubnetId"] = aws_template.subnet_ids[0]
-
-            if aws_template.security_group_ids:
-                params["SecurityGroupIds"] = aws_template.security_group_ids
+        # Networking policy: if user supplies subnet_ids or security_group_ids
+        # alongside a launch_template_id, inspect the LT to detect a collision.
+        # If the LT already defines NetworkInterfaces/SubnetId/SecurityGroupIds,
+        # raise a clear validation error (AWS would reject the combination).
+        # If the LT has no networking, inject at the API level. If the describe
+        # call is denied by IAM, log a warning and assume the LT owns networking
+        # (safe default that avoids InvalidParameterCombination).
+        if aws_template.launch_template_id:
+            user_subnets = aws_template.subnet_ids or []
+            user_sgs = aws_template.security_group_ids or []
+            if user_subnets or user_sgs:
+                lt_state = self.launch_template_manager.inspect_launch_template_networking(
+                    aws_template.launch_template_id,
+                    launch_template_version,
+                )
+                if lt_state == LTNetworkingState.HAS_NETWORKING:
+                    raise AWSValidationError(
+                        f"Launch template {aws_template.launch_template_id} already "
+                        "defines networking (NetworkInterfaces, SubnetId, or "
+                        "SecurityGroupIds). Remove subnet_ids/security_group_ids "
+                        "from the template, or remove the conflicting fields from "
+                        "the launch template."
+                    )
+                # NO_NETWORKING or UNKNOWN_UNAUTHORIZED: safe to inject.
+                if getattr(aws_template, "subnet_id", None):
+                    params["SubnetId"] = aws_template.subnet_id
+                elif len(user_subnets) == 1:
+                    params["SubnetId"] = user_subnets[0]
+                if user_sgs:
+                    params["SecurityGroupIds"] = user_sgs
 
         # Add spot instance configuration if needed
         if aws_template.price_type == "spot":
@@ -388,23 +407,6 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
         params["TagSpecifications"] = tag_specifications
 
         return params
-
-    def _respect_lt_networking(self) -> bool:
-        """Return the launch_template.respect_lt_networking config flag.
-
-        Defaults to True (LT owns networking) when the flag, config_port, or
-        provider config are unavailable — safe default that matches AWS's
-        preference for no API-level subnet/SG override alongside LT NICs.
-        """
-        try:
-            if self.config_port is None:
-                return True
-            provider_config = self.config_port.get_provider_config()
-            if provider_config and hasattr(provider_config, "launch_template"):
-                return bool(getattr(provider_config.launch_template, "respect_lt_networking", True))
-        except Exception as e:
-            self._logger.debug("Could not read respect_lt_networking from config: %s", e)
-        return True
 
     def check_hosts_status(self, request: Request) -> list[dict[str, Any]]:
         """Check the status of instances created by RunInstances."""

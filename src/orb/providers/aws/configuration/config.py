@@ -53,14 +53,6 @@ class LaunchTemplateConfiguration(BaseModel):
     on_update_failure: Literal["fail", "warn"] = Field(
         "fail", description="Behaviour when creating a new LT version fails: fail or warn"
     )
-    respect_lt_networking: bool = Field(
-        True,
-        description=(
-            "When True (default), do not inject SubnetId/SecurityGroupIds at the "
-            "RunInstances API level — assume the launch template owns networking. "
-            "Set False to let template-level subnet/SG values override the LT."
-        ),
-    )
     do_not_override: bool = Field(
         False,
         description=(
