@@ -252,11 +252,9 @@ class TestAWSLaunchTemplateManager:
         assert result.version == "$Latest"
         assert result.is_new_template is False
 
-    def test_use_existing_template_strategy_not_found_raises(self):
-        """Test that _use_existing_template_strategy raises when template is not found."""
+    def test_use_existing_template_strategy_describe_failure_warns_and_passes_through(self):
+        """Describe failures (NotFound, AccessDenied, etc.) warn and pass id/version through."""
         from botocore.exceptions import ClientError
-
-        from orb.providers.aws.exceptions.aws_exceptions import AWSValidationError
 
         self.aws_template.launch_template_id = "lt-missing"
 
@@ -270,7 +268,25 @@ class TestAWSLaunchTemplateManager:
             operation_name="DescribeLaunchTemplates",
         )
 
-        with pytest.raises(AWSValidationError):
+        result = self.manager._use_existing_template_strategy(self.aws_template)
+
+        assert result.template_id == "lt-missing"
+        assert result.is_new_template is False
+        assert result.is_new_version is False
+        self.manager._logger.warning.assert_called()
+
+    def test_use_existing_template_strategy_throttling_propagates(self):
+        """Transient errors (Throttling) must propagate, not warn-and-pass-through."""
+        from botocore.exceptions import ClientError
+
+        self.aws_template.launch_template_id = "lt-throttled"
+
+        self.mock_aws_client.ec2_client.describe_launch_templates.side_effect = ClientError(
+            error_response={"Error": {"Code": "Throttling", "Message": "rate exceeded"}},
+            operation_name="DescribeLaunchTemplates",
+        )
+
+        with pytest.raises(ClientError):
             self.manager._use_existing_template_strategy(self.aws_template)
 
     def test_inspect_lt_networking_has_networking(self):

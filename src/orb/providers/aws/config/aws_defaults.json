@@ -77,8 +77,7 @@
           "version_strategy": "incremental",
           "reuse_existing": true,
           "cleanup_old_versions": false,
-          "max_versions_per_template": 10,
-          "do_not_override": false
+          "max_versions_per_template": 10
         },
         "extensions": {
           "ami_resolution": {

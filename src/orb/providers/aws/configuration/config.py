@@ -50,20 +50,6 @@ class LaunchTemplateConfiguration(BaseModel):
     reuse_existing: bool = Field(True, description="Reuse existing launch templates")
     cleanup_old_versions: bool = Field(False, description="Cleanup old launch template versions")
     max_versions_per_template: int = Field(10, description="Maximum versions per launch template")
-    on_update_failure: Literal["fail", "warn"] = Field(
-        "fail", description="Behaviour when creating a new LT version fails: fail or warn"
-    )
-    do_not_override: bool = Field(
-        False,
-        description=(
-            "When True and the template specifies launch_template_id, use the LT "
-            "exactly as it exists in AWS: skip describe validation and skip minting "
-            "a new LT version with template-level overrides. Fleet handlers "
-            "(SpotFleet/EC2Fleet/ASG) still apply their native per-request Overrides. "
-            "Enables minimal IAM (no ec2:CreateLaunchTemplateVersion, no "
-            "ec2:DescribeLaunchTemplates)."
-        ),
-    )
 
 
 class TaggingConfiguration(BaseModel):

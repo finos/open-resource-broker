@@ -108,20 +108,6 @@ class AWSLaunchTemplateManager:
         try:
             # Check if template specifies existing launch template to use
             if aws_template.launch_template_id:
-                if self._do_not_override():
-                    # Use LT as-is: no describe, no version mint. Fleet handlers
-                    # still apply their native per-request Overrides downstream.
-                    self._logger.info(
-                        "Using launch template %s as-is (do_not_override=true)",
-                        aws_template.launch_template_id,
-                    )
-                    return LaunchTemplateResult(
-                        template_id=aws_template.launch_template_id,
-                        version=aws_template.launch_template_version or "$Default",
-                        template_name="",
-                        is_new_template=False,
-                        is_new_version=False,
-                    )
                 if self._has_overrides(aws_template):
                     return self._handle_existing_lt_with_overrides(aws_template, request)
                 return self._use_existing_template_strategy(aws_template)
@@ -244,6 +230,13 @@ class AWSLaunchTemplateManager:
         """
         Use an existing launch template specified in the template configuration.
 
+        Describe is best-effort for IAM-denial codes
+        (UnauthorizedOperation, AccessDenied, AccessDeniedException) and for
+        InvalidLaunchTemplateId.NotFound: warn and return id/version as-is so
+        downstream fleet/RunInstances calls surface a real failure if the LT
+        is genuinely unusable. Other ClientError codes (Throttling, 5xx)
+        propagate so the outer wrapper can retry.
+
         Args:
             aws_template: The AWS template configuration with launch_template_id
 
@@ -254,15 +247,11 @@ class AWSLaunchTemplateManager:
         version = aws_template.launch_template_version or "$Latest"
 
         try:
-            # Validate that the template exists
             response = self.aws_client.ec2_client.describe_launch_templates(
                 LaunchTemplateIds=[template_id]
             )
-
             template_name = response["LaunchTemplates"][0]["LaunchTemplateName"]
-
             self._logger.info("Using existing launch template %s version %s", template_id, version)
-
             return LaunchTemplateResult(
                 template_id=template_id,
                 version=version,
@@ -270,12 +259,27 @@ class AWSLaunchTemplateManager:
                 is_new_template=False,
                 is_new_version=False,
             )
-
         except ClientError as e:
-            if e.response["Error"]["Code"] == "InvalidLaunchTemplateId.NotFound":
-                raise AWSValidationError(f"Launch template {template_id} not found")
-            else:
+            code = e.response.get("Error", {}).get("Code", "")
+            if code not in (
+                "UnauthorizedOperation",
+                "AccessDenied",
+                "AccessDeniedException",
+                "InvalidLaunchTemplateId.NotFound",
+            ):
                 raise
+            self._logger.warning(
+                "Could not describe launch template %s (%s); using id/version as-is",
+                template_id,
+                code or "ClientError",
+            )
+            return LaunchTemplateResult(
+                template_id=template_id,
+                version=version,
+                template_name="",
+                is_new_template=False,
+                is_new_version=False,
+            )
 
     def _has_overrides(self, aws_template: AWSTemplate) -> bool:
         """Return True if any override field is non-None on the template."""
@@ -316,35 +320,6 @@ class AWSLaunchTemplateManager:
                 )
                 return LTNetworkingState.UNKNOWN_UNAUTHORIZED
             raise
-
-    def _get_lt_update_failure_mode(self) -> str:
-        """Read on_update_failure from launch_template config, defaulting to 'fail'."""
-        try:
-            if self.config_port is not None:
-                provider_config = self.config_port.get_provider_config()
-                if provider_config and hasattr(provider_config, "launch_template"):
-                    return provider_config.launch_template.on_update_failure
-        except Exception as e:
-            self._logger.debug("Could not read on_update_failure from config: %s", e)
-        return "fail"
-
-    def _do_not_override(self) -> bool:
-        """Read do_not_override from the AWS launch_template config, default False.
-
-        When True, treat the LT as immutable: no describe, no version mint.
-        Safe fallback keeps current behavior when config is unavailable.
-        """
-        try:
-            aws_cfg = None
-            if self.aws_client is not None and hasattr(
-                self.aws_client, "_get_selected_aws_provider_config"
-            ):
-                aws_cfg = self.aws_client._get_selected_aws_provider_config()
-            if aws_cfg and hasattr(aws_cfg, "launch_template"):
-                return bool(getattr(aws_cfg.launch_template, "do_not_override", False))
-        except Exception as e:
-            self._logger.debug("Could not read do_not_override from config: %s", e)
-        return False
 
     def _create_new_lt_version(
         self, aws_template: AWSTemplate, request: Request
@@ -440,7 +415,15 @@ class AWSLaunchTemplateManager:
     def _handle_existing_lt_with_overrides(
         self, aws_template: AWSTemplate, request: Request
     ) -> LaunchTemplateResult:
-        """Create a new LT version with overrides; handle failure per config."""
+        """Create a new LT version with overrides; warn-and-continue on IAM denial.
+
+        Falls back to the LT as-is only when CreateLaunchTemplateVersion is
+        denied (UnauthorizedOperation / AccessDenied / AccessDeniedException).
+        Transient errors (Throttling, 5xx) and unrelated ClientErrors
+        propagate so the request can retry. Tag-step failures are not caught
+        here — they follow the tagging.on_tag_failure contract via
+        _tag_resource_safe.
+        """
         override_fields = [
             f for f in _OVERRIDE_FIELDS if getattr(aws_template, f, None) is not None
         ]
@@ -451,17 +434,20 @@ class AWSLaunchTemplateManager:
         )
         try:
             return self._create_new_lt_version(aws_template, request)
-        except Exception as e:
-            failure_mode = self._get_lt_update_failure_mode()
-            if failure_mode == "warn":
-                self._logger.warning(
-                    "Failed to create new launch template version for %s, "
-                    "falling back to existing template: %s",
-                    aws_template.launch_template_id,
-                    e,
-                )
-                return self._use_existing_template_strategy(aws_template)
-            raise
+        except ClientError as e:
+            if getattr(e, "operation_name", "") != "CreateLaunchTemplateVersion":
+                raise
+            code = e.response.get("Error", {}).get("Code", "")
+            if code not in ("UnauthorizedOperation", "AccessDenied", "AccessDeniedException"):
+                raise
+            self._logger.warning(
+                "Failed to create new launch template version for %s (%s), "
+                "falling back to existing template: %s",
+                aws_template.launch_template_id,
+                code,
+                e,
+            )
+            return self._use_existing_template_strategy(aws_template)
 
     def _get_tag_failure_mode(self) -> str:
         """Read on_tag_failure from tagging config, defaulting to 'warn'."""
