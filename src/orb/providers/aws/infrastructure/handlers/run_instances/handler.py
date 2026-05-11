@@ -356,13 +356,15 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                         "from the template, or remove the conflicting fields from "
                         "the launch template."
                     )
-                # NO_NETWORKING or UNKNOWN_UNAUTHORIZED: safe to inject.
-                if getattr(aws_template, "subnet_id", None):
-                    params["SubnetId"] = aws_template.subnet_id
-                elif len(user_subnets) == 1:
-                    params["SubnetId"] = user_subnets[0]
-                if user_sgs:
-                    params["SecurityGroupIds"] = user_sgs
+                if lt_state == LTNetworkingState.NO_NETWORKING:
+                    # LT has no networking — safe to inject at API level.
+                    if getattr(aws_template, "subnet_id", None):
+                        params["SubnetId"] = aws_template.subnet_id
+                    elif len(user_subnets) == 1:
+                        params["SubnetId"] = user_subnets[0]
+                    if user_sgs:
+                        params["SecurityGroupIds"] = user_sgs
+                # UNKNOWN_UNAUTHORIZED: assume LT owns networking, do not inject.
 
         # Add spot instance configuration if needed
         if aws_template.price_type == "spot":

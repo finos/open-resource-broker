@@ -6,8 +6,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 from botocore.exceptions import ClientError
 
-from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
+from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError, AWSValidationError
 from orb.providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
+from orb.providers.aws.infrastructure.launch_template.manager import LTNetworkingState
 
 
 def _make_handler() -> Any:
@@ -291,3 +292,77 @@ class TestRunInstancesHandlerMachineAdapterContext:
             resource_id=resource_id,
             provider_api="RunInstances",
         )
+
+
+def _make_aws_template(*, subnet_ids=None, security_group_ids=None, launch_template_id="lt-abc"):
+    """Build a minimal AWSTemplate-like mock for legacy params builder."""
+    tmpl = MagicMock()
+    tmpl.template_id = "tmpl-1"
+    tmpl.launch_template_id = launch_template_id
+    tmpl.subnet_ids = subnet_ids or []
+    tmpl.security_group_ids = security_group_ids or []
+    tmpl.subnet_id = None
+    tmpl.machine_types = None
+    tmpl.price_type = "ondemand"
+    tmpl.max_price = None
+    tmpl.tags = None
+    return tmpl
+
+
+def _make_request_for_params(request_id="req-1", count=1):
+    request = MagicMock()
+    request.request_id = request_id
+    request.requested_count = count
+    return request
+
+
+def _handler_with_config_port():
+    handler = _make_handler()
+    handler.config_port = MagicMock()
+    handler.config_port.get_resource_prefix.return_value = "orb-"
+    return handler
+
+
+class TestRunInstancesHandlerNetworkingInject:
+    """Regression: networking inject must respect LTNetworkingState.
+
+    Resolves docs/bug-runinstances-unknown-unauthorized-injects-networking.md
+    UNKNOWN_UNAUTHORIZED row is the regression.
+    """
+
+    @pytest.mark.parametrize(
+        "lt_state,expect_subnet,expect_sgs,expect_raises",
+        [
+            (LTNetworkingState.HAS_NETWORKING, False, False, True),
+            (LTNetworkingState.NO_NETWORKING, True, True, False),
+            (LTNetworkingState.UNKNOWN_UNAUTHORIZED, False, False, False),
+        ],
+    )
+    def test_inject_respects_lt_state(self, lt_state, expect_subnet, expect_sgs, expect_raises):
+        handler = _handler_with_config_port()
+        handler.launch_template_manager.inspect_launch_template_networking.return_value = lt_state
+
+        aws_template = _make_aws_template(
+            subnet_ids=["subnet-1"],
+            security_group_ids=["sg-1"],
+            launch_template_id="lt-abc",
+        )
+        request = _make_request_for_params()
+
+        if expect_raises:
+            with pytest.raises(AWSValidationError):
+                handler._create_run_instances_params_legacy(
+                    aws_template, request, "lt-abc", "$Latest"
+                )
+            return
+
+        params = handler._create_run_instances_params_legacy(
+            aws_template, request, "lt-abc", "$Latest"
+        )
+
+        assert ("SubnetId" in params) is expect_subnet
+        assert ("SecurityGroupIds" in params) is expect_sgs
+        if expect_subnet:
+            assert params["SubnetId"] == "subnet-1"
+        if expect_sgs:
+            assert params["SecurityGroupIds"] == ["sg-1"]
