@@ -388,16 +388,15 @@ def generate_scenarios_from_attributes(
                     name_parts.append(str(attr_value))
             test_name = ".".join(name_parts)
 
-        # For spot priceType we supply multiple vmTypes to improve capacity placement.
+        # Pin a single unit-weight instance type on every auto-generated case so
+        # DesiredCapacity tracks instance heads, not weighted units. Custom
+        # scenarios in CUSTOM_TEST_CASES that set vmTypes explicitly are not
+        # affected (this branch only runs when vmTypes is missing).
         provider_api = overrides.get("providerApi")
         price_type = overrides.get("priceType")
         fleet_type = overrides.get("fleetType")
-        if (
-            price_type == "spot"
-            and provider_api in ("EC2Fleet", "SpotFleet", "ASG")
-            and "vmTypes" not in overrides
-        ):
-            overrides["vmTypes"] = SPOT_VM_TYPES
+        if "vmTypes" not in overrides:
+            overrides["vmTypes"] = {"t3.medium": 1}
 
         # Ensure partial-return scenarios have enough capacity to terminate one host and
         # still have machines running. Maintain fleets/ASGs need >=4 requested units.
