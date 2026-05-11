@@ -38,7 +38,11 @@ from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from orb.infrastructure.error.decorators import handle_infrastructure_exceptions
 from orb.infrastructure.logging.logger import get_logger
-from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.domain.template.aws_template_aggregate import (
+    ABISInstanceRequirements,
+    AWSRequiredIntegerRange,
+    AWSTemplate,
+)
 from orb.providers.aws.exceptions.aws_exceptions import (
     AWSConfigurationError,
     AWSInfrastructureError,
@@ -574,7 +578,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 machine_types={"t3.medium": 2, "t3.xlarge": 4},
                 max_instances=20,
                 price_type="spot",
-                max_price=0.10,
+                max_price=0.50,
                 subnet_ids=[],
                 security_group_ids=[],
                 tags={"Environment": "dev"},
@@ -589,6 +593,30 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 price_type="heterogeneous",
                 percent_on_demand=30,
                 allocation_strategy="lowestPrice",
+                subnet_ids=[],
+                security_group_ids=[],
+                tags={"Environment": "prod"},
+            ),
+            # Attribute Based Instance Selection (ABIS) example
+            AWSTemplate(
+                template_id="ASG-Mixed-ABIS",
+                name="Auto Scaling Group Mixed (ABIS)",
+                description=(
+                    "ASG mixed on-demand + spot using attribute based instance selection "
+                    "(vCPU + memory ranges) instead of explicit instance types"
+                ),
+                provider_api="ASG",
+                abis_instance_requirements=ABISInstanceRequirements(
+                    VCpuCount=AWSRequiredIntegerRange(Min=2, Max=32),
+                    MemoryMiB=AWSRequiredIntegerRange(Min=4096, Max=16384),
+                    CpuManufacturers=["intel", "amd"],
+                    InstanceGenerations=["current"],
+                    BurstablePerformance="excluded",
+                ),
+                max_instances=25,
+                price_type="heterogeneous",
+                percent_on_demand=30,
+                allocation_strategy="capacityOptimized",
                 subnet_ids=[],
                 security_group_ids=[],
                 tags={"Environment": "prod"},

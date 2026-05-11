@@ -687,9 +687,13 @@ class AWSHandler(ABC):
         # Skip AMI ID format validation as it might have been updated by AWSTemplateAdapter
         # The actual AWS API call will validate the AMI ID format
 
-        # Validate instance type(s)
-        if not template.machine_types and not template.launch_template_id:
-            errors["instanceType"] = "machine_types must be specified"
+        # Validate instance selection: either explicit machine_types, ABIS
+        # instance requirements, or a launch template that supplies them.
+        has_abis = getattr(template, "abis_instance_requirements", None) is not None
+        if not template.machine_types and not has_abis and not template.launch_template_id:
+            errors["instanceType"] = (
+                "Either machine_types or abis_instance_requirements must be specified"
+            )
 
         # Validate subnet(s) - subnet_id is a property of subnet_ids, so only
         # check subnet_ids
