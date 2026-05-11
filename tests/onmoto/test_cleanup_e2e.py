@@ -762,6 +762,9 @@ def test_external_lt_not_deleted_on_cancel(aws_client, subnet_id, sg_id, ec2):
         ext_lt_id = ext_lt_resp["LaunchTemplate"]["LaunchTemplateId"]
 
         # Build AWSTemplate referencing the external LT
+        # Build AWSTemplate referencing the external LT.
+        # No subnet_ids/security_group_ids: the external LT already defines
+        # NetworkInterfaces, so injecting at RunInstances level would collide.
         template = AWSTemplate(
             template_id="tpl-ext-lt",
             name="test-ext-lt",
@@ -770,8 +773,6 @@ def test_external_lt_not_deleted_on_cancel(aws_client, subnet_id, sg_id, ec2):
             image_id="ami-12345678",
             max_instances=1,
             price_type="ondemand",
-            subnet_ids=[ext_subnet_id],
-            security_group_ids=[ext_sg_id],
             launch_template_id=ext_lt_id,
         )
 

@@ -4,7 +4,7 @@ Covers:
 - _validate_prerequisites passes when launch_template_id is set (no image_id required)
 - LT manager uses existing template without creating a new one
 - _has_overrides logic
-- on_update_failure modes (fail vs warn)
+- Version-create failure falls back to existing LT (warn-and-continue)
 - Tag failure resilience
 - Per-request LT reuse when healthy
 - TemplateDefaultsService strips network fields when launch_template_id is set
@@ -291,64 +291,13 @@ class TestExistingLTWithImageIdOverride:
 
 
 class TestExistingLTWithOverridePermissionFailure:
-    def test_on_update_failure_defaults_to_fail_when_config_absent(
-        self, moto_aws, moto_vpc_resources
-    ):
-        """When on_update_failure is not configured, a version-create failure raises."""
+    def test_version_create_failure_falls_back_to_existing_lt(self, moto_aws, moto_vpc_resources):
+        """A CreateLaunchTemplateVersion failure falls back to the existing LT and warns."""
+        from botocore.exceptions import ClientError as BotoCE
 
         aws_client = _make_aws_client()
         logger = _make_logger()
         config_port = _make_config_port()
-        # Make provider_config return no launch_template attribute
-        config_port.get_provider_config.return_value = MagicMock(spec=[])
-
-        real_lt_id = _register_lt_in_moto(aws_client.ec2_client)
-
-        subnet_id = moto_vpc_resources["subnet_ids"][0]
-        sg_id = moto_vpc_resources["sg_id"]
-
-        template = AWSTemplate(
-            template_id="tpl-fail-mode",
-            name="fail-mode",
-            provider_api="EC2Fleet",
-            machine_types={"r5.large": 1},
-            image_id="ami-failmode00",
-            launch_template_id=real_lt_id,
-            max_instances=5,
-            price_type="spot",
-            subnet_ids=[subnet_id],
-            security_group_ids=[sg_id],
-        )
-
-        manager = AWSLaunchTemplateManager(
-            aws_client=aws_client,
-            logger=logger,
-            config_port=config_port,
-        )
-
-        # Patch _create_new_lt_version to simulate a failure
-        def _boom(aws_template, request):
-            raise RuntimeError("simulated permission denied")
-
-        manager._create_new_lt_version = _boom
-
-        from orb.providers.aws.exceptions.aws_exceptions import InfrastructureError
-
-        with pytest.raises((RuntimeError, InfrastructureError)):
-            manager.create_or_update_launch_template(template, _make_request())
-
-    def test_on_update_failure_warn_falls_back_to_existing_lt(self, moto_aws, moto_vpc_resources):
-        """When on_update_failure='warn', a version-create failure falls back to the existing LT."""
-        aws_client = _make_aws_client()
-        logger = _make_logger()
-        config_port = _make_config_port()
-
-        # Configure on_update_failure = 'warn'
-        lt_config = MagicMock()
-        lt_config.on_update_failure = "warn"
-        provider_config = MagicMock()
-        provider_config.launch_template = lt_config
-        config_port.get_provider_config.return_value = provider_config
 
         real_lt_id = _register_lt_in_moto(aws_client.ec2_client)
 
@@ -374,19 +323,67 @@ class TestExistingLTWithOverridePermissionFailure:
             config_port=config_port,
         )
 
-        # Patch _create_new_lt_version to simulate a failure
+        error_response = {"Error": {"Code": "UnauthorizedOperation", "Message": "denied"}}
+
         def _boom(aws_template, request):
-            raise RuntimeError("simulated permission denied")
+            raise BotoCE(
+                error_response=error_response, operation_name="CreateLaunchTemplateVersion"
+            )
 
         manager._create_new_lt_version = _boom
 
         result = manager.create_or_update_launch_template(template, _make_request())
 
-        # Should fall back to the existing template
         assert result.template_id == real_lt_id
         assert result.is_new_template is False
         assert result.is_new_version is False
         logger.warning.assert_called()
+
+    def test_version_create_throttling_propagates(self, moto_aws, moto_vpc_resources):
+        """Transient CreateLaunchTemplateVersion errors (Throttling) must propagate."""
+        from botocore.exceptions import ClientError as BotoCE
+
+        from orb.providers.aws.exceptions.aws_exceptions import InfrastructureError
+
+        aws_client = _make_aws_client()
+        logger = _make_logger()
+        config_port = _make_config_port()
+
+        real_lt_id = _register_lt_in_moto(aws_client.ec2_client)
+
+        subnet_id = moto_vpc_resources["subnet_ids"][0]
+        sg_id = moto_vpc_resources["sg_id"]
+
+        template = AWSTemplate(
+            template_id="tpl-throttle",
+            name="throttle",
+            provider_api="EC2Fleet",
+            machine_types={"r5.large": 1},
+            image_id="ami-throttle000",
+            launch_template_id=real_lt_id,
+            max_instances=5,
+            price_type="spot",
+            subnet_ids=[subnet_id],
+            security_group_ids=[sg_id],
+        )
+
+        manager = AWSLaunchTemplateManager(
+            aws_client=aws_client,
+            logger=logger,
+            config_port=config_port,
+        )
+
+        error_response = {"Error": {"Code": "Throttling", "Message": "rate exceeded"}}
+
+        def _boom(aws_template, request):
+            raise BotoCE(
+                error_response=error_response, operation_name="CreateLaunchTemplateVersion"
+            )
+
+        manager._create_new_lt_version = _boom
+
+        with pytest.raises((BotoCE, InfrastructureError)):
+            manager.create_or_update_launch_template(template, _make_request())
 
 
 # ---------------------------------------------------------------------------
@@ -791,78 +788,20 @@ class TestExistingLTEdgeCases:
 
 
 class TestFailureModeConfig:
-    def _make_config_port_with_lt_config(self, on_update_failure: str) -> Any:
-        """Return a config_port whose provider_config has launch_template.on_update_failure set."""
-        from orb.providers.aws.configuration.config import LaunchTemplateConfiguration
-
-        config_port = _make_config_port()
-        lt_config = LaunchTemplateConfiguration(on_update_failure=on_update_failure)  # type: ignore[call-arg]
-        provider_config = MagicMock()
-        provider_config.launch_template = lt_config
-        config_port.get_provider_config.return_value = provider_config
-        return config_port
-
     def _make_config_port_with_tag_config(self, on_tag_failure: str) -> Any:
         """Return a config_port whose provider_config has tagging.on_tag_failure set."""
-        from orb.providers.aws.configuration.config import TaggingConfiguration
+        from orb.providers.aws.configuration.config import (
+            LaunchTemplateConfiguration,
+            TaggingConfiguration,
+        )
 
         config_port = _make_config_port()
         tag_config = TaggingConfiguration(on_tag_failure=on_tag_failure)  # type: ignore[call-arg]
         provider_config = MagicMock()
         provider_config.tagging = tag_config
-        # Also expose launch_template so _get_lt_update_failure_mode doesn't blow up
-        from orb.providers.aws.configuration.config import LaunchTemplateConfiguration
-
         provider_config.launch_template = LaunchTemplateConfiguration()  # type: ignore[call-arg]
         config_port.get_provider_config.return_value = provider_config
         return config_port
-
-    def test_on_update_failure_fail_explicit_config_present(self, moto_aws, moto_vpc_resources):
-        """on_update_failure='fail' in explicit config raises InfrastructureError on version failure."""
-        from botocore.exceptions import ClientError as BotoCE
-
-        from orb.providers.aws.exceptions.aws_exceptions import InfrastructureError
-
-        aws_client = _make_aws_client()
-        logger = _make_logger()
-        config_port = self._make_config_port_with_lt_config("fail")
-
-        real_lt_id = _register_lt_in_moto(aws_client.ec2_client)
-
-        subnet_id = moto_vpc_resources["subnet_ids"][0]
-        sg_id = moto_vpc_resources["sg_id"]
-
-        template = AWSTemplate(
-            template_id="tpl-fail-explicit",
-            name="fail-explicit",
-            provider_api="EC2Fleet",
-            machine_types={"r5.large": 1},
-            image_id="ami-failexplicit",
-            launch_template_id=real_lt_id,
-            max_instances=5,
-            price_type="spot",
-            subnet_ids=[subnet_id],
-            security_group_ids=[sg_id],
-        )
-
-        manager = AWSLaunchTemplateManager(
-            aws_client=aws_client,
-            logger=logger,
-            config_port=config_port,
-        )
-
-        # Simulate an UnauthorizedOperation ClientError from create_launch_template_version
-        error_response = {"Error": {"Code": "UnauthorizedOperation", "Message": "not authorized"}}
-
-        def _boom(aws_template, request):
-            raise BotoCE(
-                error_response=error_response, operation_name="CreateLaunchTemplateVersion"
-            )
-
-        manager._create_new_lt_version = _boom
-
-        with pytest.raises((BotoCE, InfrastructureError)):
-            manager.create_or_update_launch_template(template, _make_request())
 
     def test_on_tag_failure_fail_on_version_path(self, moto_aws, moto_vpc_resources):
         """on_tag_failure='fail' must propagate a create_tags error on the version path."""

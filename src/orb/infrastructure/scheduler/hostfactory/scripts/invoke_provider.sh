@@ -15,6 +15,7 @@ PACKAGE_COMMAND=${ORB_COMMAND:-"orb"}
 if [ "$LOG_SCRIPTS" = "true" ] || [ "$LOG_SCRIPTS" = "1" ]; then
 {
 
+	    echo "=== Caller: ${HF_CALLER_SCRIPT:-<unknown>} ==="
 	    echo "=== Input Arguments Start ==="
 	    echo "Timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
 	    echo "Arguments:" "$@"

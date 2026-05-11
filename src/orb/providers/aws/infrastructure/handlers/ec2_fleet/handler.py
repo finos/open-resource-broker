@@ -38,7 +38,11 @@ from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from orb.infrastructure.error.decorators import handle_infrastructure_exceptions
 from orb.infrastructure.resilience import CircuitBreakerOpenError
-from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.domain.template.aws_template_aggregate import (
+    ABISInstanceRequirements,
+    AWSRequiredIntegerRange,
+    AWSTemplate,
+)
 from orb.providers.aws.domain.template.value_objects import AWSAllocationStrategy, AWSFleetType
 from orb.providers.aws.exceptions.aws_exceptions import (
     AWSEntityNotFoundError,
@@ -744,7 +748,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 machine_types={"t3.medium": 2, "t3.xlarge": 4},
                 max_instances=10,
                 price_type="spot",
-                max_price=0.10,
+                max_price=0.50,
                 subnet_ids=[],
                 security_group_ids=[],
                 tags={"environment": "dev"},
@@ -760,7 +764,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 price_type="heterogeneous",
                 percent_on_demand=30,
                 allocation_strategy="diversified",
-                max_price=0.10,
+                max_price=0.50,
                 subnet_ids=[],
                 security_group_ids=[],
                 tags={"environment": "dev"},
@@ -789,7 +793,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 max_instances=20,
                 price_type="spot",
                 allocation_strategy="capacityOptimized",
-                max_price=0.10,
+                max_price=0.50,
                 subnet_ids=[],
                 security_group_ids=[],
                 tags={"environment": "test"},
@@ -806,7 +810,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 percent_on_demand=40,
                 allocation_strategy="diversified",
                 allocation_strategy_on_demand=AWSAllocationStrategy.from_string("lowestPrice"),
-                max_price=0.10,
+                max_price=0.50,
                 subnet_ids=[],
                 security_group_ids=[],
                 tags={"environment": "test"},
@@ -835,7 +839,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 max_instances=30,
                 price_type="spot",
                 allocation_strategy="priceCapacityOptimized",
-                max_price=0.10,
+                max_price=0.50,
                 subnet_ids=[],
                 security_group_ids=[],
                 tags={"environment": "prod"},
@@ -852,10 +856,37 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 percent_on_demand=50,
                 allocation_strategy="capacityOptimized",
                 allocation_strategy_on_demand=AWSAllocationStrategy.from_string("prioritized"),
-                max_price=0.10,
+                max_price=0.50,
                 subnet_ids=[],
                 security_group_ids=[],
                 tags={"environment": "prod"},
                 metadata={"fleet_type": "maintain", "percent_on_demand": 50},
+            ),
+            # Attribute Based Instance Selection (ABIS) example
+            AWSTemplate(
+                template_id="EC2Fleet-Request-Mixed-ABIS",
+                name="EC2 Fleet Request Mixed (ABIS)",
+                description=(
+                    "EC2 Fleet using attribute based instance selection "
+                    "(vCPU + memory ranges) with mixed spot + on-demand pricing"
+                ),
+                provider_api="EC2Fleet",
+                abis_instance_requirements=ABISInstanceRequirements(
+                    VCpuCount=AWSRequiredIntegerRange(Min=2, Max=32),
+                    MemoryMiB=AWSRequiredIntegerRange(Min=4096, Max=16384),
+                    CpuManufacturers=["intel", "amd"],
+                    InstanceGenerations=["current"],
+                    BurstablePerformance="excluded",
+                ),
+                max_instances=10,
+                price_type="heterogeneous",
+                percent_on_demand=30,
+                allocation_strategy="capacityOptimized",
+                allocation_strategy_on_demand=AWSAllocationStrategy.from_string("lowestPrice"),
+                max_price=0.50,
+                subnet_ids=[],
+                security_group_ids=[],
+                tags={"environment": "dev"},
+                metadata={"fleet_type": "request", "percent_on_demand": 30},
             ),
         ]

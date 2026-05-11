@@ -170,6 +170,35 @@ Mixed pricing and instance types for optimal cost and performance:
 }
 ```
 
+### 4. Attribute Based Instance Selection (ABIS)
+
+Instead of listing explicit instance types in `vm_types`, you can declare the resource attributes you need (vCPU range, memory range, CPU manufacturers, generation, etc.) and let AWS pick matching instance types at fulfilment time. Supported by `EC2Fleet`, `SpotFleet`, and `ASG` (mixed instances policy). Not supported by `RunInstances`.
+
+When `abis_instance_requirements` is set, omit `vm_types` (the two are mutually exclusive in a template).
+
+```json
+{
+  "template_id": "EC2Fleet-Instant-Spot-ABIS",
+  "provider_api": "EC2Fleet",
+  "max_number": 10,
+  "abisInstanceRequirements": {
+    "vcpu_count": {"min": 2, "max": 32},
+    "memory_mib": {"min": 4096, "max": 16384},
+    "cpu_manufacturers": ["intel", "amd"],
+    "instance_generations": ["current"],
+    "burstable_performance": "excluded"
+  },
+  "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
+  "subnet_ids": ["subnet-0f984e48e6e899311"],
+  "security_group_ids": ["sg-0528dfedb6d763b16"],
+  "price_type": "spot",
+  "allocation_strategy": "priceCapacityOptimized",
+  "max_spot_price": 0.10
+}
+```
+
+The `abisInstanceRequirements` block maps directly to the AWS `InstanceRequirements` API. Required keys: `vcpu_count` and `memory_mib` (each with `min`/`max`). All other attributes are optional. Both snake_case (`vcpu_count`) and PascalCase (`VCpuCount`) keys are accepted on input. Run `orb templates generate` to see ready-to-copy ABIS examples for EC2Fleet, SpotFleet, and ASG.
+
 ## Template Configuration Fields
 
 ### Required Fields

@@ -317,13 +317,27 @@ class TemplateProcessor:
         if not template_overrides:
             return
 
+        # Snake-case wire format uses ``machine_types`` (default scheduler) while
+        # camelCase wire uses ``vmTypes`` (hostfactory scheduler). _CAMEL_TO_SNAKE
+        # only encodes the field-rename half of that pair, so vm_types overrides
+        # must be redirected to the runtime field machine_types when the template
+        # is in snake format. Without this, the override key sits next to the
+        # real machine_types key and the runtime silently ignores it.
+        snake_alias = {"vm_types": "machine_types", "vm_type": "machine_types"}
+
         for tmpl in templates_data.get("templates", []):
             fmt = _detect_template_format(tmpl)
             for k, v in template_overrides.items():
                 normalized_key = _normalize_key(k, fmt)
+                if fmt == "snake":
+                    normalized_key = snake_alias.get(normalized_key, normalized_key)
                 opposite_key = _normalize_key(k, "snake" if fmt == "camel" else "camel")
                 if opposite_key != normalized_key and opposite_key in tmpl:
                     del tmpl[opposite_key]
+                if fmt == "snake":
+                    for alias in ("vm_types", "vm_type"):
+                        if alias != normalized_key and alias in tmpl:
+                            del tmpl[alias]
                 tmpl[normalized_key] = v
 
     def _apply_config_overrides(

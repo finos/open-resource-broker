@@ -117,56 +117,17 @@ To change the behaviour:
 }
 ```
 
-## Launch template update failure (optional)
+## Launch template describe / version-create
 
-When an existing launch template is specified in a template and override fields are also set, ORB creates a new template version. The `on_update_failure` setting controls what happens if that version creation fails:
+When a template pins an existing `launch_template_id`, ORB attempts to describe it and, if override fields are also set, attempts to create a new launch template version. Both calls are best-effort: any failure (IAM denial, missing LT, transient error) is logged as a warning and ORB falls back to using the operator-supplied `launch_template_id` and `launch_template_version` as-is. Operators must ensure the LT contents are usable when describe or version-create are denied.
 
-- `fail` (default) — the request fails.
-- `warn` — ORB logs a warning and falls back to the existing template version.
-
-```json
-{
-  "provider": {
-    "providers": [{
-      "name": "aws",
-      "config": {
-        "launch_template": {
-          "on_update_failure": "warn"
-        }
-      }
-    }]
-  }
-}
-```
+This makes `ec2:DescribeLaunchTemplates*` and `ec2:CreateLaunchTemplateVersion` optional in the runtime role.
 
 ## Failure behaviour
 
-Both flags have intentionally asymmetric defaults: tagging is non-fatal by default (`warn`) because missing `ec2:CreateTags` should not block provisioning, while launch template updates default to `fail` because falling back silently to a stale template version could cause unexpected instance configuration.
-
 | Flag | Config key | Values | Default | Effect |
 |---|---|---|---|---|
-| `ORB_AWS_LAUNCH_TEMPLATE__ON_UPDATE_FAILURE` | `launch_template.on_update_failure` | `fail`, `warn` | `fail` | `fail` — request fails if template version creation fails. `warn` — logs a warning and falls back to the existing template version. |
 | `ORB_AWS_TAGGING__ON_TAG_FAILURE` | `tagging.on_tag_failure` | `warn`, `fail` | `warn` | `warn` — logs a warning and provisioning continues; resources are created without `orb:` tags. `fail` — request fails if tagging fails. |
-
-To set both flags in `config.json`:
-
-```json
-{
-  "provider": {
-    "providers": [{
-      "name": "aws",
-      "config": {
-        "launch_template": {
-          "on_update_failure": "warn"
-        },
-        "tagging": {
-          "on_tag_failure": "fail"
-        }
-      }
-    }]
-  }
-}
-```
 
 ## Example least-privilege IAM policy
 

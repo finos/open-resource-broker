@@ -109,6 +109,9 @@ class TestTemplateRoundTrip:
 
     def test_machine_types_survives_roundtrip(self):
         for template in self.example_templates:
+            # ABIS-only templates intentionally have empty machine_types
+            if template.abis_instance_requirements is not None and not template.machine_types:
+                continue
             result = self._roundtrip(template)
             assert result.get("machine_types"), f"machine_types missing for {template.template_id}"
             assert result["machine_types"] == template.machine_types, (
@@ -195,7 +198,56 @@ class TestTemplateRoundTrip:
         assert result.get("name") == template.name
         assert result.get("provider_api") == "EC2Fleet"
         assert result.get("price_type") == template.price_type
-        assert result.get("machine_types") == template.machine_types
+        if template.abis_instance_requirements is None:
+            assert result.get("machine_types") == template.machine_types
+        else:
+            assert not result.get("machine_types"), (
+                f"ABIS-only template {template.template_id} must not emit machine_types"
+            )
         assert "created_at" in result
         assert result.get("subnet_ids", []) == []
         assert result.get("security_group_ids", []) == []
+
+
+class TestABISExampleTemplates:
+    """Verify each fleet-capable handler ships at least one ABIS example."""
+
+    @pytest.mark.parametrize(
+        "handler_name,handler_import",
+        [
+            (
+                "EC2Fleet",
+                "orb.providers.aws.infrastructure.handlers.ec2_fleet.handler:EC2FleetHandler",
+            ),
+            (
+                "SpotFleet",
+                "orb.providers.aws.infrastructure.handlers.spot_fleet.handler:SpotFleetHandler",
+            ),
+            (
+                "ASG",
+                "orb.providers.aws.infrastructure.handlers.asg.handler:ASGHandler",
+            ),
+        ],
+    )
+    def test_handler_ships_abis_example(self, handler_name: str, handler_import: str):
+        """Handler examples must include at least one ABIS template (machine_types empty)."""
+        import importlib
+
+        module_path, class_name = handler_import.split(":")
+        handler_class = getattr(importlib.import_module(module_path), class_name)
+        examples = handler_class.get_example_templates()
+
+        abis_examples = [
+            t for t in examples if getattr(t, "abis_instance_requirements", None) is not None
+        ]
+        assert abis_examples, f"{handler_name} handler must include at least one ABIS example"
+
+        for tpl in abis_examples:
+            assert not tpl.machine_types, (
+                f"{tpl.template_id}: ABIS examples must not also set machine_types"
+            )
+            req = tpl.abis_instance_requirements
+            assert req.vcpu_count.min >= 1
+            assert req.vcpu_count.max >= req.vcpu_count.min
+            assert req.memory_mib.min >= 1
+            assert req.memory_mib.max >= req.memory_mib.min

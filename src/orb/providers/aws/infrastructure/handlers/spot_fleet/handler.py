@@ -35,7 +35,11 @@ from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from orb.infrastructure.error.decorators import handle_infrastructure_exceptions
-from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.domain.template.aws_template_aggregate import (
+    ABISInstanceRequirements,
+    AWSRequiredIntegerRange,
+    AWSTemplate,
+)
 from orb.providers.aws.exceptions.aws_exceptions import (
     AWSInfrastructureError,
     AWSValidationError,
@@ -539,7 +543,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 price_type="spot",
                 allocation_strategy="lowestPrice",
                 fleet_type="request",
-                max_price=0.10,
+                max_price=0.50,
                 subnet_ids=[],
                 security_group_ids=[],
                 tags={"Environment": "dev"},
@@ -554,7 +558,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 price_type="spot",
                 allocation_strategy="diversified",
                 fleet_type="request",
-                max_price=0.10,
+                max_price=0.50,
                 subnet_ids=[],
                 security_group_ids=[],
                 tags={"Environment": "dev"},
@@ -569,7 +573,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 price_type="spot",
                 allocation_strategy="capacityOptimized",
                 fleet_type="request",
-                max_price=0.10,
+                max_price=0.50,
                 subnet_ids=[],
                 security_group_ids=[],
                 tags={"Environment": "dev"},
@@ -585,7 +589,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 price_type="spot",
                 allocation_strategy="lowestPrice",
                 fleet_type="maintain",
-                max_price=0.10,
+                max_price=0.50,
                 subnet_ids=[],
                 security_group_ids=[],
                 tags={"Environment": "prod"},
@@ -600,7 +604,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 price_type="spot",
                 allocation_strategy="diversified",
                 fleet_type="maintain",
-                max_price=0.10,
+                max_price=0.50,
                 subnet_ids=[],
                 security_group_ids=[],
                 tags={"Environment": "prod"},
@@ -615,7 +619,31 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 price_type="spot",
                 allocation_strategy="capacityOptimized",
                 fleet_type="maintain",
-                max_price=0.10,
+                max_price=0.50,
+                subnet_ids=[],
+                security_group_ids=[],
+                tags={"Environment": "prod"},
+            ),
+            # Attribute Based Instance Selection (ABIS) example
+            AWSTemplate(
+                template_id="SpotFleet-Maintain-CapacityOptimized-ABIS",
+                name="Spot Fleet Maintain Capacity Optimized (ABIS)",
+                description=(
+                    "Spot Fleet using attribute based instance selection "
+                    "(vCPU + memory ranges) instead of explicit instance types"
+                ),
+                provider_api="SpotFleet",
+                abis_instance_requirements=ABISInstanceRequirements(
+                    VCpuCount=AWSRequiredIntegerRange(Min=4, Max=32),
+                    MemoryMiB=AWSRequiredIntegerRange(Min=8192, Max=32768),
+                    CpuManufacturers=["intel", "amd"],
+                    InstanceGenerations=["current"],
+                ),
+                max_instances=25,
+                price_type="spot",
+                allocation_strategy="capacityOptimized",
+                fleet_type="maintain",
+                max_price=0.50,
                 subnet_ids=[],
                 security_group_ids=[],
                 tags={"Environment": "prod"},
