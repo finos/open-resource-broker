@@ -1,6 +1,6 @@
 # ORB Provider Deployment Documentation
 
-This document describes how to configure the Open Resource Broker (ORB) as a provider in IBM Spectrum Symphony Host Factory.
+This document describes how to configure the Open Resource Broker (ORB) as a provider in IBM Spectrum Symphony HostFactory.
 
 ## Installation of the Open Resource Broker
 
@@ -13,31 +13,34 @@ This document describes how to configure the Open Resource Broker (ORB) as a pro
 <details>
 <summary>Development Install from Repository</summary>
 
-Note: initial installation paths of IBM Symphony and Host Factory along with the exact ersions might be different.
+Note: initial installation paths of IBM Symphony and HostFactory along with the exact versions may differ.
+
+The examples below use two path variables. Set them once and reuse them:
+
+- `EGO_TOP=/opt/ibm/spectrumcomputing`: Symphony install root.
+- `HF_TOP=$EGO_TOP/hostfactory`: HostFactory subtree. This matches the value `conf/profile.hf` exports at runtime, so do not double-prefix it with another `hostfactory/`.
 
 ```bash
-#Navigate to the provider plugins directory
+# Set path variables
 export EGO_TOP=/opt/ibm/spectrumcomputing
-cd ${EGO_TOP}/hostfactory/1.2/providerplugins
+export HF_TOP=$EGO_TOP/hostfactory
 
-#Clone the repository
+# Clone the repository under the plugin directory
+cd ${HF_TOP}/1.2/providerplugins
 mkdir -p orb
 git clone https://github.com/awslabs/open-resource-broker.git ./orb
 cd orb
 
-#Follow ORB development installation steps from the documentation e.g.,
+# Create a venv and install in editable mode
 python3 -m venv .venv
 source .venv/bin/activate
-
 pip install -e ".[dev]"
 
+# Verify the install
 orb --version
-
 ```
 
 </details>
-
-
 
 ## Debug Logging
 
@@ -51,233 +54,238 @@ HostFactory logging splits into two layers: the HostFactory core daemon and the 
 The HostFactory daemon writes its own log independently of any provider plugin. To raise verbosity, edit the HostFactory configuration file:
 
 ```bash
-vi /opt/ibm/spectrumcomputing/hostfactory/conf/hostfactoryconf.json
+vi ${HF_TOP}/conf/hostfactoryconf.json
+```
 
 Set:
 
+```json
 "HF_LOGLEVEL": "LOG_DEBUG"
-
 ```
 
 ### ORB provider plugin
 
-Depending on the installation location and configuration
+Set the ORB plugin log level. The path depends on the install layout. For the canonical dev layout the file lives under the plugin's own `config/` directory:
 
 ```bash
-vi /opt/ibm/spectrumcomputing/hostfactory/work/config/config.json
-
-  "logging": {
-    "level": "DEBUG",
-    "file_path": "logs/app.log",
-    "console_enabled": false
-  }
-
+vi ${HF_TOP}/1.2/providerplugins/orb/config/config.json
 ```
 
-### Where the output goes
+```json
+"logging": {
+  "level": "DEBUG",
+  "file_path": "logs/app.log",
+  "console_enabled": false
+}
+```
 
-  - {HF_LOGDIR}/hostfactory.hostname.log — HostFactory core log.
-  - ${HF_LOGDIR}/scripts.log - raw wire-format I/O: the JSON HostFactory sent in, and the JSON the plugin sent back, one block per call. Shows the exact communication between the plugin and the HhostFactory.
-  - /opt/ibm/spectrumcomputing/hostfactory/1.2/providerplugins/orb/logs/orb.log — structured per-line JSON log for full ORB tracing.
+For where each log lives, see [Log Locations](#log-locations) below.
 
+### Speed up host return for debugging
 
-### Other Settings
-
-Set host_return_policy: immediate for debugging fo requestor plugin, then restart HostFactory. Default lazy returns hosts only at the 60-min billing boundary. Immediate returns any idle host within ~1 minute. This provides fast feedback during debugging and testings. Revert to lazy before production.
+Set `host_return_policy: immediate` for debugging the requestor plugin, then restart HostFactory. The default `lazy` returns hosts only at the configurable billing boundary (~60 minutes by default). `immediate` returns any idle host within ~1 minute, giving fast feedback during debugging and testing. Revert to `lazy` before production.
 
 ```bash
-vim ${EGO_TOP}/hostfactory/conf/requestors/symAinst/symAinstreq_config.json
+vi ${HF_TOP}/conf/requestors/symAinst/symAinstreq_config.json
+```
 
+```json
 "host_return_policy": "immediate"
-
 ```
-
 
 </details>
 
-
-## Configuration of Host Factory to use ORB as a new provider plugin
+## Configuration of HostFactory to use ORB as a new provider plugin
 
 ### Step 1: Register ORB provider with HostFactory
 
 Edit the provider configuration file:
+
 ```bash
-vim ${HF_TOP}/hostfactory/conf/providers/hostProviders.json
+vi ${HF_TOP}/conf/providers/hostProviders.json
 ```
 
-Add the ORB provider configuration, (optionally) disable other providers:
+Add the ORB provider entry:
+
 ```json
 {
   "version": 2,
   "providers": [
     {
-			"name":	"orb",
-			"enabled":	1,
-			"plugin":	"orb",
-			"confPath":	"${HF_CONFDIR}/providers/orb/",
-			"workPath":	"${HF_WORKDIR}/providers/orb/",
-			"logPath":	"${HF_LOGDIR}/"
-		},
-    ...
+      "name": "orb",
+      "enabled": 1,
+      "plugin": "orb",
+      "confPath": "${HF_CONFDIR}/providers/orb/",
+      "workPath": "${HF_WORKDIR}/providers/orb/",
+      "logPath": "${HF_LOGDIR}/"
+    }
   ]
 }
 ```
 
-## Step 2: Register ORB provider plugin with HostFactory
+To disable other providers in the same file, set their `"enabled"` field to `0`.
+
+### Step 2: Register ORB provider plugin with HostFactory
 
 Edit the provider plugins configuration:
+
 ```bash
-vim ${HF_TOP}/hostfactory/conf/providerplugins/hostProviderPlugins.json
+vi ${HF_TOP}/conf/providerplugins/hostProviderPlugins.json
 ```
 
-Add the ORB plugin configuration and disable other plugins:
+Add the ORB plugin entry:
+
 ```json
 {
-    "version": 2,
-    "providerplugins":[
-        {
-            "name": "orb",
-            "enabled": 1,
-            "scriptPath": "${HF_TOP}/${HF_VERSION}/providerplugins/orb/scripts/"
-        },
-        ...
-    ]
+  "version": 2,
+  "providerplugins": [
+    {
+      "name": "orb",
+      "enabled": 1,
+      "scriptPath": "${HF_TOP}/${HF_VERSION}/providerplugins/orb/scripts/"
+    }
+  ]
 }
 ```
 
+To disable other plugins in the same file, set their `"enabled"` field to `0`.
 
+### Step 3: Create the provider directory
 
-### Step 3: Create provider directory
+Create an empty directory for the ORB provider. HostFactory checks that this path exists, but the actual ORB configuration is kept under the plugin install root, not here.
 
-Navigate to the providers folder and create a folder for the new provider. HostFactory will check for the presence of this path, however, actual configuration of ORB will not be kept here.
 ```bash
-# create directory
-mkdir vim ${HF_TOP}/hostfactory/conf/providers/orb
-
+mkdir -p ${HF_TOP}/conf/providers/orb
 ```
 
+### Step 4: Configure the requestor
 
-## Step 4: Configure Requestor
+Configure the requestor to recognise the new provider:
 
-Configure the requestor to recognize the new provider:
 ```bash
-vim ${HF_TOP}/hostfactory/conf/requestors/hostRequestors.json
+vi ${HF_TOP}/conf/requestors/hostRequestors.json
 ```
 
-Update the requestor configuration:
+Set `"providers": ["orb"]` on every requestor entry that should route demand through ORB:
+
 ```json
 {
-    "version": 2,
-    "requestors": [
-        {
-            "name": "symAinst",
-            "enabled": 1,
-            "plugin": "symA",
-            "confPath": "${HF_CONFDIR}/requestors/symAinst/",
-            "workPath": "${HF_WORKDIR}/requestors/symAinst/",
-            "logPath": "${HF_LOGDIR}/",
-            "providers": ["orb"],         # <-----
-            "requestMode": "POLL"
-        },
-        {
-            "name": "admin",
-            "enabled": 1,
-            "providers": ["orb"],         # <-----
-            "requestMode": "REST_MANUAL"
-        }
-    ]
+  "version": 2,
+  "requestors": [
+    {
+      "name": "symAinst",
+      "enabled": 1,
+      "plugin": "symA",
+      "confPath": "${HF_CONFDIR}/requestors/symAinst/",
+      "workPath": "${HF_WORKDIR}/requestors/symAinst/",
+      "logPath": "${HF_LOGDIR}/",
+      "providers": ["orb"],
+      "requestMode": "POLL"
+    },
+    {
+      "name": "admin",
+      "enabled": 1,
+      "providers": ["orb"],
+      "requestMode": "REST_MANUAL"
+    }
+  ]
 }
 ```
 
-### Set HostFactory Environmental Variables for ORB
+### Step 5: Set HostFactory environment variables for ORB
 
-HostFactory does not pick up variables from .bashrc, instead it has its own environmental files. One way to set it is by editing the following file.
+HostFactory does not pick up variables from `.bashrc`. It has its own environment file (`profile.hf`) that is sourced by every HF-spawned process: the HostFactory daemon, the requestor, and every provider plugin call. Anything exported here is global to the HF runtime.
+
+Two ORB variables to set:
+
+- `USE_LOCAL_DEV=true`: run ORB from the source tree. `invoke_provider.sh` execs `python src/orb/run.py` instead of the installed `orb` console-script, so edits under `src/orb/` take effect on the next HF call without reinstall.
+- `LOG_SCRIPTS=true`: record full HF/plugin I/O into `${HF_LOGDIR}/scripts.log` (one block per call). Useful during bring-up; turn off in production to keep the log small.
+
+Append both to `profile.hf`:
 
 ```bash
+vi ${HF_TOP}/conf/profile.hf
+```
 
-vim ${HF_TOP}/hostfactory/conf/profile.hf
-
-# runs ORB without system wide installation
+```bash
 export USE_LOCAL_DEV=true
-
-# records complete scripts I/O between HostFactory and ORB
 export LOG_SCRIPTS=true
-
 ```
 
+### Step 6: Configure ORB
 
+This step writes ORB defaults for the current AWS account and copies the entry scripts into the `orb/scripts/` directory referenced by `hostProviderPlugins.json`.
 
-
-## Configure ORB
-
-This step will set defaults for ORB in current AWS account. It will also move scripts directory under orb/ path to match configuration above.
 ```bash
 orb init
 orb templates generate
 ```
 
-export USE_LOCAL_DEV="true"         # Set true for this type of deployment
-
-
-
-
+After this, `${HF_TOP}/1.2/providerplugins/orb/scripts/` contains the five HF entry scripts plus `invoke_provider.sh`, and `${HF_TOP}/1.2/providerplugins/orb/awscpinst/config/awsprov_templates.json` contains the generated AWS templates.
 
 ## Directory Structure
 
-After configuration, your directory structure should look like:
+After configuration, the relevant subtree under `${HF_TOP}` looks like:
 
-
-hostfactory/work/providers/aws_orb_provider/dataopt/ibm/spectrumcomputing/hostfactory/work/providers/aws_orb_provider/data/
 ```
-hostfactory
+hostfactory/
 ├── conf/
+│   ├── profile.hf                          # HF environment (USE_LOCAL_DEV, LOG_SCRIPTS go here)
+│   ├── hostfactoryconf.json                # HF core config (HF_LOGLEVEL, etc.)
 │   ├── providers/
-│   │   ├── awsinst/                    # Original AWS provider (disabled)
-│   │   ├── aws_orb_provider/          # New ORB provider
-│   │   │   ├── <...>                   # Currently no config files here!
-│   │   └── hostProviders.json          # Provider registry (update)
+│   │   ├── awsinst/                        # Original AWS provider (disable)
+│   │   ├── orb/                            # ORB provider (empty, checked for existence only)
+│   │   └── hostProviders.json              # Provider registry (update)
 │   ├── providerplugins/
-│   │   └── hostProviderPlugins.json    # Plugin registry (update)
+│   │   └── hostProviderPlugins.json        # Plugin registry (update)
 │   └── requestors/
-│       └── hostRequestors.json         # Requestor configuration (update)
+│       ├── hostRequestors.json             # Requestor configuration (update)
+│       └── symAinst/
+│           └── symAinstreq_config.json     # host_return_policy lives here
 ├── work/
-│   └── config/                         # config.json, default-config.json, awsprov_templates.json
-│   └── logs/
-│       └── app.log                     # ORB Plugin Logs
 │   └── providers/
-│       └── aws_orb_provider/
+│       └── orb/
 │           └── data/
-├               ├──request_database.json. # Request/machine data
+│               └── request_database.json   # Request/machine state
 ├── log/
-│   ├── hostfactory.log                 # Host Factory logs
-│   └── scripts.log                     # Logs from Host Factory scripts invocation for debug.
-│   └── symAinst.log                    # Requestors logs
+│   ├── hostfactory.<hostname>.log          # HostFactory core log
+│   ├── scripts.log                         # Wire-format I/O between HF and plugin (LOG_SCRIPTS)
+│   └── symAinst-requestor.<hostname>.log   # Requestor log
+├── db/
+│   └── hf.db                               # HF state database
 └── 1.2/
     └── providerplugins/
-        └── orb/
+        └── orb/                            # Plugin install root (this repo, checked out here)
             ├── .venv/
-            ├── src/                    # ORB source code
-            └── scripts/                # Provider scripts
+            ├── src/orb/                    # ORB source (used when USE_LOCAL_DEV=true)
+            ├── config/config.json          # ORB plugin config (logging level, etc.)
+            ├── awscpinst/config/
+            │   └── awsprov_templates.json  # Generated by `orb templates generate`
+            ├── logs/
+            │   └── orb.log                 # Structured ORB log
+            └── scripts/                    # HF entry scripts (referenced by hostProviderPlugins.json)
                 ├── getAvailableTemplates.sh
-                ├── requestMachines.sh
                 ├── getRequestStatus.sh
-                └── requestReturnMachines.sh
-                └── invoke_provider.sh         # Edit this file
-
-
+                ├── getReturnRequests.sh
+                ├── requestMachines.sh
+                ├── requestReturnMachines.sh
+                ├── templateWizard.sh       # Interactive helper, not called by HF
+                └── invoke_provider.sh      # Wrapper sourced by every entry script
 ```
-
 
 ### Log Locations
 
 Check these log files for troubleshooting:
-- **Host Factory logs:** `/opt/ibm/spectrumcomputing/hostfactory/log/hostfactory.log`
-- **ORB application logs:** `/opt/ibm/spectrumcomputing/hostfactory/log/app.log`
-- **Provider work directory:** `/opt/ibm/spectrumcomputing/hostfactory/work/providers/aws_orb_provider/`
+
+- **HostFactory core:** `${HF_TOP}/log/hostfactory.<hostname>.log`.
+- **Plugin wire-format log:** `${HF_TOP}/log/scripts.log`. Raw I/O between HostFactory and the plugin, one block per call: the JSON HF sent in, then the JSON the plugin returned. Only populated when `LOG_SCRIPTS=true`.
+- **ORB structured log:** `${HF_TOP}/1.2/providerplugins/orb/logs/orb.log`. Per-line JSON log for full ORB tracing.
+- **Requestor:** `${HF_TOP}/log/symAinst-requestor.<hostname>.log`.
+- **Provider work directory:** `${HF_TOP}/work/providers/orb/`.
 
 ## Execution
 
-To apply any configuration changes you need to restart HostFactory
+To apply configuration changes, restart HostFactory:
 
 ```bash
 egosh service stop HostFactory
@@ -285,16 +293,32 @@ sleep 2
 egosh service start HostFactory
 ```
 
-To have a clean run, you can remove all the previous state associated with HF and requestor plugin (adjust to your paths):
+### Verify the plugin is wired up
 
 ```bash
-rm /opt/ibm/spectrumcomputing/hostfactory/work/*.json -f
-rm /opt/ibm/spectrumcomputing/hostfactory/log/* -f
-rm /opt/ibm/spectrumcomputing/hostfactory/work/logs/app.log -f
-rm /opt/ibm/spectrumcomputing/hostfactory/work/requestors/symAinst/* -f
-rm /opt/ibm/spectrumcomputing/hostfactory/db/hf.db -f
-rm /opt/ibm/spectrumcomputing/hostfactory/1.2/providerplugins/orb/awscpinst/data/*.json -f
+# 1. HostFactory is running
+egosh service list | grep HostFactory
+
+# 2. ORB CLI itself works against your AWS account
+orb templates list
+
+# 3. HF can call into the plugin (templates surface through HF)
+tail -F ${HF_TOP}/log/scripts.log
+# Within ~30 seconds you should see a `=== Caller: getAvailableTemplates.sh ===`
+# block followed by JSON output. If not, recheck Step 1 and Step 2.
 ```
 
-Note: symAinst-requestor.log is visible only if plugin successfully started and returned list of available templates.
+### Reset state for a clean run
+
+To wipe all previous HF and requestor state (adjust paths if your install differs):
+
+```bash
+rm -f ${HF_TOP}/work/*.json
+rm -f ${HF_TOP}/log/*
+rm -f ${HF_TOP}/work/requestors/symAinst/*
+rm -f ${HF_TOP}/db/hf.db
+rm -f ${HF_TOP}/work/providers/orb/data/*.json
+```
+
+Note: `symAinst-requestor.<hostname>.log` only appears once the plugin has successfully started and returned the list of available templates.
 
