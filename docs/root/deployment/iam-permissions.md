@@ -119,15 +119,41 @@ To change the behaviour:
 
 ## Launch template describe / version-create
 
-When a template pins an existing `launch_template_id`, ORB attempts to describe it and, if override fields are also set, attempts to create a new launch template version. Both calls are best-effort: any failure (IAM denial, missing LT, transient error) is logged as a warning and ORB falls back to using the operator-supplied `launch_template_id` and `launch_template_version` as-is. Operators must ensure the LT contents are usable when describe or version-create are denied.
+When a template pins an existing `launch_template_id`, ORB attempts to describe it and, if override fields are also set, attempts to create a new launch template version.
 
-This makes `ec2:DescribeLaunchTemplates*` and `ec2:CreateLaunchTemplateVersion` optional in the runtime role.
+`Describe` is best-effort: IAM denials (`UnauthorizedOperation`, `AccessDenied`, `AccessDeniedException`) and `InvalidLaunchTemplateId.NotFound` warn-and-pass-through the operator-supplied id/version as-is. Any other error propagates.
+
+`CreateLaunchTemplateVersion` failure handling is controlled by `launch_template.on_update_failure`:
+
+- `warn_on_iam_denial` (default) — fall back to the existing LT only on IAM-denial codes from `CreateLaunchTemplateVersion`; any other error propagates. Lets a minimal-permission role omit `ec2:CreateLaunchTemplateVersion` while still surfacing genuine API failures.
+- `warn` — log a warning and fall back to the existing LT on any `CreateLaunchTemplateVersion` ClientError. ORB-internal errors and AWS errors from other operations (e.g. tagging) propagate.
+- `fail` — propagate any failure; request fails.
+
+This makes `ec2:DescribeLaunchTemplates*` and `ec2:CreateLaunchTemplateVersion` optional in the runtime role under the default mode.
+
+## AMI resolution via SSM (conditional)
+
+When a template's `image_id` is an SSM parameter path (e.g. `/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64`) rather than an `ami-*` id, ORB resolves it via SSM at request time:
+
+```
+ssm:GetParameters
+```
+
+This is required when:
+
+- A template inherits the default `image_id` from `aws_defaults.json` (the AL2023 SSM parameter).
+- A template explicitly sets `image_id` to any `/aws/service/...` path.
+
+It is **not** required when every template either pins a literal `ami-*` id, or pins a `launch_template_id` whose stored data already carries a resolved AMI.
+
+Without `ssm:GetParameters`, the AMI resolution step fails before any EC2 call, surfacing as an opaque resolution error rather than as a missing-IAM error. Either grant the permission or override `image_id` per template.
 
 ## Failure behaviour
 
 | Flag | Config key | Values | Default | Effect |
 |---|---|---|---|---|
 | `ORB_AWS_TAGGING__ON_TAG_FAILURE` | `tagging.on_tag_failure` | `warn`, `fail` | `warn` | `warn` — logs a warning and provisioning continues; resources are created without `orb:` tags. `fail` — request fails if tagging fails. |
+| `ORB_AWS_LAUNCH_TEMPLATE__ON_UPDATE_FAILURE` | `launch_template.on_update_failure` | `fail`, `warn`, `warn_on_iam_denial` | `warn_on_iam_denial` | `warn_on_iam_denial` — fall back to existing LT only on IAM denials from `CreateLaunchTemplateVersion`; other errors propagate. `warn` — fall back on any `CreateLaunchTemplateVersion` ClientError; tagging and non-AWS errors propagate. `fail` — propagate any failure. |
 
 ## Example least-privilege IAM policy
 
@@ -217,10 +243,20 @@ The policy below covers all four handler types with tagging and launch template 
         "sts:GetCallerIdentity"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "SSMForAMIResolution",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetParameters"
+      ],
+      "Resource": "*"
     }
   ]
 }
 ```
+
+`SSMForAMIResolution` can be omitted if no template ever uses an SSM-style `image_id` (see [AMI resolution via SSM](#ami-resolution-via-ssm-conditional)).
 
 ### Minimal policy (EC2Fleet only, tagging optional)
 
@@ -251,6 +287,8 @@ If you only use EC2Fleet and are comfortable with the default `on_tag_failure: w
   ]
 }
 ```
+
+Add `ssm:GetParameters` if any template uses an SSM-style `image_id` (including the default `image_id` shipped in `aws_defaults.json`).
 
 ## IAM role for SpotFleet
 

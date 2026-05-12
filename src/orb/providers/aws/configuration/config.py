@@ -50,6 +50,19 @@ class LaunchTemplateConfiguration(BaseModel):
     reuse_existing: bool = Field(True, description="Reuse existing launch templates")
     cleanup_old_versions: bool = Field(False, description="Cleanup old launch template versions")
     max_versions_per_template: int = Field(10, description="Maximum versions per launch template")
+    on_update_failure: Literal["fail", "warn", "warn_on_iam_denial"] = Field(
+        "warn_on_iam_denial",
+        description=(
+            "Behaviour when CreateLaunchTemplateVersion fails for an existing "
+            "launch_template_id with overrides. fail: propagate all errors. "
+            "warn: log a warning and fall back to the existing LT for any "
+            "ClientError on CreateLaunchTemplateVersion; other errors (tagging, "
+            "non-AWS exceptions) propagate. warn_on_iam_denial: like warn, but "
+            "bounded to IAM-denial codes "
+            "(UnauthorizedOperation/AccessDenied/AccessDeniedException); any "
+            "other error propagates."
+        ),
+    )
 
 
 class TaggingConfiguration(BaseModel):
