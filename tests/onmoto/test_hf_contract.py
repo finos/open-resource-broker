@@ -344,15 +344,18 @@ class TestGetAvailableTemplatesSchema:
         _validate(response, expected_get_available_templates_schema_default)
 
     def test_hf_templates_have_required_attributes_object(self, hf_strat, orb_config_dir):
-        """Every template in HF response has attributes with type, ncores, ncpus, nram."""
+        """Every template in HF response has attributes with type, ncpus, nram (ncores is LSF-only)."""
         templates = _get_all_template_dtos(hf_strat, orb_config_dir)
         response = hf_strat.format_templates_response(templates)
         assert len(response["templates"]) > 0, "No templates returned — check config fixture"
         for tmpl in response["templates"]:
             assert "attributes" in tmpl, f"Template {tmpl.get('templateId')} missing 'attributes'"
             attrs = tmpl["attributes"]
-            for key in ("type", "ncores", "ncpus", "nram"):
+            for key in ("type", "ncpus", "nram"):
                 assert key in attrs, f"Template {tmpl.get('templateId')} attributes missing '{key}'"
+            assert "ncores" not in attrs, (
+                f"Template {tmpl.get('templateId')} must not have ncores (LSF-only)"
+            )
 
     def test_hf_instance_tags_is_string_not_dict(self, hf_strat, orb_config_dir):
         """instanceTags in HF response is a string (not a dict) when present."""

@@ -674,7 +674,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 machine_types={"t3.medium": 1},
                 max_instances=10,
                 price_type="spot",
-                max_price=0.05,
+                max_price=0.10,
                 subnet_ids=[],
                 security_group_ids=[],
                 tags={"Environment": "dev"},

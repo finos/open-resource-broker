@@ -353,7 +353,7 @@ class TestHandleGetReturnRequests:
 
         container, _scheduler, _, _, _, _, list_ret_orch, _, formatter = _mock_container()
         list_ret_orch.execute.return_value = ListReturnRequestsOutput(requests=[])
-        formatter.format_request_status.return_value = InterfaceResponse(data={"requests": []})
+        formatter.format_return_requests.return_value = InterfaceResponse(data={"requests": []})
 
         args = _make_namespace()
 

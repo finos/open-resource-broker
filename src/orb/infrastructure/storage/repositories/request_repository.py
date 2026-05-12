@@ -67,7 +67,8 @@ class RequestSerializer(BaseEntitySerializer):
                 # Core request fields
                 "request_id": _id_str(request.request_id),
                 "template_id": request.template_id,
-                "machine_count": request.requested_count,
+                "machine_count": request.requested_count,  # Legacy key — kept for backward compat
+                "requested_count": request.requested_count,
                 "desired_capacity": request.desired_capacity,
                 "request_type": _id_str(request.request_type),
                 "status": _id_str(request.status),
@@ -79,8 +80,10 @@ class RequestSerializer(BaseEntitySerializer):
                 # Resource tracking fields
                 "resource_ids": request.resource_ids,
                 "machine_ids": request.machine_ids,
-                # HF output fields
-                "message": request.message,
+                # Legacy HF wire-format key — written as an alias for status_message so
+                # that records read back by older ORB versions still have a "message" key.
+                # On read, from_dict treats "message" as a fallback for status_message.
+                "message": request.status_message,
                 # Results and instances
                 "successful_count": request.successful_count,
                 "failed_count": request.failed_count,
@@ -92,11 +95,12 @@ class RequestSerializer(BaseEntitySerializer):
                 "created_at": request.created_at.isoformat(),  # type: ignore[union-attr]
                 "started_at": self._dt.serialize_datetime(request.started_at),
                 "completed_at": self._dt.serialize_datetime(request.completed_at),
+                "first_status_check": self._dt.serialize_datetime(request.first_status_check),
+                "last_status_check": self._dt.serialize_datetime(request.last_status_check),
                 # Versioning
                 "version": request.version,
                 # Legacy fields for backward compatibility
                 "timeout": request.metadata.get("timeout"),
-                "tags": request.metadata.get("tags", {}),
                 "error_message": request.status_message,  # Legacy field name
                 # Schema version for migration support
                 "schema_version": "2.0.0",
@@ -118,13 +122,18 @@ class RequestSerializer(BaseEntitySerializer):
                 # Core request fields - handle RequestId properly
                 "request_id": self._parse_request_id(data["request_id"]),
                 "template_id": data["template_id"],
-                "requested_count": data.get("machine_count", data.get("requested_count", 1)),
+                "requested_count": data.get("requested_count", data.get("machine_count", 1)),
                 "desired_capacity": data.get(
                     "desired_capacity", data.get("machine_count", data.get("requested_count", 1))
                 ),  # Default to requested_count if not present
                 "request_type": RequestType(data["request_type"]),
                 "status": RequestStatus(data["status"]),
-                "status_message": data.get("status_message", data.get("error_message")),
+                # "message" is the legacy HF wire-format key written by older serializer
+                # versions.  Prefer the canonical "status_message"; fall back to
+                # "error_message" (even older alias), then "message".
+                "status_message": data.get("status_message")
+                or data.get("error_message")
+                or data.get("message"),
                 # Provider tracking fields
                 "provider_name": data.get("provider_name"),
                 "provider_api": data.get("provider_api"),
@@ -136,8 +145,6 @@ class RequestSerializer(BaseEntitySerializer):
                 "machine_ids": [
                     mid for mid in (data.get("machine_ids", []) or []) if mid is not None
                 ],
-                # HF output fields
-                "message": data.get("message"),
                 # Results and instances
                 "successful_count": data.get("successful_count", 0),
                 "failed_count": data.get("failed_count", 0),
@@ -149,6 +156,8 @@ class RequestSerializer(BaseEntitySerializer):
                 "created_at": created_at,
                 "started_at": started_at,
                 "completed_at": completed_at,
+                "first_status_check": self._dt.deserialize_datetime(data.get("first_status_check")),
+                "last_status_check": self._dt.deserialize_datetime(data.get("last_status_check")),
                 # Versioning
                 "version": data.get("version", 0),
             }

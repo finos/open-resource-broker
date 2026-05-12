@@ -1,9 +1,18 @@
-"""HostFactory response formatting — converts domain objects to HF wire format."""
+"""HostFactory response formatting — converts domain objects to HF wire format.
+
+NOTE (dead code): HostFactoryResponseFormatter is not referenced anywhere in the
+production code path.  All equivalent formatting logic lives inline on
+HostFactorySchedulerStrategy (hostfactory_strategy.py).  This class was
+extracted as a refactoring step but the strategy was never updated to delegate
+to it.  Do not delete — it may be wired up in a future cleanup — but do not
+rely on it being called at runtime.
+"""
 
 import json
 from typing import Any
 
 from orb.application.dto.responses import MachineDTO
+from orb.application.machine.result_mapping import map_machine_status_to_result as _map_result
 from orb.application.request.dto import RequestDTO
 from orb.infrastructure.template.dtos import TemplateDTO
 
@@ -179,13 +188,13 @@ class HostFactoryResponseFormatter:
             "machines": [
                 {
                     "machineId": str(machine.machine_id),
-                    "templateId": str(machine.template_id),
-                    "requestId": str(machine.request_id),
+                    "templateId": machine.template_id or "",
+                    "requestId": machine.request_id or "",
                     "returnRequestId": machine.return_request_id,
                     "vmType": str(machine.instance_type),
-                    "imageId": str(machine.image_id),
-                    "privateIp": machine.private_ip,
-                    "publicIp": machine.public_ip,
+                    "imageId": machine.image_id or "",
+                    "privateIpAddress": machine.private_ip,
+                    "publicIpAddress": machine.public_ip,
                     "subnetId": machine.subnet_id,
                     "securityGroupIds": machine.security_group_ids,
                     "status": str(machine.status),
@@ -284,11 +293,8 @@ class HostFactoryResponseFormatter:
                 formatted_machine["instanceType"] = machine["instance_type"]
             if machine.get("price_type"):
                 formatted_machine["priceType"] = machine["price_type"]
-            if machine.get("instance_tags"):
-                tags = machine["instance_tags"]
-                formatted_machine["instanceTags"] = (
-                    json.dumps(tags) if isinstance(tags, dict) else str(tags)
-                )
+            if machine.get("tags"):
+                formatted_machine["instanceTags"] = json.dumps(machine["tags"], sort_keys=True)
 
             formatted_machines.append(formatted_machine)
 
@@ -298,21 +304,7 @@ class HostFactoryResponseFormatter:
         self, status: str | None, request_type: str | None = None
     ) -> str:
         """Map machine status to HostFactory result field per hf_docs/input-output.md."""
-        if request_type == "return":
-            if status in ["terminated", "stopped"]:
-                return "succeed"
-            elif status in ["shutting-down", "stopping", "pending", "terminating", "running"]:
-                return "executing"
-            else:
-                return "fail"
-        elif status == "running":
-            return "succeed"
-        elif status in ["pending", "launching"]:
-            return "executing"
-        elif status in ["terminated", "failed", "error"]:
-            return "fail"
-        else:
-            return "executing"
+        return _map_result(status, request_type=request_type)
 
     def map_domain_status_to_hostfactory(self, domain_status: str) -> str:
         """Map domain status to HostFactory status per hf_docs/input-output.md."""

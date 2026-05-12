@@ -18,6 +18,7 @@ class GetRequestQuery(Query, BaseModel):
     request_id: str
     verbose: bool = False
     lightweight: bool = False
+    skip_cache: bool = False
 
 
 class ListActiveRequestsQuery(Query, BaseModel):

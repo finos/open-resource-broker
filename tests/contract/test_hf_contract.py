@@ -111,9 +111,10 @@ def test_hf_get_templates_attributes_shape(hf_strategy):
     for tpl in response["templates"]:
         assert "attributes" in tpl, f"template missing 'attributes': {tpl}"
         attrs = tpl["attributes"]
-        for key in ("type", "ncores", "ncpus", "nram"):
+        for key in ("type", "ncpus", "nram"):
             assert key in attrs, f"attributes missing '{key}': {attrs}"
             assert isinstance(attrs[key], list) and len(attrs[key]) == 2
+        assert "ncores" not in attrs, "ncores is LSF-only and must not appear in HF attributes"
 
 
 def test_hf_get_templates_empty_list(hf_strategy):
@@ -386,3 +387,86 @@ def test_hf_return_request_id_uses_ret_prefix(hf_strategy):
     req_id = response["requests"][0]["requestId"]
     assert req_id.startswith("ret-"), f"Return request ID should start with 'ret-', got: {req_id}"
     assert _STATUS_ID_PATTERN.match(req_id)
+
+
+# ---------------------------------------------------------------------------
+# 6. getReturnRequests — spec-mandated flat envelope shape
+# ---------------------------------------------------------------------------
+
+
+def test_hf_return_requests_top_level_keys(hf_strategy):
+    """format_return_requests_response must have status, message, requests at top level."""
+    response = hf_strategy.format_return_requests_response([])
+    assert "status" in response
+    assert "message" in response
+    assert "requests" in response
+
+
+def test_hf_return_requests_items_are_flat(hf_strategy):
+    """Each item in requests must be flat {machine, gracePeriod} — no nested machines array."""
+    requests = [
+        {
+            "grace_period": 300,
+            "machines": [{"name": "host-1", "machine_id": "i-001"}],
+        }
+    ]
+    response = hf_strategy.format_return_requests_response(requests)
+    assert len(response["requests"]) == 1
+    item = response["requests"][0]
+    assert "machine" in item, f"item missing 'machine': {item}"
+    assert "gracePeriod" in item, f"item missing 'gracePeriod': {item}"
+    assert "machines" not in item, f"item must not have nested 'machines': {item}"
+
+
+def test_hf_return_requests_machine_is_non_empty_string(hf_strategy):
+    """machine field in each item must be a non-empty string."""
+    requests = [
+        {
+            "grace_period": 300,
+            "machines": [{"name": "host-1", "machine_id": "i-001"}],
+        }
+    ]
+    response = hf_strategy.format_return_requests_response(requests)
+    for item in response["requests"]:
+        assert isinstance(item["machine"], str) and item["machine"], (
+            f"machine must be non-empty string, got: {item['machine']!r}"
+        )
+
+
+def test_hf_return_requests_grace_period_is_int(hf_strategy):
+    """gracePeriod in each item must be an int."""
+    requests = [
+        {
+            "grace_period": 300,
+            "machines": [{"name": "host-1", "machine_id": "i-001"}],
+        }
+    ]
+    response = hf_strategy.format_return_requests_response(requests)
+    for item in response["requests"]:
+        assert isinstance(item["gracePeriod"], int), (
+            f"gracePeriod must be int, got {type(item['gracePeriod'])}"
+        )
+
+
+def test_hf_return_requests_no_extra_keys_in_items(hf_strategy):
+    """Items must have exactly {machine, gracePeriod} — no extra fields."""
+    requests = [
+        {
+            "request_id": "ret-001",
+            "status": "complete",
+            "grace_period": 300,
+            "machines": [{"name": "host-1", "machine_id": "i-001", "status": "running"}],
+        }
+    ]
+    response = hf_strategy.format_return_requests_response(requests)
+    for item in response["requests"]:
+        extra = set(item.keys()) - {"machine", "gracePeriod"}
+        assert not extra, f"Extra keys in return request item: {extra}"
+
+
+def test_hf_return_requests_empty_produces_valid_envelope(hf_strategy):
+    """Empty input still produces a valid spec envelope."""
+    response = hf_strategy.format_return_requests_response([])
+    assert response["status"] == "complete"
+    assert isinstance(response["message"], str) and response["message"]
+    assert response["requests"] == []

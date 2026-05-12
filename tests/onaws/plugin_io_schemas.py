@@ -23,15 +23,9 @@ expected_get_available_templates_schema_hostfactory = {
                     "instanceTags": {"type": "string"},
                     "attributes": {
                         "type": "object",
-                        "required": ["type", "ncores", "ncpus", "nram"],
+                        "required": ["type", "ncpus", "nram"],
                         "properties": {
                             "type": {
-                                "type": "array",
-                                "items": {"type": "string"},
-                                "minItems": 2,
-                                "maxItems": 2,
-                            },
-                            "ncores": {
                                 "type": "array",
                                 "items": {"type": "string"},
                                 "minItems": 2,

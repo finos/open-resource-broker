@@ -168,7 +168,7 @@ class TestBackwardCompatibility:
         """Test imports commonly used in application layer."""
         # These should work without issues
         from orb.application.dto.commands import RequestStatus
-        from orb.application.request.dto import MachineReference
+        from orb.domain.request.request_identifiers import MachineReference
 
         assert RequestStatus is not None
         assert MachineReference is not None

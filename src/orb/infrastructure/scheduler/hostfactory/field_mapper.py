@@ -148,7 +148,6 @@ class HostFactoryFieldMapper(SchedulerFieldMapper):
 
         return {
             "type": ["String", "X86_64"],
-            "ncpus": ["Numeric", ncpus],
-            "ncores": ["Numeric", ncpus],
-            "nram": ["Numeric", nram],
+            "ncpus": ["Numeric", str(ncpus)],
+            "nram": ["Numeric", str(nram)],
         }

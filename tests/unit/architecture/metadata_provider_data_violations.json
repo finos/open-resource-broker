@@ -1,0 +1,5 @@
+{
+  "_comment": "Frozen baseline of known boundary violations. Both new violations (count increases) and fixed violations (count decreases) cause test failure — update this file intentionally when violations are fixed.",
+  "provider_data_writes_outside_providers": [],
+  "metadata_writes_in_providers": []
+}

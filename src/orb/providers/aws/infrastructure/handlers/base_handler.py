@@ -530,7 +530,7 @@ class AWSHandler(ABC):
         return combined_results
 
     def _build_fallback_machine_payload(
-        self, inst: dict[str, Any], resource_id: str
+        self, inst: dict[str, Any], resource_id: str, provider_api: str = ""
     ) -> dict[str, Any]:
         """Construct minimal machine payload when machine adapter is unavailable."""
         state = inst.get("State")
@@ -540,6 +540,26 @@ class AWSHandler(ABC):
         if isinstance(launch_time, datetime):
             launch_time = launch_time.isoformat()
 
+        instance_type = inst.get("InstanceType", "")
+        az = (inst.get("Placement") or {}).get("AvailabilityZone")
+
+        # Derive vcpus, availability_zone, region into provider_data (provider-owned fields)
+        from orb.providers.aws.utilities.ec2.instances import derive_cpu_ram_from_instance_type
+
+        try:
+            vcpus_str, _ = derive_cpu_ram_from_instance_type(instance_type)
+            vcpus = int(vcpus_str)
+        except (ValueError, TypeError):
+            vcpus = 0
+
+        fallback_provider_data: dict[str, Any] = {
+            "cloud_host_id": inst.get("InstanceId"),
+            "vcpus": vcpus,
+            "region": az[:-1] if az else self.aws_client.region_name,
+        }
+        if az:
+            fallback_provider_data["availability_zone"] = az
+
         return {
             "instance_id": inst.get("InstanceId"),
             "resource_id": resource_id,
@@ -547,11 +567,18 @@ class AWSHandler(ABC):
             "private_ip": inst.get("PrivateIpAddress"),
             "public_ip": inst.get("PublicIpAddress"),
             "launch_time": launch_time,
-            "instance_type": inst.get("InstanceType"),
+            "instance_type": instance_type,
             "image_id": inst.get("ImageId"),
             "subnet_id": inst.get("SubnetId"),
             "security_group_ids": [sg["GroupId"] for sg in inst.get("SecurityGroups", [])],
             "vpc_id": inst.get("VpcId"),
+            "tags": {},
+            "price_type": None,
+            "provider_api": provider_api,
+            "name": inst.get("InstanceId", inst.get("instance_id", "")),
+            "status_reason": None,
+            "provider_data": fallback_provider_data,
+            "metadata": {},
         }
 
     def _get_instance_details(

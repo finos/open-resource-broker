@@ -100,8 +100,8 @@ class TestProviderStrategyDryRun:
         # Verify result
         assert result.success is True
         assert result.metadata["dry_run"] is False
-        assert result.metadata["provider"] == "aws"
-        assert "execution_time_ms" in result.metadata
+        assert result.routing_info["provider"] == "aws"
+        assert "execution_time_ms" in result.routing_info
 
         # Verify dry-run context was not used
         mock_dry_run_context.assert_not_called()
@@ -140,8 +140,8 @@ class TestProviderStrategyDryRun:
         # Verify result
         assert result.success is True
         assert result.metadata["dry_run"] is True
-        assert result.metadata["provider"] == "aws"
-        assert "execution_time_ms" in result.metadata
+        assert result.routing_info["provider"] == "aws"
+        assert "execution_time_ms" in result.routing_info
 
         # Verify dry-run context was used
         mock_dry_run_context.assert_called_once()
@@ -180,8 +180,8 @@ class TestProviderStrategyDryRun:
         # Verify error result
         assert result.success is False
         assert result.metadata["dry_run"] is True
-        assert result.metadata["provider"] == "aws"
-        assert "execution_time_ms" in result.metadata
+        assert result.routing_info["provider"] == "aws"
+        assert "execution_time_ms" in result.routing_info
         assert result.error_message is not None and "Test error" in result.error_message
 
     @pytest.mark.asyncio
@@ -200,7 +200,7 @@ class TestProviderStrategyDryRun:
         # Verify error result
         assert result.success is False
         assert result.metadata["dry_run"] is True
-        assert result.metadata["provider"] == "aws"
+        assert result.routing_info["provider"] == "aws"
         assert result.error_message is not None and "Unsupported operation" in result.error_message
 
     @pytest.mark.asyncio

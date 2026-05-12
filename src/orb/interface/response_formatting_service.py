@@ -21,6 +21,12 @@ class ResponseFormattingService:
         data = self._scheduler.format_request_status_response(requests)
         return InterfaceResponse(data=data)
 
+    def format_return_requests(self, requests: list[Any]) -> InterfaceResponse:
+        """Format a list of return-request items using the scheduler's dedicated
+        return-requests formatter — NOT format_request_status (different spec shape)."""
+        data = self._scheduler.format_return_requests_response(requests)
+        return InterfaceResponse(data=data)
+
     def format_machine_list(self, machines: list[Any]) -> InterfaceResponse:
         """Format a list of machine DTOs."""
         data = self._scheduler.format_machine_status_response(machines)

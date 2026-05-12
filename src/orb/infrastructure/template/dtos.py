@@ -74,6 +74,9 @@ class TemplateDTO(BaseDTO):
     metadata: dict[str, Any] = Field(default_factory=dict)
     provider_config: dict[str, Any] = Field(default_factory=dict)
 
+    # Provider-specific data (keyed by provider name, e.g. {"aws": {...}})
+    provider_data: dict[str, Any] = Field(default_factory=dict)
+
     # Provider configuration
     provider_type: Optional[str] = None
     provider_name: Optional[str] = None
@@ -155,6 +158,7 @@ class TemplateDTO(BaseDTO):
             tags=getattr(template, "tags", {}),
             metadata=getattr(template, "metadata", {}),
             provider_config=provider_specific_config,
+            provider_data=getattr(template, "provider_data", {}),
             # Provider configuration
             provider_type=getattr(template, "provider_type", None),
             provider_name=getattr(template, "provider_name", None),

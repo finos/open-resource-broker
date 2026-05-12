@@ -331,13 +331,20 @@ class ProvisioningOrchestrationService:
                 fulfillment_final = provider_data.get("fulfillment_final", False)
                 has_capacity_error = provider_data.get("capacity_constrained", False)
 
+                # Merge routing telemetry (strategy-level) into provider_data so it
+                # reaches persistence alongside the provider-level data.
+                merged_provider_data: dict[str, Any] = dict(provider_data)
+                merged_provider_data.update(result.metadata or {})
+                if result.routing_info:
+                    merged_provider_data.update(result.routing_info)
+
                 self._record_provider_success(selection_result.provider_name)
                 return ProvisioningResult(
                     success=True,
                     resource_ids=resource_ids,
                     machine_ids=result_data.get("instance_ids", []),
                     instances=instances,
-                    provider_data=provider_data,
+                    provider_data=merged_provider_data,
                     fulfilled_count=len(instances),
                     is_final=(not has_capacity_error and len(instances) >= count)
                     or fulfillment_final,

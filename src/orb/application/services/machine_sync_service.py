@@ -260,7 +260,7 @@ class MachineSyncService:
     ) -> Machine:
         from datetime import datetime
 
-        from orb.domain.base.value_objects import InstanceType
+        from orb.domain.base.value_objects import InstanceType, Tags
         from orb.domain.machine.machine_identifiers import MachineId
         from orb.domain.machine.machine_status import MachineStatus
 
@@ -271,6 +271,14 @@ class MachineSyncService:
             except ValueError:
                 launch_time = None
 
+        instance_type_str = processed_data.get("instance_type")
+        if not instance_type_str:
+            self.logger.warning(
+                "Missing instance_type in processed data for request %s, defaulting to 'unknown'",
+                request.request_id,
+            )
+            instance_type_str = "unknown"
+
         return Machine(
             machine_id=MachineId(value=processed_data["instance_id"]),
             name=processed_data.get("name"),
@@ -280,7 +288,7 @@ class MachineSyncService:
             provider_name=request.provider_name,
             provider_api=request.provider_api,
             resource_id=processed_data.get("resource_id"),
-            instance_type=InstanceType(value=processed_data.get("instance_type", "t2.micro")),
+            instance_type=InstanceType(value=instance_type_str),
             image_id=processed_data.get("image_id", "unknown"),
             price_type=processed_data.get("price_type"),
             status=MachineStatus(processed_data.get("status", "pending")),
@@ -291,6 +299,7 @@ class MachineSyncService:
             launch_time=launch_time,
             subnet_id=processed_data.get("subnet_id"),
             security_group_ids=processed_data.get("security_group_ids", []),
+            tags=Tags(tags=processed_data.get("tags") or {}),
             metadata=processed_data.get("metadata", {}),
         )
 
@@ -333,9 +342,12 @@ class MachineSyncService:
                         or existing.private_dns_name != provider_machine.private_dns_name
                         or existing.public_dns_name != provider_machine.public_dns_name
                         or existing.price_type != provider_machine.price_type
+                        or existing.tags != provider_machine.tags
                         or existing.subnet_id != provider_machine.subnet_id
                         or existing.security_group_ids != provider_machine.security_group_ids
                         or existing.vpc_id != provider_machine.vpc_id
+                        or existing.status_reason != provider_machine.status_reason
+                        or existing.provider_data != provider_machine.provider_data
                     )
 
                     # Debug logging
@@ -353,7 +365,8 @@ class MachineSyncService:
                         machine_data["private_dns_name"] = provider_machine.private_dns_name
                         machine_data["public_dns_name"] = provider_machine.public_dns_name
                         machine_data["price_type"] = provider_machine.price_type
-                        machine_data["public_ip"] = provider_machine.public_ip
+                        machine_data["status_reason"] = provider_machine.status_reason
+                        machine_data["provider_data"] = provider_machine.provider_data
                         machine_data["launch_time"] = (
                             provider_machine.launch_time or existing.launch_time
                         )
@@ -361,6 +374,7 @@ class MachineSyncService:
                         machine_data["security_group_ids"] = provider_machine.security_group_ids
                         machine_data["vpc_id"] = provider_machine.vpc_id
                         machine_data["version"] = existing.version + 1
+                        machine_data["tags"] = provider_machine.tags
 
                         updated_machine = Machine.model_validate(machine_data)
                         to_upsert.append(updated_machine)

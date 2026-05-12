@@ -181,7 +181,7 @@ class TestSpotFleetHandlerCheckHostsStatus:
         ids_a = ["i-sa1", "i-sa2"]
         ids_b = ["i-sb1"]
 
-        def get_instances_side_effect(fleet_id):
+        def get_instances_side_effect(fleet_id, request_id):
             if fleet_id == "sfr-A":
                 return _formatted_instances(ids_a, "sfr-A")
             return _formatted_instances(ids_b, "sfr-B")

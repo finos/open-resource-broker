@@ -98,11 +98,6 @@ def _mock_container_with_formatter():
             _make_namespace,
             [],
         ),
-        (
-            "orb.interface.request_command_handlers.handle_get_return_requests",
-            _make_namespace,
-            [],
-        ),
     ],
 )
 @pytest.mark.asyncio
@@ -118,6 +113,21 @@ async def test_handler_delegates_to_scheduler(handler_fn, args_factory, query_re
         await handler(args_factory())
 
     formatter.format_request_status.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_get_return_requests_delegates_to_format_return_requests():
+    """handle_get_return_requests must call formatter.format_return_requests (not format_request_status)."""
+    module_path = "orb.interface.request_command_handlers"
+    from orb.interface.request_command_handlers import handle_get_return_requests
+
+    container, formatter = _mock_container_with_formatter()
+
+    with patch(f"{module_path}.get_container", return_value=container):
+        await handle_get_return_requests(_make_namespace())
+
+    formatter.format_return_requests.assert_called_once()
+    formatter.format_request_status.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

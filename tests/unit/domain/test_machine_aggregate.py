@@ -73,7 +73,7 @@ class TestMachineAggregate:
         # PENDING -> LAUNCHING
         machine = machine.start_launching()
         assert machine.status == MachineStatus.LAUNCHING
-        assert machine.launched_at is not None
+        assert machine.provisioning_started_at is not None
 
         # LAUNCHING -> RUNNING
         machine = machine.update_status(MachineStatus.RUNNING)

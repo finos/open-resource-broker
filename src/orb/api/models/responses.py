@@ -40,6 +40,10 @@ class RequestItem(BaseModel):
     template_id: Optional[str] = None
     requested_count: Optional[int] = None
     created_at: Optional[str] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    first_status_check: Optional[str] = None
+    last_status_check: Optional[str] = None
     message: Optional[str] = None
     request_type: Optional[str] = None
     provider_name: Optional[str] = None
@@ -116,6 +120,11 @@ class MachineItem(BaseModel):
     request_id: Optional[str] = None
     return_request_id: Optional[str] = None
     template_id: Optional[str] = None
+    region: Optional[str] = None
+    availability_zone: Optional[str] = None
+    vcpus: Optional[int] = None
+    health_checks: Optional[dict[str, Any]] = None
+    cloud_host_id: Optional[str] = None
 
 
 class MachineListResponse(BaseModel):

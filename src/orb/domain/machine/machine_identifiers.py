@@ -3,41 +3,23 @@
 from __future__ import annotations
 
 import re
+from typing import ClassVar
 
 from pydantic import field_validator
 
-from orb.domain.base.value_objects import ValueObject
+from orb.domain.base.value_objects import ResourceId, ValueObject
 
 
-class MachineId(ValueObject):
-    """Machine identifier with validation."""
+class MachineId(ResourceId):
+    """Machine identifier with validation.
 
-    value: str
+    Inherits value validation and self-flattening serialization from ResourceId:
+    - model_dump() returns a plain string (e.g. 'i-abc'), not {'value': 'i-abc'}
+    - model_validate('i-abc') constructs MachineId(value='i-abc')
+    - model_validate({'value': 'i-abc'}) also works for backward compatibility
+    """
 
-    @field_validator("value")
-    @classmethod
-    def validate_machine_id(cls, v: str) -> str:
-        """Validate machine ID format.
-
-        Args:
-            v: Machine ID value to validate
-
-        Returns:
-            Validated machine ID
-
-        Raises:
-            ValueError: If machine ID format is invalid
-        """
-        # Basic validation for common machine ID patterns
-        # Supports flexible formats across different providers
-        if not v or not isinstance(v, str):
-            raise ValueError("Machine ID cannot be empty")
-
-        # Allow flexible machine ID formats for different providers
-        if len(v.strip()) == 0:
-            raise ValueError("Machine ID cannot be empty")
-
-        return v.strip()
+    resource_type: ClassVar[str] = "Machine"
 
     def __str__(self) -> str:
         return self.value

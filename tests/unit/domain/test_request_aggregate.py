@@ -383,3 +383,38 @@ class TestRequestExceptions:
             details={"request_id": "req-123"},
         )
         assert str(error) == "Failed to process request"
+
+
+@pytest.mark.unit
+class TestRecordStatusCheck:
+    """Tests for Request.record_status_check."""
+
+    def test_first_call_sets_both_timestamps(self):
+        request = _make_request()
+        assert request.first_status_check is None
+        assert request.last_status_check is None
+
+        now = datetime(2026, 5, 1, 12, 0, 0, tzinfo=timezone.utc)
+        updated = request.record_status_check(now=now)
+
+        assert updated.first_status_check == now
+        assert updated.last_status_check == now
+
+    def test_second_call_updates_only_last_status_check(self):
+        request = _make_request()
+        first_time = datetime(2026, 5, 1, 12, 0, 0, tzinfo=timezone.utc)
+        second_time = datetime(2026, 5, 1, 12, 5, 0, tzinfo=timezone.utc)
+
+        after_first = request.record_status_check(now=first_time)
+        after_second = after_first.record_status_check(now=second_time)
+
+        assert after_second.first_status_check == first_time
+        assert after_second.last_status_check == second_time
+
+    def test_original_request_is_not_mutated(self):
+        request = _make_request()
+        now = datetime(2026, 5, 1, 12, 0, 0, tzinfo=timezone.utc)
+        request.record_status_check(now=now)
+
+        assert request.first_status_check is None
+        assert request.last_status_check is None

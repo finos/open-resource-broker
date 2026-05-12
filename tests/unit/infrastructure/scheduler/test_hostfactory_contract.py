@@ -178,6 +178,75 @@ def test_hf_templates_response_message_present(hf_strategy):
     assert isinstance(result["message"], str)
 
 
+# ---------------------------------------------------------------------------
+# 2e. format_machine_status_response — cloudHostId must be present
+# ---------------------------------------------------------------------------
+
+
+def _make_machine_dto(**overrides):
+    """Build a minimal MachineDTO for formatter tests."""
+    from orb.application.dto.responses import MachineDTO
+
+    defaults = {
+        "machine_id": "i-abc123",
+        "name": "test-machine",
+        "status": "running",
+        "instance_type": "t3.medium",
+        "private_ip": "10.0.0.1",
+        "result": "succeed",
+    }
+    defaults.update(overrides)
+    return MachineDTO(**defaults)
+
+
+def test_format_machine_status_response_includes_cloud_host_id(hf_strategy):
+    """format_machine_status_response must emit cloudHostId per IBM HF spec."""
+    dto = _make_machine_dto(cloud_host_id="aws-host-xyz")
+    result = hf_strategy.format_machine_status_response([dto])
+    machine = result["machines"][0]
+    assert "cloudHostId" in machine, "HF spec requires 'cloudHostId' in machine response"
+    assert machine["cloudHostId"] == "aws-host-xyz"
+
+
+def test_format_machine_status_response_cloud_host_id_none_when_not_set(hf_strategy):
+    """cloudHostId must be present (as None) even when not populated on the DTO."""
+    dto = _make_machine_dto()
+    result = hf_strategy.format_machine_status_response([dto])
+    machine = result["machines"][0]
+    assert "cloudHostId" in machine, "cloudHostId key must always be present"
+    assert machine["cloudHostId"] is None
+
+
+def test_format_machine_status_response_has_machines_key(hf_strategy):
+    """format_machine_status_response must return a dict with a 'machines' list."""
+    result = hf_strategy.format_machine_status_response([_make_machine_dto()])
+    assert "machines" in result
+    assert isinstance(result["machines"], list)
+
+
+def test_format_machine_status_response_core_fields_present(hf_strategy):
+    """Core camelCase fields must be present in each machine entry."""
+    dto = _make_machine_dto(
+        template_id="tmpl-1",
+        request_id="req-1",
+        image_id="ami-abc",
+        subnet_id="subnet-1",
+    )
+    result = hf_strategy.format_machine_status_response([dto])
+    machine = result["machines"][0]
+    for field in (
+        "machineId",
+        "templateId",
+        "requestId",
+        "vmType",
+        "imageId",
+        "privateIp",
+        "status",
+        "cloudHostId",
+    ):
+        assert field in machine, f"Missing required field: {field}"
+
+
 def test_hf_templates_response_empty_list(hf_strategy):
     """Empty template list must still return valid HF structure."""
     result = hf_strategy.format_templates_response([])

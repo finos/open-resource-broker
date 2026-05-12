@@ -327,14 +327,16 @@ class CompositeProviderStrategy(ProviderStrategy):
             # Aggregate results
             final_result = self._aggregate_results(execution_results, operation)
 
-            # Add execution metadata
+            # Populate routing_info for the application layer to stamp as telemetry
             total_time_ms = (time.time() - start_time) * 1000
-            final_result.metadata.update(
-                {
-                    "composition_mode": self._config.mode.value,
-                    "total_execution_time_ms": total_time_ms,
-                    "strategies_executed": len(execution_results),
-                    "successful_strategies": len([r for r in execution_results if r.success]),
+            final_result = final_result.model_copy(
+                update={
+                    "routing_info": {
+                        "composition_mode": self._config.mode.value,
+                        "total_execution_time_ms": total_time_ms,
+                        "strategies_executed": len(execution_results),
+                        "successful_strategies": len([r for r in execution_results if r.success]),
+                    }
                 }
             )
 
@@ -547,9 +549,10 @@ class CompositeProviderStrategy(ProviderStrategy):
             return ProviderResult.error_result("No successful results to aggregate", "NO_RESULTS")
 
         first_result = results[0]
-        first_result.result.metadata["aggregation_policy"] = "first_success"
-        first_result.result.metadata["selected_strategy"] = first_result.strategy_type
-        return first_result.result
+        routing = dict(first_result.result.routing_info or {})
+        routing["aggregation_policy"] = "first_success"
+        routing["selected_strategy"] = first_result.strategy_type
+        return first_result.result.model_copy(update={"routing_info": routing})
 
     def _aggregate_merge_all(self, results: list[StrategyExecutionResult]) -> ProviderResult:
         """Merge all successful results."""
@@ -584,11 +587,11 @@ class CompositeProviderStrategy(ProviderStrategy):
 
         # Sort by execution time (fastest first)
         best_result = min(results, key=lambda r: r.execution_time_ms)
-        best_result.result.metadata["aggregation_policy"] = "best_performance"
-        best_result.result.metadata["selected_strategy"] = best_result.strategy_type
-        best_result.result.metadata["execution_time_ms"] = best_result.execution_time_ms
-
-        return best_result.result
+        routing = dict(best_result.result.routing_info or {})
+        routing["aggregation_policy"] = "best_performance"
+        routing["selected_strategy"] = best_result.strategy_type
+        routing["execution_time_ms"] = best_result.execution_time_ms
+        return best_result.result.model_copy(update={"routing_info": routing})
 
     def get_capabilities(self) -> ProviderCapabilities:
         """

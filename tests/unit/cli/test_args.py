@@ -295,3 +295,27 @@ class TestInitAzureArgs:
         assert ns.azure_location == "eastus2"
         assert ns.azure_client_id == "managed-identity-client-id"
         assert ns.azure_cyclecloud_no_verify_ssl is True
+
+
+class TestRequestsWatch:
+    """requests watch positional and flag arguments."""
+
+    def test_watch_with_request_id(self):
+        ns = _parse(["requests", "watch", "req-123"])
+        assert ns.resource == "requests"
+        assert ns.action == "watch"
+        assert ns.request_id == "req-123"
+
+    def test_watch_without_request_id(self):
+        ns = _parse(["requests", "watch"])
+        assert ns.resource == "requests"
+        assert ns.action == "watch"
+        assert ns.request_id is None
+
+    def test_watch_interval_flag(self):
+        ns = _parse(["requests", "watch", "req-123", "--interval", "2"])
+        assert ns.interval == 2
+
+    def test_watch_interval_default(self):
+        ns = _parse(["requests", "watch"])
+        assert ns.interval == 5

@@ -1,10 +1,10 @@
 """Default scheduler strategy using native domain fields - no conversion needed."""
 
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from orb.domain.machine.aggregate import Machine
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
 from orb.infrastructure.scheduler.default.field_mapper import DefaultFieldMapper
@@ -187,27 +187,94 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
         """No conversion needed - use field mapper (identity mapping)."""
         return self.field_mapper.format_for_generation(templates)
 
-    def format_machine_status_response(self, machines: list[Machine]) -> dict[str, Any]:
-        """
-        Format domain Machines to native domain response format.
+    def format_request_status_response(self, requests: list[Any]) -> dict[str, Any]:
+        """Format RequestDTOs with full operator-visible detail.
 
-        Uses the Machine's model_dump() method to serialize to native format.
+        Overrides the base implementation to include first_status_check,
+        last_status_check, started_at, and completed_at as ISO 8601 strings.
+        These are omitted by to_dict() at the default (non-verbose) level.
+        """
+        formatted = []
+        for request in requests:
+            if isinstance(request, dict):
+                d = request
+            elif hasattr(request, "to_dict"):
+                d = request.to_dict(verbose=True)
+            else:
+                d = {}
+            formatted.append(self._serialize_request_datetimes(d))
+        return {
+            "requests": formatted,
+            "message": "Request status retrieved successfully",
+            "count": len(requests),
+        }
+
+    @staticmethod
+    def _serialize_request_datetimes(d: dict[str, Any]) -> dict[str, Any]:
+        """Convert any datetime values in a request dict to ISO 8601 strings."""
+        datetime_fields = (
+            "created_at",
+            "started_at",
+            "completed_at",
+            "first_status_check",
+            "last_status_check",
+        )
+        result = dict(d)
+        for field in datetime_fields:
+            val = result.get(field)
+            if isinstance(val, datetime):
+                result[field] = val.isoformat()
+        return result
+
+    def format_machine_status_response(self, machines: list[Any]) -> dict[str, Any]:
+        """Format machines to native domain response format with provider_data fields surfaced.
+
+        Accepts both Machine aggregates and MachineDTOs (the REST path passes DTOs).
+        Pulls region, availability_zone, vcpus, health_checks, and cloud_host_id from
+        provider_data so operators see the full picture without digging into the raw dict.
         """
         return {
-            "machines": [machine.model_dump() for machine in machines],
+            "machines": [self._serialize_machine(m) for m in machines],
             "message": "Machine status retrieved successfully",
             "count": len(machines),
         }
 
+    def _serialize_machine(self, machine: Any) -> dict[str, Any]:
+        """Serialize a single machine (aggregate or DTO) to an operator-friendly dict."""
+        if hasattr(machine, "model_dump"):
+            # MachineDTO (Pydantic) — use mode="json" so datetimes become strings
+            d = machine.model_dump(mode="json", exclude_none=True)
+        elif hasattr(machine, "to_dict"):
+            d = machine.to_dict()
+        else:
+            d = dict(machine) if machine else {}
+
+        provider_data: dict[str, Any] = d.get("provider_data") or {}
+
+        # Surface provider_data fields at the top level when present
+        for key in ("region", "availability_zone", "vcpus", "health_checks"):
+            val = provider_data.get(key)
+            if val is not None and key not in d:
+                d[key] = val
+
+        # cloud_host_id: prefer the top-level DTO field, fall back to provider_data
+        if not d.get("cloud_host_id"):
+            val = provider_data.get("cloud_host_id")
+            if val is not None:
+                d["cloud_host_id"] = val
+
+        return d
+
     def format_machine_details_response(self, machine_data: dict) -> dict:
-        """Format machine details with default fields."""
-        return {
+        """Format machine details with default fields, including provider_data fields."""
+        provider_data: dict[str, Any] = machine_data.get("provider_data") or {}
+
+        result: dict[str, Any] = {
             "id": machine_data.get("id"),
             "name": machine_data.get("name"),
             "status": machine_data.get("status"),
             "provider": "default",
             "instance_type": machine_data.get("instance_type"),
-            "region": machine_data.get("region"),
             "image_id": machine_data.get("image_id"),
             "private_ip": machine_data.get("private_ip"),
             "public_ip": machine_data.get("public_ip"),
@@ -218,6 +285,23 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
             "termination_time": machine_data.get("termination_time"),
             "tags": machine_data.get("tags"),
         }
+
+        # Provider_data fields — prefer top-level if already present, else pull from provider_data
+        for key in ("region", "availability_zone", "vcpus", "health_checks"):
+            val = (
+                machine_data.get(key)
+                if machine_data.get(key) is not None
+                else provider_data.get(key)
+            )
+            if val is not None:
+                result[key] = val
+
+        cloud_host_id = machine_data.get("cloud_host_id") or provider_data.get("cloud_host_id")
+        if cloud_host_id is not None:
+            result["cloud_host_id"] = cloud_host_id
+
+        # Drop keys with None values — operators don't need null noise
+        return {k: v for k, v in result.items() if v is not None}
 
     def should_log_to_console(self) -> bool:
         """Check if logs should be written to console for Default scheduler.

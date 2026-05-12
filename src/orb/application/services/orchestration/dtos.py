@@ -343,3 +343,29 @@ class GetStorageConfigInput:
 class GetStorageConfigOutput:
     config: dict[str, Any] = dataclasses.field(default_factory=dict)
     message: str = ""
+
+
+@dataclasses.dataclass(frozen=True)
+class WatchRequestStatusInput:
+    request_id: str
+
+
+@dataclasses.dataclass(frozen=True)
+class WatchRequestStatusOutput:
+    request_id: str
+    status: str
+    terminal: bool = False
+    requested_count: int = 0
+    fulfilled_count: int = 0
+    fulfilled_vcpus: int = 0
+    od_vcpus: int = 0
+    spot_vcpus: int = 0
+    fulfilled_capacity: int = 0
+    od_capacity: int = 0
+    spot_capacity: int = 0
+    od_machines: int = 0
+    spot_machines: int = 0
+    weighted: bool = False
+    az_stats: dict[str, dict[str, int]] = dataclasses.field(default_factory=dict)
+    created_at: Optional[str] = None
+    error: Optional[str] = None

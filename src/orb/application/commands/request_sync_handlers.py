@@ -76,8 +76,8 @@ class PopulateMachineIdsHandler(BaseCommandHandler[PopulateMachineIdsCommand, No
                 operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
                 parameters={
                     "resource_ids": request.resource_ids,
-                    "provider_api": getattr(request, "provider_api", None),
-                    "template_id": getattr(request, "template_id", None),
+                    "provider_api": request.provider_api,
+                    "template_id": request.template_id,
                     "request_metadata": self._build_request_metadata(request),
                 },
             )
