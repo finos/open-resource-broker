@@ -148,9 +148,7 @@ class TestMachineProviderDataRoundTrip:
         assert loaded.provider_data.get("vcpus") == 2
         assert loaded.provider_data.get("region") == "eu-west-1"
 
-    def test_empty_provider_data_input_does_not_crash(
-        self, machine_repository, fake_request
-    ):
+    def test_empty_provider_data_input_does_not_crash(self, machine_repository, fake_request):
         """Defensive: an instance dict with no provider_data key still
         produces a valid Machine (provider_data defaults to {})."""
         service = RequestStatusManagementService(uow_factory=MagicMock(), logger=MagicMock())
