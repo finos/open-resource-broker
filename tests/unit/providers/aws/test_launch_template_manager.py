@@ -289,6 +289,64 @@ class TestAWSLaunchTemplateManager:
         with pytest.raises(ClientError):
             self.manager._use_existing_template_strategy(self.aws_template)
 
+    def test_inspect_lt_networking_has_networking(self):
+        """LT version with NetworkInterfaces returns HAS_NETWORKING."""
+        from orb.providers.aws.infrastructure.launch_template.manager import LTNetworkingState
+
+        self.mock_aws_client.ec2_client.describe_launch_template_versions.return_value = {
+            "LaunchTemplateVersions": [
+                {
+                    "LaunchTemplateData": {
+                        "NetworkInterfaces": [{"DeviceIndex": 0, "SubnetId": "subnet-x"}]
+                    }
+                }
+            ]
+        }
+
+        result = self.manager.inspect_launch_template_networking("lt-x", "$Latest")
+
+        assert result == LTNetworkingState.HAS_NETWORKING
+
+    def test_inspect_lt_networking_no_networking(self):
+        """LT version without networking fields returns NO_NETWORKING."""
+        from orb.providers.aws.infrastructure.launch_template.manager import LTNetworkingState
+
+        self.mock_aws_client.ec2_client.describe_launch_template_versions.return_value = {
+            "LaunchTemplateVersions": [{"LaunchTemplateData": {"ImageId": "ami-x"}}]
+        }
+
+        result = self.manager.inspect_launch_template_networking("lt-x", "$Latest")
+
+        assert result == LTNetworkingState.NO_NETWORKING
+
+    def test_inspect_lt_networking_unauthorized_returns_unknown(self):
+        """IAM denial returns UNKNOWN_UNAUTHORIZED so callers can fall back."""
+        from botocore.exceptions import ClientError
+
+        from orb.providers.aws.infrastructure.launch_template.manager import LTNetworkingState
+
+        self.mock_aws_client.ec2_client.describe_launch_template_versions.side_effect = ClientError(
+            error_response={"Error": {"Code": "UnauthorizedOperation", "Message": "denied"}},
+            operation_name="DescribeLaunchTemplateVersions",
+        )
+
+        result = self.manager.inspect_launch_template_networking("lt-x", "$Latest")
+
+        assert result == LTNetworkingState.UNKNOWN_UNAUTHORIZED
+        self.manager._logger.warning.assert_called()
+
+    def test_inspect_lt_networking_throttling_propagates(self):
+        """Transient errors (Throttling) must propagate, not return UNKNOWN_UNAUTHORIZED."""
+        from botocore.exceptions import ClientError
+
+        self.mock_aws_client.ec2_client.describe_launch_template_versions.side_effect = ClientError(
+            error_response={"Error": {"Code": "Throttling", "Message": "rate exceeded"}},
+            operation_name="DescribeLaunchTemplateVersions",
+        )
+
+        with pytest.raises(ClientError):
+            self.manager.inspect_launch_template_networking("lt-x", "$Latest")
+
     def test_error_handling_wraps_client_error(self):
         """Test that AWS ClientError is wrapped in InfrastructureError."""
         from botocore.exceptions import ClientError

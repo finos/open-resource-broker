@@ -8,6 +8,7 @@ moving AWS-specific logic out of the base handler to maintain clean architecture
 import base64
 import hashlib
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Optional
 
 from botocore.exceptions import ClientError
@@ -51,6 +52,14 @@ class LaunchTemplateResult:
     template_name: str
     is_new_template: bool = False
     is_new_version: bool = False
+
+
+class LTNetworkingState(Enum):
+    """Classification of networking fields inside an LT version."""
+
+    HAS_NETWORKING = "has_networking"
+    NO_NETWORKING = "no_networking"
+    UNKNOWN_UNAUTHORIZED = "unknown_unauthorized"
 
 
 @injectable
@@ -276,6 +285,43 @@ class AWSLaunchTemplateManager:
     def _has_overrides(self, aws_template: AWSTemplate) -> bool:
         """Return True if any override field is non-None on the template."""
         return any(getattr(aws_template, field, None) is not None for field in _OVERRIDE_FIELDS)
+
+    def inspect_launch_template_networking(
+        self, launch_template_id: str, version: str
+    ) -> LTNetworkingState:
+        """Check whether the given LT version defines networking fields.
+
+        Returns HAS_NETWORKING when NetworkInterfaces, SubnetId, or
+        SecurityGroupIds are set inside LaunchTemplateData; NO_NETWORKING
+        otherwise; UNKNOWN_UNAUTHORIZED when the describe call is denied by
+        IAM (caller must decide fallback).
+        """
+        try:
+            response = self.aws_client.ec2_client.describe_launch_template_versions(
+                LaunchTemplateId=launch_template_id,
+                Versions=[version],
+            )
+            lt_data = response["LaunchTemplateVersions"][0]["LaunchTemplateData"]
+            if (
+                lt_data.get("NetworkInterfaces")
+                or lt_data.get("SubnetId")
+                or lt_data.get("SecurityGroupIds")
+            ):
+                return LTNetworkingState.HAS_NETWORKING
+            return LTNetworkingState.NO_NETWORKING
+        except ClientError as e:
+            code = e.response.get("Error", {}).get("Code", "")
+            if code in ("UnauthorizedOperation", "AccessDenied", "AccessDeniedException"):
+                self._logger.warning(
+                    "Cannot describe LT %s v%s for networking inspection (%s); "
+                    "assuming LT owns networking: %s",
+                    launch_template_id,
+                    version,
+                    code,
+                    e,
+                )
+                return LTNetworkingState.UNKNOWN_UNAUTHORIZED
+            raise
 
     def _create_new_lt_version(
         self, aws_template: AWSTemplate, request: Request
