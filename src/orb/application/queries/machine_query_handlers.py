@@ -113,8 +113,13 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, list[MachineDTO]])
 
                 machine_dtos = []
                 for machine in machines:
-                    # Refresh running machines with live AWS state before building DTOs
-                    if machine.status.value == "running" and machine.request_id:
+                    # Refresh running machines with live AWS state before building DTOs.
+                    # Skipped when query.lightweight is True (polling callers).
+                    if (
+                        not query.lightweight
+                        and machine.status.value == "running"
+                        and machine.request_id
+                    ):
                         try:
                             request = uow.requests.get_by_id(machine.request_id)
                             if request:

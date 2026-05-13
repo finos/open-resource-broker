@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from orb.application.dto.queries import GetRequestQuery, GetTemplateQuery
+import asyncio
+
+from orb.application.dto.queries import (
+    GetRequestQuery,
+    GetTemplateQuery,
+    ListMachinesQuery,
+)
 from orb.application.ports.query_bus_port import QueryBusPort
 from orb.application.services.orchestration.base import OrchestratorBase
 from orb.application.services.orchestration.dtos import (
@@ -47,8 +53,26 @@ class WatchRequestStatusOrchestrator(
             return {}, False
 
     async def execute(self, input: WatchRequestStatusInput) -> WatchRequestStatusOutput:  # type: ignore[return]
-        query = GetRequestQuery(request_id=input.request_id, lightweight=False, skip_cache=True)
-        result = await self._query_bus.execute(query)
+        # Fetch request (membership + lifecycle) and machine snapshots in parallel.
+        # awaits resolve at slightly different timestamps, which is benign for a
+        # display loop late arrivals just bucket as "unknown" for one tick.
+        # Refresh request: status drives the watch loop's terminal check; skip cache to see live transitions.
+        request_query = GetRequestQuery(
+            request_id=input.request_id, lightweight=False, skip_cache=True
+        )
+        # ListMachinesQuery(lightweight=True) skips the AWS describe sync; we only
+        # need provider_data already persisted on the Machine aggregate which is immutable post-launch;
+        machines_query = ListMachinesQuery(
+            request_id=input.request_id, lightweight=True, limit=1000
+        )
+        result, machine_dtos = await asyncio.gather(
+            self._query_bus.execute(request_query),
+            self._query_bus.execute(machines_query),
+        )
+
+        provider_data_by_id: dict[str, dict] = {
+            dto.machine_id: (dto.provider_data or {}) for dto in (machine_dtos or [])
+        }
 
         template_id = getattr(result, "template_id", None)
         machine_types: dict[str, int] = {}
@@ -81,7 +105,8 @@ class WatchRequestStatusOrchestrator(
         for ref in machine_refs:
             instance_type = getattr(ref, "instance_type", None)
             price_type = (getattr(ref, "price_type", None) or "").lower()
-            az = getattr(ref, "availability_zone", None) or "unknown"
+            pd = provider_data_by_id.get(getattr(ref, "machine_id", ""), {})
+            az = pd.get("availability_zone") or "unknown"
             is_spot = price_type == "spot"
 
             if is_spot:
@@ -105,7 +130,7 @@ class WatchRequestStatusOrchestrator(
                 az_stats[az]["od_machines"] += 1
 
             if instance_type:
-                vcpus = getattr(ref, "vcpus", 0) or 0
+                vcpus = pd.get("vcpus") or 0
                 fulfilled_vcpus += vcpus
                 if is_spot:
                     spot_vcpus += vcpus
