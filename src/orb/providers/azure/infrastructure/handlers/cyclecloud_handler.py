@@ -203,6 +203,7 @@ def _build_cyclecloud_status_result(
     node_id = parsed_node.node_id or node_name
     provider_data: AzureStatusProviderData = {
         "resource_id": cluster_name,
+        "cloud_host_id": node_id,
         "cluster_name": cluster_name,
         "node_array": parsed_node.node_array,
         "node_id": node_id,
@@ -224,7 +225,8 @@ def _build_cyclecloud_status_result(
         "instance_type": parsed_node.machine_type,
         "subnet_id": parsed_node.subnet_id,
         "vpc_id": None,
-        "availability_zone": None,
+        "tags": {},
+        "price_type": None,
         "provider_type": "azure",
         "provider_data": provider_data,
     }

@@ -217,6 +217,10 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
                         "instance_id": instance_name,
                         "status": instance.instance_status or instance.current_action or "UNKNOWN",
                         "provider_data": {
+                            # The managed-instances listing exposes the URL but
+                            # not the numeric Google instance ID; the name is
+                            # the stable HostFactory-visible identifier here.
+                            "cloud_host_id": instance_name,
                             "resource_id": mig_name,
                             "scope": scope,
                             "instance_url": instance.instance_url,

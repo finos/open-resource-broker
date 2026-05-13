@@ -30,9 +30,16 @@ class AzureAcquireHostsResult(TypedDict):
 
 
 class AzureStatusProviderData(TypedDict, total=False):
-    """Provider-owned metadata surfaced on Azure status results."""
+    """Provider-owned metadata surfaced on Azure status results.
+
+    Provider-specific fields (``availability_zone``, ``location``, etc.) live
+    here per the ``metadata vs provider_data`` architecture rule. The
+    HostFactory scheduler reads ``cloud_host_id`` from this dict to emit the
+    Symphony wire ``cloudHostId`` field.
+    """
 
     resource_id: str
+    cloud_host_id: str | None
     vm_name: str
     vmss_name: str
     vm_id: str
@@ -45,6 +52,7 @@ class AzureStatusProviderData(TypedDict, total=False):
     hostname: str
     resource_group: str
     location: str
+    availability_zone: str | None
     nic_id: str | None
     nic_name: str | None
     vnet_id: str | None
@@ -64,7 +72,8 @@ class AzureHandlerStatusResult(TypedDict, total=False):
     instance_type: str | None
     subnet_id: str | None
     vpc_id: str | None
-    availability_zone: str | None
+    price_type: str | None
+    tags: dict[str, str]
     provider_type: str
     error: str
     provider_data: AzureStatusProviderData

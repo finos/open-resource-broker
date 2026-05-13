@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from orb.domain.request.aggregate import Request
 
@@ -14,11 +14,26 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class GCPInstanceRecord:
-    """Normalized instance data returned from the Compute API."""
+    """Normalized instance data returned from the Compute API.
+
+    The normalisation strips protobuf-specific shapes (``ScalarMapContainer``
+    for ``labels``, repeated-message wrappers for ``network_interfaces``) at
+    the SDK boundary so downstream code can treat the record as plain Python
+    values.
+    """
 
     name: str
     status: str | None = None
     self_link: str | None = None
+    instance_id: str | None = None
+    machine_type: str | None = None
+    creation_timestamp: str | None = None
+    private_ip: str | None = None
+    public_ip: str | None = None
+    subnet_id: str | None = None
+    vpc_id: str | None = None
+    labels: dict[str, str] = field(default_factory=dict)
+    provisioning_model: str | None = None
 
 
 @dataclass(frozen=True)
@@ -42,12 +57,24 @@ class GCPHandlerContext(TypedDict, total=False):
     provider_api: str
 
 
-class GCPInstanceStatus(TypedDict):
-    """Normalized status record surfaced by GCP handlers."""
+class GCPInstanceStatus(TypedDict, total=False):
+    """Normalized status record surfaced by GCP handlers.
+
+    Provider-specific fields (``zone``, ``region``) live under ``provider_data``
+    per the ``metadata vs provider_data`` architecture rule; HostFactory reads
+    ``cloud_host_id`` from there to emit the Symphony wire ``cloudHostId``.
+    """
 
     instance_id: str
     status: str
-    provider_data: dict[str, str]
+    name: str
+    private_ip: str | None
+    public_ip: str | None
+    launch_time: str | None
+    instance_type: str | None
+    tags: dict[str, str]
+    price_type: str | None
+    provider_data: dict[str, Any]
 
 
 GCPProviderDataValue = str | int | bool | list[str] | list[dict[str, str]]

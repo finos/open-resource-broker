@@ -80,6 +80,11 @@ class AzureVmRuntimeStatusProtocol(AzureVmWithIdentityProtocol, Protocol):
         """Return the availability zones attached to the VM."""
         ...
 
+    @property
+    def tags(self) -> Optional[dict[str, str]]:
+        """Return the user-supplied tag dict applied to the VM, if any."""
+        ...
+
 
 class AzureInstanceViewWithStatusesProtocol(Protocol):
     """Azure instance-view-like object exposing ``statuses``."""

@@ -130,10 +130,9 @@ def _read_vm_identity(vm: AzureVmWithIdentityProtocol) -> _AzureVmIdentity:
     `vm_id` but not `instance_id`. When Azure returns a regular VM object,
     `name` becomes the stable machine identifier when `instance_id` is absent.
     """
-    typed_vm = cast(AzureVmWithIdentityProtocol, vm)
-    vm_name = typed_vm.name
+    vm_name = vm.name
     instance_id = str(_status_attr(vm, "instance_id", "") or vm_name or "")
-    vm_id = str(typed_vm.vm_id or instance_id)
+    vm_id = str(vm.vm_id or instance_id)
     return _AzureVmIdentity(
         instance_id=instance_id,
         vm_id=vm_id,
@@ -200,6 +199,7 @@ class VMSSHandler(AzureHandler):
 
             from orb.providers.azure.infrastructure.services.arm_payload_mapper import ArmPayloadMapper
             from orb.providers.azure.infrastructure.services.ssh_key_resolver import (
+                AzureComputeSshKeyClientProtocol,
                 resolve_ssh_keys_async,
             )
 
@@ -223,7 +223,12 @@ class VMSSHandler(AzureHandler):
                     ssh_key_name=resolved_template.ssh_key_name,
                     ssh_public_keys=resolved_template.ssh_public_keys,
                     resource_group=resolved_template.resource_group.value,
-                    compute_client=compute,
+                    # cast: SDK's SshPublicKeyResource structurally satisfies our
+                    # AzureSshPublicKeyResourceProtocol, but pyright requires
+                    # invariance through the Awaitable wrapper on the operations
+                    # protocol — so the inferred return type differs even though
+                    # the concrete shapes match.
+                    compute_client=cast(AzureComputeSshKeyClientProtocol, compute),
                 )
                 vm_profile = arm_payload["properties"]["virtualMachineProfile"]
                 vm_profile["osProfile"]["linuxConfiguration"] = {
@@ -884,7 +889,12 @@ class VMSSHandler(AzureHandler):
             ) from exc
 
         return [
-            await self._normalise_vm_async(vm, vmss_name, resource_group)
+            # cast: SDK 38 exposes hardware_profile/instance_view/vm_id via the
+            # __flattened_items __getattr__ shim, invisible to static checkers
+            # though documented as the SDK's public surface.
+            await self._normalise_vm_async(
+                cast(AzureVmRuntimeStatusProtocol, vm), vmss_name, resource_group
+            )
             for vm in vms
         ]
 
@@ -969,7 +979,12 @@ class VMSSHandler(AzureHandler):
             ) from exc
 
         return [
-            await self._normalise_vm_async(vm, vmss_name, resource_group)
+            # cast: SDK 38 exposes hardware_profile/instance_view/vm_id via the
+            # __flattened_items __getattr__ shim, invisible to static checkers
+            # though documented as the SDK's public surface.
+            await self._normalise_vm_async(
+                cast(AzureVmRuntimeStatusProtocol, vm), vmss_name, resource_group
+            )
             for vm in vms
         ]
 
@@ -1061,10 +1076,12 @@ class VMSSHandler(AzureHandler):
         vnet_id = network_identity["vnet_id"]
         provider_data: AzureStatusProviderData = {
             "resource_id": vmss_name,
+            "cloud_host_id": vm_identity.vm_id or vm_identity.instance_id,
             "vmss_name": vmss_name,
             "resource_group": resource_group,
             "vmss_instance_id": vm_identity.instance_id,
             "vm_id": vm_identity.vm_id,
+            "availability_zone": availability_zone,
             "nic_id": network_identity["nic_id"],
             "nic_name": network_identity["nic_name"],
             "vnet_id": vnet_id,
@@ -1084,7 +1101,8 @@ class VMSSHandler(AzureHandler):
             "instance_type": instance_type,
             "subnet_id": network_identity["subnet_id"],
             "vpc_id": vnet_id,
-            "availability_zone": availability_zone,
+            "tags": vm.tags or {},
+            "price_type": None,
             "provider_type": "azure",
             "provider_data": provider_data,
         }

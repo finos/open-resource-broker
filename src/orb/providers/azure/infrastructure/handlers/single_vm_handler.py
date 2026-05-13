@@ -8,7 +8,7 @@ is suitable for long-lived singleton workloads.
 from __future__ import annotations
 import uuid
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.request.aggregate import Request
@@ -121,12 +121,15 @@ class SingleVMHandler(AzureHandler):
     ) -> AzureHandlerStatusResult:
         """Build a typed status result for one Azure VM."""
         hw = vm.hardware_profile
+        availability_zone = vm.zones[0] if vm.zones else None
         provider_data: AzureStatusProviderData = {
             "resource_id": str(vm.name),
+            "cloud_host_id": vm.vm_id or vm.name,
             "vm_name": str(vm.name),
             "vm_id": str(vm.vm_id),
             "resource_group": resource_group,
             "location": str(vm.location),
+            "availability_zone": availability_zone,
             "nic_id": network_identity["nic_id"],
             "nic_name": network_identity["nic_name"],
             "vnet_id": network_identity["vnet_id"],
@@ -141,9 +144,8 @@ class SingleVMHandler(AzureHandler):
             "instance_type": str(hw.vm_size) if hw and hw.vm_size else None,
             "subnet_id": network_identity["subnet_id"],
             "vpc_id": network_identity["vnet_id"],
-            "availability_zone": (
-                str((vm.zones or [None])[0]) if (vm.zones or [None])[0] else None
-            ),
+            "tags": vm.tags or {},
+            "price_type": None,
             "provider_type": "azure",
             "provider_data": provider_data,
         }
@@ -178,6 +180,7 @@ class SingleVMHandler(AzureHandler):
         resolved_ssh_keys = list(template.ssh_public_keys)
         if template.ssh_key_name and not resolved_ssh_keys:
             from orb.providers.azure.infrastructure.services.ssh_key_resolver import (
+                AzureComputeSshKeyClientProtocol,
                 resolve_ssh_keys_async,
             )
 
@@ -185,7 +188,15 @@ class SingleVMHandler(AzureHandler):
                 ssh_key_name=template.ssh_key_name,
                 ssh_public_keys=template.ssh_public_keys,
                 resource_group=template.resource_group.value,
-                compute_client=await self.azure_client.get_async_compute_client(),
+                # cast: SDK's SshPublicKeyResource structurally satisfies our
+                # AzureSshPublicKeyResourceProtocol, but pyright requires
+                # invariance through the Awaitable wrapper on the operations
+                # protocol — so the inferred return type differs even though
+                # the concrete shapes match.
+                compute_client=cast(
+                    AzureComputeSshKeyClientProtocol,
+                    await self.azure_client.get_async_compute_client(),
+                ),
             )
         if resolved_ssh_keys != list(template.ssh_public_keys):
             template = template.model_copy(update={"ssh_public_keys": resolved_ssh_keys})
@@ -346,7 +357,10 @@ class SingleVMHandler(AzureHandler):
                 statuses = instance_view_statuses(vm.instance_view)
                 results.append(
                     self._build_status_result(
-                        vm=vm,
+                        # cast: SDK 38 exposes hardware_profile/instance_view/vm_id
+                        # via __flattened_items __getattr__, invisible to static
+                        # checkers though documented as the SDK's public surface.
+                        vm=cast(AzureVmRuntimeStatusProtocol, vm),
                         resource_group=resource_group,
                         status=(
                             resolve_power_state(statuses)
@@ -509,7 +523,12 @@ class SingleVMHandler(AzureHandler):
 
             if unresolved_indices:
                 pager = compute.virtual_machines.list(resource_group_name=resource_group)
-                lookup = _build_vm_name_lookup([vm async for vm in pager])
+                # cast: SDK 38 exposes vm_id via __flattened_items __getattr__,
+                # invisible to static checkers though documented as the SDK's
+                # public surface.
+                lookup = _build_vm_name_lookup(
+                    [cast(AzureVmWithIdentityProtocol, vm) async for vm in pager]
+                )
 
                 for index in unresolved_indices:
                     machine_id = str(machine_ids[index])

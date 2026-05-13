@@ -15,6 +15,7 @@ from orb.providers.gcp.types import (
     GCPCreateOutcome,
     GCPFailedOperation,
     GCPHandlerContext,
+    GCPInstanceRecord,
     GCPInstanceStatus,
     GCPMutationOutcome,
     GCPProviderData,
@@ -127,16 +128,7 @@ class GCPSingleVMHandler(GCPHandler):
         results: list[GCPInstanceStatus] = []
         for instance_name in target_ids:
             instance = self._compute_client.get_instance(zone=zone, instance_name=instance_name)
-            results.append(
-                {
-                    "instance_id": instance_name,
-                    "status": instance.status or "UNKNOWN",
-                    "provider_data": {
-                        "zone": zone,
-                        "resource_id": instance.self_link or instance_name,
-                    },
-                }
-            )
+            results.append(_build_gcp_status_result(instance, instance_name, zone))
         return results
 
     def start_instances(
@@ -259,3 +251,35 @@ def _recoverable_gcp_operation_exceptions() -> tuple[type[Exception], ...]:
     if google_exceptions is not None:
         exceptions = exceptions + (google_exceptions.GoogleAPICallError,)
     return exceptions
+
+
+def _build_gcp_status_result(
+    record: GCPInstanceRecord, instance_name: str, zone: str
+) -> GCPInstanceStatus:
+    """Build the normalized GCP status record from a ``GCPInstanceRecord``.
+
+    Maps the boundary type to the AWS-pattern instance dict: provider-specific
+    fields (zone, region, cloud_host_id) live under ``provider_data``; tags
+    come from the record's ``labels`` (GCP's user-key/value analogue, not the
+    firewall ``tags`` concept); price_type is derived from the scheduling
+    provisioning model.
+    """
+    price_type = "spot" if record.provisioning_model == "SPOT" else "ondemand"
+    return {
+        "instance_id": instance_name,
+        "name": record.name or instance_name,
+        "status": record.status or "UNKNOWN",
+        "private_ip": record.private_ip,
+        "public_ip": record.public_ip,
+        "launch_time": record.creation_timestamp,
+        "instance_type": record.machine_type,
+        "tags": record.labels,
+        "price_type": price_type,
+        "provider_data": {
+            "cloud_host_id": record.instance_id or instance_name,
+            "resource_id": record.self_link or instance_name,
+            "zone": zone,
+            "subnet_id": record.subnet_id,
+            "vpc_id": record.vpc_id,
+        },
+    }
