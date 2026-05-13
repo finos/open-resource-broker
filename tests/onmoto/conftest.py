@@ -174,6 +174,7 @@ def orb_config_dir(tmp_path, moto_vpc_resources):
                         "fleet_role": "arn:aws:iam::123456789012:role/aws-service-role/spotfleet.amazonaws.com/AWSServiceRoleForEC2SpotFleet",
                     },
                     "template_defaults": {
+                        "image_id": "ami-12345678",
                         "subnet_ids": subnet_ids,
                         "security_group_ids": [sg_id],
                     },

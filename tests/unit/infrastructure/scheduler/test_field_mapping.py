@@ -244,8 +244,7 @@ def test_transform_instance_tags_other_type_returns_empty():
 
 
 def test_transform_user_data_plain_string_passthrough():
-    """Non-path string with no path-like characters is returned as-is."""
-    # Must not contain '/', '.sh', '.ps1', '.bat' — those trigger file-path detection
+    """Non-path string is returned as-is."""
     plain = "base64encodedcloudinitdata=="
     result = HostFactoryTransformations.transform_user_data(plain)
     assert result == plain
@@ -264,6 +263,120 @@ def test_transform_user_data_reads_file_content(tmp_path):
     script.write_text("#!/bin/bash\necho from_file")
     result = HostFactoryTransformations.transform_user_data(str(script))
     assert result == "#!/bin/bash\necho from_file"
+
+
+def test_transform_user_data_shebang_content_passthrough():
+    """Literal shell script (contains newline + '/') is returned unchanged, not misread as a path."""
+    script = "#!/bin/bash\necho hi > /tmp/boot.log"
+    result = HostFactoryTransformations.transform_user_data(script)
+    assert result == script
+
+
+def test_transform_user_data_inline_script_with_paths_passthrough():
+    """Single-line literal that references a path is returned unchanged when no file exists there."""
+    script = "echo hello > /tmp/nonexistent/file/that/does/not/exist.log"
+    result = HostFactoryTransformations.transform_user_data(script)
+    assert result == script
+
+
+def test_transform_user_data_idempotent(tmp_path):
+    """Running the transformation twice yields the same result as running it once."""
+    script = tmp_path / "boot.sh"
+    script.write_text("#!/bin/bash\nyum install -y httpd")
+    pass1 = HostFactoryTransformations.transform_user_data(str(script))
+    pass2 = HostFactoryTransformations.transform_user_data(pass1)
+    assert pass1 == "#!/bin/bash\nyum install -y httpd"
+    assert pass2 == pass1
+
+
+def test_transform_user_data_does_not_mutate_value_on_miss(tmp_path):
+    """Missing file path returned unchanged — no CWD prefix, no abspath mutation."""
+    missing = "relative/path/nope.sh"
+    result = HostFactoryTransformations.transform_user_data(missing)
+    assert result == missing
+
+
+def test_transform_user_data_expands_env_vars(tmp_path, monkeypatch):
+    """$VAR in the path is expanded before the isfile check."""
+    script = tmp_path / "boot.sh"
+    script.write_text("#!/bin/bash\necho expanded")
+    monkeypatch.setenv("BOOT_DIR", str(tmp_path))
+    result = HostFactoryTransformations.transform_user_data("$BOOT_DIR/boot.sh")
+    assert result == "#!/bin/bash\necho expanded"
+
+
+def test_transform_user_data_expands_tilde(tmp_path, monkeypatch):
+    """~ in the path is expanded via the HOME env var."""
+    script = tmp_path / "boot.sh"
+    script.write_text("#!/bin/bash\necho tilde")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    result = HostFactoryTransformations.transform_user_data("~/boot.sh")
+    assert result == "#!/bin/bash\necho tilde"
+
+
+def test_transform_user_data_oversize_file_returns_original(tmp_path, monkeypatch):
+    """File larger than MAX_FILE_SIZE_BYTES is rejected; original value returned."""
+    monkeypatch.setattr(
+        "orb.infrastructure.scheduler.hostfactory.transformations.MAX_FILE_SIZE_BYTES", 16
+    )
+    script = tmp_path / "huge.sh"
+    script.write_text("#!/bin/bash\n" + "x" * 100)
+    path = str(script)
+    result = HostFactoryTransformations.transform_user_data(path)
+    assert result == path
+
+
+def test_transform_user_data_non_string_passthrough():
+    """Non-string values (None, int, list) are returned unchanged."""
+    assert HostFactoryTransformations.transform_user_data(None) is None
+    assert HostFactoryTransformations.transform_user_data(42) == 42
+    assert HostFactoryTransformations.transform_user_data([]) == []
+
+
+def test_transform_user_data_empty_string_passthrough():
+    """Empty or whitespace-only strings return as-is without touching the filesystem."""
+    assert HostFactoryTransformations.transform_user_data("") == ""
+    assert HostFactoryTransformations.transform_user_data("   ") == "   "
+
+
+def test_transform_user_data_rejects_value_with_newline_without_touching_fs(monkeypatch):
+    """Values containing newline are fast-rejected; os.path.isfile is never called."""
+    called = []
+    monkeypatch.setattr(
+        "orb.infrastructure.scheduler.hostfactory.transformations.os.path.isfile",
+        lambda p: called.append(p) or False,
+    )
+    result = HostFactoryTransformations.transform_user_data("#!/bin/bash\necho hi")
+    assert result == "#!/bin/bash\necho hi"
+    assert called == []
+
+
+def test_transform_user_data_rejects_overlong_value_without_touching_fs(monkeypatch):
+    """Values longer than PATH_MAX are fast-rejected; os.path.isfile is never called."""
+    called = []
+    monkeypatch.setattr(
+        "orb.infrastructure.scheduler.hostfactory.transformations.os.path.isfile",
+        lambda p: called.append(p) or False,
+    )
+    long_value = "a" * 5000
+    result = HostFactoryTransformations.transform_user_data(long_value)
+    assert result == long_value
+    assert called == []
+
+
+def test_transform_user_data_unreadable_file_returns_original(tmp_path):
+    """File exists but cannot be read (permission denied) returns the original path literal."""
+    import os as _os
+    import stat
+
+    script = tmp_path / "locked.sh"
+    script.write_text("#!/bin/bash\necho secret")
+    _os.chmod(script, 0)
+    try:
+        result = HostFactoryTransformations.transform_user_data(str(script))
+        assert result == str(script)
+    finally:
+        _os.chmod(script, stat.S_IRUSR | stat.S_IWUSR)
 
 
 def test_apply_transformations_fires_subnet_and_tags():
