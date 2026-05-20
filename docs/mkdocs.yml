@@ -168,6 +168,7 @@ nav:
     - Filtering: cli/filtering.md
   - Integrations:
     - Adding a Scheduler: developer_guide/adding_a_scheduler.md
+    - Adding a Provider: developer_guide/adding_a_provider.md
     - HostFactory:
       - Integration Guide: hostfactory/integration_guide.md
       - Requirements Compliance: hostfactory/requirements_compliance.md
