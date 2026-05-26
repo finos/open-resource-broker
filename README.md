@@ -160,6 +160,48 @@ See the [AWS Provider Guide](docs/root/user_guide/configuration.md) for required
 
 </details>
 
+<details>
+<summary>OCI Provider Setup</summary>
+
+ORB supports OCI through the `OCICompute` provider API and uses OCI CLI-compatible authentication.
+
+```bash
+# Verify your OCI credentials are active
+oci os ns get
+```
+
+**Supported credential methods:** instance principal (`credential_source: instance_principal`), resource principal, API key (`~/.oci/config`), profile, and `OCI_CLI_AUTH`.
+
+### Supported resource types
+
+| Type | Description |
+|---|---|
+| `OCICompute` | OCI compute instance provisioning via ORB templates |
+
+### Minimal provider config
+
+```json
+{
+  "provider": {
+    "providers": [
+      {
+        "name": "oci-default",
+        "type": "oci",
+        "enabled": true,
+        "config": {
+          "region": "us-phoenix-1",
+          "credential_source": "instance_principal"
+        }
+      }
+    ]
+  }
+}
+```
+
+Reference example: `config/oci_config.example.json`.
+
+</details>
+
 ## Interfaces
 
 ORB provides four ways to interact with your infrastructure.
