@@ -18,6 +18,21 @@ def test_create_oci_strategy_initializes():
     assert strategy.is_initialized is True
 
 
+def test_create_oci_strategy_unwraps_nested_provider_config():
+    strategy = create_oci_strategy(
+        {
+            "name": "oci-default",
+            "type": "oci",
+            "enabled": True,
+            "config": {
+                "region": "us-phoenix-1",
+                "credential_source": "instance_principal",
+            },
+        }
+    )
+    assert strategy._compute_handler._credential_source == "instance_principal"
+
+
 def test_oci_strategy_defaults_load():
     defaults = OCIProviderStrategy.get_defaults_config()
     provider_defaults = defaults["provider"]["provider_defaults"]["oci"]

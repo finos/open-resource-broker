@@ -105,13 +105,20 @@ def _extract_instance_ids(req: dict[str, Any]) -> list[str]:
     return deduped
 
 
-def _verify_oci_cli_instance(instance_id: str, profile: str | None = None) -> None:
+def _verify_oci_cli_instance(
+    instance_id: str,
+    profile: str | None = None,
+    credential_source: str | None = None,
+) -> None:
+    from orb.providers.oci.oci_cli_auth import build_oci_cli_extra_args
+
     cmd = ["oci", "compute", "instance", "get", "--instance-id", instance_id]
     region = _infer_region_from_ocid(instance_id)
     if region:
         cmd.extend(["--region", region])
-    if profile:
-        cmd.extend(["--profile", profile])
+    cmd.extend(
+        build_oci_cli_extra_args(profile=profile, credential_source=credential_source)
+    )
     rc, out, err = _run_command(cmd, timeout=120)
     if rc != 0:
         raise RuntimeError(
@@ -161,9 +168,12 @@ def main() -> int:
     args = parser.parse_args()
     config_data = json.loads(args.config.read_text(encoding="utf-8"))
     provider_profile = None
+    provider_credential_source = None
     for provider_entry in config_data.get("provider", {}).get("providers", []):
         if provider_entry.get("name") == args.provider:
-            provider_profile = (provider_entry.get("config") or {}).get("profile")
+            provider_cfg = provider_entry.get("config") or {}
+            provider_profile = provider_cfg.get("profile")
+            provider_credential_source = provider_cfg.get("credential_source")
             break
 
     counts = [int(x.strip()) for x in args.counts.split(",") if x.strip()]
@@ -252,7 +262,11 @@ def main() -> int:
 
         if args.verify_oci_cli:
             for instance_id in instance_ids:
-                _verify_oci_cli_instance(instance_id, profile=provider_profile)
+                _verify_oci_cli_instance(
+                    instance_id,
+                    profile=provider_profile,
+                    credential_source=provider_credential_source,
+                )
 
         cycle = CycleResult(
             count=count,

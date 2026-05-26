@@ -1,0 +1,31 @@
+{
+  "provider": {
+    "providers": [
+      {
+        "name": "oci-default",
+        "type": "oci",
+        "enabled": true,
+        "config": {
+          "region": "us-phoenix-1",
+          "credential_source": "instance_principal"
+        }
+      }
+    ],
+    "provider_defaults": {
+      "oci": {
+        "handlers": {
+          "OCICompute": {
+            "handler_class": "OCIComputeHandler",
+            "supports_spot": false,
+            "supports_ondemand": true
+          }
+        },
+        "template_defaults": {
+          "provider_api": "OCICompute",
+          "price_type": "ondemand",
+          "max_number": 1
+        }
+      }
+    }
+  }
+}

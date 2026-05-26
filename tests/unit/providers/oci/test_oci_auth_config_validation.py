@@ -75,6 +75,30 @@ def test_strategy_health_unhealthy_when_auth_is_invalid() -> None:
     assert "auth configuration invalid" in health.status_message.lower()
 
 
+def test_config_validation_succeeds_for_instance_principal_source() -> None:
+    config = OCIProviderConfig(region="us-phoenix-1", credential_source="instance_principal")
+
+    is_valid, message, missing, source = config.validate_auth_configuration()
+
+    assert is_valid is True
+    assert source == "instance_principal"
+    assert missing == []
+    assert "principal" in message.lower()
+
+
+def test_strategy_health_healthy_with_instance_principal_auth() -> None:
+    strategy = OCIProviderStrategy(
+        config=OCIProviderConfig(region="us-phoenix-1", credential_source="instance_principal"),
+        logger=MagicMock(),
+    )
+    strategy.initialize()
+
+    health = strategy.check_health()
+
+    assert health.is_healthy is True
+    assert "auth_source=instance_principal" in health.status_message
+
+
 def test_strategy_health_healthy_with_profile_auth() -> None:
     strategy = OCIProviderStrategy(
         config=OCIProviderConfig(region="us-phoenix-1", profile="DEFAULT"),

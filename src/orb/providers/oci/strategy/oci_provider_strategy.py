@@ -36,6 +36,7 @@ class OCIProviderStrategy(ProviderStrategy):
             logger=logger,
             region=config.region,
             profile=config.profile,
+            credential_source=config.credential_source,
         )
 
     @property

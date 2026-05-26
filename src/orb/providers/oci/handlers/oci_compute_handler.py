@@ -13,15 +13,23 @@ from uuid import uuid4
 from orb.domain.base.ports import LoggingPort
 from orb.providers.base.strategy import ProviderOperation, ProviderResult
 from orb.providers.oci.mapping import OCITemplateMapper
+from orb.providers.oci.oci_cli_auth import build_oci_cli_extra_args
 
 
 class OCIComputeHandler:
     """Handles OCI compute operation contracts and executes real OCI calls via OCI CLI."""
 
-    def __init__(self, logger: LoggingPort, region: str, profile: str | None = None) -> None:
+    def __init__(
+        self,
+        logger: LoggingPort,
+        region: str,
+        profile: str | None = None,
+        credential_source: str | None = None,
+    ) -> None:
         self._logger = logger
         self._region = region
         self._profile = profile
+        self._credential_source = credential_source
         self._oci_cli_available = shutil.which("oci") is not None
         self._force_live_cli_for_tests = False
 
@@ -54,8 +62,12 @@ class OCIComputeHandler:
     ) -> dict[str, Any]:
         effective_region = region_override or self._region
         cmd = ["oci", *args, "--region", effective_region]
-        if self._profile:
-            cmd.extend(["--profile", self._profile])
+        cmd.extend(
+            build_oci_cli_extra_args(
+                profile=self._profile,
+                credential_source=self._credential_source,
+            )
+        )
         if payload is not None:
             cmd.extend(["--from-json", json.dumps(payload)])
 
@@ -88,15 +100,23 @@ class OCIComputeHandler:
 
         resolved_compartment = compartment_id
         if subnet_id:
-            subnet_response = self._run_oci(
-                ["network", "subnet", "get", "--subnet-id", subnet_id],
-                region_override=region_override,
-            )
-            subnet_data = subnet_response.get("data", {})
-            subnet_ad = subnet_data.get("availability-domain") or subnet_data.get("availabilityDomain")
-            if subnet_ad:
-                return subnet_ad
-            resolved_compartment = resolved_compartment or subnet_data.get("compartment-id")
+            try:
+                subnet_response = self._run_oci(
+                    ["network", "subnet", "get", "--subnet-id", subnet_id],
+                    region_override=region_override,
+                )
+                subnet_data = subnet_response.get("data", {})
+                subnet_ad = subnet_data.get("availability-domain") or subnet_data.get(
+                    "availabilityDomain"
+                )
+                if subnet_ad:
+                    return subnet_ad
+                resolved_compartment = resolved_compartment or subnet_data.get("compartment-id")
+            except Exception as exc:
+                self._logger.warning(
+                    "Subnet lookup for availability domain failed (%s); using compartment fallback",
+                    exc,
+                )
 
         if resolved_compartment:
             ad_list_response = self._run_oci(

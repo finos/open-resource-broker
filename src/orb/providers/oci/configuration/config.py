@@ -21,6 +21,13 @@ class OCIProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
 
     provider_type: str = "oci"
     region: str = Field("us-phoenix-1", description="OCI region")  # type: ignore[assignment]
+    credential_source: Optional[str] = Field(
+        None,
+        description=(
+            "OCI auth mode for CLI calls: instance_principal, resource_principal, "
+            "api_key, profile, or default"
+        ),
+    )
     profile: Optional[str] = Field(None, description="OCI config profile")
     tenancy_ocid: Optional[str] = Field(None, description="OCI tenancy OCID")
     user_ocid: Optional[str] = Field(None, description="OCI user OCID")
@@ -43,7 +50,7 @@ class OCIProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
             "private_key_path": overrides.get("private_key_path", self.private_key_path),
         }
 
-        source = (credential_source or "default").lower()
+        source = (credential_source or self.credential_source or "default").lower()
         api_key_fields = ["tenancy_ocid", "user_ocid", "fingerprint", "private_key_path"]
 
         if source in {"instance_principal", "resource_principal"}:
