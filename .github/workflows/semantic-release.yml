@@ -101,8 +101,10 @@ jobs:
       - name: Setup UV
         uses: astral-sh/setup-uv@v7
 
-      - name: Install ORB
-        run: uv sync --all-extras --group ci
+      # NOTE: do NOT run `uv sync` here. The next step is a Docker action that
+      # mounts /github/workspace; a host-side .venv would be visible inside the
+      # container with a dangling interpreter path, breaking
+      # `make semantic-release-build`. Sync after the action instead.
 
       - name: Python Semantic Release
         id: release
@@ -112,13 +114,17 @@ jobs:
           git_committer_name: "github-actions[bot]"
           git_committer_email: "github-actions[bot]@users.noreply.github.com"
           force: ${{ inputs.force_level != 'auto' && inputs.force_level || '' }}
-          
+
       - name: Publish to GitHub Release Assets
         uses: python-semantic-release/publish-action@v10.5.3
         if: steps.release.outputs.released == 'true'
         with:
           github_token: ${{ steps.app-token.outputs.token }}
           tag: ${{ steps.release.outputs.tag }}
+
+      - name: Install ORB
+        if: steps.release.outputs.released == 'true'
+        run: uv sync --all-extras --group ci
 
       - name: Export OpenAPI spec for Go SDK
         if: steps.release.outputs.released == 'true'

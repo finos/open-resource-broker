@@ -26,10 +26,16 @@ setup_environment() {
     current_dir="$PWD"
     while [ "$current_dir" != "/" ]; do
         if [ -f "$current_dir/.venv/bin/activate" ]; then
-            echo "Using existing .venv environment..."
-            # shellcheck disable=SC1091
-            source "$current_dir/.venv/bin/activate"
-            return 0
+            # The interpreter inside .venv may be a dangling shebang/symlink
+            # (e.g. when a workspace is mounted into a container that lacks
+            # the host's Python). Validate it actually executes before using.
+            if "$current_dir/.venv/bin/python" -c '' 2>/dev/null; then
+                echo "Using existing .venv environment..."
+                # shellcheck disable=SC1091
+                source "$current_dir/.venv/bin/activate"
+                return 0
+            fi
+            echo "Ignoring unusable .venv at $current_dir/.venv (interpreter not executable)..."
         fi
         current_dir=$(dirname "$current_dir")
     done
@@ -82,7 +88,7 @@ run_tool() {
             # We're in project root
             uv run "${TOOL_NAME}" "$@"
         fi
-    elif [ -f ".venv/bin/${TOOL_NAME}" ]; then
+    elif [ -f ".venv/bin/${TOOL_NAME}" ] && .venv/bin/python -c '' 2>/dev/null; then
         echo "Executing with venv..."
         .venv/bin/"${TOOL_NAME}" "$@"
     elif command -v "${TOOL_NAME}" >/dev/null 2>&1; then
