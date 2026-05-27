@@ -21,7 +21,7 @@ runs:
     - name: Check comment trigger
       id: check
       if: github.event_name == 'issue_comment'
-      uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b  # v7
+      uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553  # v9
       env:
         TRIGGERS: ${{ inputs.triggers }}
         ALLOWED_ASSOCIATIONS: ${{ inputs.allowed-associations }}

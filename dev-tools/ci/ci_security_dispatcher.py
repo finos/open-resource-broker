@@ -12,9 +12,14 @@ def handle_bandit():
 
 
 def handle_safety():
-    """Handle safety dependency scan."""
+    """Handle safety dependency scan.
+
+    `--continue-on-error` makes safety exit 0 when vulnerabilities are found,
+    matching how bandit runs with `--exit-zero` (security scans are reported
+    via SARIF / job logs, not used as merge gates).
+    """
     print("Running Safety dependency scan...")
-    return ["./dev-tools/setup/run_tool.sh", "safety", "check"]
+    return ["./dev-tools/setup/run_tool.sh", "safety", "check", "--continue-on-error"]
 
 
 def handle_other_tools(tool):
