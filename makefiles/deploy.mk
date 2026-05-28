@@ -83,7 +83,11 @@ build-with-version: clean dev-install  ## Build package with explicit version (s
 semantic-release-build:  ## Build package for semantic-release (runs inside the action's container; bypasses run_tool.sh)
 	rm -rf dist/ build/ ./*.egg-info/
 	python3 -m pip install --quiet build
-	python3 -m build --no-isolation
+	# Let `build` create its own isolated env satisfying pyproject's
+	# [build-system].requires (setuptools, wheel). The python:3.14-slim
+	# container does not ship setuptools, so --no-isolation would fail
+	# with "Backend 'setuptools.build_meta' is not available".
+	python3 -m build
 	@echo "SUCCESS: Package built. Files:"
 	@ls -1 dist/
 
