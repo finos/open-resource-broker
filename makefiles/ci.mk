@@ -232,14 +232,5 @@ sdk-go-update-version:  ## Update Go SDK version file and commit (usage: make sd
 	git push
 
 sdk-go-export-spec:  ## Export OpenAPI spec from running ORB server into sdk/go/openapi.json
-	orb system serve --socket-path /tmp/orb-spec.sock &
-	@for i in $$(seq 1 30); do \
-		if curl -sf --unix-socket /tmp/orb-spec.sock http://localhost/health | python3 -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('status') in ('healthy','degraded') else 1)" 2>/dev/null; then \
-			break; \
-		fi; \
-		sleep 1; \
-	done
-	curl --fail --unix-socket /tmp/orb-spec.sock http://localhost/openapi.json > sdk/go/openapi.json
-	python3 -c "import json,sys; d=json.load(open('sdk/go/openapi.json')); assert d.get('openapi'), 'Invalid OpenAPI spec'"
-	kill %1 || true
+	@./dev-tools/release/export_openapi_spec.sh
 
