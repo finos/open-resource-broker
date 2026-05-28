@@ -62,9 +62,12 @@ jobs:
           uv lock
 
       - name: Commit updated lock file
+        env:
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
         run: |
-          make ci-git-setup
-
           if [[ -n $(git status --porcelain) ]]; then
             git add uv.lock
             git commit -m "chore: update uv.lock after dependabot changes"

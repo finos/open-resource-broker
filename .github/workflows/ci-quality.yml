@@ -96,8 +96,12 @@ jobs:
         run: make format-fix
 
       - name: Commit formatting changes
+        env:
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
         run: |
-          make ci-git-setup
           git add .
           if ! git diff --staged --quiet; then
             git commit -m "style: auto-format code with ruff [skip ci]"

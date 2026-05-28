@@ -81,19 +81,25 @@ jobs:
     - name: Build package wheel
       run: make build
 
-    - name: Build and scan container image
+    - name: Build and push container image
       env:
         REGISTRY: ${{ needs.config.outputs.container-registry }}
         IMAGE_NAME: ${{ needs.config.outputs.container-image }}
         VERSION: ${{ needs.config.outputs.package-version }}
         PYTHON_VERSION: ${{ matrix.python-version }}
-        DEFAULT_PYTHON: ${{ needs.config.outputs.default-python-version }}
       run: |
-        make container single push \
-          REGISTRY="$REGISTRY" \
-          IMAGE="$IMAGE_NAME" \
-          VERSION="$VERSION" \
-          PYTHON_VERSION="$PYTHON_VERSION"
+        docker buildx build \
+          --platform linux/amd64,linux/arm64 \
+          --build-arg "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+          --build-arg "VERSION=$VERSION" \
+          --build-arg "VCS_REF=$(git rev-parse --short HEAD)" \
+          --build-arg "PYTHON_VERSION=$PYTHON_VERSION" \
+          --build-arg PACKAGE_NAME_SHORT=orb \
+          --cache-from type=gha \
+          --cache-to type=gha,mode=max \
+          --push \
+          -t "$REGISTRY/$IMAGE_NAME:$VERSION-python$PYTHON_VERSION" \
+          .
 
   prod-manifests:
     name: Create Production Manifests
@@ -249,7 +255,7 @@ jobs:
       run: make build
 
     - name: Generate SBOM
-      run: make sbom
+      run: make sbom-generate
 
     - name: Upload release assets
       env:
@@ -257,11 +263,9 @@ jobs:
       run: |
         VERSION="${{ needs.config.outputs.package-version }}"
         RELEASE_TAG="v$VERSION"
-        
-        # Upload wheel and source distribution
         gh release upload "$RELEASE_TAG" dist/*.whl dist/*.tar.gz --clobber
-        
-        # Upload SBOM if it exists
-        if [[ -f "sbom.json" ]]; then
-          gh release upload "$RELEASE_TAG" sbom.json --clobber
-        fi
+        for f in python-sbom-cyclonedx.json python-sbom.json; do
+          if [[ -f "$f" ]]; then
+            gh release upload "$RELEASE_TAG" "$f" --clobber
+          fi
+        done

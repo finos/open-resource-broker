@@ -243,6 +243,3 @@ sdk-go-export-spec:  ## Export OpenAPI spec from running ORB server into sdk/go/
 	python3 -c "import json,sys; d=json.load(open('sdk/go/openapi.json')); assert d.get('openapi'), 'Invalid OpenAPI spec'"
 	kill %1 || true
 
-ci-git-setup:  ## Setup git configuration for CI automated commits
-	git config --local user.name "github-actions[bot]"
-	git config --local user.email "github-actions[bot]@users.noreply.github.com"

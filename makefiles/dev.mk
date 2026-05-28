@@ -234,6 +234,9 @@ show-package-info:  ## Show package information
 	@echo "Repository: $(REPO_URL)"
 	@echo "Container Registry: $(CONTAINER_REGISTRY)"
 
+print-PYTHON_VERSIONS:  ## Print Python versions space-separated (for shell consumers)
+	@echo '$(PYTHON_VERSIONS)'
+
 print-json-PYTHON_VERSIONS:  ## Print Python versions as JSON (for CI)
 	@echo '$(PYTHON_VERSIONS)' | tr ' ' '\n' | jq -R . | jq -s .
 

@@ -101,11 +101,9 @@ jobs:
       - name: Setup UV
         uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9  # v7
 
-      # NOTE: do NOT run `uv sync` here. The next step is a Docker action that
-      # mounts /github/workspace; a host-side .venv would be visible inside the
-      # container with a dangling interpreter path, breaking
-      # `make semantic-release-build`. Sync after the action instead.
-
+      # Do NOT `uv sync` here: the next step is a Docker action that mounts
+      # the workspace, so a host .venv would be visible inside the container
+      # with a dangling interpreter and break `make semantic-release-build`.
       - name: Python Semantic Release
         id: release
         uses: python-semantic-release/python-semantic-release@754a065a2ea187da71977ada6630a8ec0f98e380  # v10.5.3
@@ -128,8 +126,13 @@ jobs:
 
       - name: Export OpenAPI spec for Go SDK
         if: steps.release.outputs.released == 'true'
-        run: make sdk-go-export-spec
+        run: uv run make sdk-go-export-spec
 
       - name: Update Go SDK version
         if: steps.release.outputs.released == 'true'
-        run: make sdk-go-update-version VERSION=${{ steps.release.outputs.version }}
+        env:
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
+        run: uv run make sdk-go-update-version VERSION=${{ steps.release.outputs.version }}
