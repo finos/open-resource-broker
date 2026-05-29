@@ -240,7 +240,7 @@ class MachineSyncService:
             if not isinstance(pending_cleanup, dict):
                 continue
 
-            resource_id = pending_cleanup.get("resource_id")
+            resource_id = pending_cleanup.get("vmss_name")
             if resource_id in (None, ""):
                 continue
 

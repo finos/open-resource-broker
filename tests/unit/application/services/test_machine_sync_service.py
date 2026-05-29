@@ -148,7 +148,7 @@ async def test_fetch_provider_machines_for_return_rebuilds_vmss_mapping_from_fol
                 {
                     "pending_resource_cleanup": {
                         "resource_group": "orb-test-rg",
-                        "resource_id": "vmss-demo",
+                        "vmss_name": "vmss-demo",
                         "machine_ids": ["vmss-demo_000001"],
                         "delete_vmss_when_empty": True,
                     }
