@@ -67,14 +67,14 @@ jobs:
 
       - name: Upload Semgrep SARIF results
         if: inputs.scan-type == 'semgrep' && always()
-        uses: github/codeql-action/upload-sarif@dc73d59c2d7bd4f8194098a91219eeee6d8a1719  # v4
+        uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa  # v4
         with:
           sarif_file: semgrep.sarif
 
       # Trivy Filesystem Scan
       - name: Run Trivy filesystem vulnerability scanner
         if: inputs.scan-type == 'trivy-fs'
-        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8  # v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -83,7 +83,7 @@ jobs:
 
       - name: Upload Trivy filesystem scan results
         if: inputs.scan-type == 'trivy-fs' && always()
-        uses: github/codeql-action/upload-sarif@dc73d59c2d7bd4f8194098a91219eeee6d8a1719  # v4
+        uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa  # v4
         with:
           sarif_file: 'trivy-fs-results.sarif'
 
@@ -99,14 +99,14 @@ jobs:
 
       - name: Upload Hadolint SARIF results
         if: inputs.scan-type == 'hadolint' && always()
-        uses: github/codeql-action/upload-sarif@dc73d59c2d7bd4f8194098a91219eeee6d8a1719  # v4
+        uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa  # v4
         with:
           sarif_file: hadolint-results.sarif
 
       # CodeQL Analysis
       - name: Initialize CodeQL
         if: inputs.scan-type == 'codeql'
-        uses: github/codeql-action/init@dc73d59c2d7bd4f8194098a91219eeee6d8a1719  # v4
+        uses: github/codeql-action/init@7211b7c8077ea37d8641b6271f6a365a22a5fbfa  # v4
         with:
           languages: python
           queries: security-extended,security-and-quality
@@ -115,13 +115,13 @@ jobs:
 
       - name: Initialize CodeQL (fallback)
         if: inputs.scan-type == 'codeql' && steps.codeql-init-extended.outcome == 'failure'
-        uses: github/codeql-action/init@dc73d59c2d7bd4f8194098a91219eeee6d8a1719  # v4
+        uses: github/codeql-action/init@7211b7c8077ea37d8641b6271f6a365a22a5fbfa  # v4
         with:
           languages: python
           queries: security-and-quality
 
       - name: Perform CodeQL Analysis
         if: inputs.scan-type == 'codeql'
-        uses: github/codeql-action/analyze@dc73d59c2d7bd4f8194098a91219eeee6d8a1719  # v4
+        uses: github/codeql-action/analyze@7211b7c8077ea37d8641b6271f6a365a22a5fbfa  # v4
         with:
           category: "/language:python"

@@ -161,7 +161,7 @@ jobs:
         fi
 
     - name: Run Trivy security scan
-      uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8  # v0.36.0
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
       with:
         image-ref: "${{ needs.config.outputs.container-registry }}/${{ needs.config.outputs.container-image }}:${{ needs.config.outputs.package-version }}-python${{ matrix.python-version }}"
         format: 'sarif'
@@ -170,7 +170,7 @@ jobs:
         severity: ${{ env.SCAN_LEVEL == 'full' && 'CRITICAL,HIGH,MEDIUM' || 'CRITICAL,HIGH' }}
 
     - name: Upload Trivy scan results
-      uses: github/codeql-action/upload-sarif@dc73d59c2d7bd4f8194098a91219eeee6d8a1719  # v4
+      uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa  # v4
       if: always()
       with:
         sarif_file: 'trivy-results-py${{ matrix.python-version }}.sarif'
@@ -186,7 +186,7 @@ jobs:
 
     - name: Upload Hadolint scan results
       if: matrix.python-version == needs.config.outputs.default-python-version
-      uses: github/codeql-action/upload-sarif@dc73d59c2d7bd4f8194098a91219eeee6d8a1719  # v4
+      uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa  # v4
       with:
         sarif_file: hadolint-dockerfile.sarif
 
@@ -321,7 +321,7 @@ jobs:
 
     steps:
     - name: Delete old untagged container images
-      uses: actions/delete-package-versions@25ad4af5be03aef10e0b3376b248688b7a44c40b  # v5
+      uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55  # v5
       with:
         package-name: ${{ github.event.repository.name }}
         package-type: container
@@ -329,7 +329,7 @@ jobs:
         delete-only-untagged-versions: true
 
     - name: Delete old tagged versions (preserve releases and special tags)
-      uses: actions/delete-package-versions@25ad4af5be03aef10e0b3376b248688b7a44c40b  # v5
+      uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55  # v5
       with:
         package-name: ${{ github.event.repository.name }}
         package-type: container
