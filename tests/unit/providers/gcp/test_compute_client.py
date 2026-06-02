@@ -31,7 +31,17 @@ class _FakeInstancesClient:
 
     def get(self, **kwargs: object) -> object:
         self.get_calls.append(kwargs)
-        return SimpleNamespace(name="vm-1", status="RUNNING", self_link="instance-link")
+        return SimpleNamespace(
+            name="vm-1",
+            status="RUNNING",
+            self_link="instance-link",
+            id=None,
+            machine_type=None,
+            scheduling=None,
+            creation_timestamp=None,
+            labels={},
+            network_interfaces=[],
+        )
 
 
 class _FakeImagesClient:
@@ -55,7 +65,7 @@ def _config(**overrides: object) -> GCPProviderConfig:
     return GCPProviderConfig(**payload)
 
 
-def test_create_instance_passes_configured_retry_and_timeout(monkeypatch) -> None:
+def test_create_instance_passes_configured_retry_and_numeric_timeout(monkeypatch) -> None:
     fake_instances_client = _FakeInstancesClient()
     fake_compute_v1 = SimpleNamespace(InstancesClient=lambda: fake_instances_client)
     client = GCPComputeClient(config=_config(), logger=MagicMock())
@@ -72,12 +82,12 @@ def test_create_instance_passes_configured_retry_and_timeout(monkeypatch) -> Non
             "zone": "us-central1-a",
             "instance_resource": body,
             "retry": "mutation-policy",
-            "timeout": (7.0, 11.0),
+            "timeout": 18.0,
         }
     ]
 
 
-def test_get_image_from_family_passes_configured_retry_and_timeout(monkeypatch) -> None:
+def test_get_image_from_family_passes_configured_retry_and_numeric_timeout(monkeypatch) -> None:
     fake_images_client = _FakeImagesClient()
     fake_compute_v1 = SimpleNamespace(ImagesClient=lambda: fake_images_client)
     client = GCPComputeClient(config=_config(), logger=MagicMock())
@@ -92,7 +102,7 @@ def test_get_image_from_family_passes_configured_retry_and_timeout(monkeypatch) 
             "project": "debian-cloud",
             "family": "debian-12",
             "retry": "image_read-policy",
-            "timeout": (7.0, 11.0),
+            "timeout": 18.0,
         }
     ]
 
@@ -112,7 +122,7 @@ def test_max_retries_zero_disables_sdk_retry(monkeypatch) -> None:
             "zone": "us-central1-a",
             "instance": "vm-1",
             "retry": None,
-            "timeout": (7.0, 11.0),
+            "timeout": 18.0,
         }
     ]
 

@@ -14,6 +14,7 @@ from orb.infrastructure.mocking.dry_run_context import is_dry_run_active
 from orb.domain.request.aggregate import Request
 from orb.domain.request.value_objects import RequestType
 from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
+from orb.providers.base.strategy.provider_strategy import ProviderResult
 from orb.providers.gcp.configuration.config import GCPProviderConfig
 from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
 from orb.providers.gcp.exceptions import (
@@ -661,7 +662,7 @@ async def test_strategy_execute_operation_preserves_dry_run_context_inside_to_th
     def fake_execute(operation):
         _ = operation
         observed["dry_run_active"] = is_dry_run_active()
-        return SimpleNamespace(success=True, data={}, metadata={})
+        return ProviderResult.success_result({})
 
     strategy._execute_operation_internal_sync = fake_execute
 

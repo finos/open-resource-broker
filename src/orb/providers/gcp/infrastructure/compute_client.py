@@ -370,11 +370,12 @@ class GCPComputeClient:
     def _request_options(self, operation_name: str) -> dict[str, Any]:
         return {
             "retry": self._get_retry_policy(operation_name),
-            "timeout": (
-                float(self._config.connect_timeout),
-                float(self._config.read_timeout),
-            ),
+            "timeout": self._request_timeout_seconds(),
         }
+
+    def _request_timeout_seconds(self) -> float:
+        """Return the per-RPC timeout shape accepted by google-cloud clients."""
+        return float(self._config.connect_timeout + self._config.read_timeout)
 
     def _get_retry_policy(self, operation_name: str) -> Any:
         if self._config.max_retries == 0:
