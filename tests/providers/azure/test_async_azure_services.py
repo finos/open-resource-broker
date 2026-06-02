@@ -9,7 +9,6 @@ import pytest
 
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
 from orb.providers.azure.exceptions.azure_exceptions import AzureValidationError
-from orb.providers.azure.infrastructure.handlers.azure_handler import AzureReleaseContext
 from orb.providers.azure.infrastructure.services.azure_deployment_service import (
     AzureDeploymentService,
 )
@@ -21,8 +20,9 @@ from orb.providers.azure.services.provisioning_service import (
     CreateOperationContext,
 )
 from orb.providers.azure.services.termination_service import (
-    _dispatch_release_groups_async,
+    AzureTerminationService,
 )
+from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
 from tests.providers.azure.strategy_test_support import make_azure_template
 
 if TYPE_CHECKING:
@@ -51,6 +51,52 @@ def _handler_provider(handler) -> "AzureProviderStrategy":
     )
 
 
+def _termination_operation(
+    *,
+    instance_ids: list[str],
+    resource_mapping: dict[str, tuple[str, int]] | None = None,
+    resource_id: str | None = None,
+) -> ProviderOperation:
+    parameters = {
+        "instance_ids": instance_ids,
+        "provider_api": "VMSS",
+    }
+    if resource_mapping is not None:
+        parameters["resource_mapping"] = resource_mapping
+    if resource_id is not None:
+        parameters["resource_id"] = resource_id
+
+    return ProviderOperation(
+        operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+        parameters=parameters,
+    )
+
+
+async def _terminate_with_handler(
+    handler,
+    *,
+    instance_ids: list[str],
+    resource_mapping: dict[str, tuple[str, int]] | None = None,
+    resource_id: str | None = None,
+    logger: MagicMock | None = None,
+    cleanup_recorder: MagicMock | None = None,
+):
+    service = AzureTerminationService(
+        logger=logger or MagicMock(),
+        handler_provider=_handler_provider(handler),
+        record_pending_cleanup=cleanup_recorder or MagicMock(),
+        default_resource_group="test-rg",
+    )
+    return await service.terminate_instances_async(
+        _termination_operation(
+            instance_ids=instance_ids,
+            resource_mapping=resource_mapping,
+            resource_id=resource_id,
+        ),
+        is_dry_run=False,
+    )
+
+
 @pytest.fixture
 def resource_metadata_service() -> MagicMock:
     service = MagicMock()
@@ -61,22 +107,24 @@ def resource_metadata_service() -> MagicMock:
 
 @pytest.mark.asyncio
 async def test_dispatch_collects_provider_data_and_records_cleanup():
+    cleanup_recorder = MagicMock()
     handler = MagicMock()
     handler.release_hosts_async = AsyncMock(
         return_value={"provider_data": {"operation_status": "submitted"}}
     )
 
-    result = await _dispatch_release_groups_async(
+    result = await _terminate_with_handler(
         handler=handler,
         instance_ids=["vm-1"],
-        grouped_resource_mapping={"vmss-1": ["vm-1"]},
-        default_resource_id="vmss-1",
-        context=AzureReleaseContext(resource_group="test-rg"),
-        logger=MagicMock(),
-        record_pending_cleanup=MagicMock(),
+        resource_mapping={"vm-1": ("vmss-1", 1)},
+        cleanup_recorder=cleanup_recorder,
     )
 
-    assert result == [{"operation_status": "submitted"}]
+    assert result.success is True
+    assert result.metadata["provider_data"]["termination_requests"] == [
+        {"operation_status": "submitted"}
+    ]
+    cleanup_recorder.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -90,17 +138,18 @@ async def test_dispatch_fans_out_across_multiple_resource_groups():
         ]
     )
 
-    result = await _dispatch_release_groups_async(
+    result = await _terminate_with_handler(
         handler=handler,
         instance_ids=["vm-1", "vm-2"],
-        grouped_resource_mapping={"vmss-1": ["vm-1"], "vmss-2": ["vm-2"]},
-        default_resource_id="vmss-ignored",
-        context=AzureReleaseContext(resource_group="test-rg"),
-        logger=MagicMock(),
-        record_pending_cleanup=cleanup_recorder,
+        resource_mapping={"vm-1": ("vmss-1", 1), "vm-2": ("vmss-2", 1)},
+        cleanup_recorder=cleanup_recorder,
     )
 
-    assert result == [{"resource_id": "vmss-1"}, {"resource_id": "vmss-2"}]
+    assert result.success is True
+    assert result.metadata["provider_data"]["termination_requests"] == [
+        {"resource_id": "vmss-1"},
+        {"resource_id": "vmss-2"},
+    ]
     assert handler.release_hosts_async.await_count == 2
     cleanup_recorder.assert_called()
 
@@ -118,23 +167,24 @@ async def test_dispatch_preserves_group_order_when_release_calls_complete_out_of
 
     handler.release_hosts_async = AsyncMock(side_effect=release_hosts_async)
 
-    result = await _dispatch_release_groups_async(
+    result = await _terminate_with_handler(
         handler=handler,
         instance_ids=["vm-1", "vm-2"],
-        grouped_resource_mapping={"vmss-1": ["vm-1"], "vmss-2": ["vm-2"]},
-        default_resource_id="vmss-ignored",
-        context=AzureReleaseContext(resource_group="test-rg"),
-        logger=MagicMock(),
-        record_pending_cleanup=cleanup_recorder,
+        resource_mapping={"vm-1": ("vmss-1", 1), "vm-2": ("vmss-2", 1)},
+        cleanup_recorder=cleanup_recorder,
     )
 
-    assert result == [{"resource_id": "vmss-1"}, {"resource_id": "vmss-2"}]
+    assert result.success is True
+    assert result.metadata["provider_data"]["termination_requests"] == [
+        {"resource_id": "vmss-1"},
+        {"resource_id": "vmss-2"},
+    ]
     assert cleanup_recorder.call_args_list[0].args[0]["provider_data"]["resource_id"] == "vmss-1"
     assert cleanup_recorder.call_args_list[1].args[0]["provider_data"]["resource_id"] == "vmss-2"
 
 
 @pytest.mark.asyncio
-async def test_dispatch_preserves_partial_success_when_one_group_fails():
+async def test_dispatch_reports_partial_failure_when_one_group_fails():
     cleanup_recorder = MagicMock()
     logger = MagicMock()
     handler = MagicMock()
@@ -145,19 +195,85 @@ async def test_dispatch_preserves_partial_success_when_one_group_fails():
         ]
     )
 
-    result = await _dispatch_release_groups_async(
+    result = await _terminate_with_handler(
         handler=handler,
         instance_ids=["vm-1", "vm-2"],
-        grouped_resource_mapping={"vmss-1": ["vm-1"], "vmss-2": ["vm-2"]},
-        default_resource_id="vmss-ignored",
-        context=AzureReleaseContext(resource_group="test-rg"),
+        resource_mapping={"vm-1": ("vmss-1", 1), "vm-2": ("vmss-2", 1)},
         logger=logger,
-        record_pending_cleanup=cleanup_recorder,
+        cleanup_recorder=cleanup_recorder,
     )
 
-    assert result == [{"resource_id": "vmss-1"}]
+    assert result.success is False
+    assert result.error_code == "AZURE_TERMINATION_PARTIAL_FAILURE"
+    provider_data = result.metadata["provider_data"]
+    assert provider_data["termination_requests"] == [{"resource_id": "vmss-1"}]
+    assert provider_data["successful_instance_ids"] == ["vm-1"]
+    assert provider_data["dispatch_failures"] == [
+        {
+            "resource_id": "vmss-2",
+            "instance_ids": ["vm-2"],
+            "error_message": "delete failed",
+            "error_type": "RuntimeError",
+        }
+    ]
     cleanup_recorder.assert_called_once()
     logger.warning.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_dispatch_treats_success_without_provider_data_as_successful_group():
+    handler = MagicMock()
+    handler.release_hosts_async = AsyncMock(
+        side_effect=[
+            {},
+            RuntimeError("delete failed"),
+        ]
+    )
+
+    result = await _terminate_with_handler(
+        handler=handler,
+        instance_ids=["vm-1", "vm-2"],
+        resource_mapping={"vm-1": ("vmss-1", 1), "vm-2": ("vmss-2", 1)},
+    )
+
+    assert result.success is False
+    provider_data = result.metadata["provider_data"]
+    assert "termination_requests" not in provider_data
+    assert provider_data["successful_instance_ids"] == ["vm-1"]
+    assert provider_data["failed_instance_ids"] == ["vm-2"]
+
+
+@pytest.mark.asyncio
+async def test_terminate_instances_async_reports_partial_dispatch_failure():
+    cleanup_recorder = MagicMock()
+    handler = MagicMock()
+    handler.release_hosts_async = AsyncMock(
+        side_effect=[
+            {"provider_data": {"resource_id": "vmss-1"}},
+            RuntimeError("delete failed"),
+        ]
+    )
+    result = await _terminate_with_handler(
+        handler=handler,
+        instance_ids=["vm-1", "vm-2"],
+        resource_mapping={"vm-1": ("vmss-1", 1), "vm-2": ("vmss-2", 1)},
+        cleanup_recorder=cleanup_recorder,
+    )
+
+    assert result.success is False
+    assert result.error_code == "AZURE_TERMINATION_PARTIAL_FAILURE"
+    provider_data = result.metadata["provider_data"]
+    assert provider_data["termination_requests"] == [{"resource_id": "vmss-1"}]
+    assert provider_data["successful_instance_ids"] == ["vm-1"]
+    assert provider_data["failed_instance_ids"] == ["vm-2"]
+    assert provider_data["dispatch_failures"] == [
+        {
+            "resource_id": "vmss-2",
+            "instance_ids": ["vm-2"],
+            "error_message": "delete failed",
+            "error_type": "RuntimeError",
+        }
+    ]
 
 
 @pytest.mark.asyncio
@@ -166,14 +282,10 @@ async def test_dispatch_raises_when_all_groups_fail():
     handler.release_hosts_async = AsyncMock(side_effect=RuntimeError("delete failed"))
 
     with pytest.raises(RuntimeError, match="delete failed"):
-        await _dispatch_release_groups_async(
+        await _terminate_with_handler(
             handler=handler,
             instance_ids=["vm-1"],
-            grouped_resource_mapping={"vmss-1": ["vm-1"]},
-            default_resource_id="vmss-1",
-            context=AzureReleaseContext(resource_group="test-rg"),
-            logger=MagicMock(),
-            record_pending_cleanup=MagicMock(),
+            resource_mapping={"vm-1": ("vmss-1", 1)},
         )
 
 
