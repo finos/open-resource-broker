@@ -28,7 +28,12 @@ from orb.providers.gcp.infrastructure.handlers.mig_handler import GCPManagedInst
 from orb.providers.gcp.infrastructure.handlers.single_vm_handler import GCPSingleVMHandler
 from orb.providers.gcp.services.provisioning_service import GCPProvisioningService
 from orb.providers.gcp.strategy.gcp_provider_strategy import GCPProviderStrategy
-from orb.providers.gcp.types import GCPCreateOperationContext, GCPCreateOutcome, GCPFailedOperation
+from orb.providers.gcp.types import (
+    GCPCreateOperationContext,
+    GCPCreateOutcome,
+    GCPFailedOperation,
+    GCPInstanceRecord,
+)
 
 
 class _ComputeClientStub:
@@ -46,6 +51,7 @@ class _ComputeClientStub:
         self.fail_create_regional_mig = False
         self.template_operation_result_called = False
         self.deleted_templates: list[str] = []
+        self.instances: dict[str, GCPInstanceRecord] = {}
 
     class _OperationStub(SimpleNamespace):
         def __init__(self, owner: _ComputeClientStub, **kwargs) -> None:
@@ -132,6 +138,10 @@ class _ComputeClientStub:
             raise google_exceptions.NotFound("instance was not found")
         return SimpleNamespace(name=f"delete-{instance_name}")
 
+    def get_instance(self, *, zone: str, instance_name: str) -> GCPInstanceRecord:
+        _ = zone
+        return self.instances[instance_name]
+
 
 def _config(**overrides: object) -> GCPProviderConfig:
     payload: dict[str, object] = {
@@ -186,6 +196,58 @@ def test_single_vm_handler_acquire_hosts_submits_instance_creation() -> None:
     assert len(result.resource_ids) == 1
     assert result.provider_data["zone"] == "us-central1-a"
     assert compute_client.created_instances[0][0] == "us-central1-a"
+
+
+def test_single_vm_handler_status_normalizes_compute_instance_record() -> None:
+    compute_client = _ComputeClientStub()
+    compute_client.instances["vm-a"] = GCPInstanceRecord(
+        name="vm-a",
+        status="RUNNING",
+        self_link="projects/orb-example-12345/zones/us-central1-a/instances/vm-a",
+        instance_id="123456789",
+        machine_type="e2-standard-4",
+        creation_timestamp="2026-06-02T14:07:18.000Z",
+        private_ip="10.128.0.10",
+        public_ip="203.0.113.10",
+        subnet_id="subnet-a",
+        vpc_id="default",
+        labels={"orb-template": "gcp-single"},
+        provisioning_model="STANDARD",
+    )
+    handler = GCPSingleVMHandler(
+        compute_client=compute_client,
+        config=_config(),
+        logger=MagicMock(),
+    )
+
+    result = handler.check_hosts_status(
+        resource_ids=["vm-a"],
+        instance_ids=[],
+        context={"zone": "us-central1-a"},
+    )
+
+    assert result == [
+        {
+            "instance_id": "vm-a",
+            "name": "vm-a",
+            "status": "running",
+            "private_ip": "10.128.0.10",
+            "public_ip": "203.0.113.10",
+            "launch_time": "2026-06-02T14:07:18.000Z",
+            "instance_type": "e2-standard-4",
+            "subnet_id": "subnet-a",
+            "vpc_id": "default",
+            "tags": {"orb-template": "gcp-single"},
+            "price_type": "ondemand",
+            "provider_data": {
+                "cloud_host_id": "123456789",
+                "resource_id": "projects/orb-example-12345/zones/us-central1-a/instances/vm-a",
+                "zone": "us-central1-a",
+                "subnet_id": "subnet-a",
+                "vpc_id": "default",
+            },
+        }
+    ]
 
 
 def test_single_vm_handler_acquire_hosts_tracks_partial_failures() -> None:
@@ -465,6 +527,61 @@ def test_provisioning_service_projects_failed_operations_into_fleet_errors() -> 
             "error_message": "Quota exceeded",
         }
     ]
+
+
+def test_provisioning_service_single_vm_create_result_waits_for_status_sync() -> None:
+    template = GCPTemplate.model_validate(
+        {
+            "template_id": "gcp-single",
+            "provider_type": "gcp",
+            "provider_api": "SingleVM",
+            "project_id": "orb-example-12345",
+            "region": "us-central1",
+            "zones": ["us-central1-a"],
+            "instance_type": "e2-standard-4",
+            "max_instances": 1,
+            "source_image_family": "debian-12",
+            "source_image_project": "debian-cloud",
+        }
+    )
+    request = Request.create_new_request(
+        request_type=RequestType.ACQUIRE,
+        template_id="gcp-single",
+        machine_count=1,
+        provider_type="gcp",
+    )
+    context = GCPCreateOperationContext(
+        template=template,
+        request=request,
+        handler=MagicMock(),
+        count=1,
+    )
+
+    result = GCPProvisioningService.build_provider_result(
+        context=context,
+        outcome=GCPCreateOutcome(
+            resource_ids=["vm-a"],
+            instances=[
+                {
+                    "instance_id": "vm-a",
+                    "status": "PROVISIONING",
+                    "provider_data": {"zone": "us-central1-a", "operation_name": "op-vm-a"},
+                }
+            ],
+            provider_data={
+                "zone": "us-central1-a",
+                "requested_count": 1,
+                "submitted_count": 1,
+                "operation_status": "submitted",
+            },
+        ),
+    )
+
+    assert result.data["resource_ids"] == ["vm-a"]
+    assert result.data["instance_ids"] == ["vm-a"]
+    assert result.data["instances"] == []
+    assert result.data["results"] == {"vm-a": True}
+    assert result.metadata["provider_data"]["operation_status"] == "submitted"
 
 
 def test_mig_handler_terminates_multiple_resource_ids() -> None:

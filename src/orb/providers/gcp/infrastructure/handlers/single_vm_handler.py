@@ -268,11 +268,13 @@ def _build_gcp_status_result(
     return {
         "instance_id": instance_name,
         "name": record.name or instance_name,
-        "status": record.status or "UNKNOWN",
+        "status": _normalize_gcp_instance_status(record.status),
         "private_ip": record.private_ip,
         "public_ip": record.public_ip,
         "launch_time": record.creation_timestamp,
         "instance_type": record.machine_type,
+        "subnet_id": record.subnet_id,
+        "vpc_id": record.vpc_id,
         "tags": record.labels,
         "price_type": price_type,
         "provider_data": {
@@ -283,3 +285,21 @@ def _build_gcp_status_result(
             "vpc_id": record.vpc_id,
         },
     }
+
+
+def _normalize_gcp_instance_status(status: str | None) -> str:
+    """Map Compute Engine instance statuses to ORB machine statuses."""
+    if status is None:
+        return "unknown"
+
+    status_map = {
+        "PROVISIONING": "pending",
+        "STAGING": "launching",
+        "RUNNING": "running",
+        "STOPPING": "stopping",
+        "SUSPENDING": "stopping",
+        "SUSPENDED": "stopped",
+        "REPAIRING": "pending",
+        "TERMINATED": "terminated",
+    }
+    return status_map.get(status.upper(), "unknown")

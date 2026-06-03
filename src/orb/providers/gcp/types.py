@@ -70,6 +70,8 @@ class GCPInstanceStatus(TypedDict, total=False):
     name: str
     private_ip: str | None
     public_ip: str | None
+    subnet_id: str | None
+    vpc_id: str | None
     launch_time: str | None
     instance_type: str | None
     tags: dict[str, str]

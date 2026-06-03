@@ -126,8 +126,11 @@ class GCPProvisioningService:
         """Convert a provider-native acquire outcome into the ORB result schema."""
         failed_operations = outcome.failed_operations
         fleet_errors = GCPProvisioningService._fleet_errors_from_failures(failed_operations)
+        provider_api = context.template.provider_api.value
+        instances = [] if provider_api == "SingleVM" else outcome.instances
+        successful_ids = outcome.resource_ids
         results = {
-            **{instance["instance_id"]: True for instance in outcome.instances},
+            **{resource_id: True for resource_id in successful_ids},
             **{failure.target_id: False for failure in failed_operations},
         }
         provider_data = dict(outcome.provider_data)
@@ -136,8 +139,9 @@ class GCPProvisioningService:
         return ProviderResult.success_result(
             {
                 "resource_ids": outcome.resource_ids,
-                "instances": outcome.instances,
-                "provider_api": context.template.provider_api.value,
+                "instance_ids": successful_ids,
+                "instances": instances,
+                "provider_api": provider_api,
                 "count": context.count,
                 "template_id": context.template.template_id,
                 "failed_operations": [failure.__dict__ for failure in failed_operations],
@@ -145,7 +149,7 @@ class GCPProvisioningService:
             },
             {
                 "operation": "create_instances",
-                "handler_used": context.template.provider_api.value,
+                "handler_used": provider_api,
                 "provider_data": provider_data,
                 "partial_failure": bool(failed_operations),
             },
