@@ -9,6 +9,7 @@ from pydantic import ConfigDict, Field, model_validator
 from orb.domain.template.template_aggregate import Template
 from orb.providers.gcp.constants import DEFAULT_GCP_SERVICE_ACCOUNT_SCOPES
 from orb.providers.gcp.domain.template.value_objects import (
+    GCPDiskTypeName,
     GCPMIGScope,
     GCPProjectId,
     GCPProviderApi,
@@ -41,7 +42,7 @@ class GCPTemplate(Template):
     source_image: Optional[str] = None
     source_image_family: Optional[str] = None
     source_image_project: Optional[str] = None
-    boot_disk_type: Optional[str] = None
+    boot_disk_type: Optional[GCPDiskTypeName] = None
     boot_disk_size_gb: Optional[int] = Field(default=None, ge=10)
     mig_name: Optional[str] = None
     instance_template_name_prefix: Optional[str] = None

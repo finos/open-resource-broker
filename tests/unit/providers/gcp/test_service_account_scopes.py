@@ -199,9 +199,7 @@ def test_single_vm_and_mig_payloads_share_common_instance_configuration(monkeypa
     assert instance_payload.disks[0].initialize_params.disk_type == (
         "zones/us-central1-a/diskTypes/balanced"
     )
-    assert template_properties.disks[0].initialize_params.disk_type == (
-        "zones/us-central1-a/diskTypes/balanced"
-    )
+    assert template_properties.disks[0].initialize_params.disk_type == "balanced"
     assert instance_payload.disks[0].initialize_params.disk_size_gb == 200
     assert template_properties.disks[0].initialize_params.disk_size_gb == 200
     assert instance_payload.network_interfaces[0].network == "global/networks/orb-net"

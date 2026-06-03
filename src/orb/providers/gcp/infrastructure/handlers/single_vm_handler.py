@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-# noinspection PyTypeHints
-# PyCharm treats google-cloud-compute generated proto classes as Any in annotations here.
 import uuid
-from typing import TYPE_CHECKING, Callable
+from typing import Callable
 
 from orb.domain.request.aggregate import Request
 from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
@@ -20,10 +18,8 @@ from orb.providers.gcp.types import (
     GCPMutationOutcome,
     GCPProviderData,
 )
-
-if TYPE_CHECKING:
-    from google.api_core.extended_operation import ExtendedOperation
-    from google.cloud.compute_v1.types import Instance
+from google.api_core.extended_operation import ExtendedOperation
+from google.cloud.compute_v1.types import Instance
 
 try:
     from google.api_core import exceptions as google_exceptions
@@ -188,6 +184,7 @@ class GCPSingleVMHandler(GCPHandler):
                 template=template,
                 machine_type=machine_type,
                 zone=zone,
+                disk_type_payload_context="instance",
             ),
         )
 

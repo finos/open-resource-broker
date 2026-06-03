@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-# noinspection PyTypeHints
-# PyCharm treats google-cloud-compute generated proto classes as Any in annotations here.
 from concurrent.futures import TimeoutError as FutureTimeoutError
 import uuid
-from typing import TYPE_CHECKING
 
 from orb.domain.request.aggregate import Request
 from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
@@ -24,9 +21,7 @@ from orb.providers.gcp.types import (
     GCPMutationOutcome,
     GCPProviderData,
 )
-
-if TYPE_CHECKING:
-    from google.cloud.compute_v1.types import InstanceGroupManager, InstanceTemplate
+from google.cloud.compute_v1.types import InstanceGroupManager, InstanceTemplate
 
 
 class GCPManagedInstanceGroupHandler(GCPHandler):
@@ -269,6 +264,7 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
                 template=template,
                 machine_type=template.instance_type,
                 zone=str(template.zones[0]) if template.zones else None,
+                disk_type_payload_context="instance_template",
             )
         )
         return compute_v1.InstanceTemplate(properties=properties)

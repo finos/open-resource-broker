@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Literal
 
 from orb.domain.base.ports import LoggingPort
 from orb.domain.request.aggregate import Request
@@ -81,6 +81,7 @@ class GCPHandler(ABC):
         template: GCPTemplate,
         machine_type: str,
         zone: str | None,
+        disk_type_payload_context: Literal["instance", "instance_template"],
     ) -> dict[str, Any]:
         """Return a kwargs dict suitable for both ``Instance`` and ``InstanceProperties``.
 
@@ -96,10 +97,18 @@ class GCPHandler(ABC):
         """
         from google.cloud import compute_v1
 
-        disk_type = template.boot_disk_type or "pd-balanced"
+        disk_type = (
+            str(template.boot_disk_type)
+            if template.boot_disk_type is not None
+            else "pd-balanced"
+        )
         disk_size = template.boot_disk_size_gb or 50
         source_image = self._resolve_source_image(template)
-        normalized_disk_type = normalize_boot_disk_type(disk_type, zone=zone)
+        normalized_disk_type = normalize_boot_disk_type(
+            disk_type,
+            zone=zone,
+            payload_context=disk_type_payload_context,
+        )
 
         payload: dict[str, Any] = {
             "machine_type": machine_type,

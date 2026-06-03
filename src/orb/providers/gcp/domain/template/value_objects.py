@@ -12,6 +12,7 @@ from orb.domain.base.value_objects import ValueObject
 
 _REGION_RE = re.compile(r"^[a-z]+-[a-z0-9]+[0-9]$")
 _ZONE_RE = re.compile(r"^[a-z]+-[a-z0-9]+[0-9]-[a-z]$")
+_RESOURCE_NAME_RE = re.compile(r"^[a-z][a-z0-9-]*[a-z0-9]$")
 
 
 class GCPProviderApi(str, Enum):
@@ -75,6 +76,13 @@ class GCPProjectId(_GCPStringValue):
 
     _pattern = re.compile(r"^[a-z][a-z0-9-]{4,28}[a-z0-9]$")
     _error = "project_id must match the canonical GCP project ID format"
+
+
+class GCPDiskTypeName(_GCPStringValue):
+    """Compute Engine disk type resource name."""
+
+    _pattern = _RESOURCE_NAME_RE
+    _error = "boot_disk_type must be a disk type resource name such as 'pd-balanced'"
 
 
 class GCPProvisioningModel(str, Enum):

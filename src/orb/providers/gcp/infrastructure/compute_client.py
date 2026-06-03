@@ -2,27 +2,26 @@
 
 from __future__ import annotations
 
-# noinspection PyTypeHints
-# PyCharm treats google-cloud-compute generated proto classes as Any in annotations here.
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, Optional
 
+from google.api_core.extended_operation import ExtendedOperation
+from google.cloud.compute_v1 import (
+    Image,
+    ImagesClient,
+    Instance,
+    InstanceGroupManager,
+    InstanceGroupManagersClient,
+    InstanceTemplate,
+    InstanceTemplatesClient,
+    InstancesClient,
+    RegionInstanceGroupManagersClient,
+)
 from orb.domain.base.ports import LoggingPort
 from orb.providers.gcp.configuration.config import GCPProviderConfig
 from orb.providers.gcp.exceptions import GCPDryRunBlockedError
 from orb.providers.gcp.types import GCPInstanceRecord, GCPManagedInstanceRecord
 from orb.infrastructure.mocking.dry_run_context import is_dry_run_active
-
-if TYPE_CHECKING:
-    from google.api_core.extended_operation import ExtendedOperation
-    from google.cloud.compute_v1 import (
-        ImagesClient,
-        InstanceGroupManagersClient,
-        InstanceTemplatesClient,
-        InstancesClient,
-        RegionInstanceGroupManagersClient,
-        Image, Instance, InstanceGroupManager, InstanceTemplate
-    )
 
 
 # Keep the retryable GCP API failures visible at module scope so reviewers can
@@ -57,8 +56,6 @@ class GCPRetryProfile:
     multiplier: float
 
 
-# noinspection PyTypeHints
-# The google-cloud-compute library uses dynamically generated proto classes that are not easily type-annotated.
 class GCPComputeClient:
     """Execute a small subset of Compute Engine operations via google-cloud-compute."""
 
