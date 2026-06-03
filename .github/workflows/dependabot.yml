@@ -20,7 +20,7 @@ jobs:
       default-python-version: ${{ steps.config.outputs.default-python-version }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
 
     - name: Get project configuration
       id: config
@@ -46,7 +46,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
@@ -89,7 +89,7 @@ jobs:
     steps:
       - name: Check if PR is ready for auto-merge
         id: check-automerge
-        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553  # v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9
         with:
           script: |
             const { data: pr } = await github.rest.pulls.get({
@@ -120,7 +120,7 @@ jobs:
 
       - name: Wait for checks to complete
         if: steps.check-automerge.outputs.result == 'true'
-        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553  # v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9
         with:
           script: |
             const maxWaitTime = 10 * 60 * 1000; // 10 minutes
@@ -166,7 +166,7 @@ jobs:
 
       - name: Auto-merge PR
         if: steps.check-automerge.outputs.result == 'true'
-        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553  # v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9
         with:
           script: |
             await github.rest.pulls.merge({
@@ -189,7 +189,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
 
       - name: Setup Python and UV
         uses: ./.github/actions/setup-uv-cached

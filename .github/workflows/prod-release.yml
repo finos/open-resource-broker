@@ -33,7 +33,7 @@ jobs:
       pypi-name: ${{ steps.config.outputs.pypi-name }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
 
     - name: Get project configuration
       id: config
@@ -58,7 +58,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5  # v4
@@ -111,7 +111,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
 
     - name: Log in to Container Registry
       uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee  # v4
@@ -165,7 +165,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
 
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
@@ -196,7 +196,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
 
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
@@ -227,7 +227,7 @@ jobs:
 
     steps:
     - name: Delete untagged container images
-      uses: actions/delete-package-versions@25ad4af5be03aef10e0b3376b248688b7a44c40b  # v5
+      uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55  # v5
       with:
         package-name: ${{ github.event.repository.name }}
         package-type: container
@@ -243,7 +243,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
 
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
