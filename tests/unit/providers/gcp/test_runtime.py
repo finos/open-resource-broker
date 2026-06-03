@@ -1050,6 +1050,103 @@ async def test_strategy_terminate_single_vm_derives_zone_from_instance_resource_
 
 
 @pytest.mark.asyncio
+async def test_strategy_terminate_mig_uses_resource_mapping() -> None:
+    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    assert strategy.initialize() is True
+
+    handler = MagicMock()
+    handler.terminate_hosts.return_value = GCPMutationOutcome(
+        attempted_ids=["vm-a"],
+        operations=[{"operation_name": "delete-instances-mig-a", "mig_name": "mig-a"}],
+        warning="Delete operation submitted to GCP; completion must be confirmed by later polling.",
+    )
+    strategy._handler_factory = SimpleNamespace(create_handler=lambda _api: handler)
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={
+                "provider_api": "MIG",
+                "instance_ids": ["vm-a"],
+                "resource_mapping": {"vm-a": ("mig-a", 1)},
+                "request_metadata": {"region": "us-central1", "scope": "regional"},
+            },
+        )
+    )
+
+    assert result.success is True
+    call = handler.terminate_hosts.call_args.kwargs
+    assert call["resource_ids"] == ["mig-a"]
+    assert call["instance_ids"] == ["vm-a"]
+    assert call["context"]["mig_name"] == "mig-a"
+
+
+@pytest.mark.asyncio
+async def test_strategy_terminate_mig_requires_resource_mapping_for_instance_ids() -> None:
+    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    assert strategy.initialize() is True
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={
+                "provider_api": "MIG",
+                "instance_ids": ["vm-a"],
+                "request_metadata": {"region": "us-central1", "scope": "regional"},
+            },
+        )
+    )
+
+    assert result.success is False
+    assert result.error_code == "GCPValidationError"
+    assert "resource_mapping or resource_ids" in result.error_message
+
+
+@pytest.mark.asyncio
+async def test_strategy_terminate_mig_rejects_incomplete_resource_mapping() -> None:
+    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    assert strategy.initialize() is True
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={
+                "provider_api": "MIG",
+                "instance_ids": ["vm-a", "vm-b"],
+                "resource_mapping": {"vm-a": ("mig-a", 1)},
+                "request_metadata": {"region": "us-central1", "scope": "regional"},
+            },
+        )
+    )
+
+    assert result.success is False
+    assert result.error_code == "GCPValidationError"
+    assert "resource_mapping is missing instance 'vm-b'" in result.error_message
+
+
+@pytest.mark.asyncio
+async def test_strategy_terminate_mig_rejects_empty_resource_mapping_resource_id() -> None:
+    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    assert strategy.initialize() is True
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={
+                "provider_api": "MIG",
+                "instance_ids": ["vm-a"],
+                "resource_mapping": {"vm-a": ("", 1)},
+                "request_metadata": {"region": "us-central1", "scope": "regional"},
+            },
+        )
+    )
+
+    assert result.success is False
+    assert result.error_code == "GCPValidationError"
+    assert "Invalid GCP mutation operation parameters" in result.error_message
+
+
+@pytest.mark.asyncio
 async def test_strategy_terminate_instances_dry_run_short_circuits_handler_calls() -> None:
     strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
     assert strategy.initialize() is True

@@ -14,6 +14,7 @@ from orb.providers.gcp.domain.template.value_objects import GCPProviderApi
 from orb.providers.gcp.exceptions import GCPValidationError
 from orb.providers.gcp.infrastructure.gcp_handler_factory import GCPHandlerFactory
 from orb.providers.gcp.infrastructure.handlers.base_handler import GCPHandler
+from orb.providers.gcp.services.operation_parameters import GCPMutationParameters
 from orb.providers.gcp.types import (
     GCPCreateOperationContext,
     GCPHandlerContext,
@@ -74,13 +75,23 @@ class GCPOperationContextService:
 
     def build_mutation_context(self, operation: ProviderOperation) -> GCPMutationOperationContext:
         """Resolve a mutation/read operation into a typed handler dispatch context."""
-        instance_ids = list(operation.parameters.get("instance_ids", []) or [])
-        resource_ids = list(operation.parameters.get("resource_ids", []) or [])
+        params = GCPMutationParameters.from_operation(operation)
+        provider_api = params.provider_api_name
+        handler_context = self._build_handler_context(params)
+        resource_ids = params.resource_ids
+        if provider_api == GCPProviderApi.MIG.value:
+            resource_ids = self._resolve_mig_resource_ids(
+                params=params,
+                resource_ids=resource_ids,
+                handler_context=handler_context,
+            )
+            if len(resource_ids) == 1:
+                handler_context.setdefault("mig_name", resource_ids[0])
         return GCPMutationOperationContext(
-            handler=self._get_handler_for_operation(operation),
-            instance_ids=instance_ids,
+            handler=self._get_handler_for_operation(params),
+            instance_ids=params.instance_ids,
             resource_ids=resource_ids,
-            handler_context=self._build_handler_context(operation),
+            handler_context=handler_context,
         )
 
     def _build_gcp_template_config(
@@ -128,80 +139,107 @@ class GCPOperationContextService:
         merged.setdefault("max_instances", count)
         return merged
 
-    def _get_handler_for_operation(self, operation: ProviderOperation) -> GCPHandler:
-        provider_api = operation.parameters.get("provider_api") or operation.parameters.get(
-            "request_metadata", {}
-        ).get("provider_api")
+    def _get_handler_for_operation(self, params: GCPMutationParameters) -> GCPHandler:
+        provider_api = params.provider_api_name
         if provider_api is None:
             provider_api = GCPProviderApi.SINGLE_VM.value
         return self._handler_factory.create_handler(provider_api)
 
-    def _build_handler_context(self, operation: ProviderOperation) -> GCPHandlerContext:
-        metadata = operation.parameters.get("request_metadata", {}) or {}
-        if not isinstance(metadata, dict):
-            raise GCPValidationError("request_metadata must be a mapping when provided")
-
+    def _build_handler_context(self, params: GCPMutationParameters) -> GCPHandlerContext:
+        """Build the provider-owned handler context from validated operation parameters."""
         context: GCPHandlerContext = {}
+        provider_api = params.provider_api_name
+        metadata = params.request_metadata
 
-        for key in (
-            "project_id",
-            "region",
-            "zone",
-            "scope",
-            "mig_name",
-            "instance_template_name",
-            "provider_api",
-        ):
-            value = self._validate_optional_string(
-                metadata.get(key),
-                field_name=f"request_metadata.{key}",
-            )
-            if value is not None:
-                context[key] = value
-
+        if metadata.project_id is not None:
+            context["project_id"] = metadata.project_id
+        if metadata.region is not None:
+            context["region"] = metadata.region
+        if metadata.zone is not None:
+            context["zone"] = metadata.zone
+        if metadata.scope is not None:
+            context["scope"] = metadata.scope
+        if metadata.mig_name is not None:
+            context["mig_name"] = metadata.mig_name
+        if metadata.instance_template_name is not None:
+            context["instance_template_name"] = metadata.instance_template_name
+        if metadata.provider_api is not None:
+            context["provider_api"] = metadata.provider_api.value
         context.setdefault("project_id", self._config.project_id)
-        region = self._validate_optional_string(
-            operation.parameters.get("region", self._config.region),
-            field_name="region",
-        )
-        if region is not None:
-            context.setdefault("region", region)
 
-        zone = operation.parameters.get("zone")
+        context.setdefault("region", params.region or self._config.region)
+
+        zone = params.zone
         if zone is None:
-            resource_id = self._validate_optional_string(
-                operation.parameters.get("resource_id"),
-                field_name="resource_id",
-            )
-            if resource_id is not None:
-                zone = self._zone_from_instance_resource_id(resource_id)
+            zone = self._zone_from_instance_resource_id(params.resource_id)
         if zone is None:
-            zones = operation.parameters.get("zones") or self._config.zones
-            zone = self._first_zone(zones)
-        zone = self._validate_optional_string(zone, field_name="zone")
+            zone = self._first_zone(params.zones or self._config.zones)
         if zone is not None:
             context.setdefault("zone", zone)
 
-        resource_ids = operation.parameters.get("resource_ids", []) or []
+        resource_ids = params.resource_ids
         if len(resource_ids) == 1:
-            resource_id = self._validate_optional_string(
-                resource_ids[0],
-                field_name="resource_ids[0]",
-            )
-            if resource_id is not None:
-                context.setdefault("mig_name", resource_id)
+            context.setdefault("mig_name", resource_ids[0])
 
-        provider_api = self._validate_optional_string(
-            operation.parameters.get("provider_api"),
-            field_name="provider_api",
-        )
         if provider_api is not None:
             context.setdefault("provider_api", provider_api)
         return context
 
+    def _resolve_mig_resource_ids(
+        self,
+        *,
+        params: GCPMutationParameters,
+        resource_ids: list[str],
+        handler_context: GCPHandlerContext,
+    ) -> list[str]:
+        """Return explicit MIG resource IDs for a mutation/read operation."""
+        if resource_ids:
+            return resource_ids
+
+        mapped_resource_ids = self._resource_ids_from_mapping(
+            instance_ids=params.instance_ids,
+            resource_mapping=params.resource_mapping,
+        )
+        if mapped_resource_ids:
+            return mapped_resource_ids
+
+        mig_name = handler_context.get("mig_name")
+        if mig_name:
+            return [mig_name]
+
+        if params.instance_ids:
+            raise GCPValidationError(
+                "MIG operations with instance_ids require resource_mapping or resource_ids"
+            )
+        return []
+
+    def _resource_ids_from_mapping(
+        self,
+        *,
+        instance_ids: list[str],
+        resource_mapping: dict[str, tuple[str, int]],
+    ) -> list[str]:
+        """Read MIG resource ownership from the operation resource mapping."""
+        if not resource_mapping:
+            return []
+
+        resource_ids: list[str] = []
+        for instance_id in instance_ids:
+            mapping_value = resource_mapping.get(instance_id)
+            if mapping_value is None:
+                raise GCPValidationError(
+                    f"resource_mapping is missing instance '{instance_id}'"
+                )
+            resource_id = mapping_value[0]
+            if resource_id not in resource_ids:
+                resource_ids.append(resource_id)
+        return resource_ids
+
     @staticmethod
-    def _zone_from_instance_resource_id(resource_id: str) -> str | None:
+    def _zone_from_instance_resource_id(resource_id: str | None) -> str | None:
         """Extract the zone from a Compute Engine instance self-link or relative path."""
+        if resource_id in (None, ""):
+            return None
         parts = resource_id.split("/")
         try:
             zone_index = parts.index("zones") + 1
@@ -212,19 +250,6 @@ class GCPOperationContextService:
         return parts[zone_index] or None
 
     @staticmethod
-    def _validate_optional_string(value: object, *, field_name: str) -> str | None:
-        """Return a string value or raise when the provided value has the wrong type."""
-        if value in (None, ""):
-            return None
-        if not isinstance(value, str):
-            raise GCPValidationError(f"{field_name} must be a string")
-        return value
-
-    @staticmethod
-    def _first_zone(zones: object) -> object:
+    def _first_zone(zones: list[str]) -> str | None:
         """Return the first zone candidate from a zones collection, if any."""
-        if not zones:
-            return None
-        if not isinstance(zones, (list, tuple)):
-            raise GCPValidationError("zones must be a list or tuple when provided")
         return zones[0] if zones else None
