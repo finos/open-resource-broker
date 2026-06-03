@@ -198,7 +198,11 @@ oci os ns get
 }
 ```
 
-Reference example: `config/oci_config.example.json`.
+Example configs:
+
+- `config/oci_config.local.example.json` (local workstation with OCI CLI profile)
+- `config/oci_config.remote.example.json` (OCI compute host with instance principal)
+- `config/oci_config.example.json` (default remote/instance principal baseline)
 
 </details>
 
