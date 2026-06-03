@@ -33,6 +33,7 @@ from orb.providers.gcp.types import (
     GCPCreateOutcome,
     GCPFailedOperation,
     GCPInstanceRecord,
+    GCPMutationOutcome,
 )
 
 
@@ -48,6 +49,7 @@ class _ComputeClientStub:
         self.fail_start_instance_for: set[str] = set()
         self.fail_stop_instance_for: set[str] = set()
         self.fail_delete_instance_for: set[str] = set()
+        self.fail_get_instance_for: set[str] = set()
         self.fail_create_regional_mig = False
         self.template_operation_result_called = False
         self.deleted_templates: list[str] = []
@@ -140,6 +142,8 @@ class _ComputeClientStub:
 
     def get_instance(self, *, zone: str, instance_name: str) -> GCPInstanceRecord:
         _ = zone
+        if instance_name in self.fail_get_instance_for:
+            raise google_exceptions.NotFound("instance was not found")
         return self.instances[instance_name]
 
 
@@ -248,6 +252,23 @@ def test_single_vm_handler_status_normalizes_compute_instance_record() -> None:
             },
         }
     ]
+
+def test_single_vm_handler_status_omits_missing_instances() -> None:
+    compute_client = _ComputeClientStub()
+    compute_client.fail_get_instance_for = {"vm-deleted"}
+    handler = GCPSingleVMHandler(
+        compute_client=compute_client,
+        config=_config(),
+        logger=MagicMock(),
+    )
+
+    result = handler.check_hosts_status(
+        resource_ids=["vm-deleted"],
+        instance_ids=[],
+        context={"zone": "us-central1-a"},
+    )
+
+    assert result == []
 
 
 def test_single_vm_handler_acquire_hosts_tracks_partial_failures() -> None:
@@ -962,6 +983,41 @@ async def test_strategy_terminate_instances_supports_multiple_mig_resource_ids()
     assert result.data["results"] == {"mig-a": False, "mig-b": False}
     assert "completion must be confirmed" in result.data["warning"]
     assert "completion must be confirmed" in result.metadata["provider_data"]["warning"]
+
+
+@pytest.mark.asyncio
+async def test_strategy_terminate_single_vm_derives_zone_from_instance_resource_id() -> None:
+    strategy = GCPProviderStrategy(
+        config=_config(zones=["us-east1-b"]),
+        logger=MagicMock(),
+        provider_name="gcp-default",
+    )
+    assert strategy.initialize() is True
+
+    handler = MagicMock()
+    handler.terminate_hosts.return_value = GCPMutationOutcome(
+        attempted_ids=["gcp-gcp-single-12345678"],
+        successful_ids=["gcp-gcp-single-12345678"],
+    )
+    strategy._handler_factory = SimpleNamespace(create_handler=lambda _api: handler)
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={
+                "provider_api": "SingleVM",
+                "instance_ids": ["gcp-gcp-single-12345678"],
+                "resource_id": (
+                    "projects/orb-example-12345/zones/us-central1-a/"
+                    "instances/gcp-gcp-single-12345678"
+                ),
+            },
+        )
+    )
+
+    assert result.success is True
+    call = handler.terminate_hosts.call_args.kwargs
+    assert call["context"]["zone"] == "us-central1-a"
 
 
 @pytest.mark.asyncio

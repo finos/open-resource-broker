@@ -127,7 +127,15 @@ class GCPSingleVMHandler(GCPHandler):
         target_ids = instance_ids or resource_ids
         results: list[GCPInstanceStatus] = []
         for instance_name in target_ids:
-            instance = self._compute_client.get_instance(zone=zone, instance_name=instance_name)
+            try:
+                instance = self._compute_client.get_instance(zone=zone, instance_name=instance_name)
+            except _not_found_gcp_operation_exceptions():
+                self._logger.info(
+                    "GCP instance %s not found in %s during status check",
+                    instance_name,
+                    zone,
+                )
+                continue
             results.append(_build_gcp_status_result(instance, instance_name, zone))
         return results
 
@@ -250,6 +258,14 @@ def _recoverable_gcp_operation_exceptions() -> tuple[type[Exception], ...]:
     exceptions: tuple[type[Exception], ...] = (GCPError, RuntimeError)
     if google_exceptions is not None:
         exceptions = exceptions + (google_exceptions.GoogleAPICallError,)
+    return exceptions
+
+
+def _not_found_gcp_operation_exceptions() -> tuple[type[Exception], ...]:
+    """Return exception types that mean an instance is absent from GCP."""
+    exceptions: tuple[type[Exception], ...] = ()
+    if google_exceptions is not None:
+        exceptions = exceptions + (google_exceptions.NotFound,)
     return exceptions
 
 

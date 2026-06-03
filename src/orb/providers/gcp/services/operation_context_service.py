@@ -169,6 +169,13 @@ class GCPOperationContextService:
 
         zone = operation.parameters.get("zone")
         if zone is None:
+            resource_id = self._validate_optional_string(
+                operation.parameters.get("resource_id"),
+                field_name="resource_id",
+            )
+            if resource_id is not None:
+                zone = self._zone_from_instance_resource_id(resource_id)
+        if zone is None:
             zones = operation.parameters.get("zones") or self._config.zones
             zone = self._first_zone(zones)
         zone = self._validate_optional_string(zone, field_name="zone")
@@ -191,6 +198,18 @@ class GCPOperationContextService:
         if provider_api is not None:
             context.setdefault("provider_api", provider_api)
         return context
+
+    @staticmethod
+    def _zone_from_instance_resource_id(resource_id: str) -> str | None:
+        """Extract the zone from a Compute Engine instance self-link or relative path."""
+        parts = resource_id.split("/")
+        try:
+            zone_index = parts.index("zones") + 1
+        except ValueError:
+            return None
+        if zone_index >= len(parts):
+            return None
+        return parts[zone_index] or None
 
     @staticmethod
     def _validate_optional_string(value: object, *, field_name: str) -> str | None:
