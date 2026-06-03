@@ -47,8 +47,6 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  #
         await super().validate_command(command)
         if not command.template_id:
             raise ValueError("template_id is required")
-        if not command.provider_api:
-            raise ValueError("provider_api is required")
         if not command.image_id:
             raise ValueError("image_id is required")
 
@@ -60,9 +58,9 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  #
         validation_errors = self._template_port.validate_template_config(
             {
                 "template_id": command.template_id,
-                "provider_api": command.provider_api,
                 "image_id": command.image_id,
                 **command.configuration,
+                **({"provider_api": command.provider_api} if command.provider_api else {}),
             }
         )
         if validation_errors:
@@ -91,10 +89,28 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  #
             "template_id": command.template_id,
             "name": command.name or command.template_id,
             "description": command.description,
-            "provider_api": command.provider_api,
             "image_id": command.image_id,
             "tags": command.tags,
         }
+        if command.provider_api:
+            dto_fields["provider_api"] = command.provider_api
+        provider_api_name = str(dto_fields.get("provider_api") or "").lower()
+        if provider_api_name.startswith("oci"):
+            metadata = dict(dto_fields.get("metadata") or {})
+            for key in (
+                "compartment_id",
+                "availability_domain",
+                "ssh_authorized_keys",
+                "shape",
+                "instance_type",
+            ):
+                value = command.configuration.get(key)
+                if value is not None:
+                    metadata.setdefault(key, value)
+            if command.instance_type and "shape" not in metadata:
+                metadata["shape"] = command.instance_type
+            if metadata:
+                dto_fields["metadata"] = metadata
         # instance_type → machine_types (backward compat)
         if command.instance_type is not None and "machine_types" not in dto_fields:
             dto_fields["machine_types"] = {command.instance_type: 1}
@@ -171,6 +187,23 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, None]):  #
         # instance_type → machine_types (backward compat)
         if command.instance_type is not None and "machine_types" not in update_fields:
             update_fields["machine_types"] = {command.instance_type: 1}
+        existing_provider_api = str(getattr(existing, "provider_api", "") or "").lower()
+        if existing_provider_api.startswith("oci"):
+            metadata = dict(getattr(existing, "metadata", {}) or {})
+            for key in (
+                "compartment_id",
+                "availability_domain",
+                "ssh_authorized_keys",
+                "shape",
+                "instance_type",
+            ):
+                value = command.configuration.get(key)
+                if value is not None:
+                    metadata[key] = value
+            if command.instance_type is not None:
+                metadata["shape"] = command.instance_type
+            if metadata:
+                update_fields["metadata"] = metadata
 
         if update_fields:
             updated = existing.model_copy(update=update_fields)

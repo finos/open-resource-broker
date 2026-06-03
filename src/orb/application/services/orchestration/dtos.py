@@ -155,8 +155,9 @@ class GetTemplateOutput:
 @dataclasses.dataclass(frozen=True)
 class CreateTemplateInput:
     template_id: str
-    provider_api: str
     image_id: str
+    provider_api: Optional[str] = None
+    provider_name: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
     instance_type: Optional[str] = None

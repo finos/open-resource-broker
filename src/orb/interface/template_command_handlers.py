@@ -19,6 +19,38 @@ if TYPE_CHECKING:
     import argparse
 
 
+def _extract_template_config_from_payload(
+    payload: Any,
+    selected_template_id: str | None = None,
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Extract a single template config from payload supporting bundle files."""
+    templates: list[dict[str, Any]] = []
+
+    if isinstance(payload, dict) and isinstance(payload.get("templates"), list):
+        templates = [t for t in payload["templates"] if isinstance(t, dict)]
+    elif isinstance(payload, list):
+        templates = [t for t in payload if isinstance(t, dict)]
+    elif isinstance(payload, dict):
+        return payload, None
+    else:
+        return None, "Template file must contain a JSON object or templates array"
+
+    if not templates:
+        return None, "Template bundle has no template objects"
+
+    if selected_template_id:
+        for template in templates:
+            tid = template.get("template_id") or template.get("templateId")
+            if tid == selected_template_id:
+                return template, None
+        return None, f"Template '{selected_template_id}' not found in template bundle"
+
+    if len(templates) > 1:
+        return None, "Template bundle has multiple templates; pass --template-id to select one"
+
+    return templates[0], None
+
+
 @handle_interface_exceptions(context="list_templates", interface_type="cli")
 async def handle_list_templates(
     args: "argparse.Namespace",
@@ -135,7 +167,7 @@ async def handle_create_template(
 
     try:
         with open(args.file) as f:
-            template_config = json.load(f)
+            template_payload = json.load(f)
     except FileNotFoundError:
         return InterfaceResponse(
             data={"success": False, "error": f"Template file not found: {args.file}"}, exit_code=1
@@ -143,6 +175,20 @@ async def handle_create_template(
     except json.JSONDecodeError as e:
         return InterfaceResponse(
             data={"success": False, "error": f"Invalid JSON in template file: {e}"}, exit_code=1
+        )
+
+    selected_template_id = getattr(args, "template_id", None) or getattr(
+        args, "flag_template_id", None
+    )
+    template_config, extract_error = _extract_template_config_from_payload(
+        template_payload, selected_template_id=selected_template_id
+    )
+    if extract_error:
+        return InterfaceResponse(data={"success": False, "error": extract_error}, exit_code=1)
+    if template_config is None:
+        return InterfaceResponse(
+            data={"success": False, "error": "Failed to load template configuration"},
+            exit_code=1,
         )
 
     template_id = template_config.get("template_id") or template_config.get("templateId")
@@ -153,11 +199,7 @@ async def handle_create_template(
         )
 
     provider_api = template_config.get("provider_api") or template_config.get("providerApi")
-    if not provider_api:
-        return InterfaceResponse(
-            data={"success": False, "error": "provider_api is required in template file"},
-            exit_code=1,
-        )
+    provider_name = template_config.get("provider_name") or template_config.get("providerName")
 
     image_id = template_config.get("image_id") or template_config.get("imageId")
     if not image_id:
@@ -182,6 +224,7 @@ async def handle_create_template(
             CreateTemplateInput(
                 template_id=template_id,
                 provider_api=provider_api,
+                provider_name=provider_name,
                 image_id=image_id,
                 name=template_config.get("name"),
                 description=template_config.get("description"),
@@ -436,14 +479,35 @@ async def handle_validate_template(
         try:
             with open(template_file) as f:
                 if template_file.suffix.lower() in {".yml", ".yaml"}:
-                    template_config = yaml.safe_load(f)
+                    template_payload = yaml.safe_load(f)
                 else:
-                    template_config = json.load(f)
+                    template_payload = json.load(f)
         except Exception as e:
             return InterfaceResponse(
                 data={
                     "success": False,
                     "error": f"Failed to parse template file: {e!s}",
+                    "valid": False,
+                },
+                exit_code=1,
+            )
+
+        selected_template_id = getattr(args, "template_id", None) or getattr(
+            args, "flag_template_id", None
+        )
+        template_config, extract_error = _extract_template_config_from_payload(
+            template_payload, selected_template_id=selected_template_id
+        )
+        if extract_error:
+            return InterfaceResponse(
+                data={"success": False, "error": extract_error, "valid": False},
+                exit_code=1,
+            )
+        if template_config is None:
+            return InterfaceResponse(
+                data={
+                    "success": False,
+                    "error": "Failed to load template configuration",
                     "valid": False,
                 },
                 exit_code=1,

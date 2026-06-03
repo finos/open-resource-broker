@@ -1,0 +1,23 @@
+{
+  "template_id": "oci-canary-template",
+  "provider_name": "oci-default",
+  "provider_api": "OCICompute",
+  "count": 1,
+  "image_id": "ocid1.image.oc1..<replace-image-ocid>",
+  "instance_type": "VM.Standard.E6.Flex",
+  "shape_config": {
+    "ocpus": 1,
+    "memoryInGBs": 16
+  },
+  "subnet_ids": [
+    "ocid1.subnet.oc1..<replace-subnet-ocid>"
+  ],
+  "security_group_ids": [],
+  "compartment_id": "ocid1.compartment.oc1..<replace-compartment-ocid>",
+  "user_data": "IyEvYmluL2Jhc2gKZWNobyAnb2NpLWNhbmFyeScK",
+  "ssh_authorized_keys": "<replace-with-public-key>",
+  "tags": {
+    "env": "dev",
+    "managed_by": "orb"
+  }
+}

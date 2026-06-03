@@ -91,6 +91,83 @@ class TestCreateTemplateOrchestrator:
         assert cmd.image_id == "ami-abc"
 
     @pytest.mark.asyncio
+    async def test_execute_allows_missing_provider_api(self, create_orch, mock_command_bus):
+        async def _set(cmd):
+            cmd.created = True
+            cmd.validation_errors = []
+
+        mock_command_bus.execute.side_effect = _set
+        await create_orch.execute(CreateTemplateInput(template_id="t-1", image_id="ami-abc"))
+        cmd = mock_command_bus.execute.call_args[0][0]
+        assert cmd.provider_api is None
+
+    @pytest.mark.asyncio
+    async def test_execute_resolves_provider_api_from_defaults_service(
+        self, mock_command_bus, mock_query_bus, mock_logger
+    ):
+        mock_defaults = MagicMock()
+        mock_defaults.resolve_provider_api_default.return_value = "OCICompute"
+
+        async def _set(cmd):
+            cmd.created = True
+            cmd.validation_errors = []
+
+        mock_command_bus.execute.side_effect = _set
+        orch = CreateTemplateOrchestrator(
+            command_bus=mock_command_bus,
+            query_bus=mock_query_bus,
+            logger=mock_logger,
+            template_defaults_service=mock_defaults,
+        )
+
+        await orch.execute(
+            CreateTemplateInput(
+                template_id="t-oci",
+                image_id="ocid1.image.oc1..example",
+                provider_name="oci-primary",
+                configuration={"template_id": "t-oci"},
+            )
+        )
+
+        cmd = mock_command_bus.execute.call_args[0][0]
+        assert cmd.provider_api == "OCICompute"
+        mock_defaults.resolve_provider_api_default.assert_called_once_with(
+            {"template_id": "t-oci"},
+            provider_instance_name="oci-primary",
+        )
+
+    @pytest.mark.asyncio
+    async def test_execute_does_not_resolve_defaults_when_provider_api_is_supplied(
+        self, mock_command_bus, mock_query_bus, mock_logger
+    ):
+        mock_defaults = MagicMock()
+
+        async def _set(cmd):
+            cmd.created = True
+            cmd.validation_errors = []
+
+        mock_command_bus.execute.side_effect = _set
+        orch = CreateTemplateOrchestrator(
+            command_bus=mock_command_bus,
+            query_bus=mock_query_bus,
+            logger=mock_logger,
+            template_defaults_service=mock_defaults,
+        )
+
+        await orch.execute(
+            CreateTemplateInput(
+                template_id="t-1",
+                provider_api="EC2Fleet",
+                image_id="ami-abc",
+                provider_name="aws-primary",
+            )
+        )
+
+        cmd = mock_command_bus.execute.call_args[0][0]
+        assert cmd.provider_api == "EC2Fleet"
+        mock_defaults.resolve_provider_api_default.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_execute_returns_create_template_output(self, create_orch, mock_command_bus):
         async def _set(cmd):
             cmd.created = True

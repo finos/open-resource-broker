@@ -1,4 +1,4 @@
-"""Unit tests for template command handlers — TDD for store-unification fix."""
+"""Unit tests for template command handlers - TDD for store-unification fix."""
 
 from unittest.mock import AsyncMock, Mock
 
@@ -194,7 +194,7 @@ async def test_delete_not_found_raises():
 
 
 # ---------------------------------------------------------------------------
-# CreateTemplateHandler — validation errors path
+# CreateTemplateHandler - validation errors path
 # ---------------------------------------------------------------------------
 
 
@@ -217,8 +217,75 @@ async def test_create_validation_errors_sets_created_false() -> None:
     manager.save_template.assert_not_called()
 
 
+@pytest.mark.asyncio
+async def test_create_allows_missing_provider_api() -> None:
+    """Create command can omit provider_api so defaults can be resolved downstream."""
+    manager = _make_manager(existing=None)
+    port = _make_template_port(manager)
+    handler = _make_create_handler(port)
+
+    command = CreateTemplateCommand(
+        template_id="tpl-no-provider",
+        image_id="img-1",
+    )
+    await handler.handle(command)
+
+    port.validate_template_config.assert_called_once()
+    validate_payload = port.validate_template_config.call_args[0][0]
+    assert "provider_api" not in validate_payload
+
+    manager.save_template.assert_called_once()
+    saved: TemplateDTO = manager.save_template.call_args[0][0]
+    assert saved.provider_api is None
+    assert command.created is True
+
+
+@pytest.mark.asyncio
+async def test_create_uses_configuration_provider_api_when_command_provider_missing() -> None:
+    """Configuration provider_api should not be overwritten by an omitted command field."""
+    manager = _make_manager(existing=None)
+    port = _make_template_port(manager)
+    handler = _make_create_handler(port)
+
+    command = CreateTemplateCommand(
+        template_id="tpl-config-provider",
+        image_id="img-1",
+        configuration={"provider_api": "LaunchInstances"},
+    )
+    await handler.handle(command)
+
+    manager.save_template.assert_called_once()
+    saved: TemplateDTO = manager.save_template.call_args[0][0]
+    assert saved.provider_api == "LaunchInstances"
+    assert command.created is True
+
+
+@pytest.mark.asyncio
+async def test_create_oci_persists_launch_fields_in_metadata() -> None:
+    manager = _make_manager(existing=None)
+    port = _make_template_port(manager)
+    handler = _make_create_handler(port)
+
+    command = CreateTemplateCommand(
+        template_id="tpl-oci",
+        provider_api="OCICompute",
+        image_id="ocid1.image.oc1..img",
+        instance_type="VM.Standard.E6.Flex",
+        configuration={
+            "compartment_id": "ocid1.compartment.oc1..compartment",
+            "ssh_authorized_keys": "ssh-rsa AAAA test",
+        },
+    )
+    await handler.handle(command)
+
+    saved: TemplateDTO = manager.save_template.call_args[0][0]
+    assert saved.metadata["compartment_id"] == "ocid1.compartment.oc1..compartment"
+    assert saved.metadata["shape"] == "VM.Standard.E6.Flex"
+    assert saved.metadata["ssh_authorized_keys"] == "ssh-rsa AAAA test"
+
+
 # ---------------------------------------------------------------------------
-# UpdateTemplateHandler — validation errors path
+# UpdateTemplateHandler - validation errors path
 # ---------------------------------------------------------------------------
 
 
@@ -238,3 +305,23 @@ async def test_update_validation_errors_sets_updated_false() -> None:
     assert command.updated is False
     assert command.validation_errors == ["invalid field"]
     manager.save_template.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_update_oci_persists_launch_fields_in_metadata() -> None:
+    existing = _make_dto(provider_api="OCICompute")
+    existing = existing.model_copy(update={"metadata": {"compartment_id": "old"}})
+    manager = _make_manager(existing=existing)
+    port = _make_template_port(manager)
+    handler = _make_update_handler(port)
+
+    command = UpdateTemplateCommand(
+        template_id="tpl-1",
+        instance_type="VM.Standard.E6.Flex",
+        configuration={"compartment_id": "ocid1.compartment.oc1..new"},
+    )
+    await handler.handle(command)
+
+    saved: TemplateDTO = manager.save_template.call_args[0][0]
+    assert saved.metadata["compartment_id"] == "ocid1.compartment.oc1..new"
+    assert saved.metadata["shape"] == "VM.Standard.E6.Flex"

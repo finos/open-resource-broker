@@ -122,6 +122,39 @@ def test_providers_exec_accepts_args_flag():
     assert ns.params == '{"key": "val"}'
 
 
+def test_providers_add_accepts_oci_flags():
+    sp_tuple = _make_subparsers()
+    _, sp = sp_tuple
+    add_provider_actions(sp)
+    ns = _parse(
+        sp_tuple,
+        [
+            "add",
+            "--provider-type",
+            "oci",
+            "--oci-profile",
+            "DEFAULT",
+            "--oci-region",
+            "us-phoenix-1",
+        ],
+    )
+    assert ns.provider_type == "oci"
+    assert ns.oci_profile == "DEFAULT"
+    assert ns.oci_region == "us-phoenix-1"
+
+
+def test_providers_update_accepts_oci_flags():
+    sp_tuple = _make_subparsers()
+    _, sp = sp_tuple
+    add_provider_actions(sp)
+    ns = _parse(
+        sp_tuple,
+        ["update", "oci-default", "--oci-region", "us-ashburn-1"],
+    )
+    assert ns.provider_name == "oci-default"
+    assert ns.oci_region == "us-ashburn-1"
+
+
 # ---------------------------------------------------------------------------
 # Task 2045 — requests list --offset forwarded to orchestrator
 # ---------------------------------------------------------------------------
@@ -230,6 +263,14 @@ def test_templates_validate_accepts_template_id_flag():
     ns = _parse(sp_tuple, ["validate", "--template-id", "tmpl-1"])
     tid = getattr(ns, "template_id", None) or getattr(ns, "flag_template_id", None)
     assert tid is not None
+
+
+def test_templates_create_accepts_template_id_flag():
+    sp_tuple = _make_subparsers()
+    _, sp = sp_tuple
+    add_template_actions(sp)
+    ns = _parse(sp_tuple, ["create", "--file", "template.json", "--template-id", "tmpl-1"])
+    assert getattr(ns, "flag_template_id", None) == "tmpl-1"
 
 
 # ---------------------------------------------------------------------------
