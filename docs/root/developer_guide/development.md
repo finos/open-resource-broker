@@ -15,7 +15,7 @@ This guide covers setting up a development environment, understanding the codeba
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/awslabs/open-resource-broker.git
+   git clone https://github.com/finos/open-resource-broker.git
    cd open-resource-broker
    ```
 

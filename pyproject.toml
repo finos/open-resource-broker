@@ -9,10 +9,10 @@ description = "Open Resource Broker (ORB) — dynamic cloud resource provisionin
 readme = "README.md"
 license = "Apache-2.0"
 authors = [
-    {name = "AWS ORB Maintainers", email = "aws-orb-maintainers@amazon.com"},
+    {name = "Open Resource Broker Maintainers", email = "open-resource-broker-maintainers@lists.finos.org"},
 ]
 maintainers = [
-    {name = "AWS ORB Maintainers", email = "aws-orb-maintainers@amazon.com"},
+    {name = "Open Resource Broker Maintainers", email = "open-resource-broker-maintainers@lists.finos.org"},
 ]
 keywords = [
     "aws",
@@ -265,10 +265,10 @@ dev = [
 orb = "orb.run:cli_main"
 
 [project.urls]
-Homepage = "https://github.com/awslabs/open-resource-broker"
-Documentation = "https://awslabs.github.io/open-resource-broker/"
-Repository = "https://github.com/awslabs/open-resource-broker"
-"Bug Reports" = "https://github.com/awslabs/open-resource-broker/issues"
+Homepage = "https://github.com/finos/open-resource-broker"
+Documentation = "https://finos.github.io/open-resource-broker/"
+Repository = "https://github.com/finos/open-resource-broker"
+"Bug Reports" = "https://github.com/finos/open-resource-broker/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

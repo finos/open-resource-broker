@@ -40,7 +40,7 @@ def _get_from_package_metadata() -> Optional[dict]:
                 "license": meta.get("License") or "",
             },
             "repository": {
-                "org": "awslabs",  # Not in package metadata
+                "org": "finos",  # Not in package metadata
                 "name": "open-resource-broker",  # Not in package metadata
                 "registry": "ghcr.io",  # Not in package metadata
             },
@@ -65,12 +65,12 @@ if not config:
             # CI builds will override this with dynamic versions like "0.1.0.dev20250822145030+abc1234"
             "version": "0.1.0.dev0",
             "description": "Open Resource Broker (ORB) — dynamic cloud resource provisioning via CLI and REST API",
-            "author": "AWS ORB Maintainers",
-            "email": "aws-orb-maintainers@amazon.com",
+            "author": "Open Resource Broker Maintainers",
+            "email": "open-resource-broker-maintainers@lists.finos.org",
             "license": "Apache-2.0",
         },
         "repository": {
-            "org": "awslabs",
+            "org": "finos",
             "name": "open-resource-broker",
             "registry": "ghcr.io",
         },

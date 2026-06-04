@@ -28,7 +28,7 @@ export HF_TOP=$EGO_TOP/hostfactory
 # Clone the repository under the plugin directory
 cd ${HF_TOP}/1.2/providerplugins
 mkdir -p orb
-git clone https://github.com/awslabs/open-resource-broker.git ./orb
+git clone https://github.com/finos/open-resource-broker.git ./orb
 cd orb
 
 # Create a venv and install in editable mode

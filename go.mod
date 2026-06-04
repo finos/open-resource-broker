@@ -1,3 +1,3 @@
-module github.com/awslabs/open-resource-broker
+module github.com/finos/open-resource-broker
 
 go 1.24

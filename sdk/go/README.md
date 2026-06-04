@@ -1,6 +1,6 @@
 # orb-go
 
-Go client SDK for the [Open Resource Broker](https://github.com/awslabs/open-resource-broker) (ORB) — a Python service for provisioning cloud compute resources.
+Go client SDK for the [Open Resource Broker](https://github.com/finos/open-resource-broker) (ORB) — a Python service for provisioning cloud compute resources.
 
 ## Prerequisites
 
@@ -8,10 +8,10 @@ ORB is a Python service. Install it before using managed-process mode:
 
 ```bash
 # Recommended: uv tool install (permanent, single binary in PATH)
-uv tool install 'orb-py>=1.5.2,<2.0.0'
+uv tool install 'orb-py>=1.6.2,<2.0.0'
 
 # Or with pip
-pip install 'orb-py>=1.5.2,<2.0.0'
+pip install 'orb-py>=1.6.2,<2.0.0'
 ```
 
 Verify: `orb --version`
@@ -27,7 +27,7 @@ This creates `~/.config/orb/config.json` with your AWS credentials and infrastru
 ## Installation
 
 ```bash
-go get github.com/awslabs/open-resource-broker/sdk/go@v1.5.2
+go get github.com/finos/open-resource-broker/sdk/go@v1.6.2
 ```
 
 ## IPC Model
@@ -49,7 +49,7 @@ The SDK polls `/health` on the socket until ORB reports healthy (up to `StartTim
 The Go SDK starts ORB automatically via Unix domain socket. No port management, no separate process to run.
 
 ```go
-import "github.com/awslabs/open-resource-broker/sdk/go/orb"
+import "github.com/finos/open-resource-broker/sdk/go/orb"
 
 c, err := orb.NewClient(
     orb.WithManagedProcess(orb.ProcessConfig{
@@ -199,7 +199,7 @@ go run ./examples/scheduler/ --template <id>
 Use `mock.NewServer()` — no real ORB process needed:
 
 ```go
-import "github.com/awslabs/open-resource-broker/sdk/go/mock"
+import "github.com/finos/open-resource-broker/sdk/go/mock"
 
 srv := mock.NewServer()
 defer srv.Close()
@@ -237,7 +237,7 @@ The `WithScheduler` option must match the `--scheduler` flag the ORB server was 
 
 See [COMPATIBILITY.md](COMPATIBILITY.md).
 
-| orb-go | Requires orb-py |
+| Go SDK | Requires Python service |
 |---|---|
-| v1.5.2 | >= 1.5.2 |
+| v1.6.2 | >= 1.6.2 |
 | v2.x | >= 2.0.0 |

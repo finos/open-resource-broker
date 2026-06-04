@@ -54,12 +54,12 @@ git push origin main
 
 ### Development Artifacts (Every Push)
 - **PyPI**: `test.pypi.org/project/orb-py`
-- **Containers**: `ghcr.io/awslabs/open-resource-broker:main`
+- **Containers**: `ghcr.io/finos/open-resource-broker:main`
 - **Documentation**: GitHub Pages (development)
 
 ### Production Artifacts (On Release)
 - **PyPI**: `pypi.org/project/orb-py`
-- **Containers**: `ghcr.io/awslabs/open-resource-broker:latest`
+- **Containers**: `ghcr.io/finos/open-resource-broker:latest`
 - **Documentation**: GitHub Pages (production)
 - **Assets**: GitHub Releases (wheel, source, SBOM)
 

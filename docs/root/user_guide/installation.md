@@ -47,7 +47,7 @@ orb --version
 ## Development Install
 
 ```bash
-git clone https://github.com/awslabs/open-resource-broker.git
+git clone https://github.com/finos/open-resource-broker.git
 cd open-resource-broker
 
 python -m venv .venv

@@ -3,7 +3,7 @@
 //
 // Prerequisites:
 //
-//	pip install 'orb-py>=1.5.2,<2.0.0'
+//	pip install 'orb-py>=1.6.2,<2.0.0'
 //	orb init
 //
 // Usage:
@@ -22,7 +22,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/awslabs/open-resource-broker/sdk/go/orb"
+	"github.com/finos/open-resource-broker/sdk/go/orb"
 )
 
 func main() {

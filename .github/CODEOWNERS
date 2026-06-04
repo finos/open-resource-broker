@@ -2,25 +2,25 @@
 # These users will be automatically requested for review when PRs are opened
 
 # Default owners for everything in the repo
-* @awslabs/orb-maintainers
+* @finos/open-resource-broker-maintainers
 
 # Specific ownership for critical files
-/.github/ @awslabs/orb-maintainers
-/pyproject.toml @awslabs/orb-maintainers
-/Dockerfile @awslabs/orb-maintainers
-/src/_version.py @awslabs/orb-maintainers
-/src/_package.py @awslabs/orb-maintainers
+/.github/ @finos/open-resource-broker-maintainers
+/pyproject.toml @finos/open-resource-broker-maintainers
+/Dockerfile @finos/open-resource-broker-maintainers
+/src/_version.py @finos/open-resource-broker-maintainers
+/src/_package.py @finos/open-resource-broker-maintainers
 
 # Documentation
-/docs/ @awslabs/orb-maintainers
-/README.md @awslabs/orb-maintainers
+/docs/ @finos/open-resource-broker-maintainers
+/README.md @finos/open-resource-broker-maintainers
 
 # Security and CI/CD
-/.github/workflows/ @awslabs/orb-maintainers
-/.github/dependabot.yml @awslabs/orb-maintainers
-/dev-tools/security/ @awslabs/orb-maintainers
+/.github/workflows/ @finos/open-resource-broker-maintainers
+/.github/dependabot.yml @finos/open-resource-broker-maintainers
+/dev-tools/security/ @finos/open-resource-broker-maintainers
 
 # Container and deployment
-/Dockerfile @awslabs/orb-maintainers
-/deployment/ @awslabs/orb-maintainers
-/dev-tools/container/container_build.sh @awslabs/orb-maintainers
+/Dockerfile @finos/open-resource-broker-maintainers
+/deployment/ @finos/open-resource-broker-maintainers
+/dev-tools/container/container_build.sh @finos/open-resource-broker-maintainers

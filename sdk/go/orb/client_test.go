@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/awslabs/open-resource-broker/sdk/go/orb"
+	"github.com/finos/open-resource-broker/sdk/go/orb"
 )
 
 func TestListTemplatesEmpty(t *testing.T) {
