@@ -6,7 +6,7 @@ Get up and running with the Open Resource Broker in minutes.
 
 - Python 3.10 or higher
 - AWS credentials configured (`~/.aws/credentials` or an IAM instance profile)
-- IAM permissions for EC2, EC2Fleet, SpotFleet, and Auto Scaling — see the [README](https://github.com/awslabs/open-resource-broker#required-iam-permissions) for the full policy
+- IAM permissions for EC2, EC2Fleet, SpotFleet, and Auto Scaling — see the [README](https://github.com/finos/open-resource-broker#required-iam-permissions) for the full policy
 
 ## Installation
 

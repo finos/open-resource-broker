@@ -3,7 +3,7 @@
 //
 // Prerequisites:
 //
-//	pip install 'orb-py>=1.5.2,<2.0.0'   # or: uv tool install orb-py
+//	pip install 'orb-py>=1.6.2,<2.0.0'   # or: uv tool install orb-py
 //	orb init                               # one-time setup
 //
 // Usage:
@@ -18,7 +18,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/awslabs/open-resource-broker/sdk/go/orb"
+	"github.com/finos/open-resource-broker/sdk/go/orb"
 )
 
 func main() {

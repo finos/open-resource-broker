@@ -68,15 +68,15 @@ build-backend = "setuptools.build_meta"
 name = "open-resource-broker"
 version = "$VERSION"
 description = "Cloud provider integration plugin for IBM Spectrum Symphony Host Factory"
-authors = [{name = "AWS Professional Services", email = "aws-proserve@amazon.com"}]
+authors = [{name = "Open Resource Broker Maintainers", email = "open-resource-broker-maintainers@lists.finos.org"}]
 license = {text = "Apache-2.0"}
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/awslabs/open-resource-broker"
-Repository = "https://github.com/awslabs/open-resource-broker"
+Homepage = "https://github.com/finos/open-resource-broker"
+Repository = "https://github.com/finos/open-resource-broker"
 
 [tool.setuptools.packages.find]
 where = ["."]

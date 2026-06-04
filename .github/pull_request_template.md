@@ -71,4 +71,4 @@ Fixes #
 
 ## Reviewers
 <!-- @ mention specific team members who should review this -->
-@awslabs/orb-maintainers
+@finos/open-resource-broker-maintainers

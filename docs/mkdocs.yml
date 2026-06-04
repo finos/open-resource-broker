@@ -1,7 +1,7 @@
 site_name: Open Resource Broker
 site_description: Unified API for orchestrating and provisioning compute capacity
-site_url: https://awslabs.github.io/open-resource-broker
-repo_url: https://github.com/awslabs/open-resource-broker
+site_url: https://finos.github.io/open-resource-broker
+repo_url: https://github.com/finos/open-resource-broker
 repo_name: open-resource-broker
 
 # Appropriate docs structure: mkdocs.yml in docs/, markdown files in docs/root/

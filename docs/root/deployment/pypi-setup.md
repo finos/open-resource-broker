@@ -13,10 +13,10 @@ Trusted Publishing uses OpenID Connect (OIDC) to authenticate with PyPI without 
 1. Go to [PyPI Publishing Settings](https://pypi.org/manage/account/publishing/)
 2. Click "Add a new pending publisher"
 3. Fill in the details:
-   - **PyPI Project Name:** `open-resource-broker`
-   - **Owner:** `awslabs` (your GitHub organization/username)
+   - **PyPI Project Name:** `orb-py`
+   - **Owner:** `finos` (your GitHub organization/username)
    - **Repository name:** `open-resource-broker`
-   - **Workflow name:** `publish.yml`
+   - **Workflow name:** `prod-release.yml`
    - **Environment name:** `pypi`
 4. Click "Add"
 
@@ -24,6 +24,7 @@ Trusted Publishing uses OpenID Connect (OIDC) to authenticate with PyPI without 
 
 1. Go to [Test PyPI Publishing Settings](https://test.pypi.org/manage/account/publishing/)
 2. Follow the same steps as above, but use:
+   - **Workflow name:** `dev-pypi.yml`
    - **Environment name:** `testpypi`
 
 ### 3. GitHub Environment Setup
@@ -47,10 +48,10 @@ The workflow uses GitHub environments for additional security:
 ### Manual Publishing
 ```bash
 # Test PyPI
-gh workflow run publish.yml -f environment=testpypi
+gh workflow run dev-pypi.yml
 
-# Production PyPI
-gh workflow run publish.yml -f environment=pypi
+# Production PyPI (triggered by GitHub release event)
+gh release create v1.6.2 --generate-notes
 ```
 
 ## Security Benefits

@@ -13,9 +13,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/awslabs/open-resource-broker/sdk/go/internal/process"
-	"github.com/awslabs/open-resource-broker/sdk/go/internal/sse"
-	"github.com/awslabs/open-resource-broker/sdk/go/internal/transport"
+	"github.com/finos/open-resource-broker/sdk/go/internal/process"
+	"github.com/finos/open-resource-broker/sdk/go/internal/sse"
+	"github.com/finos/open-resource-broker/sdk/go/internal/transport"
 )
 
 // Client is the ORB API client.

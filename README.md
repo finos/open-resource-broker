@@ -1,8 +1,10 @@
+[![FINOS - Incubating](https://cdn.jsdelivr.net/gh/finos/contrib-toolbox@master/images/badge-incubating.svg)](https://community.finos.org/docs/governance/Software-Projects/stages/incubating)
+
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/awslabs/open-resource-broker/main/docs/assets/orb-logo-horizontal-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/awslabs/open-resource-broker/main/docs/assets/orb-logo-horizontal.svg">
-    <img alt="Open Resource Broker" src="https://raw.githubusercontent.com/awslabs/open-resource-broker/main/docs/assets/orb-logo-horizontal.svg" width="520">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/finos/open-resource-broker/main/docs/assets/orb-logo-horizontal-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/finos/open-resource-broker/main/docs/assets/orb-logo-horizontal.svg">
+    <img alt="Open Resource Broker" src="https://raw.githubusercontent.com/finos/open-resource-broker/main/docs/assets/orb-logo-horizontal.svg" width="520">
   </picture>
 </p>
 
@@ -13,17 +15,17 @@
 <p align="center">
   <a href="https://pypi.org/project/orb-py/"><img src="https://img.shields.io/pypi/v/orb-py" alt="PyPI Version"></a>
   <a href="https://pypi.org/project/orb-py/"><img src="https://img.shields.io/pypi/pyversions/orb-py" alt="Python Versions"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/awslabs/open-resource-broker" alt="License"></a>
-  <a href="https://github.com/awslabs/open-resource-broker/releases"><img src="https://img.shields.io/github/v/release/awslabs/open-resource-broker" alt="Latest Release"></a>
-  <a href="https://deepwiki.com/awslabs/open-resource-broker"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/finos/open-resource-broker" alt="License"></a>
+  <a href="https://github.com/finos/open-resource-broker/releases"><img src="https://img.shields.io/github/v/release/finos/open-resource-broker" alt="Latest Release"></a>
+  <a href="https://deepwiki.com/finos/open-resource-broker"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/awslabs/open-resource-broker/actions/workflows/ci-tests.yml"><img src="https://github.com/awslabs/open-resource-broker/actions/workflows/ci-tests.yml/badge.svg" alt="Unit Tests"></a>
-  <a href="https://github.com/awslabs/open-resource-broker/actions/workflows/ci-quality.yml"><img src="https://github.com/awslabs/open-resource-broker/actions/workflows/ci-quality.yml/badge.svg" alt="Quality Checks"></a>
-  <a href="https://github.com/awslabs/open-resource-broker/actions/workflows/security-code.yml"><img src="https://github.com/awslabs/open-resource-broker/actions/workflows/security-code.yml/badge.svg" alt="Security Scanning"></a>
-  <a href="https://codecov.io/gh/awslabs/open-resource-broker"><img src="https://codecov.io/gh/awslabs/open-resource-broker/graph/badge.svg" alt="Coverage"></a>
-  <a href="https://github.com/awslabs/open-resource-broker/actions/workflows/docs.yml"><img src="https://github.com/awslabs/open-resource-broker/actions/workflows/docs.yml/badge.svg" alt="Documentation"></a>
+  <a href="https://github.com/finos/open-resource-broker/actions/workflows/ci-tests.yml"><img src="https://github.com/finos/open-resource-broker/actions/workflows/ci-tests.yml/badge.svg" alt="Unit Tests"></a>
+  <a href="https://github.com/finos/open-resource-broker/actions/workflows/ci-quality.yml"><img src="https://github.com/finos/open-resource-broker/actions/workflows/ci-quality.yml/badge.svg" alt="Quality Checks"></a>
+  <a href="https://github.com/finos/open-resource-broker/actions/workflows/security-code.yml"><img src="https://github.com/finos/open-resource-broker/actions/workflows/security-code.yml/badge.svg" alt="Security Scanning"></a>
+  <a href="https://codecov.io/gh/finos/open-resource-broker"><img src="https://codecov.io/gh/finos/open-resource-broker/graph/badge.svg" alt="Coverage"></a>
+  <a href="https://github.com/finos/open-resource-broker/actions/workflows/docs.yml"><img src="https://github.com/finos/open-resource-broker/actions/workflows/docs.yml/badge.svg" alt="Documentation"></a>
 </p>
 
 ---
@@ -335,7 +337,7 @@ See the [HostFactory Guide](docs/root/hostfactory/integration_guide.md) for full
 Run ORB as a containerized service.
 
 ```bash
-git clone https://github.com/awslabs/open-resource-broker.git
+git clone https://github.com/finos/open-resource-broker.git
 cd open-resource-broker
 cp .env.example .env
 # Edit .env with your configuration
@@ -371,7 +373,7 @@ See the [Architecture Guide](docs/root/developer_guide/architecture.md) for deta
 Set up a local development environment.
 
 ```bash
-git clone https://github.com/awslabs/open-resource-broker.git
+git clone https://github.com/finos/open-resource-broker.git
 cd open-resource-broker
 python -m venv .venv
 source .venv/bin/activate
@@ -406,9 +408,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development guide.
 - [Architecture](docs/root/developer_guide/architecture.md)
 - [API Reference](docs/root/api/readme.md)
 - [Deployment](docs/root/deployment/readme.md)
-- [DeepWiki](https://deepwiki.com/awslabs/open-resource-broker) — AI-generated codebase documentation
+- [DeepWiki](https://deepwiki.com/finos/open-resource-broker) — AI-generated codebase documentation
 
-Full docs: [awslabs.github.io/open-resource-broker](https://awslabs.github.io/open-resource-broker/)
+Full docs: [finos.github.io/open-resource-broker](https://finos.github.io/open-resource-broker/)
 
 </details>
 
