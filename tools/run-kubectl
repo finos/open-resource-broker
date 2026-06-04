@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+
+set -x
+
+trap 'echo SIGINT received; exit 0' SIGINT
+trap 'echo SIGTERM received; exit 0' SIGTERM
+
+user="$(whoami)"
+hostname="$(hostname)"
+
+image="${__image:?}"
+worker_label="${__worker_label:-${SYMPHONY_SVC_WORKER_LABEL:-}}"
+vcpu="${__vcpu:-$SYMPHONY_SVC_VCPU}"
+memory="${__memory:-$SYMPHONY_SVC_MEMORY}"
+
+hostip="${MY_POD_IP:?}"
+__SIM_URL__="${__SIM_URL__//127.0.0.1/$hostip}"
+export __SIM_URL__
+
+env="[]"
+while IFS="=" read -r -d "" k v; do
+  json=$(jq -n --arg key "$k"                         \
+               --arg value "$v"                       \
+               '[{"name": $key, "value" : $value}]')
+
+  env=$(jq --null-input --argjson a "$env" --argjson b "$json" '$a + $b')
+done < <(printenv -0)
+
+uuid="$(uuidgen | cut -d- -f1)"
+sid="$(echo "$__SERVICE_ID__" | cut -d= -f1 | tr _ -)"
+
+mkdir -p /var/tmp/"$user".home
+HOME=/var/tmp/"$user".home
+export HOME
+
+pod="$sid"-"$uuid"
+
+if [[ -n "$worker_label" ]]
+then
+  node_selector=$(jq -n --arg wl "$worker_label" '{"symphony_role": $wl}')
+  pod_affinity=$(jq -n  \
+                  '{
+                    "podAntiAffinity": {
+                      "requiredDuringSchedulingIgnoredDuringExecution": [
+                        {
+                          "labelSelector": {
+                            "matchExpressions": [
+                              {
+                                "key": "app.kubernetes.io/name",
+                                "operator": "In",
+                                "values": [
+                                  "cmp"
+                                ]
+                              }
+                            ]
+                          },
+                          "topologyKey": "kubernetes.io/hostname"
+                        }
+                      ]
+                    }
+                  }'
+                )
+  topology_spread=$(jq -n  \
+                     '[
+                          {
+                            "maxSkew": 100,
+                            "topologyKey": "topology.kubernetes.io/zone",
+                            "whenUnsatisfiable": "ScheduleAnyway",
+                            "nodeAffinityPolicy": "Honor",
+                            "nodeTaintsPolicy": "Honor",
+                            "labelSelector": {
+                              "matchExpressions": [
+                                {
+                                  "key": "app.kubernetes.io/name",
+                                  "operator": "In",
+                                  "values": [
+                                    "service"
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                      ]'
+                   )
+else
+  node_selector="{}"
+  pod_affinity="{}"
+  topology_spread="{}"
+fi
+
+command=$(jq --compact-output --null-input '$ARGS.positional' --args -- "$@")
+
+# Start the pod, wait for it to complete, reflect the status in the exit code.
+pod_manifest=$( jq -n                              \
+                  --arg pod "$pod"                 \
+                  --arg hostname "$hostname"       \
+                  --arg image "$image"             \
+                  --arg vcpu "$vcpu"               \
+                  --arg memory "$memory"           \
+                  --argjson command "$command"     \
+                  --argjson env "$env"             \
+                  --argjson ns "$node_selector"    \
+                  --argjson af "$pod_affinity"     \
+                  --argjson ts "$topology_spread"  \
+                  '{
+                    "apiVersion": "v1",
+                    "kind": "Pod",
+                    "metadata": {
+                      "name": $pod,
+                      "labels": {
+                        "app.kubernetes.io/name": "service",
+                        "cmp": $hostname
+                      }
+                    },
+                    "spec": {
+                      "restartPolicy": "Never",
+                      "enableServiceLinks": false,
+                      "topologySpreadConstraints": $ts,
+                      "nodeSelector": $ns,
+                      "affinity": $af,
+                      "containers": [
+                        {
+                          "name": "cmp",
+                          "image": $image,
+                          "env": $env,
+                          "command": $command,
+                          "resources": {
+                            "requests": {
+                              "cpu": $vcpu,
+                              "memory": $memory
+                            },
+                            "limits": {
+                              "cpu": $vcpu,
+                              "memory": $memory
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }'
+                )
+
+kubectl apply -f - <<<"$pod_manifest"
+
+while true; do
+  inotifywait -P -e moved_to /run/pods/"$pod" &
+  PID="$!"
+
+  status=$(readlink /run/pods/"$pod" || echo "Unknown")
+  if [[ "$status" == "Succeeded" ]]; then
+    kill "$PID"
+    break
+  fi
+  if [[ "$status" == "Failed" ]]; then
+    kill "$PID"
+    break
+  fi
+  wait "$PID" || true
+done
+
+echo "##### BEGIN - Pod Logs #####"
+# shellcheck disable=SC2154
+kubectl logs "$pod" | tee /dev/fd/"$fd"
+echo "##### END - Pod Logs #####"
+
+test "$status" == Succeeded

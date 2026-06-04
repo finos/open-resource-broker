@@ -1,0 +1,121 @@
+exclude = [
+    "documentation",
+    "src/open_resource_broker/alembic/versions/*"
+]
+
+target-version = "py312"
+
+[lint]
+select = [
+    # pycodestyle
+    "E",
+    "W",
+    # pylint
+    "PL",
+    # Perflint
+    "PERF",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # pep8-naming
+    "N",
+    # flake8-builtins
+    "A",
+    # flake8-bugbear
+    "B",
+    # flake8-async
+    "ASYNC",
+    # flake8-annotations
+    "ANN",
+    # flake8-comprehensions
+    "C4",
+    # flake8-simplify
+    "SIM",
+    # flake8-logging
+    "LOG",
+    # flake8-print
+    "T20",
+    # flake8-executable
+    "EXE",
+    # flake8-blind-except
+    "BLE",
+    # flake8-logging-format
+    "G",
+    # flake8-no-pep420
+    "INP",
+    # flake8-implicit-str-concat,
+    "ISC",
+    # flake8-unused-arguments
+    "ARG",
+    # flake8-import-conventions,
+    "ICN",
+    # flake8-pie
+    "PIE",
+    # flake8-pyi
+    "PYI",
+    # flake8-pytest-style
+    "PT",
+    # flake8-tidy-imports
+    "TID",
+    # flake8-use-pathlib
+    "PTH",
+    # flake8-return
+    "RET",
+    # flake8-bandit
+    "S",
+    # flake8-self
+    "SLF",
+    # flake8-quotes
+    "Q",
+    # isort
+    "I",
+    # mccabe
+    "C90",
+    # refurb
+    "FURB",
+    # Ruff
+    "RUF",
+    # Refactor
+    "PLR",
+    # Eradicate
+    "ERA",
+    # pydocstyle (just the basics)
+    "D100", "D101", "D102", "D103", "D105", "D106", "D107",
+    "D200", "D201", "D202", "D203", "D204", "D206", "D207", "D208", "D209",
+    "D21",
+    "D300", "D419",
+]
+
+isort.force-single-line = true
+
+ignore = [
+    "D203", # incorrect-blank-line-before-class
+    "D213", # multi-line-summary-first-line
+    "ANN001", # missing-type-function-argument
+]
+
+# Very common error that appears not to be covered by existing Ruff filters
+# TODO: surely one of the logging-specific filters would cover this?
+flake8-tidy-imports.banned-api."logging.info".msg = "Use a named logger instead of root level"
+flake8-tidy-imports.banned-api."logging.debug".msg = "Use a named logger instead of root level"
+flake8-tidy-imports.banned-api."logging.error".msg = "Use a named logger instead of root level"
+flake8-tidy-imports.banned-api."logging.warning".msg = "Use a named logger instead of root level"
+flake8-tidy-imports.banned-api."logging.exception".msg = "Use a named logger instead of root level"
+flake8-tidy-imports.banned-api."logging.critical".msg = "Use a named logger instead of root level"
+
+flake8-tidy-imports.banned-api."sys.path".msg = "sys.path manipulations make your code far less portable"
+flake8-tidy-imports.banned-api."ms.version".msg = "ms.version is legacy/deprecated and not supported by PyKit"
+
+[lint.per-file-ignores]
+# Certain linter options do not make sense for tests
+"src/open_resource_broker/tests/**/*.py" = [
+    "S101",     # allow assert statement
+    "SLF001",   # allow private member access in tests
+    "ANN",      # do not expect type annotations
+    "PLR2004",  # magic numbers ok in test assertions
+    "PT019",    # allow fixture param without value for unittest mock
+]
+
+[lint.pylint]
+max-args = 10

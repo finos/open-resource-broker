@@ -1,0 +1,31 @@
+{
+    "scaling_policy":[
+        {
+            "name": "throughput",
+            "description": "Throughput is the number of tasks executed per minutes per slot",
+            "warmup_time": 1,
+            "history_expiry_time": 5,
+            "initial_task_duration_seconds": 30,
+            "startup_cores_if_no_history": 1,
+            "desired_task_complete_duration": 1,
+            "active_task_moving_avg": 3,
+            "max_cores_per_hour":0
+        }
+    ],
+    "host_return_policy":[
+        {
+            "name": "lazy",
+            "description": "Return cloud hosts closer to the end of billing interval",
+            "billing_interval": 8,
+            "return_interval": 1,
+            "return_idle_only": true,
+            "return_blocked_hosts": false
+        },
+        {
+            "name": "immediate",
+            "description": "Return cloud hosts immediately",
+            "return_idle_only": true,
+            "allow_idle_duration_seconds": 0
+        }
+    ]
+}

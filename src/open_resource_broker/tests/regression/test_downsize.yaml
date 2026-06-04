@@ -1,0 +1,20 @@
+- name: Deploy 5 machines
+  hostfactory-admin: request-machines --count 5
+  hostfactory: request-machines
+  target:
+      pods: 5
+      timings:
+          - from: created
+            to: running
+            average: 7
+- name: Return 3 of them
+  hostfactory-admin: request-return-machines
+  hostfactory: request-return-machines
+  return_count: 3
+  target:
+      pods: 2
+- name: Return whatever is left
+  hostfactory-admin: request-return-machines
+  hostfactory: request-return-machines
+  target:
+      pods: 0

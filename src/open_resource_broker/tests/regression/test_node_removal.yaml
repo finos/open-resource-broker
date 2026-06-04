@@ -1,0 +1,15 @@
+- name: Deploy 5 machines
+  hostfactory-admin: request-machines --count 5
+  hostfactory: request-machines
+  target:
+      pods: 5
+- name: Drain a node
+  drain_node: 1
+  target:
+      list-machines: 5
+      pods: 5
+- name: Return whatever is left
+  hostfactory-admin: request-return-machines
+  hostfactory: request-return-machines
+  target:
+      pods: 0
