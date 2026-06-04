@@ -63,9 +63,7 @@ def _get_machines_dir(workdir: pathlib.Path, request_id: str) -> pathlib.Path:
     logger.info("Checking the machine dir %s", hf_reqs_dir)
     if not hf_reqs_dir.exists():
         raise FileNotFoundError(
-            f"Request directory for {request_id} "
-            f"not found: {hf_reqs_dir} "
-            f"in workdir: {workdir}"
+            f"Request directory for {request_id} not found: {hf_reqs_dir} in workdir: {workdir}"
         )
 
     return hf_reqs_dir
@@ -146,17 +144,13 @@ def _get_templates(templates: pathlib.Path) -> dict:
     with templates.open("r") as file:
         data = json.load(file)
         if not isinstance(data, dict):
-            raise ValueError(
-                "The templates file: %s must contain a JSON object", file.name
-            )
+            raise ValueError("The templates file: %s must contain a JSON object", file.name)
 
     hfvalidator.validate(data)
     return data
 
 
-def _write_podspec(
-    tmp_path: pathlib.Path, templates: pathlib.Path, template_id: str
-) -> None:
+def _write_podspec(tmp_path: pathlib.Path, templates: pathlib.Path, template_id: str) -> None:
     """Write the podspec file as part of the request."""
     templates_data = _get_templates(templates)["templates"]
     for t in templates_data:
@@ -264,9 +258,7 @@ def get_request_status(workdir, hf_req_ids) -> dict:
 
             machines = []
             ret_request = _is_return_request(workdir, request_id)
-            logger.debug(
-                "Request ID: %s, is return request: %s", request_id, ret_request
-            )
+            logger.debug("Request ID: %s, is return request: %s", request_id, ret_request)
             machines_dir = _get_machines_dir(workdir_path, request_id)
             item_count = 0
 
@@ -276,12 +268,8 @@ def get_request_status(workdir, hf_req_ids) -> dict:
                 podname = file_path.name
                 pod_status = fsutils.fetch_pod_status(workdir_path, podname)
 
-                machine_status, machine_result = _resolve_machine_status(
-                    pod_status, ret_request
-                )
-                logger.info(
-                    "Pod status: %s, machine status: %s", pod_status, machine_status
-                )
+                machine_status, machine_result = _resolve_machine_status(pod_status, ret_request)
+                logger.info("Pod status: %s, machine status: %s", pod_status, machine_status)
 
                 if machine_result == "executing":
                     running = True

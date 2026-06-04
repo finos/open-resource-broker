@@ -71,9 +71,7 @@ def atomic_write(data, dst) -> None:
     elif isinstance(data, str):
         content = data.encode("utf-8")
     else:
-        content = json.dumps(data, cls=open_resource_broker.DateTimeEncoder).encode(
-            "utf-8"
-        )
+        content = json.dumps(data, cls=open_resource_broker.DateTimeEncoder).encode("utf-8")
 
     try:
         with tempfile.NamedTemporaryFile(

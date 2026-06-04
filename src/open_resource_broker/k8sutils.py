@@ -120,9 +120,7 @@ def get_namespace() -> str:
     else:
         # TODO: This assumes single namespace. Better solution to be
         #       explicit and require namespace to be set in the CLI opts.
-        namespace = kubernetes.config.list_kube_config_contexts()[1]["context"][
-            "namespace"
-        ]
+        namespace = kubernetes.config.list_kube_config_contexts()[1]["context"]["namespace"]
 
     return namespace
 
@@ -222,8 +220,7 @@ def _watch_events(
             rv = getattr(obj.metadata, "resource_version", None) or "0"
         resource_version = rv
         logger.warning(
-            "Restarting watcher due to resourceVersion mismatch. "
-            "Using resourceVersion: %s",
+            "Restarting watcher due to resourceVersion mismatch. Using resourceVersion: %s",
             resource_version,
         )
         return resource_version
@@ -237,9 +234,7 @@ def _watch_events(
     except Exception:
         raise
 
-    logger.warning(
-        "End of events stream. Soft restart from resource_version=%s", resource_version
-    )
+    logger.warning("End of events stream. Soft restart from resource_version=%s", resource_version)
     return resource_version
 
 
@@ -285,10 +280,7 @@ def get_total_pod_memory(pod) -> tuple[float, float]:
 
     if pod.spec.containers:
         for container in pod.spec.containers:
-            if (
-                container.resources.requests
-                and "memory" in container.resources.requests
-            ):
+            if container.resources.requests and "memory" in container.resources.requests:
                 total_memory_request_bytes += _parse_memory_quantity(
                     container.resources.requests["memory"]
                 )
@@ -318,13 +310,9 @@ def get_total_pod_cpu(pod) -> tuple[float, float]:
     if pod.spec.containers:
         for container in pod.spec.containers:
             if container.resources.requests and "cpu" in container.resources.requests:
-                total_cpu_request += _parse_cpu_quantity(
-                    container.resources.requests["cpu"]
-                )
+                total_cpu_request += _parse_cpu_quantity(container.resources.requests["cpu"])
             if container.resources.limits and "cpu" in container.resources.limits:
-                total_cpu_limit += _parse_cpu_quantity(
-                    container.resources.limits["cpu"]
-                )
+                total_cpu_limit += _parse_cpu_quantity(container.resources.limits["cpu"])
 
     return (round(total_cpu_request, 2), round(total_cpu_limit, 2))
 
@@ -445,9 +433,7 @@ class Node:
             if addr.get("type") == "InternalIP":
                 self.node_ip = addr.get("address", "")
         if self.creation_timestamp:
-            self.start_time = datetime.fromtimestamp(
-                self.creation_timestamp
-            ).isoformat()
+            self.start_time = datetime.fromtimestamp(self.creation_timestamp).isoformat()
         else:
             self.start_time = ""
         if self.deletion_timestamp:

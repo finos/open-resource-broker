@@ -21,9 +21,7 @@ from open_resource_broker import fsutils
 logger = logging.getLogger(__name__)
 
 
-def handle_event(
-    workdir: pathlib.Path, _postprocess_event, _event_path, event: dict
-) -> None:
+def handle_event(workdir: pathlib.Path, _postprocess_event, _event_path, event: dict) -> None:
     """Update the event status in the events directory."""
     data = event["object"]
     event_type = event["type"]

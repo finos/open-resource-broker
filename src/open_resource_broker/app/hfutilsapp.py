@@ -146,10 +146,7 @@ def _poll_events_bkp(workdir: Path, identifier: str) -> Path | None:
         if time.time() - start_time > timeout:
             raise HTTPException(
                 status_code=504,
-                detail=(
-                    "Timeout waiting for backup progress to reach 100% "
-                    f"for {identifier}"
-                ),
+                detail=(f"Timeout waiting for backup progress to reach 100% for {identifier}"),
             )
         time.sleep(poll_interval)
 
@@ -212,9 +209,7 @@ def create_app(settings: Settings) -> FastAPI:
                 s3 = boto3.client("s3")
                 s3.upload_file(dump_path, bucket, key)
             except botocore.exceptions.BotoCoreError as exc:
-                raise HTTPException(
-                    status_code=500, detail=f"S3 upload failed: {exc}"
-                ) from exc
+                raise HTTPException(status_code=500, detail=f"S3 upload failed: {exc}") from exc
 
         return success_msg
         # TODO: Implement for other CSPs

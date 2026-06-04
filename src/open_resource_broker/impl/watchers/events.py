@@ -118,9 +118,7 @@ class KubeState:
         if not self.objs:
             return
         self._expire()
-        cpu_gauge = GaugeMetricFamily(
-            self.common_prefix + "cpu", "", labels=self.common_labels
-        )
+        cpu_gauge = GaugeMetricFamily(self.common_prefix + "cpu", "", labels=self.common_labels)
         memory_gauge = GaugeMetricFamily(
             self.common_prefix + "memory", "", labels=self.common_labels
         )
@@ -240,9 +238,7 @@ class PrometheusEventBackend:
     def _expire(self: "PrometheusEventBackend") -> None:
         expiry_timestamp = time.time() - self.ttl
         expired_metrics = tuple(
-            k
-            for k, (timestamp, value) in self.metrics.items()
-            if timestamp < expiry_timestamp
+            k for k, (timestamp, value) in self.metrics.items() if timestamp < expiry_timestamp
         )
         for k in expired_metrics:
             self.metrics.pop(k)
@@ -313,9 +309,7 @@ class PrometheusEventBackend:
                         continue
                     category = event.get("category", None)
                     if category == "request" and event.get("template_id"):
-                        self.machine_request_counters[event.get("template_id")] += (
-                            event["count"]
-                        )
+                        self.machine_request_counters[event.get("template_id")] += event["count"]
                         continue
                     if category == "return" and event.get("count"):
                         self.machine_return_counter += event.get("count")
@@ -436,9 +430,7 @@ class SqliteEventBackend:
             ("event", "events") if self.skip_events else ()
         )
         # Find the first unknown column (SQLite schema supports one type-value pair)
-        unknown_columns_data = [
-            (k, v) for k, v in event.items() if k not in known_columns
-        ]
+        unknown_columns_data = [(k, v) for k, v in event.items() if k not in known_columns]
 
         if unknown_columns_data:
             # Format the event by merging known columns with the unknown column's
@@ -456,10 +448,7 @@ class SqliteEventBackend:
 
                 # Sort the merged dictionary and get the values alone in tuple
                 formatted_event_data = tuple(
-                    value
-                    for _, value in sorted(
-                        (known_columns_data | type_value_pair).items()
-                    )
+                    value for _, value in sorted((known_columns_data | type_value_pair).items())
                 )
 
                 formatted_event_values.append(formatted_event_data)
@@ -486,8 +475,7 @@ class SqliteEventBackend:
             return "".join(c for c in id_str if c.isalnum() or c in ("-", "_")).rstrip()
 
         identifier = (
-            f"{_sanitize_identifier(identifier)}_"
-            f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+            f"{_sanitize_identifier(identifier)}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
         )
 
         backup_dir = pathlib.Path(self.dbfile).parent / "backups"
@@ -517,9 +505,7 @@ class SqliteEventBackend:
                 self.conn.commit()
             with sqlite3.connect(backup_path) as dest_conn:
                 self.conn.backup(dest_conn, pages=pages, progress=_progress_callback)
-                logger.info(
-                    "Backup created at %s (source: %s)", backup_path, self.dbfile
-                )
+                logger.info("Backup created at %s (source: %s)", backup_path, self.dbfile)
         except sqlite3.DatabaseError as exc:
             logger.error("Failed to create backup at %s: %s", backup_path, exc)
 

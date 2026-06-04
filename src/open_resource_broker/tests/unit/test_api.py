@@ -202,9 +202,7 @@ def test_request_machines(
     templates = "/path/to/templates.json"
     request_id = "mock_request_id"
 
-    response = api.request_machines(
-        temp_workdir, templates, template_id, count, request_id
-    )
+    response = api.request_machines(temp_workdir, templates, template_id, count, request_id)
 
     mock_get_template_file.assert_called_once_with(pathlib.Path(templates))
     requestdir = pathlib.Path(temp_workdir / "requests" / "mock_request_id")
@@ -240,9 +238,7 @@ def remove_dir(path: pathlib.Path) -> None:
 
 @mock.patch("open_resource_broker.events.EventsBuffer")
 @mock.patch("open_resource_broker.api._is_return_request", return_value=True)
-def test_request_return_machines(
-    _mock_is_return_request, _mock_event_buffer, temp_workdir
-) -> None:
+def test_request_return_machines(_mock_is_return_request, _mock_event_buffer, temp_workdir) -> None:
     """Test request return machines."""
     machines = [
         {"machineId": "uuid-0", "name": "machine-0"},
@@ -326,9 +322,7 @@ def test_get_request_status(
 @mock.patch("open_resource_broker.fsutils.fetch_pod_status")
 @mock.patch("open_resource_broker.api.pathlib.Path.exists")
 @mock.patch("open_resource_broker.fsutils.iterate_directory")
-def test_get_return_requests(
-    mock_iterate_directory, mock_exists, _mock_fetch_pod_status
-) -> None:
+def test_get_return_requests(mock_iterate_directory, mock_exists, _mock_fetch_pod_status) -> None:
     """Test get_return_requests."""
     machines = [
         {"machineId": "machine-0", "name": "pod1"},

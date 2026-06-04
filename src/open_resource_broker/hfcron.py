@@ -79,9 +79,7 @@ class CleanupPodsTask:
         logger.info("Cleaning up pods")
 
         with hfevents.EventsBuffer() as events:
-            for pod in fsutils.iterate_directory(
-                directory=self.podstatusdir, symlinks_only=True
-            ):
+            for pod in fsutils.iterate_directory(directory=self.podstatusdir, symlinks_only=True):
                 pod_ctime = datetime.fromtimestamp(pod.lstat().st_ctime)
                 pod_status = pod.readlink().name
 
@@ -243,7 +241,5 @@ def run(
             if time_remaining < 3:  # noqa: PLR2004
                 next_task()
             else:
-                logger.info(
-                    "Waiting %s secs for the next task", round(time_remaining, 1)
-                )
+                logger.info("Waiting %s secs for the next task", round(time_remaining, 1))
                 time.sleep(time_remaining)

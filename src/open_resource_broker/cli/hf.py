@@ -69,9 +69,7 @@ SERVER_TIMEOUT_OPTION = click.option(
 )
 @click.option(
     "--log-level",
-    type=click.Choice(
-        ["info", "debug", "error", "warning", "critical"], case_sensitive=False
-    ),
+    type=click.Choice(["info", "debug", "error", "warning", "critical"], case_sensitive=False),
     default="info",
     help="Set the log level.",
 )
@@ -160,9 +158,7 @@ def get_available_templates() -> None:
 
 def validate_request_file(ctx, param, file_obj) -> None:
     """Validate the request JSON file input."""
-    logger.debug(
-        "Validating param [%s] with value [%s] in context %s", param.name, file_obj, ctx
-    )
+    logger.debug("Validating param [%s] with value [%s] in context %s", param.name, file_obj, ctx)
     try:
         content = json.load(file_obj)
         if not isinstance(content, dict):

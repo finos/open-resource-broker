@@ -69,10 +69,7 @@ class TestRequestMachinesWatcher(unittest.TestCase):
         )
 
         assert mock_create_pod.call_count == 3
-        calls = [
-            mock.call(mock_k8s_client, self.req_dir / f"machine{i}")
-            for i in range(1, 4)
-        ]
+        calls = [mock.call(mock_k8s_client, self.req_dir / f"machine{i}") for i in range(1, 4)]
         mock_create_pod.assert_has_calls(calls, any_order=True)
 
 

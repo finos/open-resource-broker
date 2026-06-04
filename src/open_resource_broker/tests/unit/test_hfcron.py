@@ -36,9 +36,7 @@ def _run_cli(module, args) -> click.testing.Result:
 
 
 @mock.patch("open_resource_broker.k8sutils.get_namespace")
-@mock.patch(
-    "open_resource_broker.k8sutils.get_kubernetes_client", return_value=MagicMock()
-)
+@mock.patch("open_resource_broker.k8sutils.get_kubernetes_client", return_value=MagicMock())
 @mock.patch("open_resource_broker.k8sutils.load_k8s_config", return_value=None)
 @mock.patch("open_resource_broker.hfcron.CleanupPodsTask._delete_k8s_pod")
 @mock.patch("open_resource_broker.hfcron.CleanupPodsTask._is_timeout_reached")
@@ -70,9 +68,7 @@ class TestHFCron(unittest.TestCase):
     ) -> None:
         """Test cleaner process"""
         mock_timeout.return_value = True
-        result = _run_cli(
-            hostfactory, ["--workdir", self.workdir, "run-cron", "--run-once"]
-        )
+        result = _run_cli(hostfactory, ["--workdir", self.workdir, "run-cron", "--run-once"])
         assert result.exit_code == 0, result.output
 
         mock_delete.assert_called_once_with("test-pod-id")
@@ -90,9 +86,7 @@ class TestHFCron(unittest.TestCase):
     ) -> None:
         """Test cleaner process"""
         mock_timeout.return_value = False
-        result = _run_cli(
-            hostfactory, ["--workdir", self.workdir, "run-cron", "--run-once"]
-        )
+        result = _run_cli(hostfactory, ["--workdir", self.workdir, "run-cron", "--run-once"])
         assert result.exit_code == 0, result.output
 
         mock_delete.assert_not_called()

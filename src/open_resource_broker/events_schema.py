@@ -36,9 +36,7 @@ class RunMetadata(Base):
     namespace = Column(String, nullable=False)
     date = Column(String, nullable=False)
 
-    __table_args__ = (
-        sqlalchemy.UniqueConstraint("cluster", "platform", "namespace", "date"),
-    )
+    __table_args__ = (sqlalchemy.UniqueConstraint("cluster", "platform", "namespace", "date"),)
 
 
 class Container(Base):

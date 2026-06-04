@@ -107,9 +107,7 @@ def handle_exceptions(
                 sys.exit(EXIT_CODE_DEFAULT)
 
             except Exception as unhandled:  # pylint: disable=W0703  # noqa: BLE001
-                with tempfile.NamedTemporaryFile(
-                    delete=False, mode="w", encoding="utf-8"
-                ) as f:  # noqa: PLR1704
+                with tempfile.NamedTemporaryFile(delete=False, mode="w", encoding="utf-8") as f:  # noqa: PLR1704
                     traceback.print_exc(file=f)
                     click.echo(
                         f"Error: {unhandled} [ {f.name} ]",

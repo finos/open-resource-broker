@@ -70,12 +70,8 @@ def _get_machines(workdir) -> list:
     requests_dir = pathlib.Path(workdir + "/requests")
     machines = []
 
-    for request_dir in fsutils.iterate_directory(
-        directory=requests_dir, directories_only=True
-    ):
-        machines.extend(
-            [item.name for item in fsutils.iterate_directory(directory=request_dir)]
-        )
+    for request_dir in fsutils.iterate_directory(directory=requests_dir, directories_only=True):
+        machines.extend([item.name for item in fsutils.iterate_directory(directory=request_dir)])
 
     return machines
 
@@ -89,9 +85,7 @@ def _get_machines(workdir) -> list:
 )
 @click.option(
     "--log-level",
-    type=click.Choice(
-        ["info", "debug", "error", "warning", "critical"], case_sensitive=False
-    ),
+    type=click.Choice(["info", "debug", "error", "warning", "critical"], case_sensitive=False),
     default="info",
     help="Set the log level.",
 )
@@ -142,9 +136,7 @@ def list_requests() -> None:
 )
 def get_timings(from_event: str, to_event: str) -> None:
     """Get the timings of the requests."""
-    average = events.event_average(
-        context.GLOBAL.workdir, event_from=from_event, event_to=to_event
-    )
+    average = events.event_average(context.GLOBAL.workdir, event_from=from_event, event_to=to_event)
     cli.output(f"Average time between events: {average}")
 
 
@@ -191,9 +183,7 @@ def get_request_status(return_requests) -> None:
 def get_return_requests() -> None:
     """Get the status of a return request."""
     data = {
-        "machines": [
-            {"name": entry} for entry in _get_machines(context.GLOBAL.workdir) if entry
-        ]
+        "machines": [{"name": entry} for entry in _get_machines(context.GLOBAL.workdir) if entry]
     }
     cli.output(json.dumps(data))
 

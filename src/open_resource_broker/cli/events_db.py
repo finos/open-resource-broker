@@ -61,9 +61,7 @@ def _populate_run_metadata(output_session, table_metadata) -> int:
     return run_metadata.id
 
 
-def _process_container_statuses(
-    output_session, run_id, pod_id, timestamp, value
-) -> None:
+def _process_container_statuses(output_session, run_id, pod_id, timestamp, value) -> None:
     """Extract values from the json value of container statuses and insert
     them into the container table.
     """
@@ -147,8 +145,7 @@ def _transform_data(input_session, events, output_session, run_id) -> None:  # n
     # associated with each event category.
     logger.info("Transforming data for run ID: %d", run_id)
     categories = [
-        category[0]
-        for category in input_session.query(events.c.category).distinct().all()
+        category[0] for category in input_session.query(events.c.category).distinct().all()
     ]
 
     processed = set()
@@ -156,9 +153,7 @@ def _transform_data(input_session, events, output_session, run_id) -> None:  # n
     for category in categories:
         logger.debug("Processing category: %s", category)
         rows = (
-            input_session.query(
-                events.c.id, events.c.timestamp, events.c.type, events.c.value
-            )
+            input_session.query(events.c.id, events.c.timestamp, events.c.type, events.c.value)
             .filter(events.c.category == category)
             .order_by(events.c.timestamp)
             .all()
@@ -168,9 +163,7 @@ def _transform_data(input_session, events, output_session, run_id) -> None:  # n
             # Special handling of container statuses, as they are
             # translated into container table.
             if category == "pod" and type_ == "container_statuses":
-                _process_container_statuses(
-                    output_session, run_id, id_, timestamp, value
-                )
+                _process_container_statuses(output_session, run_id, id_, timestamp, value)
                 continue
 
             if type_ == "status":
@@ -199,15 +192,11 @@ def _transform_data(input_session, events, output_session, run_id) -> None:  # n
 
             table_class = getattr(schema, table)
             if column_name not in table_class.__table__.columns:
-                logger.debug(
-                    "Column %s does not exist in table %s.", column_name, table
-                )
+                logger.debug("Column %s does not exist in table %s.", column_name, table)
                 continue
 
             existing_row = (
-                output_session.query(table_class)
-                .filter_by(name=id_, run_id=run_id)
-                .first()
+                output_session.query(table_class).filter_by(name=id_, run_id=run_id).first()
             )
             if not existing_row:
                 new_row = table_class(name=id_, run_id=run_id)
@@ -265,9 +254,7 @@ def _generate_summary(output_session, run_id) -> None:
     if summary_data:
         start, end = summary_data
         output_session.execute(
-            schema.Summary.__table__.insert().values(
-                start=start, end=end, run_id=run_id
-            )
+            schema.Summary.__table__.insert().values(start=start, end=end, run_id=run_id)
         )
 
         # Calculate CPU minutes
@@ -334,9 +321,7 @@ def _generate_summary(output_session, run_id) -> None:
             .scalar()
             or 0
         )
-        percentage_node_usage = (
-            vcpu_pod_usage / vcpu_usage * 100 if vcpu_usage > 0 else 0
-        )
+        percentage_node_usage = vcpu_pod_usage / vcpu_usage * 100 if vcpu_usage > 0 else 0
         output_session.execute(
             schema.Summary.__table__.update()
             .values(percentage_node_usage=percentage_node_usage)
@@ -345,22 +330,14 @@ def _generate_summary(output_session, run_id) -> None:
 
         output_session.commit()
         # Print summary
-        summary = (
-            output_session.query(schema.Summary)
-            .filter(schema.Summary.run_id == run_id)
-            .all()
-        )
+        summary = output_session.query(schema.Summary).filter(schema.Summary.run_id == run_id).all()
 
         if all(
             getattr(summary[0], field) is not None
             for field in ["start", "end", "cpu_minutes", "percentage_node_usage"]
         ):
-            start_time = datetime.fromtimestamp(summary[0].start).strftime(
-                "%Y-%m-%d %H:%M:%S"
-            )
-            end_time = datetime.fromtimestamp(summary[0].end).strftime(
-                "%Y-%m-%d %H:%M:%S"
-            )
+            start_time = datetime.fromtimestamp(summary[0].start).strftime("%Y-%m-%d %H:%M:%S")
+            end_time = datetime.fromtimestamp(summary[0].end).strftime("%Y-%m-%d %H:%M:%S")
             duration_hours = (summary[0].end - summary[0].start) / 3600
             cpu_minutes = summary[0].cpu_minutes
             percentage = summary[0].percentage_node_usage
@@ -396,9 +373,7 @@ def run() -> None:
 )
 @click.option(
     "--log-level",
-    type=click.Choice(
-        ["info", "debug", "error", "warning", "critical"], case_sensitive=False
-    ),
+    type=click.Choice(["info", "debug", "error", "warning", "critical"], case_sensitive=False),
     default="info",
     help="Set the log level.",
 )
@@ -480,9 +455,7 @@ def transform(
 
         logger.debug("Reflecting events table from input database: %s", input_db)
         input_metadata = sqlalchemy.MetaData()
-        events_table = sqlalchemy.Table(
-            "events", input_metadata, autoload_with=input_engine
-        )
+        events_table = sqlalchemy.Table("events", input_metadata, autoload_with=input_engine)
 
         output_session = sessionmaker(bind=output_engine)()
         input_session = sessionmaker(bind=input_engine)()

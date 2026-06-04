@@ -89,9 +89,7 @@ def run_hostfactory_command(
     """Run a open-resource-broker command"""
     logger.info("Json in is %s", json_in)
 
-    with tempfile.NamedTemporaryFile(
-        delete=False, mode="w", encoding="utf-8"
-    ) as json_file:
+    with tempfile.NamedTemporaryFile(delete=False, mode="w", encoding="utf-8") as json_file:
         json_file.write(json_in)
         json_file.flush()
         logger.debug("Json is written to %s", json_file.name)
@@ -196,8 +194,7 @@ def run_custom_hostfactory_test(  # noqa: C901, PLR0912
         limit = 10
         iteration = 0
         while (
-            not run_hostfactory_admin_command("list-machines").output
-            < test_spec["list-machines"]
+            not run_hostfactory_admin_command("list-machines").output < test_spec["list-machines"]
             and iteration < limit
         ):
             sleep(10)
@@ -272,9 +269,7 @@ def verify_timings(expected_timings: dict) -> None:
         from_event = expected_timing["from"]
         to_event = expected_timing["to"]
         expected_average = expected_timing["average"]
-        actual_average = find_event_average(
-            get_workdir(), event_from=from_event, event_to=to_event
-        )
+        actual_average = find_event_average(get_workdir(), event_from=from_event, event_to=to_event)
         assert actual_average < expected_average
 
 
@@ -376,9 +371,7 @@ def run_hostfactory_returns():
     logger.info("Running open-resource-broker return")
     return_machine_watcher = ReturnMachineWatcher()
     with return_machine_watcher:
-        thread = threading.Thread(
-            target=return_machine_watcher.run_request_return_watcher
-        )
+        thread = threading.Thread(target=return_machine_watcher.run_request_return_watcher)
         thread.daemon = True
         thread.start()
         yield return_machine_watcher
@@ -404,9 +397,7 @@ def run_hostfactory_machines():
     logger.info("Running request machine")
     request_machine_watcher = RequestMachineWatcher()
     with request_machine_watcher:
-        thread = threading.Thread(
-            target=request_machine_watcher.run_request_machine_watcher
-        )
+        thread = threading.Thread(target=request_machine_watcher.run_request_machine_watcher)
         thread.daemon = True
         thread.start()
         yield request_machine_watcher

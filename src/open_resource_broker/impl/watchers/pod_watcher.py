@@ -143,9 +143,7 @@ def _track_pod_event(workdir, event: dict) -> None:
                     disrupted_message=str(condition.message),
                 )
 
-        pod_cpu_core_request, pod_cpu_core_limit = k8sutils.get_total_pod_cpu(
-            event["object"]
-        )
+        pod_cpu_core_request, pod_cpu_core_limit = k8sutils.get_total_pod_cpu(event["object"])
         pod_memory_mib_request, pod_memory_mib_limit = k8sutils.get_total_pod_memory(
             event["object"]
         )

@@ -47,9 +47,7 @@ def drain_node_in_namespace(node_count=1, sleep_duration: int = 5) -> int:
     namespace = kubernetes.config.list_kube_config_contexts()[1]["context"]["namespace"]
 
     # List the pods in the current namespace
-    pods = (
-        k8sutils.get_kubernetes_client().list_namespaced_pod(namespace=namespace).items
-    )
+    pods = k8sutils.get_kubernetes_client().list_namespaced_pod(namespace=namespace).items
     if len(pods) == 0:
         logger.info("There are no active pods, nothing to do")
         return 0
@@ -84,9 +82,7 @@ def delete_pods_in_namespace(pod_count: int = 0, sleep_duration: int = 5) -> Non
     namespace = kubernetes.config.list_kube_config_contexts()[1]["context"]["namespace"]
 
     # List the pods in the current namespace
-    pods = (
-        k8sutils.get_kubernetes_client().list_namespaced_pod(namespace=namespace).items
-    )
+    pods = k8sutils.get_kubernetes_client().list_namespaced_pod(namespace=namespace).items
     logger.info("Pods types is %s", type(pods))
 
     random_pods = pods if pod_count == 0 else random.sample(pods, pod_count)

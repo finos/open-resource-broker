@@ -57,9 +57,7 @@ def replay(dbfile, wait) -> None:
     """Replay open-resource-broker events"""
     events = _read_events(dbfile)
     if not events:
-        logger.info(
-            "No matching events found for category: %s", _CATEGORY_COMMAND_MAPPING
-        )
+        logger.info("No matching events found for category: %s", _CATEGORY_COMMAND_MAPPING)
         return
     logger.info("Found %d events", len(events))
     prev_timestamp = None
@@ -83,9 +81,7 @@ def replay(dbfile, wait) -> None:
 
         command = _CATEGORY_COMMAND_MAPPING.get(category)
         if not command:
-            logger.warning(
-                "Unknown category '%s', skipping event id=%s", category, event_id
-            )
+            logger.warning("Unknown category '%s', skipping event id=%s", category, event_id)
             continue
 
         try:
