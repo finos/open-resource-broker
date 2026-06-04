@@ -1,0 +1,23 @@
+{
+    "requestors": [
+        {
+            "name": "symA",
+            "confPath": "${HF_CONFDIR}/requestors/symA/conf/",
+            "workPath": "${HF_CONFDIR}/requestors/symA/conf/",
+            "enabled": 1,
+            "plugin": "symA",
+            "providers": [
+                "k8s-hf"
+            ],
+            "requestMode": "POLL"
+        },
+        {
+            "name": "admin",
+            "enabled": 1,
+            "providers": [
+                "k8s-hf"
+            ],
+            "requestMode": "REST"
+        }
+    ]
+}

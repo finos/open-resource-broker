@@ -1,0 +1,13 @@
+{
+    "version": 2,
+    "providers": [
+        {
+            "name": "k8s-hf",
+            "enabled": 1,
+            "plugin": "k8s-hf",
+            "confPath": "${HF_CONFDIR}/providers/k8s-hf/conf",
+            "workPath": "${HF_WORKDIR}",
+            "logPath": "${HF_LOGDIR}/"
+        }
+    ]
+}

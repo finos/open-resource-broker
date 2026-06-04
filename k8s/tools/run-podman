@@ -1,0 +1,166 @@
+#!/bin/bash
+
+set -euo pipefail
+
+readonly IMAGE="${__image:?}"
+readonly REGISTRY="${IMAGE%%/*}"
+readonly CERT_DIR="${PODMAN_CERT_DIR:-/var/spool/certs}"
+readonly AUTH_FILE="/run/podman/auth.json"
+readonly USER_HOME="/var/tmp/symphony"
+
+
+function log() {
+  # Log messages with timestamp
+  local log_level="$1"
+  shift
+  echo "$(date +"%Y-%m-%d %H:%M:%S") [$log_level] $*"
+}
+
+function detect_platform() {
+    case "$REGISTRY" in
+        *".azurecr."*) echo "aks" ;;
+        *".ecr."*)     echo "eks" ;;
+        *".pkg.dev")   echo "gke" ;;
+        *)             echo "unknown" ;;
+    esac
+}
+
+function setup_gke_env() {
+    local hmac_creds_dir="${GCLOUD_HMAC_CREDS_DIR:-/run/gcp-hmac-creds}"
+    log "INFO" "Checking HMAC credentials directory: $hmac_creds_dir"
+    [[ -d "$hmac_creds_dir" ]] || return 0
+    
+    log "INFO" "Loading GKE HMAC credentials"
+    local file
+    for file in "$hmac_creds_dir"/*; do
+        [[ -f "$file" ]] && export "$(basename -- "$file")"="$(<"$file")"
+    done
+}
+
+function setup_platform_env() {
+    local platform="$1"
+    log "INFO" "Setting up environment for platform: $platform"
+    case "$platform" in
+        gke) setup_gke_env ;;
+        *) log "INFO" "No specific setup required for platform: $platform" ;;
+    esac
+}
+
+function create_env_file() {
+    local envfile
+    envfile=$(mktemp)
+    printenv | sort > "$envfile"
+    echo "$envfile"
+}
+
+function pull_image() {
+    local platform="$1"
+    local image="$2"
+    local lock="/tmp/${image//\//-}.lock"
+    local fd
+    
+    log "INFO" "Acquiring lock for image: $image"
+    exec {fd}>"$lock"
+    flock "$fd"
+    
+    log "INFO" "Pulling image: $image"
+    case "$platform" in
+        eks|aks|gke)
+            log "INFO" "Command: podman pull --authfile $AUTH_FILE --cert-dir $CERT_DIR $image"
+            podman pull --authfile "$AUTH_FILE" --cert-dir "$CERT_DIR" "$image"
+            ;;
+        *)
+            log "INFO" "Command: podman pull --cert-dir $CERT_DIR $image"
+            podman pull --cert-dir "$CERT_DIR" "$image"
+            ;;
+    esac
+    
+    flock -u "$fd"
+    log "INFO" "Image pull completed: $image"
+}
+
+function setup_common_args() {
+    local envfile="$1"
+    local cwd
+    cwd="$(pwd)"
+    
+    local -a args=(
+        -v "/var/run/secrets:/var/run/secrets:ro"
+        -v "/tmp:/tmp:rw"
+        -v "/var/tmp:/var/tmp:rw"
+        -v "$cwd:$cwd:rw"
+        --workdir "$cwd"
+        --userns=keep-id
+        --rm
+        --network=host
+        --pid=host
+        --uts=host
+        --env-file="$envfile"
+    )
+    
+    printf '%s\n' "${args[@]}"
+}
+
+function pre_run_checks() {
+    local platform="$1"
+    local envfile="$2"
+
+    if [[ "$platform" == "eks" ]]; then
+        if ! grep -qE 'AWS_ROLE_ARN' "$envfile"; then
+            log "ERROR" "Missing AWS_ROLE_ARN in environment"
+            exit 1
+        fi
+        if ! grep -qE 'AWS_WEB_IDENTITY_TOKEN_FILE' "$envfile"; then
+            log "ERROR" "Missing AWS_WEB_IDENTITY_TOKEN_FILE in environment"
+            exit 1
+        fi
+        token_file=$(grep '^AWS_WEB_IDENTITY_TOKEN_FILE=' "$envfile" | cut -d'=' -f2-)
+        if [[ -z "$token_file" ]]; then
+            log "ERROR" "AWS_WEB_IDENTITY_TOKEN_FILE is empty"
+            exit 1
+        fi
+    fi
+}
+
+function run() {
+    log "INFO" "Starting podman runner"
+    log "INFO" "Arguments passed: $*"
+
+    # Log initialization info
+    log "INFO" "IMAGE: $IMAGE"
+    log "INFO" "REGISTRY: $REGISTRY"
+    log "INFO" "CERT_DIR: $CERT_DIR"
+
+    local platform
+    log "INFO" "Detecting platform from registry: $REGISTRY"
+    platform="$(detect_platform)"
+    log "INFO" "Detected platform: $platform"
+    
+    setup_platform_env "$platform"
+
+    log "INFO" "Setting HOME to $USER_HOME"
+    export HOME="$USER_HOME"
+
+    pull_image "$platform" "$IMAGE"
+    
+    local envfile
+    envfile="$(create_env_file)"
+    
+    log "INFO" "Current working directory: $(pwd)"
+    # Debug info
+    podman image list
+    ls -al "$(pwd)"
+    id
+    
+    mapfile -t common_args < <(setup_common_args "$envfile")
+
+    log "INFO" "Running pre-run checks for platform: $platform"
+    pre_run_checks "$platform" "$envfile"
+
+    log "INFO" "Running container"
+    log "INFO" "Container arguments: ${common_args[*]}"
+    log "INFO" "Command: podman run ${common_args[*]} $IMAGE $*"
+    exec podman run "${common_args[@]}" "$IMAGE" "$@"
+}
+
+run "$@"

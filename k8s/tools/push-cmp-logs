@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+
+set -x
+set -euo pipefail
+
+
+echo "================================"
+echo "   Running push-cmp-logs script "
+echo "================================"
+
+HOME=$(mktemp -d)
+export HOME
+
+platform="${SYMPHONY_K8S_PLATFORM:?}"
+podname="${MY_POD_NAME:?}"
+namespace="${MY_POD_NAMESPACE:?}"
+logsbucket="${LOGS_BUCKET:?}"
+timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
+output_file="/tmp/${timestamp}_${podname}_${namespace}.tar.gz"
+user=$(id -un)
+log_files="/tmp/${user}.run-podman"
+
+
+if [[ -z "$logsbucket" ]]; then
+    echo "LOGS_BUCKET is not set, exiting."
+    exit 1
+fi
+
+# TODO: parametrize logs dir
+if [ -z "$(ls "$log_files"* 2>/dev/null)" ]; then
+    echo "No log files found, exiting."
+    exit 1
+fi
+
+# Copy logs if there are any errors
+if ! grep -iq "ERROR" "$log_files"*; then
+    echo "No errors found in log files, exiting."
+    exit 0
+fi
+
+tar -czvf "$output_file" "$log_files"*
+
+case "$platform" in
+    eks)
+        key_suffix=$(date +"%Y/%m/%d")
+        key="cmp-logs/${namespace}/${key_suffix}/${podname}.tar.gz"
+        aws s3 cp "$output_file" s3://"$logsbucket"/"$key"
+        ;;
+    # TODO: Implement the the run-podman log push for other platforms
+    aks)
+        echo "push-cmp-logs not implemented for $platform !!"
+        ;;
+    gke)
+        echo "push-cmp-logs not implemented for $platform !!"
+        ;;
+    mks)
+        echo "push-cmp-logs not implemented for $platform !!"
+        ;;
+    *)
+        echo "Unknown platform: $platform"
+        exit 1
+        ;;
+esac
