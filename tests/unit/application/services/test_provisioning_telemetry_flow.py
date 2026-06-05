@@ -201,3 +201,54 @@ async def test_no_routing_info_does_not_break_provider_data():
 
     assert result.success is True
     assert result.provider_data["some_key"] == "some_value"
+
+
+@pytest.mark.asyncio
+async def test_provider_template_defaults_are_resolved_before_dispatch():
+    """Provider defaults should reach provider strategies at request time."""
+    svc = _make_service()
+
+    provider_result = ProviderResult.success_result(
+        data={
+            "resource_ids": ["ocid1.instance.oc1..abc"],
+            "instances": [{"instance_id": "ocid1.instance.oc1..abc"}],
+            "instance_ids": ["ocid1.instance.oc1..abc"],
+        },
+        metadata={},
+    )
+    svc._provider_selection_port.execute_operation = AsyncMock(return_value=provider_result)
+
+    raw_template = {
+        "template_id": "oci-vm-flex-ondemand-small",
+        "provider_api": "OCICompute",
+        "machine_types": {"VM.Standard.E6.Flex": 1},
+        "subnet_ids": [],
+    }
+    resolved_template = {
+        **raw_template,
+        "image_id": "ocid1.image.oc1..img",
+        "subnet_ids": ["ocid1.subnet.oc1..subnet"],
+        "compartment_id": "ocid1.compartment.oc1..compartment",
+    }
+
+    scheduler = MagicMock()
+    scheduler.format_template_for_provider.return_value = raw_template
+    defaults_service = MagicMock()
+    defaults_service.resolve_template_defaults.return_value = resolved_template
+    svc._container.get.return_value = scheduler
+    svc._container.get_optional.return_value = defaults_service
+
+    result = await svc._dispatch_single_attempt(
+        _make_template(),
+        _make_request(),
+        _make_selection_result("oci-default"),
+        1,
+    )
+
+    assert result.success is True
+    defaults_service.resolve_template_defaults.assert_called_once_with(
+        raw_template,
+        "oci-default",
+    )
+    operation = svc._provider_selection_port.execute_operation.await_args.args[1]
+    assert operation.parameters["template_config"] == resolved_template

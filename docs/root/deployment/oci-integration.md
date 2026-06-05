@@ -84,8 +84,8 @@ Recommended:
 Typical CLI sequence:
 
 ```bash
-orb --config config/oci_config.json templates validate --file config/oci_templates.json --provider oci-default
-orb --config config/oci_config.json templates create --file config/oci_templates.json --provider oci-default
+orb --config config/oci_config.json templates validate --file config/oci_templates.json --template-id oci-vm-flex-ondemand-small --provider oci-default
+orb --config config/oci_config.json templates create --file config/oci_templates.json --template-id oci-vm-flex-ondemand-small --provider oci-default
 orb --config config/oci_config.json machines request --template-id oci-vm-flex-ondemand-small --count 1 --provider oci-default
 orb --config config/oci_config.json requests show --request-id <req-id> --provider oci-default
 orb --config config/oci_config.json machines return --machine-id <ocid1> --machine-id <ocid2> --provider oci-default
