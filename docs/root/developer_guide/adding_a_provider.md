@@ -93,8 +93,7 @@ src/orb/providers/
     types.py                           # Data classes describing a registration entry plus error and factory-interface types.
   base/
     strategy/
-      base_provider_strategy.py        # The minimal base class every provider strategy inherits from. Stores config and logger and provides default metadata.
-      provider_strategy.py             # Defines the strategy contract and the value objects (operation, result, health status, capabilities) used to talk to it.
+      provider_strategy.py             # The strategy contract every provider strategy inherits from (`ProviderStrategy(ABC)`), plus value objects (operation, result, health status, capabilities) used to talk to it.
       fallback_strategy.py             # A wrapper strategy: tries a primary provider, falls back to others when the primary keeps failing.
       composite_strategy.py            # A wrapper strategy: runs an operation across several providers at once (parallel, sequential, aggregated, etc.).
       load_balancing_strategy.py       # A wrapper strategy: spreads requests across multiple providers based on a load-balancing policy.
@@ -138,10 +137,13 @@ src/orb/providers/
     validation/                        # Field-level validators and constraint checks for AWS templates and configuration.
 ```
 
-`BaseProviderStrategy` provides almost nothing concrete: `__init__`,
-`get_provider_info`, and an empty `get_defaults_config()`. Almost every
-behaviour is delegated to focused services that the strategy composes,
-which is why a real provider expands to dozens of files.
+`ProviderStrategy` (in `src/orb/providers/base/strategy/provider_strategy.py`)
+is the abstract base every provider strategy inherits from. It defines
+the Strategy-pattern contract: `provider_type`, `initialize`,
+`execute_operation`, `get_capabilities`, `check_health`, name
+generate / parse / pattern hooks, and `cleanup`. Concrete cloud calls
+are delegated to focused services that the strategy composes, which is
+why a real provider expands to dozens of files.
 
 ---
 
@@ -165,38 +167,46 @@ provider's directory, stop, you are violating the bounded context.
 
 ---
 
-## 4. The Provider Port Contract
+## 4. The Provider Strategy Contract
 
 Every provider integration is a concrete subclass of
-`BaseProviderStrategy`, which implements the composite `ProviderPort`.
-Source of truth: `src/orb/domain/base/ports/provider_port.py`. The
-contract is split across five focused interfaces; concrete strategies
-inherit them all through `BaseProviderStrategy`.
+`ProviderStrategy` (`src/orb/providers/base/strategy/provider_strategy.py`).
+The contract has two parts:
 
-The HostFactory and AWS reference implementations are the canonical
-references. Skim the AWS strategy at
+1. The **Strategy-pattern surface** declared on `ProviderStrategy` itself:
+   `provider_type`, `initialize`, `execute_operation`, `get_capabilities`,
+   `check_health`, `cleanup`, plus name generate / parse / pattern hooks.
+2. The **focused domain ports** in `src/orb/domain/base/ports/`
+   (`ProviderProvisioningPort`, `ProviderTemplatePort`,
+   `ProviderMonitoringPort`, optional `ProviderDiscoveryPort`,
+   `ProviderValidationPort`). These are composed into `ProviderPort`,
+   which is what the rest of ORB types against. Concrete strategies
+   satisfy these via the focused services they compose, not by direct
+   inheritance from `ProviderPort`.
+
+The AWS reference implementation is canonical. Skim the AWS strategy at
 `src/orb/providers/aws/strategy/aws_provider_strategy.py` once before §5;
 do not edit it.
 
 ```mermaid
 classDiagram
     class ProviderProvisioningPort {
-        <<abstract>>
+        <<abstract port>>
         +provision_resources(request) list~Machine~
         +terminate_resources(machine_ids) None
     }
     class ProviderTemplatePort {
-        <<abstract>>
+        <<abstract port>>
         +get_available_templates() list~Template~
         +validate_template(template) bool
     }
     class ProviderMonitoringPort {
-        <<abstract>>
+        <<abstract port>>
         +get_resource_status(machine_ids) dict
         +get_provider_info() dict
     }
     class ProviderDiscoveryPort {
-        <<optional>>
+        <<abstract port, optional>>
         +discover_infrastructure(config) dict
         +discover_infrastructure_interactive(config) dict
         +validate_infrastructure(config) dict
@@ -209,23 +219,28 @@ classDiagram
         +validate_template_configuration(config) dict
     }
     class ProviderPort {
-        <<abstract>>
+        <<abstract composite>>
         +get_strategy(name) Any
         +discover_infrastructure(config) dict
+        +discover_infrastructure_interactive(config) dict
+        +validate_infrastructure(config) dict
     }
-    class BaseProviderStrategy {
+    class ProviderStrategy {
         <<abstract>>
-        +__init__(config, logger)
-        +get_provider_info() dict
-        +get_defaults_config() dict
+        +provider_type
+        +initialize() bool
+        +execute_operation(op) ProviderResult
+        +get_capabilities() ProviderCapabilities
+        +check_health() ProviderHealthStatus
+        +generate_provider_name(config) str
+        +parse_provider_name(name) dict
+        +get_provider_name_pattern() str
+        +cleanup() None
     }
     class AWSProviderStrategy {
-        +provision_resources(...) ...
-        +terminate_resources(...) ...
-        +get_available_templates() ...
-        +validate_template(...) ...
-        +get_resource_status(...) ...
-        +get_strategy(name) Any
+        +execute_operation(...) ProviderResult
+        +discover_infrastructure(...) dict
+        ... composes services satisfying focused ports ...
     }
     class MyProviderStrategy {
         <<your code>>
@@ -233,9 +248,8 @@ classDiagram
     ProviderProvisioningPort <|-- ProviderPort
     ProviderTemplatePort <|-- ProviderPort
     ProviderMonitoringPort <|-- ProviderPort
-    ProviderPort <|-- BaseProviderStrategy
-    BaseProviderStrategy <|-- AWSProviderStrategy
-    BaseProviderStrategy <|.. MyProviderStrategy : you implement
+    ProviderStrategy <|-- AWSProviderStrategy
+    ProviderStrategy <|.. MyProviderStrategy : you implement
 ```
 
 ### 4.1 Provisioning
@@ -257,18 +271,24 @@ classDiagram
 | Method | Purpose | Required? |
 |--------|---------|-----------|
 | `get_resource_status(machine_ids: list[str]) -> dict[str, Any]` | Look up current cloud-side state per machine. Return a mapping `machine_id -> {"status": <domain status>, ...}` using ORB's domain status vocabulary, not the cloud's raw codes. | Yes (abstract) |
-| `get_provider_info() -> dict[str, Any]` | Return provider metadata (type, version, capabilities). | Yes (abstract on `ProviderMonitoringPort`; base default at `BaseProviderStrategy.get_provider_info` returns `{"type": class_name, "config": self.config}`, override only when you want to expose more) |
+| `get_provider_info() -> dict[str, Any]` | Return provider metadata (type, version, capabilities). | Yes (abstract on `ProviderMonitoringPort`; concrete providers expose it via the strategy's `get_capabilities()` and the services they compose) |
 
 ### 4.4 Discovery (optional)
 
+`ProviderDiscoveryPort` itself declares all three methods
+`@abstractmethod`. The usable defaults live on the composite
+`ProviderPort`, which ships concrete (non-abstract) implementations
+returning per-method "not supported" envelopes:
+
 | Method | Purpose | Required? |
 |--------|---------|-----------|
-| `discover_infrastructure(config) -> dict` | Passive scan of cloud resources matching the config (subnets, security groups, AMIs). | No (base default returns `{"error": "Infrastructure discovery not supported"}`) |
-| `discover_infrastructure_interactive(config) -> dict` | Same, but may prompt the user during CLI runs. | No (base default returns the same error envelope) |
-| `validate_infrastructure(config) -> dict` | Validate discovered infrastructure against ORB requirements. | No (base default returns `{"error": ...}`) |
+| `discover_infrastructure(config) -> dict` | Passive scan of cloud resources matching the config (subnets, security groups, AMIs). | No (composite default returns `{"error": "Infrastructure discovery not supported"}`) |
+| `discover_infrastructure_interactive(config) -> dict` | Same, but may prompt the user during CLI runs. | No (composite default returns `{"error": "Interactive infrastructure discovery not supported"}`) |
+| `validate_infrastructure(config) -> dict` | Validate discovered infrastructure against ORB requirements. | No (composite default returns `{"error": "Infrastructure validation not supported"}`) |
 
-A provider that supports `orb infrastructure discover` must override these
-three methods. Most do not; AWS does (see
+The three error messages are distinct; do not parse for a single
+literal. A provider that supports `orb infrastructure discover` must
+override the methods. Most do not; AWS does (see
 `src/orb/providers/aws/services/infrastructure_discovery_service.py`).
 
 ### 4.5 Validation (Protocol, not ABC)
@@ -300,9 +320,12 @@ table.
 
 ### 4.6 Composite operations
 
-`ProviderPort.get_strategy(strategy_name)` is the only method on the
-composite port itself. Most providers return the strategy registered by
-name in their internal handler factory.
+`ProviderPort.get_strategy(strategy_name)` is the only abstract method
+declared directly on the composite port. Three concrete (non-abstract)
+defaults also live on `ProviderPort`: the discovery / interactive
+discovery / validate-infrastructure methods listed in §4.4. Most
+providers return the strategy registered by name in their internal
+handler factory.
 
 ---
 
@@ -333,7 +356,7 @@ src/orb/providers/myprovider/
     config.py                              (P)  Pydantic provider config used by create_myprovider_config().
   strategy/
     __init__.py                            (P)
-    myprovider_strategy.py                 (P)  Concrete subclass of BaseProviderStrategy implementing the three focused ports.
+    myprovider_strategy.py                 (P)  Concrete subclass of ProviderStrategy that composes services satisfying the focused ports.
   infrastructure/
     __init__.py                            (P)
     client.py                              (P)  SDK or REST client wrapper that handlers call into.
@@ -463,48 +486,116 @@ The AWS analogue is the `AWSClient` wrapper at
 
 ### 5.5 Strategy class (`strategy/myprovider_strategy.py`)
 
-Subclass `BaseProviderStrategy` and implement the abstract methods from
-§4. Do not put cloud-API logic in the strategy; delegate to focused
-services. The strategy is wiring.
+Subclass `ProviderStrategy` and implement its abstract members. Do not
+put cloud-API logic in the strategy; delegate to focused services. The
+strategy is wiring.
+
+`ProviderStrategy` requires (see
+`src/orb/providers/base/strategy/provider_strategy.py:139`):
+
+| Member | Purpose |
+|--------|---------|
+| `provider_type` (property) | Stable identifier (`"aws"`, `"myprovider"`). |
+| `initialize() -> bool` | One-shot setup: validate config, build clients. Return `True` on success. |
+| `execute_operation(op: ProviderOperation) -> ProviderResult` | Dispatch on `op.operation_type` to the right service (provision, terminate, status, validate, etc.). |
+| `get_capabilities() -> ProviderCapabilities` | Declare supported operations, APIs, features, limitations. |
+| `check_health() -> ProviderHealthStatus` | Liveness probe used by selection / fallback. |
+| `generate_provider_name(config) -> str` | Build a stable per-instance name from config. |
+| `parse_provider_name(name) -> dict[str, str]` | Inverse of generate. |
+| `get_provider_name_pattern() -> str` | Naming pattern, e.g. `"{type}_{project}_{region}"`. |
+| `cleanup() -> None` | Release resources at shutdown. |
 
 ```python
 # src/orb/providers/myprovider/strategy/myprovider_strategy.py
 from typing import Any
 
-from orb.providers.base.strategy.base_provider_strategy import BaseProviderStrategy
+from orb.providers.base.strategy.provider_strategy import (
+    ProviderCapabilities,
+    ProviderHealthStatus,
+    ProviderOperation,
+    ProviderOperationType,
+    ProviderResult,
+    ProviderStrategy,
+)
+from orb.providers.myprovider.configuration.config import MyProviderConfig
 
 
-class MyProviderStrategy(BaseProviderStrategy):
+class MyProviderStrategy(ProviderStrategy):
     """Provider strategy for MyCloud."""
 
-    def __init__(self, config: dict[str, Any], logger: Any) -> None:
-        super().__init__(config, logger)
+    def __init__(self, config: MyProviderConfig) -> None:
+        super().__init__(config)
         # Lazy services; constructed on first use
         self._instance_service = None
         self._template_service = None
-        self._health_service = None
+        self._handler_factory = None
 
-    # 4.1 Provisioning
-    def provision_resources(self, request):
-        return self._instance_svc().provision(request)
+    @property
+    def provider_type(self) -> str:
+        return "myprovider"
 
-    def terminate_resources(self, machine_ids):
-        self._instance_svc().terminate(machine_ids)
+    def initialize(self) -> bool:
+        # Validate credentials, build the SDK client. Cheap operations only.
+        self._initialized = True
+        return True
 
-    # 4.2 Templates
-    def get_available_templates(self):
-        return self._template_svc().list_available()
+    async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
+        try:
+            match operation.operation_type:
+                case ProviderOperationType.CREATE_INSTANCES:
+                    machines = self._instance_svc().provision(operation.parameters["request"])
+                    return ProviderResult.success_result(data=machines)
+                case ProviderOperationType.TERMINATE_INSTANCES:
+                    self._instance_svc().terminate(operation.parameters["machine_ids"])
+                    return ProviderResult.success_result()
+                case ProviderOperationType.GET_INSTANCE_STATUS:
+                    status = self._instance_svc().status(operation.parameters["machine_ids"])
+                    return ProviderResult.success_result(data=status)
+                case ProviderOperationType.GET_AVAILABLE_TEMPLATES:
+                    return ProviderResult.success_result(
+                        data=self._template_svc().list_available()
+                    )
+                case ProviderOperationType.VALIDATE_TEMPLATE:
+                    valid = self._template_svc().validate(operation.parameters["template"])
+                    return ProviderResult.success_result(data=valid)
+                case _:
+                    return ProviderResult.error_result(
+                        f"Unsupported operation: {operation.operation_type}"
+                    )
+        except Exception as exc:
+            return ProviderResult.error_result(str(exc))
 
-    def validate_template(self, template):
-        return self._template_svc().validate(template)
+    def get_capabilities(self) -> ProviderCapabilities:
+        return ProviderCapabilities(
+            provider_type=self.provider_type,
+            supported_operations=[
+                ProviderOperationType.CREATE_INSTANCES,
+                ProviderOperationType.TERMINATE_INSTANCES,
+                ProviderOperationType.GET_INSTANCE_STATUS,
+                ProviderOperationType.GET_AVAILABLE_TEMPLATES,
+                ProviderOperationType.VALIDATE_TEMPLATE,
+            ],
+            supported_apis=["InstanceGroup"],
+        )
 
-    # 4.3 Monitoring
-    def get_resource_status(self, machine_ids):
-        return self._instance_svc().status(machine_ids)
+    def check_health(self) -> ProviderHealthStatus:
+        # Cheap liveness probe; full per-dependency probes belong in
+        # services/health_check_service.py (see §5.11).
+        return ProviderHealthStatus.healthy("MyCloud reachable")
 
-    # 4.6 Composite
-    def get_strategy(self, strategy_name: str) -> Any:
-        return self._handler_factory().get(strategy_name)
+    def generate_provider_name(self, config: dict[str, Any]) -> str:
+        return f"myprovider_{config.get('project_id', 'default')}_{config.get('region', 'default')}"
+
+    def parse_provider_name(self, provider_name: str) -> dict[str, str]:
+        _, project_id, region = provider_name.split("_", 2)
+        return {"project_id": project_id, "region": region}
+
+    def get_provider_name_pattern(self) -> str:
+        return "{type}_{project_id}_{region}"
+
+    def cleanup(self) -> None:
+        # Release SDK clients, close connections.
+        self._initialized = False
 
     # ... lazy service constructors elided ...
 ```
@@ -517,10 +608,14 @@ Pitfalls to avoid:
 - Returning machine status using cloud-native vocabulary
   (`PROVISIONING`, `STAGING`, etc.). Always map to the domain
   `MachineStatus` enum.
-- Performing API calls during `__init__`. Strategies must construct
-  cheaply; deferred service construction makes tests fast.
-- Catching every exception and returning empty results. Let domain
-  exceptions propagate; the orchestrator handles them.
+- Performing API calls during `__init__`. `ProviderStrategy.__init__`
+  only stores config; do real setup in `initialize()`. Tests stay fast
+  this way, and the context-manager protocol on `ProviderStrategy`
+  calls `initialize()` lazily on first use.
+- Catching every exception and returning empty results. `execute_operation`
+  must always return a `ProviderResult`; map domain exceptions to
+  `ProviderResult.error_result(...)` so the orchestrator can surface
+  them. Do not swallow.
 
 > Files touched: `myprovider_strategy.py`.
 
@@ -534,7 +629,7 @@ dispatch via a factory.
 infrastructure/
   handler_factory.py              # API name -> handler class (sits at infrastructure/, not handlers/)
   handlers/
-    base_handler.py               # BaseProviderHandler ABC; common error mapping + retry hook
+    base_handler.py               # Provider-local handler ABC (e.g. AWSHandler + BaseAWSHandler[TRequest, TResponse]); common error mapping + retry hook. The framework-wide BaseProviderHandler lives at src/orb/application/base/, not here.
     <api_name>/                   # AWS uses asg/, ec2_fleet/, spot_fleet/, run_instances/
       handler.py                  # provision / terminate / status for one API
       config_builder.py           # Template -> API request body
@@ -583,40 +678,77 @@ Reference: `AWSRetryStrategy` (in
 
 ### 5.10 Exceptions (`exceptions/myprovider_exceptions.py`)
 
-Translate cloud SDK exceptions to domain exceptions at the lowest layer
-where they occur (the SDK wrapper). The SDK wrapper is the canonical
-translation boundary; handlers and helper modules that call boto3
-directly must perform the same translation rather than re-raise the
-SDK type.
+Translate cloud SDK exceptions at the lowest layer where they occur
+(the SDK wrapper). The SDK wrapper is the canonical translation
+boundary; handlers and helper modules that call the cloud SDK directly
+must perform the same translation rather than re-raise the SDK type.
 
-Mandatory mappings:
+There are two layers of exceptions in ORB. Use the right one for each
+cloud category.
 
-| Cloud category | Domain exception |
-|----------------|------------------|
-| Authentication / authorization failure | `AuthorizationError` |
-| Rate limit / throttling | `RateLimitError` |
-| Quota exceeded | `QuotaExceededError` |
-| Resource not found | `ResourceNotFoundError` |
-| Resource state mismatch | `ResourceStateError` (record current and expected states) |
-| Other transient I/O | retain SDK type wrapped as `<MyProvider>Error` extending `InfrastructureError` |
+**Domain exceptions (use directly).** Defined under `src/orb/domain/base/`:
 
-Reference: the full mapping table in `src/orb/providers/aws/exceptions/aws_exceptions.py`.
+| Cloud category | Domain exception | Path |
+|----------------|------------------|------|
+| Quota exceeded | `QuotaExceededError` (subclass of `QuotaError`) | `src/orb/domain/base/exceptions.py:93` |
+| Resource not found | `ResourceNotFoundError` (subclass of `ResourceException`) | `src/orb/domain/base/domain_exceptions.py:427` |
+| Other transient I/O | base class `InfrastructureError` | `src/orb/domain/base/exceptions.py:77` |
+
+> Note: `domain/base/exceptions.py` and `domain/base/domain_exceptions.py`
+> are two unrelated modules; `ResourceNotFoundError` does not subclass
+> `InfrastructureError`. Mirror these import paths exactly.
+
+**Provider-local exceptions (mirror per provider).** AWS defines its own
+classes under `src/orb/providers/aws/exceptions/aws_exceptions.py` for
+categories that do not have a canonical domain class today:
+
+| Cloud category | AWS class | Pattern for `myprovider` |
+|----------------|-----------|--------------------------|
+| Authentication / authorization failure | `AuthorizationError` (extends `AWSError`) | Define `MyProviderAuthorizationError` extending `MyProviderError`. |
+| Rate limit / throttling | `RateLimitError` (extends `AWSError`) | Define `MyProviderRateLimitError`. |
+| Resource state mismatch | `ResourceStateError` (extends `AWSError`; record current + expected states) | Define `MyProviderResourceStateError`. |
+
+Define a `MyProviderError` base extending `InfrastructureError` at the
+top of `myprovider_exceptions.py` so all provider-local classes share a
+common parent that the orchestrator can catch.
+
+Cloud-SDK-to-exception mapping logic does NOT live in
+`aws_exceptions.py` (that file only declares the classes). The actual
+boto3 error classifier lives at
+`src/orb/providers/aws/resilience/aws_retry_errors.py`. Mirror the
+same split for your provider: declare classes in `exceptions/`, classify
+SDK errors in `resilience/retry_errors.py` (§5.9).
 
 ### 5.11 Health checks (`services/health_check_service.py`)
 
-Register at least one probe per critical dependency. AWS registers three:
-STS (auth), EC2 (control plane), DynamoDB (state store). For a cloud
-without an external state store, two probes (auth + control plane) are
-the floor.
+Register at least one probe per critical dependency. AWS registers three
+under the keys `"aws"` (auth via STS `GetCallerIdentity`), `"ec2"`
+(control plane), and `"dynamodb"` (state store). The registered key is
+not always the same as the underlying API name (e.g. the auth probe
+calls STS but registers as `"aws"`). For a cloud without an external
+state store, two probes (auth + control plane) are the floor.
 
 Each probe must return a `ProviderHealthStatus` (Pydantic; defined in
-`src/orb/providers/base/strategy/provider_strategy.py`) with the
-fields `is_healthy: bool`, `status_message: str`,
-`response_time_ms: float`, and optional `error_details`. The probe
-must complete within `health_check.timeout` seconds (default 30, set
-in `HealthCheckConfig`). The monitoring layer ships a separate
-`HealthStatus` envelope (in `src/orb/monitoring/health.py`) used for
-system-wide aggregated status; do not confuse the two.
+`src/orb/providers/base/strategy/provider_strategy.py`) with the fields:
+
+| Field | Type | Default |
+|-------|------|---------|
+| `is_healthy` | `bool` | required |
+| `status_message` | `str` | required |
+| `last_check_time` | `Optional[str]` | `None` |
+| `response_time_ms` | `Optional[float]` | `None` |
+| `error_details` | `Optional[dict[str, Any]]` | `None` |
+
+Use the `ProviderHealthStatus.healthy(message, response_time_ms=...)` /
+`ProviderHealthStatus.unhealthy(message, error_details=...)` factory
+classmethods rather than constructing the object directly.
+
+The probe must complete within `health_check.timeout` seconds (default
+30, set in `HealthCheckConfig` at
+`src/orb/config/schemas/provider_strategy_schema.py:54`). The monitoring
+layer ships a separate `HealthStatus` envelope (in
+`src/orb/monitoring/health.py`) used for system-wide aggregated status;
+do not confuse the two.
 
 > Files touched: every file under `src/orb/providers/myprovider/`.
 
@@ -659,20 +791,28 @@ def create_myprovider_config(data: dict[str, Any]) -> "MyProviderConfig":
     return MyProviderConfig(**data)
 
 
-def create_myprovider_resolver(config: Any) -> Any:
-    """Reference resolver (image IDs, project IDs, etc.)."""
+def create_myprovider_resolver() -> Any:
+    """Reference resolver (image IDs, project IDs, etc.).
+
+    Mirrors `create_aws_resolver()` — takes no arguments. Per-instance
+    config is resolved lazily by the resolver itself when needed.
+    """
     from orb.providers.myprovider.services.image_resolution_service import (
         MyProviderImageResolver,
     )
-    return MyProviderImageResolver(config)
+    return MyProviderImageResolver()
 
 
-def create_myprovider_validator(config: Any) -> Any:
-    """Validator (implements ProviderValidationPort)."""
+def create_myprovider_validator(provider_config: Any = None) -> Any:
+    """Validator (implements ProviderValidationPort).
+
+    `provider_config` is optional and forwarded by the registry when
+    available; mirror `create_aws_validator`.
+    """
     from orb.providers.myprovider.infrastructure.adapters.validation_adapter import (
         MyProviderValidationAdapter,
     )
-    return MyProviderValidationAdapter(config)
+    return MyProviderValidationAdapter(provider_config)
 
 
 def register_myprovider_provider(
@@ -727,8 +867,11 @@ def register_all_provider_types() -> None:
     register_myprovider_provider(registry)
 ```
 
-The body around this dict (try/except, fallback wiring, instance-mode
-support) must be preserved.
+The current `register_all_provider_types()` body is just the bare
+imports and `register_*_provider(registry)` calls; there is no
+try/except, no policy dict, no fallback wiring at this layer. Fallback
+chains are built separately by `register_fallback_provider` (§7.2),
+not here.
 
 > Files touched: `src/orb/providers/registration.py`.
 
@@ -776,13 +919,20 @@ selected in `ProviderRegistry.__init__` (in
 providers can be registered simultaneously and one is selected per
 request based on `ProviderConfig.selection_policy`.
 
-Selection policies:
+Selection policies recognized by the registry's load-balancing dispatch
+(`_apply_load_balancing_strategy` in `provider_registry.py`):
 
 | Policy | Behaviour |
 |--------|-----------|
-| `FIRST_AVAILABLE` (default) | Pick the first provider whose health is `healthy` and whose validation accepts the template. |
-| `WEIGHTED_ROUND_ROBIN` | Distribute requests across providers using `ProviderInstanceConfig.weight`. |
-| `PRIORITY` | Lower `priority` value wins; ties broken by weight. |
+| `FIRST_AVAILABLE` | Pick the first provider in the list. |
+| `WEIGHTED_ROUND_ROBIN` | Sort by `priority` ascending; among the highest-priority instances, pick the one with the largest `weight`. |
+| `HEALTH_BASED` | Pick the lowest-`priority` instance (current implementation does not yet weight by health metrics). |
+
+If `selection_policy` is unset or set to any other value, the registry
+falls back to lowest-`priority`-wins selection. Every
+`ProviderInstanceConfig` carries a `priority: int` (default `0`,
+*lower = higher priority*) and a `weight: int` (default `100`); these
+fields drive the actual ordering regardless of the policy string.
 
 Selection happens through `ProviderSelectionPort`; your provider does
 not implement selection itself, only the validation hooks that allow it
@@ -808,11 +958,11 @@ function (§6.1). User config:
 ```json
 {
   "provider": {
-    "selection_policy": "PRIORITY",
+    "selection_policy": "WEIGHTED_ROUND_ROBIN",
     "providers": [
-      { "name": "aws-us-east", "type": "aws", "priority": 0,
+      { "name": "aws-us-east", "type": "aws", "priority": 0, "weight": 100,
         "config": { "region": "us-east-1" } },
-      { "name": "aws-eu-west", "type": "aws", "priority": 10,
+      { "name": "aws-eu-west", "type": "aws", "priority": 10, "weight": 100,
         "config": { "region": "eu-west-1" } },
       { "name": "myprovider-default", "type": "myprovider", "priority": 20,
         "config": { "api_endpoint": "https://api.mycloud.example", "region": "us-central1" } }
