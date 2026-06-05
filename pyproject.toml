@@ -283,6 +283,7 @@ include-package-data = true
 "*" = ["py.typed"]
 "orb.config" = ["default_config.json"]
 "orb.providers.aws.config" = ["*.json"]
+"orb.providers.oci.config" = ["*.json"]
 
 [tool.setuptools.data-files]
 "orb_scripts" = ["src/orb/infrastructure/scheduler/hostfactory/scripts/*.sh", "src/orb/infrastructure/scheduler/hostfactory/scripts/*.bat"]  # keep in sync with .project.yml build.package_root

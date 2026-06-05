@@ -17,6 +17,7 @@ CLI_AUTH_MODES = frozenset(
 )
 
 PRINCIPAL_AUTH_MODES = frozenset({"instance_principal", "resource_principal"})
+PROFILE_AUTH_MODES = frozenset({"profile", "default"})
 
 
 def build_oci_cli_extra_args(
@@ -27,15 +28,18 @@ def build_oci_cli_extra_args(
     """Build extra OCI CLI arguments for authentication.
 
     Precedence:
-    1. ``credential_source`` from ORB provider config (or ``ORB_OCI_CREDENTIAL_SOURCE``)
-    2. ``OCI_CLI_AUTH`` environment variable
-    3. ``--profile`` when a config profile is set
+    1. ``credential_source`` from ORB provider config
+    2. ``ORB_OCI_CREDENTIAL_SOURCE`` environment variable
+    3. ``OCI_CLI_AUTH`` environment variable
+    4. ``--profile`` when a config profile is set
 
     Principal-based auth never passes ``--profile`` (API key file not required).
     """
     source = (credential_source or os.environ.get("ORB_OCI_CREDENTIAL_SOURCE") or "").strip().lower()
     if source in CLI_AUTH_MODES:
         return ["--auth", source]
+    if source in PROFILE_AUTH_MODES:
+        return ["--profile", profile] if profile else []
 
     cli_auth = os.environ.get("OCI_CLI_AUTH", "").strip().lower()
     if cli_auth in CLI_AUTH_MODES:

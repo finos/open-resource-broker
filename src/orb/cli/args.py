@@ -44,10 +44,20 @@ def _register_builtin_provider_cli_specs() -> None:
     """Register built-in provider CLI specs used by providers add/update parsers."""
     try:
         from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
+    except Exception:
+        return
+
+    try:
         from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec
-        from orb.providers.oci.cli.oci_cli_spec import OCICLISpec
 
         CLISpecRegistry.register("aws", AWSCLISpec())
+    except Exception:
+        # Best-effort registration. Provider handlers still validate using available specs.
+        pass
+
+    try:
+        from orb.providers.oci.cli.oci_cli_spec import OCICLISpec
+
         CLISpecRegistry.register("oci", OCICLISpec())
     except Exception:
         # Best-effort registration. Provider handlers still validate using available specs.

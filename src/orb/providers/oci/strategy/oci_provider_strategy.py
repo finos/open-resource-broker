@@ -20,6 +20,7 @@ from orb.providers.base.strategy import (
 from orb.providers.oci.configuration.config import OCIProviderConfig
 from orb.providers.oci.handlers import OCIComputeHandler
 from orb.providers.oci.mapping import OCITemplateMapper
+from orb.providers.oci.services import OCIPricingService
 
 
 @injectable
@@ -93,7 +94,7 @@ class OCIProviderStrategy(ProviderStrategy):
                     "valid": len(missing) == 0,
                     "message": "OCI template validation complete",
                     "errors": missing,
-                    "pricing_estimate": OCITemplateMapper.estimate_hourly_cost(template_data),
+                    "pricing_estimate": OCIPricingService.estimate_hourly_cost(template_data),
                 },
                 {"provider": "oci", "operation": "validate_template"},
             )

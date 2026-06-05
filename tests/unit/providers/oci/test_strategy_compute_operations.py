@@ -360,6 +360,89 @@ async def test_create_instances_preemptible_fallback_to_ondemand() -> None:
 
 
 @pytest.mark.asyncio
+async def test_create_instances_cli_unavailable_outside_mock_returns_error() -> None:
+    strategy = _make_strategy()
+    handler = strategy._compute_handler
+    handler._oci_cli_available = False
+    handler._is_test_context = MagicMock(return_value=False)
+
+    operation = ProviderOperation(
+        operation_type=ProviderOperationType.CREATE_INSTANCES,
+        parameters={
+            "template_id": "tpl-oci",
+            "count": 1,
+            "image_id": "ocid1.image.oc1..img",
+            "instance_type": "VM.Standard.E6.Flex",
+            "subnet_ids": ["ocid1.subnet.oc1..subnet"],
+            "compartment_id": "ocid1.compartment.oc1..compartment",
+        },
+    )
+
+    result = await strategy.execute_operation(operation)
+
+    assert result.success is False
+    assert result.error_code == "OCI_CLI_UNAVAILABLE"
+
+
+@pytest.mark.asyncio
+async def test_create_instances_live_launch_failure_returns_error_without_mock_ids() -> None:
+    strategy = _make_strategy()
+    handler = strategy._compute_handler
+    handler._oci_cli_available = True
+    handler._force_live_cli_for_tests = True
+    handler._run_oci = MagicMock(side_effect=RuntimeError("NotAuthorizedOrNotFound"))
+
+    operation = ProviderOperation(
+        operation_type=ProviderOperationType.CREATE_INSTANCES,
+        parameters={
+            "template_id": "tpl-oci-live-fail",
+            "count": 1,
+            "image_id": "ocid1.image.oc1..img",
+            "instance_type": "VM.Standard.E6.Flex",
+            "subnet_ids": ["ocid1.subnet.oc1..subnet"],
+            "compartment_id": "ocid1.compartment.oc1..compartment",
+            "availability_domain": "kIdk:FRA-AD-1",
+        },
+    )
+
+    result = await strategy.execute_operation(operation)
+
+    assert result.success is False
+    assert result.error_code == "OCI_LAUNCH_FAILED"
+    assert result.metadata["launched_instance_ids"] == []
+
+
+@pytest.mark.asyncio
+async def test_create_instances_preemptible_fallback_failure_returns_error() -> None:
+    strategy = _make_strategy()
+    handler = strategy._compute_handler
+    handler._oci_cli_available = True
+    handler._force_live_cli_for_tests = True
+    handler._run_oci = MagicMock(side_effect=RuntimeError("capacity still unavailable"))
+
+    operation = ProviderOperation(
+        operation_type=ProviderOperationType.CREATE_INSTANCES,
+        parameters={
+            "template_id": "tpl-oci-preemptible-fallback-fail",
+            "count": 1,
+            "image_id": "ocid1.image.oc1..img",
+            "instance_type": "VM.Standard.E6.Flex",
+            "subnet_ids": ["ocid1.subnet.oc1..subnet"],
+            "compartment_id": "ocid1.compartment.oc1..compartment",
+            "availability_domain": "kIdk:FRA-AD-1",
+            "capacity_type": "preemptible",
+            "fallback_to_ondemand": True,
+        },
+    )
+
+    result = await strategy.execute_operation(operation)
+
+    assert result.success is False
+    assert result.error_code == "OCI_LAUNCH_FAILED"
+    assert result.metadata["fallback_attempted"] is True
+
+
+@pytest.mark.asyncio
 async def test_get_instance_status_supports_instance_ids_live_cli() -> None:
     strategy = _make_strategy()
     handler = strategy._compute_handler
@@ -402,6 +485,42 @@ async def test_terminate_instances_supports_instance_ids_live_cli() -> None:
 
     assert result.success is True
     assert result.data["terminated_machine_ids"] == ["ocid1.instance.oc1..realinstanceid"]
+
+
+def test_terminate_instances_live_failure_returns_error() -> None:
+    strategy = _make_strategy()
+    handler = strategy._compute_handler
+    handler._oci_cli_available = True
+    handler._force_live_cli_for_tests = True
+    handler._run_oci = MagicMock(side_effect=RuntimeError("terminate denied"))
+
+    operation = ProviderOperation(
+        operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+        parameters={"instance_ids": ["ocid1.instance.oc1..realinstanceid"]},
+    )
+
+    result = strategy._compute_handler.terminate_instances(operation)
+
+    assert result.success is False
+    assert result.error_code == "OCI_TERMINATE_FAILED"
+
+
+def test_get_instance_status_live_failure_returns_error() -> None:
+    strategy = _make_strategy()
+    handler = strategy._compute_handler
+    handler._oci_cli_available = True
+    handler._force_live_cli_for_tests = True
+    handler._run_oci = MagicMock(side_effect=RuntimeError("status denied"))
+
+    operation = ProviderOperation(
+        operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
+        parameters={"instance_ids": ["ocid1.instance.oc1..realinstanceid"]},
+    )
+
+    result = strategy._compute_handler.get_instance_status(operation)
+
+    assert result.success is False
+    assert result.error_code == "OCI_STATUS_FAILED"
 
 
 @pytest.mark.asyncio

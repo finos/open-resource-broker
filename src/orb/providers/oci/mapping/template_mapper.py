@@ -4,25 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
+from orb.providers.oci.services import OCIPricingService
+
 
 class OCITemplateMapper:
     """Maps provider-agnostic template fields to OCI launch payload fields."""
 
     REQUIRED_FIELDS = ("template_id", "image_id", "shape", "subnet_id", "compartment_id")
     CAPACITY_TYPES = {"ondemand", "preemptible"}
-    # OCI pricing is region-stable in this integration. Values are reference defaults
-    # and can be overridden per template under pricing.overrides.
-    DEFAULT_PRICING = {
-        "currency": "USD",
-        "storage_gb_hourly": 0.00006,
-        "shape_family_rates": {
-            "VM.Standard.E6.Flex": {"ocpu_hourly": 0.04, "memory_gb_hourly": 0.004},
-            "VM.Standard.E5.Flex": {"ocpu_hourly": 0.04, "memory_gb_hourly": 0.004},
-            "VM.Standard3.Flex": {"ocpu_hourly": 0.043, "memory_gb_hourly": 0.0043},
-        },
-        "preemptible_discount": 0.5,
-    }
-
     @staticmethod
     def _shape_family(shape: str | None) -> str | None:
         if not isinstance(shape, str) or not shape:
@@ -183,62 +172,8 @@ class OCITemplateMapper:
 
     @classmethod
     def estimate_hourly_cost(cls, template: dict[str, Any]) -> dict[str, Any]:
-        normalized = cls.normalize_template_fields(template)
-        pricing_cfg = dict(cls.DEFAULT_PRICING)
-        pricing_overrides = normalized.get("pricing") or {}
-        if isinstance(pricing_overrides, dict):
-            if isinstance(pricing_overrides.get("overrides"), dict):
-                pricing_cfg.update(pricing_overrides["overrides"])
-            else:
-                pricing_cfg.update(pricing_overrides)
-
-        shape_family = normalized.get("shape_family")
-        shape_rates = (
-            (pricing_cfg.get("shape_family_rates") or {}).get(shape_family, {})
-            if shape_family
-            else {}
-        )
-        ocpu_rate = cls._to_float(shape_rates.get("ocpu_hourly")) or 0.0
-        memory_rate = cls._to_float(shape_rates.get("memory_gb_hourly")) or 0.0
-        storage_rate = cls._to_float(pricing_cfg.get("storage_gb_hourly")) or 0.0
-
-        ocpus = cls._to_float(normalized.get("ocpus")) or 0.0
-        memory_gbs = cls._to_float(normalized.get("memory_gbs")) or 0.0
-        storage_gbs = cls._to_float(normalized.get("boot_volume_gbs")) or 0.0
-
-        compute_hourly = (ocpus * ocpu_rate) + (memory_gbs * memory_rate)
-        storage_hourly = storage_gbs * storage_rate
-        total_hourly = compute_hourly + storage_hourly
-
-        capacity_type = normalized.get("capacity_type")
-        discount = 1.0
-        if capacity_type == "preemptible":
-            discount_value = cls._to_float(pricing_cfg.get("preemptible_discount"))
-            if discount_value is not None:
-                discount = max(0.0, min(1.0, discount_value))
-                total_hourly = total_hourly * discount
-                compute_hourly = compute_hourly * discount
-
-        return {
-            "currency": pricing_cfg.get("currency", "USD"),
-            "capacity_type": capacity_type,
-            "shape_family": shape_family,
-            "compute_hourly": round(compute_hourly, 6),
-            "storage_hourly": round(storage_hourly, 6),
-            "total_hourly": round(total_hourly, 6),
-            "inputs": {
-                "ocpus": ocpus,
-                "memory_gbs": memory_gbs,
-                "storage_gbs": storage_gbs,
-            },
-            "rates": {
-                "ocpu_hourly": ocpu_rate,
-                "memory_gb_hourly": memory_rate,
-                "storage_gb_hourly": storage_rate,
-                "preemptible_discount": discount if capacity_type == "preemptible" else None,
-            },
-            "rate_source": "oci_global_reference_rates",
-        }
+        """Compatibility wrapper; pricing logic lives in OCIPricingService."""
+        return OCIPricingService.estimate_hourly_cost(template)
 
     @classmethod
     def build_launch_payload(cls, template: dict[str, Any], display_name: str) -> dict[str, Any]:
@@ -262,7 +197,7 @@ class OCITemplateMapper:
             "freeform_tags": normalized.get("tags") or {},
             "capacity_type": normalized.get("capacity_type"),
             "boot_volume_gbs": normalized.get("boot_volume_gbs"),
-            "pricing_estimate": cls.estimate_hourly_cost(template),
+            "pricing_estimate": OCIPricingService.estimate_hourly_cost(template),
             "fallback_to_ondemand": normalized.get("fallback_to_ondemand", False),
         }
         if normalized.get("capacity_type") == "preemptible":

@@ -12,9 +12,10 @@ def register_all_provider_types() -> None:
 
     register_aws_provider(registry)
 
-    # Future providers would be added here
-    # register_provider1_provider(registry)
-    # register_provider2_provider(registry)
+    # Register OCI provider
+    from orb.providers.oci.registration import register_oci_provider
+
+    register_oci_provider(registry)
 
 
 def register_fallback_provider(

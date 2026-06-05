@@ -23,6 +23,7 @@
         "template_defaults": {
           "provider_api": "OCICompute",
           "price_type": "ondemand",
+          "capacity_type": "ondemand",
           "max_number": 1
         }
       }

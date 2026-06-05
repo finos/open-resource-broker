@@ -5,6 +5,7 @@ import argparse
 import pytest
 
 from orb.cli.args import (
+    _register_builtin_provider_cli_specs,
     add_machine_actions,
     add_provider_actions,
     add_request_actions,
@@ -153,6 +154,27 @@ def test_providers_update_accepts_oci_flags():
     )
     assert ns.provider_name == "oci-default"
     assert ns.oci_region == "us-ashburn-1"
+
+
+def test_builtin_cli_spec_registration_keeps_aws_when_oci_import_fails(monkeypatch):
+    import builtins
+
+    from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
+
+    CLISpecRegistry._specs.clear()
+    real_import = builtins.__import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "orb.providers.oci.cli.oci_cli_spec":
+            raise ImportError("simulated OCI spec failure")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    _register_builtin_provider_cli_specs()
+
+    assert CLISpecRegistry.get("aws") is not None
+    assert CLISpecRegistry.get("oci") is None
 
 
 # ---------------------------------------------------------------------------

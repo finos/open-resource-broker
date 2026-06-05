@@ -20,6 +20,12 @@ def test_profile_when_no_principal_source(monkeypatch) -> None:
     assert args == ["--profile", "DEFAULT"]
 
 
+def test_config_profile_source_beats_oci_cli_auth_env() -> None:
+    with patch.dict(os.environ, {"OCI_CLI_AUTH": "instance_principal"}, clear=False):
+        args = build_oci_cli_extra_args(profile="DEFAULT", credential_source="profile")
+    assert args == ["--profile", "DEFAULT"]
+
+
 def test_oci_cli_auth_env_fallback() -> None:
     with patch.dict(os.environ, {"OCI_CLI_AUTH": "instance_principal"}, clear=False):
         args = build_oci_cli_extra_args(profile="DEFAULT", credential_source=None)

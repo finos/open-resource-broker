@@ -10,9 +10,9 @@ On OCI VMs, auth is usually **instance principal**. The OCI CLI supports this vi
 oci --auth instance_principal ...
 ```
 
-ORB invokes the OCI CLI as a subprocess. Without `--auth instance_principal`, the CLI looks for `~/.oci/config`. That fails or hangs interactively, and the OCI handler **falls back to mock instance OCIDs** (`ocid1.instance.oc1..mock1`).
+ORB invokes the OCI CLI as a subprocess. Without `--auth instance_principal`, the CLI looks for `~/.oci/config`. That fails or hangs interactively, and ORB now returns a provider error in live mode instead of silently accepting mock instance OCIDs.
 
-Mock IDs mean the request “completed” in ORB but **no real VM was created**. Always verify IDs look like `ocid1.instance.oc1.phx....`, not `...mock...`.
+Mock IDs should only appear in explicit test/dry-run mode. Always verify live IDs look like `ocid1.instance.oc1.phx....`, not `...mock...`.
 
 ## Solution (ORB 1.6+)
 
@@ -26,7 +26,7 @@ Mock IDs mean the request “completed” in ORB but **no real VM was created**.
 
 ## ORB provider config
 
-Copy `config/oci_config.example.json` to `config/oci_config.json` (gitignored) or merge into `config/config.json`:
+Copy `config/oci_config.remote.example.json` to `config/oci_config.json` (gitignored) or merge into `config/config.json`:
 
 ```json
 {
@@ -227,21 +227,22 @@ Allow dynamic-group orb-broker-instances to manage all-resources in compartment 
 
 ## Templates
 
-`config/oci_templates.json` must match the IAM-scoped subnet and region.
+`config/oci_config.json` and `config/oci_templates.json` must match the IAM-scoped subnet and region. Environment-specific values live in `provider_defaults.oci.template_defaults`; compute-grid choices live in `config/oci_templates.json`.
 
-- `subnet_ids` → OCID in the policy `where target.subnet.id = '...'` clause.
-- `metadata.compartment_id` → compartment where instances are created.
-- `availability_domain` → from instance metadata (skips subnet GET if IAM read is limited).
+- `subnet_ids` -> OCID in the policy `where target.subnet.id = '...'` clause.
+- `compartment_id` -> compartment where instances are created.
+- `availability_domain` -> optional explicit availability domain (skips subnet GET if IAM read is limited).
 
 ```json
-"subnet_ids": [
-  "ocid1.subnet.oc1.phx.aaaaaaaa..."
-],
-"metadata": {
-  "compartment_id": "ocid1.compartment.oc1..aaaa...",
-  "availability_domain": "pILZ:PHX-AD-1"
-},
-"availability_domain": "pILZ:PHX-AD-1"
+"provider_defaults": {
+  "oci": {
+    "template_defaults": {
+      "subnet_ids": ["ocid1.subnet.oc1.phx.aaaaaaaa..."],
+      "compartment_id": "ocid1.compartment.oc1..aaaa...",
+      "availability_domain": "pILZ:PHX-AD-1"
+    }
+  }
+}
 ```
 
 Sync after edits:
@@ -346,12 +347,12 @@ The gate fails if any instance ID contains `mock` (unless `--allow-mock-ocids`).
 
 | Symptom | Likely cause | Fix |
 |---------|----------------|-----|
-| Mock OCIDs (`...mock1`) | Launch failed; ORB fallback | Fix IAM; confirm `credential_source`; check `logs/orb.log` for `OCI live launch failed` |
+| Mock OCIDs (`...mock1`) in live runs | Test/dry-run path leaked into live flow | Treat as a bug; live launch failures should return provider errors |
 | Hang on `oci` | Missing config, interactive prompt | `credential_source: instance_principal`; remove `profile` |
 | `NotAuthorizedOrNotFound` on launch; volume create OK | Missing `use instances`, `use virtual-network-family`, or **service compute** policies | Add policy blocks above |
 | `NotAuthorizedOrNotFound` on launch; instance update OK | Missing **`use instances`** (manage ≠ use for launch) | Add `use instances in compartment ...` |
 | Policy builder: `No permissions found` | Invalid statement grammar | Remove `inspect availability-domains`; avoid `where target.vcn.id` on `virtual-network-family` |
-| Subnet get 404 | Wrong subnet or IAM read | Align template subnet OCID with policy; set `availability_domain` on template |
+| Subnet get 404 | Wrong subnet or IAM read | Align config default subnet OCID with policy; set `availability_domain` in template defaults or the template |
 | Wrong region | Config vs OCID mismatch | Set `region` to image/subnet region (e.g. `us-phoenix-1`) |
 | Launch CLI typo | Bad `--region` or missing `--auth` | Use `--region us-phoenix-1` and `--auth instance_principal` |
 
@@ -368,7 +369,7 @@ Shows the exact `oci` command and stderr from the handler.
 ## Code references
 
 - `src/orb/providers/oci/oci_cli_auth.py` — builds `--auth` / `--profile` args
-- `src/orb/providers/oci/handlers/oci_compute_handler.py` — launch/terminate/status; mock fallback on CLI failure
+- `src/orb/providers/oci/handlers/oci_compute_handler.py` — launch/terminate/status; live OCI failures return provider errors
 - `src/orb/providers/oci/configuration/config.py` — `credential_source` field + validation
 - `dev-tools/oci/run_pre_live_gate.py` — end-to-end smoke with mock OCID rejection
 

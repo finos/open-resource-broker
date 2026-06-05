@@ -10,6 +10,7 @@
         "type": "oci",
         "enabled": true,
         "weight": 100,
+        "capabilities": ["OCICompute"],
         "config": {
           "region": "us-phoenix-1",
           "credential_source": "instance_principal"
@@ -18,7 +19,29 @@
     ],
     "selection_policy": "FIRST_AVAILABLE",
     "default_provider_type": "oci",
-    "provider_defaults": {}
+    "provider_defaults": {
+      "oci": {
+        "template_defaults": {
+          "provider_name": "oci-default",
+          "provider_api": "OCICompute",
+          "provider_type": "oci",
+          "image_id": "ocid1.image.oc1..<replace-image-ocid>",
+          "subnet_ids": [
+            "ocid1.subnet.oc1..<replace-subnet-ocid>"
+          ],
+          "security_group_ids": [
+            "ocid1.networksecuritygroup.oc1..<replace-nsg-ocid>"
+          ],
+          "compartment_id": "ocid1.compartment.oc1..<replace-compartment-ocid>",
+          "ssh_authorized_keys": "<replace-with-public-key>",
+          "user_data": "IyEvYmluL2Jhc2gKZWNobyAnb2NpLWNhbmFyeScK",
+          "tags": {
+            "env": "dev",
+            "managed_by": "orb"
+          }
+        }
+      }
+    }
   },
   "storage": {
     "strategy": "json",

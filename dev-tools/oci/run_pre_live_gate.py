@@ -143,7 +143,11 @@ def main() -> int:
     parser.add_argument("--config", required=True, type=Path, help="Path to ORB config json")
     parser.add_argument("--template-file", required=True, type=Path, help="Path to OCI template json")
     parser.add_argument("--provider", default="oci-default", help="Provider instance name")
-    parser.add_argument("--template-id", default="oci-canary-template", help="Template ID")
+    parser.add_argument(
+        "--template-id",
+        default="oci-vm-flex-ondemand-small",
+        help="Template ID",
+    )
     parser.add_argument("--orb-bin", default="orb", help="ORB executable")
     parser.add_argument("--counts", default="1,2", help="Comma-separated machine counts (example: 1,2)")
     parser.add_argument("--poll-interval", type=int, default=5, help="Polling interval seconds")

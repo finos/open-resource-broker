@@ -14,6 +14,7 @@ from orb.domain.base.ports import LoggingPort
 from orb.providers.base.strategy import ProviderOperation, ProviderResult
 from orb.providers.oci.mapping import OCITemplateMapper
 from orb.providers.oci.oci_cli_auth import build_oci_cli_extra_args
+from orb.providers.oci.services import OCIPricingService
 
 
 class OCIComputeHandler:
@@ -43,6 +44,12 @@ class OCIComputeHandler:
         if self._force_live_cli_for_tests:
             return True
         return not self._is_test_context()
+
+    def _use_mock_mode(self, operation: ProviderOperation) -> bool:
+        context = operation.context or {}
+        return self._is_test_context() or bool(
+            context.get("dry_run") or context.get("mock") or context.get("allow_mock")
+        )
 
     @staticmethod
     def _infer_region_from_ocid(ocid: str | None) -> str | None:
@@ -287,7 +294,7 @@ class OCIComputeHandler:
 
         instance_ids: list[str] = []
         instances: list[dict[str, Any]] = []
-        pricing_estimate = OCITemplateMapper.estimate_hourly_cost(merged_template)
+        pricing_estimate = OCIPricingService.estimate_hourly_cost(merged_template)
         effective_capacity_types: list[str] = []
         fallback_attempted_any = False
         if self._use_live_cli():
@@ -344,33 +351,21 @@ class OCIComputeHandler:
                         }
                     )
             except Exception as exc:
-                self._logger.warning(
-                    "OCI live launch failed, falling back to mock IDs: %s",
-                    exc,
-                )
-                instance_ids = [f"ocid1.instance.oc1..mock{idx+1}" for idx in range(requested)]
-                instances = [
+                self._logger.error("OCI live launch failed for template %s: %s", template_id, exc)
+                return ProviderResult.error_result(
+                    f"OCI live launch failed: {exc}",
+                    "OCI_LAUNCH_FAILED",
                     {
-                        "instance_id": instance_id,
-                        "resource_id": instance_id,
-                        "instance_type": normalized_template.get("shape"),
-                        "image_id": normalized_template.get("image_id"),
-                        "metadata": {
-                            "provider": "oci",
-                            "provider_api": "OCICompute",
-                            "compartment_id": normalized_template.get("compartment_id"),
-                            "subnet_id": normalized_template.get("subnet_id"),
-                            "capacity_type": normalized_template.get("capacity_type"),
-                            "pricing_estimate": pricing_estimate,
-                        },
-                    }
-                    for instance_id in instance_ids
-                ]
-                effective_capacity_types = [normalized_template.get("capacity_type", "ondemand")] * len(
-                    instance_ids
+                        "operation": "create_instances",
+                        "provider": "oci",
+                        "request_id": request_id,
+                        "template_id": template_id,
+                        "launched_instance_ids": instance_ids,
+                        "fallback_attempted": fallback_attempted_any,
+                    },
                 )
-        else:
-            # Fallback for test/local environments where OCI CLI is unavailable.
+        elif self._use_mock_mode(operation):
+            # Explicit test/dry-run fallback only. Production live failures must surface.
             instance_ids = [f"ocid1.instance.oc1..mock{idx+1}" for idx in range(requested)]
             instances = [
                 {
@@ -391,6 +386,12 @@ class OCIComputeHandler:
             ]
             effective_capacity_types = [normalized_template.get("capacity_type", "ondemand")] * len(
                 instance_ids
+            )
+        else:
+            return ProviderResult.error_result(
+                "OCI CLI is not available; install oci-cli or run in explicit dry-run/mock mode",
+                "OCI_CLI_UNAVAILABLE",
+                {"operation": "create_instances", "provider": "oci"},
             )
 
         self._logger.info(
@@ -444,10 +445,22 @@ class OCIComputeHandler:
                         ]
                     )
             except Exception as exc:
-                self._logger.warning(
-                    "OCI live terminate failed, returning accepted fallback: %s",
-                    exc,
+                self._logger.error("OCI live terminate failed: %s", exc)
+                return ProviderResult.error_result(
+                    f"OCI live terminate failed: {exc}",
+                    "OCI_TERMINATE_FAILED",
+                    {
+                        "operation": "terminate_instances",
+                        "provider": "oci",
+                        "machine_ids": machine_ids,
+                    },
                 )
+        elif not self._use_mock_mode(operation):
+            return ProviderResult.error_result(
+                "OCI CLI is not available; install oci-cli or run in explicit dry-run/mock mode",
+                "OCI_CLI_UNAVAILABLE",
+                {"operation": "terminate_instances", "provider": "oci"},
+            )
 
         return ProviderResult.success_result(
             {
@@ -480,19 +493,27 @@ class OCIComputeHandler:
                         "provider_api": "OCICompute",
                     }
             except Exception as exc:
-                self._logger.warning(
-                    "OCI live status check failed, returning unknown fallback: %s",
-                    exc,
+                self._logger.error("OCI live status check failed: %s", exc)
+                return ProviderResult.error_result(
+                    f"OCI live status check failed: {exc}",
+                    "OCI_STATUS_FAILED",
+                    {
+                        "operation": "get_instance_status",
+                        "provider": "oci",
+                        "machine_ids": machine_ids,
+                    },
                 )
-                statuses = {
-                    machine_id: {"status": "unknown", "provider_api": "OCICompute"}
-                    for machine_id in machine_ids
-                }
-        else:
+        elif self._use_mock_mode(operation):
             statuses = {
                 machine_id: {"status": "unknown", "provider_api": "OCICompute"}
                 for machine_id in machine_ids
             }
+        else:
+            return ProviderResult.error_result(
+                "OCI CLI is not available; install oci-cli or run in explicit dry-run/mock mode",
+                "OCI_CLI_UNAVAILABLE",
+                {"operation": "get_instance_status", "provider": "oci"},
+            )
 
         return ProviderResult.success_result(
             {"instances": statuses},
