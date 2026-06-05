@@ -21,6 +21,27 @@ from orb.infrastructure.logging.logger import get_logger
 __all__ = ["main", "parse_args", "execute_command"]
 
 
+def _preload_explicit_config(args, logger) -> None:
+    """Make --config the DI-managed configuration before overrides run."""
+    config_path = getattr(args, "config", None)
+    if not config_path:
+        return
+
+    try:
+        # Importing bootstrap registers the container factory before get_container().
+        import orb.bootstrap  # noqa: F401
+        from orb.config.managers.configuration_manager import ConfigurationManager
+        from orb.infrastructure.di.container import get_container
+
+        container = get_container()
+        container.register_instance(
+            ConfigurationManager,
+            ConfigurationManager(config_file=config_path),
+        )
+    except Exception as e:
+        logger.warning("Failed to preload explicit configuration: %s", e, exc_info=True)
+
+
 async def _show_resource_help(resource):
     """Show help for a resource when no action is provided."""
     import subprocess  # nosec B404
@@ -79,6 +100,8 @@ async def main() -> None:
 
         getattr(logging, args.log_level.upper())
         logger = get_logger(__name__)
+
+        _preload_explicit_config(args, logger)
 
         # Handle help display early - no need for app initialization
         if (

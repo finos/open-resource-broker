@@ -185,6 +185,7 @@ def register_orchestrators(container: DIContainer) -> None:
                 command_bus=c.get(CommandBus),
                 query_bus=c.get(QueryBus),
                 logger=c.get(LoggingPort),
+                template_defaults_service=c.get_optional(TemplateDefaultsPort),
             ),
         )
     if not container.is_registered(RefreshTemplatesOrchestrator):

@@ -199,13 +199,14 @@ async def handle_create_template(
         )
 
     provider_api = template_config.get("provider_api") or template_config.get("providerApi")
-    provider_name = template_config.get("provider_name") or template_config.get("providerName")
+    provider_name = (
+        getattr(args, "provider", None)
+        or getattr(args, "provider_name", None)
+        or template_config.get("provider_name")
+        or template_config.get("providerName")
+    )
 
     image_id = template_config.get("image_id") or template_config.get("imageId")
-    if not image_id:
-        return InterfaceResponse(
-            data={"success": False, "error": "image_id is required in template file"}, exit_code=1
-        )
 
     if getattr(args, "validate_only", False):
         return {
@@ -514,8 +515,18 @@ async def handle_validate_template(
             )
 
         template_id = template_config.get("template_id", "file-template")
+        provider_name = (
+            getattr(args, "provider", None)
+            or getattr(args, "provider_name", None)
+            or template_config.get("provider_name")
+            or template_config.get("providerName")
+        )
         result = await orchestrator.execute(
-            ValidateTemplateInput(template_id=template_id, config=template_config)
+            ValidateTemplateInput(
+                template_id=template_id,
+                config=template_config,
+                provider_name=provider_name,
+            )
         )
         return formatter.format_template_mutation(
             {

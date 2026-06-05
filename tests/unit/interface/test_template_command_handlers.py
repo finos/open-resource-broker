@@ -205,6 +205,47 @@ class TestHandleCreateTemplateDefaultsFirst:
         create_input = mock_orchestrator.execute.call_args.args[0]
         assert create_input.provider_name == "oci-primary"
 
+    def test_create_allows_image_id_from_provider_defaults(self, tmp_path):
+        import asyncio
+
+        from orb.application.services.orchestration.create_template import (
+            CreateTemplateOrchestrator,
+        )
+        from orb.application.services.orchestration.dtos import CreateTemplateOutput
+        from orb.interface.template_command_handlers import handle_create_template
+
+        template_file = self._make_template_file(
+            tmp_path,
+            {
+                "template_id": "oci-vm-flex-ondemand-small",
+                "provider_api": "OCICompute",
+                "provider_name": "oci-default",
+            },
+        )
+
+        mock_orchestrator = MagicMock(spec=CreateTemplateOrchestrator)
+        mock_orchestrator.execute = AsyncMock(
+            return_value=CreateTemplateOutput(
+                template_id="oci-vm-flex-ondemand-small",
+                created=True,
+                validation_errors=[],
+            )
+        )
+        container = _make_container(orchestrator=mock_orchestrator)
+        args = _make_args(file=template_file, provider="oci-default", validate_only=False)
+
+        with patch("orb.interface.template_command_handlers.get_container", return_value=container):
+            with patch(
+                "orb.infrastructure.mocking.dry_run_context.is_dry_run_active",
+                return_value=False,
+            ):
+                result = asyncio.run(handle_create_template(args))
+
+        assert result.data["success"] is True
+        create_input = mock_orchestrator.execute.call_args.args[0]
+        assert create_input.image_id is None
+        assert create_input.provider_name == "oci-default"
+
 
 class TestTemplateBundleSelection:
     """Tests for selecting a template from bundle files."""
@@ -283,6 +324,50 @@ class TestTemplateBundleSelection:
         assert create_input.template_id == "oci-large"
         assert create_input.image_id == "ocid1.image.oc1..large"
 
+    def test_create_bundle_allows_selected_template_image_id_from_defaults(self, tmp_path):
+        import asyncio
+        import json
+
+        from orb.application.services.orchestration.create_template import (
+            CreateTemplateOrchestrator,
+        )
+        from orb.application.services.orchestration.dtos import CreateTemplateOutput
+        from orb.interface.template_command_handlers import handle_create_template
+
+        bundle = {
+            "templates": [
+                {
+                    "template_id": "oci-small",
+                    "provider_api": "OCICompute",
+                    "provider_name": "oci-default",
+                }
+            ]
+        }
+        path = tmp_path / "oci_templates.json"
+        path.write_text(json.dumps(bundle))
+
+        mock_orchestrator = MagicMock(spec=CreateTemplateOrchestrator)
+        mock_orchestrator.execute = AsyncMock(
+            return_value=CreateTemplateOutput(
+                template_id="oci-small",
+                created=True,
+                validation_errors=[],
+            )
+        )
+        container = _make_container(orchestrator=mock_orchestrator)
+        args = _make_args(file=str(path), flag_template_id="oci-small", validate_only=False)
+
+        with patch("orb.interface.template_command_handlers.get_container", return_value=container):
+            with patch(
+                "orb.infrastructure.mocking.dry_run_context.is_dry_run_active",
+                return_value=False,
+            ):
+                asyncio.run(handle_create_template(args))
+
+        create_input = mock_orchestrator.execute.call_args.args[0]
+        assert create_input.template_id == "oci-small"
+        assert create_input.image_id is None
+
     def test_validate_bundle_selects_requested_template(self, tmp_path):
         import asyncio
 
@@ -299,7 +384,6 @@ class TestTemplateBundleSelection:
                 template_id="oci-small",
                 valid=True,
                 errors=[],
-                warnings=[],
                 message="ok",
             )
         )

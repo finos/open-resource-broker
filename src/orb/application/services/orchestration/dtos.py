@@ -155,7 +155,7 @@ class GetTemplateOutput:
 @dataclasses.dataclass(frozen=True)
 class CreateTemplateInput:
     template_id: str
-    image_id: str
+    image_id: Optional[str] = None
     provider_api: Optional[str] = None
     provider_name: Optional[str] = None
     name: Optional[str] = None
@@ -204,6 +204,7 @@ class DeleteTemplateOutput:
 class ValidateTemplateInput:
     template_id: Optional[str] = None
     config: Optional[dict[str, Any]] = None
+    provider_name: Optional[str] = None
 
 
 @dataclasses.dataclass(frozen=True)

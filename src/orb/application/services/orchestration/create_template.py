@@ -31,38 +31,51 @@ class CreateTemplateOrchestrator(OrchestratorBase[CreateTemplateInput, CreateTem
     async def execute(self, input: CreateTemplateInput) -> CreateTemplateOutput:  # type: ignore[return]
         self._logger.info("CreateTemplateOrchestrator: template_id=%s", input.template_id)
 
-        provider_api = input.provider_api
-        if not provider_api and self._template_defaults_service is not None:
-            provider_name = (
-                input.provider_name
-                or input.configuration.get("provider_name")
-                or input.configuration.get("providerName")
-            )
+        provider_name = (
+            input.provider_name
+            or input.configuration.get("provider_name")
+            or input.configuration.get("providerName")
+        )
+        configuration = dict(input.configuration)
+        if self._template_defaults_service is not None:
             try:
-                provider_api = self._template_defaults_service.resolve_provider_api_default(
-                    input.configuration, provider_instance_name=provider_name
+                configuration = self._template_defaults_service.resolve_template_defaults(
+                    configuration, provider_instance_name=provider_name
                 )
                 self._logger.info(
-                    "Resolved provider_api=%s for template_id=%s using provider defaults",
-                    provider_api,
+                    "Resolved template defaults for template_id=%s provider=%s",
                     input.template_id,
+                    provider_name,
                 )
             except ValueError as exc:
                 self._logger.warning(
-                    "Could not resolve provider_api defaults for template_id=%s: %s",
+                    "Could not resolve template defaults for template_id=%s: %s",
                     input.template_id,
                     exc,
                 )
 
+        provider_api = (
+            input.provider_api
+            or configuration.get("provider_api")
+            or configuration.get("providerApi")
+        )
+        image_id = input.image_id or configuration.get("image_id") or configuration.get("imageId")
+        instance_type = (
+            input.instance_type
+            or configuration.get("instance_type")
+            or configuration.get("instanceType")
+            or configuration.get("shape")
+        )
+
         command = CreateTemplateCommand(
             template_id=input.template_id,
             provider_api=provider_api,
-            image_id=input.image_id,
-            name=input.name,
-            description=input.description,
-            instance_type=input.instance_type,
-            tags=input.tags,
-            configuration=input.configuration,
+            image_id=image_id,
+            name=input.name or configuration.get("name"),
+            description=input.description or configuration.get("description"),
+            instance_type=instance_type,
+            tags=input.tags or configuration.get("tags", {}),
+            configuration=configuration,
         )
         await self._command_bus.execute(command)
 
