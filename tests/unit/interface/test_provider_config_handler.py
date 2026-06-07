@@ -361,6 +361,7 @@ class TestHandleProviderUpdate:
         provider = next(p for p in saved["provider"]["providers"] if p["name"] == "aws-default")
         assert provider["config"]["region"] == "ap-southeast-1"
 
+
 # ---------------------------------------------------------------------------
 # handle_provider_set_default
 # ---------------------------------------------------------------------------

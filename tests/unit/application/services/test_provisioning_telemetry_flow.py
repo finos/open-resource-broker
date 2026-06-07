@@ -55,9 +55,10 @@ def _make_template():
 
 
 def _make_selection_result(provider_name: str = "aws_default_us-east-1") -> ProviderSelectionResult:
+    provider_type = "oci" if provider_name.startswith("oci") else "aws"
     return ProviderSelectionResult(
         provider_name=provider_name,
-        provider_type="aws",
+        provider_type=provider_type,
         selection_reason="test",
         confidence=1.0,
     )
