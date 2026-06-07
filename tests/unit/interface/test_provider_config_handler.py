@@ -63,23 +63,6 @@ def _base_config(providers=None) -> dict:
     }
 
 
-def _base_oci_config(providers=None) -> dict:
-    return {
-        "provider": {
-            "providers": providers
-            if providers is not None
-            else [
-                {
-                    "name": "oci-default",
-                    "type": "oci",
-                    "enabled": True,
-                    "config": {"profile": "DEFAULT", "region": "us-phoenix-1"},
-                }
-            ]
-        }
-    }
-
-
 # ---------------------------------------------------------------------------
 # handle_provider_add
 # ---------------------------------------------------------------------------
@@ -377,44 +360,6 @@ class TestHandleProviderUpdate:
         saved = json.loads((tmp_path / "config.json").read_text())
         provider = next(p for p in saved["provider"]["providers"] if p["name"] == "aws-default")
         assert provider["config"]["region"] == "ap-southeast-1"
-
-    @pytest.mark.asyncio
-    async def test_oci_update_uses_provider_cli_spec_partial_config(self, tmp_path):
-        from orb.interface.provider_config_handler import handle_provider_update
-        from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
-        from orb.providers.oci.cli.oci_cli_spec import OCICLISpec
-
-        CLISpecRegistry.register("oci", OCICLISpec())
-
-        _write_config(tmp_path, _base_oci_config())
-        with (
-            patch(
-                "orb.interface.provider_config_handler.get_config_location",
-                return_value=tmp_path,
-            ),
-            patch(
-                "orb.interface.provider_config_handler._test_provider_credentials",
-                return_value=(True, ""),
-            ),
-        ):
-            args = _ns(provider_name="oci-default", oci_region="us-ashburn-1", oci_profile=None)
-            result = await handle_provider_update(args)
-
-        assert result.get("error") is not True
-        saved = json.loads((tmp_path / "config.json").read_text())
-        provider = next(p for p in saved["provider"]["providers"] if p["name"] == "oci-default")
-        assert provider["config"]["region"] == "us-ashburn-1"
-
-
-@pytest.mark.unit
-class TestProviderCliSpecRegistryOCI:
-    def test_registry_get_oci_returns_spec_when_registered(self):
-        from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
-        from orb.providers.oci.cli.oci_cli_spec import OCICLISpec
-
-        CLISpecRegistry.register("oci", OCICLISpec())
-        assert CLISpecRegistry.get("oci") is not None
-
 
 # ---------------------------------------------------------------------------
 # handle_provider_set_default

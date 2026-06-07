@@ -38,7 +38,10 @@ def detect_installation_mode(package_name: str = "orb-py") -> Tuple[str, Optiona
                     # Extract source path from file:// URL
                     source_url = direct_url.get("url", "")
                     if source_url.startswith("file://"):
-                        source_path = source_url[7:]  # Remove file://
+                        from urllib.parse import urlparse
+                        from urllib.request import url2pathname
+
+                        source_path = url2pathname(urlparse(source_url).path)
                         return "editable", Path(source_path)
             except (json.JSONDecodeError, OSError):
                 pass

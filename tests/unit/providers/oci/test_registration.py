@@ -41,6 +41,7 @@ def test_oci_strategy_defaults_load():
     assert provider_defaults["template_defaults"]["capacity_type"] == "ondemand"
 
 
-def test_oci_cli_spec_registered_in_registry():
+def test_oci_cli_spec_not_registered_in_registry():
+    CLISpecRegistry._specs.clear()
     register_oci_provider(registry=ProviderRegistry())
-    assert CLISpecRegistry.get("oci") is not None
+    assert CLISpecRegistry.get("oci") is None

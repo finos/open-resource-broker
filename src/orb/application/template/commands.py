@@ -16,7 +16,7 @@ class CreateTemplateCommand(BaseCommand):
     template_id: str
     name: Optional[str] = None
     description: Optional[str] = None
-    provider_api: Optional[str] = None
+    provider_api: str
     instance_type: Optional[str] = None
     image_id: str
     tags: dict[str, str] = Field(default_factory=dict)

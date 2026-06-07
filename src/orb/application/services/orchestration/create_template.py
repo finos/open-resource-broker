@@ -13,6 +13,16 @@ from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
 
 
+def _is_oci_template(configuration: dict, provider_name: Optional[str]) -> bool:
+    provider_type = configuration.get("provider_type") or configuration.get("providerType")
+    if isinstance(provider_type, str) and provider_type.lower() == "oci":
+        return True
+    if provider_name:
+        prefix = provider_name.replace("_", "-", 1).split("-", maxsplit=1)[0]
+        return prefix.lower() == "oci"
+    return False
+
+
 class CreateTemplateOrchestrator(OrchestratorBase[CreateTemplateInput, CreateTemplateOutput]):
     """Orchestrator for creating a new template."""
 
@@ -37,7 +47,10 @@ class CreateTemplateOrchestrator(OrchestratorBase[CreateTemplateInput, CreateTem
             or input.configuration.get("providerName")
         )
         configuration = dict(input.configuration)
-        if self._template_defaults_service is not None:
+        if (
+            _is_oci_template(configuration, provider_name)
+            and self._template_defaults_service is not None
+        ):
             try:
                 configuration = self._template_defaults_service.resolve_template_defaults(
                     configuration, provider_instance_name=provider_name
@@ -66,6 +79,10 @@ class CreateTemplateOrchestrator(OrchestratorBase[CreateTemplateInput, CreateTem
             or configuration.get("instanceType")
             or configuration.get("shape")
         )
+        if not provider_api:
+            raise ValueError("provider_api is required")
+        if not image_id:
+            raise ValueError("image_id is required")
 
         command = CreateTemplateCommand(
             template_id=input.template_id,

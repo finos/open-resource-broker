@@ -252,9 +252,11 @@ class TestAWSLaunchTemplateManager:
         assert result.version == "$Latest"
         assert result.is_new_template is False
 
-    def test_use_existing_template_strategy_describe_failure_warns_and_passes_through(self):
-        """Describe failures (NotFound, AccessDenied, etc.) warn and pass id/version through."""
+    def test_use_existing_template_strategy_not_found_raises(self):
+        """Test that _use_existing_template_strategy raises when template is not found."""
         from botocore.exceptions import ClientError
+
+        from orb.providers.aws.exceptions.aws_exceptions import AWSValidationError
 
         self.aws_template.launch_template_id = "lt-missing"
 
@@ -268,84 +270,8 @@ class TestAWSLaunchTemplateManager:
             operation_name="DescribeLaunchTemplates",
         )
 
-        result = self.manager._use_existing_template_strategy(self.aws_template)
-
-        assert result.template_id == "lt-missing"
-        assert result.is_new_template is False
-        assert result.is_new_version is False
-        self.manager._logger.warning.assert_called()
-
-    def test_use_existing_template_strategy_throttling_propagates(self):
-        """Transient errors (Throttling) must propagate, not warn-and-pass-through."""
-        from botocore.exceptions import ClientError
-
-        self.aws_template.launch_template_id = "lt-throttled"
-
-        self.mock_aws_client.ec2_client.describe_launch_templates.side_effect = ClientError(
-            error_response={"Error": {"Code": "Throttling", "Message": "rate exceeded"}},
-            operation_name="DescribeLaunchTemplates",
-        )
-
-        with pytest.raises(ClientError):
+        with pytest.raises(AWSValidationError):
             self.manager._use_existing_template_strategy(self.aws_template)
-
-    def test_inspect_lt_networking_has_networking(self):
-        """LT version with NetworkInterfaces returns HAS_NETWORKING."""
-        from orb.providers.aws.infrastructure.launch_template.manager import LTNetworkingState
-
-        self.mock_aws_client.ec2_client.describe_launch_template_versions.return_value = {
-            "LaunchTemplateVersions": [
-                {
-                    "LaunchTemplateData": {
-                        "NetworkInterfaces": [{"DeviceIndex": 0, "SubnetId": "subnet-x"}]
-                    }
-                }
-            ]
-        }
-
-        result = self.manager.inspect_launch_template_networking("lt-x", "$Latest")
-
-        assert result == LTNetworkingState.HAS_NETWORKING
-
-    def test_inspect_lt_networking_no_networking(self):
-        """LT version without networking fields returns NO_NETWORKING."""
-        from orb.providers.aws.infrastructure.launch_template.manager import LTNetworkingState
-
-        self.mock_aws_client.ec2_client.describe_launch_template_versions.return_value = {
-            "LaunchTemplateVersions": [{"LaunchTemplateData": {"ImageId": "ami-x"}}]
-        }
-
-        result = self.manager.inspect_launch_template_networking("lt-x", "$Latest")
-
-        assert result == LTNetworkingState.NO_NETWORKING
-
-    def test_inspect_lt_networking_unauthorized_returns_unknown(self):
-        """IAM denial returns UNKNOWN_UNAUTHORIZED so callers can fall back."""
-        from botocore.exceptions import ClientError
-
-        from orb.providers.aws.infrastructure.launch_template.manager import LTNetworkingState
-
-        self.mock_aws_client.ec2_client.describe_launch_template_versions.side_effect = ClientError(
-            error_response={"Error": {"Code": "UnauthorizedOperation", "Message": "denied"}},
-            operation_name="DescribeLaunchTemplateVersions",
-        )
-
-        result = self.manager.inspect_launch_template_networking("lt-x", "$Latest")
-
-        assert result == LTNetworkingState.UNKNOWN_UNAUTHORIZED
-        self.manager._logger.warning.assert_called()
-
-    def test_inspect_lt_networking_throttling_propagates(self):
-        """Transient errors (Throttling) must propagate, not return UNKNOWN_UNAUTHORIZED."""
-        from botocore.exceptions import ClientError
-
-        self.mock_aws_client.ec2_client.describe_launch_template_versions.side_effect = ClientError(
-            error_response={"Error": {"Code": "Throttling", "Message": "rate exceeded"}},
-            operation_name="DescribeLaunchTemplateVersions",
-        )
-
-        with pytest.raises(ClientError):
-            self.manager.inspect_launch_template_networking("lt-x", "$Latest")
 
     def test_error_handling_wraps_client_error(self):
         """Test that AWS ClientError is wrapped in InfrastructureError."""

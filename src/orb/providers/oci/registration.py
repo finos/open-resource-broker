@@ -12,17 +12,24 @@ if TYPE_CHECKING:
 
 def _extract_oci_provider_settings(provider_config: Any) -> dict[str, Any]:
     """Unwrap provider instance entries to the inner OCI settings dict."""
+    if provider_config is None:
+        return {}
+    if hasattr(provider_config, "config"):
+        provider_config = provider_config.config
+    if hasattr(provider_config, "model_dump"):
+        provider_config = provider_config.model_dump()
+    elif hasattr(provider_config, "dict"):
+        provider_config = provider_config.dict()
     if isinstance(provider_config, dict):
         nested = provider_config.get("config")
         if isinstance(nested, dict):
             return nested
+        if hasattr(nested, "model_dump"):
+            return nested.model_dump()
+        if hasattr(nested, "dict"):
+            return nested.dict()
         return provider_config
-    if hasattr(provider_config, "config"):
-        nested = provider_config.config
-        if isinstance(nested, dict):
-            return nested
-        return nested or {}
-    return provider_config or {}
+    return {}
 
 
 def create_oci_strategy(provider_config: Any) -> Any:
@@ -34,11 +41,24 @@ def create_oci_strategy(provider_config: Any) -> Any:
     try:
         if isinstance(provider_config, OCIProviderConfig):
             oci_config = provider_config
+            provider_instance_config = None
+            provider_name = None
+        elif hasattr(provider_config, "config"):
+            provider_instance_config = provider_config
+            provider_name = getattr(provider_config, "name", None)
+            oci_config = OCIProviderConfig(**_extract_oci_provider_settings(provider_config))
         else:
+            provider_instance_config = None
+            provider_name = None
             oci_config = OCIProviderConfig(**_extract_oci_provider_settings(provider_config))
 
         logger = LoggingAdapter()
-        strategy = OCIProviderStrategy(config=oci_config, logger=logger)
+        strategy = OCIProviderStrategy(
+            config=oci_config,
+            logger=logger,
+            provider_name=provider_name,
+            provider_instance_config=provider_instance_config,
+        )
 
         if not strategy.initialize():
             raise RuntimeError("Failed to initialize OCI provider strategy")
@@ -163,16 +183,33 @@ def register_oci_provider_instance(provider_instance: Any, logger: Optional[Any]
 def initialize_oci_provider(logger: Optional["LoggingPort"] = None) -> None:
     """Initialize OCI provider components."""
     register_oci_provider_settings()
-    try:
-        from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
-        from orb.providers.oci.cli.oci_cli_spec import OCICLISpec
-
-        CLISpecRegistry.register("oci", OCICLISpec())
-    except Exception as exc:
-        if logger:
-            logger.warning("Failed to register OCI CLI spec: %s", exc, exc_info=True)
     if logger:
         logger.info("OCI provider initialization completed successfully")
+
+
+def register_oci_services_with_di(container) -> None:
+    """Register OCI utility services with DI container."""
+    from orb.domain.base.ports import LoggingPort
+    from orb.domain.base.ports.template_example_generator_port import (
+        TemplateExampleGeneratorPort,
+    )
+    from orb.providers.oci.adapters.template_example_generator_adapter import (
+        ChainedTemplateExampleGeneratorAdapter,
+        OCITemplateExampleGeneratorAdapter,
+    )
+
+    logger = container.get(LoggingPort)
+    previous = container.get_optional(TemplateExampleGeneratorPort)
+    oci_generator = OCITemplateExampleGeneratorAdapter()
+    if previous is None:
+        generator = oci_generator
+    elif isinstance(previous, ChainedTemplateExampleGeneratorAdapter):
+        generator = ChainedTemplateExampleGeneratorAdapter([previous, oci_generator])
+    else:
+        generator = ChainedTemplateExampleGeneratorAdapter([previous, oci_generator])
+
+    container.register_instance(TemplateExampleGeneratorPort, generator)
+    logger.debug("OCI template example generator registered with DI container")
 
 
 with suppress(Exception):

@@ -42,7 +42,6 @@ from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.exceptions.aws_exceptions import (
     AWSConfigurationError,
     AWSInfrastructureError,
-    AWSValidationError,
 )
 from orb.providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from orb.providers.aws.infrastructure.aws_client import AWSClient
@@ -50,7 +49,6 @@ from orb.providers.aws.infrastructure.handlers.base_handler import AWSHandler
 from orb.providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
 from orb.providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
-    LTNetworkingState,
 )
 from orb.providers.aws.infrastructure.tags import build_system_tags, merge_tags
 from orb.providers.aws.utilities.aws_operations import AWSOperations
@@ -333,38 +331,23 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             # Use first machine type for RunInstances (single instance type only)
             params["InstanceType"] = next(iter(aws_template.machine_types.keys()))
 
-        # Networking policy: if user supplies subnet_ids or security_group_ids
-        # alongside a launch_template_id, inspect the LT to detect a collision.
-        # If the LT already defines NetworkInterfaces/SubnetId/SecurityGroupIds,
-        # raise a clear validation error (AWS would reject the combination).
-        # If the LT has no networking, inject at the API level. If the describe
-        # call is denied by IAM, log a warning and assume the LT owns networking
-        # (safe default that avoids InvalidParameterCombination).
+        # Handle networking overrides based on launch template source
         if aws_template.launch_template_id:
-            user_subnets = aws_template.subnet_ids or []
-            user_sgs = aws_template.security_group_ids or []
-            if user_subnets or user_sgs:
-                lt_state = self.launch_template_manager.inspect_launch_template_networking(
-                    aws_template.launch_template_id,
-                    launch_template_version,
-                )
-                if lt_state == LTNetworkingState.HAS_NETWORKING:
-                    raise AWSValidationError(
-                        f"Launch template {aws_template.launch_template_id} already "
-                        "defines networking (NetworkInterfaces, SubnetId, or "
-                        "SecurityGroupIds). Remove subnet_ids/security_group_ids "
-                        "from the template, or remove the conflicting fields from "
-                        "the launch template."
-                    )
-                if lt_state == LTNetworkingState.NO_NETWORKING:
-                    # LT has no networking — safe to inject at API level.
-                    if getattr(aws_template, "subnet_id", None):
-                        params["SubnetId"] = aws_template.subnet_id
-                    elif len(user_subnets) == 1:
-                        params["SubnetId"] = user_subnets[0]
-                    if user_sgs:
-                        params["SecurityGroupIds"] = user_sgs
-                # UNKNOWN_UNAUTHORIZED: assume LT owns networking, do not inject.
+            # Using existing launch template - need to check what it contains
+            # For now, assume we can override (this should be improved to inspect the
+            # LT)
+            if aws_template.subnet_id:
+                params["SubnetId"] = aws_template.subnet_id
+            elif aws_template.subnet_ids and len(aws_template.subnet_ids) == 1:
+                params["SubnetId"] = aws_template.subnet_ids[0]
+
+            if aws_template.security_group_ids:
+                params["SecurityGroupIds"] = aws_template.security_group_ids
+        else:
+            # We created the launch template ourselves with NetworkInterfaces
+            # Don't override networking at API level - AWS will reject it
+            # The launch template already contains all networking configuration
+            pass
 
         # Add spot instance configuration if needed
         if aws_template.price_type == "spot":
@@ -676,7 +659,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 name="Run Instances On-Demand",
                 description="On-demand instances using RunInstances API",
                 provider_api="RunInstances",
-                machine_types={"t3.medium": 2},
+                machine_types={"t3.medium": 1},
                 max_instances=5,
                 price_type="ondemand",
                 subnet_ids=[],
@@ -688,7 +671,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 name="Run Instances Spot",
                 description="Spot instances using RunInstances API",
                 provider_api="RunInstances",
-                machine_types={"t3.medium": 2},
+                machine_types={"t3.medium": 1},
                 max_instances=10,
                 price_type="spot",
                 max_price=0.10,

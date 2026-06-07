@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+from orb.providers.oci.adapters import OCITemplateExampleGeneratorAdapter
 from orb.providers.oci.mapping.template_mapper import OCITemplateMapper
 from orb.providers.oci.services import OCIPricingService
 
@@ -221,3 +222,15 @@ def test_oci_config_examples_make_credential_modes_explicit() -> None:
     assert "profile" not in remote_provider["config"]
     assert local_provider["config"]["credential_source"] == "profile"
     assert local_provider["config"]["profile"] == "DEFAULT"
+
+
+def test_oci_template_example_generator_uses_active_provider_name() -> None:
+    generator = OCITemplateExampleGeneratorAdapter()
+
+    templates = generator.generate_example_templates("oci", "oci_DEFAULT_us-phoenix-1")
+
+    assert len(templates) == 4
+    assert {template["provider_name"] for template in templates} == {
+        "oci_DEFAULT_us-phoenix-1"
+    }
+    assert {template["provider_api"] for template in templates} == {"OCICompute"}

@@ -5,7 +5,6 @@ import argparse
 import pytest
 
 from orb.cli.args import (
-    _register_builtin_provider_cli_specs,
     add_machine_actions,
     add_provider_actions,
     add_request_actions,
@@ -123,7 +122,7 @@ def test_providers_exec_accepts_args_flag():
     assert ns.params == '{"key": "val"}'
 
 
-def test_providers_add_accepts_oci_flags():
+def test_providers_add_accepts_aws_flags():
     sp_tuple = _make_subparsers()
     _, sp = sp_tuple
     add_provider_actions(sp)
@@ -132,49 +131,55 @@ def test_providers_add_accepts_oci_flags():
         [
             "add",
             "--provider-type",
-            "oci",
-            "--oci-profile",
-            "DEFAULT",
-            "--oci-region",
-            "us-phoenix-1",
+            "aws",
+            "--aws-profile",
+            "prod",
+            "--aws-region",
+            "us-east-1",
         ],
     )
-    assert ns.provider_type == "oci"
-    assert ns.oci_profile == "DEFAULT"
-    assert ns.oci_region == "us-phoenix-1"
+    assert ns.provider_type == "aws"
+    assert ns.aws_profile == "prod"
+    assert ns.aws_region == "us-east-1"
 
 
-def test_providers_update_accepts_oci_flags():
+def test_providers_update_accepts_aws_flags():
     sp_tuple = _make_subparsers()
     _, sp = sp_tuple
     add_provider_actions(sp)
     ns = _parse(
         sp_tuple,
-        ["update", "oci-default", "--oci-region", "us-ashburn-1"],
+        ["update", "aws-default", "--aws-region", "us-west-2"],
     )
-    assert ns.provider_name == "oci-default"
-    assert ns.oci_region == "us-ashburn-1"
+    assert ns.provider_name == "aws-default"
+    assert ns.aws_region == "us-west-2"
 
 
-def test_builtin_cli_spec_registration_keeps_aws_when_oci_import_fails(monkeypatch):
-    import builtins
+def test_providers_add_rejects_oci_flags():
+    sp_tuple = _make_subparsers()
+    _, sp = sp_tuple
+    add_provider_actions(sp)
+    with pytest.raises(SystemExit):
+        _parse(
+            sp_tuple,
+            [
+                "add",
+                "--provider-type",
+                "oci",
+                "--oci-profile",
+                "DEFAULT",
+                "--oci-region",
+                "us-phoenix-1",
+            ],
+        )
 
-    from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
 
-    CLISpecRegistry._specs.clear()
-    real_import = builtins.__import__
-
-    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
-        if name == "orb.providers.oci.cli.oci_cli_spec":
-            raise ImportError("simulated OCI spec failure")
-        return real_import(name, globals, locals, fromlist, level)
-
-    monkeypatch.setattr(builtins, "__import__", fake_import)
-
-    _register_builtin_provider_cli_specs()
-
-    assert CLISpecRegistry.get("aws") is not None
-    assert CLISpecRegistry.get("oci") is None
+def test_providers_update_rejects_oci_flags():
+    sp_tuple = _make_subparsers()
+    _, sp = sp_tuple
+    add_provider_actions(sp)
+    with pytest.raises(SystemExit):
+        _parse(sp_tuple, ["update", "oci-default", "--oci-region", "us-ashburn-1"])
 
 
 # ---------------------------------------------------------------------------
@@ -287,12 +292,12 @@ def test_templates_validate_accepts_template_id_flag():
     assert tid is not None
 
 
-def test_templates_create_accepts_template_id_flag():
+def test_templates_create_rejects_template_id_flag():
     sp_tuple = _make_subparsers()
     _, sp = sp_tuple
     add_template_actions(sp)
-    ns = _parse(sp_tuple, ["create", "--file", "template.json", "--template-id", "tmpl-1"])
-    assert getattr(ns, "flag_template_id", None) == "tmpl-1"
+    with pytest.raises(SystemExit):
+        _parse(sp_tuple, ["create", "--file", "template.json", "--template-id", "tmpl-1"])
 
 
 # ---------------------------------------------------------------------------

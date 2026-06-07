@@ -218,46 +218,14 @@ async def test_create_validation_errors_sets_created_false() -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_allows_missing_provider_api() -> None:
-    """Create command can omit provider_api so defaults can be resolved downstream."""
-    manager = _make_manager(existing=None)
-    port = _make_template_port(manager)
-    handler = _make_create_handler(port)
+async def test_create_requires_provider_api_field() -> None:
+    from pydantic import ValidationError
 
-    command = CreateTemplateCommand(
-        template_id="tpl-no-provider",
-        image_id="img-1",
-    )
-    await handler.handle(command)
-
-    port.validate_template_config.assert_called_once()
-    validate_payload = port.validate_template_config.call_args[0][0]
-    assert "provider_api" not in validate_payload
-
-    manager.save_template.assert_called_once()
-    saved: TemplateDTO = manager.save_template.call_args[0][0]
-    assert saved.provider_api is None
-    assert command.created is True
-
-
-@pytest.mark.asyncio
-async def test_create_uses_configuration_provider_api_when_command_provider_missing() -> None:
-    """Configuration provider_api should not be overwritten by an omitted command field."""
-    manager = _make_manager(existing=None)
-    port = _make_template_port(manager)
-    handler = _make_create_handler(port)
-
-    command = CreateTemplateCommand(
-        template_id="tpl-config-provider",
-        image_id="img-1",
-        configuration={"provider_api": "LaunchInstances"},
-    )
-    await handler.handle(command)
-
-    manager.save_template.assert_called_once()
-    saved: TemplateDTO = manager.save_template.call_args[0][0]
-    assert saved.provider_api == "LaunchInstances"
-    assert command.created is True
+    with pytest.raises(ValidationError):
+        CreateTemplateCommand(
+            template_id="tpl-no-provider",
+            image_id="img-1",
+        )
 
 
 @pytest.mark.asyncio

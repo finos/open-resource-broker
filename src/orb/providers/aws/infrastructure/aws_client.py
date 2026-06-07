@@ -61,7 +61,7 @@ class AWSClient:
 
         self._logger.debug("AWS client region determined: %s", self.region_name)
 
-        aws_provider_config = self.get_selected_aws_provider_config()
+        aws_provider_config = self._get_selected_aws_provider_config()
         max_attempts = (
             int(aws_provider_config.request_retry_attempts) + 1 if aws_provider_config else 1
         )
@@ -155,7 +155,7 @@ class AWSClient:
         Returns:
             AWS region or None if not found
         """
-        aws_provider_config = self.get_selected_aws_provider_config()
+        aws_provider_config = self._get_selected_aws_provider_config()
         if aws_provider_config and aws_provider_config.region:
             self._logger.debug(
                 "Using region from selected AWS config: %s", aws_provider_config.region
@@ -171,7 +171,7 @@ class AWSClient:
         Returns:
             AWS profile or None if not found
         """
-        aws_provider_config = self.get_selected_aws_provider_config()
+        aws_provider_config = self._get_selected_aws_provider_config()
         if aws_provider_config and aws_provider_config.profile:
             self._logger.debug(
                 "Using profile from selected AWS config: %s",
@@ -181,7 +181,7 @@ class AWSClient:
 
         return None
 
-    def get_selected_aws_provider_config(self) -> Optional["AWSProviderConfig"]:
+    def _get_selected_aws_provider_config(self) -> Optional["AWSProviderConfig"]:
         """Get selected AWS provider configuration.
 
         Primary path: use provider registry to pick the active instance and
@@ -305,7 +305,7 @@ class AWSClient:
 
         # Resolve batch sizes from AWSProviderConfig if available, else use defaults
         batch_sizes: dict[str, int] = AWSBatchSizesConfig().model_dump()  # type: ignore[call-arg]
-        aws_provider_config = self.get_selected_aws_provider_config()
+        aws_provider_config = self._get_selected_aws_provider_config()
         if aws_provider_config is not None and hasattr(aws_provider_config, "batch_sizes"):
             batch_sizes = aws_provider_config.batch_sizes.model_dump()
 

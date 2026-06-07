@@ -16,6 +16,16 @@ from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
 
 
+def _is_oci_template(configuration: dict, provider_name: Optional[str]) -> bool:
+    provider_type = configuration.get("provider_type") or configuration.get("providerType")
+    if isinstance(provider_type, str) and provider_type.lower() == "oci":
+        return True
+    if provider_name:
+        prefix = provider_name.replace("_", "-", 1).split("-", maxsplit=1)[0]
+        return prefix.lower() == "oci"
+    return False
+
+
 class ValidateTemplateOrchestrator(OrchestratorBase[ValidateTemplateInput, ValidateTemplateOutput]):
     """Orchestrator for validating a template configuration."""
 
@@ -38,11 +48,20 @@ class ValidateTemplateOrchestrator(OrchestratorBase[ValidateTemplateInput, Valid
         )
 
         template_config = input.config or {}
-        if template_config and self._template_defaults_service is not None:
+        provider_name = (
+            input.provider_name
+            or template_config.get("provider_name")
+            or template_config.get("providerName")
+        )
+        if (
+            template_config
+            and _is_oci_template(template_config, provider_name)
+            and self._template_defaults_service is not None
+        ):
             try:
                 template_config = self._template_defaults_service.resolve_template_defaults(
                     template_config,
-                    provider_instance_name=input.provider_name,
+                    provider_instance_name=provider_name,
                 )
             except ValueError as exc:
                 self._logger.warning(

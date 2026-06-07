@@ -17,16 +17,15 @@ def test_config_validation_succeeds_with_profile() -> None:
     assert "valid" in message.lower()
 
 
-def test_config_validation_fails_when_missing_profile_and_api_key_fields() -> None:
+def test_config_validation_succeeds_with_default_oci_cli_credentials() -> None:
     config = OCIProviderConfig(region="us-phoenix-1")
 
     is_valid, message, missing, source = config.validate_auth_configuration()
 
-    assert is_valid is False
+    assert is_valid is True
     assert source == "default"
-    assert "tenancy_ocid" in missing
-    assert "profile" not in missing
-    assert "no usable oci auth" in message.lower()
+    assert missing == []
+    assert "default oci cli" in message.lower()
 
 
 def test_config_validation_succeeds_for_api_key_source_when_complete() -> None:
@@ -65,14 +64,14 @@ def test_strategy_test_credentials_rejects_unsupported_source() -> None:
     assert "unsupported credential source" in result["message"].lower()
 
 
-def test_strategy_health_unhealthy_when_auth_is_invalid() -> None:
+def test_strategy_health_healthy_with_default_oci_cli_credentials() -> None:
     strategy = OCIProviderStrategy(config=OCIProviderConfig(region="us-phoenix-1"), logger=MagicMock())
     strategy.initialize()
 
     health = strategy.check_health()
 
-    assert health.is_healthy is False
-    assert "auth configuration invalid" in health.status_message.lower()
+    assert health.is_healthy is True
+    assert "auth_source=default" in health.status_message
 
 
 def test_config_validation_succeeds_for_instance_principal_source() -> None:

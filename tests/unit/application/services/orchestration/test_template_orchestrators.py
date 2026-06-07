@@ -91,15 +91,10 @@ class TestCreateTemplateOrchestrator:
         assert cmd.image_id == "ami-abc"
 
     @pytest.mark.asyncio
-    async def test_execute_allows_missing_provider_api(self, create_orch, mock_command_bus):
-        async def _set(cmd):
-            cmd.created = True
-            cmd.validation_errors = []
-
-        mock_command_bus.execute.side_effect = _set
-        await create_orch.execute(CreateTemplateInput(template_id="t-1", image_id="ami-abc"))
-        cmd = mock_command_bus.execute.call_args[0][0]
-        assert cmd.provider_api is None
+    async def test_execute_requires_provider_api_for_non_oci(self, create_orch, mock_command_bus):
+        with pytest.raises(ValueError, match="provider_api is required"):
+            await create_orch.execute(CreateTemplateInput(template_id="t-1", image_id="ami-abc"))
+        mock_command_bus.execute.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_execute_resolves_provider_api_from_defaults_service(
@@ -142,7 +137,7 @@ class TestCreateTemplateOrchestrator:
         )
 
     @pytest.mark.asyncio
-    async def test_execute_resolves_defaults_when_provider_api_is_supplied(
+    async def test_execute_skips_defaults_for_aws_when_provider_api_is_supplied(
         self, mock_command_bus, mock_query_bus, mock_logger
     ):
         mock_defaults = MagicMock()
@@ -176,7 +171,7 @@ class TestCreateTemplateOrchestrator:
         cmd = mock_command_bus.execute.call_args[0][0]
         assert cmd.provider_api == "EC2Fleet"
         assert cmd.image_id == "ami-abc"
-        mock_defaults.resolve_template_defaults.assert_called_once()
+        mock_defaults.resolve_template_defaults.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_execute_resolves_full_template_defaults_before_create(

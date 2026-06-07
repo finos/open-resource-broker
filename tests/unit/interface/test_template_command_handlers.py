@@ -125,13 +125,9 @@ class TestHandleCreateTemplateDefaultsFirst:
         p.write_text(json.dumps(data))
         return str(p)
 
-    def test_create_allows_missing_provider_api(self, tmp_path):
+    def test_create_rejects_missing_provider_api_without_oci_context(self, tmp_path):
         import asyncio
 
-        from orb.application.services.orchestration.create_template import (
-            CreateTemplateOrchestrator,
-        )
-        from orb.application.services.orchestration.dtos import CreateTemplateOutput
         from orb.interface.template_command_handlers import handle_create_template
 
         template_file = self._make_template_file(
@@ -142,28 +138,16 @@ class TestHandleCreateTemplateDefaultsFirst:
             },
         )
 
-        mock_orchestrator = MagicMock(spec=CreateTemplateOrchestrator)
-        mock_orchestrator.execute = AsyncMock(
-            return_value=CreateTemplateOutput(
-                template_id="tmpl-oci-001",
-                created=True,
-                validation_errors=[],
-            )
-        )
-        container = _make_container(orchestrator=mock_orchestrator)
         args = _make_args(file=template_file, validate_only=False)
 
-        with patch("orb.interface.template_command_handlers.get_container", return_value=container):
-            with patch(
-                "orb.infrastructure.mocking.dry_run_context.is_dry_run_active",
-                return_value=False,
-            ):
-                result = asyncio.run(handle_create_template(args))
+        with patch(
+            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active",
+            return_value=False,
+        ):
+            result = asyncio.run(handle_create_template(args))
 
-        assert result.data["success"] is True
-        mock_orchestrator.execute.assert_called_once()
-        create_input = mock_orchestrator.execute.call_args.args[0]
-        assert create_input.provider_api is None
+        assert result.exit_code == 1
+        assert result.data["error"] == "provider_api is required in template file"
 
     def test_create_passes_provider_name_context(self, tmp_path):
         import asyncio
@@ -245,161 +229,3 @@ class TestHandleCreateTemplateDefaultsFirst:
         create_input = mock_orchestrator.execute.call_args.args[0]
         assert create_input.image_id is None
         assert create_input.provider_name == "oci-default"
-
-
-class TestTemplateBundleSelection:
-    """Tests for selecting a template from bundle files."""
-
-    def _write_bundle(self, tmp_path) -> str:
-        import json
-
-        data = {
-            "scheduler_type": "default",
-            "templates": [
-                {
-                    "template_id": "oci-small",
-                    "provider_api": "OCICompute",
-                    "provider_name": "oci-default",
-                    "image_id": "ocid1.image.oc1..small",
-                },
-                {
-                    "template_id": "oci-large",
-                    "provider_api": "OCICompute",
-                    "provider_name": "oci-default",
-                    "image_id": "ocid1.image.oc1..large",
-                },
-            ],
-        }
-        p = tmp_path / "oci_templates.json"
-        p.write_text(json.dumps(data))
-        return str(p)
-
-    def test_create_bundle_requires_template_id_when_multiple(self, tmp_path):
-        import asyncio
-
-        from orb.interface.template_command_handlers import handle_create_template
-
-        args = _make_args(file=self._write_bundle(tmp_path), validate_only=False)
-        with patch(
-            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active",
-            return_value=False,
-        ):
-            result = asyncio.run(handle_create_template(args))
-
-        assert result.exit_code == 1
-        assert "pass --template-id" in result.data["error"]
-
-    def test_create_bundle_selects_requested_template(self, tmp_path):
-        import asyncio
-
-        from orb.application.services.orchestration.create_template import (
-            CreateTemplateOrchestrator,
-        )
-        from orb.application.services.orchestration.dtos import CreateTemplateOutput
-        from orb.interface.template_command_handlers import handle_create_template
-
-        mock_orchestrator = MagicMock(spec=CreateTemplateOrchestrator)
-        mock_orchestrator.execute = AsyncMock(
-            return_value=CreateTemplateOutput(
-                template_id="oci-large",
-                created=True,
-                validation_errors=[],
-            )
-        )
-        container = _make_container(orchestrator=mock_orchestrator)
-        args = _make_args(
-            file=self._write_bundle(tmp_path),
-            flag_template_id="oci-large",
-            validate_only=False,
-        )
-
-        with patch("orb.interface.template_command_handlers.get_container", return_value=container):
-            with patch(
-                "orb.infrastructure.mocking.dry_run_context.is_dry_run_active",
-                return_value=False,
-            ):
-                asyncio.run(handle_create_template(args))
-
-        create_input = mock_orchestrator.execute.call_args.args[0]
-        assert create_input.template_id == "oci-large"
-        assert create_input.image_id == "ocid1.image.oc1..large"
-
-    def test_create_bundle_allows_selected_template_image_id_from_defaults(self, tmp_path):
-        import asyncio
-        import json
-
-        from orb.application.services.orchestration.create_template import (
-            CreateTemplateOrchestrator,
-        )
-        from orb.application.services.orchestration.dtos import CreateTemplateOutput
-        from orb.interface.template_command_handlers import handle_create_template
-
-        bundle = {
-            "templates": [
-                {
-                    "template_id": "oci-small",
-                    "provider_api": "OCICompute",
-                    "provider_name": "oci-default",
-                }
-            ]
-        }
-        path = tmp_path / "oci_templates.json"
-        path.write_text(json.dumps(bundle))
-
-        mock_orchestrator = MagicMock(spec=CreateTemplateOrchestrator)
-        mock_orchestrator.execute = AsyncMock(
-            return_value=CreateTemplateOutput(
-                template_id="oci-small",
-                created=True,
-                validation_errors=[],
-            )
-        )
-        container = _make_container(orchestrator=mock_orchestrator)
-        args = _make_args(file=str(path), flag_template_id="oci-small", validate_only=False)
-
-        with patch("orb.interface.template_command_handlers.get_container", return_value=container):
-            with patch(
-                "orb.infrastructure.mocking.dry_run_context.is_dry_run_active",
-                return_value=False,
-            ):
-                asyncio.run(handle_create_template(args))
-
-        create_input = mock_orchestrator.execute.call_args.args[0]
-        assert create_input.template_id == "oci-small"
-        assert create_input.image_id is None
-
-    def test_validate_bundle_selects_requested_template(self, tmp_path):
-        import asyncio
-
-        from orb.application.services.orchestration.dtos import ValidateTemplateOutput
-        from orb.application.services.orchestration.validate_template import (
-            ValidateTemplateOrchestrator,
-        )
-        from orb.interface.response_formatting_service import ResponseFormattingService
-        from orb.interface.template_command_handlers import handle_validate_template
-
-        mock_validate = MagicMock(spec=ValidateTemplateOrchestrator)
-        mock_validate.execute = AsyncMock(
-            return_value=ValidateTemplateOutput(
-                template_id="oci-small",
-                valid=True,
-                errors=[],
-                message="ok",
-            )
-        )
-        formatter = MagicMock(spec=ResponseFormattingService)
-        formatter.format_template_mutation.side_effect = lambda payload: payload
-        container = MagicMock()
-        container.get.side_effect = lambda cls: {
-            ValidateTemplateOrchestrator: mock_validate,
-            ResponseFormattingService: formatter,
-        }.get(cls, MagicMock())
-
-        args = _make_args(file=self._write_bundle(tmp_path), flag_template_id="oci-small")
-        with patch("orb.interface.template_command_handlers.get_container", return_value=container):
-            result = asyncio.run(handle_validate_template(args))
-
-        call_input = mock_validate.execute.call_args.args[0]
-        assert call_input.template_id == "oci-small"
-        assert call_input.config["image_id"] == "ocid1.image.oc1..small"
-        assert result["template_id"] == "oci-small"

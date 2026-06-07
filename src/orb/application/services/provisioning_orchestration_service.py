@@ -260,10 +260,11 @@ class ProvisioningOrchestrationService:
 
             scheduler = self._container.get(SchedulerPort)
             template_config = scheduler.format_template_for_provider(template)
-            template_config = self._resolve_template_defaults(
-                template_config,
-                selection_result.provider_name,
-            )
+            if selection_result.provider_type.lower() == "oci":
+                template_config = self._resolve_template_defaults(
+                    template_config,
+                    selection_result.provider_name,
+                )
 
             operation = ProviderOperation(
                 operation_type=ProviderOperationType.CREATE_INSTANCES,

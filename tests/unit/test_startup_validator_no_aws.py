@@ -100,3 +100,10 @@ def test_credentials_checker_returns_false_triggers_warning() -> None:
     result = validator._check_provider_credentials()
 
     assert result is False
+
+
+def test_default_config_check_uses_packaged_template() -> None:
+    """The startup validator checks package defaults, not cwd/config copies."""
+    validator = StartupValidator()
+
+    assert validator._check_default_config() is True

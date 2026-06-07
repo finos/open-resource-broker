@@ -68,6 +68,9 @@ class OCIProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         if effective.get("profile"):
             return True, "OCI profile configuration is valid", [], "profile"
 
+        if source == "default":
+            return True, "Default OCI CLI credentials selected", [], "default"
+
         missing = [field for field in api_key_fields if not effective.get(field)]
         if missing:
             return (

@@ -40,45 +40,6 @@ except ImportError:
     HELP_FORMATTER = argparse.RawDescriptionHelpFormatter
 
 
-def _register_builtin_provider_cli_specs() -> None:
-    """Register built-in provider CLI specs used by providers add/update parsers."""
-    try:
-        from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
-    except Exception:
-        return
-
-    try:
-        from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec
-
-        CLISpecRegistry.register("aws", AWSCLISpec())
-    except Exception:
-        # Best-effort registration. Provider handlers still validate using available specs.
-        pass
-
-    try:
-        from orb.providers.oci.cli.oci_cli_spec import OCICLISpec
-
-        CLISpecRegistry.register("oci", OCICLISpec())
-    except Exception:
-        # Best-effort registration. Provider handlers still validate using available specs.
-        pass
-
-
-def _add_provider_cli_spec_arguments(parser: argparse.ArgumentParser) -> None:
-    """Add provider-specific CLI args for all registered provider specs."""
-    try:
-        from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
-
-        for spec in CLISpecRegistry.all().values():
-            try:
-                spec.add_arguments(parser)
-            except Exception:
-                # Keep parser construction resilient if a provider spec misbehaves.
-                continue
-    except Exception:
-        return
-
-
 def add_global_arguments(parser):
     """Add arguments that should be available on all commands."""
     parser.add_argument(
@@ -323,8 +284,6 @@ def add_infrastructure_actions(subparsers):
 
 def add_provider_actions(subparsers):
     """Add provider actions to a subparser."""
-    _register_builtin_provider_cli_specs()
-
     providers_list = subparsers.add_parser(
         "list",
         help="List providers",
@@ -343,7 +302,8 @@ def add_provider_actions(subparsers):
     providers_add.add_argument(
         "--provider-type", dest="provider_type", required=True, help="Provider type (e.g. aws)"
     )
-    _add_provider_cli_spec_arguments(providers_add)
+    providers_add.add_argument("--aws-profile", help="AWS profile name")
+    providers_add.add_argument("--aws-region", help="AWS region")
     providers_add.add_argument("--name", help="Provider instance name")
     providers_add.add_argument("--discover", action="store_true", help="Discover infrastructure")
 
@@ -354,7 +314,8 @@ def add_provider_actions(subparsers):
     providers_update = subparsers.add_parser("update", help="Update provider configuration")
     add_global_arguments(providers_update)
     providers_update.add_argument("provider_name", help="Provider instance name")
-    _add_provider_cli_spec_arguments(providers_update)
+    providers_update.add_argument("--aws-region", help="Update region")
+    providers_update.add_argument("--aws-profile", help="Update profile")
 
     providers_set_default = subparsers.add_parser("set-default", help="Set default provider")
     add_global_arguments(providers_set_default)
@@ -404,12 +365,6 @@ def add_template_actions(subparsers):
 
     templates_create = subparsers.add_parser("create", help="Create template")
     add_global_arguments(templates_create)
-    templates_create.add_argument(
-        "--template-id",
-        "-t",
-        dest="flag_template_id",
-        help="Template ID to select when --file contains a templates bundle",
-    )
     templates_create.add_argument("--file", required=True, help="Template configuration file")
     templates_create.add_argument(
         "--validate-only", action="store_true", help="Only validate, do not create"

@@ -56,7 +56,7 @@ class TemplateCreateRequest(APIRequest):
     template_id: str
     name: Optional[str] = None
     description: Optional[str] = None
-    provider_api: Optional[str] = None
+    provider_api: Optional[str] = "aws"
     provider_name: Optional[str] = None
     image_id: Optional[str] = None
     instance_type: Optional[str] = None
@@ -219,12 +219,15 @@ async def create_template(
     - **template_data**: Template configuration data
     """
     template_dict = template_data.model_dump(exclude_unset=True)
+    provider_api = template_dict.get("provider_api") or (
+        "aws" if not template_dict.get("provider_name") else None
+    )
     result = await orchestrator.execute(
         CreateTemplateInput(
             template_id=template_dict["template_id"],
             name=template_dict.get("name"),
             description=template_dict.get("description"),
-            provider_api=template_dict.get("provider_api"),
+            provider_api=provider_api,
             provider_name=template_dict.get("provider_name"),
             instance_type=template_dict.get("instance_type"),
             image_id=template_dict.get("image_id") or "",

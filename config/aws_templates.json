@@ -6,59 +6,56 @@
       "maxNumber": 10,
       "fleetType": "instant",
       "vmTypes": {
-        "t3.medium": 2,
-        "t3.xlarge": 4
+        "t3.medium": 1
       },
       "priceType": "ondemand",
       "allocationStrategy": "lowestPrice",
       "volumeType": "gp3",
       "instanceTags": {
-        "Environment": "dev"
+        "environment": "dev"
       },
       "name": "EC2 Fleet Instant On-Demand",
       "providerApi": "EC2Fleet",
       "providerType": "aws",
-      "createdAt": "2026-05-12T21:17:00.065904"
+      "createdAt": "2026-04-06T16:50:49.737415"
     },
     {
       "templateId": "EC2Fleet-Instant-Spot",
       "maxNumber": 10,
       "fleetType": "instant",
       "vmTypes": {
-        "t3.medium": 2,
-        "t3.xlarge": 4
+        "t3.medium": 1
       },
       "priceType": "spot",
-      "maxSpotPrice": 0.1,
+      "maxSpotPrice": 0.05,
       "allocationStrategy": "priceCapacityOptimized",
       "volumeType": "gp3",
       "instanceTags": {
-        "Environment": "dev"
+        "environment": "dev"
       },
       "name": "EC2 Fleet Instant Spot",
       "providerApi": "EC2Fleet",
       "providerType": "aws",
-      "createdAt": "2026-05-12T21:17:00.066041"
+      "createdAt": "2026-04-06T16:50:49.738212"
     },
     {
       "templateId": "EC2Fleet-Instant-Mixed",
       "maxNumber": 10,
       "fleetType": "instant",
       "vmTypes": {
-        "t3.medium": 2,
-        "t3.xlarge": 4
+        "t3.medium": 1
       },
       "priceType": "heterogeneous",
-      "maxSpotPrice": 0.1,
+      "maxSpotPrice": 0.05,
       "allocationStrategy": "diversified",
       "volumeType": "gp3",
       "instanceTags": {
-        "Environment": "dev"
+        "environment": "dev"
       },
       "name": "EC2 Fleet Instant Mixed",
       "providerApi": "EC2Fleet",
       "providerType": "aws",
-      "createdAt": "2026-05-12T21:17:00.066063",
+      "createdAt": "2026-04-06T16:50:49.738235",
       "percentOnDemand": 30
     },
     {
@@ -66,60 +63,57 @@
       "maxNumber": 15,
       "fleetType": "request",
       "vmTypes": {
-        "t3.medium": 2,
-        "t3.xlarge": 4
+        "t3.medium": 1
       },
       "priceType": "ondemand",
       "allocationStrategy": "lowestPrice",
       "volumeType": "gp3",
       "instanceTags": {
-        "Environment": "test"
+        "environment": "test"
       },
       "name": "EC2 Fleet Request On-Demand",
       "providerApi": "EC2Fleet",
       "providerType": "aws",
-      "createdAt": "2026-05-12T21:17:00.066075"
+      "createdAt": "2026-04-06T16:50:49.738247"
     },
     {
       "templateId": "EC2Fleet-Request-Spot",
       "maxNumber": 20,
       "fleetType": "request",
       "vmTypes": {
-        "t3.medium": 2,
-        "t3.xlarge": 4
+        "t3.medium": 1
       },
       "priceType": "spot",
-      "maxSpotPrice": 0.1,
+      "maxSpotPrice": 0.08,
       "allocationStrategy": "capacityOptimized",
       "volumeType": "gp3",
       "instanceTags": {
-        "Environment": "test"
+        "environment": "test"
       },
       "name": "EC2 Fleet Request Spot",
       "providerApi": "EC2Fleet",
       "providerType": "aws",
-      "createdAt": "2026-05-12T21:17:00.066087"
+      "createdAt": "2026-04-06T16:50:49.738258"
     },
     {
       "templateId": "EC2Fleet-Request-Mixed",
       "maxNumber": 25,
       "fleetType": "request",
       "vmTypes": {
-        "t3.medium": 2,
-        "t3.large": 2,
-        "t3.xlarge": 4
+        "t3.medium": 1,
+        "t3.large": 2
       },
       "priceType": "heterogeneous",
-      "maxSpotPrice": 0.1,
+      "maxSpotPrice": 0.08,
       "allocationStrategy": "diversified",
       "volumeType": "gp3",
       "instanceTags": {
-        "Environment": "test"
+        "environment": "test"
       },
       "name": "EC2 Fleet Request Mixed",
       "providerApi": "EC2Fleet",
       "providerType": "aws",
-      "createdAt": "2026-05-12T21:17:00.066100",
+      "createdAt": "2026-04-06T16:50:49.738268",
       "percentOnDemand": 40,
       "allocationStrategyOnDemand": "lowestPrice"
     },
@@ -128,60 +122,58 @@
       "maxNumber": 12,
       "fleetType": "maintain",
       "vmTypes": {
-        "t3.medium": 2,
-        "t3.xlarge": 4
+        "t3.medium": 1
       },
       "priceType": "ondemand",
       "allocationStrategy": "lowestPrice",
       "volumeType": "gp3",
       "instanceTags": {
-        "Environment": "prod"
+        "environment": "prod"
       },
       "name": "EC2 Fleet Maintain On-Demand",
       "providerApi": "EC2Fleet",
       "providerType": "aws",
-      "createdAt": "2026-05-12T21:17:00.066110"
+      "createdAt": "2026-04-06T16:50:49.738277"
     },
     {
       "templateId": "EC2Fleet-Maintain-Spot",
       "maxNumber": 30,
       "fleetType": "maintain",
       "vmTypes": {
-        "t3.medium": 2,
-        "t3.xlarge": 4
+        "t3.medium": 1
       },
       "priceType": "spot",
       "maxSpotPrice": 0.1,
       "allocationStrategy": "priceCapacityOptimized",
       "volumeType": "gp3",
       "instanceTags": {
-        "Environment": "prod"
+        "environment": "prod"
       },
       "name": "EC2 Fleet Maintain Spot",
       "providerApi": "EC2Fleet",
       "providerType": "aws",
-      "createdAt": "2026-05-12T21:17:00.066122"
+      "createdAt": "2026-04-06T16:50:49.738290"
     },
     {
       "templateId": "EC2Fleet-Maintain-Mixed",
       "maxNumber": 50,
       "fleetType": "maintain",
       "vmTypes": {
-        "t3.medium": 2,
+        "t3.medium": 1,
         "t3.large": 2,
-        "t3.xlarge": 4
+        "t3.xlarge": 3
       },
       "priceType": "heterogeneous",
-      "maxSpotPrice": 0.1,
+      "maxSpotPrice": 0.12,
       "allocationStrategy": "capacityOptimized",
       "volumeType": "gp3",
       "instanceTags": {
-        "Environment": "prod"
+        "environment": "prod"
       },
       "name": "EC2 Fleet Maintain Mixed",
       "providerApi": "EC2Fleet",
       "providerType": "aws",
-      "createdAt": "2026-05-12T21:17:00.066131",
+      "createdAt": "2026-04-06T16:50:49.738297",
       "percentOnDemand": 50,
       "allocationStrategyOnDemand": "prioritized"
     },
@@ -190,12 +182,11 @@
       "maxNumber": 20,
       "fleetType": "request",
       "vmTypes": {
-        "t3.medium": 2,
-        "t3.large": 2,
-        "t3.xlarge": 4
+        "t3.medium": 1,
+        "t3.large": 2
       },
       "priceType": "spot",
-      "maxSpotPrice": 0.1,
+      "maxSpotPrice": 0.05,
       "allocationStrategy": "lowestPrice",
       "volumeType": "gp3",
       "instanceTags": {
@@ -204,19 +195,18 @@
       "name": "Spot Fleet Request - Lowest Price",
       "providerApi": "SpotFleet",
       "providerType": "aws",
-      "createdAt": "2026-05-12T21:17:00.066148"
+      "createdAt": "2026-04-06T16:50:49.738310"
     },
     {
       "templateId": "SpotFleet-Request-Diversified",
       "maxNumber": 25,
       "fleetType": "request",
       "vmTypes": {
-        "t3.medium": 2,
-        "t3.large": 2,
-        "t3.xlarge": 4
+        "t3.medium": 1,
+        "t3.large": 2
       },
       "priceType": "spot",
-      "maxSpotPrice": 0.1,
+      "maxSpotPrice": 0.06,
       "allocationStrategy": "diversified",
       "volumeType": "gp3",
       "instanceTags": {
@@ -225,19 +215,18 @@
       "name": "Spot Fleet Request - Diversified",
       "providerApi": "SpotFleet",
       "providerType": "aws",
-      "createdAt": "2026-05-12T21:17:00.066159"
+      "createdAt": "2026-04-06T16:50:49.738317"
     },
     {
       "templateId": "SpotFleet-Request-CapacityOptimized",
       "maxNumber": 30,
       "fleetType": "request",
       "vmTypes": {
-        "t3.medium": 2,
-        "t3.large": 2,
-        "t3.xlarge": 4
+        "t3.medium": 1,
+        "t3.large": 2
       },
       "priceType": "spot",
-      "maxSpotPrice": 0.1,
+      "maxSpotPrice": 0.07,
       "allocationStrategy": "capacityOptimized",
       "volumeType": "gp3",
       "instanceTags": {
@@ -246,19 +235,18 @@
       "name": "Spot Fleet Request - Capacity Optimized",
       "providerApi": "SpotFleet",
       "providerType": "aws",
-      "createdAt": "2026-05-12T21:17:00.066323"
+      "createdAt": "2026-04-06T16:50:49.738322"
     },
     {
       "templateId": "SpotFleet-Maintain-LowestPrice",
       "maxNumber": 15,
       "fleetType": "maintain",
       "vmTypes": {
-        "t3.medium": 2,
-        "t3.large": 2,
-        "t3.xlarge": 4
+        "t3.medium": 1,
+        "t3.large": 2
       },
       "priceType": "spot",
-      "maxSpotPrice": 0.1,
+      "maxSpotPrice": 0.04,
       "allocationStrategy": "lowestPrice",
       "volumeType": "gp3",
       "instanceTags": {
@@ -267,19 +255,18 @@
       "name": "Spot Fleet Maintain - Lowest Price",
       "providerApi": "SpotFleet",
       "providerType": "aws",
-      "createdAt": "2026-05-12T21:17:00.066331"
+      "createdAt": "2026-04-06T16:50:49.738328"
     },
     {
       "templateId": "SpotFleet-Maintain-Diversified",
       "maxNumber": 20,
       "fleetType": "maintain",
       "vmTypes": {
-        "t3.medium": 2,
-        "t3.large": 2,
-        "t3.xlarge": 4
+        "t3.medium": 1,
+        "t3.large": 2
       },
       "priceType": "spot",
-      "maxSpotPrice": 0.1,
+      "maxSpotPrice": 0.05,
       "allocationStrategy": "diversified",
       "volumeType": "gp3",
       "instanceTags": {
@@ -288,19 +275,18 @@
       "name": "Spot Fleet Maintain - Diversified",
       "providerApi": "SpotFleet",
       "providerType": "aws",
-      "createdAt": "2026-05-12T21:17:00.066339"
+      "createdAt": "2026-04-06T16:50:49.738335"
     },
     {
       "templateId": "SpotFleet-Maintain-CapacityOptimized",
       "maxNumber": 25,
       "fleetType": "maintain",
       "vmTypes": {
-        "t3.medium": 2,
-        "t3.large": 2,
-        "t3.xlarge": 4
+        "t3.medium": 1,
+        "t3.large": 2
       },
       "priceType": "spot",
-      "maxSpotPrice": 0.1,
+      "maxSpotPrice": 0.06,
       "allocationStrategy": "capacityOptimized",
       "volumeType": "gp3",
       "instanceTags": {
@@ -309,14 +295,13 @@
       "name": "Spot Fleet Maintain - Capacity Optimized",
       "providerApi": "SpotFleet",
       "providerType": "aws",
-      "createdAt": "2026-05-12T21:17:00.066347"
+      "createdAt": "2026-04-06T16:50:49.738340"
     },
     {
       "templateId": "ASG-OnDemand",
       "maxNumber": 15,
       "vmTypes": {
-        "t3.medium": 2,
-        "t3.xlarge": 4
+        "t3.medium": 1
       },
       "priceType": "ondemand",
       "allocationStrategy": "lowestPrice",
@@ -327,17 +312,16 @@
       "name": "Auto Scaling Group On-Demand",
       "providerApi": "ASG",
       "providerType": "aws",
-      "createdAt": "2026-05-12T21:17:00.066359"
+      "createdAt": "2026-04-06T16:50:49.738348"
     },
     {
       "templateId": "ASG-Spot",
       "maxNumber": 20,
       "vmTypes": {
-        "t3.medium": 2,
-        "t3.xlarge": 4
+        "t3.medium": 1
       },
       "priceType": "spot",
-      "maxSpotPrice": 0.1,
+      "maxSpotPrice": 0.05,
       "allocationStrategy": "priceCapacityOptimized",
       "volumeType": "gp3",
       "instanceTags": {
@@ -346,15 +330,14 @@
       "name": "Auto Scaling Group Spot",
       "providerApi": "ASG",
       "providerType": "aws",
-      "createdAt": "2026-05-12T21:17:00.066372"
+      "createdAt": "2026-04-06T16:50:49.738361"
     },
     {
       "templateId": "ASG-Mixed",
       "maxNumber": 25,
       "vmTypes": {
-        "t3.medium": 2,
-        "t3.large": 2,
-        "t3.xlarge": 4
+        "t3.medium": 1,
+        "t3.large": 2
       },
       "priceType": "heterogeneous",
       "allocationStrategy": "lowestPrice",
@@ -365,14 +348,14 @@
       "name": "Auto Scaling Group Mixed",
       "providerApi": "ASG",
       "providerType": "aws",
-      "createdAt": "2026-05-12T21:17:00.066383",
+      "createdAt": "2026-04-06T16:50:49.738370",
       "percentOnDemand": 30
     },
     {
       "templateId": "RunInstances-OnDemand",
       "maxNumber": 5,
       "vmTypes": {
-        "t3.medium": 2
+        "t3.medium": 1
       },
       "priceType": "ondemand",
       "allocationStrategy": "lowestPrice",
@@ -383,16 +366,16 @@
       "name": "Run Instances On-Demand",
       "providerApi": "RunInstances",
       "providerType": "aws",
-      "createdAt": "2026-05-12T21:17:00.066394"
+      "createdAt": "2026-04-06T16:50:49.738379"
     },
     {
       "templateId": "RunInstances-Spot",
       "maxNumber": 10,
       "vmTypes": {
-        "t3.medium": 2
+        "t3.medium": 1
       },
       "priceType": "spot",
-      "maxSpotPrice": 0.1,
+      "maxSpotPrice": 0.05,
       "allocationStrategy": "priceCapacityOptimized",
       "volumeType": "gp3",
       "instanceTags": {
@@ -401,7 +384,7 @@
       "name": "Run Instances Spot",
       "providerApi": "RunInstances",
       "providerType": "aws",
-      "createdAt": "2026-05-12T21:17:00.066407"
+      "createdAt": "2026-04-06T16:50:49.738387"
     }
   ]
 }

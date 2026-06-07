@@ -1,0 +1,85 @@
+{
+  "scheduler_type": "default",
+  "templates": [
+    {
+      "template_id": "oci-vm-flex-ondemand-small",
+      "name": "OCI VM Flex On-Demand Small",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "VM",
+      "cpu_vendor": "AMD",
+      "generation": "E6",
+      "max_instances": 1,
+      "machine_types": {
+        "VM.Standard.E6.Flex": 1
+      },
+      "shape_config": {
+        "ocpus": 1,
+        "memoryInGBs": 8
+      },
+      "boot_volume_gbs": 50,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-vm-flex-preemptible-small",
+      "name": "OCI VM Flex Preemptible Small",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "VM",
+      "cpu_vendor": "AMD",
+      "generation": "E6",
+      "max_instances": 1,
+      "machine_types": {
+        "VM.Standard.E6.Flex": 1
+      },
+      "shape_config": {
+        "ocpus": 1,
+        "memoryInGBs": 8
+      },
+      "boot_volume_gbs": 50,
+      "capacity_type": "preemptible",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-vm-flex-preemptible-fallback-medium",
+      "name": "OCI VM Flex Preemptible Fallback Medium",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "VM",
+      "cpu_vendor": "AMD",
+      "generation": "E6",
+      "max_instances": 2,
+      "machine_types": {
+        "VM.Standard.E6.Flex": 1
+      },
+      "shape_config": {
+        "ocpus": 2,
+        "memoryInGBs": 16
+      },
+      "boot_volume_gbs": 100,
+      "capacity_type": "preemptible",
+      "fallback_to_ondemand": true
+    },
+    {
+      "template_id": "oci-bm-standard-ondemand",
+      "name": "OCI BM Standard On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "BM",
+      "cpu_vendor": "AMD",
+      "generation": "E5",
+      "max_instances": 1,
+      "machine_types": {
+        "BM.Standard.E5.192": 1
+      },
+      "boot_volume_gbs": 200,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    }
+  ]
+}

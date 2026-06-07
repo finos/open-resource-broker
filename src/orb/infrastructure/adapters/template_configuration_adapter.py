@@ -51,6 +51,8 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
             errors.append("Template ID is required")
 
         provider_api = config.get("providerApi") or config.get("provider_api")
+        if not provider_api:
+            errors.append("Provider API is required")
 
         image_id = config.get("imageId") or config.get("image_id")
         if not image_id:
@@ -69,7 +71,7 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
                 security_group_ids=config.get("securityGroupIds")
                 or config.get("security_group_ids", []),
                 price_type=config.get("priceType") or config.get("price_type", "ondemand"),
-                provider_api=provider_api,
+                provider_api=provider_api or "",
                 metadata=config.get("metadata", {}),
             )
 
