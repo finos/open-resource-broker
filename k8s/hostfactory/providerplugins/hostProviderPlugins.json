@@ -1,0 +1,10 @@
+{
+    "version": 2,
+    "providerplugins": [
+        {
+            "name": "k8s-hf",
+            "enabled": 1,
+            "scriptPath": "${HF_CONFDIR}/providers/k8s-hf/scripts/"
+        }
+    ]
+}

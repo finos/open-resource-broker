@@ -1,0 +1,128 @@
+[build-system]
+requires = [
+    "hatchling",
+]
+build-backend = "hatchling.build"
+
+[project]
+name = "open-resource-broker"
+description = "Symphony k8s deployment tools"
+
+readme = "README.md"
+requires-python = ">=3.12"
+
+# dynamic = ["version"]
+version = "1.0.0"
+
+dependencies = [
+    "click>=8",
+    "kubernetes",
+    "boto3",
+    "jinja2",
+    "typing-extensions",
+    "watchdog",
+    "hatchling",
+    "rich",
+    "wrapt",
+    "pydantic",
+    "pydantic-settings",
+    "tenacity",
+    "prometheus-client",
+    "sqlalchemy",
+    "pg8000",
+    "alembic",
+    "fastapi",
+    "uvicorn"
+]
+
+[project.optional-dependencies]
+testing = [
+    "PyYAML",
+    "coverage",
+    "pytest-cov",
+    "pytest",
+    "mypy",
+    "ruff>=0.8.0",
+    "typos",
+    "httpx"
+]
+documentation = [
+    "sphinx",
+    "sphinx-click",
+    "myst-parser",
+]
+
+[project.scripts]
+open-resource-broker = "open_resource_broker.cli.hf:run"
+open-resource-broker-admin = "open_resource_broker.cli.hfadmin:run"
+open-resource-broker-events = "open_resource_broker.cli.events_db:run"
+open-resource-broker-utils = "open_resource_broker.cli.hfutils:runserver"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/open_resource_broker"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/open_resource_broker" = "open_resource_broker"
+
+[tool.hatch.build.targets.sdist]
+exclude = ["/*venv"]
+
+[tool.pytest.ini_options]
+addopts = "--cov src/open_resource_broker --cov-report term-missing --verbose --cov-fail-under 40"
+norecursedirs = ["dist", "build", ".tox", "relvenv"]
+testpaths = ["src/open_resource_broker/tests/unit"]
+markers = [
+    "unit: testing with no external dependencies",
+    "regression: expects the pr instance to be up"]
+
+[tool.coverage.run]
+branch = true
+omit = ["src/open_resource_broker/tests/*"]
+
+[tool.coverage.paths]
+source = [
+    "src/open_resource_broker/",
+    "*/site-packages/open_resource_broker/",
+]
+
+[tool.coverage.report]
+# Regexes for lines to exclude from consideration
+exclude_also = [
+    # Don't complain about missing debug-only code:
+    "def __repr__",
+    "if self\\.debug",
+    # Don't complain if tests don't hit defensive assertion code:
+    "raise AssertionError",
+    "raise NotImplementedError",
+    # Don't complain if non-runnable code isn't run:
+    "if 0:",
+    "if __name__ == .__main__.:",
+    # Don't complain about abstract methods, they aren't run:
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.mypy]
+# If we ever refactor, we need to deal with this "no_implicit_optional"
+no_implicit_optional = false
+no_namespace_packages = true
+warn_return_any = true
+# Remove "import-untyped" when installing new packages in case it has a type hints package, remove the rest as we refactor.
+disable_error_code = ["call-arg", "attr-defined", "arg-type", "valid-type", "import-untyped", "union-attr", "assignment", "no-any-return", "return-value", "import-not-found"]
+
+[tool.uv]
+
+[tool.uv.sources]
+
+[tool.typos]
+# The signer API contains certificate data and appears to confuse the spellchecker
+files.extend-exclude = ["*.json"]
+
+[tool.typos.default.extend-words]
+# $nin is a mongodb query [not in], 
+# requestor is valid as it is in reference to a technical interface [https://english.stackexchange.com/questions/29254/whats-the-difference-between-requester-and-requestor]
+requestor = "requestor"
+nin = "nin"
+

@@ -1,0 +1,18 @@
+{
+    "scaling_policy": "throughput",
+    "slot_mapping": {
+        "ncores": 1,
+        "nram": 256
+    },
+    "cloud_apps": [
+        {
+            "consumer_path": "/"
+        }
+    ],
+    "host_return_policy": "immediate",
+    "resource_groups": [
+        "ComputeHosts"
+    ],
+    "unavailable_host_timeout": 30,
+    "maximum_applications_allowed": 30
+}

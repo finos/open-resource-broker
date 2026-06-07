@@ -60,7 +60,7 @@ representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement at
-aws-orb-maintainers@amazon.com.
+open-resource-broker-maintainers@lists.finos.org.
 All complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the
@@ -167,4 +167,4 @@ https://www.contributor-covenant.org/translations.
 ## Contact
 
 For questions about this code of conduct, please contact:
-aws-orb-maintainers@amazon.com
+open-resource-broker-maintainers@lists.finos.org

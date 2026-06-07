@@ -1,0 +1,7 @@
+SPDXVersion: SPDX-2.0
+DataLicense: CC0-1.0
+Creator: Morgan Stanley
+PackageName: open-resource-broker
+PackageOriginator: Morgan Stanley
+PackageHomePage: https://github.com/finos/open-resource-broker
+PackageLicenseDeclared: Apache-2.0

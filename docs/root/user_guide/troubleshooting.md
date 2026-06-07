@@ -208,5 +208,5 @@ If you're still having issues:
 1. Check the logs in your work directory
 2. Run with debug logging: `ORB_LOG_LEVEL=DEBUG orb <command>`
 3. Validate your setup: `orb config validate`
-4. Check the documentation: https://awslabs.github.io/open-resource-broker/
-5. File an issue: https://github.com/awslabs/open-resource-broker/issues
+4. Check the documentation: https://finos.github.io/open-resource-broker/
+5. File an issue: https://github.com/finos/open-resource-broker/issues
