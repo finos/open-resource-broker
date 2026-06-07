@@ -42,6 +42,8 @@ OCI follows the same pattern as AWS: templates describe the compute/capacity gri
 
 Use `oci_config.remote.example.json` as the production baseline for OCI-hosted brokers and `oci_config.local.example.json` for local development.
 
+For OCI, `orb init` discovery can write these environment-specific defaults into the generated config. `orb templates generate` only creates the example `oci_templates.json` file if it is missing; it does not rediscover images, subnets, compartments, or keys.
+
 ## Configuration Structure
 
 The configuration is structured into several sections, each serving a specific purpose:

@@ -206,7 +206,7 @@ Example configs:
 - `config/oci_config.remote.example.json` - ORB running on OCI Compute with instance principal auth. Do not set `profile` in this mode.
 - `config/oci_config.local.example.json` - local workstation or laptop using an OCI CLI profile. `DEFAULT` is the standard OCI CLI profile name; replace it only if your `~/.oci/config` uses another profile.
 
-OCI templates keep compute-grid choices in `config/oci_templates.json`. Environment-specific values such as image OCID, subnet OCID, compartment OCID, NSGs, SSH keys, and tags live in the config `provider_defaults.oci.template_defaults`, matching the AWS template-defaults pattern.
+OCI templates keep compute-grid choices in `oci_templates.json`. Environment-specific values such as image OCID, subnet OCID, compartment OCID, NSGs, SSH keys, and tags live in the config `provider_defaults.oci.template_defaults`, matching the AWS template-defaults pattern. `orb init` can populate these defaults during OCI discovery; `orb templates generate` only writes the packaged OCI template examples into the configured templates directory when they are missing.
 
 </details>
 
