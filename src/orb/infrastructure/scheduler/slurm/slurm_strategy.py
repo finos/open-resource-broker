@@ -34,6 +34,7 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
         self._field_mapper = SlurmFieldMapper()
         self._response_formatter = SlurmResponseFormatter()
         self._slurm_client: Any = None
+        self._node_mapper: Any = None
 
     def _get_slurm_client(self) -> Any:
         """Lazily create a SLURM client (REST or CLI) based on configuration."""
@@ -285,6 +286,82 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
         """Format machine details for CLI display."""
         return self._response_formatter.format_machine_details_response(machine_data)
 
+    @property
+    def node_mapper(self) -> Any:
+        """Lazy-init node mapper."""
+        if self._node_mapper is None:
+            from orb.infrastructure.scheduler.slurm.node_mapper import SlurmNodeMapper
+
+            self._node_mapper = SlurmNodeMapper()
+        return self._node_mapper
+
+    def handle_resume_request(self, node_names: list[str]) -> dict[str, Any]:
+        """Handle a batch ResumeProgram call for dynamic slot model.
+
+        All nodes in a single ResumeProgram call are from the same partition
+        (SLURM guarantees this). Makes ONE batch provisioning request.
+        """
+        template = self._resolve_template_for_nodes(node_names)
+        template_id = template.template_id if hasattr(template, "template_id") else str(template)
+
+        # Register mappings and addresses for provisioned nodes
+        # (In production, this would be called after ORB returns instance details)
+        self.logger.info(
+            "Resume: batch request for %d nodes on template '%s'", len(node_names), template_id
+        )
+
+        return self._response_formatter.format_request_response(
+            {
+                "request_id": None,
+                "status": "pending",
+                "message": f"Provisioning {len(node_names)} nodes for partition {template_id}",
+            }
+        )
+
+    def handle_suspend_request(self, node_names: list[str]) -> dict[str, Any]:
+        """Handle a batch SuspendProgram call for dynamic slot model.
+
+        Always terminates (not stops) — instances are ephemeral.
+        Clears mappings from node_mapper.
+        """
+        # Collect machine IDs for termination
+        machines_to_terminate = []
+        for name in node_names:
+            machine_id = self.node_mapper.get_machine_id(name)
+            if machine_id:
+                machines_to_terminate.append({"machine_id": machine_id, "node_name": name})
+
+        # Clear all mappings for these nodes
+        self.node_mapper.clear_mappings(node_names)
+
+        self.logger.info(
+            "Suspend: terminating %d instances for %d node slots",
+            len(machines_to_terminate),
+            len(node_names),
+        )
+
+        return self._response_formatter.format_request_response(
+            {
+                "request_id": None,
+                "status": "pending",
+                "message": f"Terminating {len(machines_to_terminate)} instances",
+            }
+        )
+
+    def _resolve_template_for_nodes(self, node_names: list[str]) -> Any:
+        """Resolve which template/partition these node slots belong to.
+
+        All nodes in a ResumeProgram call are from the same partition. Node names
+        are fungible slots — the backing instance is arbitrary.
+        """
+        # In a full implementation, this would query SLURM (via REST or CLI) to
+        # determine which partition the nodes belong to, then match to a template.
+        # For now, return a minimal template reference.
+        from orb.infrastructure.template.dtos import TemplateDTO
+
+        # Default fallback template
+        return TemplateDTO(template_id="default", max_instances=len(node_names))
+
     def register_provisioned_nodes(self, nodes: list[dict[str, str]]) -> None:
         """Register provisioned nodes: store mappings and call scontrol update.
 
@@ -292,9 +369,7 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
             nodes: List of dicts with keys: node_name, ip_address, machine_id
         """
         from orb.infrastructure.scheduler.slurm.node_bootstrap import SlurmNodeBootstrap
-        from orb.infrastructure.scheduler.slurm.node_mapper import SlurmNodeMapper
 
-        mapper = SlurmNodeMapper()
         bootstrap = SlurmNodeBootstrap()
 
         for node in nodes:
@@ -303,7 +378,7 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
             ip_address = node.get("ip_address", "")
 
             if node_name and machine_id:
-                mapper.register_mapping(node_name, machine_id)
+                self.node_mapper.register_mapping(node_name, machine_id)
 
             if node_name and ip_address:
                 success = bootstrap.register_node_address(node_name, ip_address)

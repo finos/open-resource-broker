@@ -2,6 +2,12 @@
 # SLURM SuspendProgram hook for ORB — powers down cloud nodes via ORB deprovisioning.
 # Configure in slurm.conf: SuspendProgram=/path/to/suspendProgram.sh
 # SLURM invokes this with node list as $1 (e.g. "compute-[001-003]" or "node1 node2")
+#
+# Dynamic Slot Model:
+# - Always TERMINATES instances (never stops) — they are ephemeral
+# - Node name ↔ machine ID mappings are cleared after termination
+# - Next resume will provision completely fresh instances
+# - No data residency between cycles — use shared storage
 set -euo pipefail
 
 LOG_DIR="${SLURM_ORB_LOG_DIR:-/var/log/orb}"
@@ -31,9 +37,8 @@ fi
 
 log "INFO: SuspendProgram called with nodes: ${NODE_LIST}"
 
-# --- Invoke ORB ---
+# --- Single batch request to ORB (terminate all) ---
 if [ "${ORB_MODE}" = "api" ]; then
-    # REST API mode
     PAYLOAD="{\"node_names\": [\"${NODE_LIST// /\", \"}\"], \"request_type\": \"deprovision\"}"
     RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
         -H "Content-Type: application/json" \
@@ -44,20 +49,19 @@ if [ "${ORB_MODE}" = "api" ]; then
     BODY=$(echo "${RESPONSE}" | sed '$d')
 
     if [ "${HTTP_CODE}" -ge 200 ] && [ "${HTTP_CODE}" -lt 300 ]; then
-        log "INFO: API request succeeded (HTTP ${HTTP_CODE}): ${BODY}"
+        log "INFO: Batch API terminate succeeded (HTTP ${HTTP_CODE})"
         exit 0
     else
-        log "ERROR: API request failed (HTTP ${HTTP_CODE}): ${BODY}"
+        log "ERROR: Batch API terminate failed (HTTP ${HTTP_CODE}): ${BODY}"
         exit 1
     fi
 else
-    # CLI mode (default)
     if orb machines return --nodes "${NODE_LIST}" --scheduler slurm >> "${LOG_FILE}" 2>&1; then
-        log "INFO: CLI request succeeded for nodes: ${NODE_LIST}"
+        log "INFO: Batch CLI terminate succeeded for nodes: ${NODE_LIST}"
         exit 0
     else
         RC=$?
-        log "ERROR: CLI request failed (exit ${RC}) for nodes: ${NODE_LIST}"
+        log "ERROR: Batch CLI terminate failed (exit ${RC}) for nodes: ${NODE_LIST}"
         exit "${RC}"
     fi
 fi

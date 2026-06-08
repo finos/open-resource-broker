@@ -3,16 +3,21 @@
 # Configure in slurm.conf: ResumeProgram=/path/to/resumeProgram.sh
 # SLURM invokes this with node list as $1 (e.g. "compute-[001-003]" or "node1 node2")
 #
+# Dynamic Slot Model:
+# - Node names are fungible capacity slots (not persistent identities)
+# - Each resume provisions FRESH instances (no data residency)
+# - Assignment of instances to slot names is arbitrary
+# - All persistent data should live on shared storage (FSx, EFS, NFS)
+#
 # SLURM Resume Lifecycle:
-# 1. SLURM calls this script with node names
-# 2. ORB provisions cloud instances (EC2)
+# 1. SLURM calls this script with node names (single batch)
+# 2. ORB provisions cloud instances in ONE batch request
 # 3. This script reports back node addresses via scontrol update
-# 4. slurmd starts on the provisioned node and registers with slurmctld
-# 5. SLURM clears POWERING_UP flag → node becomes IDLE → jobs can run
+# 4. slurmd starts on the provisioned nodes and registers with slurmctld
+# 5. SLURM clears POWERING_UP flag → nodes become IDLE → jobs can run
 #
 # IMPORTANT: The provisioned instance's AMI/image MUST have slurmd
 # pre-installed and configured to connect to this cluster's slurmctld.
-# Without slurmd, the node will never register and SLURM will timeout.
 set -euo pipefail
 
 LOG_DIR="${SLURM_ORB_LOG_DIR:-/var/log/orb}"
@@ -42,9 +47,8 @@ fi
 
 log "INFO: ResumeProgram called with nodes: ${NODE_LIST}"
 
-# --- Invoke ORB to provision ---
+# --- Single batch request to ORB ---
 if [ "${ORB_MODE}" = "api" ]; then
-    # REST API mode — response includes machine details with IPs
     PAYLOAD="{\"node_names\": [\"${NODE_LIST// /\", \"}\"], \"request_type\": \"provision\"}"
     RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
         -H "Content-Type: application/json" \
@@ -55,25 +59,21 @@ if [ "${ORB_MODE}" = "api" ]; then
     BODY=$(echo "${RESPONSE}" | sed '$d')
 
     if [ "${HTTP_CODE}" -ge 200 ] && [ "${HTTP_CODE}" -lt 300 ]; then
-        log "INFO: API request succeeded (HTTP ${HTTP_CODE}): ${BODY}"
+        log "INFO: Batch API request succeeded (HTTP ${HTTP_CODE})"
     else
-        log "ERROR: API request failed (HTTP ${HTTP_CODE}): ${BODY}"
+        log "ERROR: Batch API request failed (HTTP ${HTTP_CODE}): ${BODY}"
         exit 1
     fi
 else
-    # CLI mode (default)
     if ! BODY=$(orb machines request --nodes "${NODE_LIST}" --scheduler slurm --format json 2>>"${LOG_FILE}"); then
         RC=$?
-        log "ERROR: CLI request failed (exit ${RC}) for nodes: ${NODE_LIST}"
+        log "ERROR: Batch CLI request failed (exit ${RC}) for nodes: ${NODE_LIST}"
         exit "${RC}"
     fi
-    log "INFO: CLI request succeeded for nodes: ${NODE_LIST}"
+    log "INFO: Batch CLI request succeeded for nodes: ${NODE_LIST}"
 fi
 
 # --- Register node addresses with SLURM ---
-# Parse ORB response for node_name→IP mappings and update slurmctld.
-# This allows SLURM to route communications before slurmd fully registers.
-# Format expected: JSON with .machines[].node_name and .machines[].private_ip_address
 if command -v jq >/dev/null 2>&1 && [ -n "${BODY:-}" ]; then
     echo "${BODY}" | jq -r '.machines[]? | "\(.node_name) \(.private_ip_address)"' 2>/dev/null | \
     while read -r NODE_NAME NODE_IP; do
@@ -81,12 +81,12 @@ if command -v jq >/dev/null 2>&1 && [ -n "${BODY:-}" ]; then
             if scontrol update "NodeName=${NODE_NAME}" "NodeAddr=${NODE_IP}" 2>>"${LOG_FILE}"; then
                 log "INFO: Registered NodeAddr=${NODE_IP} for ${NODE_NAME}"
             else
-                log "WARN: scontrol update failed for ${NODE_NAME} (slurmd fallback will handle)"
+                log "WARN: scontrol update failed for ${NODE_NAME} (slurmd fallback)"
             fi
         fi
     done
 else
-    log "INFO: jq not available or no response body — skipping scontrol update (slurmd will self-register)"
+    log "INFO: jq not available or no body — skipping scontrol update (slurmd will self-register)"
 fi
 
 exit 0
