@@ -240,3 +240,22 @@ def test_acquire_request_with_terminal_planned_shortfall_and_no_instances_become
 
     assert status == RequestStatus.FAILED.value
     assert message == "OperationNotAllowed: quota exceeded"
+
+
+def test_acquire_request_with_malformed_unfulfilled_count_becomes_failed():
+    svc = _make_service()
+    req = _make_request("acquire")
+    req.requested_count = 2
+
+    status, message = svc.determine_status_from_machines(
+        db_machines=[],
+        provider_machines=[],
+        request=req,
+        provider_metadata={
+            "terminal_error_message": "OperationNotAllowed: quota exceeded",
+            "unfulfilled_count": "not-an-int",
+        },
+    )
+
+    assert status == RequestStatus.FAILED.value
+    assert message == "Provider reported malformed unfulfilled_count metadata"

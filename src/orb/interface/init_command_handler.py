@@ -650,11 +650,6 @@ def _write_config_file(
     default_provider_name: str | None = None
     for provider_data in user_config.get("providers", []):
         provider_config = dict(provider_data.get("config", {}))
-        if not provider_config:
-            provider_config = {
-                "profile": provider_data.get("profile"),
-                "region": provider_data.get("region"),
-            }
         provider_type = provider_data["type"]
 
         # Create provider instance
@@ -731,17 +726,9 @@ def _write_config_file(
 
 def _generate_provider_instance_name(provider_type: str, provider_config: Dict[str, Any]) -> str:
     """Generate a provider instance name using the provider strategy when available."""
-    try:
-        registry = get_container().get(ProviderRegistryPort)
-        strategy = registry.create_strategy_by_type(provider_type, provider_config)
-        return strategy.generate_provider_name(provider_config)
-    except Exception:
-        import re
-
-        profile_for_name = provider_config.get("profile") or "instance-profile"
-        sanitized_profile = re.sub(r"[^a-zA-Z0-9\-_]", "-", str(profile_for_name))
-        region = provider_config.get("region") or "default"
-        return f"{provider_type}_{sanitized_profile}_{region}"
+    registry = get_container().get(ProviderRegistryPort)
+    strategy = registry.create_strategy_by_type(provider_type, provider_config)
+    return strategy.generate_provider_name(provider_config)
 
 
 def _copy_scripts(scripts_dir: Path):

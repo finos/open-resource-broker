@@ -365,9 +365,6 @@ class ProvisioningOrchestrationService:
         except CircuitBreakerOpenError:
             raise  # do not swallow — let it propagate to execute_provisioning
 
-        except TimeoutError:
-            raise
-
         except QuotaError as e:
             self._logger.error(
                 "Quota error during provisioning for template %s: %s",

@@ -1,26 +1,19 @@
 """Tests for provider defaults loading."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 
-def test_load_strategy_defaults_registers_all_provider_types_before_collecting_defaults():
+def test_load_strategy_defaults_uses_static_provider_defaults_without_provider_bootstrap():
     from orb.config.loader import ConfigurationLoader
-
-    registry = MagicMock()
-    registry.collect_defaults.return_value = {
-        "provider": {
-            "provider_defaults": {
-                "azure": {"handlers": {"VMSS": {"enabled": True}}},
-            }
-        }
-    }
 
     with (
         patch("orb.providers.registration.register_all_provider_types") as register_all,
-        patch("orb.providers.registry.get_provider_registry", return_value=registry),
+        patch("orb.providers.registry.get_provider_registry") as get_provider_registry,
     ):
         defaults = ConfigurationLoader._load_strategy_defaults()
 
-    register_all.assert_called_once_with()
-    registry.collect_defaults.assert_called_once_with()
+    register_all.assert_not_called()
+    get_provider_registry.assert_not_called()
+    assert "aws" in defaults["provider"]["provider_defaults"]
     assert "azure" in defaults["provider"]["provider_defaults"]
+    assert "gcp" in defaults["provider"]["provider_defaults"]

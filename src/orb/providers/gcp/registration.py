@@ -166,6 +166,19 @@ def register_gcp_extensions(logger: Optional[LoggingPort] = None) -> None:
         logger.debug("GCP template extensions registered successfully")
 
 
+def register_gcp_provider_settings() -> None:
+    """Register GCPProviderConfig with the provider settings registry."""
+    try:
+        from orb.config.schemas.provider_settings_registry import ProviderSettingsRegistry
+        from orb.providers.gcp.configuration.config import GCPProviderConfig
+
+        ProviderSettingsRegistry.register_provider_settings("gcp", GCPProviderConfig)
+    except ImportError:
+        pass
+    except Exception as exc:
+        raise RuntimeError(f"Failed to register GCP provider settings: {exc!s}")
+
+
 def register_gcp_template_factory(
     factory: TemplateFactory, logger: Optional[LoggingPort] = None
 ) -> None:
@@ -188,6 +201,7 @@ def initialize_gcp_provider(
 ) -> None:
     """Initialize GCP provider components."""
     register_gcp_extensions(logger)
+    register_gcp_provider_settings()
     if template_factory:
         register_gcp_template_factory(template_factory, logger)
 
@@ -199,3 +213,4 @@ def is_gcp_provider_registered() -> bool:
 
 with suppress(Exception):
     register_gcp_extensions()
+    register_gcp_provider_settings()

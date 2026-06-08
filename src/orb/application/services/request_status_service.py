@@ -112,8 +112,15 @@ class RequestStatusService:
                 capacity_state = str(fleet_capacity.get("state") or "").lower()
                 terminal_error_message = provider_metadata.get("terminal_error_message")
                 unfulfilled_count = provider_metadata.get("unfulfilled_count")
+                if terminal_error_message and unfulfilled_count is not None and not isinstance(
+                    unfulfilled_count, int
+                ):
+                    return (
+                        RequestStatus.FAILED.value,
+                        "Provider reported malformed unfulfilled_count metadata",
+                    )
                 planned_terminal_shortfall = bool(terminal_error_message) and (
-                    unfulfilled_count is None or int(unfulfilled_count) > 0
+                    unfulfilled_count is None or unfulfilled_count > 0
                 )
 
                 if not machines_to_check:

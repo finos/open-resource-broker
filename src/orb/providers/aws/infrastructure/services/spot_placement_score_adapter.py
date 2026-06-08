@@ -30,55 +30,48 @@ class AWSSpotPlacementScoreAdapter(SpotPlacementScoreAdapter):
             return []
 
         scores: list[PlacementScore] = []
-        for idx, instance_type in enumerate(instance_types):
+        for instance_type in instance_types:
             candidate = PlacementCandidate(
                 candidate_id=f"aws:{self._region}:{instance_type}",
                 instance_type=instance_type,
                 region=self._region,
             )
-            peer_group = self._build_peer_group(instance_types, idx)
-            raw_score = self._get_score_for_candidate(
+            score_entry = self._get_score_for_candidate(
                 candidate=candidate,
-                peer_group=peer_group,
                 requested_count=requested_count,
             )
+            raw_score = self._score_value(score_entry)
+            availability_zone = score_entry.get("AvailabilityZone")
+            if availability_zone:
+                candidate = PlacementCandidate(
+                    candidate_id=f"aws:{self._region}:{availability_zone}:{instance_type}",
+                    instance_type=instance_type,
+                    region=self._region,
+                    zone=str(availability_zone),
+                )
             scores.append(
                 PlacementScore(
                     candidate=candidate,
                     raw_score=raw_score,
                     normalized_score=self._normalize_score(raw_score),
                     approximate=True,
-                    metadata={"peer_group": peer_group},
+                    metadata={"score_entry": score_entry},
                 )
             )
 
         return scores
 
-    @staticmethod
-    def _build_peer_group(instance_types: list[str], candidate_index: int) -> list[str]:
-        if len(instance_types) <= 3:
-            return list(instance_types)
-
-        ordered = [instance_types[candidate_index]]
-        for offset in range(1, len(instance_types)):
-            next_index = (candidate_index + offset) % len(instance_types)
-            ordered.append(instance_types[next_index])
-            if len(ordered) == 3:
-                break
-        return ordered
-
     def _get_score_for_candidate(
         self,
         candidate: PlacementCandidate,
-        peer_group: list[str],
         requested_count: int,
-    ) -> int:
+    ) -> dict[str, Any]:
         try:
             response = self._aws_client.ec2_client.get_spot_placement_scores(
-                InstanceTypes=peer_group,
+                InstanceTypes=[candidate.instance_type],
                 TargetCapacity=requested_count,
                 TargetCapacityUnitType="units",
-                SingleAvailabilityZone=False,
+                SingleAvailabilityZone=True,
                 RegionNames=[candidate.region or self._region],
             )
         except Exception as exc:
@@ -87,16 +80,27 @@ class AWSSpotPlacementScoreAdapter(SpotPlacementScoreAdapter):
                 candidate.instance_type,
                 exc,
             )
-            return 0
+            return {}
 
         placement_scores = response.get("SpotPlacementScores", [])
-        for score_entry in placement_scores:
-            if score_entry.get("Region") == (candidate.region or self._region):
-                try:
-                    return int(score_entry.get("Score", 0) or 0)
-                except (TypeError, ValueError):
-                    return 0
-        return 0
+        if not isinstance(placement_scores, list):
+            return {}
+        matching_scores = [
+            score_entry
+            for score_entry in placement_scores
+            if isinstance(score_entry, dict)
+            and score_entry.get("Region") == (candidate.region or self._region)
+        ]
+        if not matching_scores:
+            return {}
+        return max(matching_scores, key=self._score_value)
+
+    @staticmethod
+    def _score_value(score_entry: dict[str, Any]) -> int:
+        try:
+            return int(score_entry.get("Score", 0) or 0)
+        except (TypeError, ValueError):
+            return 0
 
     @staticmethod
     def _normalize_score(raw_score: int) -> float:

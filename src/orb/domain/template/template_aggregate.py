@@ -5,7 +5,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from orb.domain.base.value_objects import AllocationStrategy, PlacementSplitStrategy
+from orb.domain.base.value_objects import PlacementSplitStrategy
 
 
 class Template(BaseModel):
@@ -135,10 +135,6 @@ class Template(BaseModel):
 
         if self.placement_primary_share_percent < 0 or self.placement_primary_share_percent > 100:
             raise ValueError("placement_primary_share_percent must be between 0 and 100")
-
-        if self.allocation_strategy == AllocationStrategy.SPOT_PLACEMENT_SCORE.value:
-            if self.price_type != "spot":
-                raise ValueError("spotPlacementScore allocation strategy requires price_type='spot'")
 
         return self
 

@@ -263,6 +263,8 @@ class AWSTemplate(Template):
         # from provider.template_defaults via _coalesce_merge)
 
         if self.allocation_strategy == AllocationStrategy.SPOT_PLACEMENT_SCORE.value:
+            if self.price_type != "spot":
+                raise ValueError("spotPlacementScore allocation strategy requires price_type='spot'")
             candidate_types = list((self.machine_types or {}).keys())
             if self.instance_type and self.instance_type not in candidate_types:
                 candidate_types.insert(0, self.instance_type)

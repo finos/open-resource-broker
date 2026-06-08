@@ -141,13 +141,31 @@ def test_spot_placement_score_adapter_uses_canonical_machine_types():
 
     assert [score.candidate.instance_type for score in scores] == ["m7i.large", "m7i.xlarge"]
     assert ec2_client.get_spot_placement_scores.call_count == 2
+    assert [
+        call.kwargs["InstanceTypes"]
+        for call in ec2_client.get_spot_placement_scores.call_args_list
+    ] == [["m7i.large"], ["m7i.xlarge"]]
+    assert all(
+        call.kwargs["SingleAvailabilityZone"] is True
+        for call in ec2_client.get_spot_placement_scores.call_args_list
+    )
 
 
 def test_spot_placement_score_adapter_preserves_aws_score_granularity():
     ec2_client = MagicMock()
-    ec2_client.get_spot_placement_scores.return_value = {
-        "SpotPlacementScores": [{"Region": "eu-west-1", "Score": 90}]
-    }
+    ec2_client.get_spot_placement_scores.side_effect = [
+        {
+            "SpotPlacementScores": [
+                {"Region": "eu-west-1", "AvailabilityZone": "eu-west-1a", "Score": 40},
+                {"Region": "eu-west-1", "AvailabilityZone": "eu-west-1b", "Score": 90},
+            ]
+        },
+        {
+            "SpotPlacementScores": [
+                {"Region": "eu-west-1", "AvailabilityZone": "eu-west-1a", "Score": 25}
+            ]
+        },
+    ]
     aws_client = MagicMock()
     aws_client.ec2_client = ec2_client
 
@@ -181,3 +199,6 @@ def test_spot_placement_score_adapter_preserves_aws_score_granularity():
     assert len(scores) == 2
     assert scores[0].raw_score == 90
     assert scores[0].normalized_score == 0.9
+    assert scores[0].candidate.zone == "eu-west-1b"
+    assert scores[0].metadata["score_entry"]["AvailabilityZone"] == "eu-west-1b"
+    assert scores[1].raw_score == 25

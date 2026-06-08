@@ -28,7 +28,7 @@ from orb.domain.base.ports import (
 from orb.domain.request.request_identifiers import RequestId
 from orb.domain.request.value_objects import RequestType
 from orb.domain.template.factory import TemplateFactoryPort
-from orb.infrastructure.template.dtos import TemplateDTO
+from orb.domain.template.template_aggregate import Template
 
 
 @command_handler(CreateRequestCommand)  # type: ignore[arg-type]
@@ -121,7 +121,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
 
         self.logger.info("Machine request created successfully: %s", request.request_id)
 
-    async def _load_template(self, template_id: str) -> Any:
+    async def _load_template(self, template_id: str) -> Template:
         """Load template using CQRS QueryBus."""
         if not self._query_bus:
             raise ApplicationError("QueryBus is required for template lookup")
@@ -134,9 +134,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
         if not template:
             raise EntityNotFoundError("Template", template_id)
 
-        if isinstance(template, TemplateDTO):
-            template_factory = self._container.get(TemplateFactoryPort)
-            template = template_factory.create_template(template.to_template_config())
+        template_factory = self._container.get(TemplateFactoryPort)
+        template = template_factory.create_template(template.to_template_config())
 
         self.logger.debug("Template found: %s (id=%s)", type(template), template.template_id)
         return template

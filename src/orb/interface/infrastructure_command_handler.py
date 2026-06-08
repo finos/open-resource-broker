@@ -116,6 +116,9 @@ def _show_provider_infrastructure(provider: Dict[str, Any]) -> None:
         console.info(f"Region: {config.get('region', 'N/A')}")
         if provider["type"] == "aws":
             console.info(f"Profile: {config.get('profile', 'N/A')}")
+        elif provider["type"] == "azure":
+            console.info(f"Subscription: {config.get('subscription_id', 'N/A')}")
+            console.info(f"Resource Group: {config.get('resource_group', 'N/A')}")
         elif provider["type"] == "gcp":
             console.info(f"Project: {config.get('project_id', 'N/A')}")
 

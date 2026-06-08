@@ -274,14 +274,14 @@ class SpotPlacementExecutionService:
             "instances": [],
             "error_message": SpotPlacementExecutionService._format_launch_error(exc),
             "provider_data": {
-                "error_codes": [exc.error_code] if getattr(exc, "error_code", None) else [],
+                "error_codes": [exc.error_code] if exc.error_code else [],
             },
         }
 
     @staticmethod
-    def _format_launch_error(exc: Exception) -> str:
+    def _format_launch_error(exc: DomainException) -> str:
         """Format a launch exception while keeping the visible error code prefix."""
-        error_code = getattr(exc, "error_code", None)
+        error_code = exc.error_code
         message = str(exc)
         if error_code and not message.startswith(f"{error_code}:"):
             return f"{error_code}: {message}"
@@ -293,7 +293,7 @@ class SpotPlacementExecutionService:
         requested_count: int,
         raw_result: Mapping[str, Any],
     ) -> dict[str, Any]:
-        result = SpotPlacementExecutionService._coerce_child_result_mapping(raw_result)
+        result = dict(raw_result)
         success = result.get("success", True)
         error_message = result.get("error_message")
         resource_ids = result.get("resource_ids", [])
@@ -319,15 +319,6 @@ class SpotPlacementExecutionService:
             ),
             "provider_data": provider_data,
         }
-
-    @staticmethod
-    def _coerce_child_result_mapping(raw_result: Mapping[str, Any]) -> dict[str, Any]:
-        if not isinstance(raw_result, Mapping):
-            raise TypeError(
-                "Spot placement child launch must return a mapping result with "
-                "'success', 'resource_ids', 'instances', and optional provider metadata"
-            )
-        return dict(raw_result)
 
     @staticmethod
     def _extract_error_codes(

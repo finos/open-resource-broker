@@ -1013,12 +1013,21 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
                         ]
 
                     primary_vm_size, *fallback_vm_sizes = candidate_sizes
-                    result = {"vm_size": primary_vm_size}
+                    result: dict[str, Any] = {"vm_size": primary_vm_size}
                     if fallback_vm_sizes:
                         result["vm_sizes"] = fallback_vm_sizes
                     return result
             if primary_vm_type:
                 return {"vm_size": primary_vm_type}
+            return {}
+
+        if provider_type == "gcp":
+            if "vmType" in hf_data:
+                return {"instance_type": hf_data["vmType"]}
+            if "vmTypes" in hf_data:
+                raw_vm_types = hf_data["vmTypes"]
+                if isinstance(raw_vm_types, dict) and raw_vm_types:
+                    return {"instance_type": next(iter(raw_vm_types.keys()))}
             return {}
 
         if "vmType" in hf_data:

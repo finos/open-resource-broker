@@ -64,21 +64,6 @@ def test_execute_plan_propagates_domain_exception_error_code():
     assert summary.child_results[0]["provider_data"]["error_codes"] == ["AllocationFailed"]
 
 
-def test_execute_plan_rejects_non_mapping_child_result():
-    service = SpotPlacementExecutionService()
-    plan = [_plan_entry("azure:eastus2:1:Standard_D4s_v5")]
-
-    with pytest.raises(TypeError, match="child launch must return a mapping result"):
-        service.execute_plan(
-            plan=plan,
-            total_count=1,
-            build_child_template=lambda plan_entry: {"candidate_id": plan_entry.score.candidate.candidate_id},
-            build_child_request=lambda requested_count, idx: {"count": requested_count, "index": idx},
-            launch_child=lambda child_request, child_template: "legacy-resource-id",
-            is_capacity_like_failure=lambda child_result: False,
-        )
-
-
 def test_execute_plan_keeps_shortfall_when_child_succeeds_partially():
     service = SpotPlacementExecutionService()
     plan = [_plan_entry("azure:eastus2:1:Standard_D4s_v5", planned_count=2)]
@@ -125,22 +110,6 @@ async def test_execute_plan_async_propagates_domain_exception_error_code():
     assert summary.unfulfilled_count == 1
     assert summary.failed_subplans[0]["error_codes"] == ["AllocationFailed"]
     assert summary.child_results[0]["provider_data"]["error_codes"] == ["AllocationFailed"]
-
-
-@pytest.mark.asyncio
-async def test_execute_plan_async_rejects_non_mapping_child_result():
-    service = SpotPlacementExecutionService()
-    plan = [_plan_entry("azure:eastus2:1:Standard_D4s_v5")]
-
-    with pytest.raises(TypeError, match="child launch must return a mapping result"):
-        await service.execute_plan_async(
-            plan=plan,
-            total_count=1,
-            build_child_template=lambda plan_entry: {"candidate_id": plan_entry.score.candidate.candidate_id},
-            build_child_request=lambda requested_count, idx: {"count": requested_count, "index": idx},
-            launch_child=lambda child_request, child_template: _async_result("legacy-resource-id"),
-            is_capacity_like_failure=lambda child_result: False,
-        )
 
 
 @pytest.mark.asyncio

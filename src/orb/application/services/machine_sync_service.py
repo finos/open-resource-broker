@@ -221,8 +221,8 @@ class MachineSyncService:
         mapping: dict[str, tuple[str, int]] = {}
 
         for machine in db_machines:
-            resource_id = getattr(machine, "resource_id", None)
-            machine_id = getattr(getattr(machine, "machine_id", None), "value", None)
+            resource_id = machine.resource_id
+            machine_id = machine.machine_id.value
             if resource_id in (None, "") or machine_id in (None, ""):
                 continue
             mapping[str(machine_id)] = (str(resource_id), 1)

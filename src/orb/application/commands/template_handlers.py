@@ -189,7 +189,7 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, None]):  #
             update_fields["machine_types"] = {command.instance_type: 1}
         if provider_specific_updates:
             update_fields["provider_config"] = {
-                **getattr(existing, "provider_config", {}),
+                **existing.provider_config,
                 **provider_specific_updates,
             }
 
