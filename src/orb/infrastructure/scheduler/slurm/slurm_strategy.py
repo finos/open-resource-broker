@@ -251,8 +251,7 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
         if node_names:
             node_names = [n for n in node_names if isinstance(n, str) and _node_pattern.match(n)]
 
-        if requested_count < 1:
-            requested_count = 1
+        requested_count = max(requested_count, 1)
 
         return {
             "template_id": template_id,
