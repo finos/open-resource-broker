@@ -2,7 +2,13 @@
   "version": "2.0.0",
   "scheduler": {
     "type": "hostfactory",
-    "config_root": "$HF_PROVIDER_CONFDIR"
+    "config_root": "$HF_PROVIDER_CONFDIR",
+    "_comment_scheduler_alternatives": "Alternatives: type='default' (standalone), type='slurm' (SLURM power hooks)",
+    "_slurm_example": {
+      "type": "slurm",
+      "config_root": "/etc/orb",
+      "log_level": "INFO"
+    }
   },
   "provider": {
     "providers": [

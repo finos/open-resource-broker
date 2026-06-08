@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 <small>[Compare with latest](https://github.com/awslabs/open-resource-broker/compare/v0.1.0rc0...HEAD)</small>
 
+### Added
+
+- SLURM scheduler integration — ORB can now act as a resource provider for SLURM clusters via ResumeProgram/SuspendProgram power management hooks
+- SlurmSchedulerStrategy with full SchedulerPort implementation
+- Bidirectional field mapping between SLURM and ORB domain concepts
+- SlurmNodeMapper for node name ↔ machine ID translation with hostlist range expansion
+- slurmrestd REST client for cluster health monitoring
+- CLI fallback adapter for environments without slurmrestd
+- Mock slurmrestd server for local development and testing
+- Comprehensive documentation: integration guide, deployment scenarios, feature mapping, supported APIs
+
 ### Features
 
 - integrate comprehensive release management and notes enhancements ([207203b](https://github.com/awslabs/open-resource-broker/commit/207203b414f2649e68a80711d281f656e723c2a1) by Flamur Gogolli).
