@@ -1,9 +1,12 @@
-"""SLURM node bootstrap — post-provisioning setup and scontrol registration."""
+"""SLURM node bootstrap — post-provisioning setup for ephemeral cloud nodes.
+
+Handles post-provisioning setup for ephemeral cloud nodes. Each resume cycle
+provisions fresh instances — no state is preserved between cycles.
+"""
 
 import logging
 import re
 import subprocess
-import time
 
 _logger = logging.getLogger(__name__)
 _NAME_RE = re.compile(r"^[a-zA-Z0-9\-_]+$")
@@ -11,7 +14,7 @@ _IP_RE = re.compile(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$")
 
 
 class SlurmNodeBootstrap:
-    """Handles post-provisioning node registration and readiness verification."""
+    """Handles post-provisioning node registration for ephemeral cloud nodes."""
 
     def __init__(self, scontrol_path: str = "scontrol", timeout: int = 30) -> None:
         self._scontrol = scontrol_path
@@ -62,35 +65,6 @@ class SlurmNodeBootstrap:
         except (subprocess.TimeoutExpired, FileNotFoundError) as e:
             _logger.warning("scontrol update failed for %s: %s", node_name, e)
             return False
-
-    def verify_node_ready(self, node_name: str, timeout: int = 300) -> bool:
-        """Poll node state until it leaves POWERING_UP (or timeout).
-
-        Returns True if node is ready, False on timeout.
-        """
-        self._validate_node_name(node_name)
-        deadline = time.time() + timeout
-        interval = 5
-
-        while time.time() < deadline:
-            try:
-                result = subprocess.run(
-                    [self._scontrol, "show", "node", node_name],
-                    capture_output=True,
-                    text=True,
-                    timeout=self._timeout,
-                    shell=False,
-                    check=False,
-                )
-                if result.returncode == 0 and "POWERING_UP" not in result.stdout:
-                    _logger.info("Node %s is ready (no longer POWERING_UP)", node_name)
-                    return True
-            except (subprocess.TimeoutExpired, FileNotFoundError):
-                pass
-            time.sleep(interval)
-
-        _logger.warning("Node %s still POWERING_UP after %ds timeout", node_name, timeout)
-        return False
 
     @staticmethod
     def generate_user_data(
