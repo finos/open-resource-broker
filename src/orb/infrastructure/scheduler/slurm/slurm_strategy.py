@@ -120,14 +120,44 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
             return []
 
     def parse_template_config(self, raw_data: dict[str, Any]) -> Any:
-        """Parse SLURM partition data to TemplateDTO using field mapper."""
+        """Parse SLURM template config to TemplateDTO.
+
+        Accepts a dict with SLURM template fields (snake_case) and returns a TemplateDTO.
+        Applies defaults for missing fields and uses template_defaults_service if available.
+        """
         from orb.infrastructure.template.dtos import TemplateDTO
 
+        # Map input fields (handles partition_name → template_id etc.)
         mapped = self._field_mapper.map_input_fields(raw_data)
+
+        # Apply defaults for missing fields
+        mapped.setdefault("max_instances", 1)
+        mapped.setdefault("price_type", "ondemand")
+        mapped.setdefault("is_active", True)
+        mapped.setdefault("machine_types", {})
+        mapped.setdefault("subnet_ids", [])
+        mapped.setdefault("security_group_ids", [])
+
+        # Ensure template_id exists
+        if not mapped.get("template_id"):
+            mapped["template_id"] = mapped.get("partition_name", "unknown")
+
+        # Apply template defaults service if available
+        provider_name = self._get_provider_name()
+        mapped = self._apply_template_defaults(mapped, provider_name)
+
         return TemplateDTO.from_dict(mapped)
 
     def parse_request_data(self, raw_data: dict[str, Any]) -> dict[str, Any] | list[dict[str, Any]]:
-        """Parse incoming SLURM resume/suspend request data."""
+        """Parse incoming SLURM resume/suspend request data.
+
+        Handles:
+        - Status query: {"requests": [{"request_id": "req-xxx"}, ...]}
+        - Single request: {"template_id": ..., "requested_count": N, "node_names": [...]}
+        - Nested template: {"template": {"template_id": ..., ...}}
+        """
+        import re
+
         # List of requests (status query)
         if "requests" in raw_data:
             return [
@@ -138,20 +168,28 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
         # Nested template format
         if "template" in raw_data:
             template_data = raw_data["template"]
-            return {
-                "template_id": template_data.get("template_id") or template_data.get("partition_name"),
-                "requested_count": template_data.get("machine_count", 1),
-                "request_type": template_data.get("request_type", "provision"),
-                "node_names": template_data.get("node_names", []),
-                "metadata": raw_data.get("metadata", {}),
-            }
+            template_id = template_data.get("template_id") or template_data.get("partition_name")
+            node_names = template_data.get("node_names", [])
+            requested_count = int(template_data.get("machine_count", 1))
+        else:
+            # Flat format
+            template_id = raw_data.get("template_id") or raw_data.get("partition_name")
+            node_names = raw_data.get("node_names", [])
+            requested_count = int(raw_data.get("requested_count", raw_data.get("count", 1)))
 
-        # Flat format (e.g. from ResumeProgram with node list)
+        # Input validation
+        _node_pattern = re.compile(r"^[a-zA-Z0-9\-\[\],]+$")
+        if node_names:
+            node_names = [n for n in node_names if isinstance(n, str) and _node_pattern.match(n)]
+
+        if requested_count < 1:
+            requested_count = 1
+
         return {
-            "template_id": raw_data.get("template_id") or raw_data.get("partition_name"),
-            "requested_count": raw_data.get("requested_count", raw_data.get("count", 1)),
+            "template_id": template_id,
+            "requested_count": requested_count,
             "request_type": raw_data.get("request_type", "provision"),
-            "node_names": raw_data.get("node_names", []),
+            "node_names": node_names,
             "metadata": raw_data.get("metadata", {}),
         }
 
@@ -160,8 +198,11 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
         return self._response_formatter.format_templates_response(templates)
 
     def format_templates_for_dispatch(self, templates: list[dict]) -> list[dict]:
-        """Convert internal templates to SLURM format."""
-        return self._field_mapper.format_for_generation(templates)
+        """Convert internal templates to SLURM on-disk format.
+
+        This is the inverse of parse_template_config — ensures round-trip fidelity.
+        """
+        return self._field_mapper.format_for_generation(templates, copy_unmapped=True)
 
     def format_request_response(self, request_data: dict[str, Any]) -> dict[str, Any]:
         """Format request creation response."""
