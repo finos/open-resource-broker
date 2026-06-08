@@ -14,13 +14,17 @@ from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedul
 from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
     HostFactorySchedulerStrategy,
 )
+from orb.infrastructure.scheduler.slurm.slurm_strategy import SlurmSchedulerStrategy
 from tests.onaws.plugin_io_schemas import (
     expected_get_available_templates_schema_default,
     expected_get_available_templates_schema_hostfactory,
+    expected_get_available_templates_schema_slurm,
     expected_request_machines_schema_default,
     expected_request_machines_schema_hostfactory,
+    expected_request_machines_schema_slurm,
     expected_request_status_schema_default,
     expected_request_status_schema_hostfactory,
+    expected_request_status_schema_slurm,
 )
 
 # ---------------------------------------------------------------------------
@@ -51,6 +55,18 @@ _MINIMAL_SNAKE_TEMPLATE: dict[str, Any] = {
     "provider_type": "aws",
 }
 
+_MINIMAL_SLURM_TEMPLATE_ON_DISK: dict[str, Any] = {
+    "template_id": "slurm-tpl-001",
+    "max_instances": 5,
+    "machine_types": {"t3.medium": 1},
+    "subnet_ids": ["subnet-aaa"],
+    "security_group_ids": ["sg-111"],
+    "price_type": "ondemand",
+    "allocation_strategy": "lowest_price",
+    "provider_api": "EC2Fleet",
+    "provider_type": "aws",
+}
+
 
 # ---------------------------------------------------------------------------
 # File writers
@@ -65,6 +81,10 @@ def write_default_file(path: Path, templates: list[dict]) -> None:
     path.write_text(json.dumps({"scheduler_type": "default", "templates": templates}))
 
 
+def write_slurm_file(path: Path, templates: list[dict]) -> None:
+    path.write_text(json.dumps({"scheduler_type": "slurm", "templates": templates}))
+
+
 # ---------------------------------------------------------------------------
 # Strategy factories
 # ---------------------------------------------------------------------------
@@ -76,6 +96,10 @@ def make_hf_strategy(defaults_service=None) -> HostFactorySchedulerStrategy:
 
 def make_default_strategy(defaults_service=None) -> DefaultSchedulerStrategy:
     return DefaultSchedulerStrategy(template_defaults_service=defaults_service)
+
+
+def make_slurm_strategy(defaults_service=None) -> SlurmSchedulerStrategy:
+    return SlurmSchedulerStrategy(template_defaults_service=defaults_service)
 
 
 def make_defaults_service(subnet_ids: list[str], sg_ids: list[str]) -> MagicMock:
@@ -138,6 +162,25 @@ SCHEDULER_CONFIGS: dict[str, dict[str, Any]] = {
             "private_ip": "private_ip_address",
         },
     },
+    "slurm": {
+        "strategy_factory": make_slurm_strategy,
+        "minimal_template_on_disk": _MINIMAL_SLURM_TEMPLATE_ON_DISK,
+        "write_file_fn": write_slurm_file,
+        "minimal_domain_dict": _MINIMAL_SNAKE_TEMPLATE,
+        "expected_on_disk_key": "template_id",
+        "expected_domain_key": "template_id",
+        "schemas": {
+            "get_available_templates": expected_get_available_templates_schema_slurm,
+            "request_machines": expected_request_machines_schema_slurm,
+            "request_status": expected_request_status_schema_slurm,
+        },
+        "response_field_names": {
+            "request_id": "request_id",
+            "machine_id": "machine_id",
+            "instance_type": "instance_type",
+            "private_ip": "private_ip_address",
+        },
+    },
 }
 
 
@@ -160,3 +203,8 @@ def hf_strategy():
 @pytest.fixture
 def default_strategy():
     return make_default_strategy()
+
+
+@pytest.fixture
+def slurm_strategy():
+    return make_slurm_strategy()
