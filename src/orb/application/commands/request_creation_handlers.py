@@ -29,6 +29,7 @@ from orb.domain.request.request_identifiers import RequestId
 from orb.domain.request.value_objects import RequestType
 from orb.domain.template.factory import TemplateFactoryPort
 from orb.domain.template.template_aggregate import Template
+from orb.infrastructure.template.dtos import TemplateDTO
 
 
 @command_handler(CreateRequestCommand)  # type: ignore[arg-type]
@@ -134,8 +135,13 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
         if not template:
             raise EntityNotFoundError("Template", template_id)
 
-        template_factory = self._container.get(TemplateFactoryPort)
-        template = template_factory.create_template(template.to_template_config())
+        # The query bus may return a TemplateDTO (production path) or a domain
+        # Template (test paths, or callers that pre-construct one). Only convert
+        # in the DTO case — calling .to_template_config() on a domain Template
+        # would AttributeError.
+        if isinstance(template, TemplateDTO):
+            template_factory = self._container.get(TemplateFactoryPort)
+            template = template_factory.create_template(template.to_template_config())
 
         self.logger.debug("Template found: %s (id=%s)", type(template), template.template_id)
         return template

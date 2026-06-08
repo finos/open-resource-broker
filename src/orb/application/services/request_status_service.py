@@ -153,7 +153,13 @@ class RequestStatusService:
                     if planned_terminal_shortfall:
                         return RequestStatus.FAILED.value, str(terminal_error_message)
 
-                    return None, None
+                    # No machines yet and no terminal signal — provider may still
+                    # be submitting. Keep the request in_progress so the caller
+                    # polls again rather than stalling on a "no transition" None.
+                    return (
+                        RequestStatus.IN_PROGRESS.value,
+                        "No instances visible yet — continuing to poll",
+                    )
 
                 running_count = sum(1 for m in machines_to_check if m.status.value == "running")
                 pending_count = sum(

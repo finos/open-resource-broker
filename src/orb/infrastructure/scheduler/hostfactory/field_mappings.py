@@ -76,6 +76,7 @@ class HostFactoryFieldMappings:
         "azure": {
             # Override generic AWS-centric meanings for Azure templates
             "vmType": "vm_size",
+            "vmTypes": "vm_sizes",
             "keyName": "ssh_key_name",
             "subnetId": "network_config.subnet_id",
             "securityGroupIds": "network_config.network_security_group_id",
@@ -84,6 +85,7 @@ class HostFactoryFieldMappings:
             "subscriptionId": "subscription_id",
             # Azure VMSS / compute configuration
             "vmSize": "vm_size",
+            "vmSizes": "vm_sizes",
             "vmSizePreferences": "vm_size_preferences",
             "vmssName": "vmss_name",
             "orchestrationMode": "orchestration_mode",

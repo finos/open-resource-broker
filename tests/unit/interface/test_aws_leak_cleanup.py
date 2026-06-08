@@ -40,9 +40,26 @@ class TestInfrastructureCommandHandlerNoAWSLeaks:
         )
 
     def test_no_aws_type_guard_in_overrides(self):
-        source = self._source()
-        # The type == 'aws' guard that restricted override logic to AWS only must be gone.
-        assert '== "aws"' not in source and "== 'aws'" not in source, (
+        # Scope the check to the named function body — other functions in the
+        # file (e.g. _show_provider_infrastructure) intentionally dispatch on
+        # provider type for display formatting.
+        import ast
+
+        tree = ast.parse(self._source())
+        target = next(
+            (
+                node
+                for node in ast.walk(tree)
+                if isinstance(node, ast.FunctionDef)
+                and node.name == "_get_active_providers_with_overrides"
+            ),
+            None,
+        )
+        assert target is not None, (
+            "_get_active_providers_with_overrides function must exist in infrastructure_command_handler.py"
+        )
+        body_source = ast.unparse(target)
+        assert '== "aws"' not in body_source and "== 'aws'" not in body_source, (
             "_get_active_providers_with_overrides must not guard on provider type 'aws'"
         )
 

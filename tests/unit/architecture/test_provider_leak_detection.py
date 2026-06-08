@@ -36,6 +36,8 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
     {
         ("bootstrap/core_services.py", "orb.providers.registry"),
         ("bootstrap/infrastructure_services.py", "orb.providers.aws.registration"),
+        ("bootstrap/infrastructure_services.py", "orb.providers.azure.registration"),
+        ("bootstrap/infrastructure_services.py", "orb.providers.gcp.registration"),
         ("bootstrap/provider_services.py", "orb.providers.registry"),
         ("bootstrap/provider_services.py", "orb.providers.aws.registration"),
         ("bootstrap/services.py", "orb.providers.registration"),
@@ -69,6 +71,11 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
         ("config/schemas/cleanup_schema.py", "orb.providers.aws.configuration.cleanup_config"),
         # loader collects strategy-contributed defaults at load time — intentional bootstrap wiring
         ("config/loader.py", "orb.providers.registry"),
+        # Loader's static defaults loader imports each provider's defaults function directly
+        # so collecting defaults stays side-effect-free (no full ConfigurationManager wiring).
+        ("config/loader.py", "orb.providers.aws.strategy.aws_provider_strategy"),
+        ("config/loader.py", "orb.providers.azure.registration"),
+        ("config/loader.py", "orb.providers.gcp.registration"),
     }
 )
 

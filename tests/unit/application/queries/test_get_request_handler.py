@@ -161,7 +161,7 @@ async def test_get_request_returns_synced_dto_on_success():
     assert result.request_id == _ID_SUCCESS
 
     # Cache SHOULD be written on the success path
-    mock_cache_service.cache_request.assert_not_called()
+    mock_cache_service.cache_request.assert_called_once()
 
 
 @pytest.mark.asyncio

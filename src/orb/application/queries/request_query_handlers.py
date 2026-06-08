@@ -65,16 +65,19 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
           provider call.  Useful for cheap reads where freshness is not
           critical (e.g. UI polling after a recent full sync).
 
-        The cache sits in front of both modes.  Full-sync queries populate
-        it; all queries (including lightweight) read from it.  This means a
-        lightweight caller benefits from a recent full-sync without paying
-        the provider call cost.
+        Cache semantics:
+          * Full-sync queries populate the cache but never read from it —
+            callers asking for a sync want fresh data and would be confused
+            by a stale cache hit.
+          * Lightweight queries read from the cache (fast path) and skip the
+            write since the lightweight DTO is intentionally a partial view.
         """
         self.logger.info("Getting request details for: %s", query.request_id)
 
         try:
             if (
-                not query.skip_cache
+                query.lightweight
+                and not query.skip_cache
                 and self._cache_service
                 and self._cache_service.is_caching_enabled()
             ):
