@@ -231,3 +231,34 @@ def test_node_mapper_round_trip():
     mapper.register_mapping("compute-001", "i-abc123")
     assert mapper.get_machine_id("compute-001") == "i-abc123"
     assert mapper.get_node_name("i-abc123") == "compute-001"
+
+
+def test_node_mapper_register_replaces_existing():
+    """register_mapping overwrites existing entries (dynamic slots are fungible)."""
+    mapper = SlurmNodeMapper()
+    mapper.register_mapping("compute-001", "i-old111")
+    mapper.register_mapping("compute-001", "i-new222")
+    assert mapper.get_machine_id("compute-001") == "i-new222"
+    assert mapper.get_node_name("i-new222") == "compute-001"
+    assert mapper.get_node_name("i-old111") is None
+
+
+def test_node_mapper_clear_mappings():
+    """clear_mappings removes specified nodes."""
+    mapper = SlurmNodeMapper()
+    mapper.register_mapping("node-1", "i-aaa")
+    mapper.register_mapping("node-2", "i-bbb")
+    mapper.register_mapping("node-3", "i-ccc")
+    mapper.clear_mappings(["node-1", "node-3"])
+    assert mapper.get_machine_id("node-1") is None
+    assert mapper.get_machine_id("node-2") == "i-bbb"
+    assert mapper.get_machine_id("node-3") is None
+
+
+def test_node_mapper_clear_all():
+    """clear_all resets everything."""
+    mapper = SlurmNodeMapper()
+    mapper.register_mapping("node-1", "i-aaa")
+    mapper.register_mapping("node-2", "i-bbb")
+    mapper.clear_all()
+    assert mapper.get_all_mappings() == {}

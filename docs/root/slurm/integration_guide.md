@@ -13,6 +13,21 @@ ORB integrates with SLURM's **ResumeProgram/SuspendProgram** power saving hooks 
 - Cloud provider credentials configured in ORB
 - Elastic node definitions in `slurm.conf`
 
+### Cloud Node Model (Dynamic Slots)
+
+ORB treats SLURM cloud nodes as **fungible capacity slots**:
+
+- `batch-[001-100]` defines 100 slots of identical shape
+- Each ResumeProgram call provisions FRESH instances
+- No data residency between suspend/resume cycles
+- Node names are arbitrary handles — `batch-005` today may be backed
+  by a completely different EC2 instance than `batch-005` yesterday
+- All persistent data should live on shared storage (FSx for Lustre, EFS, NFS)
+- Suspend ALWAYS terminates instances (no stop/start mode)
+
+This matches the AWS ParallelCluster model and SchedMD's official
+cloud-bursting recommendations.
+
 ## Configuration Steps
 
 ### 1. Configure ORB for SLURM
@@ -137,20 +152,19 @@ The provisioned cloud instances **must** have SLURM pre-installed and configured
 ## Node Registration Flow
 
 ```
-ResumeProgram called
+ResumeProgram (N nodes, single batch)
     │
     ▼
-ORB provisions EC2 instance
+ORB batch provisions N fresh EC2 instances
     │
     ▼
-resumeProgram.sh calls: scontrol update NodeName=X NodeAddr=<IP>
-    │ (pre-registers address — allows slurmctld to reach the node)
+resumeProgram.sh calls: scontrol update NodeAddr=<IP> (for each)
     │
     ▼
-Instance boots → slurmd starts → registers with slurmctld
+Instances boot → slurmd starts → registers with slurmctld
     │
     ▼
-SLURM clears POWERING_UP → node becomes IDLE → jobs scheduled
+SLURM clears POWERING_UP → nodes become IDLE → jobs scheduled
 ```
 
 **Timing considerations:**
@@ -161,27 +175,3 @@ SLURM clears POWERING_UP → node becomes IDLE → jobs scheduled
 | Compute (c5, c6i) | 60-90s | 300s |
 | GPU (p3, g4) | 90-180s | 600s |
 | Large/metal | 120-300s | 900s |
-
-## Troubleshooting: Node Stuck in POWERING_UP
-
-If a node remains in `POWERING_UP` past `ResumeTimeout`, SLURM marks it `DOWN`. Common causes:
-
-1. **Instance failed to launch** — Check ORB logs: `$SLURM_ORB_LOG_DIR/resume_program.log`
-2. **slurmd not starting** — SSH to the instance, check `systemctl status slurmd`
-3. **Wrong slurm.conf** — Verify `SlurmctldHost` matches your controller
-4. **Munge auth failure** — Check munge key matches between controller and node
-5. **Network issue** — Verify security groups allow port 6817 (slurmctld) and 6818 (slurmd)
-6. **Hostname mismatch** — Node hostname must match the `NodeName` in slurm.conf
-
-**Recovery:**
-
-```bash
-# Check what SLURM sees
-scontrol show node compute-001
-
-# Manually resume a stuck node
-scontrol update NodeName=compute-001 State=IDLE
-
-# Check ORB provisioning status
-orb machines list --scheduler slurm
-```

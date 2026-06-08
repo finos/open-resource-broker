@@ -154,18 +154,33 @@ def test_suspend_unknown_nodes_fails_gracefully(slurm_app):
 
 
 @pytest.mark.integration
-def test_node_mapper_persists_across_operations(slurm_app):
-    """Node mappings registered during resume are available during suspend."""
-    slurm_app.resume_nodes(["persist-node-1"], "compute-partition")
-    machine_id = slurm_app._node_mapper.get_machine_id("persist-node-1")
+def test_node_mapper_ephemeral_per_cycle(slurm_app):
+    """Mappings are ephemeral — cleared on suspend (dynamic slot model)."""
+    slurm_app.resume_nodes(["ephemeral-node-1"], "compute-partition")
+    machine_id = slurm_app._node_mapper.get_machine_id("ephemeral-node-1")
     assert machine_id is not None
     assert machine_id.startswith("i-")
 
-    # Suspend should find and use the mapping
-    resp = slurm_app.suspend_nodes(["persist-node-1"])
+    # Suspend clears the mapping
+    resp = slurm_app.suspend_nodes(["ephemeral-node-1"])
     assert resp["status"] == "complete"
-    # Mapping should be removed after suspend
-    assert slurm_app._node_mapper.get_machine_id("persist-node-1") is None
+    assert slurm_app._node_mapper.get_machine_id("ephemeral-node-1") is None
+
+
+@pytest.mark.integration
+def test_resume_same_nodes_gets_fresh_instances(slurm_app):
+    """Resume→suspend→resume same nodes gets different machine_ids (no reuse)."""
+    # First cycle
+    slurm_app.resume_nodes(["fresh-node-1"], "compute-partition")
+    first_id = slurm_app._node_mapper.get_machine_id("fresh-node-1")
+    assert first_id is not None
+    slurm_app.suspend_nodes(["fresh-node-1"])
+
+    # Second cycle — must get a different instance
+    slurm_app.resume_nodes(["fresh-node-1"], "compute-partition")
+    second_id = slurm_app._node_mapper.get_machine_id("fresh-node-1")
+    assert second_id is not None
+    assert second_id != first_id  # Fresh instance, not reused
 
 
 # ---------------------------------------------------------------------------

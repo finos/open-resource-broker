@@ -12,8 +12,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
-- SLURM scheduler integration — ORB can now act as a resource provider for SLURM clusters via ResumeProgram/SuspendProgram power management hooks
-- SlurmSchedulerStrategy with full SchedulerPort implementation
+- SLURM scheduler integration — ORB can now act as a resource provider for SLURM clusters via ResumeProgram/SuspendProgram power management hooks (dynamic slot model with batch provisioning)
+- SlurmSchedulerStrategy with full SchedulerPort implementation and batch resume/suspend handlers
 - Bidirectional field mapping between SLURM and ORB domain concepts
 - SlurmNodeMapper for node name ↔ machine ID translation with hostlist range expansion
 - slurmrestd REST client for cluster health monitoring

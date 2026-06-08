@@ -6,11 +6,15 @@
 |---------------|-------------|-------|
 | Partition | Template | Each SLURM partition maps to an ORB template defining instance specs |
 | Node | Machine | Each SLURM elastic node maps to an ORB machine (cloud instance) |
-| ResumeProgram | requestMachines | SLURM calls ResumeProgram → ORB provisions cloud instances |
-| SuspendProgram | returnMachines | SLURM calls SuspendProgram → ORB terminates cloud instances |
+| ResumeProgram | requestMachines | Provision N fresh instances for the given slot names (batch) |
+| SuspendProgram | returnMachines | Terminate instances, clear mappings (always terminate, never stop) |
 | slurmrestd | Health check | Optional monitoring of cluster state |
 | slurm.conf | config.json | Configuration lives in respective config files |
-| Node Name (e.g. `compute-001`) | Machine ID (e.g. `i-0abc123`) | Bidirectional mapping maintained by ORB |
+| Node Name (e.g. `compute-001`) | Machine ID (e.g. `i-0abc123`) | Ephemeral mapping for current cycle only |
+
+> **Note:** Node names are fungible capacity slots, not persistent identities.
+> `compute-005` today may be backed by a completely different EC2 instance
+> than `compute-005` was yesterday. Each resume cycle provisions fresh instances.
 
 ## Node State Mapping
 
