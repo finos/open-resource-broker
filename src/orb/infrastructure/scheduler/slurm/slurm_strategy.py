@@ -284,3 +284,32 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
     def format_machine_details_response(self, machine_data: dict) -> dict:
         """Format machine details for CLI display."""
         return self._response_formatter.format_machine_details_response(machine_data)
+
+    def register_provisioned_nodes(self, nodes: list[dict[str, str]]) -> None:
+        """Register provisioned nodes: store mappings and call scontrol update.
+
+        Args:
+            nodes: List of dicts with keys: node_name, ip_address, machine_id
+        """
+        from orb.infrastructure.scheduler.slurm.node_bootstrap import SlurmNodeBootstrap
+        from orb.infrastructure.scheduler.slurm.node_mapper import SlurmNodeMapper
+
+        mapper = SlurmNodeMapper()
+        bootstrap = SlurmNodeBootstrap()
+
+        for node in nodes:
+            node_name = node.get("node_name", "")
+            machine_id = node.get("machine_id", "")
+            ip_address = node.get("ip_address", "")
+
+            if node_name and machine_id:
+                mapper.register_mapping(node_name, machine_id)
+
+            if node_name and ip_address:
+                success = bootstrap.register_node_address(node_name, ip_address)
+                if success:
+                    self.logger.info("Registered %s → %s (%s)", node_name, ip_address, machine_id)
+                else:
+                    self.logger.warning(
+                        "Failed to register %s addr (slurmd will self-register)", node_name
+                    )

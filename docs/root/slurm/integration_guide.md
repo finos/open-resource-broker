@@ -115,3 +115,73 @@ orb system health
 # Check node was provisioned
 scontrol show node compute-001
 ```
+
+## AMI/Image Requirements
+
+The provisioned cloud instances **must** have SLURM pre-installed and configured. ORB provisions the infrastructure; the image handles SLURM membership.
+
+**Required on the AMI/image:**
+
+- **slurmd** installed (same SLURM version as the cluster)
+- **slurm.conf** configured with correct `SlurmctldHost` pointing to your controller
+- **Munge** authentication configured (shared munge key from the cluster)
+- **slurmd systemd service** enabled to start on boot
+- Network access to slurmctld (typically port 6817)
+
+**Recommended:**
+
+- cloud-init or user_data support for dynamic hostname configuration
+- Log forwarding for slurmd logs
+- Health check script for node self-verification
+
+## Node Registration Flow
+
+```
+ResumeProgram called
+    │
+    ▼
+ORB provisions EC2 instance
+    │
+    ▼
+resumeProgram.sh calls: scontrol update NodeName=X NodeAddr=<IP>
+    │ (pre-registers address — allows slurmctld to reach the node)
+    │
+    ▼
+Instance boots → slurmd starts → registers with slurmctld
+    │
+    ▼
+SLURM clears POWERING_UP → node becomes IDLE → jobs scheduled
+```
+
+**Timing considerations:**
+
+| Instance Type | Typical Boot Time | Recommended ResumeTimeout |
+|---------------|-------------------|--------------------------|
+| General (t3, m5) | 60-90s | 300s |
+| Compute (c5, c6i) | 60-90s | 300s |
+| GPU (p3, g4) | 90-180s | 600s |
+| Large/metal | 120-300s | 900s |
+
+## Troubleshooting: Node Stuck in POWERING_UP
+
+If a node remains in `POWERING_UP` past `ResumeTimeout`, SLURM marks it `DOWN`. Common causes:
+
+1. **Instance failed to launch** — Check ORB logs: `$SLURM_ORB_LOG_DIR/resume_program.log`
+2. **slurmd not starting** — SSH to the instance, check `systemctl status slurmd`
+3. **Wrong slurm.conf** — Verify `SlurmctldHost` matches your controller
+4. **Munge auth failure** — Check munge key matches between controller and node
+5. **Network issue** — Verify security groups allow port 6817 (slurmctld) and 6818 (slurmd)
+6. **Hostname mismatch** — Node hostname must match the `NodeName` in slurm.conf
+
+**Recovery:**
+
+```bash
+# Check what SLURM sees
+scontrol show node compute-001
+
+# Manually resume a stuck node
+scontrol update NodeName=compute-001 State=IDLE
+
+# Check ORB provisioning status
+orb machines list --scheduler slurm
+```
