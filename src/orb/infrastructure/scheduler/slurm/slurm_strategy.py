@@ -48,17 +48,40 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
 
     def get_config_file_path(self) -> str:
         """Get config file path for SLURM scheduler."""
-        return self.config_manager.resolve_file("config", "slurm_config.json")
+        config_dir = self.get_config_directory()
+        return os.path.join(config_dir, "slurm_config.json")
+
+    def _get_scheduler_env_var(self, suffix: str) -> str | None:
+        """SLURM checks SLURM_ORB_* env vars."""
+        mapping = {
+            "CONFIG_DIR": "SLURM_ORB_CONFIG_DIR",
+            "WORK_DIR": "SLURM_ORB_WORK_DIR",
+            "LOG_DIR": "SLURM_ORB_LOG_DIR",
+            "LOG_LEVEL": "SLURM_ORB_LOG_LEVEL",
+        }
+        if env_var := mapping.get(suffix):
+            return os.environ.get(env_var)
+        return None
 
     def get_directory(self, file_type: str) -> str | None:
         """Get directory path for the given file type."""
-        workdir = self.get_working_directory()
         if file_type in ("config", "template", "legacy"):
-            return os.path.join(workdir, "config")
-        elif file_type == "log":
-            return os.path.join(workdir, "logs")
+            return self.get_config_directory()
+        elif file_type in ("log", "logs"):
+            return self.get_logs_directory()
+        elif file_type == "scripts":
+            scripts = self.get_scripts_directory()
+            return str(scripts) if scripts else None
+        elif file_type == "health":
+            return os.path.join(self.get_working_directory(), "health")
         else:
-            return workdir
+            return self.get_working_directory()
+
+    def _templates_filename_pattern_key(self) -> str:
+        return "provider_type"
+
+    def _templates_filename_fallback(self, provider_name: str, provider_type: str) -> str:
+        return f"slurm_{provider_type}_templates.json"
 
     def load_templates_from_path(
         self, template_path: str, provider_override: Any = None
