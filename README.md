@@ -42,6 +42,8 @@ Built for AWS today (EC2, Auto Scaling Groups, SpotFleet, EC2Fleet), with an ext
 - **HostFactory** — runs as an [IBM Spectrum Symphony provider plugin](#hostfactory-integration)
 - **Standalone** — direct usage without an external scheduler
 
+![ORB](./ORB.gif)
+
 ## Quick Start
 
 ```bash
