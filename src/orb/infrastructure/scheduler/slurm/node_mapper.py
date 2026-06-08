@@ -5,7 +5,6 @@ import re
 import threading
 from pathlib import Path
 
-
 _NODE_NAME_RE = re.compile(r"^[a-zA-Z0-9\-\[\],]+$")
 _MACHINE_ID_RE = re.compile(r"^[a-zA-Z0-9\-]+$")
 

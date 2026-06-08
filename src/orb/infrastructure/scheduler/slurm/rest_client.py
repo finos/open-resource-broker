@@ -61,10 +61,10 @@ class SlurmRestClient:
                 url, headers=self._get_headers(), timeout=self._timeout, verify=self._verify_ssl
             )
             if resp.status_code >= 400:
-                _logger.error("slurmrestd %s returned HTTP %d: %s", url, resp.status_code, resp.text)
-                raise SlurmRestClientError(
-                    f"slurmrestd HTTP {resp.status_code}: {resp.text[:200]}"
+                _logger.error(
+                    "slurmrestd %s returned HTTP %d: %s", url, resp.status_code, resp.text
                 )
+                raise SlurmRestClientError(f"slurmrestd HTTP {resp.status_code}: {resp.text[:200]}")
             return resp.json()  # type: ignore[no-any-return]
         except requests.ConnectionError as e:
             _logger.error("slurmrestd connection failed for %s: %s", url, e)

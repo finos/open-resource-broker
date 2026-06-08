@@ -35,7 +35,9 @@ class SlurmResponseFormatter:
             }
             # Build attributes from machine_types if available
             machine_types = d.get("machine_types", {})
-            instance_type = next(iter(machine_types), None) if machine_types else d.get("instance_type")
+            instance_type = (
+                next(iter(machine_types), None) if machine_types else d.get("instance_type")
+            )
             if instance_type:
                 entry["attributes"] = {
                     "type": instance_type,
@@ -55,12 +57,14 @@ class SlurmResponseFormatter:
         formatted = []
         for r in requests:
             d = self._to_dict(r)
-            formatted.append({
-                "request_id": d.get("request_id"),
-                "status": d.get("status"),
-                "machines": d.get("machines", []),
-                "message": d.get("message", ""),
-            })
+            formatted.append(
+                {
+                    "request_id": d.get("request_id"),
+                    "status": d.get("status"),
+                    "machines": d.get("machines", []),
+                    "message": d.get("message", ""),
+                }
+            )
 
         return {
             "requests": formatted,
@@ -73,14 +77,16 @@ class SlurmResponseFormatter:
         formatted = []
         for m in machines:
             d = self._to_dict(m)
-            formatted.append({
-                "machine_id": d.get("machine_id"),
-                "node_name": d.get("name") or d.get("node_name"),
-                "status": d.get("status"),
-                "instance_type": d.get("instance_type"),
-                "private_ip_address": d.get("private_ip_address"),
-                "result": d.get("result"),
-            })
+            formatted.append(
+                {
+                    "machine_id": d.get("machine_id"),
+                    "node_name": d.get("name") or d.get("node_name"),
+                    "status": d.get("status"),
+                    "instance_type": d.get("instance_type"),
+                    "private_ip_address": d.get("private_ip_address"),
+                    "result": d.get("result"),
+                }
+            )
 
         return {"machines": formatted, "count": len(formatted)}
 
@@ -109,15 +115,20 @@ class SlurmResponseFormatter:
         formatted = []
         for r in requests:
             d = self._to_dict(r)
-            formatted.append({
-                "request_id": d.get("request_id"),
-                "status": d.get("status"),
-                "message": d.get("message"),
-                "grace_period": d.get("grace_period"),
-                "machines": [
-                    {"machine_id": self._to_dict(m).get("machine_id"), "node_name": self._to_dict(m).get("name")}
-                    for m in (d.get("machines") or d.get("machine_references") or [])
-                ],
-            })
+            formatted.append(
+                {
+                    "request_id": d.get("request_id"),
+                    "status": d.get("status"),
+                    "message": d.get("message"),
+                    "grace_period": d.get("grace_period"),
+                    "machines": [
+                        {
+                            "machine_id": self._to_dict(m).get("machine_id"),
+                            "node_name": self._to_dict(m).get("name"),
+                        }
+                        for m in (d.get("machines") or d.get("machine_references") or [])
+                    ],
+                }
+            )
 
         return {"return_requests": formatted}

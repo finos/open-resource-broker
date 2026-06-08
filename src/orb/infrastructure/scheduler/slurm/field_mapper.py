@@ -27,7 +27,9 @@ class SlurmFieldMapper(SchedulerFieldMapper):
                 value = external_template[slurm_field]
                 # Transform state string to boolean is_active
                 if slurm_field == "state" and orb_field == "is_active":
-                    mapped[orb_field] = value.upper() == "UP" if isinstance(value, str) else bool(value)
+                    mapped[orb_field] = (
+                        value.upper() == "UP" if isinstance(value, str) else bool(value)
+                    )
                 else:
                     mapped[orb_field] = value
 

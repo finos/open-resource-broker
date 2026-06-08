@@ -56,9 +56,7 @@ class SlurmCliAdapter:
     def get_nodes(self) -> dict:
         """List all nodes via sinfo."""
         try:
-            output = self._run_command(
-                [self._sinfo, "-N", "-h", "-o", "%N %T %P %c %m"]
-            )
+            output = self._run_command([self._sinfo, "-N", "-h", "-o", "%N %T %P %c %m"])
         except (RuntimeError, subprocess.TimeoutExpired, FileNotFoundError) as e:
             _logger.error("get_nodes failed: %s", e)
             return {}
@@ -67,13 +65,15 @@ class SlurmCliAdapter:
         for line in output.strip().splitlines():
             parts = line.split()
             if len(parts) >= 5:
-                nodes.append({
-                    "node_name": parts[0],
-                    "state": parts[1],
-                    "partition": parts[2],
-                    "cpus": parts[3],
-                    "memory": parts[4],
-                })
+                nodes.append(
+                    {
+                        "node_name": parts[0],
+                        "state": parts[1],
+                        "partition": parts[2],
+                        "cpus": parts[3],
+                        "memory": parts[4],
+                    }
+                )
         return {"nodes": nodes}
 
     def get_node(self, node_name: str) -> dict:
@@ -91,9 +91,7 @@ class SlurmCliAdapter:
     def get_partitions(self) -> dict:
         """List all partitions via sinfo."""
         try:
-            output = self._run_command(
-                [self._sinfo, "-h", "-o", "%P %a %l %D %C"]
-            )
+            output = self._run_command([self._sinfo, "-h", "-o", "%P %a %l %D %C"])
         except (RuntimeError, subprocess.TimeoutExpired, FileNotFoundError) as e:
             _logger.error("get_partitions failed: %s", e)
             return {}
@@ -102,13 +100,15 @@ class SlurmCliAdapter:
         for line in output.strip().splitlines():
             parts = line.split()
             if len(parts) >= 5:
-                partitions.append({
-                    "partition_name": parts[0].rstrip("*"),
-                    "availability": parts[1],
-                    "time_limit": parts[2],
-                    "nodes": parts[3],
-                    "cpus": parts[4],
-                })
+                partitions.append(
+                    {
+                        "partition_name": parts[0].rstrip("*"),
+                        "availability": parts[1],
+                        "time_limit": parts[2],
+                        "nodes": parts[3],
+                        "cpus": parts[4],
+                    }
+                )
         return {"partitions": partitions}
 
     def get_partition(self, partition_name: str) -> dict:

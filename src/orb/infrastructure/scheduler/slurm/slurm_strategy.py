@@ -232,10 +232,7 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
 
         # List of requests (status query)
         if "requests" in raw_data:
-            return [
-                {"request_id": req.get("request_id")}
-                for req in raw_data["requests"]
-            ]
+            return [{"request_id": req.get("request_id")} for req in raw_data["requests"]]
 
         # Nested template format
         if "template" in raw_data:
