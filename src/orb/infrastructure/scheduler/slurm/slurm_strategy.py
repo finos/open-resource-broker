@@ -33,6 +33,78 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
         )
         self._field_mapper = SlurmFieldMapper()
         self._response_formatter = SlurmResponseFormatter()
+        self._slurm_client: Any = None
+
+    def _get_slurm_client(self) -> Any:
+        """Lazily create a SLURM client (REST or CLI) based on configuration."""
+        if self._slurm_client is not None:
+            return self._slurm_client
+
+        # Check if slurmrestd URL is configured
+        slurmrestd_url = os.environ.get("SLURM_ORB_RESTD_URL")
+        if not slurmrestd_url and self._config_manager:
+            try:
+                # Future: could read slurmrestd_url from scheduler config
+                pass
+            except Exception:
+                pass
+
+        if slurmrestd_url:
+            from orb.infrastructure.scheduler.slurm.rest_client import SlurmRestClient
+
+            token = os.environ.get("SLURM_ORB_JWT_TOKEN")
+            self._slurm_client = SlurmRestClient(base_url=slurmrestd_url, token=token)
+        else:
+            from orb.infrastructure.scheduler.slurm.cli_adapter import SlurmCliAdapter
+
+            self._slurm_client = SlurmCliAdapter()
+
+        return self._slurm_client
+
+    def check_slurm_health(self) -> dict[str, Any]:
+        """Check SLURM cluster health via REST or CLI.
+
+        Returns a health check dict compatible with the ORB health framework.
+        """
+        try:
+            client = self._get_slurm_client()
+            if not client.is_available():
+                return {
+                    "name": "slurm_cluster",
+                    "status": "fail",
+                    "message": "SLURM cluster not reachable",
+                    "details": {},
+                }
+
+            nodes_data = client.get_nodes()
+            partitions_data = client.get_partitions()
+
+            nodes = nodes_data.get("nodes", [])
+            partitions = partitions_data.get("partitions", [])
+
+            # Count nodes by state
+            state_counts: dict[str, int] = {}
+            for node in nodes:
+                state = node.get("state", "UNKNOWN") if isinstance(node, dict) else "UNKNOWN"
+                state_counts[state] = state_counts.get(state, 0) + 1
+
+            return {
+                "name": "slurm_cluster",
+                "status": "pass",
+                "message": f"SLURM cluster UP: {len(nodes)} nodes, {len(partitions)} partitions",
+                "details": {
+                    "total_nodes": len(nodes),
+                    "total_partitions": len(partitions),
+                    "node_states": state_counts,
+                },
+            }
+        except Exception as e:
+            return {
+                "name": "slurm_cluster",
+                "status": "fail",
+                "message": f"SLURM cluster not reachable: {e}",
+                "details": {},
+            }
 
     def get_scheduler_type(self) -> str:
         """Return the scheduler type identifier."""
