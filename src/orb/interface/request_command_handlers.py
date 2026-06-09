@@ -204,18 +204,18 @@ async def handle_request_return_machines(
     else:
         machine_ids = getattr(args, "machine_ids_flag", None) or getattr(args, "machine_ids", [])
 
-    # Resolve --nodes to machine IDs via scheduler node mapper
+    # Resolve --nodes to machine IDs by querying machine storage by name
     nodes_arg = getattr(args, "nodes", None)
     if nodes_arg and not machine_ids:
+        from orb.domain.machine.repository import MachineRepository
         from orb.infrastructure.scheduler.slurm.node_mapper import SlurmNodeMapper
 
-        scheduler = container.get(SchedulerPort)
         node_names = SlurmNodeMapper.expand_node_range(nodes_arg)
-        mapper = getattr(scheduler, "node_mapper", None)
-        if mapper:
-            machine_ids = [
-                mid for n in node_names if (mid := mapper.get_machine_id(n))
-            ]
+        repo = container.get(MachineRepository)
+        active_machines = repo.find_active_machines()
+        machine_ids = [
+            str(m.machine_id) for m in active_machines if m.name in node_names
+        ]
 
     has_specific_ids = bool(machine_ids)
 
