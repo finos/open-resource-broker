@@ -21,6 +21,23 @@ ORB runs directly on the SLURM controller node. The ResumeProgram/SuspendProgram
 **Pros:** Simplest setup, no network dependencies.
 **Cons:** ORB shares resources with slurmctld.
 
+**Setup requirements:**
+- `ORB_ROOT_DIR` defaults to `/usr/orb` — create this directory and place `slurm_hooks.env` there
+- The `slurm` user (or whichever user slurmctld runs as) must have read access to `${ORB_ROOT_DIR}/slurm_hooks.env` and write access to the log directory
+- AWS credentials must be accessible to the same user (via instance profile, `~/.aws/`, or environment)
+
+```bash
+# Typical setup
+sudo mkdir -p /usr/orb /var/log/orb
+sudo chown slurm:slurm /var/log/orb
+
+# Create hook config
+cat <<'EOF' | sudo tee /usr/orb/slurm_hooks.env
+SLURM_ORB_TEMPLATE_ID=EC2Fleet-Instant-OnDemand
+EOF
+sudo chmod 644 /usr/orb/slurm_hooks.env
+```
+
 ## 2. Separate Management Node (API Mode)
 
 ORB runs on a separate node with its REST API exposed. The SLURM scripts use `curl` to call the ORB API.

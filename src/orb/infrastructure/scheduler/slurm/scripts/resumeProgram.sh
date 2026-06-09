@@ -33,15 +33,15 @@ ORB_MODE="${SLURM_ORB_MODE:-cli}"  # "cli" or "api"
 ORB_API_URL="${SLURM_ORB_API_URL:-http://localhost:8000}"
 TEMPLATE_ID="${SLURM_ORB_TEMPLATE_ID:-default}"
 
-if [ "${TEMPLATE_ID}" = "default" ]; then
-    log "WARN: SLURM_ORB_TEMPLATE_ID not set, using 'default' — set this env var to your partition template"
-fi
-
 mkdir -p "${LOG_DIR}"
 
 log() {
     echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') [resumeProgram] $*" >> "${LOG_FILE}"
 }
+
+if [ "${TEMPLATE_ID}" = "default" ]; then
+    log "WARN: SLURM_ORB_TEMPLATE_ID not set, using 'default' — set this in ${ORB_ROOT_DIR}/slurm_hooks.env"
+fi
 
 # --- Input validation ---
 if [ -z "${1:-}" ]; then

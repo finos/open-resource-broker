@@ -84,22 +84,42 @@ cp /path/to/orb/infrastructure/scheduler/slurm/scripts/suspendProgram.sh /opt/or
 chmod +x /opt/orb/scripts/*.sh
 ```
 
-### 4. Environment Variables
+### 4. Hook Configuration File
 
-Configure these environment variables for ORB's SLURM integration:
+SLURM spawns ResumeProgram/SuspendProgram as child processes — systemd
+environment variables on slurmctld do NOT propagate. The hook scripts
+source a configuration file instead.
+
+Create `${ORB_ROOT_DIR}/slurm_hooks.env` (default: `/usr/orb/slurm_hooks.env`):
+
+```bash
+# Template to provision when SLURM calls ResumeProgram
+SLURM_ORB_TEMPLATE_ID=EC2Fleet-Instant-OnDemand
+
+# Optional overrides
+# SLURM_ORB_LOG_DIR=/var/log/orb
+# SLURM_ORB_MODE=cli
+# SLURM_ORB_API_URL=http://localhost:8000
+```
+
+The scripts source this file before reading any `SLURM_ORB_*` variables.
+
+### 5. Environment Variables
+
+Configure these environment variables for ORB's SLURM integration
+(set them in `slurm_hooks.env` or the calling environment):
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `SLURM_ORB_CONFIG_DIR` | ORB configuration directory | Platform default |
-| `SLURM_ORB_WORK_DIR` | ORB working directory | Platform default |
+| `ORB_ROOT_DIR` | ORB installation directory (used for config discovery) | `/usr/orb` |
+| `SLURM_ORB_TEMPLATE_ID` | Template ID for provisioning | `default` (warns) |
 | `SLURM_ORB_LOG_DIR` | ORB log directory | `/var/log/orb` |
-| `SLURM_ORB_LOG_LEVEL` | Log level | `INFO` |
 | `SLURM_ORB_MODE` | `cli` or `api` | `cli` |
 | `SLURM_ORB_API_URL` | ORB API URL (for api mode) | `http://localhost:8000` |
 | `SLURM_ORB_RESTD_URL` | slurmrestd URL (for health checks) | Not set |
 | `SLURM_ORB_JWT_TOKEN` | JWT token for slurmrestd auth | Not set |
 
-### 5. slurmrestd Integration (Optional)
+### 6. slurmrestd Integration (Optional)
 
 If slurmrestd is running on your cluster, ORB can use it for health monitoring:
 
@@ -130,6 +150,39 @@ orb system health
 # Check node was provisioned
 scontrol show node compute-001
 ```
+
+## CLI Usage with --nodes
+
+The `--nodes` flag lets ORB work directly with SLURM node names.
+
+### Provisioning by Node Name
+
+```bash
+# Request 3 machines, associating them with SLURM node names
+orb machines request EC2Fleet-Instant-OnDemand 3 --nodes "compute-[001-003]"
+```
+
+ORB expands the SLURM hostlist format and stores the node name on each
+provisioned machine's `name` field. This enables lookup by node name later.
+
+### Terminating by Node Name
+
+```bash
+# Terminate machines associated with specific SLURM nodes
+orb machines terminate --nodes "compute-[001-003]" --force
+```
+
+This resolves node names to machine IDs via storage and terminates them.
+No in-memory state is needed — node names persist across CLI invocations.
+
+### How Node Names Persist
+
+When machines are provisioned with `--nodes`:
+1. The SLURM hostlist is expanded to individual names (e.g. `compute-001`)
+2. Each provisioned machine's `name` field is set to its assigned node name
+3. The name persists in machine storage (survives CLI restarts)
+4. `terminate --nodes` queries storage by name to find machine IDs
+5. Provider sync does NOT overwrite explicitly-set node names
 
 ## AMI/Image Requirements
 
