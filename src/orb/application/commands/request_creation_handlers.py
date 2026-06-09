@@ -151,9 +151,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
                 parameters={"instance_tags": instance_tags},
                 context={"correlation_id": str(request.request_id)},
             )
-            await self._provider_selection_port.execute_operation(
-                request.provider_name, operation
-            )
+            await self._provider_selection_port.execute_operation(request.provider_name, operation)
             self.logger.info(
                 "Synced tags to %d instances for request %s",
                 len(instance_tags),

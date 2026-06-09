@@ -82,10 +82,12 @@ class RequestStatusManagementService:
                 # Override name with SLURM node name if available
                 if idx < len(expanded_node_names):
                     node_name = expanded_node_names[idx]
-                    machine = machine.model_copy(update={
-                        "name": node_name,
-                        "tags": machine.tags.add("orb:node-name", node_name),
-                    })
+                    machine = machine.model_copy(
+                        update={
+                            "name": node_name,
+                            "tags": machine.tags.add("orb:node-name", node_name),
+                        }
+                    )
                 machines_to_save.append(machine)
 
             if machines_to_save:

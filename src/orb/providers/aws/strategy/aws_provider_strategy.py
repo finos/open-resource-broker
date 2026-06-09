@@ -257,7 +257,9 @@ class AWSProviderStrategy(ProviderStrategy):
         if not instance_tags:
             return ProviderResult.success_result({})
         try:
-            ec2 = self.aws_client.ec2_client
+            ec2 = self.aws_client.ec2_client if self.aws_client else None
+            if ec2 is None:
+                return ProviderResult.success_result({"tagged_count": 0})
             for instance_id, tags in instance_tags.items():
                 aws_tags = [{"Key": k, "Value": v} for k, v in tags.items()]
                 ec2.create_tags(Resources=[instance_id], Tags=aws_tags)
