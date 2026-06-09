@@ -10,6 +10,8 @@
 # - No data residency between cycles — use shared storage
 set -euo pipefail
 
+export ORB_ROOT_DIR=${ORB_ROOT_DIR:-/usr/orb}
+
 LOG_DIR="${SLURM_ORB_LOG_DIR:-/var/log/orb}"
 LOG_FILE="${LOG_DIR}/suspend_program.log"
 ORB_MODE="${SLURM_ORB_MODE:-cli}"  # "cli" or "api"
@@ -56,7 +58,7 @@ if [ "${ORB_MODE}" = "api" ]; then
         exit 1
     fi
 else
-    if orb machines return --nodes "${NODE_LIST}" --scheduler slurm >> "${LOG_FILE}" 2>&1; then
+    if orb machines terminate --nodes "${NODE_LIST}" --force >> "${LOG_FILE}" 2>&1; then
         log "INFO: Batch CLI terminate succeeded for nodes: ${NODE_LIST}"
         exit 0
     else

@@ -167,6 +167,9 @@ def add_machine_actions(subparsers):
         help="Machine ID to terminate",
     )
     machines_terminate.add_argument(
+        "--nodes", type=str, help="SLURM node list to terminate by node name"
+    )
+    machines_terminate.add_argument(
         "--wait", action="store_true", help="Wait for terminate request to complete"
     )
     machines_terminate.add_argument(
