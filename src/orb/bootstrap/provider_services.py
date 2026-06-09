@@ -63,12 +63,12 @@ def _register_application_services(container: DIContainer) -> None:
 
 def _register_provider_utility_services(container: DIContainer) -> None:
     """Register provider-specific utility services only (not provider instances)."""
-    import importlib.util
-
     logger = get_logger(__name__)
 
     # Register AWS utility services if available
     try:
+        import importlib.util
+
         # Check if AWS provider is available
         if importlib.util.find_spec("orb.providers.aws"):
             try:
