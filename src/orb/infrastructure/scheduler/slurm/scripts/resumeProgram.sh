@@ -28,6 +28,10 @@ ORB_MODE="${SLURM_ORB_MODE:-cli}"  # "cli" or "api"
 ORB_API_URL="${SLURM_ORB_API_URL:-http://localhost:8000}"
 TEMPLATE_ID="${SLURM_ORB_TEMPLATE_ID:-default}"
 
+if [ "${TEMPLATE_ID}" = "default" ]; then
+    log "WARN: SLURM_ORB_TEMPLATE_ID not set, using 'default' — set this env var to your partition template"
+fi
+
 mkdir -p "${LOG_DIR}"
 
 log() {
@@ -43,7 +47,7 @@ fi
 NODE_LIST="$1"
 
 # Validate node names: alphanumeric, hyphens, brackets, commas, spaces only
-if ! echo "${NODE_LIST}" | grep -qE '^[a-zA-Z0-9\-\[\],\s ]+$'; then
+if ! echo "${NODE_LIST}" | grep -qE '^[a-zA-Z0-9 \-\[\],]+$'; then
     log "ERROR: Invalid node name characters in: ${NODE_LIST}"
     exit 1
 fi
