@@ -22,6 +22,11 @@ set -euo pipefail
 
 export ORB_ROOT_DIR=${ORB_ROOT_DIR:-/usr/orb}
 
+# Source hook configuration if available
+if [ -f "${ORB_ROOT_DIR}/slurm_hooks.env" ]; then
+    . "${ORB_ROOT_DIR}/slurm_hooks.env"
+fi
+
 LOG_DIR="${SLURM_ORB_LOG_DIR:-/var/log/orb}"
 LOG_FILE="${LOG_DIR}/resume_program.log"
 ORB_MODE="${SLURM_ORB_MODE:-cli}"  # "cli" or "api"
@@ -76,7 +81,7 @@ if [ "${ORB_MODE}" = "api" ]; then
         exit 1
     fi
 else
-    if ! BODY=$(orb machines request "${TEMPLATE_ID}" ${NUM_NODES} --nodes "${NODE_LIST}" --format json 2>>"${LOG_FILE}"); then
+    if ! BODY=$(orb machines request "${TEMPLATE_ID}" ${NUM_NODES} --nodes "${NODE_LIST}" 2>>"${LOG_FILE}"); then
         RC=$?
         log "ERROR: Batch CLI request failed (exit ${RC}) for nodes: ${NODE_LIST}"
         exit "${RC}"

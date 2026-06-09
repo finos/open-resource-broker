@@ -12,6 +12,11 @@ set -euo pipefail
 
 export ORB_ROOT_DIR=${ORB_ROOT_DIR:-/usr/orb}
 
+# Source hook configuration if available
+if [ -f "${ORB_ROOT_DIR}/slurm_hooks.env" ]; then
+    . "${ORB_ROOT_DIR}/slurm_hooks.env"
+fi
+
 LOG_DIR="${SLURM_ORB_LOG_DIR:-/var/log/orb}"
 LOG_FILE="${LOG_DIR}/suspend_program.log"
 ORB_MODE="${SLURM_ORB_MODE:-cli}"  # "cli" or "api"
