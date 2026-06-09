@@ -268,8 +268,12 @@ class AWSProviderStrategy(ProviderStrategy):
             )
 
     def _build_spot_placement_plan(self, aws_template: Any, count: int) -> list[PlacementPlanEntry]:
+        aws_client = self.aws_client
+        if aws_client is None:
+            raise AWSConfigurationError("AWS client is required for spot placement scoring")
+
         adapter = AWSSpotPlacementScoreAdapter(
-            aws_client=self.aws_client,
+            aws_client=aws_client,
             logger=self._logger,
             region=self._aws_config.region,
         )

@@ -6,13 +6,12 @@ DI container.
 """
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, Protocol, TypeVar
 
 from orb.config import PerformanceConfig
 
 if TYPE_CHECKING:
     from orb.domain.base.ports import LoggingPort
-    from orb.domain.base.ports.configuration_port import ConfigurationPort
     from orb.providers.azure.configuration.config import AzureProviderConfig
     from orb.providers.azure.infrastructure.adapters.azure_validation_adapter import (
         AzureValidationAdapter,
@@ -31,9 +30,19 @@ from orb.domain.template.extensions import TemplateExtensionRegistry
 from orb.domain.template.factory import TemplateFactory
 from orb.providers.azure.configuration.template_extension import AzureTemplateExtensionConfig
 
+T = TypeVar("T")
+
+
+class PerformanceConfigSource(Protocol):
+    """Configuration source shape used to resolve shared performance settings."""
+
+    def get_typed(self, config_type: type[T]) -> T:
+        """Return a typed configuration object."""
+        ...
+
 
 def _resolve_performance_config(
-    config_port: Any,  # ConfigurationPort.get_typed() is called with non-standard args
+    config_port: PerformanceConfigSource | None,
     logger: "LoggingPort",
 ) -> PerformanceConfig:
     """Resolve shared performance config, falling back to defaults."""
@@ -62,7 +71,7 @@ def _build_azure_client_runtime_config(
     logger: "LoggingPort",
     *,
     performance_config: PerformanceConfig | None = None,
-    config_port: Optional["ConfigurationPort"] = None,
+    config_port: PerformanceConfigSource | None = None,
 ) -> "AzureClientRuntimeConfig":
     """Assemble the explicit runtime config owned by Azure infrastructure."""
     from orb.providers.azure.infrastructure.azure_client import AzureClientRuntimeConfig
@@ -94,7 +103,7 @@ def create_azure_strategy(
     *,
     provider_instance_name: str,
     performance_config: PerformanceConfig | None = None,
-    config_port: Optional["ConfigurationPort"] = None,
+    config_port: PerformanceConfigSource | None = None,
     azure_native_spec_service: Optional["AzureNativeSpecService"] = None,
 ) -> "AzureProviderStrategy":
     """Create an ``AzureProviderStrategy`` from raw provider config data.
@@ -191,7 +200,7 @@ def _register_named_azure_provider_instance(
     registry: "ProviderRegistry",
     instance_name: str,
     *,
-    config_port: Optional["ConfigurationPort"] = None,
+    config_port: PerformanceConfigSource | None = None,
 ) -> None:
     """Register a named Azure provider instance with the registry."""
     registry.register_provider_instance(
@@ -215,7 +224,7 @@ def register_azure_provider(
     registry: Optional["ProviderRegistry"] = None,
     logger: Optional["LoggingPort"] = None,
     instance_name: Optional[str] = None,
-    config_port: Optional["ConfigurationPort"] = None,
+    config_port: PerformanceConfigSource | None = None,
 ) -> None:
     """Register Azure provider with the provider registry."""
     if registry is None:
@@ -253,7 +262,7 @@ def register_azure_provider(
 def register_azure_provider_instance(
     provider_instance: Any,
     logger: Optional["LoggingPort"] = None,
-    config_port: Optional["ConfigurationPort"] = None,
+    config_port: PerformanceConfigSource | None = None,
 ) -> bool:
     """Register an Azure provider instance using the canonical registry contract."""
     try:

@@ -48,6 +48,7 @@ class SpotPlacementScoreAdapter(Protocol):
         template: Any,
     ) -> list[PlacementScore]:
         """Return normalized placement scores for the provider's candidates."""
+        ...
 
 
 class SpotPlacementPlanner:
