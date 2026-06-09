@@ -244,10 +244,27 @@ class AWSProviderStrategy(ProviderStrategy):
             return self._get_instance_service().start_instances(operation)
         elif operation.operation_type == ProviderOperationType.STOP_INSTANCES:
             return self._get_instance_service().stop_instances(operation)
+        elif operation.operation_type == ProviderOperationType.TAG_INSTANCES:
+            return await self._tag_instances(operation)
         else:
             return ProviderResult.error_result(
                 f"Unsupported operation: {operation.operation_type}", "UNSUPPORTED_OPERATION"
             )
+
+    async def _tag_instances(self, operation: ProviderOperation) -> ProviderResult:
+        """Apply per-instance tags via EC2 CreateTags (batched, fire-and-forget)."""
+        instance_tags: dict[str, dict[str, str]] = operation.parameters.get("instance_tags", {})
+        if not instance_tags:
+            return ProviderResult.success_result({})
+        try:
+            ec2 = self.aws_client.ec2_client
+            for instance_id, tags in instance_tags.items():
+                aws_tags = [{"Key": k, "Value": v} for k, v in tags.items()]
+                ec2.create_tags(Resources=[instance_id], Tags=aws_tags)
+            return ProviderResult.success_result({"tagged_count": len(instance_tags)})
+        except Exception as e:
+            self._logger.warning("Failed to apply per-instance tags: %s", e)
+            return ProviderResult.success_result({"tagged_count": 0, "warning": str(e)})
 
     def get_capabilities(self) -> ProviderCapabilities:
         """Get AWS provider capabilities."""

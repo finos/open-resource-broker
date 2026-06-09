@@ -22,6 +22,7 @@ class OperationType(str, Enum):
     RESOLVE_IMAGE = "resolve_image"
     START_INSTANCES = "start_instances"
     STOP_INSTANCES = "stop_instances"
+    TAG_INSTANCES = "tag_instances"
 
 
 @dataclass
