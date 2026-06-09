@@ -207,19 +207,16 @@ async def handle_request_return_machines(
     # Resolve --nodes to machine IDs by querying machine storage by name
     nodes_arg = getattr(args, "nodes", None)
     if nodes_arg and not machine_ids:
-        from orb.domain.machine.machine_status import MachineStatus
-        from orb.domain.machine.repository import MachineRepository
+        from orb.domain.base import UnitOfWorkFactory
         from orb.infrastructure.scheduler.slurm.node_mapper import SlurmNodeMapper
 
         node_names_set = set(SlurmNodeMapper.expand_node_range(nodes_arg))
-        repo = container.get(MachineRepository)
-        # Query all non-terminal statuses to find machines by node name
-        non_terminal_statuses = [
-            s for s in MachineStatus if not s.is_terminal
-        ]
-        candidates = repo.find_by_statuses(non_terminal_statuses)
+        uow_factory = container.get(UnitOfWorkFactory)
+        with uow_factory.create_unit_of_work() as uow:
+            all_machines = uow.machines.get_all()
         machine_ids = [
-            str(m.machine_id) for m in candidates if m.name in node_names_set
+            str(m.machine_id) for m in all_machines
+            if m.name in node_names_set and not m.status.is_terminal
         ]
 
     has_specific_ids = bool(machine_ids)
