@@ -185,7 +185,16 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
 
             raw_templates = self._load_single_file(template_path)
             provider_name = provider_override or self._get_provider_name()
-            templates = [self._apply_template_defaults(t, provider_name) for t in raw_templates]
+            templates = []
+            for t in raw_templates:
+                # Ensure template_id is set from partition_name/templateId before applying defaults
+                if not t.get("template_id"):
+                    t["template_id"] = (
+                        t.get("templateId") or t.get("partition_name") or t.get("name", "")
+                    )
+                if not t.get("templateId"):
+                    t["templateId"] = t["template_id"]
+                templates.append(self._apply_template_defaults(t, provider_name))
             self.logger.debug("Loaded %d templates from %s", len(templates), template_path)
             return templates
         except Exception as e:
