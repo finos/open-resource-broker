@@ -134,6 +134,9 @@ def add_machine_actions(subparsers):
         "--count", "-c", type=int, dest="flag_machine_count", help="Number of machines to request"
     )
     machines_request.add_argument(
+        "--nodes", type=str, help="SLURM node list to associate with this request"
+    )
+    machines_request.add_argument(
         "--wait", action="store_true", help="Wait for machines to be ready"
     )
     machines_request.add_argument(

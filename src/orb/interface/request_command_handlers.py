@@ -111,6 +111,9 @@ async def handle_request_machines(
             "template_id": template_id,
             "requested_count": machine_count,
         }
+        node_names = getattr(args, "nodes", None)
+        if node_names:
+            parsed_data["node_names"] = node_names
 
     template_id = parsed_data.get("template_id")
     machine_count = parsed_data.get("requested_count", 1)
@@ -136,6 +139,7 @@ async def handle_request_machines(
             requested_count=int(machine_count),
             wait=bool(wait),
             timeout_seconds=int(timeout_seconds),
+            additional_data={k: v for k, v in parsed_data.items() if k not in ("template_id", "requested_count")},
         )
     )
 

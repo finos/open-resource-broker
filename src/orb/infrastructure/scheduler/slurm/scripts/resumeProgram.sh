@@ -20,10 +20,13 @@
 # pre-installed and configured to connect to this cluster's slurmctld.
 set -euo pipefail
 
+export ORB_ROOT_DIR=${ORB_ROOT_DIR:-/usr/orb}
+
 LOG_DIR="${SLURM_ORB_LOG_DIR:-/var/log/orb}"
 LOG_FILE="${LOG_DIR}/resume_program.log"
 ORB_MODE="${SLURM_ORB_MODE:-cli}"  # "cli" or "api"
 ORB_API_URL="${SLURM_ORB_API_URL:-http://localhost:8000}"
+TEMPLATE_ID="${SLURM_ORB_TEMPLATE_ID:-default}"
 
 mkdir -p "${LOG_DIR}"
 
@@ -47,6 +50,10 @@ fi
 
 log "INFO: ResumeProgram called with nodes: ${NODE_LIST}"
 
+# --- Compute node count from SLURM hostlist ---
+NUM_NODES=$(scontrol show hostnames "${NODE_LIST}" | wc -l | tr -d ' ')
+log "INFO: Resolved ${NUM_NODES} nodes from hostlist"
+
 # --- Single batch request to ORB ---
 if [ "${ORB_MODE}" = "api" ]; then
     PAYLOAD="{\"node_names\": [\"${NODE_LIST// /\", \"}\"], \"request_type\": \"provision\"}"
@@ -65,7 +72,7 @@ if [ "${ORB_MODE}" = "api" ]; then
         exit 1
     fi
 else
-    if ! BODY=$(orb machines request --nodes "${NODE_LIST}" --scheduler slurm --format json 2>>"${LOG_FILE}"); then
+    if ! BODY=$(orb machines request "${TEMPLATE_ID}" ${NUM_NODES} --nodes "${NODE_LIST}" --format json 2>>"${LOG_FILE}"); then
         RC=$?
         log "ERROR: Batch CLI request failed (exit ${RC}) for nodes: ${NODE_LIST}"
         exit "${RC}"
