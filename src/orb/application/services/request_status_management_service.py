@@ -68,12 +68,11 @@ class RequestStatusManagementService:
             node_names_raw = request.metadata.get("node_names")
             expanded_node_names: list[str] = []
             if node_names_raw:
-                from orb.infrastructure.scheduler.slurm.node_mapper import SlurmNodeMapper
-
-                if isinstance(node_names_raw, str):
-                    expanded_node_names = SlurmNodeMapper.expand_node_range(node_names_raw)
-                elif isinstance(node_names_raw, list):
+                if isinstance(node_names_raw, list):
                     expanded_node_names = node_names_raw
+                elif isinstance(node_names_raw, str):
+                    # Single node name (pre-expanded lists are the norm)
+                    expanded_node_names = [node_names_raw]
 
             machines_to_save = []
             for idx, instance_data in enumerate(instances):
