@@ -14,7 +14,6 @@ from orb.providers.azure.domain.template.value_objects import (
     AzureOSDiskType,
     AzurePriority,
     AzureProviderApi,
-    AzureUpgradePolicyMode,
     AzureVMSSOrchestrationMode,
 )
 from orb.providers.azure.infrastructure.services.arm_payload_mapper import ArmPayloadMapper
@@ -102,6 +101,7 @@ class TestAzureTemplateConstruction:
             **fields,
             image={"image_id": "/subscriptions/.../images/my-image"},
         )
+        assert t.image is not None
         assert t.image.image_id == "/subscriptions/.../images/my-image"
 
     def test_rejects_invalid_location_slug(self):
@@ -236,6 +236,11 @@ class TestSpotValidation:
 
     def test_spot_percentage_implies_spot_priority(self):
         t = AzureTemplate(**_BASE_FIELDS, spot_percentage=70)
+        assert t.priority == AzurePriority.SPOT
+        assert t.eviction_policy == AzureEvictionPolicy.DEALLOCATE
+
+    def test_spot_percentage_overrides_regular_priority_default(self):
+        t = AzureTemplate(**_BASE_FIELDS, priority="Regular", spot_percentage=70)
         assert t.priority == AzurePriority.SPOT
         assert t.eviction_policy == AzureEvictionPolicy.DEALLOCATE
 

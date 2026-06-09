@@ -465,7 +465,11 @@ class AzureTemplate(Template):
                 else AllocationStrategy.LOWEST_PRICE.value
             )
 
-        if data.get("spot_percentage") is not None and data.get("priority") in (None, ""):
+        if data.get("spot_percentage") is not None and data.get("priority") in (
+            None,
+            "",
+            "Regular",
+        ):
             data["priority"] = "Spot"
 
         # Spot VMs need an eviction policy.
