@@ -87,25 +87,26 @@ class MachineGroupingService:
                     if not machine:
                         raise ValueError(f"Machine not found: {machine_id}")
 
-                    # Use machine's actual provider context
-                    if not machine.provider_api:
-                        self.logger.warning(
-                            "Machine %s has no provider_api — skipping",
-                            machine_id,
-                        )
-                        skipped_ids.append(machine_id)
-                        continue
-                    if not machine.resource_id:
-                        self.logger.warning(
-                            "Machine %s has no resource_id — skipping",
-                            machine_id,
-                        )
-                        skipped_ids.append(machine_id)
-                        continue
+                    # Use machine's actual provider context, with fallback for
+                    # machines that only have an instance ID (e.g. SLURM node-mapped)
+                    provider_api = machine.provider_api
+                    resource_id = machine.resource_id
+                    if not provider_api or not resource_id:
+                        mid_val = str(machine.machine_id)
+                        if mid_val.startswith("i-"):
+                            provider_api = provider_api or "RunInstances"
+                            resource_id = resource_id or f"direct-{mid_val}"
+                        else:
+                            self.logger.warning(
+                                "Machine %s missing provider context — skipping",
+                                machine_id,
+                            )
+                            skipped_ids.append(machine_id)
+                            continue
                     group_key = (
                         machine.provider_name,
-                        machine.provider_api,
-                        machine.resource_id,
+                        provider_api,
+                        resource_id,
                     )
                     resource_groups[group_key].append(machine)
 
