@@ -196,34 +196,6 @@ The provisioned cloud instances **must** have SLURM pre-installed and configured
 - **slurmd systemd service** enabled to start on boot
 - Network access to slurmctld (typically port 6817)
 
-### Reading the Node Name from Instance Tags
-
-ORB tags each provisioned instance with `orb:node-name=<SLURM node name>`.
-The compute image's boot script should read this tag to start slurmd with
-the correct identity:
-
-```bash
-#!/bin/bash
-# /opt/slurm/boot.sh — run on instance boot (e.g. via cloud-init)
-INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
-
-NODE_NAME=$(aws ec2 describe-tags \
-  --region "${REGION}" \
-  --filters "Name=resource-id,Values=${INSTANCE_ID}" "Name=key,Values=orb:node-name" \
-  --query 'Tags[0].Value' --output text)
-
-if [ -n "${NODE_NAME}" ] && [ "${NODE_NAME}" != "None" ]; then
-    hostnamectl set-hostname "${NODE_NAME}"
-    slurmd -N "${NODE_NAME}"
-else
-    # Fallback: start slurmd without explicit name (self-registers)
-    slurmd
-fi
-```
-
-The instance's IAM role needs `ec2:DescribeTags` permission for this to work.
-
 **Recommended:**
 
 - cloud-init or user_data support for dynamic hostname configuration

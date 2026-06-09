@@ -113,57 +113,10 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
             request = await self._status_service.update_request_from_provisioning(
                 request, provisioning_result
             )
-
-            # Tag instances with orb:node-name for SLURM compute self-registration
-            if request.metadata.get("node_names") and provisioning_result.success:
-                await self._apply_node_name_tags(request)
-
             # Persist final status
             await self._persist_and_publish(request)
 
         self.logger.info("Machine request created successfully: %s", request.request_id)
-
-    async def _apply_node_name_tags(self, request: Any) -> None:
-        """Tag provisioned instances with orb:node-name for SLURM self-registration.
-
-        Accesses the EC2 client dynamically via the provider strategy to avoid
-        importing provider-specific modules. Failure is non-fatal.
-        """
-        try:
-            with self.uow_factory.create_unit_of_work() as uow:
-                machines = uow.machines.find_by_request_id(str(request.request_id))
-            if not machines:
-                return
-
-            tag_map = {
-                str(m.machine_id): m.name
-                for m in machines
-                if m.name and str(m.machine_id).startswith("i-")
-            }
-            if not tag_map:
-                return
-
-            # Resolve EC2 client dynamically through provider strategy capabilities
-            strategy = self._provider_selection_port.get_strategy_capabilities(
-                request.provider_name
-            )
-            ec2 = getattr(getattr(strategy, "aws_client", None), "ec2_client", None)
-            if ec2 is None:
-                self.logger.debug("No EC2 client available for node-name tagging")
-                return
-
-            for instance_id, node_name in tag_map.items():
-                ec2.create_tags(
-                    Resources=[instance_id],
-                    Tags=[{"Key": "orb:node-name", "Value": node_name}],
-                )
-            self.logger.info(
-                "Tagged %d instances with orb:node-name for request %s",
-                len(tag_map),
-                request.request_id,
-            )
-        except Exception as e:
-            self.logger.warning("Failed to apply orb:node-name tags: %s", e)
 
     async def _load_template(self, template_id: str) -> Any:
         """Load template using CQRS QueryBus."""
