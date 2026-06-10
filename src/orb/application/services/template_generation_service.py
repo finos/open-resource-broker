@@ -114,10 +114,15 @@ class TemplateGenerationService:
         provider_type = provider["type"]
 
         try:
-            # Generate example templates using provider registry
-            examples = await self._generate_examples_from_provider(
-                provider_type, provider_name, request.provider_api
-            )
+            # Try scheduler-specific template generation first (e.g. SLURM partitions)
+            scheduler_templates = self._scheduler_strategy.generate_scheduler_templates()
+            if scheduler_templates:
+                examples = scheduler_templates
+            else:
+                # Generate example templates using provider registry
+                examples = await self._generate_examples_from_provider(
+                    provider_type, provider_name, request.provider_api
+                )
 
             # Format templates using scheduler strategy
             formatted_examples = self._format_templates(examples, request)

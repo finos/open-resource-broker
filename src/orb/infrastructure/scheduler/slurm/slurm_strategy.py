@@ -397,3 +397,159 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
                     self.logger.warning(
                         "Failed to register %s addr (slurmd will self-register)", node_name
                     )
+
+    # ------------------------------------------------------------------
+    # Template generation from slurm.conf
+    # ------------------------------------------------------------------
+
+    # CPU+Memory → instance type lookup (common t3/m5/c5 families)
+    _INSTANCE_TYPE_MAP: list[tuple[int, int, str]] = [
+        # (cpus, memory_mb, instance_type)
+        (1, 512, "t3.nano"),
+        (2, 1024, "t3.micro"),
+        (2, 2048, "t3.small"),
+        (2, 4096, "t3.medium"),
+        (2, 8192, "t3.large"),
+        (4, 16384, "t3.xlarge"),
+        (8, 32768, "t3.2xlarge"),
+        (2, 8192, "m5.large"),
+        (4, 16384, "m5.xlarge"),
+        (8, 32768, "m5.2xlarge"),
+        (16, 65536, "m5.4xlarge"),
+        (2, 4096, "c5.large"),
+        (4, 8192, "c5.xlarge"),
+        (8, 16384, "c5.2xlarge"),
+        (16, 32768, "c5.4xlarge"),
+    ]
+
+    def generate_scheduler_templates(self) -> list[dict[str, Any]] | None:
+        """Generate templates from slurm.conf partition/node definitions.
+
+        Parses NodeName and PartitionName lines to create one template per partition
+        with a single instance type matching the declared CPUs and RealMemory.
+        """
+        slurm_conf_path = self._find_slurm_conf()
+        if not slurm_conf_path:
+            return None
+
+        try:
+            partitions = self._parse_slurm_conf(slurm_conf_path)
+            if not partitions:
+                return None
+
+            templates: list[dict[str, Any]] = []
+            for partition in partitions:
+                instance_type = self._match_instance_type(
+                    partition["cpus"], partition["memory_mb"]
+                )
+                templates.append({
+                    "template_id": partition["name"],
+                    "machine_types": {instance_type: 1},
+                    "max_instances": partition.get("max_nodes", 10),
+                    "provider_api": "EC2Fleet",
+                    "price_type": "ondemand",
+                })
+
+            self.logger.info(
+                "Generated %d templates from slurm.conf partitions", len(templates)
+            )
+            return templates if templates else None
+        except Exception as e:
+            self.logger.warning("Failed to parse slurm.conf for template generation: %s", e)
+            return None
+
+    def _find_slurm_conf(self) -> str | None:
+        """Locate slurm.conf from environment or standard paths."""
+        # Check SLURM_CONF env var first
+        conf = os.environ.get("SLURM_CONF")
+        if conf and Path(conf).is_file():
+            return conf
+        # Standard paths
+        for path in ["/etc/slurm/slurm.conf", "/etc/slurm-llnl/slurm.conf"]:
+            if Path(path).is_file():
+                return path
+        return None
+
+    def _parse_slurm_conf(self, path: str) -> list[dict[str, Any]]:
+        """Parse NodeName and PartitionName lines from slurm.conf."""
+        import re
+
+        node_specs: dict[str, dict[str, int]] = {}  # node_group → {cpus, memory_mb}
+        partitions: list[dict[str, Any]] = []
+
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("#") or not line:
+                    continue
+
+                # Parse NodeName lines: NodeName=compute-[001-100] CPUs=4 RealMemory=16000
+                if line.startswith("NodeName="):
+                    match = re.match(r"NodeName=(\S+)", line)
+                    if not match:
+                        continue
+                    node_group = match.group(1)
+                    cpus = int(re.search(r"CPUs=(\d+)", line).group(1)) if re.search(r"CPUs=(\d+)", line) else 1
+                    mem_match = re.search(r"RealMemory=(\d+)", line)
+                    memory_mb = int(mem_match.group(1)) if mem_match else 4096
+                    node_specs[node_group] = {"cpus": cpus, "memory_mb": memory_mb}
+
+                    # Count nodes from bracket notation e.g. compute-[001-100]
+                    count_match = re.search(r"\[(\d+)-(\d+)\]", node_group)
+                    if count_match:
+                        node_specs[node_group]["max_nodes"] = (
+                            int(count_match.group(2)) - int(count_match.group(1)) + 1
+                        )
+
+                # Parse PartitionName lines: PartitionName=gpu Nodes=gpu-[001-010] ...
+                elif line.startswith("PartitionName="):
+                    match = re.match(r"PartitionName=(\S+)", line)
+                    if not match:
+                        continue
+                    partition_name = match.group(1)
+                    nodes_match = re.search(r"Nodes=(\S+)", line)
+                    nodes_ref = nodes_match.group(1) if nodes_match else None
+
+                    # Resolve node specs for this partition
+                    cpus = 1
+                    memory_mb = 4096
+                    max_nodes = 10
+                    if nodes_ref and nodes_ref in node_specs:
+                        cpus = node_specs[nodes_ref]["cpus"]
+                        memory_mb = node_specs[nodes_ref]["memory_mb"]
+                        max_nodes = node_specs[nodes_ref].get("max_nodes", 10)
+                    else:
+                        # Try matching node specs by prefix
+                        for ng, spec in node_specs.items():
+                            # Check if partition's Nodes matches any NodeName definition
+                            if nodes_ref and (ng.split("[")[0] == nodes_ref.split("[")[0]):
+                                cpus = spec["cpus"]
+                                memory_mb = spec["memory_mb"]
+                                max_nodes = spec.get("max_nodes", 10)
+                                break
+
+                    partitions.append({
+                        "name": partition_name,
+                        "cpus": cpus,
+                        "memory_mb": memory_mb,
+                        "max_nodes": max_nodes,
+                    })
+
+        return partitions
+
+    def _match_instance_type(self, cpus: int, memory_mb: int) -> str:
+        """Find the best-fit instance type for the given CPU and memory specs."""
+        best_match = "t3.medium"  # default fallback
+        best_score = float("inf")
+
+        for type_cpus, type_mem, instance_type in self._INSTANCE_TYPE_MAP:
+            # Instance must have >= requested CPUs and >= requested memory
+            if type_cpus < cpus or type_mem < memory_mb:
+                continue
+            # Score by excess resources (prefer smallest fit)
+            score = (type_cpus - cpus) * 1000 + (type_mem - memory_mb)
+            if score < best_score:
+                best_score = score
+                best_match = instance_type
+
+        return best_match
