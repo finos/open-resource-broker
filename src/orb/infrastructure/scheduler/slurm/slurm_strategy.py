@@ -425,14 +425,9 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
     def generate_scheduler_templates(self, **kwargs: Any) -> list[dict[str, Any]] | None:
         """Generate templates from slurm.conf partition/node definitions.
 
-        Parses NodeName and PartitionName lines to create one template per partition
-        with a single instance type matching the declared CPUs and RealMemory.
-
-        Resolution order for slurm.conf:
-        1. slurm_conf kwarg (from --slurm-conf CLI flag)
-        2. scheduler.slurm.config_path in config.json
-        3. SLURM_CONF environment variable
-        4. Default paths: /etc/slurm/slurm.conf, /usr/local/etc/slurm.conf, $ORB_ROOT_DIR/slurm.conf
+        Parses NodeName and PartitionName lines to create one template per partition.
+        If scheduler.slurm.partitions config specifies instance_types for a partition,
+        those are used directly; otherwise auto-maps from declared CPUs/RealMemory.
         """
         slurm_conf_path = self._find_slurm_conf(kwargs.get("slurm_conf"))
         if not slurm_conf_path:
@@ -443,18 +438,49 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
             if not partitions:
                 return None
 
+            # Load user partition preferences from config
+            partition_prefs = self._get_partition_preferences()
+
             templates: list[dict[str, Any]] = []
             for partition in partitions:
-                instance_type = self._match_instance_type(
-                    partition["cpus"], partition["memory_mb"]
-                )
-                templates.append({
-                    "template_id": partition["name"],
-                    "machine_types": {instance_type: 1},
-                    "max_instances": partition.get("max_nodes", 10),
-                    "provider_api": "EC2Fleet",
-                    "price_type": "ondemand",
-                })
+                name = partition["name"]
+                pref = partition_prefs.get(name, {})
+                user_types = pref.get("instance_types")
+
+                if user_types:
+                    # User-specified instance types — validate and use
+                    self._validate_instance_types(
+                        user_types, partition["cpus"], partition["memory_mb"], name
+                    )
+                    # Build machine_types dict (weight=1 for each unless weights provided)
+                    if isinstance(user_types, dict):
+                        machine_types = user_types
+                    else:
+                        machine_types = {t: 1 for t in user_types}
+                    template: dict[str, Any] = {
+                        "template_id": name,
+                        "machine_types": machine_types,
+                        "max_instances": partition.get("max_nodes", 10),
+                        "provider_api": "EC2Fleet",
+                        "price_type": "ondemand",
+                        "fleet_type": "instant",
+                    }
+                    if pref.get("allocation_strategy"):
+                        template["allocation_strategy"] = pref["allocation_strategy"]
+                else:
+                    # Auto-map from slurm.conf node specs
+                    instance_type = self._match_instance_type(
+                        partition["cpus"], partition["memory_mb"]
+                    )
+                    template = {
+                        "template_id": name,
+                        "machine_types": {instance_type: 1},
+                        "max_instances": partition.get("max_nodes", 10),
+                        "provider_api": "EC2Fleet",
+                        "price_type": "ondemand",
+                    }
+
+                templates.append(template)
 
             self.logger.info(
                 "Generated %d templates from slurm.conf partitions", len(templates)
@@ -463,6 +489,43 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
         except Exception as e:
             self.logger.warning("Failed to parse slurm.conf for template generation: %s", e)
             return None
+
+    def _get_partition_preferences(self) -> dict[str, dict[str, Any]]:
+        """Read partition preferences from scheduler.slurm.partitions in config."""
+        if not self._config_manager:
+            return {}
+        try:
+            scheduler_config = self._config_manager.get_scheduler_config()
+            if isinstance(scheduler_config, dict):
+                return scheduler_config.get("slurm", {}).get("partitions", {})
+            elif hasattr(scheduler_config, "slurm"):
+                slurm_cfg = getattr(scheduler_config, "slurm", None)
+                if slurm_cfg and hasattr(slurm_cfg, "partitions"):
+                    return slurm_cfg.partitions or {}
+        except Exception:
+            pass
+        return {}
+
+    def _validate_instance_types(
+        self, types: list | dict, required_cpus: int, required_mem: int, partition_name: str
+    ) -> None:
+        """Warn if any listed instance type is undersized for the partition."""
+        type_list = types if isinstance(types, list) else list(types.keys())
+        for itype in type_list:
+            specs = self._get_instance_specs(itype)
+            if specs and (specs[0] < required_cpus or specs[1] < required_mem):
+                self.logger.warning(
+                    "Instance type %s (%d CPU, %dMB) does not meet partition '%s' "
+                    "requirements (CPUs=%d, RealMemory=%d). Nodes may fail to register.",
+                    itype, specs[0], specs[1], partition_name, required_cpus, required_mem,
+                )
+
+    def _get_instance_specs(self, instance_type: str) -> tuple[int, int] | None:
+        """Look up (cpus, memory_mb) for an instance type from the static map."""
+        for cpus, mem, itype in self._INSTANCE_TYPE_MAP:
+            if itype == instance_type:
+                return (cpus, mem)
+        return None
 
     def _find_slurm_conf(self, cli_path: str | None = None) -> str | None:
         """Locate slurm.conf using resolution order:
@@ -476,9 +539,9 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
             return cli_path
 
         # 2. Config file
-        if self._config_port:
+        if self._config_manager:
             try:
-                scheduler_config = self._config_port.get_scheduler_config()
+                scheduler_config = self._config_manager.get_scheduler_config()
                 config_path = None
                 if isinstance(scheduler_config, dict):
                     config_path = scheduler_config.get("slurm", {}).get("config_path")
