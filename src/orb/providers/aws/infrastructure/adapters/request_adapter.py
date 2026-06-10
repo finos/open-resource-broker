@@ -361,7 +361,7 @@ class AWSRequestAdapter(RequestAdapterPort):
         except ClientError as e:
             if e.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
                 self._logger.info(
-                    "Instances already terminated (InvalidInstanceID.NotFound) -- treating as success"
+                    "Instances already terminated (InvalidInstanceID.NotFound) — treating as success"
                 )
                 return {
                     "status": "success",
@@ -421,7 +421,7 @@ class AWSRequestAdapter(RequestAdapterPort):
                     "message": f"Failed to cancel fleet request: {e!s}",
                 }
 
-        # Fallback: no handler factory -- use direct AWS API calls
+        # Fallback: no handler factory — use direct AWS API calls
         self._logger.warning(
             "No handler factory available; using direct AWS API for cancel of %s %s",
             request.provider_api,

@@ -10,7 +10,7 @@ from orb.providers.aws.configuration.validator import (
     AWSProviderConfig,
 )
 
-# Static handler capability data -- no runtime config needed.
+# Static handler capability data — no runtime config needed.
 _HANDLER_CONFIG = AWSHandlerConfig()
 
 

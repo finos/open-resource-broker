@@ -212,7 +212,7 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
         # Normalise service-linked role ARNs
         if fleet_role and "ec2fleet.amazonaws.com/AWSServiceRoleForEC2Fleet" in fleet_role:
             # AWSClient is not available here; caller must pass a resolved role.
-            # Log a warning and leave the role as-is -- the handler should resolve it before calling.
+            # Log a warning and leave the role as-is — the handler should resolve it before calling.
             self._logger.warning(
                 "EC2Fleet role passed to SpotFleetConfigBuilder; role may need conversion: %s",
                 fleet_role,

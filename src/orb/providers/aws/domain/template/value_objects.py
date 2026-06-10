@@ -308,7 +308,7 @@ class AWSAllocationStrategy:
     def from_core(cls, strategy: Any) -> "AWSAllocationStrategy":
         """Create from a legacy AllocationStrategy enum or plain string.
 
-        Kept for backwards compatibility -- prefer from_string() for new code.
+        Kept for backwards compatibility — prefer from_string() for new code.
         """
         return cls(str(strategy.value) if hasattr(strategy, "value") else str(strategy))
 
@@ -330,7 +330,7 @@ class AWSAllocationStrategy:
         return self.to_api_format("asg")
 
 
-# Canonical (camelCase) allocation strategy values -- the authoritative set used on disk
+# Canonical (camelCase) allocation strategy values — the authoritative set used on disk
 # and by the HF/SpotFleet wire format.
 CANONICAL_ALLOCATION_STRATEGIES: frozenset[str] = frozenset(
     {
@@ -345,7 +345,7 @@ CANONICAL_ALLOCATION_STRATEGIES: frozenset[str] = frozenset(
 
 # Maps every accepted input variant to its canonical camelCase form.
 _ALLOCATION_STRATEGY_NORMALISATION_MAP: dict[str, str] = {
-    # camelCase (HF / SpotFleet wire format) -- identity mappings
+    # camelCase (HF / SpotFleet wire format) — identity mappings
     "capacityOptimized": "capacityOptimized",
     "capacityOptimizedPrioritized": "capacityOptimizedPrioritized",
     "diversified": "diversified",
@@ -369,9 +369,9 @@ def normalise_allocation_strategy(value: str) -> str:
     """Return the canonical camelCase form of an allocation strategy string.
 
     Accepts any of the three formats used across the AWS provider:
-    - camelCase (HF/SpotFleet wire format): ``capacityOptimized``, ``lowestPrice``, ...
-    - hyphenated (EC2Fleet/ASG API format): ``capacity-optimized``, ``lowest-price``, ...
-    - snake_case (legacy domain enum): ``capacity_optimized``, ``lowest_price``, ...
+    - camelCase (HF/SpotFleet wire format): ``capacityOptimized``, ``lowestPrice``, …
+    - hyphenated (EC2Fleet/ASG API format): ``capacity-optimized``, ``lowest-price``, …
+    - snake_case (legacy domain enum): ``capacity_optimized``, ``lowest_price``, …
 
     Returns the canonical camelCase string, which is the form stored on disk in
     ``aws_templates.json`` and used by the HF scheduler.

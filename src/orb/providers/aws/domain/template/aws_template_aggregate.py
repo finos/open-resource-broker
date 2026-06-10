@@ -249,7 +249,7 @@ class AWSTemplate(Template):
     @model_validator(mode="after")
     def validate_aws_template(self) -> "AWSTemplate":
         """AWS-specific template validation."""
-        # AWS-specific required fields -- only enforced when values are present
+        # AWS-specific required fields — only enforced when values are present
         # (generic/example templates may have empty subnet_ids/image_id, filled at runtime
         # from provider.template_defaults via _coalesce_merge)
 
@@ -498,7 +498,7 @@ class AWSTemplate(Template):
 
         if self.provider_api is None:
             raise ValueError(
-                f"provider_api is not set on template '{self.template_id}' -- "
+                f"provider_api is not set on template '{self.template_id}' — "
                 "cannot build AWSConfiguration without a handler type"
             )
 

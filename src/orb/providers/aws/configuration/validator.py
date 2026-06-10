@@ -110,12 +110,12 @@ class AWSConfigManager:
             if self._provider_config is not None:
                 return self._provider_config
             raise ValueError(
-                "AWSProviderConfig not available from config manager -- no AWS provider configured"
+                "AWSProviderConfig not available from config manager — no AWS provider configured"
             )
         raise ValueError(f"Unknown AWS config type: {config_type}")
 
 
-# Global AWS config manager instance -- can be reconfigured at startup via configure()
+# Global AWS config manager instance — can be reconfigured at startup via configure()
 _aws_config_manager = AWSConfigManager()
 
 

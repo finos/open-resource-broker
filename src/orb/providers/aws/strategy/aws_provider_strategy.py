@@ -337,7 +337,7 @@ class AWSProviderStrategy(ProviderStrategy):
         return None
 
     def get_handler(self, handler_type: str) -> Optional[Any]:
-        """Get AWS handler by type -- delegates to handler registry."""
+        """Get AWS handler by type — delegates to handler registry."""
         registry = self._get_handler_registry()
         if registry:
             return registry.get_handler(handler_type)
@@ -550,7 +550,7 @@ class AWSProviderStrategy(ProviderStrategy):
             ("ap-southeast-2", "Sydney"),
             ("ap-northeast-1", "Tokyo"),
             ("ca-central-1", "Canada"),
-            ("sa-east-1", "Sao Paulo"),
+            ("sa-east-1", "São Paulo"),
         ]
 
     def get_default_region(self) -> str:
@@ -691,7 +691,7 @@ class AWSProviderStrategy(ProviderStrategy):
             if not image_specifications:
                 return ProviderResult.success_result({"resolved_images": {}})
 
-            # Partition specs -- only create the service (and activate aws_client) if needed
+            # Partition specs — only create the service (and activate aws_client) if needed
             needs_resolution = [s for s in image_specifications if not s.startswith("ami-")]
 
             resolved_images = {s: s for s in image_specifications}  # default: pass-through

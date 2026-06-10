@@ -3,9 +3,9 @@
 Encapsulates the two capacity-adjustment responsibilities that precede instance
 termination in an Auto Scaling Group:
 
-1. Pre-termination capacity reduction -- lower DesiredCapacity and MinSize so
+1. Pre-termination capacity reduction — lower DesiredCapacity and MinSize so
    AWS does not replace the instances we are about to terminate.
-2. Instance detachment with capacity decrement -- detach specific instances from
+2. Instance detachment with capacity decrement — detach specific instances from
    a known ASG, lower MinSize if needed, then terminate.
 """
 

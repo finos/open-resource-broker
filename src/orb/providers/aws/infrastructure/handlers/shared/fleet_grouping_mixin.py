@@ -64,7 +64,7 @@ class FleetGroupingMixin:
             # Check if we have cached mapping data for this instance
             mapping_entry = resource_map.get(instance_id)
             if mapping_entry is None:
-                # No mapping data available - defer this instance to AWS lookup phase
+                # No mapping data available – defer this instance to AWS lookup phase
                 instances_needing_lookup.append(instance_id)
                 self._logger.debug(
                     "%s grouping: %s not found in resource mapping, will query AWS",
@@ -99,7 +99,7 @@ class FleetGroupingMixin:
                     label.lower(),
                 )
             else:
-                # Mapping is ambiguous or incomplete - AWS lookup required
+                # Mapping is ambiguous or incomplete – AWS lookup required
                 instances_needing_lookup.append(instance_id)
                 self._logger.debug(
                     "%s grouping: %s requires AWS lookup (incomplete mapping)",
@@ -119,7 +119,7 @@ class FleetGroupingMixin:
             self._collect_groups_from_instances(
                 instances_needing_lookup, groups, group_ids_to_fetch
             )
-            # Fetch details only for groups discovered via AWS lookup -- groups resolved
+            # Fetch details only for groups discovered via AWS lookup — groups resolved
             # from the mapping are left with details=None so the release manager fetches
             # them on demand (avoiding unnecessary describe calls on the return path).
             if group_ids_to_fetch:

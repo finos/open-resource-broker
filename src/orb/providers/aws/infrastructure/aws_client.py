@@ -226,7 +226,7 @@ class AWSClient:
                     self._logger.debug("Injected resolver raised an exception: %s", str(e))
                     return None
             else:
-                # No resolver and no explicit provider_name -- skip primary path
+                # No resolver and no explicit provider_name — skip primary path
                 self._logger.debug(
                     "No provider_name and no resolver provided; skipping primary config path"
                 )

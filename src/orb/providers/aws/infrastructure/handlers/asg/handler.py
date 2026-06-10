@@ -329,7 +329,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         Args:
             machine_ids: List of instance IDs to terminate
             resource_mapping: Dict mapping instance_id to (resource_id or None, desired_capacity) for intelligent resource management
-            request_id: Original provisioning request ID (unused by ASG handler -- recovered from ASG name)
+            request_id: Original provisioning request ID (unused by ASG handler — recovered from ASG name)
         """
         try:
             if not machine_ids:

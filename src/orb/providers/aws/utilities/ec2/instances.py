@@ -255,7 +255,7 @@ def terminate_instance(instance_id: str, aws_client: Any = None) -> dict[str, An
         )
 
 
-# Instance type spec lookup -- API cache with heuristic fallback
+# Instance type spec lookup — API cache with heuristic fallback
 
 _instance_spec_cache: dict[str, tuple[int, int]] | None = None  # {type: (vcpus, memory_mib)}
 _cache_lock = threading.Lock()
@@ -283,7 +283,7 @@ _SIZE_TO_VCPUS: dict[str, int] = {
     "metal": 96,
 }
 
-# Family letter -> GiB per vCPU
+# Family letter → GiB per vCPU
 _FAMILY_MEM_RATIO: dict[str, int] = {
     "c": 2,  # compute-optimized
     "m": 4,  # general purpose
@@ -296,7 +296,7 @@ _FAMILY_MEM_RATIO: dict[str, int] = {
     "g": 4,  # graphics/inference
 }
 
-# t-family special cases (burstable -- ratio varies by size and generation)
+# t-family special cases (burstable — ratio varies by size and generation)
 _T2_SPECS: dict[str, tuple[int, int]] = {
     "nano": (1, 512),
     "micro": (1, 1024),
@@ -347,7 +347,7 @@ def _heuristic_cpu_ram(instance_type: str) -> tuple[str, str]:
     try:
         family_gen, size = instance_type.split(".", 1)
     except ValueError:
-        return ("1", "1024")  # Unparseable -- safe default
+        return ("1", "1024")  # Unparseable — safe default
 
     family = family_gen[0].lower()
 
@@ -357,7 +357,7 @@ def _heuristic_cpu_ram(instance_type: str) -> tuple[str, str]:
         if gen_specs and size in gen_specs:
             vcpus, mem_mib = gen_specs[size]
             return (str(vcpus), str(mem_mib))
-        # Unknown t-generation -- fall through to standard heuristic
+        # Unknown t-generation — fall through to standard heuristic
 
     # Standard families
     vcpus = _SIZE_TO_VCPUS.get(size, 2)

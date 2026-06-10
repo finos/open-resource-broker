@@ -49,7 +49,7 @@ class SpotFleetValidator:
         elif self._is_valid_tagging_role(template.fleet_role):
             self._logger.debug("Valid Spot Fleet tagging role: %s", template.fleet_role)
         else:
-            # Custom role -- validate via IAM
+            # Custom role — validate via IAM
             try:
                 role_name = template.fleet_role.split("/")[-1]
                 iam_client = self._aws_client.session.client(

@@ -1,4 +1,4 @@
-"""AWS health checks -- registered with the application HealthCheck instance."""
+"""AWS health checks — registered with the application HealthCheck instance."""
 
 from typing import TYPE_CHECKING
 

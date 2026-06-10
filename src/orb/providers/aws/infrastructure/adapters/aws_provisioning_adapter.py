@@ -175,7 +175,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             aws_template = AWSTemplate.model_validate(template.model_dump())
 
         try:
-            # Acquire hosts using the handler -- raises typed exception on failure
+            # Acquire hosts using the handler — raises typed exception on failure
             result: dict[str, Any] = handler.acquire_hosts(request, aws_template)  # type: ignore[arg-type]
 
             resource_ids = result.get("resource_ids", [])
@@ -293,7 +293,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             "Successfully released %d instances using %s handler", len(machine_ids), provider_api
         )
 
-    # No current caller -- available for a future health endpoint
+    # No current caller — available for a future health endpoint
     def get_resource_health(self, resource_id: str) -> dict[str, Any]:
         """
         Get health information for a specific AWS resource.

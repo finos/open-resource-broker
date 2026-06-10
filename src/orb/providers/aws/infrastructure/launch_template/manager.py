@@ -159,7 +159,7 @@ class AWSLaunchTemplateManager:
                 LaunchTemplateNames=[launch_template_name]
             )
 
-            # Template exists -- reuse the default version, no new version needed for same config.
+            # Template exists — reuse the default version, no new version needed for same config.
             # Guard against templates that are in a deleting/invalid state by catching
             # InvalidLaunchTemplateId errors on reuse and falling through to creation.
             try:
@@ -189,7 +189,7 @@ class AWSLaunchTemplateManager:
                 ):
                     self._logger.warning(
                         "Launch template %s appears to be in a deleting/invalid state (%s)"
-                        " -- falling through to create a new one",
+                        " — falling through to create a new one",
                         launch_template_name,
                         reuse_code,
                     )
@@ -199,10 +199,10 @@ class AWSLaunchTemplateManager:
 
         except ClientError as e:
             if e.response["Error"]["Code"] != "InvalidLaunchTemplateName.NotFoundException":
-                # Some other error -- propagate
+                # Some other error — propagate
                 raise
 
-        # Template doesn't exist (or was in a deleting state) -- create it
+        # Template doesn't exist (or was in a deleting state) — create it
         return self._create_new_launch_template(
             launch_template_name,
             launch_template_data,
