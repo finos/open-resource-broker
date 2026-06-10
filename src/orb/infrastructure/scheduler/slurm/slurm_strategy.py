@@ -428,10 +428,16 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
         Parses NodeName and PartitionName lines to create one template per partition.
         If scheduler.slurm.partitions config specifies instance_types for a partition,
         those are used directly; otherwise auto-maps from declared CPUs/RealMemory.
+
+        Kwargs:
+            slurm_conf: Path to slurm.conf (from --slurm-conf CLI flag)
+            skip_validation: If True, skip instance type validation (from --force)
         """
         slurm_conf_path = self._find_slurm_conf(kwargs.get("slurm_conf"))
         if not slurm_conf_path:
             return None
+
+        skip_validation = kwargs.get("skip_validation", False)
 
         try:
             partitions = self._parse_slurm_conf(slurm_conf_path)
@@ -449,9 +455,10 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
 
                 if user_types:
                     # User-specified instance types — validate and use
-                    self._validate_instance_types(
-                        user_types, partition["cpus"], partition["memory_mb"], name
-                    )
+                    if not skip_validation:
+                        self._validate_instance_types(
+                            user_types, partition["cpus"], partition["memory_mb"], name
+                        )
                     # Build machine_types dict (weight=1 for each unless weights provided)
                     if isinstance(user_types, dict):
                         machine_types = user_types
@@ -472,6 +479,10 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
                     instance_type = self._match_instance_type(
                         partition["cpus"], partition["memory_mb"]
                     )
+                    if not skip_validation:
+                        self._validate_instance_types(
+                            [instance_type], partition["cpus"], partition["memory_mb"], name
+                        )
                     template = {
                         "template_id": name,
                         "machine_types": {instance_type: 1},
@@ -486,6 +497,8 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
                 "Generated %d templates from slurm.conf partitions", len(templates)
             )
             return templates if templates else None
+        except ValueError:
+            raise  # Validation errors must propagate
         except Exception as e:
             self.logger.warning("Failed to parse slurm.conf for template generation: %s", e)
             return None
@@ -509,16 +522,29 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
     def _validate_instance_types(
         self, types: list | dict, required_cpus: int, required_mem: int, partition_name: str
     ) -> None:
-        """Warn if any listed instance type is undersized for the partition."""
+        """Validate instance types meet partition resource requirements. Raises on failure."""
         type_list = types if isinstance(types, list) else list(types.keys())
+        errors: list[str] = []
         for itype in type_list:
             specs = self._get_instance_specs(itype)
-            if specs and (specs[0] < required_cpus or specs[1] < required_mem):
-                self.logger.warning(
-                    "Instance type %s (%d CPU, %dMB) does not meet partition '%s' "
-                    "requirements (CPUs=%d, RealMemory=%d). Nodes may fail to register.",
-                    itype, specs[0], specs[1], partition_name, required_cpus, required_mem,
+            if not specs:
+                continue  # Unknown type — can't validate, skip
+            type_cpus, type_mem = specs
+            if type_cpus < required_cpus or type_mem < required_mem:
+                errors.append(
+                    f"  - Instance type '{itype}' ({type_cpus} vCPU, {type_mem}MB) "
+                    f"does not meet partition requirements (CPUs={required_cpus}, "
+                    f"RealMemory={required_mem})"
                 )
+        if errors:
+            msg = (
+                f"ERROR: Template '{partition_name}' validation failed:\n"
+                + "\n".join(errors)
+                + f"\nFix: Remove undersized instance types from "
+                f"scheduler.slurm.partitions.{partition_name}.instance_types "
+                f"or reduce partition resource requirements in slurm.conf"
+            )
+            raise ValueError(msg)
 
     def _get_instance_specs(self, instance_type: str) -> tuple[int, int] | None:
         """Look up (cpus, memory_mb) for an instance type from the static map."""
