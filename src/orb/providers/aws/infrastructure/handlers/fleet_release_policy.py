@@ -23,7 +23,7 @@ def compute_fleet_release_decision(
 
     Args:
         fleet_type: Raw fleet type string (e.g. "maintain", "request", "instant").
-                    Accepts enum values — normalised to lowercase string internally.
+                    Accepts enum values -- normalised to lowercase string internally.
         current_capacity: Current TotalTargetCapacity / TargetCapacity of the fleet.
         instances_to_return: Number of instances being returned in this call.
 
@@ -54,7 +54,7 @@ def compute_fleet_release_decision(
             is_full_return=is_full,
         )
     else:
-        # instant or unknown — fleet record already gone, no capacity to modify
+        # instant or unknown -- fleet record already gone, no capacity to modify
         return FleetReleaseDecision(
             requires_capacity_reduction=False,
             has_fleet_record=False,

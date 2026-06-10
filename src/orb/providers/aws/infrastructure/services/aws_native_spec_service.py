@@ -15,7 +15,7 @@ from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 class NativeSpecServiceProtocol(Protocol):
     """Structural protocol matching NativeSpecService from the application layer.
 
-    Using a protocol here avoids a providers→application import while still
+    Using a protocol here avoids a providers->application import while still
     allowing type-safe usage of the service.
     """
 

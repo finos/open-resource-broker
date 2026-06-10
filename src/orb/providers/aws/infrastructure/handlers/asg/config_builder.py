@@ -104,7 +104,7 @@ class ASGConfigBuilder(BaseConfigBuilder):
 
         overrides = lt.get("Overrides", [])
         if any("InstanceRequirements" in o for o in overrides):
-            return  # already present — respect it
+            return  # already present -- respect it
 
         lt["Overrides"] = [{"InstanceRequirements": instance_requirements}]
 

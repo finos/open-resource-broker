@@ -112,7 +112,7 @@ class SpotFleetReleaseManager:
                     )
                     self._maybe_cleanup_launch_template(fleet_details, fleet_config, request_id)
             else:
-                # No specific instances — cancel the entire fleet
+                # No specific instances -- cancel the entire fleet
                 self._retry(
                     self._aws_client.ec2_client.cancel_spot_fleet_requests,
                     operation_type="critical",

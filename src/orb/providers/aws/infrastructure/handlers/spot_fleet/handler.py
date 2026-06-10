@@ -326,7 +326,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         Args:
             machine_ids: List of instance IDs to terminate
             resource_mapping: Dict mapping instance_id to (resource_id or None, desired_capacity)
-            request_id: Original provisioning request ID (unused by SpotFleet handler — recovered from fleet tag)
+            request_id: Original provisioning request ID (unused by SpotFleet handler -- recovered from fleet tag)
         """
         try:
             if not machine_ids:

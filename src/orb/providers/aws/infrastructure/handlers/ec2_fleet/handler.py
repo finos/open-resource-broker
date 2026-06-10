@@ -149,7 +149,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
             if fleet_type is AWSFleetType.INSTANT:
                 # For instant fleets, instance IDs are already in the create_fleet response.
-                # Skip describe_instances here — full details (IP, type, etc.) are resolved
+                # Skip describe_instances here -- full details (IP, type, etc.) are resolved
                 # lazily by the check_hosts_status / _check_single_fleet_status polling path.
                 instance_ids = fleet_result.get("instance_ids", [])
                 if instance_ids:
@@ -512,7 +512,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         Args:
             machine_ids: List of instance IDs to terminate
             resource_mapping: Dict mapping instance_id to (resource_id or None, desired_capacity)
-            request_id: Original provisioning request ID (unused by EC2Fleet handler — recovered from fleet tag)
+            request_id: Original provisioning request ID (unused by EC2Fleet handler -- recovered from fleet tag)
         """
         try:
             if not machine_ids:

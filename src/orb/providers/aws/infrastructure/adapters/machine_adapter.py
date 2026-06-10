@@ -193,7 +193,7 @@ class AWSMachineAdapter:
                     self._logger.error("Missing required State.Name in AWS instance data")
                     raise AWSError("Missing required State.Name in AWS instance data")
 
-                # For terminal/transitional states AWS strips most network fields —
+                # For terminal/transitional states AWS strips most network fields --
                 # return a minimal record rather than failing validation.
                 instance_state = aws_instance_data["State"]["Name"]
                 if instance_state in ("shutting-down", "terminated", "stopping", "stopped"):
@@ -338,7 +338,7 @@ class AWSMachineAdapter:
 
         # Detect format and extract fields accordingly
         if "instance_id" in aws_instance_data:
-            # snake_case format — always populate cloud_host_id with the instance ID
+            # snake_case format -- always populate cloud_host_id with the instance ID
             provider_data["cloud_host_id"] = aws_instance_data.get("instance_id")
 
             # Provider-owned placement fields
@@ -366,7 +366,7 @@ class AWSMachineAdapter:
                 "private_dns_name": "private_dns_name",
             }
         else:
-            # PascalCase format — always populate cloud_host_id with the instance ID
+            # PascalCase format -- always populate cloud_host_id with the instance ID
             provider_data["cloud_host_id"] = aws_instance_data.get("InstanceId")
 
             # Provider-owned placement fields
@@ -402,7 +402,7 @@ class AWSMachineAdapter:
 
         # Synthesize basic health status from describe_instances data (no extra API call).
         # Full health checks (system/instance status) require describe_instance_status
-        # which needs additional IAM permissions — available via explicit health command.
+        # which needs additional IAM permissions -- available via explicit health command.
         if "instance_id" in aws_instance_data:
             instance_state = aws_instance_data.get("status")
         else:

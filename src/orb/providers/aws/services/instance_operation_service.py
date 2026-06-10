@@ -102,7 +102,7 @@ class AWSInstanceOperationService:
             )
             request.provider_api = provider_api
 
-            # Provision via adapter (includes SSM image resolution) — raises on failure
+            # Provision via adapter (includes SSM image resolution) -- raises on failure
             adapter_result = await self._provisioning_adapter.provision_resources(
                 request, aws_template
             )
@@ -152,7 +152,7 @@ class AWSInstanceOperationService:
                     )
                 except Exception as e:
                     provider_api = operation.parameters.get("provider_api", "RunInstances")
-                    # Fleet-based resources must not silently fall through — their
+                    # Fleet-based resources must not silently fall through -- their
                     # termination requires fleet-aware logic in the provisioning adapter.
                     # Only RunInstances can safely fall back to direct EC2 termination.
                     if provider_api not in ("RunInstances",):

@@ -150,10 +150,10 @@ class EC2FleetReleaseManager:
                 if decision.is_full_return and decision.has_fleet_record:
                     self._logger.info("EC2 Fleet %s capacity is zero, deleting fleet", fleet_id)
                     if decision.requires_capacity_reduction:
-                        # maintain fleet — use _delete_fleet (TerminateInstances=True)
+                        # maintain fleet -- use _delete_fleet (TerminateInstances=True)
                         self._delete_fleet(fleet_id)
                     else:
-                        # request fleet — instances already terminated, delete without terminating
+                        # request fleet -- instances already terminated, delete without terminating
                         self._retry(
                             self._aws_client.ec2_client.delete_fleets,
                             operation_type="critical",
@@ -162,7 +162,7 @@ class EC2FleetReleaseManager:
                         )
                     self._maybe_cleanup_launch_template(fleet_details)
                 elif not decision.has_fleet_record:
-                    # instant fleet — already deleted by AWS; only clean up the launch template.
+                    # instant fleet -- already deleted by AWS; only clean up the launch template.
                     self._maybe_cleanup_launch_template(fleet_details)
             else:
                 self._delete_fleet(fleet_id)

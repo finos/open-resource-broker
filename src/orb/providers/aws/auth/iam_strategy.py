@@ -224,7 +224,7 @@ class IAMAuthStrategy(AuthPort):
         (via SimulatePrincipalPolicy) is not yet implemented.
 
         Set ``assume_permissions=True`` at construction time to grant all
-        ``required_actions`` unconditionally — intended for development and testing
+        ``required_actions`` unconditionally -- intended for development and testing
         only, never for production use.
 
         Args:

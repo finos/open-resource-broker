@@ -357,7 +357,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                         "the launch template."
                     )
                 if lt_state == LTNetworkingState.NO_NETWORKING:
-                    # LT has no networking — safe to inject at API level.
+                    # LT has no networking -- safe to inject at API level.
                     if getattr(aws_template, "subnet_id", None):
                         params["SubnetId"] = aws_template.subnet_id
                     elif len(user_subnets) == 1:
@@ -610,7 +610,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
     def cancel_resource(self, resource_id: str, request_id: str) -> dict[str, Any]:
         """Cancel a RunInstances reservation by terminating its instances.
 
-        RunInstances has no fleet-level cancel concept — instances are
+        RunInstances has no fleet-level cancel concept -- instances are
         terminated directly. If no instance IDs are available from the
         resource_id, this is a no-op (instances may not have launched yet).
 
@@ -649,7 +649,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 )
             else:
                 self._logger.info(
-                    "No instances found for RunInstances reservation %s — nothing to terminate",
+                    "No instances found for RunInstances reservation %s -- nothing to terminate",
                     resource_id,
                 )
 

@@ -75,7 +75,7 @@ class AWSRetryStrategy(RetryStrategy):
         if attempt >= self.max_attempts:
             return False
 
-        # Never retry permanent IAM/auth denials — duck-type the botocore ClientError shape.
+        # Never retry permanent IAM/auth denials -- duck-type the botocore ClientError shape.
         response = getattr(exception, "response", None)
         if isinstance(response, dict):
             error_code = response.get("Error", {}).get("Code", "")

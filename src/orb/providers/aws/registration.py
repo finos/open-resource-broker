@@ -490,7 +490,7 @@ def register_aws_services_with_di(container) -> None:
 
         # Register TemplateExampleGeneratorPort backed by AWSHandlerFactory.
         # The factory is constructed with no AWS client because generate_example_templates
-        # only calls handler classmethods — no live AWS connection is needed.
+        # only calls handler classmethods -- no live AWS connection is needed.
         from orb.domain.base.ports.template_example_generator_port import (
             TemplateExampleGeneratorPort,
         )

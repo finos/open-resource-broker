@@ -99,7 +99,7 @@ class AWSOperations:
         except ClientError as e:
             if e.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
                 self._logger.info(
-                    "Instances already gone during %s termination (InvalidInstanceID.NotFound) — treating as success",
+                    "Instances already gone during %s termination (InvalidInstanceID.NotFound) -- treating as success",
                     operation_context,
                 )
                 return {"terminated_instances": []}

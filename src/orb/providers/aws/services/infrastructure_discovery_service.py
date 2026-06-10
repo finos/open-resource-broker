@@ -221,7 +221,7 @@ class AWSInfrastructureDiscoveryService:
                 f"arn:aws:iam::{account_id}:role/aws-service-role"
                 f"/spotfleet.amazonaws.com/AWSServiceRoleForEC2SpotFleet"
             )
-            # Best-effort IAM role verification — failure is intentionally ignored
+            # Best-effort IAM role verification -- failure is intentionally ignored
             # as the ARN can still be constructed without confirming the role exists
             try:
                 self.iam_client.get_role(RoleName="AWSServiceRoleForEC2SpotFleet")
