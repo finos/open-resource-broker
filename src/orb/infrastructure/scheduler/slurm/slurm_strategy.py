@@ -422,13 +422,19 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
         (16, 32768, "c5.4xlarge"),
     ]
 
-    def generate_scheduler_templates(self) -> list[dict[str, Any]] | None:
+    def generate_scheduler_templates(self, **kwargs: Any) -> list[dict[str, Any]] | None:
         """Generate templates from slurm.conf partition/node definitions.
 
         Parses NodeName and PartitionName lines to create one template per partition
         with a single instance type matching the declared CPUs and RealMemory.
+
+        Resolution order for slurm.conf:
+        1. slurm_conf kwarg (from --slurm-conf CLI flag)
+        2. scheduler.slurm.config_path in config.json
+        3. SLURM_CONF environment variable
+        4. Default paths: /etc/slurm/slurm.conf, /usr/local/etc/slurm.conf, $ORB_ROOT_DIR/slurm.conf
         """
-        slurm_conf_path = self._find_slurm_conf()
+        slurm_conf_path = self._find_slurm_conf(kwargs.get("slurm_conf"))
         if not slurm_conf_path:
             return None
 
@@ -458,16 +464,53 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
             self.logger.warning("Failed to parse slurm.conf for template generation: %s", e)
             return None
 
-    def _find_slurm_conf(self) -> str | None:
-        """Locate slurm.conf from environment or standard paths."""
-        # Check SLURM_CONF env var first
+    def _find_slurm_conf(self, cli_path: str | None = None) -> str | None:
+        """Locate slurm.conf using resolution order:
+        1. CLI flag (cli_path)
+        2. Config file (scheduler.slurm.config_path)
+        3. SLURM_CONF env var
+        4. Default paths
+        """
+        # 1. CLI flag
+        if cli_path and Path(cli_path).is_file():
+            return cli_path
+
+        # 2. Config file
+        if self._config_port:
+            try:
+                scheduler_config = self._config_port.get_scheduler_config()
+                config_path = None
+                if isinstance(scheduler_config, dict):
+                    config_path = scheduler_config.get("slurm", {}).get("config_path")
+                elif hasattr(scheduler_config, "slurm"):
+                    slurm_cfg = getattr(scheduler_config, "slurm", None)
+                    if slurm_cfg and hasattr(slurm_cfg, "config_path"):
+                        config_path = slurm_cfg.config_path
+                if config_path and Path(config_path).is_file():
+                    return config_path
+            except Exception:
+                pass
+
+        # 3. SLURM_CONF env var
         conf = os.environ.get("SLURM_CONF")
         if conf and Path(conf).is_file():
             return conf
-        # Standard paths
-        for path in ["/etc/slurm/slurm.conf", "/etc/slurm-llnl/slurm.conf"]:
+
+        # 4. Default paths
+        orb_root = os.environ.get("ORB_ROOT_DIR", "/usr/orb")
+        for path in [
+            "/etc/slurm/slurm.conf",
+            "/usr/local/etc/slurm.conf",
+            os.path.join(orb_root, "slurm.conf"),
+        ]:
             if Path(path).is_file():
                 return path
+
+        # Not found — log clear error
+        self.logger.error(
+            "Cannot find slurm.conf. Specify with --slurm-conf /path/to/slurm.conf "
+            "or set SLURM_CONF environment variable."
+        )
         return None
 
     def _parse_slurm_conf(self, path: str) -> list[dict[str, Any]]:

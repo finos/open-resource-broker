@@ -424,6 +424,10 @@ def add_template_actions(subparsers):
         "--generic", action="store_true", help="Generate generic templates"
     )
     templates_generate.add_argument("--provider-type", help="Provider type (e.g., aws)")
+    templates_generate.add_argument(
+        "--slurm-conf",
+        help="Path to slurm.conf for SLURM-aware template generation",
+    )
 
 
 def build_parser() -> tuple[argparse.ArgumentParser, dict]:

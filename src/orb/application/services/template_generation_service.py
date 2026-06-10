@@ -115,7 +115,9 @@ class TemplateGenerationService:
 
         try:
             # Try scheduler-specific template generation first (e.g. SLURM partitions)
-            scheduler_templates = self._scheduler_strategy.generate_scheduler_templates()
+            scheduler_templates = self._scheduler_strategy.generate_scheduler_templates(
+                slurm_conf=request.slurm_conf
+            )
             if scheduler_templates:
                 examples = scheduler_templates
             else:
