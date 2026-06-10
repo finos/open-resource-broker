@@ -165,6 +165,7 @@ nav:
       - Supported APIs: hostfactory/supported-apis.md
     - SLURM Integration:
       - Integration Guide: slurm/integration_guide.md
+      - Operations Guide: slurm/operations_guide.md
       - Deployment Scenarios: slurm/deployment_scenarios.md
       - Feature Mapping: slurm/feature_mapping.md
       - Supported APIs: slurm/supported-apis.md
