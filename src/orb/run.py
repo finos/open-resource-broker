@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """CLI entry point with resource-action structure."""
 
-import asyncio
 import os
-import sys
+
+# Ensure UTF-8 mode on systems with POSIX/C locale (PEP 540)
+os.environ.setdefault("PYTHONUTF8", "1")
+
+import asyncio  # noqa: E402
+import sys  # noqa: E402
 
 # Add project root to Python path to enable absolute imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
