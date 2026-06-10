@@ -20,9 +20,6 @@
 # pre-installed and configured to connect to this cluster's slurmctld.
 set -euo pipefail
 
-# Ensure Python reads source files as UTF-8 regardless of system locale
-export PYTHONUTF8=1
-
 export ORB_ROOT_DIR=${ORB_ROOT_DIR:-/usr/orb}
 
 # Source hook configuration if available
