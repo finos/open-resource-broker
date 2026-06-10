@@ -158,7 +158,12 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
                 request.request_id,
             )
         except Exception as e:
-            self.logger.warning("Failed to sync machine tags to provider: %s", e)
+            self.logger.error(
+                "Failed to sync machine tags to provider for request %s: %s",
+                request.request_id, e, exc_info=True,
+            )
+            # Don't re-raise -- tagging failure should not fail the whole provisioning request
+            # But DO log at ERROR level so it's visible in monitoring
 
     async def _load_template(self, template_id: str) -> Any:
         """Load template using CQRS QueryBus."""

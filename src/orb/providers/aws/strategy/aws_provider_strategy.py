@@ -265,8 +265,10 @@ class AWSProviderStrategy(ProviderStrategy):
                 ec2.create_tags(Resources=[instance_id], Tags=aws_tags)
             return ProviderResult.success_result({"tagged_count": len(instance_tags)})
         except Exception as e:
-            self._logger.warning("Failed to apply per-instance tags: %s", e)
-            return ProviderResult.success_result({"tagged_count": 0, "warning": str(e)})
+            self._logger.error("Failed to apply per-instance tags: %s", e, exc_info=True)
+            return ProviderResult.error_result(
+                f"TAG_INSTANCES failed: {e}", "TAG_OPERATION_FAILED"
+            )
 
     def get_capabilities(self) -> ProviderCapabilities:
         """Get AWS provider capabilities."""
