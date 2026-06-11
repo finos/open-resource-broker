@@ -145,13 +145,13 @@ class DynamoDBConverter(DataConverter):
         if isinstance(value, datetime):
             return value.isoformat()
 
+        # Handle boolean (must precede int: bool is a subclass of int)
+        if isinstance(value, bool):
+            return value
+
         # Handle numeric types - convert to Decimal for DynamoDB
         if isinstance(value, (int, float)):
             return Decimal(str(value))
-
-        # Handle boolean
-        if isinstance(value, bool):
-            return value
 
         # Handle strings
         if isinstance(value, str):
