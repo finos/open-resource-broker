@@ -163,6 +163,12 @@ nav:
       - Feature Mapping: hostfactory/feature_mapping.md
       - Deployment Scenarios: hostfactory/deployment_scenarios.md
       - Supported APIs: hostfactory/supported-apis.md
+    - SLURM Integration:
+      - Integration Guide: slurm/integration_guide.md
+      - Operations Guide: slurm/operations_guide.md
+      - Deployment Scenarios: slurm/deployment_scenarios.md
+      - Feature Mapping: slurm/feature_mapping.md
+      - Supported APIs: slurm/supported-apis.md
   - CLI Reference:
     - Overview: cli/README.md
     - Full CLI Reference: cli/cli-reference.md

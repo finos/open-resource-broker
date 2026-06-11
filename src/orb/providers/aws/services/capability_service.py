@@ -43,6 +43,9 @@ class AWSCapabilityService:
                 ProviderOperationType.GET_AVAILABLE_TEMPLATES,
                 ProviderOperationType.HEALTH_CHECK,
                 ProviderOperationType.RESOLVE_IMAGE,
+                ProviderOperationType.START_INSTANCES,
+                ProviderOperationType.STOP_INSTANCES,
+                ProviderOperationType.TAG_INSTANCES,
             ],
             supported_apis=supported_apis,
             features={

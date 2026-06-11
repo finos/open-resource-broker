@@ -144,10 +144,73 @@ def register_default_scheduler(registry: "SchedulerRegistry | None" = None) -> N
     )
 
 
+def create_slurm_strategy(config: Any) -> "SchedulerPort":
+    """Create SLURM scheduler strategy.
+
+    Args:
+        config: Scheduler configuration — either a DI container (during normal
+            startup) or a plain dict (non-container call paths).
+
+    Returns:
+        SchedulerPort: SLURM scheduler strategy instance
+    """
+    from orb.application.services.provider_registry_service import ProviderRegistryService
+    from orb.domain.base.ports.configuration_port import ConfigurationPort
+    from orb.domain.base.ports.logging_port import LoggingPort
+    from orb.domain.base.ports.path_resolution_port import PathResolutionPort
+    from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
+    from orb.infrastructure.scheduler.slurm.slurm_strategy import SlurmSchedulerStrategy
+
+    template_defaults_service = None
+    config_port = None
+    logger = None
+    provider_registry_service = None
+    path_resolver = None
+
+    if hasattr(config, "get_optional"):
+        template_defaults_service = config.get_optional(TemplateDefaultsPort)
+        config_port = config.get_optional(ConfigurationPort)
+        logger = config.get_optional(LoggingPort)
+        provider_registry_service = config.get_optional(ProviderRegistryService)
+        path_resolver = config.get_optional(PathResolutionPort)
+
+    return SlurmSchedulerStrategy(
+        template_defaults_service=template_defaults_service,
+        config_port=config_port,
+        logger=logger,
+        provider_registry_service=provider_registry_service,
+        path_resolver=path_resolver,
+    )
+
+
+def create_slurm_config(data: dict[str, Any]) -> Any:
+    """Create SLURM scheduler configuration."""
+    return data
+
+
+def register_slurm_scheduler(registry: "SchedulerRegistry | None" = None) -> None:
+    """Register SLURM scheduler (idempotent)."""
+    if registry is None:
+        from orb.infrastructure.scheduler.registry import get_scheduler_registry
+
+        registry = get_scheduler_registry()
+
+    from orb.infrastructure.scheduler.slurm.slurm_strategy import SlurmSchedulerStrategy
+
+    # Registry handles idempotent registration
+    registry.register(
+        type_name="slurm",
+        strategy_factory=create_slurm_strategy,
+        config_factory=create_slurm_config,
+        strategy_class=SlurmSchedulerStrategy,
+    )
+
+
 def register_all_scheduler_types() -> None:
     """Register all scheduler types - same pattern as storage/provider registration."""
     register_symphony_hostfactory_scheduler()
     register_default_scheduler()
+    register_slurm_scheduler()
 
 
 def register_active_scheduler_only(scheduler_type: str = "default") -> bool:
@@ -171,6 +234,7 @@ def register_active_scheduler_only(scheduler_type: str = "default") -> bool:
     registration_functions: dict[str, Any] = {
         "hostfactory": register_symphony_hostfactory_scheduler,
         "default": register_default_scheduler,
+        "slurm": register_slurm_scheduler,
     }
 
     try:

@@ -261,6 +261,12 @@ expected_request_status_schema_default = {
 }
 
 
+# SLURM scheduler schemas - same as default (snake_case) for now
+expected_get_available_templates_schema_slurm = expected_get_available_templates_schema_default
+expected_request_machines_schema_slurm = expected_request_machines_schema_default
+expected_request_status_schema_slurm = expected_request_status_schema_default
+
+
 # Backward compatibility aliases (default to hostfactory for existing code)
 expected_get_available_templates_schema = expected_get_available_templates_schema_hostfactory
 expected_request_machines_schema = expected_request_machines_schema_hostfactory

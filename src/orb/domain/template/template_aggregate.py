@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 
 class Template(BaseModel):
@@ -54,7 +54,10 @@ class Template(BaseModel):
     # Access and security (generic concepts)
     key_name: Optional[str] = None  # SSH key, etc.
     user_data: Optional[str] = None  # cloud-init, etc.
-    instance_profile: Optional[str] = None  # IAM role, service principal
+    instance_profile: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("instance_profile", "iam_instance_profile"),
+    )  # IAM role, service principal
 
     # Advanced configuration (extensible)
     monitoring_enabled: Optional[bool] = None

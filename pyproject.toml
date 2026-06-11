@@ -283,9 +283,10 @@ include-package-data = true
 "*" = ["py.typed"]
 "orb.config" = ["default_config.json"]
 "orb.providers.aws.config" = ["*.json"]
+"orb.infrastructure.scheduler.slurm.scripts" = ["*.sh", "*.bat"]
 
 [tool.setuptools.data-files]
-"orb_scripts" = ["src/orb/infrastructure/scheduler/hostfactory/scripts/*.sh", "src/orb/infrastructure/scheduler/hostfactory/scripts/*.bat"]  # keep in sync with .project.yml build.package_root
+"orb_scripts" = ["src/orb/infrastructure/scheduler/hostfactory/scripts/*.sh", "src/orb/infrastructure/scheduler/hostfactory/scripts/*.bat", "src/orb/infrastructure/scheduler/slurm/scripts/*.sh", "src/orb/infrastructure/scheduler/slurm/scripts/*.bat"]  # keep in sync with .project.yml build.package_root
 
 
 

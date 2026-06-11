@@ -64,11 +64,30 @@ class RequestStatusManagementService:
 
         # Create and save machine aggregates
         if instances:
+            # Expand node_names from request metadata for SLURM node assignment
+            node_names_raw = request.metadata.get("node_names")
+            expanded_node_names: list[str] = []
+            if node_names_raw:
+                if isinstance(node_names_raw, list):
+                    expanded_node_names = node_names_raw
+                elif isinstance(node_names_raw, str):
+                    # Single node name (pre-expanded lists are the norm)
+                    expanded_node_names = [node_names_raw]
+
             machines_to_save = []
-            for instance_data in instances:
+            for idx, instance_data in enumerate(instances):
                 machine = self._create_machine_aggregate(
                     instance_data, request, request.template_id
                 )
+                # Override name with SLURM node name if available
+                if idx < len(expanded_node_names):
+                    node_name = expanded_node_names[idx]
+                    machine = machine.model_copy(
+                        update={
+                            "name": node_name,
+                            "tags": machine.tags.add("orb:node-name", node_name),
+                        }
+                    )
                 machines_to_save.append(machine)
 
             if machines_to_save:
@@ -210,5 +229,6 @@ class RequestStatusManagementService:
             private_ip=instance_data.get("private_ip"),
             public_ip=instance_data.get("public_ip"),
             launch_time=launch_time,
+            name=instance_data.get("name"),
             metadata=instance_data.get("metadata", {}),
         )
