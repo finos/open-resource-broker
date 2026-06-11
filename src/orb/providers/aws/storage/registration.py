@@ -74,12 +74,6 @@ def create_dynamodb_unit_of_work(config: Any) -> Any:
     Returns:
         DynamoDBUnitOfWork instance with correctly configured AWS client
     """
-    from botocore.config import Config
-
-    from orb.providers.aws.session_factory import AWSSessionFactory
-
-    boto_config = Config(connect_timeout=10, read_timeout=30, retries={"max_attempts": 3})
-
     from orb.config.manager import ConfigurationManager
     from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
     from orb.providers.aws.storage.config import DynamodbStrategyConfig
@@ -90,15 +84,14 @@ def create_dynamodb_unit_of_work(config: Any) -> Any:
     # Handle different config types
     if isinstance(config, ConfigurationManager):
         from orb.providers.aws.configuration.config import AWSProviderConfig
+        from orb.providers.aws.infrastructure.aws_client import AWSClient
 
         aws_cfg = config.get_typed(AWSProviderConfig)
         dynamodb_config = aws_cfg.storage.dynamodb or DynamodbStrategyConfig()  # type: ignore[call-arg]
 
-        session = AWSSessionFactory.create_session(
-            profile=dynamodb_config.profile if dynamodb_config.profile else None,
-            region=dynamodb_config.region,
-        )
-        aws_client = session.client("dynamodb", config=boto_config)
+        # ORB AWS wrapper exposes dynamodb_client/dynamodb_resource (lazy boto3),
+        # which DynamoDBClientManager consumes directly.
+        aws_client = AWSClient(config=config, logger=_logger)
 
         collections = config.app_config.naming.collections
         machine_name = collections.get("machines", "machines")
@@ -115,18 +108,14 @@ def create_dynamodb_unit_of_work(config: Any) -> Any:
             template_table=f"{dynamodb_config.table_prefix}-{template_name}",
         )
     else:
-        # For testing or other scenarios - assume it's a dict with AWS config
+        # dict path (tests/direct) - no ConfigurationPort to build AWSClient,
+        # so let DynamoDBClientManager self-init its boto3 client/resource.
         region = config.get("region") or None
         profile = config.get("profile")
         table_prefix = config.get("table_prefix", "hostfactory")
 
-        session = AWSSessionFactory.create_session(
-            profile=profile if profile else None, region=region
-        )
-        aws_client = session.client("dynamodb", config=boto_config)
-
         return DynamoDBUnitOfWork(  # type: ignore[abstract]
-            aws_client=aws_client,
+            aws_client=None,
             logger=_logger,
             region=region,
             profile=profile,
