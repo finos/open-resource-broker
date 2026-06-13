@@ -56,7 +56,6 @@ class TemplateDTO(BaseDTO):
     key_name: Optional[str] = None
     user_data: Optional[str] = None
     instance_profile: Optional[str] = None
-    launch_template_id: Optional[str] = None
 
     # Advanced configuration
     monitoring_enabled: Optional[bool] = None
@@ -151,7 +150,6 @@ class TemplateDTO(BaseDTO):
             key_name=getattr(template, "key_name", None),
             user_data=getattr(template, "user_data", None),
             instance_profile=getattr(template, "instance_profile", None),
-            launch_template_id=getattr(template, "launch_template_id", None),
             # Advanced configuration
             monitoring_enabled=getattr(template, "monitoring_enabled", None),
             # Tags and metadata

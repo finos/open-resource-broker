@@ -9,6 +9,7 @@ Command routing logic:   cli.router
 """
 
 import asyncio
+import json
 import logging
 import sys
 
@@ -19,6 +20,60 @@ from orb.cli.router import execute_command
 from orb.infrastructure.logging.logger import get_logger
 
 __all__ = ["main", "parse_args", "execute_command"]
+
+
+def _preload_explicit_config(args, logger) -> None:
+    """Make --config the DI-managed configuration before overrides run."""
+    config_path = getattr(args, "config", None)
+    if not config_path:
+        return
+
+    try:
+        import os
+        from pathlib import Path
+
+        config_file = Path(config_path).resolve()
+        config_dir = config_file.parent
+        run_dir = config_dir.parent
+
+        runtime_dirs = {
+            "ORB_CONFIG_DIR": str(config_dir),
+            "ORB_WORK_DIR": str(run_dir / "work"),
+            "ORB_LOG_DIR": str(run_dir / "logs"),
+            "ORB_SCRIPTS_DIR": str(run_dir / "scripts"),
+        }
+
+        if config_file.exists():
+            try:
+                with config_file.open(encoding="utf-8") as f:
+                    config_data = json.load(f)
+                if log_path := config_data.get("logging", {}).get("file_path"):
+                    runtime_dirs["ORB_LOG_DIR"] = str(Path(log_path).expanduser().parent)
+                if work_path := (
+                    config_data.get("storage", {}).get("json_strategy", {}).get("base_path")
+                ):
+                    runtime_dirs["ORB_WORK_DIR"] = str(Path(work_path).expanduser())
+                if scripts_path := config_data.get("scripts_dir"):
+                    runtime_dirs["ORB_SCRIPTS_DIR"] = str(Path(scripts_path).expanduser())
+            except Exception as e:
+                logger.debug("Could not read runtime directories from explicit config: %s", e)
+
+        os.environ["ORB_CONFIG_DIR"] = runtime_dirs["ORB_CONFIG_DIR"]
+        for key, value in runtime_dirs.items():
+            os.environ.setdefault(key, value)
+
+        # Importing bootstrap registers the container factory before get_container().
+        import orb.bootstrap  # noqa: F401
+        from orb.config.managers.configuration_manager import ConfigurationManager
+        from orb.infrastructure.di.container import get_container
+
+        container = get_container()
+        container.register_instance(
+            ConfigurationManager,
+            ConfigurationManager(config_file=config_path),
+        )
+    except Exception as e:
+        logger.warning("Failed to preload explicit configuration: %s", e, exc_info=True)
 
 
 async def _show_resource_help(resource):
@@ -61,6 +116,12 @@ async def main() -> None:
                     sys.argv = original_argv
             raise
 
+        getattr(logging, args.log_level.upper())
+        logger = get_logger(__name__)
+
+        # Let --config drive platform directory discovery before bootstrap seeds defaults.
+        _preload_explicit_config(args, logger)
+
         # Setup environment after arg parse — skip for init (it calls get_config_location() directly)
         if args.resource != "init":
             from orb.run import setup_environment
@@ -76,9 +137,6 @@ async def main() -> None:
             elif args.completion == "zsh":
                 print(generate_zsh_completion())
             return
-
-        getattr(logging, args.log_level.upper())
-        logger = get_logger(__name__)
 
         # Handle help display early - no need for app initialization
         if (

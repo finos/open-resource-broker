@@ -85,3 +85,22 @@ def _register_provider_utility_services(container: DIContainer) -> None:
         logger.debug("AWS provider not available, skipping AWS utility service registration")
     except Exception as e:
         logger.warning("Failed to register AWS utility services: %s", str(e))
+
+    # Register OCI utility services if available
+    try:
+        import importlib.util
+
+        if importlib.util.find_spec("orb.providers.oci"):
+            try:
+                from orb.providers.oci.registration import register_oci_services_with_di
+
+                register_oci_services_with_di(container)
+                logger.debug("OCI utility services registered with DI")
+            except Exception as e:
+                logger.warning("Failed to register OCI utility services: %s", str(e))
+        else:
+            logger.debug("OCI provider not available, skipping OCI utility service registration")
+    except ImportError:
+        logger.debug("OCI provider not available, skipping OCI utility service registration")
+    except Exception as e:
+        logger.warning("Failed to register OCI utility services: %s", str(e))

@@ -85,9 +85,9 @@ async def handle_init(args) -> int:
         _copy_scripts(scripts_dir)
 
         # Success message with separator
-        console.separator(char="━", color="green")
+        console.separator(char="=", color="green")
         console.success("  ORB initialized successfully")
-        console.separator(char="━", color="green")
+        console.separator(char="=", color="green")
         console.info("")  # Empty line
         console.info("Created:")
         console.info(f"  Config:  {config_dir}")
@@ -96,10 +96,13 @@ async def handle_init(args) -> int:
         console.info(f"  Scripts: {scripts_dir}")
         console.info("")  # Empty line
         console.info("Next Steps:")
-        console.command("  1. Generate templates: orb templates generate")
-        console.command("  2. List templates:     orb templates list")
-        console.command("  3. Show infrastructure: orb infrastructure show")
-        console.command("  3. Show config:        orb config show")
+        command_prefix = "orb"
+        if config_dir != get_config_location():
+            command_prefix = f'orb --config "{config_file}"'
+        console.command(f"  1. Generate templates: {command_prefix} templates generate")
+        console.command(f"  2. List templates:     {command_prefix} templates list")
+        console.command(f"  3. Show infrastructure: {command_prefix} infrastructure show")
+        console.command(f"  4. Show config:        {command_prefix} config show")
 
         return 0
 
@@ -233,16 +236,19 @@ def _interactive_setup() -> Dict[str, Any]:
             selected_source = credential_sources[int(choice) - 1]["name"]
         except (ValueError, IndexError):
             selected_source = None
+        selected_source = _collect_credential_source_inputs(
+            provider_type, selected_source, provider_config
+        )
 
         # Step 3: test credentials (no region yet)
         console.info("")
         console.info("Testing credentials...")
         success, error_msg = _test_provider_credentials(
-            provider_type, selected_source, **provider_config
+            provider_type, selected_source, **_credential_test_kwargs(provider_config)
         )
         if success:
             console.success("Credentials verified successfully")
-            if selected_source:
+            if selected_source and provider_type.lower() != "oci":
                 provider_config["profile"] = selected_source
         else:
             console.error("[bold red]ERROR[/bold red] Authentication failed:")
@@ -282,7 +288,11 @@ def _interactive_setup() -> Dict[str, Any]:
         if discover_choice in ["y", "yes"]:
             registry = get_container().get(ProviderRegistryPort)
             infrastructure_defaults = _discover_infrastructure(
-                provider_type, region, profile, registry
+                provider_type,
+                region,
+                profile,
+                registry,
+                provider_settings=provider_config,
             )
 
         # Create first provider instance
@@ -292,6 +302,7 @@ def _interactive_setup() -> Dict[str, Any]:
             "region": region,
             "infrastructure_defaults": infrastructure_defaults,
         }
+        _copy_provider_auth_config(provider_config, first_provider)
 
         providers = [first_provider]
 
@@ -397,16 +408,19 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
             selected_source = credential_sources[int(choice) - 1]["name"]
         except (ValueError, IndexError):
             selected_source = None
+        selected_source = _collect_credential_source_inputs(
+            provider_type, selected_source, provider_config
+        )
 
         # Step 3: test credentials (no region yet)
         console.info("")
         console.info("Testing credentials...")
         success, error_msg = _test_provider_credentials(
-            provider_type, selected_source, **provider_config
+            provider_type, selected_source, **_credential_test_kwargs(provider_config)
         )
         if success:
             console.success("Credentials verified successfully")
-            if selected_source:
+            if selected_source and provider_type.lower() != "oci":
                 provider_config["profile"] = selected_source
         else:
             console.error(f"Authentication failed: {error_msg}")
@@ -439,15 +453,21 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
         if discover_choice in ["y", "yes"]:
             registry = get_container().get(ProviderRegistryPort)
             infrastructure_defaults = _discover_infrastructure(
-                provider_type, region, profile, registry
+                provider_type,
+                region,
+                profile,
+                registry,
+                provider_settings=provider_config,
             )
 
-        return {
+        additional_provider = {
             "type": provider_type,
             "profile": provider_config.get("profile") or None,
             "region": provider_config.get("region") or default_region,
             "infrastructure_defaults": infrastructure_defaults,
         }
+        _copy_provider_auth_config(provider_config, additional_provider)
+        return additional_provider
 
     except KeyboardInterrupt:
         console.error("\nProvider configuration cancelled")
@@ -503,6 +523,51 @@ def _pick_region(regions: list[tuple[str, str]], default_region: str = "") -> st
         return default_region
 
 
+def _collect_credential_source_inputs(
+    provider_type: str,
+    selected_source: Optional[str],
+    provider_config: Dict[str, Any],
+) -> Optional[str]:
+    """Collect provider-specific auth inputs after a credential source is selected."""
+    if provider_type.lower() != "oci" or not selected_source:
+        return selected_source
+
+    provider_config["credential_source"] = selected_source
+    if selected_source == "profile":
+        profile = input("  OCI profile (DEFAULT): ").strip() or "DEFAULT"
+        provider_config["profile"] = profile
+    elif selected_source == "api_key":
+        requirements = _get_credential_requirements(provider_type)
+        for param, info in requirements.items():
+            if info.get("required_if_source") == "api_key":
+                prompt = f"  {info['description']}: "
+                provider_config[param] = input(prompt).strip()
+
+    return selected_source
+
+
+def _copy_provider_auth_config(
+    provider_config: Dict[str, Any],
+    provider_data: Dict[str, Any],
+) -> None:
+    """Copy provider auth mode fields into the init model before writing config."""
+    for key in (
+        "credential_source",
+        "tenancy_ocid",
+        "user_ocid",
+        "fingerprint",
+        "private_key_path",
+    ):
+        value = provider_config.get(key)
+        if value:
+            provider_data[key] = value
+
+
+def _credential_test_kwargs(provider_config: Dict[str, Any]) -> Dict[str, Any]:
+    """Return provider config fields that can be passed to strategy.test_credentials."""
+    return {key: value for key, value in provider_config.items() if key != "credential_source"}
+
+
 def _get_available_credential_sources(provider_type: str) -> list[dict]:
     """Get available credential sources for provider via strategy."""
     strategy = _get_provider_strategy(provider_type)
@@ -555,7 +620,11 @@ def _get_operational_requirements(provider_type: str) -> dict:
 
 
 def _discover_infrastructure(
-    provider_type: str, region: str, profile: str | None, registry: ProviderRegistryPort
+    provider_type: str,
+    region: str,
+    profile: str | None,
+    registry: ProviderRegistryPort,
+    provider_settings: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Discover infrastructure interactively using provider strategy."""
     console = get_container().get(ConsolePort)
@@ -566,7 +635,8 @@ def _discover_infrastructure(
             return {}
 
         # Create provider config for discovery
-        provider_config = {"region": region, "profile": profile}
+        provider_config = dict(provider_settings or {})
+        provider_config.update({"region": region, "profile": profile})
 
         # Get strategy from registry — bypass cache so discovery uses the correct region/profile
         strategy = registry.create_strategy_by_type(provider_type, provider_config)
@@ -639,6 +709,15 @@ def _write_config_file(
     for provider_data in user_config.get("providers", []):
         provider_config = {"profile": provider_data["profile"], "region": provider_data["region"]}
         provider_type = provider_data["type"]
+        for key in (
+            "credential_source",
+            "tenancy_ocid",
+            "user_ocid",
+            "fingerprint",
+            "private_key_path",
+        ):
+            if provider_data.get(key):
+                provider_config[key] = provider_data[key]
 
         # Generate provider name
         import re

@@ -259,11 +259,17 @@ class ProvisioningOrchestrationService:
             )
 
             scheduler = self._container.get(SchedulerPort)
+            template_config = scheduler.format_template_for_provider(template)
+            if selection_result.provider_type.lower() == "oci":
+                template_config = self._resolve_template_defaults(
+                    template_config,
+                    selection_result.provider_name,
+                )
 
             operation = ProviderOperation(
                 operation_type=ProviderOperationType.CREATE_INSTANCES,
                 parameters={
-                    "template_config": scheduler.format_template_for_provider(template),
+                    "template_config": template_config,
                     "count": count,
                     "request_id": str(request.request_id),
                     "request_metadata": dict(request.metadata),
@@ -369,3 +375,34 @@ class ProvisioningOrchestrationService:
                 provider_data={},
                 error_message=f"Provisioning failed: {e}",
             )
+
+    def _resolve_template_defaults(
+        self,
+        template_config: dict[str, Any],
+        provider_name: str,
+    ) -> dict[str, Any]:
+        """Apply provider defaults immediately before provider dispatch."""
+        try:
+            from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
+
+            get_optional = getattr(self._container, "get_optional", None)
+            defaults_service = (
+                get_optional(TemplateDefaultsPort) if callable(get_optional) else None
+            )
+            if defaults_service is None:
+                return template_config
+
+            resolver = getattr(defaults_service, "resolve_template_defaults", None)
+            if not callable(resolver):
+                return template_config
+
+            resolved = resolver(template_config, provider_name)
+            if isinstance(resolved, dict):
+                return resolved
+        except Exception as exc:
+            self._logger.warning(
+                "Failed to resolve template defaults for provider %s: %s",
+                provider_name,
+                exc,
+            )
+        return template_config

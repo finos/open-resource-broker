@@ -32,10 +32,11 @@
 
 ORB is a unified API for orchestrating and provisioning compute capacity programmatically. Define what you need in a template, request it, track it, return it — through a CLI, REST API, Python SDK, or MCP server.
 
-Built for AWS today (EC2, Auto Scaling Groups, SpotFleet, EC2Fleet), with an extensible provider system for adding new cloud backends.
+Built for AWS (EC2, Auto Scaling Groups, SpotFleet, EC2Fleet) and OCI Compute, with an extensible provider system for adding new cloud backends.
 
 **Provider support:**
 - **AWS** — EC2 RunInstances, EC2Fleet, SpotFleet, Auto Scaling Groups
+- **OCI** — OCI Compute through the `OCICompute` provider API
 - **Custom** — extensible via [provider registry](docs/root/developer_guide/architecture.md)
 
 **Scheduler support:**
@@ -161,6 +162,53 @@ aws sts get-caller-identity
 | `AutoScalingGroup` | Managed scaling groups |
 
 See the [AWS Provider Guide](docs/root/user_guide/configuration.md) for required IAM permissions and SpotFleet service-linked role setup.
+
+</details>
+
+<details>
+<summary>OCI Provider Setup</summary>
+
+ORB supports OCI through the `OCICompute` provider API and uses OCI CLI-compatible authentication.
+
+```bash
+# Verify your OCI credentials are active
+oci os ns get
+```
+
+**Supported credential methods:** instance principal (`credential_source: instance_principal`), resource principal, API key, OCI CLI profile (`credential_source: profile` with `profile: DEFAULT`), and `OCI_CLI_AUTH`.
+
+### Supported resource types
+
+| Type | Description |
+|---|---|
+| `OCICompute` | OCI compute instance provisioning via ORB templates |
+
+### Remote provider config (OCI compute)
+
+```json
+{
+  "provider": {
+    "providers": [
+      {
+        "name": "oci-default",
+        "type": "oci",
+        "enabled": true,
+        "config": {
+          "region": "us-phoenix-1",
+          "credential_source": "instance_principal"
+        }
+      }
+    ]
+  }
+}
+```
+
+Example configs:
+
+- `config/oci_config.remote.example.json` - ORB running on OCI Compute with instance principal auth. Do not set `profile` in this mode.
+- `config/oci_config.local.example.json` - local workstation or laptop using an OCI CLI profile. `DEFAULT` is the standard OCI CLI profile name; replace it only if your `~/.oci/config` uses another profile.
+
+OCI templates keep compute-grid choices in `oci_templates.json`. Environment-specific values such as image OCID, subnet OCID, compartment OCID, NSGs, SSH keys, and tags live in the config `provider_defaults.oci.template_defaults`, matching the AWS template-defaults pattern. `orb init` can populate these defaults during OCI discovery; `orb templates generate` only writes the packaged OCI template examples into the configured templates directory when they are missing.
 
 </details>
 
@@ -363,7 +411,7 @@ ORB is built on Clean Architecture with Domain-Driven Design (DDD) and CQRS:
 - **Infrastructure layer** — AWS adapters, DI container, storage strategies
 - **Interface layer** — CLI, REST API, MCP server
 
-The **provider system** uses a Strategy/Registry pattern — each cloud provider (AWS, future providers) registers its own strategy, handlers, and template format. The **scheduler system** uses the same pattern — HostFactory and Default schedulers are interchangeable strategies behind a common port.
+The **provider system** uses a Strategy/Registry pattern — each cloud provider (AWS, OCI, and custom providers) registers its own strategy, handlers, and template format. The **scheduler system** uses the same pattern — HostFactory and Default schedulers are interchangeable strategies behind a common port.
 
 See the [Architecture Guide](docs/root/developer_guide/architecture.md) for details.
 

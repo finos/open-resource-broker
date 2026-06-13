@@ -169,6 +169,10 @@ docker-compose.override.yml
 .terraformrc
 terraform.rc
 
+# OCI
+/oci-provider-base-plan.md
+config/oci_config.json
+
 # Application specific
 config/config.json
 # Runtime-generated script copies (orb init)

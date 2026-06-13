@@ -147,6 +147,7 @@ nav:
       - Cloud Platforms: deployment/cloud_platforms.md
       - Traditional Deployment: deployment/traditional.md
       - PyPI Setup: deployment/pypi-setup.md
+      - OCI Integration: deployment/oci-integration.md
       - Security: deployment/security.md
       - IAM Permissions: deployment/iam-permissions.md
       - Monitoring: deployment/monitoring.md

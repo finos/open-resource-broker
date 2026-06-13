@@ -113,3 +113,119 @@ class TestHandleCreateTemplateValidateOnly:
         mock_orchestrator.execute.assert_called_once()
         assert result.data["success"] is True
         assert result.data.get("validate_only") is None
+
+
+class TestHandleCreateTemplateDefaultsFirst:
+    """Tests for defaults-first provider_api behavior in CLI create flow."""
+
+    def _make_template_file(self, tmp_path, data: dict) -> str:
+        import json
+
+        p = tmp_path / "template.json"
+        p.write_text(json.dumps(data))
+        return str(p)
+
+    def test_create_rejects_missing_provider_api_without_oci_context(self, tmp_path):
+        import asyncio
+
+        from orb.interface.template_command_handlers import handle_create_template
+
+        template_file = self._make_template_file(
+            tmp_path,
+            {
+                "template_id": "tmpl-oci-001",
+                "image_id": "ocid1.image.oc1..example",
+            },
+        )
+
+        args = _make_args(file=template_file, validate_only=False)
+
+        with patch(
+            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active",
+            return_value=False,
+        ):
+            result = asyncio.run(handle_create_template(args))
+
+        assert result.exit_code == 1
+        assert result.data["error"] == "provider_api is required in template file"
+
+    def test_create_passes_provider_name_context(self, tmp_path):
+        import asyncio
+
+        from orb.application.services.orchestration.create_template import (
+            CreateTemplateOrchestrator,
+        )
+        from orb.application.services.orchestration.dtos import CreateTemplateOutput
+        from orb.interface.template_command_handlers import handle_create_template
+
+        template_file = self._make_template_file(
+            tmp_path,
+            {
+                "template_id": "tmpl-oci-ctx",
+                "provider_name": "oci-primary",
+                "image_id": "ocid1.image.oc1..example",
+            },
+        )
+
+        mock_orchestrator = MagicMock(spec=CreateTemplateOrchestrator)
+        mock_orchestrator.execute = AsyncMock(
+            return_value=CreateTemplateOutput(
+                template_id="tmpl-oci-ctx",
+                created=True,
+                validation_errors=[],
+            )
+        )
+        container = _make_container(orchestrator=mock_orchestrator)
+        args = _make_args(file=template_file, validate_only=False)
+
+        with patch("orb.interface.template_command_handlers.get_container", return_value=container):
+            with patch(
+                "orb.infrastructure.mocking.dry_run_context.is_dry_run_active",
+                return_value=False,
+            ):
+                asyncio.run(handle_create_template(args))
+
+        mock_orchestrator.execute.assert_called_once()
+        create_input = mock_orchestrator.execute.call_args.args[0]
+        assert create_input.provider_name == "oci-primary"
+
+    def test_create_allows_image_id_from_provider_defaults(self, tmp_path):
+        import asyncio
+
+        from orb.application.services.orchestration.create_template import (
+            CreateTemplateOrchestrator,
+        )
+        from orb.application.services.orchestration.dtos import CreateTemplateOutput
+        from orb.interface.template_command_handlers import handle_create_template
+
+        template_file = self._make_template_file(
+            tmp_path,
+            {
+                "template_id": "oci-vm-flex-ondemand-small",
+                "provider_api": "OCICompute",
+                "provider_name": "oci-default",
+            },
+        )
+
+        mock_orchestrator = MagicMock(spec=CreateTemplateOrchestrator)
+        mock_orchestrator.execute = AsyncMock(
+            return_value=CreateTemplateOutput(
+                template_id="oci-vm-flex-ondemand-small",
+                created=True,
+                validation_errors=[],
+            )
+        )
+        container = _make_container(orchestrator=mock_orchestrator)
+        args = _make_args(file=template_file, provider="oci-default", validate_only=False)
+
+        with patch("orb.interface.template_command_handlers.get_container", return_value=container):
+            with patch(
+                "orb.infrastructure.mocking.dry_run_context.is_dry_run_active",
+                return_value=False,
+            ):
+                result = asyncio.run(handle_create_template(args))
+
+        assert result.data["success"] is True
+        create_input = mock_orchestrator.execute.call_args.args[0]
+        assert create_input.image_id is None
+        assert create_input.provider_name == "oci-default"

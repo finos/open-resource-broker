@@ -144,8 +144,33 @@ class TestApplicationWithConfigDict:
         registered_cm: ConfigurationManager = cm_call.args[1]
         assert registered_cm._config_dict is MINIMAL_CONFIG
 
-    def test_ensure_container_skips_registration_when_no_dict(self):
-        """_ensure_container must NOT pre-register ConfigurationManager when config_dict is None."""
+    def test_ensure_container_registers_config_manager_when_path_provided(self):
+        """_ensure_container pre-registers ConfigurationManager for config_path too."""
+        app = Application(config_path="/some/path.json", skip_validation=True)
+
+        mock_container = MagicMock()
+
+        import orb.infrastructure.di.container as container_module
+
+        original_get_container = container_module.get_container
+        container_module.get_container = lambda: mock_container
+
+        try:
+            app._ensure_container()
+        finally:
+            container_module.get_container = original_get_container
+
+        calls = mock_container.register_instance.call_args_list
+        registered_types = [call.args[0] for call in calls]
+        assert ConfigurationManager in registered_types
+
+        cm_call = next(c for c in calls if c.args[0] is ConfigurationManager)
+        registered_cm: ConfigurationManager = cm_call.args[1]
+        assert registered_cm._config_file == "/some/path.json"
+        assert registered_cm._config_dict is None
+
+    def test_ensure_container_skips_registration_when_no_config_input(self):
+        """_ensure_container must NOT pre-register ConfigurationManager without explicit config."""
         app = Application(skip_validation=True)
 
         mock_container = MagicMock()

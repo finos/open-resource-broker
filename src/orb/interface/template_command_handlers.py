@@ -19,6 +19,16 @@ if TYPE_CHECKING:
     import argparse
 
 
+def _is_oci_template(configuration: dict[str, Any], provider_name: str | None) -> bool:
+    provider_type = configuration.get("provider_type") or configuration.get("providerType")
+    if isinstance(provider_type, str) and provider_type.lower() == "oci":
+        return True
+    if provider_name:
+        prefix = provider_name.replace("_", "-", 1).split("-", maxsplit=1)[0]
+        return prefix.lower() == "oci"
+    return False
+
+
 @handle_interface_exceptions(context="list_templates", interface_type="cli")
 async def handle_list_templates(
     args: "argparse.Namespace",
@@ -153,14 +163,21 @@ async def handle_create_template(
         )
 
     provider_api = template_config.get("provider_api") or template_config.get("providerApi")
-    if not provider_api:
+    provider_name = (
+        getattr(args, "provider", None)
+        or getattr(args, "provider_name", None)
+        or template_config.get("provider_name")
+        or template_config.get("providerName")
+    )
+    is_oci_template = _is_oci_template(template_config, provider_name)
+    if not provider_api and not is_oci_template:
         return InterfaceResponse(
             data={"success": False, "error": "provider_api is required in template file"},
             exit_code=1,
         )
 
     image_id = template_config.get("image_id") or template_config.get("imageId")
-    if not image_id:
+    if not image_id and not is_oci_template:
         return InterfaceResponse(
             data={"success": False, "error": "image_id is required in template file"}, exit_code=1
         )
@@ -182,6 +199,7 @@ async def handle_create_template(
             CreateTemplateInput(
                 template_id=template_id,
                 provider_api=provider_api,
+                provider_name=provider_name,
                 image_id=image_id,
                 name=template_config.get("name"),
                 description=template_config.get("description"),
@@ -450,8 +468,18 @@ async def handle_validate_template(
             )
 
         template_id = template_config.get("template_id", "file-template")
+        provider_name = (
+            getattr(args, "provider", None)
+            or getattr(args, "provider_name", None)
+            or template_config.get("provider_name")
+            or template_config.get("providerName")
+        )
         result = await orchestrator.execute(
-            ValidateTemplateInput(template_id=template_id, config=template_config)
+            ValidateTemplateInput(
+                template_id=template_id,
+                config=template_config,
+                provider_name=provider_name,
+            )
         )
         return formatter.format_template_mutation(
             {

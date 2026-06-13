@@ -135,12 +135,13 @@ class StartupValidator:
         return any(Path(path).exists() for path in template_paths)
 
     def _check_default_config(self) -> bool:
-        """Check if default_config.json template exists."""
-        from orb.config.services.path_resolution_service import PathResolutionService
+        """Check if the packaged default_config.json template exists."""
+        try:
+            from importlib.resources import files
 
-        resolved_path = PathResolutionService().resolve_file_path("template", "default_config.json")
-
-        return Path(resolved_path).exists()
+            return files("orb.config").joinpath("default_config.json").is_file()
+        except Exception:
+            return False
 
     def _check_provider_credentials(self) -> bool:
         """Check if provider credentials are configured for all configured providers."""

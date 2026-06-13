@@ -99,7 +99,10 @@ def register_port_adapters(container):
     from orb.domain.base.ports.path_resolution_port import PathResolutionPort
     from orb.infrastructure.adapters.path_resolution_adapter import PathResolutionAdapter
 
-    container.register_singleton(PathResolutionPort, lambda c: PathResolutionAdapter())
+    container.register_singleton(
+        PathResolutionPort,
+        lambda c: PathResolutionAdapter(c.get(ConfigurationManager)),
+    )
 
     # Register in-memory cache service as CacheServicePort implementation.
     # The handler (GetRequestHandler) calls only the sync convenience methods
