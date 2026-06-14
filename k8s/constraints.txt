@@ -37,7 +37,7 @@ pydantic==2.13.4
 pydantic_core==2.47.0
 pydantic-settings==2.14.1
 Pygments==2.20.0
-pytest==9.0.3
+pytest==9.1.0
 pytest-cov==5.0.0
 pytest-mock==3.15.1
 python-dateutil==2.9.0.post0
