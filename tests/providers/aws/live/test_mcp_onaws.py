@@ -106,8 +106,9 @@ def setup_mcp_test(request, test_session_id):
     (test_config_dir / "logs").mkdir(exist_ok=True)
     (test_config_dir / "work").mkdir(exist_ok=True)
 
-    os.environ["ORB_CONFIG_DIR"] = str(test_config_dir)
-    os.environ["HF_PROVIDER_CONFDIR"] = str(test_config_dir)
+    config_dir = test_config_dir / "config"
+    os.environ["ORB_CONFIG_DIR"] = str(config_dir)
+    os.environ["HF_PROVIDER_CONFDIR"] = str(config_dir)
     os.environ["HF_PROVIDER_LOGDIR"] = str(test_config_dir / "logs")
     os.environ["HF_PROVIDER_WORKDIR"] = str(test_config_dir / "work")
     os.environ["DEFAULT_PROVIDER_WORKDIR"] = str(test_config_dir / "work")
@@ -182,7 +183,12 @@ def setup_mcp_test(request, test_session_id):
                     "Fixture teardown: cleanup_launch_templates failed for %s: %s", req_id, exc
                 )
 
-    # Teardown: reset DI container so next test gets a fresh one
+    # Teardown: clean up env vars and reset DI container so next test gets a fresh one
+    for key in ("ORB_CONFIG_DIR", "HF_PROVIDER_CONFDIR", "HF_PROVIDER_LOGDIR",
+                "HF_PROVIDER_WORKDIR", "DEFAULT_PROVIDER_WORKDIR", "AWS_PROVIDER_LOG_DIR",
+                "HF_LOGDIR"):
+        os.environ.pop(key, None)
+
     try:
         from orb.infrastructure.di import reset_container
 

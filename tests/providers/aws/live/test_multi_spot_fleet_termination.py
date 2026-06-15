@@ -179,7 +179,9 @@ def setup_multi_spot_fleet_templates(test_session_id):
     processor.generate_combined_templates(test_name, template_configs)
 
     # Set environment variables
-    os.environ["HF_PROVIDER_CONFDIR"] = str(test_config_dir)
+    config_dir = test_config_dir / "config"
+    os.environ["ORB_CONFIG_DIR"] = str(config_dir)
+    os.environ["HF_PROVIDER_CONFDIR"] = str(config_dir)
     os.environ["HF_PROVIDER_LOGDIR"] = str(test_config_dir / "logs")
     os.environ["HF_PROVIDER_WORKDIR"] = str(test_config_dir / "work")
     os.environ["AWS_PROVIDER_LOG_DIR"] = str(test_config_dir / "logs")
@@ -209,6 +211,9 @@ def setup_multi_spot_fleet_templates(test_session_id):
     except Exception as exc:
         log.warning("Fixture teardown: cleanup_tracked_requests failed: %s", exc)
 
+    for key in ("ORB_CONFIG_DIR", "HF_PROVIDER_CONFDIR", "HF_PROVIDER_LOGDIR",
+                "HF_PROVIDER_WORKDIR", "AWS_PROVIDER_LOG_DIR", "HF_LOGDIR"):
+        os.environ.pop(key, None)
     processor.cleanup_test_templates(test_name)
     log.removeHandler(file_handler)
     file_handler.close()

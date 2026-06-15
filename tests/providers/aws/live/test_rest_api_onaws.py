@@ -326,7 +326,9 @@ def setup_rest_api_environment(request, test_session_id):
     )
 
     # Configure environment (must be set before server start)
-    os.environ["HF_PROVIDER_CONFDIR"] = str(test_config_dir)
+    config_dir = test_config_dir / "config"
+    os.environ["ORB_CONFIG_DIR"] = str(config_dir)
+    os.environ["HF_PROVIDER_CONFDIR"] = str(config_dir)
     os.environ["HF_PROVIDER_LOGDIR"] = str(test_config_dir / "logs")
     os.environ["HF_PROVIDER_WORKDIR"] = str(test_config_dir / "work")
     os.environ["DEFAULT_PROVIDER_WORKDIR"] = str(test_config_dir / "work")
@@ -343,6 +345,15 @@ def setup_rest_api_environment(request, test_session_id):
 
     yield test_case
 
+    for key in ("ORB_CONFIG_DIR", "HF_PROVIDER_CONFDIR", "HF_PROVIDER_LOGDIR",
+                "HF_PROVIDER_WORKDIR", "DEFAULT_PROVIDER_WORKDIR", "AWS_PROVIDER_LOG_DIR",
+                "METRICS_DIR"):
+        os.environ.pop(key, None)
+    try:
+        from orb.infrastructure.di import reset_container
+        reset_container()
+    except Exception:
+        pass
     try:
         processor.cleanup_test_templates(test_name)
     except Exception as exc:
