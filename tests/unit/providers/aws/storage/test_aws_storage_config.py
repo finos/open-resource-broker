@@ -2,7 +2,7 @@
 
 import pytest
 
-from orb.config.schemas.storage_schema import StorageConfig
+from orb.config.schemas.storage_schema import StorageConfig, _get_valid_storage_strategies
 from orb.providers.aws.configuration.config import AWSProviderConfig
 from orb.providers.aws.storage.config import AWSStorageConfig
 
@@ -84,15 +84,17 @@ def test_storage_config_accepts_strategy_once_registered(monkeypatch):
     The generic schema names no provider backend; validity is derived from the
     registry, so 'dynamodb' is accepted only after it is registered.
     """
-    import orb.config.schemas.storage_schema as storage_schema
-
     # Not registered (registry reports baseline only) -> rejected.
-    monkeypatch.setattr(storage_schema, "_get_valid_storage_strategies", lambda: {"json", "sql"})
+    monkeypatch.setattr(
+        "tests.unit.providers.aws.storage.test_aws_storage_config._get_valid_storage_strategies",
+        lambda: {"json", "sql"},
+    )
     with pytest.raises(ValueError):
         StorageConfig(strategy="dynamodb")
 
     # Registered (registry now advertises it) -> accepted.
     monkeypatch.setattr(
-        storage_schema, "_get_valid_storage_strategies", lambda: {"json", "sql", "dynamodb"}
+        "tests.unit.providers.aws.storage.test_aws_storage_config._get_valid_storage_strategies",
+        lambda: {"json", "sql", "dynamodb"},
     )
     assert StorageConfig(strategy="dynamodb").strategy == "dynamodb"
