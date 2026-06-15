@@ -29,7 +29,13 @@ async def handle_provider_add(args) -> dict[str, Any]:
         with open(config_file) as f:
             config = json.load(f)
 
-        provider_type = getattr(args, "provider_type", "aws")
+        provider_type = getattr(args, "provider_type", None)
+        if not provider_type:
+            return {
+                "error": True,
+                "message": "Provider type is required. Specify --provider-type.",
+                "exit_code": 1,
+            }
         spec = CLISpecRegistry.get(provider_type)
 
         if spec is None:
@@ -152,7 +158,7 @@ async def handle_provider_update(args) -> dict[str, Any]:
             }
 
         # Infer provider type from stored record
-        provider_type = provider.get("type", "aws")
+        provider_type = provider.get("type") or ""
         spec = CLISpecRegistry.get(provider_type)
 
         provider_config = provider.get("config", {})
