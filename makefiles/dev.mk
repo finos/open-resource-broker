@@ -94,26 +94,29 @@ test-docker: dev-install  ## Run Docker containerization tests
 	@./dev-tools/testing/test-docker.sh
 
 # Provider-aware test targets
+# Parallel worker count for pytest (override: make test-providers-aws-live PYTEST_WORKERS=4)
+PYTEST_WORKERS ?= auto
+
 test-no-live: dev-install  ## Run all tests except live cloud suites (pre-PR check)
-	@uv run pytest --no-cov -q -ra --ignore=tests/providers/aws/live
+	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) --ignore=tests/providers/aws/live
 
 test-providers: dev-install  ## Run all provider tests except live
-	@uv run pytest --no-cov -q -ra tests/providers --ignore=tests/providers/aws/live
+	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/providers --ignore=tests/providers/aws/live
 
 test-providers-aws: dev-install  ## Run AWS provider unit + moto tests
-	@uv run pytest --no-cov -q -ra tests/providers/aws/unit tests/providers/aws/moto
+	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/providers/aws/unit tests/providers/aws/moto
 
 test-providers-aws-unit: dev-install  ## Run AWS provider unit tests only
-	@uv run pytest --no-cov -q -ra tests/providers/aws/unit
+	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/providers/aws/unit
 
 test-providers-aws-moto: dev-install  ## Run AWS moto (mocked) tests only
-	@uv run pytest --no-cov -q -ra tests/providers/aws/moto
+	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/providers/aws/moto
 
-test-providers-aws-live: dev-install  ## Run AWS live tests (requires real AWS credentials)
-	@uv run pytest --no-cov -q -ra --live tests/providers/aws/live
+test-providers-aws-live: dev-install  ## Run AWS live tests (requires real AWS credentials; parallel by default)
+	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) --live tests/providers/aws/live
 
 test-architecture: dev-install  ## Run architecture compliance tests
-	@uv run pytest --no-cov -q -ra tests/unit/architecture tests/unit/test_architectural_compliance.py
+	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/unit/architecture tests/unit/test_architectural_compliance.py
 
 # Dummy targets removed (consolidated in quality.mk)
 
