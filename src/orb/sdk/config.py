@@ -70,7 +70,19 @@ class SDKConfig:
 
         for key, value in config.items():
             if key in known_fields:
-                sdk_config[key] = value
+                # ``scheduler`` is a plain string override in SDKConfig (e.g. "default"
+                # or "hostfactory").  When loading from an ORB config.json the top-level
+                # ``scheduler`` key is the full scheduler sub-config dict
+                # ({"type": "hostfactory", "config_root": "..."}).  Ingesting that dict
+                # as the string override causes ConfigurationManager.override_scheduler_strategy
+                # to store a dict, which then propagates as the scheduler_type into the
+                # registry lookup and fails with "unhashable type: 'dict'".
+                if key == "scheduler" and isinstance(value, dict):
+                    # The ORB config scheduler object is not an SDK string override;
+                    # skip it so the scheduler type is resolved from the config file.
+                    custom_config[key] = value
+                else:
+                    sdk_config[key] = value
             else:
                 custom_config[key] = value
 
