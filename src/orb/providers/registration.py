@@ -20,6 +20,27 @@ def register_all_provider_cli_specs() -> None:
     #     CLISpecRegistry.register("oci", OCICLISpec())
 
 
+def register_all_defaults_loaders() -> None:
+    """Register defaults loaders for all available providers.
+
+    Lightweight bootstrap that only registers ``ProviderDefaultsLoaderPort``
+    implementations so that ``ConfigurationLoader._load_strategy_defaults`` can
+    call it before a full application context (DI container / ``initialize_aws_provider``)
+    has been set up.
+    """
+    from orb.providers.registry.defaults_loader_registry import DefaultsLoaderRegistry
+
+    if DefaultsLoaderRegistry.get("aws") is None:
+        from orb.providers.aws.defaults_loader import AWSDefaultsLoader
+
+        DefaultsLoaderRegistry.register("aws", AWSDefaultsLoader())
+
+    # Future providers register their defaults loaders here:
+    # from orb.providers.oci.defaults_loader import OCIDefaultsLoader
+    # if DefaultsLoaderRegistry.get("oci") is None:
+    #     DefaultsLoaderRegistry.register("oci", OCIDefaultsLoader())
+
+
 def register_all_provider_types() -> None:
     """Register all available provider types."""
     from orb.providers.registry import get_provider_registry
