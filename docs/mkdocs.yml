@@ -157,12 +157,6 @@ nav:
       - Performance: operational/performance.md
       - Monitoring: operational/monitoring.md
       - Tools: operational/tools.md
-    - HostFactory Integration:
-      - Integration Guide: hostfactory/integration_guide.md
-      - Requirements Compliance: hostfactory/requirements_compliance.md
-      - Feature Mapping: hostfactory/feature_mapping.md
-      - Deployment Scenarios: hostfactory/deployment_scenarios.md
-      - Supported APIs: hostfactory/supported-apis.md
   - CLI Reference:
     - Overview: cli/README.md
     - Full CLI Reference: cli/cli-reference.md
@@ -172,6 +166,15 @@ nav:
     - Multi-Provider Templates: cli/multi-provider-templates.md
     - Provider Override: cli/provider-override.md
     - Filtering: cli/filtering.md
+  - Integrations:
+    - Adding a Scheduler: developer_guide/adding_a_scheduler.md
+    - Adding a Provider: developer_guide/adding_a_provider.md
+    - HostFactory:
+      - Integration Guide: hostfactory/integration_guide.md
+      - Requirements Compliance: hostfactory/requirements_compliance.md
+      - Feature Mapping: hostfactory/feature_mapping.md
+      - Deployment Scenarios: hostfactory/deployment_scenarios.md
+      - Supported APIs: hostfactory/supported-apis.md
   - MCP Integration:
     - Integration Guide: mcp/integration-guide.md
     - Tools Mode: mcp/tools-mode.md
