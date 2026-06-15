@@ -194,6 +194,17 @@ class ConfigurationLoader:
         try:
             from orb.providers.registry import DefaultsLoaderRegistry
 
+            # Ensure at least the built-in loaders are registered even when
+            # _load_strategy_defaults is called before a full application
+            # bootstrap (e.g. bare config loading in tests or the CLI parser).
+            # This mirrors what the old pkgutil.iter_modules approach did
+            # implicitly — importing each provider's registration module
+            # triggered side-effect registrations.
+            if not DefaultsLoaderRegistry.registered_providers():
+                from orb.providers.registration import register_all_defaults_loaders
+
+                register_all_defaults_loaders()
+
             for provider_type, loader in DefaultsLoaderRegistry.all().items():
                 try:
                     defaults = loader.load_defaults()
