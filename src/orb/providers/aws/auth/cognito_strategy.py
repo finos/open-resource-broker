@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from base64 import urlsafe_b64decode
 from typing import TYPE_CHECKING, Any, Optional
 
 import boto3
 import jwt
 from botocore.config import Config
 from botocore.exceptions import ClientError
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
 
 _DEFAULT_CONFIG = Config(
     connect_timeout=10,
@@ -303,15 +305,27 @@ class CognitoAuthStrategy(AuthPort):
         """
         return self.enabled
 
-    async def _get_public_key(self, kid: str) -> Optional[str]:
+    @staticmethod
+    def _b64url_to_int(val: str) -> int:
+        """Decode a base64url-encoded string to an integer (used for RSA key fields)."""
+        padded = val + "=" * (-len(val) % 4)
+        return int.from_bytes(urlsafe_b64decode(padded), "big")
+
+    async def _get_public_key(self, kid: str) -> Any:
         """
         Get public key from Cognito JWKS endpoint.
+
+        Fetches the JWKS, locates the entry matching ``kid``, and converts it
+        to a ``cryptography`` RSAPublicKey object suitable for use with PyJWT.
 
         Args:
             kid: Key ID from token header
 
         Returns:
-            Public key for token verification
+            RSAPublicKey for token verification, or None if not found
+
+        Raises:
+            jwt.InvalidTokenError: If the matched key is not an RSA key
         """
         try:
             # In production, you would cache JWKS and implement appropriate key rotation
@@ -324,12 +338,18 @@ class CognitoAuthStrategy(AuthPort):
 
             for key in jwks.get("keys", []):
                 if key.get("kid") == kid:
-                    # Convert JWK to PEM format (simplified)
-                    # In production, use a appropriate JWK library
-                    return key  # Return the key dict for now
+                    if key.get("kty") != "RSA":
+                        raise jwt.InvalidTokenError(
+                            f"Unsupported key type: {key.get('kty')!r}. Only RSA keys are supported."
+                        )
+                    n = self._b64url_to_int(key["n"])
+                    e = self._b64url_to_int(key["e"])
+                    return RSAPublicNumbers(e=e, n=n).public_key()
 
             return None
 
+        except jwt.InvalidTokenError:
+            raise
         except Exception as e:
             self._logger.error("Failed to get public key: %s", e)
             return None
