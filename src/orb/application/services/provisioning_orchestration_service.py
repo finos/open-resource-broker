@@ -1,5 +1,6 @@
 """Service for orchestrating provider provisioning operations."""
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Callable
@@ -58,12 +59,14 @@ class ProvisioningOrchestrationService:
         default_config: dict[str, Any] = {
             "max_retries": request_config.get("fulfillment_max_retries", 3),
             "timeout_seconds": request_config.get("fulfillment_timeout_seconds", 300),
+            "dispatch_timeout_seconds": request_config.get("dispatch_timeout_seconds", 300),
             "batch_size": request_config.get("fulfillment_batch_size", 1000),
             "fallback_template_id": request_config.get("fulfillment_fallback_template_id"),
         }
         config = {**default_config, **request.metadata.get("fulfillment_config", {})}
         max_retries: int = int(config["max_retries"])
         timeout_seconds: float = float(config["timeout_seconds"])
+        dispatch_timeout_seconds: float = float(config["dispatch_timeout_seconds"])
         batch_size: int = int(config["batch_size"])
 
         started_at = datetime.now(timezone.utc)
@@ -104,7 +107,7 @@ class ProvisioningOrchestrationService:
 
             try:
                 last_result = await self._dispatch_single_attempt(
-                    template, request, selection_result, attempt_count
+                    template, request, selection_result, attempt_count, dispatch_timeout_seconds
                 )
             except Exception as e:
                 if not isinstance(e, CircuitBreakerOpenError):
@@ -168,7 +171,7 @@ class ProvisioningOrchestrationService:
                     request.requested_count,
                     remaining,
                 )
-                request, persist_ok = self._persist_acquiring(request)
+                request, persist_ok = await asyncio.to_thread(self._persist_acquiring, request)
                 if not persist_ok:
                     self._logger.warning(
                         "ACQUIRING persist failed for request %s on attempt %d — "
@@ -249,6 +252,7 @@ class ProvisioningOrchestrationService:
         request: Request,
         selection_result: ProviderSelectionResult,
         count: int,
+        dispatch_timeout_seconds: float = 300.0,
     ) -> ProvisioningResult:
         """Dispatch a single provisioning attempt for `count` instances."""
         try:
@@ -277,9 +281,10 @@ class ProvisioningOrchestrationService:
 
             self._provider_config_port.get_provider_instance_config(selection_result.provider_name)
 
-            result = await self._provider_selection_port.execute_operation(
-                selection_result.provider_name, operation
-            )
+            async with asyncio.timeout(dispatch_timeout_seconds):
+                result = await self._provider_selection_port.execute_operation(
+                    selection_result.provider_name, operation
+                )
 
             if result.success:
                 self._logger.debug("Provider result.data: %s", result.data)
@@ -323,6 +328,23 @@ class ProvisioningOrchestrationService:
 
         except CircuitBreakerOpenError:
             raise  # do not swallow — let it propagate to execute_provisioning
+
+        except TimeoutError:
+            self._logger.warning(
+                "Dispatch timed out after %.1fs for provider %s (request %s)",
+                dispatch_timeout_seconds,
+                selection_result.provider_name,
+                str(request.request_id) if hasattr(request, "request_id") else "unknown",
+            )
+            return ProvisioningResult(
+                success=False,
+                resource_ids=[],
+                machine_ids=[],
+                instances=[],
+                provider_data={},
+                error_message=f"Dispatch timed out after {dispatch_timeout_seconds:.0f}s",
+                is_final=True,
+            )
 
         except QuotaError as e:
             self._logger.error(
