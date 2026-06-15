@@ -1,12 +1,16 @@
 """Enhanced bearer token authentication strategy with blacklist and rate limiting."""
 
+from __future__ import annotations
+
 import base64
 import json
 import time
 from collections import defaultdict
+from typing import TYPE_CHECKING, Any
 
 import jwt
 
+from orb.domain.base.exceptions import ConfigurationError
 from orb.infrastructure.adapters.ports.auth import (
     AuthContext,
     AuthPort,
@@ -15,6 +19,9 @@ from orb.infrastructure.adapters.ports.auth import (
 )
 from orb.infrastructure.auth.token_blacklist import TokenBlacklistPort
 from orb.infrastructure.logging.logger import get_logger
+
+if TYPE_CHECKING:
+    pass
 
 
 class RateLimiter:
@@ -316,6 +323,44 @@ class EnhancedBearerTokenStrategy(AuthPort):
         except Exception as e:
             self.logger.error("Auth revocation error: %s", e)
             return False
+
+    @classmethod
+    def from_auth_config(cls, auth_config: Any) -> EnhancedBearerTokenStrategy:
+        """
+        Build strategy instance from AuthConfig.
+
+        Extracts the bearer_token sub-config and wires an InMemoryTokenBlacklist.
+
+        Args:
+            auth_config: AuthConfig instance with typed bearer_token sub-config
+
+        Returns:
+            Configured EnhancedBearerTokenStrategy
+
+        Raises:
+            ConfigurationError: If required fields are missing or invalid
+        """
+        from orb.infrastructure.auth.token_blacklist.in_memory_blacklist import (
+            InMemoryTokenBlacklist,
+        )
+
+        bearer_cfg = getattr(auth_config, "bearer_token", None)
+        if bearer_cfg is None:
+            raise ConfigurationError(
+                "Enhanced bearer token authentication requires auth.bearer_token configuration."
+            )
+        secret_key: str = getattr(bearer_cfg, "secret_key", "") or ""
+        if not secret_key:
+            raise ConfigurationError(
+                "Enhanced bearer token authentication requires a secret_key in auth.bearer_token config."
+            )
+        return cls(
+            secret_key=secret_key,
+            blacklist=InMemoryTokenBlacklist(),
+            algorithm=getattr(bearer_cfg, "algorithm", "HS256"),
+            token_expiry=getattr(bearer_cfg, "token_expiry", 3600),
+            enabled=True,
+        )
 
     def get_strategy_name(self) -> str:
         """Get strategy name."""

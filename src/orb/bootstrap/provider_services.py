@@ -72,10 +72,20 @@ def _register_provider_utility_services(container: DIContainer) -> None:
         # Check if AWS provider is available
         if importlib.util.find_spec("orb.providers.aws"):
             try:
-                from orb.providers.aws.registration import register_aws_services_with_di
+                from orb.providers.aws.registration import (
+                    register_aws_auth_strategies,
+                    register_aws_services_with_di,
+                )
 
                 register_aws_services_with_di(container)
                 logger.debug("AWS utility services registered with DI")
+
+                # Register IAM and Cognito auth strategies so the auth registry
+                # can resolve them without server.py importing provider classes.
+                # Pass None for the logging port; registration is best-effort and
+                # the bootstrap logger (ContextLogger) does not implement LoggingPort.
+                register_aws_auth_strategies(None)
+                logger.debug("AWS auth strategies registered")
             except Exception as e:
                 logger.warning("Failed to register AWS utility services: %s", str(e))
 

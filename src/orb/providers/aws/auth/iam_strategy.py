@@ -1,6 +1,8 @@
 """AWS IAM authentication strategy."""
 
-from typing import Any, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Optional
 
 from botocore.config import Config
 from botocore.exceptions import ClientError, NoCredentialsError
@@ -14,6 +16,9 @@ from orb.infrastructure.adapters.ports.auth import (
     AuthStatus,
 )
 from orb.providers.aws.session_factory import AWSSessionFactory
+
+if TYPE_CHECKING:
+    pass
 
 _DEFAULT_CONFIG = Config(
     connect_timeout=10,
@@ -183,6 +188,52 @@ class IAMAuthStrategy(AuthPort):
             Always True (AWS handles session management)
         """
         return True
+
+    @classmethod
+    def from_auth_config(cls, auth_config: Any) -> IAMAuthStrategy:
+        """
+        Build strategy instance from AuthConfig.
+
+        Extracts the provider_auth.iam sub-config and constructs an IAMAuthStrategy.
+        A LoggingPort is obtained from the DI container when available; otherwise a
+        plain logging adapter is used so the classmethod stays self-contained.
+
+        Args:
+            auth_config: AuthConfig instance with optional provider_auth.iam sub-config
+
+        Returns:
+            Configured IAMAuthStrategy
+        """
+        from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
+
+        provider_auth = getattr(auth_config, "provider_auth", None)
+        iam_cfg = getattr(provider_auth, "iam", None) if provider_auth is not None else None
+
+        region: str = getattr(iam_cfg, "region", "us-east-1") if iam_cfg is not None else "us-east-1"
+        profile: Optional[str] = getattr(iam_cfg, "profile", None) if iam_cfg is not None else None
+        required_actions: list[str] = (
+            getattr(iam_cfg, "required_actions", []) if iam_cfg is not None else []
+        )
+        assume_permissions: bool = (
+            getattr(iam_cfg, "assume_permissions", False) if iam_cfg is not None else False
+        )
+
+        try:
+            from orb.domain.base.ports import LoggingPort
+            from orb.infrastructure.di.container import get_container
+
+            logger: LoggingPort = get_container().get(LoggingPort)
+        except Exception:
+            logger = LoggingAdapter()  # type: ignore[assignment]
+
+        return cls(
+            logger=logger,
+            region=region,
+            profile=profile,
+            required_actions=required_actions,
+            enabled=True,
+            assume_permissions=assume_permissions,
+        )
 
     def get_strategy_name(self) -> str:
         """

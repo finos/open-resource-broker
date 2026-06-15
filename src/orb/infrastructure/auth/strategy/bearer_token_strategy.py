@@ -1,9 +1,13 @@
 """Bearer token authentication strategy."""
 
+from __future__ import annotations
+
 import time
+from typing import TYPE_CHECKING, Any
 
 import jwt
 
+from orb.domain.base.exceptions import ConfigurationError
 from orb.infrastructure.adapters.ports.auth import (
     AuthContext,
     AuthPort,
@@ -11,6 +15,9 @@ from orb.infrastructure.adapters.ports.auth import (
     AuthStatus,
 )
 from orb.infrastructure.logging.logger import get_logger
+
+if TYPE_CHECKING:
+    pass
 
 
 class BearerTokenStrategy(AuthPort):
@@ -191,6 +198,45 @@ class BearerTokenStrategy(AuthPort):
         raise NotImplementedError(
             "Token revocation not supported by BearerTokenStrategy. "
             "Use EnhancedBearerTokenStrategy for revocation support."
+        )
+
+    @classmethod
+    def from_auth_config(cls, auth_config: Any) -> BearerTokenStrategy:
+        """
+        Build strategy instance from AuthConfig.
+
+        Extracts and validates the bearer_token sub-config, then constructs
+        a ``BearerTokenStrategy``.
+
+        Args:
+            auth_config: AuthConfig instance with typed bearer_token sub-config
+
+        Returns:
+            Configured BearerTokenStrategy
+
+        Raises:
+            ConfigurationError: If required fields are missing or invalid
+        """
+        bearer_cfg = getattr(auth_config, "bearer_token", None)
+        if bearer_cfg is None:
+            raise ConfigurationError(
+                "Bearer token authentication requires auth.bearer_token configuration. "
+                "Set auth.bearer_token.secret_key in your server config."
+            )
+        secret_key: str = getattr(bearer_cfg, "secret_key", "") or ""
+        if not secret_key:
+            raise ConfigurationError(
+                "Bearer token authentication requires a secret_key in auth.bearer_token config."
+            )
+        if len(secret_key.encode()) < 32:
+            raise ConfigurationError(
+                "Bearer token secret_key must be at least 32 bytes for security."
+            )
+        return cls(
+            secret_key=secret_key,
+            algorithm=getattr(bearer_cfg, "algorithm", "HS256"),
+            token_expiry=getattr(bearer_cfg, "token_expiry", 3600),
+            enabled=True,
         )
 
     def get_strategy_name(self) -> str:

@@ -1,6 +1,8 @@
 """AWS Cognito authentication strategy."""
 
-from typing import Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Optional
 
 import boto3
 import jwt
@@ -21,6 +23,9 @@ from orb.infrastructure.adapters.ports.auth import (
     AuthResult,
     AuthStatus,
 )
+
+if TYPE_CHECKING:
+    pass
 
 
 @injectable
@@ -227,6 +232,58 @@ class CognitoAuthStrategy(AuthPort):
         except Exception as e:
             self._logger.error("Token revocation error: %s", e)
             return False
+
+    @classmethod
+    def from_auth_config(cls, auth_config: Any) -> CognitoAuthStrategy:
+        """
+        Build strategy instance from AuthConfig.
+
+        Extracts the provider_auth.cognito sub-config and constructs a
+        CognitoAuthStrategy.  A LoggingPort is obtained from the DI container
+        when available; otherwise a plain logging adapter is used.
+
+        Args:
+            auth_config: AuthConfig instance with optional provider_auth.cognito sub-config
+
+        Returns:
+            Configured CognitoAuthStrategy
+        """
+        from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
+
+        provider_auth = getattr(auth_config, "provider_auth", None)
+        cognito_cfg = (
+            getattr(provider_auth, "cognito", None) if provider_auth is not None else None
+        )
+
+        user_pool_id: str = (
+            getattr(cognito_cfg, "user_pool_id", "") if cognito_cfg is not None else ""
+        )
+        client_id: str = (
+            getattr(cognito_cfg, "client_id", "") if cognito_cfg is not None else ""
+        )
+        region: str = (
+            getattr(cognito_cfg, "region", "us-east-1") if cognito_cfg is not None else "us-east-1"
+        )
+        jwks_url: Optional[str] = (
+            getattr(cognito_cfg, "jwks_url", None) if cognito_cfg is not None else None
+        )
+
+        try:
+            from orb.domain.base.ports import LoggingPort
+            from orb.infrastructure.di.container import get_container
+
+            logger: LoggingPort = get_container().get(LoggingPort)
+        except Exception:
+            logger = LoggingAdapter()  # type: ignore[assignment]
+
+        return cls(
+            logger=logger,
+            user_pool_id=user_pool_id,
+            client_id=client_id,
+            region=region,
+            jwks_url=jwks_url,
+            enabled=True,
+        )
 
     def get_strategy_name(self) -> str:
         """

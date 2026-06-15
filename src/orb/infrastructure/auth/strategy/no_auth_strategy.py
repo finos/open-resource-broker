@@ -1,5 +1,9 @@
 """No authentication strategy - allows all requests."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
 from orb.infrastructure.adapters.ports.auth import (
     AuthContext,
     AuthPort,
@@ -7,6 +11,9 @@ from orb.infrastructure.adapters.ports.auth import (
     AuthStatus,
 )
 from orb.infrastructure.logging.logger import get_logger
+
+if TYPE_CHECKING:
+    pass
 
 
 class NoAuthStrategy(AuthPort):
@@ -21,6 +28,19 @@ class NoAuthStrategy(AuthPort):
         """
         self.enabled = enabled
         self.logger = get_logger(__name__)
+
+    @classmethod
+    def from_auth_config(cls, auth_config: Any) -> NoAuthStrategy:
+        """
+        Build strategy instance from AuthConfig.
+
+        Args:
+            auth_config: AuthConfig instance (ignored for no-auth)
+
+        Returns:
+            NoAuthStrategy with enabled=False
+        """
+        return cls(enabled=False)
 
     async def authenticate(self, context: AuthContext) -> AuthResult:
         """

@@ -5,27 +5,73 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class BearerTokenAuthSubConfig(BaseModel):
+    """Typed sub-configuration for the bearer_token auth strategy."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    secret_key: str = Field(..., description="Secret key for JWT signing/verification (>=32 bytes)")
+    algorithm: str = Field("HS256", description="JWT algorithm")
+    token_expiry: int = Field(3600, description="Token expiry in seconds")
+
+
+class IAMAuthSubConfig(BaseModel):
+    """Typed sub-configuration for AWS IAM auth strategy."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    region: str = Field("us-east-1", description="AWS region")
+    profile: Optional[str] = Field(None, description="AWS profile")
+    required_actions: list[str] = Field(default_factory=list, description="Required IAM actions")
+    assume_permissions: bool = Field(
+        False,
+        description="If True, grant all required_actions without evaluation (dev/test only)",
+    )
+
+
+class CognitoAuthSubConfig(BaseModel):
+    """Typed sub-configuration for AWS Cognito auth strategy."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    user_pool_id: str = Field("", description="Cognito User Pool ID")
+    client_id: str = Field("", description="Cognito App Client ID")
+    region: str = Field("us-east-1", description="AWS region")
+    jwks_url: Optional[str] = Field(None, description="JWKS URL (auto-generated if omitted)")
+
+
+class ProviderAuthSubConfig(BaseModel):
+    """Typed sub-configuration for provider-specific auth strategies."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    iam: Optional[IAMAuthSubConfig] = Field(None, description="IAM auth sub-configuration")
+    cognito: Optional[CognitoAuthSubConfig] = Field(
+        None, description="Cognito auth sub-configuration"
+    )
+
+
 class AuthConfig(BaseModel):
     """Authentication configuration."""
 
-    model_config = ConfigDict(extra="allow")  # Allow provider-specific auth configs
+    model_config = ConfigDict(extra="forbid")
 
     enabled: bool = Field(False, description="Enable authentication")
     strategy: str = Field(
         "none",
-        description="Authentication strategy (none, bearer_token, iam, cognito, oauth)",
+        description="Authentication strategy (none, bearer_token, bearer_token_enhanced, iam, cognito)",
     )
 
     # Bearer token configuration
-    bearer_token: Optional[dict[str, Any]] = Field(
+    bearer_token: Optional[BearerTokenAuthSubConfig] = Field(
         None, description="Bearer token strategy configuration"
     )
 
-    # OAuth configuration
+    # OAuth configuration (kept as untyped dict for forward compatibility)
     oauth: Optional[dict[str, Any]] = Field(None, description="OAuth strategy configuration")
 
     # Provider-specific auth configurations
-    provider_auth: Optional[dict[str, Any]] = Field(
+    provider_auth: Optional[ProviderAuthSubConfig] = Field(
         None, description="Provider-specific auth configuration"
     )
 
