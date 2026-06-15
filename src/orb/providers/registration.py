@@ -91,10 +91,14 @@ def register_all_provider_cli_specs() -> None:
     ``cli/args.py`` and other early-bootstrap callers continue to work.
     """
     from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
-    from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec
 
-    if CLISpecRegistry.get("aws") is None:
-        CLISpecRegistry.register("aws", AWSCLISpec())
+    try:
+        from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec
+
+        if CLISpecRegistry.get("aws") is None:
+            CLISpecRegistry.register("aws", AWSCLISpec())
+    except ImportError:
+        pass  # [aws] extra not installed; AWS CLI spec unavailable
 
 
 def register_all_defaults_loaders() -> None:
@@ -112,9 +116,12 @@ def register_all_defaults_loaders() -> None:
     from orb.providers.registry.defaults_loader_registry import DefaultsLoaderRegistry
 
     if DefaultsLoaderRegistry.get("aws") is None:
-        from orb.providers.aws.defaults_loader import AWSDefaultsLoader
+        try:
+            from orb.providers.aws.defaults_loader import AWSDefaultsLoader
 
-        DefaultsLoaderRegistry.register("aws", AWSDefaultsLoader())
+            DefaultsLoaderRegistry.register("aws", AWSDefaultsLoader())
+        except ImportError:
+            pass  # [aws] extra not installed; AWS defaults loader unavailable
 
 
 def register_fallback_provider(

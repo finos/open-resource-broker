@@ -83,11 +83,35 @@ Get ORB installed and configured for your environment.
 <details>
 <summary>Installation</summary>
 
-### Standard install
+### Standard install (core only — no provider)
 
 ```bash
 pip install orb-py
 ```
+
+ORB boots cleanly with no provider registered.  Any command that needs a provider
+will return a clear "no provider configured" error rather than an ImportError.
+
+### Per-provider install
+
+```bash
+pip install "orb-py[aws]"          # AWS provider (boto3 + botocore)
+pip install "orb-py[aws,cli]"      # AWS provider + colored CLI output
+pip install "orb-py[aws,api]"      # AWS provider + REST API server
+pip install "orb-py[monitoring-aws]"  # AWS provider + full monitoring stack
+pip install "orb-py[all]"          # All providers + all features
+```
+
+### Provider extras matrix
+
+| Use case | Install command |
+|----------|----------------|
+| Core only (no provider) | `pip install orb-py` |
+| AWS operator | `pip install "orb-py[aws]"` |
+| AWS + colored CLI | `pip install "orb-py[aws,cli]"` |
+| AWS + REST API | `pip install "orb-py[aws,api]"` |
+| AWS + monitoring | `pip install "orb-py[monitoring-aws]"` |
+| Full (all providers + features) | `pip install "orb-py[all]"` |
 
 ### With colored CLI output
 
