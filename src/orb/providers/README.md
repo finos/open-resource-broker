@@ -518,6 +518,12 @@ class NewCloudProvider(ProviderInterface):
 - Provide clear extension examples
 - Support community contributions
 
+## Developer Guide
+
+For a step-by-step walkthrough of adding a new provider — including the mandatory glue points, all extension point registries, the `OperationOutcome` contract, anti-patterns to avoid, and the recommended test layout — see:
+
+- [Adding a Provider](../../docs/root/developer_guide/adding_a_provider.md)
+
 ---
 
 This provider layer enables seamless multi-cloud support while maintaining the clean architecture and cloud-agnostic design of the core system. Built on open standards and designed for extensibility, it provides a solid foundation for supporting any cloud platform.
