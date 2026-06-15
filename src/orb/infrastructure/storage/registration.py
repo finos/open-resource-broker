@@ -66,8 +66,6 @@ def get_available_storage_types() -> list:
 
     # Check Aurora storage availability
     try:
-        pass
-
         available_types.append("aurora")
     except ImportError:
         pass
