@@ -270,12 +270,23 @@ class ASGCapacityManager:
                 operation_type="read_only",
                 InstanceIds=instance_ids,
             )
+            entries = response.get("AutoScalingInstances", [])
+            # If describe returned no entries, the API call did not give us
+            # actionable membership info — fall back to processing all
+            # instances rather than silently dropping them. This matches the
+            # exception-path behaviour below.
+            if not entries:
+                return list(instance_ids)
             attached_ids = {
                 entry["InstanceId"]
-                for entry in response.get("AutoScalingInstances", [])
+                for entry in entries
                 if entry.get("AutoScalingGroupName") == asg_name
             }
-            return [iid for iid in instance_ids if iid in attached_ids]
+            filtered = [iid for iid in instance_ids if iid in attached_ids]
+            # If the membership filter excluded everything, treat that as
+            # "couldn't verify" and fall back to all instances. Excluding all
+            # would skip a necessary capacity decrement.
+            return filtered or list(instance_ids)
         except Exception as exc:
             self._logger.warning(
                 "Failed to verify ASG %s membership for instances %s; "
