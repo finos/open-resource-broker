@@ -73,17 +73,26 @@ jobs:
       python-version: ${{ needs.config.outputs.default-python-version }}
 
   auto-format:
-    name: Auto-Format Code  
-    if: github.event_name == 'pull_request'
+    name: Auto-Format Code
+    # Same-repo PRs only: App token can push directly to the branch.
+    # Fork PRs are handled by the auto-format-suggest job below.
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     needs: [config, setup-cache]
     permissions:
-      contents: write
+      contents: read
     steps:
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           ref: ${{ github.head_ref }}
 
       - name: Setup UV with cache
@@ -97,16 +106,48 @@ jobs:
 
       - name: Commit formatting changes
         env:
-          GIT_AUTHOR_NAME: github-actions[bot]
-          GIT_AUTHOR_EMAIL: github-actions[bot]@users.noreply.github.com
-          GIT_COMMITTER_NAME: github-actions[bot]
-          GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
+          GIT_AUTHOR_NAME: open-resource-broker-cicd[bot]
+          GIT_AUTHOR_EMAIL: open-resource-broker-cicd[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: open-resource-broker-cicd[bot]
+          GIT_COMMITTER_EMAIL: open-resource-broker-cicd[bot]@users.noreply.github.com
         run: |
           git add .
           if ! git diff --staged --quiet; then
             git commit -m "style: auto-format code with ruff [skip ci]"
             git push
           fi
+
+  auto-format-suggest:
+    name: Auto-Format Suggestions
+    # Fork PRs: post formatted changes as PR review suggestions instead of pushing
+    # to the fork (which requires the contributor to install the App on their fork).
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    needs: [config, setup-cache]
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup UV with cache
+        uses: ./.github/actions/setup-uv-cached
+        with:
+          cache-key: ${{ needs.setup-cache.outputs.cache-key }}
+          fail-on-cache-miss: false
+
+      - name: Run formatter
+        run: make format-fix
+
+      - name: Post review suggestions
+        uses: reviewdog/action-suggester@aa38384ceb608d00f84b4690cacc83a5aba307ff  # v1.24.0
+        with:
+          tool_name: ruff
+          level: warning
+          fail_on_error: false
 
   lint-ruff:
     name: Ruff (Code Quality)
