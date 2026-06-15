@@ -17,6 +17,7 @@ import pytest
 from boto3 import Session
 from botocore.exceptions import ClientError, NoCredentialsError
 
+
 def _find_repo_root(start: Path) -> Path:
     """Walk up from *start* until we find pyproject.toml. Hard-fail otherwise.
 

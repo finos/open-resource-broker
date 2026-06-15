@@ -345,12 +345,19 @@ def setup_rest_api_environment(request, test_session_id):
 
     yield test_case
 
-    for key in ("ORB_CONFIG_DIR", "HF_PROVIDER_CONFDIR", "HF_PROVIDER_LOGDIR",
-                "HF_PROVIDER_WORKDIR", "DEFAULT_PROVIDER_WORKDIR", "AWS_PROVIDER_LOG_DIR",
-                "METRICS_DIR"):
+    for key in (
+        "ORB_CONFIG_DIR",
+        "HF_PROVIDER_CONFDIR",
+        "HF_PROVIDER_LOGDIR",
+        "HF_PROVIDER_WORKDIR",
+        "DEFAULT_PROVIDER_WORKDIR",
+        "AWS_PROVIDER_LOG_DIR",
+        "METRICS_DIR",
+    ):
         os.environ.pop(key, None)
     try:
         from orb.infrastructure.di import reset_container
+
         reset_container()
     except Exception:
         pass

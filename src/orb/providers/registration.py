@@ -69,6 +69,7 @@ def register_all_providers(container: "DIContainer | None" = None) -> None:
 # Deprecated aliases – kept for backward compatibility with existing callers.
 # ---------------------------------------------------------------------------
 
+
 def register_all_provider_types() -> None:
     """Register all available provider types.
 

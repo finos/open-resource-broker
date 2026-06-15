@@ -85,9 +85,7 @@ class ProviderResourceStateChangedEvent(DomainEvent):
     def model_post_init(self, __context: Any) -> None:
         """Initialize aggregate information after model creation."""
         object.__setattr__(self, "aggregate_id", self.resource_id)
-        object.__setattr__(
-            self, "aggregate_type", f"{self.provider_type}_{self.resource_type}"
-        )
+        object.__setattr__(self, "aggregate_type", f"{self.provider_type}_{self.resource_type}")
         super().model_post_init(__context)
         if not self.resource_type:
             raise ValueError("Resource type cannot be empty")

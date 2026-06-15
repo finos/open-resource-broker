@@ -390,9 +390,15 @@ def setup_cleanup_e2e(request, test_session_id):
                     "Fixture teardown: cleanup_launch_templates failed for %s: %s", req_id, exc
                 )
 
-    for key in ("ORB_CONFIG_DIR", "HF_PROVIDER_CONFDIR", "HF_PROVIDER_LOGDIR",
-                "HF_PROVIDER_WORKDIR", "DEFAULT_PROVIDER_WORKDIR", "AWS_PROVIDER_LOG_DIR",
-                "HF_LOGDIR"):
+    for key in (
+        "ORB_CONFIG_DIR",
+        "HF_PROVIDER_CONFDIR",
+        "HF_PROVIDER_LOGDIR",
+        "HF_PROVIDER_WORKDIR",
+        "DEFAULT_PROVIDER_WORKDIR",
+        "AWS_PROVIDER_LOG_DIR",
+        "HF_LOGDIR",
+    ):
         os.environ.pop(key, None)
 
     try:

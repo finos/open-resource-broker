@@ -184,9 +184,15 @@ def setup_mcp_test(request, test_session_id):
                 )
 
     # Teardown: clean up env vars and reset DI container so next test gets a fresh one
-    for key in ("ORB_CONFIG_DIR", "HF_PROVIDER_CONFDIR", "HF_PROVIDER_LOGDIR",
-                "HF_PROVIDER_WORKDIR", "DEFAULT_PROVIDER_WORKDIR", "AWS_PROVIDER_LOG_DIR",
-                "HF_LOGDIR"):
+    for key in (
+        "ORB_CONFIG_DIR",
+        "HF_PROVIDER_CONFDIR",
+        "HF_PROVIDER_LOGDIR",
+        "HF_PROVIDER_WORKDIR",
+        "DEFAULT_PROVIDER_WORKDIR",
+        "AWS_PROVIDER_LOG_DIR",
+        "HF_LOGDIR",
+    ):
         os.environ.pop(key, None)
 
     try:

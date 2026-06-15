@@ -73,9 +73,7 @@ def _register_provider_utility_services(container: DIContainer) -> None:
     for name in _REGISTERED_PROVIDERS:
         mod_path = f"orb.providers.{name}.registration"
         if importlib.util.find_spec(mod_path) is None:
-            logger.debug(
-                "%s provider not available, skipping utility service registration", name
-            )
+            logger.debug("%s provider not available, skipping utility service registration", name)
             continue
         try:
             mod = importlib.import_module(mod_path)
