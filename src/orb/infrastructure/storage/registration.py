@@ -42,33 +42,43 @@ def get_available_storage_types() -> list:
 
     # Check JSON storage availability
     try:
-        pass
+        from orb.infrastructure.storage.json.registration import (  # noqa: F401
+            register_json_storage,
+        )
 
         available_types.append("json")
     except ImportError:
-        pass
+        pass  # optional backend not installed
 
     # Check SQL storage availability
     try:
-        pass
+        from orb.infrastructure.storage.sql.registration import (  # noqa: F401
+            register_sql_storage,
+        )
 
         available_types.append("sql")
     except ImportError:
-        pass
+        pass  # optional backend not installed
 
     # Check DynamoDB storage availability
     try:
-        pass
+        from orb.providers.aws.storage.registration import (  # noqa: F401
+            register_dynamodb_storage,
+        )
 
         available_types.append("dynamodb")
     except ImportError:
-        pass
+        pass  # optional backend not installed (boto3 missing)
 
     # Check Aurora storage availability
     try:
+        from orb.providers.aws.storage.registration import (  # noqa: F401
+            register_aurora_storage,
+        )
+
         available_types.append("aurora")
     except ImportError:
-        pass
+        pass  # optional backend not installed
 
     return available_types
 
