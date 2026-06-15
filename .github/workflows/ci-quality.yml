@@ -21,6 +21,19 @@ on:
       - 'uv.lock'
       - '.ruff.toml'
       - '.github/workflows/ci-quality.yml'
+  # pull_request_target is needed only for the auto-format-suggest job to call
+  # the PR Reviews API on fork PRs. All other jobs gate on event_name to avoid
+  # double execution.
+  pull_request_target:
+    branches: [ main, develop ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'uv.lock'
+      - '.ruff.toml'
+      - '.github/workflows/ci-quality.yml'
 
 permissions:
   contents: read
@@ -32,6 +45,8 @@ jobs:
 
   quality-check:
     name: Quality Standards
+    # Skip on pull_request_target — only auto-format-suggest needs that event.
+    if: github.event_name != 'pull_request_target'
     runs-on: ubuntu-latest
     needs: config
     permissions:
@@ -65,6 +80,8 @@ jobs:
 
   setup-cache:
     name: Setup Cache
+    # Runs on both pull_request and pull_request_target — auto-format-suggest
+    # depends on it and needs to run on pull_request_target for fork PRs.
     needs: config
     uses: ./.github/workflows/cache-management.yml
     with:
@@ -114,7 +131,11 @@ jobs:
     name: Auto-Format Suggestions
     # Fork PRs: post formatted changes as PR review suggestions for the
     # contributor to apply via the GitHub UI's "Commit suggestion" button.
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+    # Uses pull_request_target so the GITHUB_TOKEN can call the PR Reviews API
+    # (POST /pulls/{id}/reviews) — pull_request fork-PR tokens cannot.
+    # The workflow file is evaluated at the base ref (safe); only the PR head
+    # code is checked out into a non-elevated working tree for formatting.
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     needs: [config, setup-cache]
     permissions:
@@ -125,6 +146,9 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          # No token here — formatter does not need write access; this prevents
+          # untrusted PR code from authenticating with elevated permissions.
+          persist-credentials: false
 
       - name: Setup UV with cache
         uses: ./.github/actions/setup-uv-cached
@@ -144,6 +168,7 @@ jobs:
 
   lint-ruff:
     name: Ruff (Code Quality)
+    if: github.event_name != 'pull_request_target'
     runs-on: ubuntu-latest
     needs: [config, setup-cache]
     permissions:
@@ -163,6 +188,7 @@ jobs:
 
   lint-ruff-optional:
     name: Ruff (Extended Checks)
+    if: github.event_name != 'pull_request_target'
     runs-on: ubuntu-latest
     needs: [config, setup-cache, lint-ruff]
     permissions:
@@ -183,6 +209,7 @@ jobs:
 
   lint-pyright:
     name: Type Checking (pyright)
+    if: github.event_name != 'pull_request_target'
     runs-on: ubuntu-latest
     needs: [config, setup-cache, lint-ruff]
     permissions:
@@ -203,6 +230,7 @@ jobs:
 
   arch-validation:
     name: Architecture Validation
+    if: github.event_name != 'pull_request_target'
     runs-on: ubuntu-latest
     needs: [config, setup-cache, lint-ruff]
     permissions:

@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import time
 from base64 import urlsafe_b64encode
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -100,9 +99,7 @@ async def test_cognito_validate_token_expired():
     strategy = _make_strategy()
 
     with patch.object(strategy, "_get_public_key", return_value="fake_key"):
-        with patch(
-            "orb.providers.aws.auth.cognito_strategy.jwt.decode"
-        ) as mock_decode:
+        with patch("orb.providers.aws.auth.cognito_strategy.jwt.decode") as mock_decode:
             mock_decode.side_effect = pyjwt.ExpiredSignatureError("expired")
             # Need an unverified header
             with patch(
@@ -123,7 +120,6 @@ async def test_cognito_validate_token_expired():
 @pytest.mark.unit
 async def test_cognito_validate_token_missing_kid():
     """validate_token returns INVALID when token header has no kid."""
-    import jwt as pyjwt
 
     strategy = _make_strategy()
 
@@ -319,9 +315,7 @@ async def test_cognito_validate_token_unknown_kid_returns_invalid():
     region = "us-east-1"
 
     # Generate a valid JWKS+token but serve JWKS with a *different* kid
-    jwks, token = _generate_rs256_jwks_and_token(
-        user_pool_id, client_id, region, kid="actual-kid"
-    )
+    jwks, token = _generate_rs256_jwks_and_token(user_pool_id, client_id, region, kid="actual-kid")
     # Replace kid in JWKS so the lookup fails
     jwks["keys"][0]["kid"] = "different-kid"
 

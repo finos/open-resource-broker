@@ -235,7 +235,9 @@ class IAMAuthStrategy(AuthPort):
         provider_auth = getattr(auth_config, "provider_auth", None)
         iam_cfg = getattr(provider_auth, "iam", None) if provider_auth is not None else None
 
-        region: str = getattr(iam_cfg, "region", "us-east-1") if iam_cfg is not None else "us-east-1"
+        region: str = (
+            getattr(iam_cfg, "region", "us-east-1") if iam_cfg is not None else "us-east-1"
+        )
         profile: Optional[str] = getattr(iam_cfg, "profile", None) if iam_cfg is not None else None
         required_actions: list[str] = (
             getattr(iam_cfg, "required_actions", []) if iam_cfg is not None else []

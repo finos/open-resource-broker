@@ -150,7 +150,9 @@ class RequestDTO(BaseDTO):
                 ]
 
         # Build structured error block from error_details when available.
-        error_block: Optional[dict[str, Any]] = request.error_details.get("aws_error") if request.error_details else None
+        error_block: Optional[dict[str, Any]] = (
+            request.error_details.get("aws_error") if request.error_details else None
+        )
 
         # Create the DTO with all available fields
         return cls(

@@ -253,16 +253,12 @@ class CognitoAuthStrategy(AuthPort):
         from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
 
         provider_auth = getattr(auth_config, "provider_auth", None)
-        cognito_cfg = (
-            getattr(provider_auth, "cognito", None) if provider_auth is not None else None
-        )
+        cognito_cfg = getattr(provider_auth, "cognito", None) if provider_auth is not None else None
 
         user_pool_id: str = (
             getattr(cognito_cfg, "user_pool_id", "") if cognito_cfg is not None else ""
         )
-        client_id: str = (
-            getattr(cognito_cfg, "client_id", "") if cognito_cfg is not None else ""
-        )
+        client_id: str = getattr(cognito_cfg, "client_id", "") if cognito_cfg is not None else ""
         region: str = (
             getattr(cognito_cfg, "region", "us-east-1") if cognito_cfg is not None else "us-east-1"
         )

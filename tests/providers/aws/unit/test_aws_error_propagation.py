@@ -15,11 +15,9 @@ Covers:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 from botocore.exceptions import ClientError
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -297,7 +295,6 @@ class TestRequestDTOErrorField:
     """RequestDTO.from_domain exposes aws_error as the top-level error field."""
 
     def _make_request_with_error(self, aws_error_block: dict):
-        from datetime import datetime, timezone
 
         from orb.domain.request.aggregate import Request
         from orb.domain.request.value_objects import RequestType
@@ -328,7 +325,6 @@ class TestRequestDTOErrorField:
         assert dto.error["message"] == "not authorized"
 
     def test_error_field_none_when_no_aws_error(self):
-        from datetime import datetime, timezone
 
         from orb.application.request.dto import RequestDTO
         from orb.domain.request.aggregate import Request
@@ -355,7 +351,6 @@ class TestRequestDTOErrorField:
         assert d["error"]["code"] == "AccessDenied"
 
     def test_to_dict_omits_error_key_when_no_error(self):
-        from datetime import datetime, timezone
 
         from orb.application.request.dto import RequestDTO
         from orb.domain.request.aggregate import Request
