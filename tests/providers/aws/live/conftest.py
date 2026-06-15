@@ -49,35 +49,25 @@ def _is_live_run(config) -> bool:
 def _get_aws_profile_and_region() -> tuple[str | None, str | None]:
     """Read profile and region from ORB config.
 
-    Priority (matches `orb init` discovery + operator overrides):
-    1. ORB_CONFIG_DIR env var (per-test or per-deployment config dir)
-    2. ~/.orb/config.json (default user-level location written by `orb init`)
-    3. <repo>/config/config.json (in-repo dev fallback — only present when
-       running tests from a checkout that ran `orb init` inside it)
-    4. AWS_REGION / AWS_DEFAULT_REGION env vars (region only)
+    Delegates to ORB's own config-discovery (``orb.config.platform_dirs``) so
+    test discovery never drifts from runtime discovery.  Falls back to the
+    AWS_REGION / AWS_DEFAULT_REGION env vars for the region only.
     """
-    candidates: list[str] = []
-    config_dir = os.environ.get("ORB_CONFIG_DIR")
-    if config_dir:
-        candidates.append(os.path.join(config_dir, "config.json"))
-    # User-default location for `orb init`
-    candidates.append(str(Path.home() / ".orb" / "config.json"))
-    # In-repo dev fallback (the directory exists only in source checkouts)
-    candidates.append(str(repo_root / "config" / "config.json"))
+    from orb.config.platform_dirs import get_config_location
 
-    for config_path in candidates:
-        try:
-            with open(config_path) as f:
-                config = json.load(f)
-            providers = config.get("provider", {}).get("providers", [])
-            if providers:
-                provider_config = providers[0].get("config", {})
-                profile = provider_config.get("profile")
-                region = provider_config.get("region")
-                if profile or region:
-                    return profile, region
-        except Exception:
-            pass
+    config_path = get_config_location() / "config.json"
+    try:
+        with open(config_path) as f:
+            config = json.load(f)
+        providers = config.get("provider", {}).get("providers", [])
+        if providers:
+            provider_config = providers[0].get("config", {})
+            profile = provider_config.get("profile")
+            region = provider_config.get("region")
+            if profile or region:
+                return profile, region
+    except FileNotFoundError:
+        pass
 
     region = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
     return None, region
@@ -88,10 +78,9 @@ def pytest_configure(config) -> None:
     if not _is_live_run(config):
         return
 
-    config_dir = os.environ.get("ORB_CONFIG_DIR", ".")
-    config_path = Path(config_dir)
+    from orb.config.platform_dirs import get_scripts_location
 
-    scripts_dir = config_path / "scripts"
+    scripts_dir = get_scripts_location()
 
     if not scripts_dir.exists():
         pytest.exit(
