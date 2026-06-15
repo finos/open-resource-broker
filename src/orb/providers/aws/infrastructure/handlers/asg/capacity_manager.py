@@ -298,11 +298,7 @@ class ASGCapacityManager:
                 return list(instance_ids)
 
             # Return only the instances in a detachable lifecycle state.
-            filtered = [
-                iid
-                for iid in instance_ids
-                if state_by_id.get(iid) in _DETACHABLE_STATES
-            ]
+            filtered = [iid for iid in instance_ids if state_by_id.get(iid) in _DETACHABLE_STATES]
             # instances not in state_by_id are not (or no longer) in this ASG;
             # they can be skipped for detach (will still be terminated downstream).
             return filtered
