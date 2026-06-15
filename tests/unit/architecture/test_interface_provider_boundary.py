@@ -43,6 +43,9 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
         ("interface/mcp/server/core.py", "orb.providers.registry"),
         ("api/server.py", "orb.providers.aws.auth.iam_strategy"),
         ("api/server.py", "orb.providers.aws.auth.cognito_strategy"),
+        # CLI spec bootstrap: build_parser triggers lightweight CLI-spec registration
+        # so that provider flags (e.g. --aws-profile) are available before app init.
+        ("cli/args.py", "orb.providers.registration"),
     }
 )
 

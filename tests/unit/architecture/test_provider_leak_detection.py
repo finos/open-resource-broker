@@ -70,6 +70,9 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
         # loader collects strategy-contributed defaults at load time — intentional bootstrap wiring
         ("config/loader.py", "orb.providers.registry"),
         ("config/loader.py", "orb.providers"),
+        # CLI spec bootstrap: build_parser triggers lightweight CLI-spec registration
+        # so that provider flags (e.g. --aws-profile) are available before app init.
+        ("cli/args.py", "orb.providers.registration"),
     }
 )
 
