@@ -91,18 +91,26 @@ def _normalize_key(key: str, target_fmt: str) -> str:
     return _SNAKE_TO_CAMEL.get(key, key)
 
 
+def _find_repo_root(start: Path) -> Path:
+    """Walk up from *start* until pyproject.toml is found. Hard-fail otherwise."""
+    for candidate in (start, *start.parents):
+        if (candidate / "pyproject.toml").is_file():
+            return candidate
+    raise RuntimeError(f"Could not locate repo root (no pyproject.toml) above {start}")
+
+
 class TemplateProcessor:
     """Generates per-test config directories from the real project config files."""
 
     def __init__(self, base_dir: str | None = None):
         resolved: Path
         if base_dir is None:
-            resolved = Path(__file__).parent
+            resolved = Path(__file__).resolve().parent
         else:
             resolved = Path(base_dir)
 
         self.base_dir = resolved
-        self.config_source_dir = resolved.parent.parent / "config"
+        self.config_source_dir = _find_repo_root(resolved) / "config"
         self.run_templates_dir = resolved / "run_templates"
 
     # ------------------------------------------------------------------
@@ -257,10 +265,11 @@ class TemplateProcessor:
         """
         import sys
 
-        sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+        repo_root = _find_repo_root(Path(__file__).resolve().parent)
+        sys.path.insert(0, str(repo_root / "src"))
 
         # Find the real generated templates file in config/
-        config_dir = Path(__file__).parent.parent.parent / "config"
+        config_dir = repo_root / "config"
         templates_file = config_dir / "aws_templates.json"
         if not templates_file.exists():
             raise FileNotFoundError(
