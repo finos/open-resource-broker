@@ -238,6 +238,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         resolver_factory: Optional[Callable] = None,
         validator_factory: Optional[Callable] = None,
         strategy_class: Optional[type] = None,
+        default_api: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
         """Register provider type - implements abstract method."""
@@ -249,9 +250,27 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
                 resolver_factory=resolver_factory,
                 validator_factory=validator_factory,
                 strategy_class=strategy_class,
+                default_api=default_api,
             )
         except ValueError as e:
             raise ConfigurationError(str(e))
+
+    def get_default_api(self, provider_type: str) -> Optional[str]:
+        """Return the default API name for the given provider type, or None if not set.
+
+        Args:
+            provider_type: Type identifier for the provider (e.g., 'aws')
+
+        Returns:
+            Default API string from registration, or None if not registered / not set.
+        """
+        try:
+            registration = self._get_type_registration(provider_type)
+            if isinstance(registration, ProviderRegistration):
+                return registration.default_api
+        except (ValueError, KeyError):
+            pass
+        return None
 
     def register_provider(
         self,
@@ -261,6 +280,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         resolver_factory: Optional[Callable] = None,
         validator_factory: Optional[Callable] = None,
         strategy_class: Optional[type] = None,
+        default_api: Optional[str] = None,
     ) -> None:
         """
         Register a provider with its factory functions - backward compatibility method.
@@ -271,6 +291,8 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
             config_factory: Factory function to create provider configuration
             resolver_factory: Optional factory for template resolver
             validator_factory: Optional factory for template validator
+            strategy_class: Optional provider strategy class
+            default_api: Optional default API name contributed by this provider
 
         Raises:
             ValueError: If provider_type is already registered
@@ -282,6 +304,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
             resolver_factory,
             validator_factory,
             strategy_class=strategy_class,
+            default_api=default_api,
         )
 
     def register_provider_instance(
@@ -853,6 +876,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
             additional_factories.get("resolver_factory"),
             additional_factories.get("validator_factory"),
             strategy_class=additional_factories.get("strategy_class"),
+            default_api=additional_factories.get("default_api"),
         )
 
     @staticmethod

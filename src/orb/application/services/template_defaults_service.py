@@ -5,6 +5,7 @@ from typing import Any, Optional
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.logging_port import LoggingPort
+from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 from orb.domain.base.utils import extract_provider_type
 from orb.domain.template.extensions import TemplateExtensionRegistry
 from orb.domain.template.factory import TemplateFactoryPort
@@ -33,6 +34,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         logger: LoggingPort,
         template_factory: Optional[TemplateFactoryPort] = None,
         extension_registry: Optional[TemplateExtensionRegistry] = None,
+        provider_registry: Optional[ProviderRegistryPort] = None,
     ) -> None:
         """
         Initialize the template defaults service.
@@ -42,11 +44,13 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             logger: Logger for debugging and monitoring
             template_factory: Factory for creating domain templates
             extension_registry: Registry for provider extensions
+            provider_registry: Registry for resolving provider-contributed defaults
         """
         self.config_manager = config_manager
         self.logger = logger
         self.template_factory = template_factory
         self.extension_registry = extension_registry or TemplateExtensionRegistry
+        self.provider_registry = provider_registry
 
     def resolve_template_defaults(
         self,
@@ -100,7 +104,13 @@ class TemplateDefaultsService(TemplateDefaultsPort):
                 )
 
         # 4. Apply template values (highest priority - only for missing fields)
-        if template_dict.get("launch_template_id"):
+        # launch_template_id may be at top level (legacy) or inside provider_config (new path).
+        _pc = template_dict.get("provider_config") or {}
+        _has_lt = bool(
+            template_dict.get("launch_template_id")
+            or (_pc.get("launch_template_id") if isinstance(_pc, dict) else None)
+        )
+        if _has_lt:
             lt_fields = [
                 k
                 for k in (
@@ -284,18 +294,13 @@ class TemplateDefaultsService(TemplateDefaultsPort):
                 provider_defaults = provider_config.provider_defaults.get(provider_type)  # type: ignore[union-attr]
                 if provider_defaults and hasattr(provider_defaults, "template_defaults"):
                     result = provider_defaults.template_defaults or {}
-                    # Fallback: if no provider_api in template_defaults, read from
-                    # handlers.defaults.default_handler (e.g. the configured default handler name)
-                    if not result.get("provider_api") and hasattr(provider_defaults, "handlers"):
-                        default_handler = (
-                            provider_defaults.handlers.defaults.default_handler
-                            if provider_defaults.handlers
-                            and hasattr(provider_defaults.handlers, "defaults")
-                            else None
-                        )
-                        if default_handler:
+                    # Fallback: if no provider_api in template_defaults, delegate to the
+                    # provider registry which reads it from the provider's registration.
+                    if not result.get("provider_api") and self.provider_registry is not None:
+                        default_api = self.provider_registry.get_default_api(provider_type)
+                        if default_api:
                             result = dict(result)
-                            result["provider_api"] = default_handler
+                            result["provider_api"] = default_api
                     return result
 
             return {}
