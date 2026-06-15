@@ -16,22 +16,42 @@ class AWSError(InfrastructureError):
         message: str,
         details: Optional[dict[str, Any]] = None,
         error_code: Optional[str] = None,
+        aws_error_code: Optional[str] = None,
+        aws_error_message: Optional[str] = None,
+        aws_request_id: Optional[str] = None,
+        error_source: Optional[str] = None,
     ) -> None:
         """Initialize AWS exception.
 
         Args:
             message: Human-readable error message
             details: Additional error details and context
-            error_code: Specific error code for programmatic handling
+            error_code: Domain-level error code for programmatic handling
+            aws_error_code: Original AWS API error code (e.g. UnauthorizedOperation)
+            aws_error_message: Original AWS API error message
+            aws_request_id: AWS request ID for Support cases
+            error_source: AWS service.operation that failed (e.g. aws.ec2.RunInstances)
         """
         super().__init__(message, error_code or self.__class__.__name__, details)
         self.error_code = error_code or self.__class__.__name__
+        self.aws_error_code = aws_error_code
+        self.aws_error_message = aws_error_message
+        self.aws_request_id = aws_request_id
+        self.error_source = error_source
 
     def to_dict(self) -> dict[str, Any]:
         """Convert error to dictionary."""
         result: dict[str, Any] = super().to_dict()  # type: ignore[attr-defined]
         if self.error_code and self.error_code != self.__class__.__name__:
             result["error_code"] = self.error_code
+        if self.aws_error_code:
+            result["aws_error_code"] = self.aws_error_code
+        if self.aws_error_message:
+            result["aws_error_message"] = self.aws_error_message
+        if self.aws_request_id:
+            result["aws_request_id"] = self.aws_request_id
+        if self.error_source:
+            result["error_source"] = self.error_source
         return result
 
 
