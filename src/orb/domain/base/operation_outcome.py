@@ -29,10 +29,9 @@ Usage example (exhaustive match with ``assert_never``)::
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    from orb.application.services.request_follow_up_context import FollowUpContext
+from orb.domain.base.follow_up_context import FollowUpContext
 
 
 @dataclass(frozen=True)
@@ -83,7 +82,7 @@ class RequiresFollowUp:
         metadata: Optional provider-specific supplementary data.
     """
 
-    context: "FollowUpContext"
+    context: FollowUpContext
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
