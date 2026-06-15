@@ -90,8 +90,9 @@ def create_dynamodb_unit_of_work(config: Any) -> Any:
         dynamodb_config = aws_cfg.storage.dynamodb or DynamodbStrategyConfig()  # type: ignore[call-arg]
 
         # ORB AWS wrapper exposes dynamodb_client/dynamodb_resource (lazy boto3),
-        # which DynamoDBClientManager consumes directly.
-        aws_client = AWSClient(config=config, logger=_logger)
+        # which DynamoDBClientManager consumes directly. ConfigurationManager
+        # provides the configuration access AWSClient needs at runtime.
+        aws_client = AWSClient(config=config, logger=_logger)  # type: ignore[arg-type]
 
         collections = config.app_config.naming.collections
         machine_name = collections.get("machines", "machines")
