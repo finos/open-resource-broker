@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import time
+from base64 import urlsafe_b64encode
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -175,3 +178,162 @@ def test_cognito_from_auth_config_defaults():
     assert strategy.region == "us-east-1"
     assert strategy.user_pool_id == ""
     assert strategy.client_id == ""
+
+
+# ---------------------------------------------------------------------------
+# _get_public_key — non-RSA key raises InvalidTokenError
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_cognito_get_public_key_non_rsa_raises():
+    """_get_public_key raises InvalidTokenError when the matched JWK is not RSA."""
+    import jwt as pyjwt
+
+    strategy = _make_strategy()
+
+    ec_jwks = {
+        "keys": [
+            {
+                "kid": "test-kid",
+                "kty": "EC",
+                "crv": "P-256",
+                "x": "abc",
+                "y": "def",
+            }
+        ]
+    }
+
+    mock_response = MagicMock()
+    mock_response.json.return_value = ec_jwks
+
+    with patch("requests.get", return_value=mock_response):
+        with pytest.raises(pyjwt.InvalidTokenError):
+            await strategy._get_public_key("test-kid")
+
+
+# ---------------------------------------------------------------------------
+# validate_token — full round-trip with a real RS256 token
+# ---------------------------------------------------------------------------
+
+
+def _generate_rs256_jwks_and_token(
+    user_pool_id: str,
+    client_id: str,
+    region: str,
+    kid: str = "test-key-1",
+) -> tuple[dict[str, Any], str]:
+    """
+    Generate a minimal JWKS dict and a matching RS256 JWT for testing.
+
+    Returns (jwks_dict, encoded_token).
+    """
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
+
+    # Generate a 2048-bit RSA key pair
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    public_key = private_key.public_key()
+    pub_numbers: RSAPublicNumbers = public_key.public_numbers()  # type: ignore[attr-defined]
+
+    def _int_to_b64url(n: int) -> str:
+        byte_length = (n.bit_length() + 7) // 8
+        raw = n.to_bytes(byte_length, "big")
+        return urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+    jwks: dict[str, Any] = {
+        "keys": [
+            {
+                "kid": kid,
+                "kty": "RSA",
+                "alg": "RS256",
+                "use": "sig",
+                "n": _int_to_b64url(pub_numbers.n),
+                "e": _int_to_b64url(pub_numbers.e),
+            }
+        ]
+    }
+
+    now = int(time.time())
+    payload = {
+        "sub": "user-cognito-123",
+        "cognito:username": "testuser",
+        "email": "test@example.com",
+        "cognito:groups": ["operators"],
+        "token_use": "access",
+        "aud": client_id,
+        "iss": f"https://cognito-idp.{region}.amazonaws.com/{user_pool_id}",
+        "iat": now,
+        "exp": now + 3600,
+    }
+
+    import jwt as pyjwt
+
+    token = pyjwt.encode(
+        payload,
+        private_key,
+        algorithm="RS256",
+        headers={"kid": kid},
+    )
+    return jwks, token
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_cognito_validate_token_full_rs256_round_trip():
+    """
+    Full validate_token round-trip: mocked JWKS + real RS256 token must succeed.
+
+    This test would fail if _get_public_key returned a raw JWK dict (the pre-fix
+    behaviour) because PyJWT cannot decode with a dict key.
+    """
+    user_pool_id = "us-east-1_TESTPOOL"
+    client_id = "test-client-id"
+    region = "us-east-1"
+
+    jwks, token = _generate_rs256_jwks_and_token(user_pool_id, client_id, region)
+
+    mock_response = MagicMock()
+    mock_response.json.return_value = jwks
+
+    strategy = _make_strategy()
+    strategy.user_pool_id = user_pool_id
+    strategy.client_id = client_id
+    strategy.region = region
+
+    with patch("requests.get", return_value=mock_response):
+        result = await strategy.validate_token(token)
+
+    assert result.status == AuthStatus.SUCCESS
+    assert result.user_id == "user-cognito-123"
+    assert "operator" in (result.user_roles or [])
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_cognito_validate_token_unknown_kid_returns_invalid():
+    """validate_token returns INVALID when no JWKS entry matches the token's kid."""
+    user_pool_id = "us-east-1_TESTPOOL"
+    client_id = "test-client-id"
+    region = "us-east-1"
+
+    # Generate a valid JWKS+token but serve JWKS with a *different* kid
+    jwks, token = _generate_rs256_jwks_and_token(
+        user_pool_id, client_id, region, kid="actual-kid"
+    )
+    # Replace kid in JWKS so the lookup fails
+    jwks["keys"][0]["kid"] = "different-kid"
+
+    mock_response = MagicMock()
+    mock_response.json.return_value = jwks
+
+    strategy = _make_strategy()
+    strategy.user_pool_id = user_pool_id
+    strategy.client_id = client_id
+    strategy.region = region
+
+    with patch("requests.get", return_value=mock_response):
+        result = await strategy.validate_token(token)
+
+    assert result.status == AuthStatus.INVALID

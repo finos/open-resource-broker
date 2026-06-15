@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Any, Optional
 
 from botocore.config import Config
@@ -67,7 +68,32 @@ class IAMAuthStrategy(AuthPort):
             "ec2:TerminateInstances",
         ]
         self.enabled = enabled
-        self._assume_permissions = assume_permissions
+
+        # assume_permissions is a dev-only escape hatch. It is only honoured when
+        # the operator has explicitly set ORB_IAM_ASSUME_PERMISSIONS_DEV_ONLY=true
+        # in the environment.  Without that env-var the flag is silently disabled
+        # so that a misconfigured production deployment cannot accidentally bypass
+        # real IAM evaluation.
+        _dev_env_var = os.environ.get("ORB_IAM_ASSUME_PERMISSIONS_DEV_ONLY", "").lower()
+        _dev_override_active = _dev_env_var == "true"
+
+        if assume_permissions and not _dev_override_active:
+            self._logger.critical(
+                "IAM assume_permissions=True is set in config but "
+                "ORB_IAM_ASSUME_PERMISSIONS_DEV_ONLY env var is not 'true'. "
+                "Treating as assume_permissions=False to prevent privilege bypass in production. "
+                "Set ORB_IAM_ASSUME_PERMISSIONS_DEV_ONLY=true only in non-production environments."
+            )
+            self._assume_permissions = False
+        else:
+            self._assume_permissions = assume_permissions
+
+        if self._assume_permissions:
+            self._logger.critical(
+                "IAM assume_permissions=True is ACTIVE (ORB_IAM_ASSUME_PERMISSIONS_DEV_ONLY=true). "
+                "All required_actions are granted without AWS evaluation. "
+                "This MUST NOT be used in production."
+            )
 
         if not self._assume_permissions:
             self._logger.error(

@@ -112,8 +112,8 @@ class EnhancedBearerTokenStrategy(AuthPort):
 
         # Validate secret key strength (minimum 256 bits = 32 bytes)
         if len(secret_key.encode()) < 32:
-            self.logger.warning(
-                "Secret key is weak (< 256 bits). Use a stronger key for production."
+            raise ConfigurationError(
+                "Bearer token secret_key must be at least 32 bytes for security."
             )
 
     async def authenticate(self, context: AuthContext) -> AuthResult:

@@ -217,3 +217,25 @@ def test_enhanced_bearer_from_auth_config_missing_bearer_token():
 
     with pytest.raises(ConfigurationError):
         EnhancedBearerTokenStrategy.from_auth_config(auth_config)
+
+
+# ---------------------------------------------------------------------------
+# Short secret key → ConfigurationError (not a warning)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_enhanced_bearer_short_key_raises_configuration_error():
+    """
+    EnhancedBearerTokenStrategy must raise ConfigurationError for keys shorter
+    than 32 bytes, matching the error policy of BearerTokenStrategy.
+    """
+    from orb.domain.base.exceptions import ConfigurationError
+
+    short_key = "a" * 16  # 16 bytes — below the 32-byte minimum
+
+    with pytest.raises(ConfigurationError, match="32 bytes"):
+        EnhancedBearerTokenStrategy(
+            secret_key=short_key,
+            blacklist=_make_blacklist(),
+        )
