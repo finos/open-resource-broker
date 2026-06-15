@@ -73,6 +73,7 @@ class ReturnMachinesOutput:
     status: str
     message: str = ""
     skipped_machines: list[str] = dataclasses.field(default_factory=list)
+    machine_ids: list[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(frozen=True)

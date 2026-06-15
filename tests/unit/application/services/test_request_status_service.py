@@ -84,3 +84,85 @@ class TestReturnRequestCompletion:
             provider_metadata={},
         )
         assert status == RequestStatus.COMPLETED.value
+
+    def test_return_request_mix_shutting_down_and_running_is_in_progress(self):
+        """Some shutting-down, some running → IN_PROGRESS (not complete)."""
+        machines = [
+            _make_machine(MachineStatus.SHUTTING_DOWN),
+            _make_machine(MachineStatus.RUNNING),
+        ]
+        status, _ = self.svc.determine_status_from_machines(
+            db_machines=machines,  # type: ignore[arg-type]
+            provider_machines=machines,  # type: ignore[arg-type]
+            request=self.req,
+            provider_metadata={},
+        )
+        assert status == RequestStatus.IN_PROGRESS.value
+
+    def test_return_request_empty_provider_machines_is_complete(self):
+        """No instances visible in provider → all gone, COMPLETED."""
+        db_machines = [_make_machine(MachineStatus.TERMINATED)]
+        status, msg = self.svc.determine_status_from_machines(
+            db_machines=db_machines,  # type: ignore[arg-type]
+            provider_machines=[],
+            request=self.req,
+            provider_metadata={},
+        )
+        assert status == RequestStatus.COMPLETED.value
+        assert "no longer visible" in (msg or "")
+
+
+class TestPrematureCompletedRegression:
+    """Regression guard: COMPLETED must NOT be written when termination is merely accepted.
+
+    The bug: request_creation_handlers wrote COMPLETED immediately on TerminateInstances
+    accept, while instances were still shutting-down.  The fix writes IN_PROGRESS so that
+    background sync can poll and transition to COMPLETED only when all instances reach
+    the terminated state.
+    """
+
+    def setup_method(self):
+        self.svc = _make_service()
+        self.req = _make_request("return")
+
+    def test_shutting_down_instance_yields_in_progress_not_completed(self):
+        """Single shutting-down instance → IN_PROGRESS, never COMPLETED."""
+        machines = [_make_machine(MachineStatus.SHUTTING_DOWN)]
+        status, _ = self.svc.determine_status_from_machines(
+            db_machines=machines,  # type: ignore[arg-type]
+            provider_machines=machines,  # type: ignore[arg-type]
+            request=self.req,
+            provider_metadata={},
+        )
+        assert status != RequestStatus.COMPLETED.value
+        assert status == RequestStatus.IN_PROGRESS.value
+
+    def test_mix_shutting_down_terminated_yields_in_progress(self):
+        """Not all terminated → IN_PROGRESS (shutting-down counts as still processing)."""
+        machines = [
+            _make_machine(MachineStatus.SHUTTING_DOWN),
+            _make_machine(MachineStatus.TERMINATED),
+            _make_machine(MachineStatus.SHUTTING_DOWN),
+        ]
+        status, _ = self.svc.determine_status_from_machines(
+            db_machines=machines,  # type: ignore[arg-type]
+            provider_machines=machines,  # type: ignore[arg-type]
+            request=self.req,
+            provider_metadata={},
+        )
+        assert status == RequestStatus.IN_PROGRESS.value
+
+    def test_all_terminated_yields_completed(self):
+        """All terminated → COMPLETED (the honest transition the poller should see)."""
+        machines = [
+            _make_machine(MachineStatus.TERMINATED),
+            _make_machine(MachineStatus.TERMINATED),
+            _make_machine(MachineStatus.TERMINATED),
+        ]
+        status, _ = self.svc.determine_status_from_machines(
+            db_machines=machines,  # type: ignore[arg-type]
+            provider_machines=machines,  # type: ignore[arg-type]
+            request=self.req,
+            provider_metadata={},
+        )
+        assert status == RequestStatus.COMPLETED.value

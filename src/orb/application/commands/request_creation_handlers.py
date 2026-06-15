@@ -488,8 +488,8 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                         skipped_str,
                     )
                 else:
-                    await self._update_request_to_completed(request)
-                    self.logger.info("Termination initiated for request %s", request.request_id)
+                    await self._update_request_to_terminating(request)
+                    self.logger.info("Termination accepted for request %s", request.request_id)
             else:
                 await self._update_request_to_failed(request, provisioning_result.get("errors", []))
 
@@ -563,6 +563,36 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                     final_error,
                 )
                 # Nothing more we can do
+
+    async def _update_request_to_terminating(self, request: Any) -> None:
+        """Set return request to IN_PROGRESS after termination is accepted by provider.
+
+        Termination is asynchronous — the provider accepted the request but instances
+        are still ``shutting-down``.  Using IN_PROGRESS here lets the background sync
+        poll AWS and transition to COMPLETED only when all instances reach ``terminated``.
+        """
+        try:
+            from orb.application.dto.commands import UpdateRequestStatusCommand
+            from orb.application.ports.command_bus_port import CommandBusPort
+            from orb.domain.request.request_types import RequestStatus
+
+            update_command = UpdateRequestStatusCommand(
+                request_id=str(request.request_id),
+                status=RequestStatus.IN_PROGRESS,
+                message="Termination accepted: waiting for instances to reach terminated state",
+            )
+            command_bus = self._container.get(CommandBusPort)
+            await command_bus.execute(update_command)
+            self.logger.info(
+                "Request %s set to IN_PROGRESS: termination accepted, polling for completion",
+                request.request_id,
+            )
+        except Exception as update_error:
+            self.logger.error(
+                "Failed to update request status to in_progress after termination: %s",
+                update_error,
+                exc_info=True,
+            )
 
     async def _update_request_to_completed(self, request: Any) -> None:
         """Update return request status to completed and persist."""

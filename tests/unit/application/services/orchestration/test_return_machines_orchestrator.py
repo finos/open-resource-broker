@@ -189,3 +189,48 @@ class TestReturnMachinesOrchestrator:
         result = await orchestrator.execute(input)
         assert result.status == "pending"
         assert result.request_id == "ret-req-001"
+
+    @pytest.mark.asyncio
+    async def test_output_machine_ids_populated_from_explicit_input(
+        self, orchestrator, mock_command_bus
+    ):
+        """machine_ids in output must reflect the machines submitted for return."""
+        async def _set_request_ids(cmd):
+            cmd.created_request_ids = ["ret-req-001"]
+
+        mock_command_bus.execute.side_effect = _set_request_ids
+        input = ReturnMachinesInput(machine_ids=["i-aaa", "i-bbb", "i-ccc"])
+        result = await orchestrator.execute(input)
+        assert isinstance(result, ReturnMachinesOutput)
+        assert result.machine_ids == ["i-aaa", "i-bbb", "i-ccc"]
+
+    @pytest.mark.asyncio
+    async def test_output_machine_ids_populated_from_all_machines_path(
+        self, orchestrator, mock_query_bus, mock_command_bus
+    ):
+        """machine_ids in output must reflect resolved IDs from --all path."""
+        mock_query_bus.execute.return_value = [
+            MagicMock(machine_id="i-001"),
+            MagicMock(machine_id="i-002"),
+        ]
+
+        async def _set_request_ids(cmd):
+            cmd.created_request_ids = ["ret-req-001"]
+
+        mock_command_bus.execute.side_effect = _set_request_ids
+        input = ReturnMachinesInput(all_machines=True)
+        result = await orchestrator.execute(input)
+        assert sorted(result.machine_ids) == ["i-001", "i-002"]
+
+    @pytest.mark.asyncio
+    async def test_output_machine_ids_empty_when_no_op(self, orchestrator, mock_command_bus):
+        """machine_ids must be empty (default) when no request was created."""
+        async def _set_empty(cmd):
+            cmd.created_request_ids = []
+            cmd.skipped_machines = ["i-001"]
+
+        mock_command_bus.execute.side_effect = _set_empty
+        input = ReturnMachinesInput(machine_ids=["i-001"])
+        result = await orchestrator.execute(input)
+        assert result.status == "no_op"
+        assert result.machine_ids == []

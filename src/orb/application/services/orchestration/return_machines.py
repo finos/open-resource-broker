@@ -108,6 +108,7 @@ class ReturnMachinesOrchestrator(OrchestratorBase[ReturnMachinesInput, ReturnMac
         return ReturnMachinesOutput(
             request_id=primary_request_id,
             status=status,
+            machine_ids=machine_ids,
         )
 
     async def _poll_until_terminal(self, request_id: str, timeout_seconds: int) -> str:
