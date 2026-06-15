@@ -85,22 +85,34 @@ class TestCleanArchitectureIntegration:
 
     def test_aws_extension_registration(self):
         """Test that AWS extensions are properly registered."""
-        # Clear registry for clean test
-        TemplateExtensionRegistry.clear_registry()
+        # Snapshot both class and instance registries before mutating them so we
+        # can restore them afterwards.  clear_registry() + selective re-register
+        # must not leak state into subsequent tests.
+        saved_extensions = dict(TemplateExtensionRegistry._extensions)
+        saved_instances = dict(TemplateExtensionRegistry._extension_instances)
+        try:
+            # Clear registry for clean test
+            TemplateExtensionRegistry.clear_registry()
 
-        # Register AWS extension
-        TemplateExtensionRegistry.register_extension("aws", AWSTemplateExtensionConfig)
+            # Register AWS extension
+            TemplateExtensionRegistry.register_extension("aws", AWSTemplateExtensionConfig)
 
-        # Verify registration
-        assert TemplateExtensionRegistry.has_extension("aws")
-        assert TemplateExtensionRegistry.get_extension_class("aws") == AWSTemplateExtensionConfig
+            # Verify registration
+            assert TemplateExtensionRegistry.has_extension("aws")
+            assert TemplateExtensionRegistry.get_extension_class("aws") == AWSTemplateExtensionConfig
 
-        # Test extension defaults - must provide non-empty config_data or it returns {}
-        extension_defaults = TemplateExtensionRegistry.get_extension_defaults(
-            "aws", {"allocation_strategy": "capacity_optimized"}
-        )
-        assert isinstance(extension_defaults, dict)
-        assert "allocation_strategy" in extension_defaults
+            # Test extension defaults - must provide non-empty config_data or it returns {}
+            extension_defaults = TemplateExtensionRegistry.get_extension_defaults(
+                "aws", {"allocation_strategy": "capacity_optimized"}
+            )
+            assert isinstance(extension_defaults, dict)
+            assert "allocation_strategy" in extension_defaults
+        finally:
+            # Restore the registry to the pre-test state unconditionally.
+            TemplateExtensionRegistry._extensions.clear()
+            TemplateExtensionRegistry._extensions.update(saved_extensions)
+            TemplateExtensionRegistry._extension_instances.clear()
+            TemplateExtensionRegistry._extension_instances.update(saved_instances)
 
     def test_clean_template_schema_validation(self):
         """Test that cleaned template schema works correctly."""
