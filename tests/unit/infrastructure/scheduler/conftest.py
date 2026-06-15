@@ -14,7 +14,7 @@ from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedul
 from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
     HostFactorySchedulerStrategy,
 )
-from tests.onaws.plugin_io_schemas import (
+from tests.providers.aws.live.plugin_io_schemas import (
     expected_get_available_templates_schema_default,
     expected_get_available_templates_schema_hostfactory,
     expected_request_machines_schema_default,

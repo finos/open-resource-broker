@@ -23,7 +23,7 @@ try:
 except ImportError:
     pytest.skip("jsonschema not installed", allow_module_level=True)
 
-from tests.onaws.plugin_io_schemas import (
+from tests.providers.aws.live.plugin_io_schemas import (
     expected_get_available_templates_schema_hostfactory,
     expected_request_machines_schema_hostfactory,
     expected_request_status_schema_hostfactory,

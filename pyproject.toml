@@ -291,7 +291,7 @@ include-package-data = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-norecursedirs = ["tests/onaws"]
+norecursedirs = ["tests/providers/aws/live"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -323,6 +323,7 @@ markers = [
     "simulator_limitation: Assertion weakened due to known simulator gap",
     "requires_real_provider: Skipped unless --run-real-provider flag passed",
     "moto: Tests using moto-mocked AWS (no real credentials required)",
+    "live: Tests requiring real AWS credentials (enabled with --live or --run-aws)",
     "sdk: Tests exercising the ORBClient SDK interface",
     "cli: marks CLI integration tests",
     "benchmark: marks benchmark/performance tests",

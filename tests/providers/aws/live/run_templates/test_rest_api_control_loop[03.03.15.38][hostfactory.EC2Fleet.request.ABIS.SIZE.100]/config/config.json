@@ -1,0 +1,72 @@
+{
+  "scheduler": {
+    "type": "hostfactory",
+    "config_root": "$ORB_CONFIG_DIR"
+  },
+  "provider": {
+    "providers": [
+      {
+        "name": "aws_flamurg-testing-Admin_eu-west-2",
+        "type": "aws",
+        "enabled": true,
+        "config": {
+          "profile": "flamurg+testing-Admin",
+          "region": "eu-west-2"
+        },
+        "default": true,
+        "template_defaults": {
+          "subnet_ids": [
+            "subnet-0b4779042604b3c3c",
+            "subnet-0cfcdcb5ecffd8e34",
+            "subnet-087ffbe112328f00c"
+          ],
+          "security_group_ids": [
+            "sg-0207c8c797fadea6f"
+          ],
+          "fleet_role": "arn:aws:iam::740606666446:role/aws-service-role/spotfleet.amazonaws.com/AWSServiceRoleForEC2SpotFleet"
+        }
+      },
+      {
+        "name": "aws_flamurg-testing-Admin_eu-west-1",
+        "type": "aws",
+        "enabled": true,
+        "config": {
+          "profile": "flamurg+testing-Admin",
+          "region": "eu-west-1"
+        },
+        "template_defaults": {
+          "subnet_ids": [
+            "subnet-066e96d0499e41604",
+            "subnet-00c299c4863848390",
+            "subnet-0968547c59325f14b"
+          ],
+          "security_group_ids": [
+            "sg-09b5f54bfac80dc9f"
+          ],
+          "fleet_role": "arn:aws:iam::740606666446:role/aws-service-role/spotfleet.amazonaws.com/AWSServiceRoleForEC2SpotFleet"
+        }
+      }
+    ]
+  },
+  "storage": {
+    "default_storage_path": "/Users/flamurg/src/aws/symphony/open-resource-broker/tests/onaws/run_templates/test_rest_api_control_loop[03.03.15.38][hostfactory.EC2Fleet.request.ABIS.SIZE.100]/data",
+    "json_strategy": {
+      "base_path": "/Users/flamurg/src/aws/symphony/open-resource-broker/tests/onaws/run_templates/test_rest_api_control_loop[03.03.15.38][hostfactory.EC2Fleet.request.ABIS.SIZE.100]/data"
+    }
+  },
+  "metrics": {
+    "metrics_enabled": true,
+    "metrics_dir": "/Users/flamurg/src/aws/symphony/open-resource-broker/tests/onaws/run_templates/test_rest_api_control_loop[03.03.15.38][hostfactory.EC2Fleet.request.ABIS.SIZE.100]/metrics",
+    "metrics_interval": 20,
+    "trace_enabled": true,
+    "trace_buffer_size": 1000,
+    "trace_file_max_size_mb": 10,
+    "aws_metrics": {
+      "aws_metrics_enabled": true,
+      "sample_rate": 1.0,
+      "monitored_services": [],
+      "monitored_operations": [],
+      "track_payload_sizes": true
+    }
+  }
+}
