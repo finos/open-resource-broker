@@ -81,7 +81,7 @@ class RequestStatusManagementService:
         )
 
     def _handle_provisioning_failure(self, request: Any, provisioning_result: Any) -> Any:
-        """Handle provisioning failure."""
+        """Handle provisioning failure, capturing AWS error details when available."""
         from orb.domain.request.value_objects import RequestStatus
 
         error_message = (
@@ -94,6 +94,39 @@ class RequestStatusManagementService:
         request = request.update_metadata(
             {"error_message": error_message, "error_type": "ProvisioningFailure"}
         )
+
+        # Persist structured AWS error details so they are available to the status
+        # response.  Only non-None fields are included to keep error_details clean.
+        aws_error_code: str | None = getattr(provisioning_result, "aws_error_code", None)
+        aws_error_message: str | None = getattr(provisioning_result, "aws_error_message", None)
+        aws_request_id: str | None = getattr(provisioning_result, "aws_request_id", None)
+        error_source: str | None = getattr(provisioning_result, "error_source", None)
+
+        if any([aws_error_code, aws_error_message, aws_request_id, error_source]):
+            aws_error_block: dict[str, Any] = {}
+            if aws_error_code:
+                aws_error_block["code"] = aws_error_code
+            if aws_error_message:
+                aws_error_block["message"] = aws_error_message
+            if error_source:
+                aws_error_block["source"] = error_source
+            if aws_request_id:
+                aws_error_block["aws_request_id"] = aws_request_id
+
+            # Merge into error_details so it survives serialization / persistence.
+            current = dict(request.error_details) if request.error_details else {}
+            current["aws_error"] = aws_error_block
+            # Pydantic freeze-safe: use model_copy for the error_details field.
+            from orb.domain.request.aggregate import Request as RequestAggregate
+
+            if isinstance(request, RequestAggregate):
+                fields = request.model_dump()
+                fields["error_details"] = current
+                fields["version"] = request.version + 1
+                request = RequestAggregate.model_validate(fields)
+            else:
+                # Fallback for mock objects in tests
+                request.error_details = current  # type: ignore[attr-defined]
 
         return request
 

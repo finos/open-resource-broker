@@ -38,6 +38,12 @@ class ProvisioningResult:
     ``RequiresFollowUp`` → ``is_final = False`` (background work remains)
     ``Failed``           → ``is_final = True``
     ``None`` (legacy)    → honour the explicit ``is_final`` value
+
+    AWS-specific error fields (all optional, only set on failure from AWS):
+      ``aws_error_code``    — boto3 ``ClientError`` code (e.g. ``UnauthorizedOperation``)
+      ``aws_error_message`` — human-readable message from the AWS response
+      ``aws_request_id``    — AWS request ID for Support cases
+      ``error_source``      — service.operation label (e.g. ``aws.ec2.RunInstances``)
     """
 
     success: bool
@@ -49,6 +55,12 @@ class ProvisioningResult:
     fulfilled_count: int = 0
     is_final: bool = True
     outcome: OperationOutcome | None = field(default=None)
+    # AWS-specific error detail fields — populated when the failure originates from
+    # an AWS API call so callers can surface actionable diagnostics to the user.
+    aws_error_code: str | None = None
+    aws_error_message: str | None = None
+    aws_request_id: str | None = None
+    error_source: str | None = None
 
     def __post_init__(self) -> None:
         """Derive ``is_final`` from ``outcome`` when an outcome is provided."""
@@ -64,6 +76,25 @@ class ProvisioningResult:
                     self.is_final = True
                 case _ as unreachable:
                     assert_never(unreachable)
+
+
+def _extract_aws_error_fields(exc: BaseException) -> dict[str, Any]:
+    """Extract AWS-specific error fields from an AWSError exception (if applicable).
+
+    Returns a dict suitable for **-unpacking into ProvisioningResult.  When the
+    exception is not an AWSError the dict will contain only None values so the
+    ProvisioningResult fields stay empty (safe default).
+    """
+    aws_error_code: str | None = getattr(exc, "aws_error_code", None)
+    aws_error_message: str | None = getattr(exc, "aws_error_message", None)
+    aws_request_id: str | None = getattr(exc, "aws_request_id", None)
+    error_source: str | None = getattr(exc, "error_source", None)
+    return {
+        "aws_error_code": aws_error_code,
+        "aws_error_message": aws_error_message,
+        "aws_request_id": aws_request_id,
+        "error_source": error_source,
+    }
 
 
 class ProvisioningOrchestrationService:
@@ -418,6 +449,7 @@ class ProvisioningOrchestrationService:
                     "error_type": type(e).__name__,
                 },
             )
+            aws_fields = _extract_aws_error_fields(e)
             return ProvisioningResult(
                 success=False,
                 resource_ids=[],
@@ -426,6 +458,7 @@ class ProvisioningOrchestrationService:
                 provider_data={},
                 error_message=quota_msg,
                 outcome=Failed(error=quota_msg, recoverable=False),
+                **aws_fields,
             )
 
         except Exception as e:
@@ -443,6 +476,7 @@ class ProvisioningOrchestrationService:
                     "error_type": type(e).__name__,
                 },
             )
+            aws_fields = _extract_aws_error_fields(e)
             return ProvisioningResult(
                 success=False,
                 resource_ids=[],
@@ -451,4 +485,5 @@ class ProvisioningOrchestrationService:
                 provider_data={},
                 error_message=generic_msg,
                 outcome=Failed(error=generic_msg, recoverable=False),
+                **aws_fields,
             )

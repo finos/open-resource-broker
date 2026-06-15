@@ -115,6 +115,9 @@ class RequestDTO(BaseDTO):
     provider_data: dict[str, Any] = Field(default_factory=dict)
     version: int = 0
     resource_ids: list[str] = Field(default_factory=list)
+    # Structured error block surfaced when status is failed or partial.
+    # Populated from error_details["aws_error"] when an AWS API error was captured.
+    error: Optional[dict[str, Any]] = None
 
     @classmethod
     def from_domain(
@@ -145,6 +148,9 @@ class RequestDTO(BaseDTO):
                 machine_refs = [
                     MachineReferenceDTO.from_machine(m, request.request_type) for m in domain_refs
                 ]
+
+        # Build structured error block from error_details when available.
+        error_block: Optional[dict[str, Any]] = request.error_details.get("aws_error") if request.error_details else None
 
         # Create the DTO with all available fields
         return cls(
@@ -177,6 +183,7 @@ class RequestDTO(BaseDTO):
             provider_data=request.provider_data,
             version=request.version,
             resource_ids=request.resource_ids,
+            error=error_block,
         )
 
     def to_dict(self, verbose: bool = False) -> dict[str, Any]:
@@ -202,6 +209,12 @@ class RequestDTO(BaseDTO):
 
         # Remove machine_references field as it's replaced by machines
         result.pop("machine_references", None)
+
+        # Include error block only when present (failed / partial requests).
+        if self.error:
+            result["error"] = self.error
+        else:
+            result.pop("error", None)
 
         # Remove fields based on detail level
         if not include_details:
