@@ -17,8 +17,21 @@ import pytest
 from boto3 import Session
 from botocore.exceptions import ClientError, NoCredentialsError
 
+def _find_repo_root(start: Path) -> Path:
+    """Walk up from *start* until we find pyproject.toml. Hard-fail otherwise.
+
+    Robust against test-tree reshuffles: counting parents (e.g. `parent ** 5`)
+    silently breaks the moment a test file moves up or down the tree. The
+    pyproject.toml marker is stable as long as the repo has one.
+    """
+    for candidate in (start, *start.parents):
+        if (candidate / "pyproject.toml").is_file():
+            return candidate
+    raise RuntimeError(f"Could not locate repo root (no pyproject.toml) above {start}")
+
+
 # Ensure repo root is on sys.path so hfmock.py and other root-level modules are importable
-repo_root = Path(__file__).parent.parent.parent.parent
+repo_root = _find_repo_root(Path(__file__).resolve().parent)
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
