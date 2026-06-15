@@ -203,6 +203,17 @@ class TestCQRSArchitectureIntegration:
                 is_final=True,
             )
         )
+        from orb.domain.base.results import ProviderSelectionResult
+
+        mock_provider_validation_service = AsyncMock()
+        mock_provider_validation_service.select_and_validate_provider = AsyncMock(
+            return_value=ProviderSelectionResult(
+                provider_type="aws",
+                provider_name="aws-default",
+                selection_reason="Best match for template requirements",
+                confidence=0.95,
+            )
+        )
         return CreateMachineRequestHandler(
             uow_factory=mock_uow_factory,
             logger=mock_logger,
@@ -212,6 +223,7 @@ class TestCQRSArchitectureIntegration:
             query_bus=mock_query_bus,
             provider_selection_port=mock_provider_selection_port,
             provisioning_service=mock_provisioning_service,
+            provider_validation_service=mock_provider_validation_service,
         )
 
     @pytest.fixture
@@ -240,7 +252,7 @@ class TestCQRSArchitectureIntegration:
 
         # Verify handler interactions
         create_request_handler._query_bus.execute.assert_called_once()
-        create_request_handler._provider_selection_port.select_provider_for_template.assert_called_once()
+        create_request_handler._provider_validation_service.select_and_validate_provider.assert_called_once()
         create_request_handler._provisioning_service.execute_provisioning.assert_called_once()
 
     @pytest.mark.asyncio

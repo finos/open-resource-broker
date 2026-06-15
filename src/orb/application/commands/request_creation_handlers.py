@@ -11,6 +11,7 @@ from orb.application.dto.commands import (
     CreateReturnRequestCommand,
 )
 from orb.application.ports.query_bus_port import QueryBusPort
+from orb.application.services.provider_validation_service import ProviderValidationService
 from orb.application.services.provisioning_orchestration_service import (
     ProvisioningOrchestrationService,
 )
@@ -46,6 +47,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
         query_bus: QueryBusPort,  # QueryBus is required for template lookup
         provider_selection_port: ProviderSelectionPort,
         provisioning_service: ProvisioningOrchestrationService,
+        provider_validation_service: ProviderValidationService,
     ) -> None:
         """Initialize the instance."""
         super().__init__(logger, event_publisher, error_handler)
@@ -55,7 +57,6 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
         self._provider_selection_port = provider_selection_port
 
         # Initialize services
-        from orb.application.services.provider_validation_service import ProviderValidationService
         from orb.application.services.request_creation_service import RequestCreationService
         from orb.application.services.request_status_management_service import (
             RequestStatusManagementService,
@@ -64,9 +65,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
         self._request_creation_service = RequestCreationService(logger)
         self._provisioning_service = provisioning_service
         self._status_service = RequestStatusManagementService(uow_factory, logger)
-        self._provider_validation_service = ProviderValidationService(
-            container, logger, provider_selection_port
-        )
+        self._provider_validation_service = provider_validation_service
 
     async def validate_command(self, command: CreateRequestCommand) -> None:
         """Validate create request command."""

@@ -192,10 +192,23 @@ class ConfigurationLoader:
     def _load_strategy_defaults(cls, config_manager=None) -> dict[str, Any]:
         merged: dict[str, Any] = {}
         try:
+            import importlib
+            import pkgutil
+
+            import orb.providers as _providers_pkg
             from orb.providers.registry import get_provider_registry
 
             registry = get_provider_registry()
-            registry.ensure_provider_type_registered("aws")
+            # Discover all provider subpackages that carry a registration module
+            # and ensure each type is registered before collecting defaults.
+            for pkg_info in pkgutil.iter_modules(_providers_pkg.__path__):
+                provider_type = pkg_info.name
+                reg_module = f"orb.providers.{provider_type}.registration"
+                try:
+                    importlib.import_module(reg_module)
+                    registry.ensure_provider_type_registered(provider_type)
+                except ImportError:
+                    pass  # subpackage has no registration module — skip it
             cls._merge_config(merged, registry.collect_defaults())
         except Exception as e:
             get_config_logger().warning("Failed to load provider defaults: %s", e)
