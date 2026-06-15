@@ -49,16 +49,20 @@ def _is_live_run(config) -> bool:
 def _get_aws_profile_and_region() -> tuple[str | None, str | None]:
     """Read profile and region from ORB config.
 
-    Priority:
-    1. ORB_CONFIG_DIR env var (per-test config dir)
-    2. Project config/config.json (written by orb init)
-    3. AWS_REGION / AWS_DEFAULT_REGION env vars
+    Priority (matches `orb init` discovery + operator overrides):
+    1. ORB_CONFIG_DIR env var (per-test or per-deployment config dir)
+    2. ~/.orb/config.json (default user-level location written by `orb init`)
+    3. <repo>/config/config.json (in-repo dev fallback — only present when
+       running tests from a checkout that ran `orb init` inside it)
+    4. AWS_REGION / AWS_DEFAULT_REGION env vars (region only)
     """
-    candidates = []
+    candidates: list[str] = []
     config_dir = os.environ.get("ORB_CONFIG_DIR")
     if config_dir:
         candidates.append(os.path.join(config_dir, "config.json"))
-    # Fall back to the project's real config written by orb init
+    # User-default location for `orb init`
+    candidates.append(str(Path.home() / ".orb" / "config.json"))
+    # In-repo dev fallback (the directory exists only in source checkouts)
     candidates.append(str(repo_root / "config" / "config.json"))
 
     for config_path in candidates:
