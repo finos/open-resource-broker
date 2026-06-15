@@ -172,8 +172,35 @@ class ASGCapacityManager:
             self._cleanup_on_zero_capacity("asg", asg_name)
             return
 
+        # Guard against double-execution: only detach instances that are currently
+        # members of this ASG.  If release_instances is called a second time for the
+        # same set (e.g. due to an IN_PROGRESS status retry or a race), the instances
+        # are already detached and this check prevents a second DesiredCapacity decrement.
+        instances_to_detach = self._filter_asg_members(asg_name, instance_ids)
+        if not instances_to_detach:
+            self._logger.info(
+                "ASG %s: all %d instance(s) already detached — skipping detach and capacity decrement",
+                asg_name,
+                len(instance_ids),
+            )
+            # Instances may still be running (standalone after a prior partial detach);
+            # terminate them directly so the return request can complete.
+            self._aws_ops.terminate_instances_with_fallback(
+                instance_ids, self._request_adapter, f"ASG {asg_name} instances (already detached)"
+            )
+            return
+
+        skipped = [i for i in instance_ids if i not in instances_to_detach]
+        if skipped:
+            self._logger.info(
+                "ASG %s: %d instance(s) already detached (skipping): %s",
+                asg_name,
+                len(skipped),
+                skipped,
+            )
+
         # Detach instances (API limit: 50 per call; use 20 for safety)
-        for chunk in self._chunk_list(instance_ids, 20):
+        for chunk in self._chunk_list(instances_to_detach, 20):
             self._retry_with_backoff(
                 self._aws_client.autoscaling_client.detach_instances,
                 operation_type="critical",
@@ -182,7 +209,7 @@ class ASGCapacityManager:
                 ShouldDecrementDesiredCapacity=True,
             )
             self._logger.debug("Detached chunk from ASG %s: %s", asg_name, chunk)
-        self._logger.info("Detached instances from ASG %s: %s", asg_name, instance_ids)
+        self._logger.info("Detached instances from ASG %s: %s", asg_name, instances_to_detach)
 
         # Re-describe the ASG to get the live DesiredCapacity after detach, since
         # ShouldDecrementDesiredCapacity=True may have already decremented it in AWS
@@ -201,7 +228,7 @@ class ASGCapacityManager:
                 asg_name,
                 exc,
             )
-            live_desired = max(0, asg_details["DesiredCapacity"] - len(instance_ids))
+            live_desired = max(0, asg_details["DesiredCapacity"] - len(instances_to_detach))
 
         new_capacity = max(0, live_desired)
 
@@ -227,6 +254,40 @@ class ASGCapacityManager:
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
+
+    def _filter_asg_members(self, asg_name: str, instance_ids: list[str]) -> list[str]:
+        """Return the subset of instance_ids that are currently attached to asg_name.
+
+        Used as an idempotency guard in release_instances: if an instance has already
+        been detached (e.g. by a prior call), it is excluded so that
+        ShouldDecrementDesiredCapacity=True is not applied a second time.
+        """
+        if not instance_ids:
+            return []
+        try:
+            response = self._retry_with_backoff(
+                self._aws_client.autoscaling_client.describe_auto_scaling_instances,
+                operation_type="read_only",
+                InstanceIds=instance_ids,
+            )
+            attached_ids = {
+                entry["InstanceId"]
+                for entry in response.get("AutoScalingInstances", [])
+                if entry.get("AutoScalingGroupName") == asg_name
+            }
+            return [iid for iid in instance_ids if iid in attached_ids]
+        except Exception as exc:
+            self._logger.warning(
+                "Failed to verify ASG %s membership for instances %s; "
+                "proceeding with all instances to avoid leaving them running: %s",
+                asg_name,
+                instance_ids,
+                exc,
+            )
+            # On error, be conservative: attempt detach for all instances.
+            # A "not a member" error from detach_instances is better than
+            # skipping a needed capacity decrement.
+            return list(instance_ids)
 
     def _call_delete_asg(self, asg_name: str) -> None:
         """Invoke the registered delete-ASG callback, or fall back to direct deletion."""
