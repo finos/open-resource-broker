@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "orb-py"
-version = "1.7.0"
+version = "1.6.2"
 description = "Open Resource Broker (ORB) — dynamic cloud resource provisioning via CLI and REST API"
 readme = "README.md"
 license = "Apache-2.0"
@@ -53,11 +53,21 @@ dependencies = [
     "requests>=2.31.0",
     "PyYAML>=6.0.0", # Exported API (lazy-loaded)
     "jsonschema>=4.17.0",
+    # AWS provider deps — currently in core for backward compatibility.
+    # The canonical install path going forward is `pip install orb-py[aws]`,
+    # which already works today.  When the second provider lands these will
+    # move to the [aws] extra and a major-version bump will signal the
+    # breaking change for operators who installed without extras.
+    "boto3>=1.42.21",
+    "botocore>=1.42.21",
 ]
 
 [project.optional-dependencies]
 # ── Provider extras ────────────────────────────────────────────────────────
-# AWS provider — boto3 and botocore (moved from core in 1.7.0; breaking change)
+# AWS provider — explicit opt-in alias for the AWS deps currently in core.
+# Pinning the same versions keeps `pip install orb-py[aws]` resolving identically
+# to the bare install and future-proofs operator install commands for the day
+# AWS deps move out of core.
 aws = [
     "boto3>=1.42.21",
     "botocore>=1.42.21",
