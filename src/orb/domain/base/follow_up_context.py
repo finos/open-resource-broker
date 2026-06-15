@@ -12,7 +12,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
 
-
 # ---------------------------------------------------------------------------
 # Individual context variants
 # ---------------------------------------------------------------------------
@@ -60,9 +59,7 @@ class DeploymentPollingFollowUpContext:
         provider_handle: Provider-side tracking ID (fleet request ID, etc.).
     """
 
-    follow_up_kind: Literal["deployment_polling"] = field(
-        default="deployment_polling", init=False
-    )
+    follow_up_kind: Literal["deployment_polling"] = field(default="deployment_polling", init=False)
     pending_resource_ids: list[str] = field(default_factory=list)
     expected_terminal_state: str = "running"
     poll_after: datetime | None = None

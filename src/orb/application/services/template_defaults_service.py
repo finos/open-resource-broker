@@ -473,9 +473,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             # 1. Get provider type extension defaults — safe for unknown providers (returns {})
             type_extension_defaults = self.extension_registry.get_extension_defaults(provider_type)
             extension_defaults.update(type_extension_defaults)
-            self.logger.debug(
-                "Applied %s type extension defaults", len(type_extension_defaults)
-            )
+            self.logger.debug("Applied %s type extension defaults", len(type_extension_defaults))
 
             # 2. Get provider instance extension overrides
             if provider_instance_name:

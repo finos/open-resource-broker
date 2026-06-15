@@ -5,7 +5,7 @@ execute_operation via ProviderRegistryService.  These tests cover the core paths
 that interact with the outcome-aware request status logic.
 """
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -121,8 +121,15 @@ class TestFetchProviderMachinesWithMockRegistry:
         async def _capture(provider_name, operation):
             called_operations.append(operation.operation_type.value)
             return ProviderResult.success_result(
-                data={"instances": [{"instance_id": "i-1", "status": "shutting-down",
-                                     "instance_type": "m5.large"}]},
+                data={
+                    "instances": [
+                        {
+                            "instance_id": "i-1",
+                            "status": "shutting-down",
+                            "instance_type": "m5.large",
+                        }
+                    ]
+                },
             )
 
         registry_svc = MagicMock()

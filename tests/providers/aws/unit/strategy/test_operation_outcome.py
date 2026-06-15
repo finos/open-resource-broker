@@ -19,7 +19,6 @@ from orb.domain.base.operation_outcome import (
     RequiresFollowUp,
 )
 
-
 # ---------------------------------------------------------------------------
 # Domain types
 # ---------------------------------------------------------------------------
@@ -171,7 +170,6 @@ class TestAWSProviderStrategyOutcomeInterface:
     """AWSProviderStrategy must declare acquire / return_machines / get_status."""
 
     def test_acquire_method_exists(self):
-        import inspect
 
         from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
@@ -191,7 +189,6 @@ class TestAWSProviderStrategyOutcomeInterface:
         assert asyncio_or_coroutine(AWSProviderStrategy.get_status)
 
     def test_base_strategy_declares_acquire_abstract(self):
-        import inspect
 
         from orb.providers.base.strategy.base_provider_strategy import BaseProviderStrategy
 

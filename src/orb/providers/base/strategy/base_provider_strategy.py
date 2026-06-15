@@ -72,9 +72,7 @@ class BaseProviderStrategy(ProviderPort, ABC):
         """
 
     @abstractmethod
-    async def get_status(
-        self, resource_ids: list[str], request: "Request"
-    ) -> OperationOutcome:
+    async def get_status(self, resource_ids: list[str], request: "Request") -> OperationOutcome:
         """Query the current status of previously submitted resources.
 
         Args:

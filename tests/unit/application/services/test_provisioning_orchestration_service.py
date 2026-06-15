@@ -12,8 +12,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from orb.application.services.provisioning_orchestration_service import (
-    ProvisioningResult,
     ProvisioningOrchestrationService,
+    ProvisioningResult,
 )
 from orb.domain.base.operation_outcome import (
     Accepted,
@@ -23,7 +23,6 @@ from orb.domain.base.operation_outcome import (
     RequiresFollowUp,
 )
 from orb.domain.base.results import ProviderSelectionResult
-
 
 # ---------------------------------------------------------------------------
 # ProvisioningResult — outcome/is_final derivation
@@ -211,7 +210,7 @@ class TestDispatchSingleAttemptOutcome:
         provider_result = ProviderResult.success_result(
             data={
                 "resource_ids": ["fleet-1"],
-                "instances": [{"id": "i-1"}],   # only 1 of 2 requested
+                "instances": [{"id": "i-1"}],  # only 1 of 2 requested
                 "instance_ids": ["i-1"],
             },
             metadata={},
@@ -242,7 +241,7 @@ class TestDispatchSingleAttemptOutcome:
         provider_result = ProviderResult.success_result(
             data={
                 "resource_ids": ["fleet-1"],
-                "instances": [{"id": "i-1"}, {"id": "i-2"}],   # 2 of 2
+                "instances": [{"id": "i-1"}, {"id": "i-2"}],  # 2 of 2
                 "instance_ids": ["i-1", "i-2"],
             },
             metadata={},

@@ -12,13 +12,12 @@ the terminated state.
 from __future__ import annotations
 
 from contextlib import contextmanager
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from orb.application.commands.request_creation_handlers import CreateReturnRequestHandler
 from orb.domain.request.request_types import RequestStatus
-
 
 # ---------------------------------------------------------------------------
 # Minimal fakes

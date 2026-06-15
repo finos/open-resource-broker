@@ -195,6 +195,7 @@ class TestReturnMachinesOrchestrator:
         self, orchestrator, mock_command_bus
     ):
         """machine_ids in output must reflect the machines submitted for return."""
+
         async def _set_request_ids(cmd):
             cmd.created_request_ids = ["ret-req-001"]
 
@@ -225,6 +226,7 @@ class TestReturnMachinesOrchestrator:
     @pytest.mark.asyncio
     async def test_output_machine_ids_empty_when_no_op(self, orchestrator, mock_command_bus):
         """machine_ids must be empty (default) when no request was created."""
+
         async def _set_empty(cmd):
             cmd.created_request_ids = []
             cmd.skipped_machines = ["i-001"]

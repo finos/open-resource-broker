@@ -12,10 +12,8 @@ import pytest
 
 from orb.application.services.provisioning_orchestration_service import (
     ProvisioningOrchestrationService,
-    ProvisioningResult,
 )
 from orb.domain.base.results import ProviderSelectionResult
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -193,9 +191,7 @@ class TestDispatchTimeout:
         updated_req.update_metadata = lambda d: updated_req
         request.update_metadata = lambda d: updated_req
 
-        result = await svc.execute_provisioning(
-            _make_template(), request, _make_selection_result()
-        )
+        result = await svc.execute_provisioning(_make_template(), request, _make_selection_result())
 
         # At least one attempt was made and resulted in failure due to timeout
         assert call_count >= 1
@@ -323,8 +319,6 @@ class TestPersistAcquiringToThread:
         request.update_status = MagicMock(return_value=request)
 
         # Make _persist_acquiring return failure (second return value = False)
-        original_persist = svc._persist_acquiring
-
         def _failing_persist(req):
             return req, False
 
@@ -337,9 +331,7 @@ class TestPersistAcquiringToThread:
             "orb.application.services.provisioning_orchestration_service.asyncio.to_thread",
             side_effect=_inline_to_thread,
         ):
-            result = await svc.execute_provisioning(
-                _make_template(), request, _make_selection_result()
-            )
+            await svc.execute_provisioning(_make_template(), request, _make_selection_result())
 
         # Loop should have continued despite persist failure
         svc._logger.warning.assert_called()
