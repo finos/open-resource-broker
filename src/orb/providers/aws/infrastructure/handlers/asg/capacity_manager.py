@@ -277,16 +277,35 @@ class ASGCapacityManager:
             # exception-path behaviour below.
             if not entries:
                 return list(instance_ids)
-            attached_ids = {
-                entry["InstanceId"]
+            # Only detach instances that are currently in a state where
+            # ShouldDecrementDesiredCapacity=True is meaningful.  Instances in
+            # Detaching / Detached / Terminated already had their DesiredCapacity
+            # decremented on the first call; including them again would double-count.
+            _DETACHABLE_STATES = {"InService", "Standby"}
+
+            # Map: instance_id → lifecycle_state for every entry belonging to asg_name.
+            state_by_id = {
+                entry["InstanceId"]: entry.get("LifecycleState", "")
                 for entry in entries
                 if entry.get("AutoScalingGroupName") == asg_name
             }
-            filtered = [iid for iid in instance_ids if iid in attached_ids]
-            # If the membership filter excluded everything, treat that as
-            # "couldn't verify" and fall back to all instances. Excluding all
-            # would skip a necessary capacity decrement.
-            return filtered or list(instance_ids)
+
+            if not state_by_id:
+                # None of the requested instances appeared in describe output at all.
+                # Could mean: (a) instances were never in this ASG, (b) describe had a
+                # gap.  Fall back to processing all instances to be safe — the original
+                # guard logic below will fall through to terminate_instances_with_fallback.
+                return list(instance_ids)
+
+            # Return only the instances in a detachable lifecycle state.
+            filtered = [
+                iid
+                for iid in instance_ids
+                if state_by_id.get(iid) in _DETACHABLE_STATES
+            ]
+            # instances not in state_by_id are not (or no longer) in this ASG;
+            # they can be skipped for detach (will still be terminated downstream).
+            return filtered
         except Exception as exc:
             self._logger.warning(
                 "Failed to verify ASG %s membership for instances %s; "
