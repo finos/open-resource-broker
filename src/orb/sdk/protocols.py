@@ -48,7 +48,13 @@ class ORBClientProtocol(Protocol):
         pass
 
     # --- Request operations ---
-    async def get_request_status(self, request_ids: list[str], **kwargs: Any) -> dict[str, Any]:  # type: ignore[return]
+    async def get_request_status(
+        self,
+        request_ids: "list[str] | None" = None,
+        *,
+        request_id: "str | None" = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:  # type: ignore[return]
         pass
 
     async def get_request(self, *, request_id: str, **kwargs: Any) -> dict[str, Any]:  # type: ignore[return]
