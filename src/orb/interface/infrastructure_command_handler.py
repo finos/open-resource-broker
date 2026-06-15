@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 
 from orb.config.platform_dirs import get_config_location
 from orb.domain.base.ports.console_port import ConsolePort
+from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
 from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
 
@@ -113,8 +114,15 @@ def _show_provider_infrastructure(provider: Dict[str, Any]) -> None:
 
     config = provider.get("config", {})
     if config:
-        console.info(f"Region: {config.get('region', 'N/A')}")
-        console.info(f"Profile: {config.get('profile', 'N/A')}")
+        provider_type = provider.get("type", "")
+        spec = CLISpecRegistry.get(provider_type)
+        if spec is not None:
+            for label, value in spec.format_display(config):
+                console.info(f"{label}: {value}")
+        else:
+            for key, value in config.items():
+                label = key.replace("_", " ").title()
+                console.info(f"{label}: {value}")
 
     template_defaults = provider.get("template_defaults", {})
     if template_defaults:
@@ -174,7 +182,11 @@ def _get_active_providers() -> List[Dict[str, Any]]:
 
         registry_service = get_container().get(ProviderRegistryService)
         registered_types = registry_service.get_registered_provider_types()
-        default_type = registered_types[0] if registered_types else "aws"
+        if not registered_types:
+            raise RuntimeError(
+                "No providers are registered. Run 'orb init' to configure a provider."
+            )
+        default_type = registered_types[0]
         return [
             {
                 "name": "default",
@@ -199,7 +211,11 @@ def _get_active_providers() -> List[Dict[str, Any]]:
 
         registry_service = get_container().get(ProviderRegistryService)
         registered_types = registry_service.get_registered_provider_types()
-        default_type = registered_types[0] if registered_types else "aws"
+        if not registered_types:
+            raise RuntimeError(
+                "No providers are registered. Run 'orb init' to configure a provider."
+            )
+        default_type = registered_types[0]
         active_providers = [
             {
                 "name": "default",

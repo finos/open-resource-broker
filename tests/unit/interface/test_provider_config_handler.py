@@ -216,6 +216,22 @@ class TestHandleProviderAdd:
 
         assert result.get("error") is True and result.get("exit_code") == 1
 
+    @pytest.mark.asyncio
+    async def test_missing_provider_type_returns_1(self, tmp_path):
+        """No provider_type attribute on args must return an error, not default to 'aws'."""
+        from orb.interface.provider_config_handler import handle_provider_add
+
+        _write_config(tmp_path, _base_config())
+        with patch(
+            "orb.interface.provider_config_handler.get_config_location",
+            return_value=tmp_path,
+        ):
+            # args has no provider_type attribute at all
+            args = _ns(aws_profile="default", aws_region="us-east-1", name=None, discover=False)
+            result = await handle_provider_add(args)
+
+        assert result.get("error") is True and result.get("exit_code") == 1
+
 
 # ---------------------------------------------------------------------------
 # handle_provider_remove
