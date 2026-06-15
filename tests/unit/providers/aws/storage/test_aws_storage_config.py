@@ -87,9 +87,7 @@ def test_storage_config_accepts_strategy_once_registered(monkeypatch):
     import orb.config.schemas.storage_schema as storage_schema
 
     # Not registered (registry reports baseline only) -> rejected.
-    monkeypatch.setattr(
-        storage_schema, "_get_valid_storage_strategies", lambda: {"json", "sql"}
-    )
+    monkeypatch.setattr(storage_schema, "_get_valid_storage_strategies", lambda: {"json", "sql"})
     with pytest.raises(ValueError):
         StorageConfig(strategy="dynamodb")
 
