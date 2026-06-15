@@ -6,32 +6,37 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 <!-- insertion marker -->
-## [1.7.0] — Breaking Change
-
-### Breaking Changes
-
-- `boto3` and `botocore` removed from core `[project.dependencies]`.
-  Install `orb-py[aws]` (or `orb-py[all]`) to restore the previous behaviour.
-  Plain `pip install orb-py` no longer installs the AWS SDK.
+## Unreleased
 
 ### Added
 
-- New `[aws]` extra: `boto3>=1.42.21`, `botocore>=1.42.21`.
+- New `[aws]` extra (alias for AWS deps currently in core). The canonical install
+  command going forward is `pip install orb-py[aws]`. This continues to work
+  unchanged when AWS deps move out of core in a future major version.
 - New `[all-providers]` meta-extra: pulls in all currently implemented providers.
 - New `[monitoring-aws]` extra: AWS-specific OpenTelemetry boto instrumentation (previously bundled inside `[monitoring]`).
 - New `[test-aws]` extra: moto + response-mocking deps for AWS test suites.
-- Architecture test `test_boto3_leak_detection.py`: asserts boto3/botocore are never imported outside `providers/aws/`.
-- Unit tests `test_no_provider_install.py`: verifies ORB core modules boot cleanly when `[aws]` extra is absent.
+- Architecture test `test_boto3_leak_detection.py`: asserts boto3/botocore are never imported outside `providers/aws/` except by guarded backward-compat shims.
+- Unit tests `test_no_provider_install.py`: verifies ORB core modules boot cleanly when AWS deps are absent.
 
 ### Changed
 
 - `[monitoring]` extra no longer includes `opentelemetry-instrumentation-boto` (use `[monitoring-aws]`).
 - `[all]` extra now includes `[all-providers]` so `pip install orb-py[all]` still pulls everything.
 - `[dev]` shim extra now includes `[all-providers]` for full local development.
-- Three module-level import leaks fixed with `try/except ImportError` guards:
+- Three module-level import sites guarded with `try/except ImportError` so ORB core boots when AWS extras are absent:
   `config/schemas/cleanup_schema.py`, `infrastructure/storage/registration.py`,
   `providers/registration.py` (deprecated shims).
 - `tests/conftest.py`: bare `import boto3` replaced with guarded `AWS_AVAILABLE` flag; AWS provider tests auto-skip when `[aws]` extra is absent.
+
+### Notes
+
+- `boto3` + `botocore` **remain in core** `[project.dependencies]` for now to
+  preserve backward compatibility — `pip install orb-py` still works unchanged.
+- When the second provider (Azure / GCP / OCI) lands, AWS deps will move from
+  core to the `[aws]` extra and a major-version bump will signal the breaking
+  change. Operators who use `pip install orb-py[aws]` today will see no
+  behavior change at that cutover.
 
 ## Unreleased
 

@@ -2411,9 +2411,11 @@ wheels = [
 
 [[package]]
 name = "orb-py"
-version = "1.7.0"
+version = "1.6.2"
 source = { editable = "." }
 dependencies = [
+    { name = "boto3" },
+    { name = "botocore" },
     { name = "cryptography" },
     { name = "filelock" },
     { name = "jsonschema" },
@@ -2704,7 +2706,9 @@ dev = [
 requires-dist = [
     { name = "bandit", marker = "extra == 'ci'", specifier = ">=1.7.5,<2.0.0" },
     { name = "bandit-sarif-formatter", marker = "extra == 'ci'", specifier = ">=1.1.1,<2.0.0" },
+    { name = "boto3", specifier = ">=1.42.21" },
     { name = "boto3", marker = "extra == 'aws'", specifier = ">=1.42.21" },
+    { name = "botocore", specifier = ">=1.42.21" },
     { name = "botocore", marker = "extra == 'aws'", specifier = ">=1.42.21" },
     { name = "build", marker = "extra == 'ci'", specifier = ">=1.0.3,<2.0.0" },
     { name = "bump2version", marker = "extra == 'dev'", specifier = ">=1.0.1,<2.0.0" },
