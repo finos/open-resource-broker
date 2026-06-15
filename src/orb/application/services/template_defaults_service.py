@@ -470,15 +470,12 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         extension_defaults = {}
 
         try:
-            # 1. Get provider type extension defaults
-            if self.extension_registry.has_extension(provider_type):
-                type_extension_defaults = self.extension_registry.get_extension_defaults(
-                    provider_type
-                )
-                extension_defaults.update(type_extension_defaults)
-                self.logger.debug(
-                    "Applied %s type extension defaults", len(type_extension_defaults)
-                )
+            # 1. Get provider type extension defaults — safe for unknown providers (returns {})
+            type_extension_defaults = self.extension_registry.get_extension_defaults(provider_type)
+            extension_defaults.update(type_extension_defaults)
+            self.logger.debug(
+                "Applied %s type extension defaults", len(type_extension_defaults)
+            )
 
             # 2. Get provider instance extension overrides
             if provider_instance_name:
@@ -519,14 +516,13 @@ class TemplateDefaultsService(TemplateDefaultsPort):
                         and hasattr(provider, "extensions")
                         and provider.extensions
                     ):
-                        # Use extension registry to process the extensions
-                        if self.extension_registry.has_extension(provider_type):
-                            return self.extension_registry.get_extension_defaults(
-                                provider_type, provider.extensions
-                            )
-                        else:
-                            # Return raw extensions if no registry entry
-                            return provider.extensions
+                        # Delegate to extension registry — returns {} for unknown providers,
+                        # so this is safe to call unconditionally.
+                        result = self.extension_registry.get_extension_defaults(
+                            provider_type, provider.extensions
+                        )
+                        # Fall back to raw extensions dict when registry has no entry.
+                        return result if result else provider.extensions
 
             return {}
 
@@ -598,18 +594,6 @@ class TemplateDefaultsService(TemplateDefaultsPort):
                 except Exception as e:
                     validation_result["warnings"].append(f"Domain validation failed: {e}")
                     validation_result["domain_validation"] = "failed"
-
-            # Check for provider-specific validation
-            provider_type = (
-                self._get_provider_type(provider_instance_name) if provider_instance_name else None
-            )
-            if provider_type and hasattr(template, f"validate_{provider_type}"):
-                try:
-                    getattr(template, f"validate_{provider_type}")()
-                    validation_result[f"{provider_type}_validation"] = "passed"
-                except Exception as e:
-                    validation_result["warnings"].append(f"{provider_type} validation failed: {e}")
-                    validation_result[f"{provider_type}_validation"] = "failed"
 
         except Exception as e:
             validation_result["errors"].append(f"Template creation with extensions failed: {e}")
