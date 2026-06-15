@@ -38,8 +38,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   change. Operators who use `pip install orb-py[aws]` today will see no
   behavior change at that cutover.
 
-## Unreleased
-
 <small>[Compare with latest](https://github.com/awslabs/open-resource-broker/compare/v0.1.0rc0...HEAD)</small>
 
 ### Features

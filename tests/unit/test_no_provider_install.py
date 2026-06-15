@@ -12,11 +12,9 @@ from __future__ import annotations
 import importlib
 import sys
 from types import ModuleType
-from typing import Generator
 from unittest.mock import patch
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -27,7 +25,7 @@ class _ImportBlocker(ModuleType):
     """A fake module that raises ImportError on attribute access, simulating absence."""
 
     def __getattr__(self, name: str) -> object:
-        raise ImportError(f"boto3 extra not installed (simulated)")
+        raise ImportError("boto3 extra not installed (simulated)")
 
 
 def _block_modules(*names: str) -> dict[str, ModuleType | None]:

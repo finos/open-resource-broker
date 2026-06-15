@@ -467,7 +467,9 @@ class TestPartialReturnCapacityReduction:
         assert resp["AutoScalingGroups"], "ASG should still exist after partial release"
         assert resp["AutoScalingGroups"][0]["DesiredCapacity"] == 1
 
-    def test_asg_partial_return_idempotent_capacity_not_double_decremented(self, moto_vpc_resources):
+    def test_asg_partial_return_idempotent_capacity_not_double_decremented(
+        self, moto_vpc_resources
+    ):
         """Calling release_hosts twice for the same instance must NOT decrement capacity twice.
 
         Regression guard for the IN_PROGRESS status flow introduced in commit 641a03332:
