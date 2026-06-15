@@ -12,6 +12,7 @@ import sys
 # Optional: Rich formatting for help text
 import sys as _sys
 
+from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
 from orb.domain.machine.machine_status import MachineStatus
 from orb.domain.request.value_objects import RequestStatus
 
@@ -302,8 +303,8 @@ def add_provider_actions(subparsers):
     providers_add.add_argument(
         "--provider-type", dest="provider_type", required=True, help="Provider type (e.g. aws)"
     )
-    providers_add.add_argument("--aws-profile", help="AWS profile name")
-    providers_add.add_argument("--aws-region", help="AWS region")
+    for _spec in CLISpecRegistry.all().values():
+        _spec.add_arguments(providers_add)
     providers_add.add_argument("--name", help="Provider instance name")
     providers_add.add_argument("--discover", action="store_true", help="Discover infrastructure")
 
@@ -314,8 +315,8 @@ def add_provider_actions(subparsers):
     providers_update = subparsers.add_parser("update", help="Update provider configuration")
     add_global_arguments(providers_update)
     providers_update.add_argument("provider_name", help="Provider instance name")
-    providers_update.add_argument("--aws-region", help="Update region")
-    providers_update.add_argument("--aws-profile", help="Update profile")
+    for _spec in CLISpecRegistry.all().values():
+        _spec.add_arguments(providers_update)
 
     providers_set_default = subparsers.add_parser("set-default", help="Set default provider")
     add_global_arguments(providers_set_default)
@@ -424,6 +425,13 @@ def build_parser() -> tuple[argparse.ArgumentParser, dict]:
     Returns:
         tuple: (parser, resource_parsers_dict)
     """
+    # Ensure CLI specs are registered before iterating the registry.  This is
+    # a lightweight bootstrap (no full provider initialisation) so it is safe
+    # to call before any application context exists.
+    from orb.providers.registration import register_all_provider_cli_specs
+
+    register_all_provider_cli_specs()
+
     from orb._package import DESCRIPTION, DOCS_URL
 
     parser = argparse.ArgumentParser(
@@ -709,6 +717,10 @@ For more information, visit: {DOCS_URL}
         "--fleet-role",
         help="Spot Fleet IAM role ARN or name for template_defaults (non-interactive only)",
     )
+    # Inject per-provider CLI flags (e.g. --aws-profile, --aws-region) so that
+    # _get_default_config can use spec.extract_config() in non-interactive mode.
+    for _spec in CLISpecRegistry.all().values():
+        _spec.add_arguments(init_parser)
 
     return parser, resource_parsers
 

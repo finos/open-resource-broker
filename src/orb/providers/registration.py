@@ -1,6 +1,25 @@
 """Provider registration functions."""
 
 
+def register_all_provider_cli_specs() -> None:
+    """Register CLI argument specs for all available providers.
+
+    This is a lightweight bootstrap that only registers CLI specs (no full
+    provider strategy initialisation) so that ``build_parser`` can call it
+    before any application context exists.
+    """
+    from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
+    from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec
+
+    if CLISpecRegistry.get("aws") is None:
+        CLISpecRegistry.register("aws", AWSCLISpec())
+
+    # Future providers register their CLI specs here:
+    # from orb.providers.oci.cli.oci_cli_spec import OCICLISpec
+    # if CLISpecRegistry.get("oci") is None:
+    #     CLISpecRegistry.register("oci", OCICLISpec())
+
+
 def register_all_provider_types() -> None:
     """Register all available provider types."""
     from orb.providers.registry import get_provider_registry
