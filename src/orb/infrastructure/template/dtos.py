@@ -4,9 +4,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import Field, model_validator
+from pydantic import BaseModel, Field, field_serializer, model_validator
 
 from orb.application.dto.base import BaseDTO
+from orb.domain.template.extensions import TemplateExtensionRegistry
 
 
 class TemplateDTO(BaseDTO):
@@ -56,7 +57,6 @@ class TemplateDTO(BaseDTO):
     key_name: Optional[str] = None
     user_data: Optional[str] = None
     instance_profile: Optional[str] = None
-    launch_template_id: Optional[str] = None
 
     # Advanced configuration
     monitoring_enabled: Optional[bool] = None
@@ -64,6 +64,9 @@ class TemplateDTO(BaseDTO):
     # Tags and metadata
     tags: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    # Typed provider-specific configuration, populated via TemplateExtensionRegistry
+    provider_config: Optional[BaseModel] = None
 
     # Provider-specific data (keyed by provider name, e.g. {"aws": {...}})
     provider_data: dict[str, Any] = Field(default_factory=dict)
@@ -83,6 +86,13 @@ class TemplateDTO(BaseDTO):
     # Legacy fields
     version: Optional[str] = None
 
+    @field_serializer("provider_config")
+    def _serialize_provider_config(self, value: Optional[BaseModel]) -> Optional[dict[str, Any]]:
+        """Serialise the typed provider_config to a plain dict for model_dump() consumers."""
+        if value is None:
+            return None
+        return value.model_dump()
+
     @model_validator(mode="before")
     @classmethod
     def _set_defaults(cls, data: Any) -> Any:
@@ -95,28 +105,21 @@ class TemplateDTO(BaseDTO):
     @classmethod
     def from_domain(cls, template) -> "TemplateDTO":
         """Convert domain template to DTO."""
-        # Pack AWS-specific fields into metadata.
-        _fleet_type = getattr(template, "fleet_type", None)
-        _fleet_type_str: Optional[str] = (
-            str(_fleet_type.value)
-            if _fleet_type is not None and hasattr(_fleet_type, "value")
-            else (_fleet_type if _fleet_type is None else str(_fleet_type))
-        )
-        _abis = getattr(template, "abis_instance_requirements", None)
-        _fleet_role = getattr(template, "fleet_role", None)
-        _percent_on_demand = getattr(template, "percent_on_demand", None)
-
-        aws_extras: dict[str, Any] = {}
-        if _fleet_type_str is not None:
-            aws_extras["fleet_type"] = _fleet_type_str
-        if _fleet_role is not None:
-            aws_extras["fleet_role"] = _fleet_role
-        if _percent_on_demand is not None:
-            aws_extras["percent_on_demand"] = _percent_on_demand
-        if _abis is not None:
-            aws_extras["abis_instance_requirements"] = _abis.to_aws_dict()
-
-        metadata = {**getattr(template, "metadata", {}), **aws_extras}
+        # Delegate provider-specific field extraction to the extension registry.
+        # Each provider registers an extension class that knows which fields to
+        # capture.  Infrastructure layer stays provider-agnostic.
+        _provider_type = getattr(template, "provider_type", None)
+        _provider_config: Optional[BaseModel] = None
+        if _provider_type:
+            # Serialise the domain object to a plain dict so the extension class
+            # can pick up its own fields (with extra="ignore").
+            if hasattr(template, "model_dump"):
+                _template_data = template.model_dump()
+            else:
+                _template_data = vars(template)
+            _provider_config = TemplateExtensionRegistry.create_extension_config(
+                _provider_type, _template_data
+            )
 
         return cls(
             # Core fields
@@ -151,15 +154,16 @@ class TemplateDTO(BaseDTO):
             key_name=getattr(template, "key_name", None),
             user_data=getattr(template, "user_data", None),
             instance_profile=getattr(template, "instance_profile", None),
-            launch_template_id=getattr(template, "launch_template_id", None),
             # Advanced configuration
             monitoring_enabled=getattr(template, "monitoring_enabled", None),
-            # Tags and metadata
+            # Tags and metadata (cross-provider opaque data only)
             tags=getattr(template, "tags", {}),
-            metadata=metadata,
+            metadata=getattr(template, "metadata", {}),
+            # Typed provider-specific configuration (populated via registry)
+            provider_config=_provider_config,
             provider_data=getattr(template, "provider_data", {}),
-            # Provider configuration
-            provider_type=getattr(template, "provider_type", None),
+            # Provider identification
+            provider_type=_provider_type,
             provider_name=getattr(template, "provider_name", None),
             provider_api=getattr(template, "provider_api", None),
             # Timestamps
