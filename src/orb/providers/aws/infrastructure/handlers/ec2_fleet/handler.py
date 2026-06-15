@@ -39,7 +39,8 @@ from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapte
 from orb.infrastructure.error.decorators import handle_infrastructure_exceptions
 from orb.infrastructure.resilience import CircuitBreakerOpenError
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from orb.providers.aws.domain.template.value_objects import AWSAllocationStrategy, AWSFleetType
+from orb.providers.aws.domain.template.value_objects import AWSFleetType
+from orb.providers.aws.value_objects import AWSAllocationStrategy
 from orb.providers.aws.exceptions.aws_exceptions import (
     AWSEntityNotFoundError,
     AWSInfrastructureError,

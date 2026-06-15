@@ -200,7 +200,7 @@ def test_aws_template_accepts_allocation_strategy_as_string():
 
     assert template.allocation_strategy_on_demand is not None
     # Must be the enum, not a raw string
-    from orb.providers.aws.domain.template.value_objects import AWSAllocationStrategy
+    from orb.providers.aws.value_objects import AWSAllocationStrategy
 
     assert isinstance(template.allocation_strategy_on_demand, AWSAllocationStrategy)
 
@@ -213,7 +213,7 @@ def test_aws_template_accepts_allocation_strategy_as_string():
 def test_aws_template_accepts_allocation_strategy_as_enum():
     """AWSTemplate accepts an AWSAllocationStrategy object directly (no coercion needed)."""
     from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-    from orb.providers.aws.domain.template.value_objects import AWSAllocationStrategy
+    from orb.providers.aws.value_objects import AWSAllocationStrategy
 
     strategy = AWSAllocationStrategy.from_string("lowestPrice")
     template = AWSTemplate(

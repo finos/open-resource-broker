@@ -14,7 +14,6 @@ from pydantic import (
 
 from orb.domain.template.template_aggregate import Template
 from orb.providers.aws.domain.template.value_objects import (
-    AWSAllocationStrategy,
     AWSConfiguration,
     AWSFleetType,
     AWSInstanceType,
@@ -22,8 +21,8 @@ from orb.providers.aws.domain.template.value_objects import (
     AWSSubnetId,
     AWSTags,
     ProviderApi,
-    normalise_allocation_strategy,
 )
+from orb.providers.aws.value_objects import AWSAllocationStrategy, normalise_allocation_strategy
 
 
 class AWSOptionalIntegerRange(BaseModel):
