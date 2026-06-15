@@ -12,8 +12,8 @@ import pytest
 @pytest.mark.integration
 class TestAuroraFactory:
     def test_create_aurora_strategy_with_simple_config(self):
-        from orb.providers.aws.storage.registration import create_aurora_strategy
         from orb.infrastructure.storage.sql.strategy import SQLStorageStrategy
+        from orb.providers.aws.storage.registration import create_aurora_strategy
 
         class _Cfg:
             connection_string = "sqlite:///:memory:"
@@ -22,8 +22,8 @@ class TestAuroraFactory:
         assert isinstance(strategy, SQLStorageStrategy)
 
     def test_create_aurora_unit_of_work_with_dict_config(self):
-        from orb.providers.aws.storage.registration import create_aurora_unit_of_work
         from orb.infrastructure.storage.sql.unit_of_work import SQLUnitOfWork
+        from orb.providers.aws.storage.registration import create_aurora_unit_of_work
 
         uow = create_aurora_unit_of_work({"connection_string": "sqlite:///:memory:"})
         assert isinstance(uow, SQLUnitOfWork)
