@@ -516,6 +516,12 @@ def initialize_aws_provider(
 
         FieldMappingRegistry.register("aws", AWSFieldMapping())
 
+        # Register AWS defaults loader
+        from orb.providers.aws.defaults_loader import AWSDefaultsLoader
+        from orb.providers.registry.defaults_loader_registry import DefaultsLoaderRegistry
+
+        DefaultsLoaderRegistry.register("aws", AWSDefaultsLoader())
+
         if logger:
             logger.info("AWS provider initialization completed successfully")
 
