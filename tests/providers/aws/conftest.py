@@ -387,36 +387,37 @@ def _inject_moto_factory(aws_client: AWSClient, logger, config_port) -> None:
         return
 
     lt_manager = _make_launch_template_manager(aws_client, logger)
-    aws_ops = AWSOperations(aws_client, logger, config_port)
-    factory = AWSHandlerFactory(aws_client=aws_client, logger=logger, config=config_port)
+    effective_config = cfg_port if config_port is None else config_port
+    aws_ops = AWSOperations(aws_client, logger, effective_config)
+    factory = AWSHandlerFactory(aws_client=aws_client, logger=logger, config=effective_config)
 
     factory._handlers[ProviderApi.ASG.value] = ASGHandler(
         aws_client=aws_client,
         logger=logger,
         aws_ops=aws_ops,
         launch_template_manager=lt_manager,
-        config_port=config_port,
+        config_port=effective_config,
     )
     factory._handlers[ProviderApi.EC2_FLEET.value] = EC2FleetHandler(
         aws_client=aws_client,
         logger=logger,
         aws_ops=aws_ops,
         launch_template_manager=lt_manager,
-        config_port=config_port,
+        config_port=effective_config,
     )
     factory._handlers[ProviderApi.RUN_INSTANCES.value] = RunInstancesHandler(
         aws_client=aws_client,
         logger=logger,
         aws_ops=aws_ops,
         launch_template_manager=lt_manager,
-        config_port=config_port,
+        config_port=effective_config,
     )
     factory._handlers[ProviderApi.SPOT_FLEET.value] = SpotFleetHandler(
         aws_client=aws_client,
         logger=logger,
         aws_ops=aws_ops,
         launch_template_manager=lt_manager,
-        config_port=config_port,
+        config_port=effective_config,
     )
 
     strategy._aws_client = aws_client
