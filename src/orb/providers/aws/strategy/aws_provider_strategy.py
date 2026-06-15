@@ -777,9 +777,7 @@ class AWSProviderStrategy(ProviderStrategy):
             self._logger.error("AWS acquire failed: %s", exc, exc_info=True)
             return Failed(error=str(exc), recoverable=False)
 
-    async def return_machines(
-        self, machine_ids: list[str], request: "Request"
-    ) -> OperationOutcome:
+    async def return_machines(self, machine_ids: list[str], request: "Request") -> OperationOutcome:
         """Submit a return (termination) request to AWS.
 
         AWS terminates asynchronously — ``TerminateInstances`` returns
@@ -831,9 +829,7 @@ class AWSProviderStrategy(ProviderStrategy):
             self._logger.error("AWS return_machines failed: %s", exc, exc_info=True)
             return Failed(error=str(exc), recoverable=False)
 
-    async def get_status(
-        self, resource_ids: list[str], request: "Request"
-    ) -> OperationOutcome:
+    async def get_status(self, resource_ids: list[str], request: "Request") -> OperationOutcome:
         """Query AWS instance status for previously submitted resources.
 
         Returns ``Completed`` only when *all* instances have reached a
@@ -873,9 +869,7 @@ class AWSProviderStrategy(ProviderStrategy):
             instances: list[dict[str, Any]] = (result.data or {}).get("instances", [])
             terminal_states = frozenset({"running", "terminated", "stopped", "failed"})
             non_terminal = [
-                inst
-                for inst in instances
-                if inst.get("status", "") not in terminal_states
+                inst for inst in instances if inst.get("status", "") not in terminal_states
             ]
 
             if non_terminal:

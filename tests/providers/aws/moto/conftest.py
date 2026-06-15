@@ -21,11 +21,11 @@ from tests.providers.aws.conftest import (  # noqa: F401
     make_asg_handler,
     make_aws_template,
     make_ec2_fleet_handler,
+    make_patch_moto_compat,
     make_request,
     make_run_instances_handler,
     make_spot_fleet_handler,
 )
-from tests.providers.aws.conftest import make_patch_moto_compat
 
 
 @pytest.fixture(autouse=True)

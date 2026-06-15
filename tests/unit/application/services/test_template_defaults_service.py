@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from orb.application.services.template_defaults_service import TemplateDefaultsService
-
 
 # ---------------------------------------------------------------------------
 # Helpers

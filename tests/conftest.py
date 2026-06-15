@@ -54,9 +54,7 @@ def pytest_collection_modifyitems(config, items):
     provider_filter = config.getoption("--provider")
 
     # Also honour legacy path-based live detection (e.g. pytest tests/providers/aws/live)
-    explicit_live = any(
-        "live" in str(a) or "onaws" in str(a) for a in config.args
-    )
+    explicit_live = any("live" in str(a) or "onaws" in str(a) for a in config.args)
     if explicit_live:
         live_enabled = True
 
@@ -64,9 +62,7 @@ def pytest_collection_modifyitems(config, items):
         reason="requires real credentials — pass --live (or --run-aws) to run"
     )
     skip_mocked = pytest.mark.skip(reason="moto tests skipped — remove --no-mocked to run")
-    skip_provider = pytest.mark.skip(
-        reason=f"filtered to --provider {provider_filter}"
-    )
+    skip_provider = pytest.mark.skip(reason=f"filtered to --provider {provider_filter}")
 
     for item in items:
         path = str(item.fspath)

@@ -20,7 +20,11 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from tests.providers.aws.moto.conftest import _inject_moto_factory, _make_logger, _make_moto_aws_client
+from tests.providers.aws.moto.conftest import (
+    _inject_moto_factory,
+    _make_logger,
+    _make_moto_aws_client,
+)
 from tests.shared.constants import REQUEST_ID_RE
 from tests.shared.scenarios import TestScenario, get_smoke_scenarios
 

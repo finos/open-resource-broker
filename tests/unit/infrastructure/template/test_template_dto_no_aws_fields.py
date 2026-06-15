@@ -185,7 +185,12 @@ class TestFromDomainPopulatesProviderConfig:
 
     def test_metadata_stays_clean_of_aws_fields(self):
         """metadata dict must not contain any AWS-specific keys after from_domain."""
-        aws_only_keys = {"fleet_type", "fleet_role", "percent_on_demand", "abis_instance_requirements"}
+        aws_only_keys = {
+            "fleet_type",
+            "fleet_role",
+            "percent_on_demand",
+            "abis_instance_requirements",
+        }
         template = _make_aws_template(
             fleet_type=AWSFleetType.MAINTAIN,
             fleet_role="arn:aws:iam::123:role/R",

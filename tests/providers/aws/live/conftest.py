@@ -30,9 +30,7 @@ logs_dir.mkdir(exist_ok=True)
 
 def _is_live_run(config) -> bool:
     """Return True when live tests have been explicitly requested."""
-    return config.getoption("--live", default=False) or config.getoption(
-        "--run-aws", default=False
-    )
+    return config.getoption("--live", default=False) or config.getoption("--run-aws", default=False)
 
 
 def _get_aws_profile_and_region() -> tuple[str | None, str | None]:

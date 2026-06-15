@@ -99,7 +99,9 @@ class TestCleanArchitectureIntegration:
 
             # Verify registration
             assert TemplateExtensionRegistry.has_extension("aws")
-            assert TemplateExtensionRegistry.get_extension_class("aws") == AWSTemplateExtensionConfig
+            assert (
+                TemplateExtensionRegistry.get_extension_class("aws") == AWSTemplateExtensionConfig
+            )
 
             # Test extension defaults - must provide non-empty config_data or it returns {}
             extension_defaults = TemplateExtensionRegistry.get_extension_defaults(

@@ -114,9 +114,8 @@ def dynamodb_uow():
     if not HAS_MOTO:
         pytest.skip("moto not installed")
 
-    from orb.providers.aws.storage.unit_of_work import DynamoDBUnitOfWork
-
     from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
+    from orb.providers.aws.storage.unit_of_work import DynamoDBUnitOfWork
 
     with _mock_aws():
         uow = DynamoDBUnitOfWork(
