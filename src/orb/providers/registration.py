@@ -14,10 +14,8 @@ def register_all_provider_cli_specs() -> None:
     if CLISpecRegistry.get("aws") is None:
         CLISpecRegistry.register("aws", AWSCLISpec())
 
-    # Future providers register their CLI specs here:
-    # from orb.providers.oci.cli.oci_cli_spec import OCICLISpec
-    # if CLISpecRegistry.get("oci") is None:
-    #     CLISpecRegistry.register("oci", OCICLISpec())
+    # Each new provider should register its CLI spec here at bootstrap time.
+    # See docs/root/developer_guide/adding_a_provider.md for the full pattern.
 
 
 def register_all_defaults_loaders() -> None:
@@ -35,10 +33,8 @@ def register_all_defaults_loaders() -> None:
 
         DefaultsLoaderRegistry.register("aws", AWSDefaultsLoader())
 
-    # Future providers register their defaults loaders here:
-    # from orb.providers.oci.defaults_loader import OCIDefaultsLoader
-    # if DefaultsLoaderRegistry.get("oci") is None:
-    #     DefaultsLoaderRegistry.register("oci", OCIDefaultsLoader())
+    # Each new provider should register its defaults loader here.
+    # See docs/root/developer_guide/adding_a_provider.md for the full pattern.
 
 
 def register_all_provider_types() -> None:
@@ -52,9 +48,8 @@ def register_all_provider_types() -> None:
 
     register_aws_provider(registry)
 
-    # Future providers would be added here
-    # register_provider1_provider(registry)
-    # register_provider2_provider(registry)
+    # Each new provider's register_*_provider(registry) is called here.
+    # See docs/root/developer_guide/adding_a_provider.md for the full pattern.
 
 
 def register_fallback_provider(
