@@ -12,7 +12,6 @@ from orb.application.dto.responses import MachineDTO
 from orb.application.request.dto import RequestDTO
 from orb.infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
 from orb.infrastructure.scheduler.hostfactory.field_mapper import HostFactoryFieldMapper
-from orb.infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings
 from orb.infrastructure.scheduler.hostfactory.transformations import HostFactoryTransformations
 from orb.infrastructure.template.dtos import TemplateDTO
 from orb.infrastructure.utilities.common.string_utils import extract_provider_type
@@ -140,7 +139,15 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         if "template_id" in mapped:
             mapped["name"] = template.get("name", mapped["template_id"])
 
-        HostFactoryFieldMappings.apply_aws_defaults(mapped)
+        # Apply per-provider field defaults via the registry.
+        provider_type = self._get_active_provider_type()
+        from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import (
+            FieldMappingRegistry,
+        )
+
+        adapter = FieldMappingRegistry.get(provider_type)
+        if adapter is not None:
+            adapter.apply_defaults(mapped)
 
         mapped["created_at"] = template.get("created_at")
         mapped["updated_at"] = template.get("updated_at")
@@ -592,14 +599,28 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         }
 
     def _build_hf_attributes(self, instance_type: str) -> dict[str, list[str]]:
-        """Build IBM HF attributes dict from an instance type string."""
-        from orb.providers.aws.utilities.ec2.instances import derive_cpu_ram_from_instance_type
+        """Build IBM HF attributes dict from an instance type string.
 
-        ncpus, nram = derive_cpu_ram_from_instance_type(instance_type)
+        Delegates to the per-provider ``FieldMappingPort.derive_attributes``
+        via the registry.  Falls back to a minimal placeholder so callers
+        always receive a valid attributes object.
+        """
+        from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import (
+            FieldMappingRegistry,
+        )
+
+        provider_type = self._get_active_provider_type()
+        adapter = FieldMappingRegistry.get(provider_type)
+        if adapter is not None:
+            result = adapter.derive_attributes(instance_type)
+            if result is not None:
+                return result
+
+        # Fallback: return a minimal attributes object so HF spec is still satisfied.
         return {
             "type": ["String", "X86_64"],
-            "ncpus": ["Numeric", str(ncpus)],
-            "nram": ["Numeric", str(nram)],
+            "ncpus": ["Numeric", "1"],
+            "nram": ["Numeric", "1024"],
         }
 
     def format_templates_for_dispatch(self, templates: list[dict]) -> list[dict]:

@@ -57,15 +57,9 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
         ("infrastructure/adapters/provider_discovery_adapter.py", "orb.providers.registry"),
         # DI wiring — intentional: storage registration must wire AWS provider
         ("infrastructure/storage/registration.py", "orb.providers.aws.storage.registration"),
-        # hostfactory is inherently AWS/HPC-specific — provider import is expected
-        (
-            "infrastructure/scheduler/hostfactory/field_mapper.py",
-            "orb.providers.aws.utilities.ec2.instances",
-        ),
-        (
-            "infrastructure/scheduler/hostfactory/hostfactory_strategy.py",
-            "orb.providers.aws.utilities.ec2.instances",
-        ),
+        # The cpu/ram lookup (derive_cpu_ram_from_instance_type) has been moved
+        # into providers/aws/scheduler/hostfactory_field_mapping.py.  The shared
+        # hostfactory infrastructure no longer imports from orb.providers.aws.*.
         ("config/schemas/cleanup_schema.py", "orb.providers.aws.configuration.cleanup_config"),
         # loader collects strategy-contributed defaults at load time — intentional bootstrap wiring
         ("config/loader.py", "orb.providers.registry"),

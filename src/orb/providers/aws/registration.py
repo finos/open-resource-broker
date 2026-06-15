@@ -508,6 +508,14 @@ def initialize_aws_provider(
 
         CLISpecRegistry.register("aws", AWSCLISpec())
 
+        # Register AWS HostFactory field-mapping adapter
+        from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import (
+            FieldMappingRegistry,
+        )
+        from orb.providers.aws.scheduler.hostfactory_field_mapping import AWSFieldMapping
+
+        FieldMappingRegistry.register("aws", AWSFieldMapping())
+
         if logger:
             logger.info("AWS provider initialization completed successfully")
 
