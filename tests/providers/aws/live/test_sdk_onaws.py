@@ -115,15 +115,16 @@ def setup_sdk_test(request, test_session_id):
         "AWS_PROVIDER_LOG_DIR",
         "HF_LOGDIR",
     ]
-    os.environ["ORB_CONFIG_DIR"] = str(test_config_dir)
-    os.environ["HF_PROVIDER_CONFDIR"] = str(test_config_dir)
+    config_dir = test_config_dir / "config"
+    os.environ["ORB_CONFIG_DIR"] = str(config_dir)
+    os.environ["HF_PROVIDER_CONFDIR"] = str(config_dir)
     os.environ["HF_PROVIDER_LOGDIR"] = str(test_config_dir / "logs")
     os.environ["HF_PROVIDER_WORKDIR"] = str(test_config_dir / "work")
     os.environ["DEFAULT_PROVIDER_WORKDIR"] = str(test_config_dir / "work")
     os.environ["AWS_PROVIDER_LOG_DIR"] = str(test_config_dir / "logs")
     os.environ["HF_LOGDIR"] = str(test_config_dir / "logs")
 
-    config_path = str(test_config_dir / "config.json")
+    config_path = str(config_dir / "config.json")
 
     _tracked_request_ids: list[str] = []
 

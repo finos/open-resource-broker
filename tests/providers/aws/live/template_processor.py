@@ -9,8 +9,8 @@ Flow:
     config/aws_templates.json  ──load_templates_from_path──►  raw dicts (with real image_id)
                                ──format_templates_for_generation──►  scheduler wire format
                                ──copy + override──►  run_templates/<test>/aws_templates.json
-    config/config.json         ──merge overrides──►  run_templates/<test>/config.json
-    config/default_config.json ──copy──────────────►  run_templates/<test>/default_config.json
+    config/config.json         ──merge overrides──►  run_templates/<test>/config/config.json
+    config/default_config.json ──copy──────────────►  run_templates/<test>/config/default_config.json
 """
 
 import json
