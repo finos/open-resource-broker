@@ -1,15 +1,22 @@
 """Service for orchestrating provider provisioning operations."""
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, assert_never
 
 if TYPE_CHECKING:
     from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
     from orb.infrastructure.resilience.strategy.circuit_breaker import CircuitBreakerStrategy
 
 from orb.domain.base.exceptions import QuotaError
+from orb.domain.base.operation_outcome import (
+    Accepted,
+    Completed,
+    Failed,
+    OperationOutcome,
+    RequiresFollowUp,
+)
 from orb.domain.base.ports import ConfigurationPort, ContainerPort, LoggingPort, ProviderConfigPort
 from orb.domain.base.results import ProviderSelectionResult
 from orb.domain.request.aggregate import Request
@@ -20,7 +27,18 @@ from orb.infrastructure.resilience.exceptions import CircuitBreakerOpenError
 
 @dataclass
 class ProvisioningResult:
-    """Result of provisioning operation."""
+    """Result of provisioning operation.
+
+    The ``outcome`` field carries the typed :class:`OperationOutcome` returned
+    by the provider.  ``is_final`` is preserved for backward compatibility and
+    is derived from ``outcome`` when it is present.
+
+    ``Accepted``         → ``is_final = False`` (provider is still processing)
+    ``Completed``        → ``is_final = True``
+    ``RequiresFollowUp`` → ``is_final = False`` (background work remains)
+    ``Failed``           → ``is_final = True``
+    ``None`` (legacy)    → honour the explicit ``is_final`` value
+    """
 
     success: bool
     resource_ids: list[str]
@@ -30,6 +48,22 @@ class ProvisioningResult:
     error_message: str | None = None
     fulfilled_count: int = 0
     is_final: bool = True
+    outcome: OperationOutcome | None = field(default=None)
+
+    def __post_init__(self) -> None:
+        """Derive ``is_final`` from ``outcome`` when an outcome is provided."""
+        if self.outcome is not None:
+            match self.outcome:
+                case Accepted():
+                    self.is_final = False
+                case Completed():
+                    self.is_final = True
+                case RequiresFollowUp():
+                    self.is_final = False
+                case Failed():
+                    self.is_final = True
+                case _ as unreachable:
+                    assert_never(unreachable)
 
 
 class ProvisioningOrchestrationService:
@@ -305,6 +339,25 @@ class ProvisioningOrchestrationService:
                 if result.routing_info:
                     merged_provider_data.update(result.routing_info)
 
+                # Build a typed OperationOutcome from the ProviderResult payload.
+                # AWS provider returns request-IDs with pending instances (async
+                # model) — express that as Accepted rather than pretending it is
+                # immediately Completed.
+                is_immediately_final = (
+                    not has_capacity_error and len(instances) >= count
+                ) or fulfillment_final
+                if is_immediately_final:
+                    outcome: OperationOutcome = Completed(
+                        resource_ids=resource_ids,
+                        metadata=merged_provider_data,
+                    )
+                else:
+                    outcome = Accepted(
+                        request_id=str(request.request_id),
+                        pending_resource_ids=resource_ids,
+                        metadata=merged_provider_data,
+                    )
+
                 self._record_provider_success(selection_result.provider_name)
                 return ProvisioningResult(
                     success=True,
@@ -313,8 +366,8 @@ class ProvisioningOrchestrationService:
                     instances=instances,
                     provider_data=merged_provider_data,
                     fulfilled_count=len(instances),
-                    is_final=(not has_capacity_error and len(instances) >= count)
-                    or fulfillment_final,
+                    outcome=outcome,
+                    # is_final derived from outcome in __post_init__
                 )
             else:
                 return ProvisioningResult(
@@ -324,12 +377,17 @@ class ProvisioningOrchestrationService:
                     instances=[],
                     provider_data=result.metadata or {},
                     error_message=result.error_message,
+                    outcome=Failed(
+                        error=result.error_message or "Provider returned failure",
+                        recoverable=False,
+                    ),
                 )
 
         except CircuitBreakerOpenError:
             raise  # do not swallow — let it propagate to execute_provisioning
 
         except TimeoutError:
+            timeout_msg = f"Dispatch timed out after {dispatch_timeout_seconds:.0f}s"
             self._logger.warning(
                 "Dispatch timed out after %.1fs for provider %s (request %s)",
                 dispatch_timeout_seconds,
@@ -342,11 +400,12 @@ class ProvisioningOrchestrationService:
                 machine_ids=[],
                 instances=[],
                 provider_data={},
-                error_message=f"Dispatch timed out after {dispatch_timeout_seconds:.0f}s",
-                is_final=True,
+                error_message=timeout_msg,
+                outcome=Failed(error=timeout_msg, recoverable=True),
             )
 
         except QuotaError as e:
+            quota_msg = f"Quota exceeded: {e}"
             self._logger.error(
                 "Quota error during provisioning for template %s: %s",
                 template.template_id if hasattr(template, "template_id") else "unknown",
@@ -365,11 +424,12 @@ class ProvisioningOrchestrationService:
                 machine_ids=[],
                 instances=[],
                 provider_data={},
-                error_message=f"Quota exceeded: {e}",
-                is_final=True,
+                error_message=quota_msg,
+                outcome=Failed(error=quota_msg, recoverable=False),
             )
 
         except Exception as e:
+            generic_msg = f"Provisioning failed: {e}"
             self._logger.error(
                 "Provisioning dispatch failed for template %s: %s",
                 template.template_id if hasattr(template, "template_id") else "unknown",
@@ -389,5 +449,6 @@ class ProvisioningOrchestrationService:
                 machine_ids=[],
                 instances=[],
                 provider_data={},
-                error_message=f"Provisioning failed: {e}",
+                error_message=generic_msg,
+                outcome=Failed(error=generic_msg, recoverable=False),
             )

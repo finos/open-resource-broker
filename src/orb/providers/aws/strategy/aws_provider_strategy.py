@@ -11,6 +11,7 @@ import time
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from orb.domain.base.dependency_injection import injectable
+from orb.domain.base.operation_outcome import Accepted, Completed, Failed, OperationOutcome
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 
@@ -30,6 +31,7 @@ from orb.providers.aws.services.instance_operation_service import AWSInstanceOpe
 from orb.providers.aws.services.template_validation_service import AWSTemplateValidationService
 
 if TYPE_CHECKING:
+    from orb.domain.request.aggregate import Request
     from orb.monitoring.health import HealthCheck
     from orb.providers.aws.infrastructure.adapters.aws_provisioning_adapter import (
         AWSProvisioningAdapter,
@@ -711,6 +713,188 @@ class AWSProviderStrategy(ProviderStrategy):
             cache=cache,
             logger=self._logger,
         )
+
+    # ------------------------------------------------------------------
+    # Typed provisioning interface — OperationOutcome
+    # ------------------------------------------------------------------
+
+    async def acquire(self, request: "Request") -> OperationOutcome:
+        """Submit an acquisition request to AWS.
+
+        AWS provider operations are asynchronous: the API call (EC2Fleet,
+        SpotFleet, RunInstances, ASG) returns a request/fleet ID immediately
+        while instances transition through ``pending``.  The outcome is
+        therefore always ``Accepted`` on success.
+
+        Args:
+            request: Domain request describing resources to acquire.
+
+        Returns:
+            ``Accepted`` with pending instance IDs on success.
+            ``Failed`` on provider rejection or configuration error.
+        """
+        try:
+            # Build operation using the strategy-layer types already imported at the
+            # module level (ProviderOperation / ProviderOperationType from
+            # orb.providers.base.strategy).  These are what execute_operation() expects.
+            operation = ProviderOperation(
+                operation_type=ProviderOperationType.CREATE_INSTANCES,
+                parameters={
+                    "template_config": {},
+                    "count": request.requested_count,
+                    "request_id": str(request.request_id),
+                    "request_metadata": dict(request.metadata),
+                },
+                context={
+                    "correlation_id": str(request.request_id),
+                    "request_id": str(request.request_id),
+                    "dry_run": request.metadata.get("dry_run", False),
+                },
+            )
+            result = await self.execute_operation(operation)
+
+            if not result.success:
+                return Failed(
+                    error=result.error_message or "AWS acquire failed",
+                    recoverable=False,
+                )
+
+            resource_ids: list[str] = (result.data or {}).get("resource_ids", [])
+            request_id = str(request.request_id)
+
+            self._logger.info(
+                "AWS acquire accepted: request_id=%s, pending_resource_ids=%s",
+                request_id,
+                resource_ids,
+            )
+            return Accepted(
+                request_id=request_id,
+                pending_resource_ids=resource_ids,
+                metadata=result.metadata or {},
+            )
+
+        except Exception as exc:
+            self._logger.error("AWS acquire failed: %s", exc, exc_info=True)
+            return Failed(error=str(exc), recoverable=False)
+
+    async def return_machines(
+        self, machine_ids: list[str], request: "Request"
+    ) -> OperationOutcome:
+        """Submit a return (termination) request to AWS.
+
+        AWS terminates asynchronously — ``TerminateInstances`` returns
+        immediately while instances move through ``shutting-down``.  The
+        outcome is therefore ``Accepted`` with the terminating IDs.
+
+        Args:
+            machine_ids: EC2 instance IDs to terminate.
+            request: Domain request providing context.
+
+        Returns:
+            ``Accepted`` with terminating instance IDs on success.
+            ``Failed`` on provider rejection or configuration error.
+        """
+        try:
+            operation = ProviderOperation(
+                operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+                parameters={
+                    "instance_ids": machine_ids,
+                    "request_id": str(request.request_id),
+                    "template_id": request.template_id,
+                    "provider_api": request.provider_api or "RunInstances",
+                },
+                context={
+                    "correlation_id": str(request.request_id),
+                    "request_id": str(request.request_id),
+                },
+            )
+            result = await self.execute_operation(operation)
+
+            if not result.success:
+                return Failed(
+                    error=result.error_message or "AWS return_machines failed",
+                    recoverable=False,
+                )
+
+            self._logger.info(
+                "AWS termination accepted: request_id=%s, terminating=%s",
+                request.request_id,
+                machine_ids,
+            )
+            return Accepted(
+                request_id=str(request.request_id),
+                pending_resource_ids=list(machine_ids),
+                metadata=result.metadata or {},
+            )
+
+        except Exception as exc:
+            self._logger.error("AWS return_machines failed: %s", exc, exc_info=True)
+            return Failed(error=str(exc), recoverable=False)
+
+    async def get_status(
+        self, resource_ids: list[str], request: "Request"
+    ) -> OperationOutcome:
+        """Query AWS instance status for previously submitted resources.
+
+        Returns ``Completed`` only when *all* instances have reached a
+        terminal state (``running`` for acquire, ``terminated`` for return).
+        Returns ``Accepted`` (still in-progress) otherwise.
+
+        Args:
+            resource_ids: EC2 instance or resource IDs to check.
+            request: Domain request providing context.
+
+        Returns:
+            ``Completed`` when all instances are terminal.
+            ``Accepted``  when one or more instances are still transitioning.
+            ``Failed``    when all instances failed or a hard error occurred.
+        """
+        try:
+            operation = ProviderOperation(
+                operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
+                parameters={
+                    "instance_ids": resource_ids,
+                    "template_id": request.template_id,
+                    "provider_api": request.provider_api or "RunInstances",
+                },
+                context={
+                    "correlation_id": str(request.request_id),
+                    "request_id": str(request.request_id),
+                },
+            )
+            result = await self.execute_operation(operation)
+
+            if not result.success:
+                return Failed(
+                    error=result.error_message or "AWS get_status failed",
+                    recoverable=True,
+                )
+
+            instances: list[dict[str, Any]] = (result.data or {}).get("instances", [])
+            terminal_states = frozenset({"running", "terminated", "stopped", "failed"})
+            non_terminal = [
+                inst
+                for inst in instances
+                if inst.get("status", "") not in terminal_states
+            ]
+
+            if non_terminal:
+                still_pending = [inst.get("instance_id", "") for inst in non_terminal]
+                return Accepted(
+                    request_id=str(request.request_id),
+                    pending_resource_ids=still_pending,
+                    metadata=result.metadata or {},
+                )
+
+            completed_ids = [inst.get("instance_id", "") for inst in instances]
+            return Completed(
+                resource_ids=completed_ids,
+                metadata=result.metadata or {},
+            )
+
+        except Exception as exc:
+            self._logger.error("AWS get_status failed: %s", exc, exc_info=True)
+            return Failed(error=str(exc), recoverable=True)
 
     def __str__(self) -> str:
         """Return string representation for debugging."""
