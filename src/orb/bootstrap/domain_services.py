@@ -10,7 +10,6 @@ from orb.domain.base.ports.container_port import ContainerPort
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
-from orb.domain.constants import PROVIDER_TYPE_AWS
 from orb.domain.services.filter_service import FilterService
 from orb.domain.services.generic_filter_service import GenericFilterService
 from orb.domain.services.template_validation_domain_service import TemplateValidationDomainService
@@ -29,7 +28,8 @@ def register_domain_services(container: DIContainer) -> None:
         # Inject dependencies after creation
         config = c.get(ConfigurationPort)
         logger = c.get(LoggingPort)
-        service.inject_dependencies(config, logger)
+        provider_registry = c.get(ProviderRegistryPort)
+        service.inject_dependencies(config, logger, provider_registry)
         return service
 
     container.register_singleton(
@@ -70,16 +70,10 @@ def register_domain_services(container: DIContainer) -> None:
 
     # Provider validation service (SRP refactoring)
     def create_provider_validation_service(c):
-        validator = None
-        try:
-            validator = c.get(ProviderRegistryPort).create_validator(PROVIDER_TYPE_AWS)
-        except Exception as e:
-            c.get(LoggingPort).debug("Could not create AWS provider validator: %s", e)
         return ProviderValidationService(
             container=c.get(ContainerPort),
             logger=c.get(LoggingPort),
             provider_selection_port=c.get(ProviderSelectionPort),
-            validator=validator,
         )
 
     container.register_singleton(ProviderValidationService, create_provider_validation_service)

@@ -10,6 +10,9 @@ import asyncio
 from typing import Any
 
 from orb.application.ports.query_bus_port import QueryBusPort
+from orb.application.services.request_follow_up_context import (
+    merge_request_metadata_with_follow_up_context,
+)
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.ports import ContainerPort, LoggingPort, ProviderSelectionPort
 
@@ -75,6 +78,7 @@ class DeprovisioningOrchestrator:
             success_count = 0
             error_count = 0
             errors = []
+            provider_data_items: list[dict[str, Any]] = []
 
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
@@ -83,6 +87,9 @@ class DeprovisioningOrchestrator:
                     self.logger.error("Task %s failed: %s", tasks[i].get_name(), result)
                 elif isinstance(result, dict) and result.get("success", False):
                     success_count += 1
+                    provider_data = result.get("provider_data")
+                    if isinstance(provider_data, dict) and provider_data:
+                        provider_data_items.append(provider_data)
                 else:
                     error_count += 1
                     if isinstance(result, dict):
@@ -94,11 +101,24 @@ class DeprovisioningOrchestrator:
                 "Deprovisioning completed: %d successful, %d failed", success_count, error_count
             )
 
+            aggregated_provider_data: dict[str, Any] = {}
+            termination_requests = [
+                item for item in provider_data_items if item.get("termination_requests")
+            ]
+            if termination_requests:
+                aggregated_provider_data["termination_requests"] = [
+                    request
+                    for item in termination_requests
+                    for request in item.get("termination_requests", [])
+                    if isinstance(request, dict)
+                ]
+
             return {
                 "success": error_count == 0,
                 "successful_operations": success_count,
                 "failed_operations": error_count,
                 "errors": errors,
+                "provider_data": aggregated_provider_data,
             }
 
         except Exception as e:
@@ -174,6 +194,7 @@ class DeprovisioningOrchestrator:
                     "resource_id": resource_id,
                     "resource_mapping": {iid: (resource_id, 1) for iid in instance_ids},
                     "request_id": origin_request_id,
+                    "request_metadata": self._build_request_metadata(request),
                 },
                 context={
                     "correlation_id": str(request.request_id),
@@ -196,7 +217,11 @@ class DeprovisioningOrchestrator:
                     len(instance_ids),
                     resource_id,
                 )
-                return {"success": True, "terminated_instances": len(instance_ids)}
+                return {
+                    "success": True,
+                    "terminated_instances": len(instance_ids),
+                    "provider_data": result.metadata.get("provider_data", {}),
+                }
             else:
                 self.logger.error(
                     "Termination failed for resource %s: %s", resource_id, result.error_message
@@ -206,3 +231,8 @@ class DeprovisioningOrchestrator:
         except Exception as e:
             self.logger.error("Failed to process resource group %s: %s", resource_id, e)
             return {"success": False, "error_message": str(e)}
+
+    @staticmethod
+    def _build_request_metadata(request: Any) -> dict[str, Any]:
+        """Merge durable request metadata with persisted provider follow-up context."""
+        return merge_request_metadata_with_follow_up_context(request)

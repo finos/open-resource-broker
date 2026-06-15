@@ -12,6 +12,7 @@ from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
 )
 from orb.infrastructure.template.dtos import TemplateDTO
 from orb.infrastructure.template.services.template_storage_service import TemplateStorageService
+from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -38,6 +39,27 @@ def _make_dto(template_id: str = "tpl-001") -> TemplateDTO:
         price_type="ondemand",
         provider_api="EC2Fleet",
         provider_type="aws",
+    )
+
+
+def _make_azure_dto(template_id: str = "azure-tpl-001") -> TemplateDTO:
+    return TemplateDTO(
+        template_id=template_id,
+        name=template_id,
+        provider_api="VMSS",
+        provider_type="azure",
+        provider_name="azure-default",
+        vm_size="Standard_D4s_v5",
+        provider_config={
+            "resource_group": "rg-test",
+            "location": "eastus2",
+            "image": {
+                "publisher": "Canonical",
+                "offer": "0001-com-ubuntu-server-jammy",
+                "sku": "22_04-lts-gen2",
+                "version": "latest",
+            },
+        },
     )
 
 
@@ -90,6 +112,50 @@ class TestSaveWritesSchedulerNativeFormat:
         )
         assert templates[0]["templateId"] == "tpl-hf"
         assert "template_id" not in templates[0]
+
+    @pytest.mark.asyncio
+    async def test_default_scheduler_promotes_provider_config_without_persisting_provider_config(
+        self, tmp_path
+    ):
+        strategy = DefaultSchedulerStrategy()
+        svc, target = _make_service(strategy, tmp_path)
+
+        await svc.save_template(_make_azure_dto("azure-storage"))
+
+        raw = json.loads(target.read_text())
+        stored = raw["templates"][0]
+        assert stored["template_id"] == "azure-storage"
+        assert stored["resource_group"] == "rg-test"
+        assert stored["location"] == "eastus2"
+        assert stored["image"]["publisher"] == "Canonical"
+        assert "provider_config" not in stored
+
+
+class TestFormatTemplateForProvider:
+    @pytest.mark.asyncio
+    async def test_default_scheduler_accepts_domain_template(self, tmp_path):
+        strategy = DefaultSchedulerStrategy()
+        template = AzureTemplate(
+            template_id="azure-provider-shape",
+            provider_type="azure",
+            provider_name="azure-default",
+            provider_api="VMSS",
+            vm_size="Standard_D4s_v5",
+            resource_group="rg-test",
+            location="eastus2",
+            ssh_public_keys=["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCtest azure@example"],
+            image={
+                "publisher": "Canonical",
+                "offer": "0001-com-ubuntu-server-jammy",
+                "sku": "22_04-lts-gen2",
+                "version": "latest",
+            },
+        )
+
+        formatted = strategy.format_template_for_provider(template)
+
+        assert formatted["resource_group"] == "rg-test"
+        assert formatted["image"]["publisher"] == "Canonical"
 
 
 # ---------------------------------------------------------------------------

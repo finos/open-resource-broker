@@ -1,0 +1,2 @@
+"""Azure provider test package."""
+

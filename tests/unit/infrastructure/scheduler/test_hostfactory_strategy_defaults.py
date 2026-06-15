@@ -17,6 +17,26 @@ def make_strategy():
     return strategy
 
 
+def test_transform_machine_types_input_for_gcp_vm_type_sets_instance_type():
+    strategy = make_strategy()
+    strategy.field_mapper.provider_type = "gcp"
+
+    result = strategy._transform_machine_types_input({"vmType": "e2-standard-4"})
+
+    assert result == {"instance_type": "e2-standard-4"}
+
+
+def test_transform_machine_types_input_for_gcp_vm_types_uses_first_candidate():
+    strategy = make_strategy()
+    strategy.field_mapper.provider_type = "gcp"
+
+    result = strategy._transform_machine_types_input(
+        {"vmTypes": {"e2-standard-4": 1, "n2-standard-4": 1}}
+    )
+
+    assert result == {"instance_type": "e2-standard-4"}
+
+
 class TestMapTemplateFieldsCallsApplyTemplateDefaults:
     """_map_template_fields must delegate to _apply_template_defaults, not call resolve inline."""
 
@@ -24,7 +44,7 @@ class TestMapTemplateFieldsCallsApplyTemplateDefaults:
         self.strategy = make_strategy()
         # Provide a minimal field mapper that returns the input unchanged
         mock_mapper = MagicMock()
-        mock_mapper.map_input_fields.side_effect = lambda t: dict(t)
+        mock_mapper.map_input_fields.side_effect = dict
         self.strategy._field_mapper = mock_mapper
 
     def _minimal_template(self):

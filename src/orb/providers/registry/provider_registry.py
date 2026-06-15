@@ -366,17 +366,18 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         """
         return self.create_additional_component(provider_type, "resolver_factory")
 
-    def create_validator(self, provider_type: str) -> Optional[Any]:
+    def create_validator(self, provider_type: str, config: Any = None) -> Optional[Any]:
         """
         Create a template validator using registered factory.
 
         Args:
             provider_type: Type identifier for the provider
+            config: Optional provider config data to pass to the factory
 
         Returns:
             Created template validator instance or None if not registered
         """
-        return self.create_additional_component(provider_type, "validator_factory")
+        return self.create_additional_component(provider_type, "validator_factory", config)
 
     def unregister_provider(self, provider_type: str) -> bool:
         """

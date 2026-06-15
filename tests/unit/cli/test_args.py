@@ -220,6 +220,83 @@ class TestGlobalFlags:
         assert ns.yes is True
 
 
+class TestProviderAzureArgs:
+    """Azure provider CLI arguments for add/update commands."""
+
+    def test_providers_add_accepts_azure_fields(self):
+        ns = _parse(
+            [
+                "providers",
+                "add",
+                "--provider-type",
+                "azure",
+                "--azure-subscription-id",
+                "12345678-1234-1234-1234-123456789012",
+                "--azure-resource-group",
+                "orb-test-rg",
+                "--azure-location",
+                "eastus2",
+                "--azure-cyclecloud-credential-path",
+                "op://vault/item/cred",
+                "--azure-cyclecloud-no-verify-ssl",
+            ]
+        )
+
+        assert ns.provider_type == "azure"
+        assert ns.azure_subscription_id == "12345678-1234-1234-1234-123456789012"
+        assert ns.azure_resource_group == "orb-test-rg"
+        assert ns.azure_location == "eastus2"
+        assert ns.azure_cyclecloud_credential_path == "op://vault/item/cred"
+        assert ns.azure_cyclecloud_no_verify_ssl is True
+
+    def test_providers_update_accepts_azure_fields(self):
+        ns = _parse(
+            [
+                "providers",
+                "update",
+                "azure-default",
+                "--azure-resource-group",
+                "orb-updated-rg",
+                "--azure-location",
+                "westeurope",
+            ]
+        )
+
+        assert ns.provider_name == "azure-default"
+        assert ns.azure_resource_group == "orb-updated-rg"
+        assert ns.azure_location == "westeurope"
+
+
+class TestInitAzureArgs:
+    """Azure init CLI arguments."""
+
+    def test_init_accepts_azure_fields(self):
+        ns = _parse(
+            [
+                "init",
+                "--non-interactive",
+                "--provider",
+                "azure",
+                "--azure-subscription-id",
+                "12345678-1234-1234-1234-123456789012",
+                "--azure-resource-group",
+                "orb-test-rg",
+                "--azure-location",
+                "eastus2",
+                "--azure-client-id",
+                "managed-identity-client-id",
+                "--azure-cyclecloud-no-verify-ssl",
+            ]
+        )
+
+        assert ns.provider == "azure"
+        assert ns.azure_subscription_id == "12345678-1234-1234-1234-123456789012"
+        assert ns.azure_resource_group == "orb-test-rg"
+        assert ns.azure_location == "eastus2"
+        assert ns.azure_client_id == "managed-identity-client-id"
+        assert ns.azure_cyclecloud_no_verify_ssl is True
+
+
 class TestRequestsWatch:
     """requests watch positional and flag arguments."""
 

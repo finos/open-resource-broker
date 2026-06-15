@@ -72,7 +72,17 @@ class AcquireMachinesOrchestrator(OrchestratorBase[AcquireMachinesInput, Acquire
         consecutive_errors = 0
         while elapsed < timeout_seconds:
             try:
-                query = GetRequestQuery(request_id=request_id, lightweight=True)
+                # Polling must use the full syncing path (lightweight=False).
+                #
+                # lightweight=True returns stored DB state without querying the
+                # provider.  For providers with async provisioning (Azure VMSS,
+                # ARM deployments), the creation handler sets IN_PROGRESS and
+                # the only way to detect completion is to sync live provider
+                # state on each poll.  AWS happened to work with lightweight
+                # polling because its handlers set terminal status synchronously,
+                # but that was accidental — the sync path is the correct
+                # general-purpose contract.
+                query = GetRequestQuery(request_id=request_id, lightweight=False, verbose=True)
                 result = await self._query_bus.execute(query)
                 consecutive_errors = 0
                 status_val = getattr(result, "status", None)

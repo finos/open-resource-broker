@@ -11,6 +11,101 @@ from orb.config.schemas.provider_strategy_schema import (
 class TestConfigDrivenProviderRegistration:
     """Test config-driven provider registration functionality."""
 
+    def test_register_all_provider_types_includes_azure_and_gcp(self):
+        """Canonical provider bootstrap must register Azure and GCP alongside AWS."""
+        from orb.providers.registration import register_all_provider_types
+        from orb.providers.registry import get_provider_registry
+
+        registry = get_provider_registry()
+        registry.clear_registrations()
+
+        register_all_provider_types()
+
+        assert registry.is_provider_registered("aws") is True
+        assert registry.is_provider_registered("azure") is True
+        assert registry.is_provider_registered("gcp") is True
+
+    def test_provider_config_builder_accepts_azure_provider_instance_config(self):
+        """Azure config creation must accept the canonical ProviderInstanceConfig input."""
+        from orb.providers.config_builder import ProviderConfigBuilder
+        from orb.providers.registration import register_all_provider_types
+        from orb.providers.registry import get_provider_registry
+
+        registry = get_provider_registry()
+        registry.clear_registrations()
+        register_all_provider_types()
+
+        logger = MagicMock()
+        builder = ProviderConfigBuilder(logger, registry)
+        provider_instance = ProviderInstanceConfig(  # type: ignore[call-arg]
+            name="azure-default",
+            type="azure",
+            enabled=True,
+            config={
+                "subscription_id": "11111111-1111-1111-1111-111111111111",
+                "client_id": "test-client",
+                "region": "uksouth",
+            },
+        )
+
+        azure_config = builder.build_config(provider_instance)
+
+        assert azure_config.subscription_id == "11111111-1111-1111-1111-111111111111"
+        assert azure_config.region == "uksouth"
+
+    def test_provider_config_builder_accepts_aws_provider_instance_config(self):
+        """AWS config creation must use the provider instance's config mapping."""
+        from orb.providers.config_builder import ProviderConfigBuilder
+        from orb.providers.registration import register_all_provider_types
+        from orb.providers.registry import get_provider_registry
+
+        registry = get_provider_registry()
+        registry.clear_registrations()
+        register_all_provider_types()
+
+        logger = MagicMock()
+        builder = ProviderConfigBuilder(logger, registry)
+        provider_instance = ProviderInstanceConfig(  # type: ignore[call-arg]
+            name="aws-default",
+            type="aws",
+            enabled=True,
+            config={"region": "eu-west-1", "profile": "test-profile"},
+        )
+
+        aws_config = builder.build_config(provider_instance)
+
+        assert aws_config.region == "eu-west-1"
+        assert aws_config.profile == "test-profile"
+
+    def test_provider_config_builder_accepts_gcp_provider_instance_config(self):
+        """GCP config creation must accept the canonical ProviderInstanceConfig input."""
+        from orb.providers.config_builder import ProviderConfigBuilder
+        from orb.providers.registration import register_all_provider_types
+        from orb.providers.registry import get_provider_registry
+
+        registry = get_provider_registry()
+        registry.clear_registrations()
+        register_all_provider_types()
+
+        logger = MagicMock()
+        builder = ProviderConfigBuilder(logger, registry)
+        provider_instance = ProviderInstanceConfig(  # type: ignore[call-arg]
+            name="gcp-default",
+            type="gcp",
+            enabled=True,
+            config={
+                "project_id": "orb-example-12345",
+                "region": "us-central1",
+                "zones": ["us-central1-a", "us-central1-b"],
+            },
+        )
+
+        gcp_config = builder.build_config(provider_instance)
+
+        assert gcp_config.project_id == "orb-example-12345"
+        assert gcp_config.region == "us-central1"
+        assert gcp_config.zones == ["us-central1-a", "us-central1-b"]
+
     def test_register_providers_with_valid_config(self):
         """Test provider registration with valid configuration."""
         from orb.bootstrap.provider_services import register_provider_services

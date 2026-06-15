@@ -265,6 +265,22 @@ class DebugStatementViolation(Violation):
         return True
 
 
+class UnjustifiedGetAttrViolation(Violation):
+    """getattr call without a justifying ``# getattr`` comment."""
+
+    def __init__(self, file_path: str, line_num: int, content: str):
+        super().__init__(
+            file_path,
+            line_num,
+            content,
+            "getattr should only be used when absolutely needed; "
+            "justify with a comment starting with '# getattr' on the same "
+            "or a preceding line if it is needed, remove getattr if not. Strongly prefer"
+            "removing, use web search to find the real API for external SDK calls. Do not replace"
+            "with an equivalent pattern that avoids getattr but is still the same anti-pattern.",
+        )
+
+
 # --- Checker Classes ---
 
 
@@ -555,6 +571,120 @@ class CommentChecker(FileChecker):
         return violations
 
 
+class GetAttrChecker(FileChecker):
+    """Enforce justified ``getattr`` use in Azure and GCP provider code.
+
+    Every ``getattr(...)`` call in ``src/orb/providers/azure/`` and
+    ``src/orb/providers/gcp/`` must have a comment starting with ``# getattr``
+    on the same line, on a preceding line within the same scope, or in the
+    enclosing function/method docstring. This keeps defensive SDK access
+    intentional and documented at the provider boundary.
+    """
+
+    _PROVIDER_PREFIXES = (
+        os.path.join("src", "orb", "providers", "azure"),
+        os.path.join("src", "orb", "providers", "gcp"),
+    )
+    _GETATTR_CALL = re.compile(r"\bgetattr\s*\(")
+    _JUSTIFICATION_COMMENT = re.compile(r"#\s*getattr\b")
+    _JUSTIFICATION_DOCSTRING = re.compile(r"\bgetattr\b")
+    _SCOPE_BOUNDARY = re.compile(r"^\s*(def |class )")
+    _MAX_LOOKBACK = 30
+
+    def check_content(self, file_path: str, content: str) -> list[Violation]:
+        if not file_path.endswith(".py"):
+            return []
+        normalised = os.path.normpath(file_path)
+        if not any(prefix in normalised for prefix in self._PROVIDER_PREFIXES):
+            return []
+
+        violations: list[Violation] = []
+        lines = content.splitlines()
+
+        # Pre-compute the docstring that covers each function/method body so
+        # we can check it cheaply per getattr line.
+        scope_docstrings = self._build_scope_docstring_map(lines)
+
+        for idx, line in enumerate(lines):
+            if not self._GETATTR_CALL.search(line):
+                continue
+            if self._is_justified(lines, idx, scope_docstrings):
+                continue
+            violations.append(
+                UnjustifiedGetAttrViolation(file_path, idx + 1, line.strip())
+            )
+        return violations
+
+    def _is_justified(
+        self,
+        lines: list[str],
+        idx: int,
+        scope_docstrings: dict[int, str],
+    ) -> bool:
+        """Return True if the getattr at *idx* has a visible justification."""
+        line = lines[idx]
+
+        # 1. Same-line comment.
+        if self._JUSTIFICATION_COMMENT.search(line):
+            return True
+
+        # 2. Scan backward within the same scope for a ``# getattr`` comment.
+        for back in range(1, self._MAX_LOOKBACK + 1):
+            prev_idx = idx - back
+            if prev_idx < 0:
+                break
+            prev = lines[prev_idx]
+            if self._JUSTIFICATION_COMMENT.search(prev):
+                return True
+            if self._SCOPE_BOUNDARY.search(prev):
+                break
+
+        # 3. Enclosing function/method docstring mentions ``getattr``.
+        for scope_start, docstring in scope_docstrings.items():
+            if scope_start < idx and self._JUSTIFICATION_DOCSTRING.search(docstring):
+                # Check that *idx* is inside this scope (no newer scope in
+                # between).
+                next_scope = min(
+                    (s for s in scope_docstrings if s > scope_start),
+                    default=len(lines),
+                )
+                if idx < next_scope:
+                    return True
+
+        return False
+
+    @staticmethod
+    def _build_scope_docstring_map(lines: list[str]) -> dict[int, str]:
+        """Map ``def``/``class`` line indices to their docstrings (if any)."""
+        scope_boundary = re.compile(r"^\s*(def |class )")
+        result: dict[int, str] = {}
+        for idx, line in enumerate(lines):
+            if not scope_boundary.search(line):
+                continue
+            # Look for a docstring on the next non-blank line.
+            doc_start = idx + 1
+            while doc_start < len(lines) and not lines[doc_start].strip():
+                doc_start += 1
+            if doc_start >= len(lines):
+                continue
+            first = lines[doc_start].strip()
+            if not (first.startswith('"""') or first.startswith("'''")):
+                continue
+            quote = first[:3]
+            if first.count(quote) >= 2:
+                # Single-line docstring.
+                result[idx] = first
+            else:
+                # Multi-line docstring — collect until closing quotes.
+                parts = [first]
+                for j in range(doc_start + 1, len(lines)):
+                    parts.append(lines[j])
+                    if quote in lines[j]:
+                        break
+                result[idx] = "\n".join(parts)
+        return result
+
+
 class QualityChecker:
     """Main quality checker that runs all checks."""
 
@@ -565,6 +695,7 @@ class QualityChecker:
             DocstringChecker(),
             ImportChecker(),
             CommentChecker(),
+            GetAttrChecker(),
         ]
         self.gitignore_spec = self._load_gitignore()
 
@@ -781,6 +912,8 @@ def main():
                 category = "Unused imports"
             elif "Commented-out code" in v.message:
                 category = "Commented-out code"
+            elif "getattr should only" in v.message:
+                category = "Unjustified getattr"
             else:
                 category = "Other issues"
 
