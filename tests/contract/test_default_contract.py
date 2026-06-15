@@ -1,7 +1,7 @@
 """Default scheduler boundary contract tests.
 
 Validates that every response ORB emits through the default scheduler
-interface conforms to the schemas defined in tests/onaws/plugin_io_schemas.py.
+interface conforms to the schemas defined in tests/providers/aws/live/plugin_io_schemas.py.
 """
 
 import re

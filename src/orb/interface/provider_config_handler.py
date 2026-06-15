@@ -163,22 +163,16 @@ async def handle_provider_update(args) -> dict[str, Any]:
 
         provider_config = provider.get("config", {})
 
-        if spec is not None:
-            partial = spec.extract_partial_config(args)
-            if not partial:
-                return {"error": True, "message": "No updates specified.", "exit_code": 1}
-            provider_config.update(partial)
-        else:
-            # Fallback: apply any non-None aws_* attrs directly
-            updated = False
-            if getattr(args, "aws_region", None):
-                provider_config["region"] = args.aws_region
-                updated = True
-            if getattr(args, "aws_profile", None):
-                provider_config["profile"] = args.aws_profile
-                updated = True
-            if not updated:
-                return {"error": True, "message": "No updates specified.", "exit_code": 1}
+        if spec is None:
+            return {
+                "error": True,
+                "message": f"Unknown provider type '{provider_type}'. No CLI spec registered.",
+                "exit_code": 1,
+            }
+        partial = spec.extract_partial_config(args)
+        if not partial:
+            return {"error": True, "message": "No updates specified.", "exit_code": 1}
+        provider_config.update(partial)
 
         # Test updated credentials
         success, error = _test_provider_credentials(provider_type, provider_config)

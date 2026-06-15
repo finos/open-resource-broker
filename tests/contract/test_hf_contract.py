@@ -1,7 +1,7 @@
 """HostFactory plugin boundary contract tests (Boundary A).
 
 Validates that every response ORB emits through the HF plugin interface
-conforms to the schemas defined in tests/onaws/plugin_io_schemas.py.
+conforms to the schemas defined in tests/providers/aws/live/plugin_io_schemas.py.
 
 The strictest contract is request_machines: additionalProperties=False means
 any extra field added to that response immediately breaks HF.

@@ -6,7 +6,15 @@ from orb.infrastructure.logging.logger import get_logger
 class HostFactoryFieldMappings:
     """Registry of HostFactory-specific field mappings per provider."""
 
-    # Field mappings organized by provider
+    # Field mappings organized by provider.
+    #
+    # NOTE: AWS entries here are kept as a no-bootstrap fallback so static
+    # consumers (e.g. unit tests that exercise the mapper without booting the
+    # AWS provider) keep working. The canonical AWS mapping lives in
+    # ``providers/aws/scheduler/hostfactory_field_mapping.py:AWSFieldMapping``
+    # registered into ``FieldMappingRegistry`` during provider bootstrap.
+    # Adding a new provider should NOT add entries here — register a
+    # ``FieldMappingPort`` adapter instead.
     MAPPINGS = {
         # Generic fields (work with any provider)
         "generic": {
