@@ -73,18 +73,30 @@ def _register_template_services(container: DIContainer):
 
     # Register TemplateFactory as a singleton so handlers can receive it via DI
     def create_template_factory(c: DIContainer):
+        import importlib
+        import importlib.util
+
         from orb.domain.template.factory import TemplateFactory
+        from orb.providers.registration import _REGISTERED_PROVIDERS
 
         factory = TemplateFactory(logger=c.get(LoggingPort))
-        try:
-            from orb.providers.aws.registration import register_aws_template_factory
-
-            register_aws_template_factory(factory, c.get(LoggingPort))
-        except ImportError as exc:
-            c.get(LoggingPort).debug(
-                "AWS provider module not available; AWS-specific templates will not be registered: %s",
-                exc,
-            )
+        logger_port = c.get(LoggingPort)
+        for _name in _REGISTERED_PROVIDERS:
+            _mod_path = f"orb.providers.{_name}.registration"
+            if importlib.util.find_spec(_mod_path) is None:
+                continue
+            try:
+                _mod = importlib.import_module(_mod_path)
+                _reg_fn = getattr(_mod, f"register_{_name}_template_factory", None)
+                if _reg_fn is not None:
+                    _reg_fn(factory, logger_port)
+            except ImportError as exc:
+                logger_port.debug(
+                    "%s provider module not available; provider-specific templates will not be"
+                    " registered: %s",
+                    _name,
+                    exc,
+                )
         return factory
 
     from orb.domain.template.factory import TemplateFactory, TemplateFactoryPort
