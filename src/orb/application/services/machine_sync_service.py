@@ -214,6 +214,7 @@ class MachineSyncService:
             security_group_ids=processed_data.get("security_group_ids", []),
             tags=Tags(tags=processed_data.get("tags") or {}),
             metadata=processed_data.get("metadata", {}),
+            provider_data=processed_data.get("provider_data", {}),
         )
 
     def _create_terminated_machine(self, existing: Machine) -> Machine:

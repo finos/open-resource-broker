@@ -102,6 +102,7 @@ class ListMachinesQuery(Query, BaseModel):
     timestamp_format: Optional[str] = None
     limit: Optional[int] = 50  # Default: 50, Max: 1000
     offset: Optional[int] = 0
+    lightweight: bool = False
 
 
 class GetActiveMachineCountQuery(Query, BaseModel):
