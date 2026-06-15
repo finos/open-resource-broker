@@ -105,17 +105,31 @@ def pytest_sessionstart(session: pytest.Session) -> None:
 
     Only runs when --live (or --run-aws) is passed.  Calls sts:GetCallerIdentity
     and exits immediately if credentials are invalid so no tests are attempted.
+
+    Also exports AWS_PROFILE and AWS_REGION/AWS_DEFAULT_REGION from the ORB
+    config into the process env so that bare ``boto3.Session()`` instances
+    inside test modules and ORB SDK code pick the right account+region.  Any
+    pre-existing AWS_PROFILE / AWS_REGION env vars are overridden — the ORB
+    config is the single source of truth for live test runs.
     """
     if not _is_live_run(session.config):
         return
     profile, region = _get_aws_profile_and_region()
     region = region or "eu-west-1"
+
+    # Override caller's shell env so bare boto3.Session() honours config
+    if profile:
+        os.environ["AWS_PROFILE"] = profile
+    os.environ["AWS_REGION"] = region
+    os.environ["AWS_DEFAULT_REGION"] = region
+
     try:
         boto_session = Session(profile_name=profile, region_name=region)
         sts = boto_session.client("sts", region_name=region)
         identity = sts.get_caller_identity()
         print(
-            f"\n✓ AWS credentials valid: {identity.get('Arn')} (account: {identity.get('Account')})"
+            f"\n✓ AWS credentials valid: {identity.get('Arn')} "
+            f"(account: {identity.get('Account')}, region: {region}, profile: {profile!r})"
         )
     except NoCredentialsError as e:
         pytest.exit(f"AWS credentials not found (profile={profile!r}): {e}", returncode=1)
