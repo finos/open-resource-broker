@@ -413,6 +413,43 @@ def get_aws_extension_defaults() -> dict:
     return default_config.to_template_defaults()
 
 
+def register_aws_auth_strategies(logger: "Optional[LoggingPort]" = None) -> None:
+    """Register AWS authentication strategies with the auth registry.
+
+    Registers the ``iam`` and ``cognito`` strategies so that ``AuthRegistry``
+    can resolve them without server.py importing provider-specific classes.
+
+    Args:
+        logger: Optional logger for registration messages
+    """
+    try:
+        from orb.infrastructure.auth.registry import get_auth_registry
+
+        registry = get_auth_registry()
+
+        if not registry.is_registered("iam"):
+            from orb.providers.aws.auth.iam_strategy import IAMAuthStrategy
+
+            registry.register_strategy("iam", IAMAuthStrategy)
+            if logger:
+                logger.debug("AWS IAM auth strategy registered")
+
+        if not registry.is_registered("cognito"):
+            from orb.providers.aws.auth.cognito_strategy import CognitoAuthStrategy
+
+            registry.register_strategy("cognito", CognitoAuthStrategy)
+            if logger:
+                logger.debug("AWS Cognito auth strategy registered")
+
+    except ImportError as e:
+        if logger:
+            logger.warning("AWS auth strategies not available: %s", e)
+    except Exception as e:
+        if logger:
+            logger.error("Failed to register AWS auth strategies: %s", e, exc_info=True)
+        raise
+
+
 def initialize_aws_provider(
     template_factory: Optional[TemplateFactory] = None,
     logger: Optional["LoggingPort"] = None,
@@ -432,6 +469,9 @@ def initialize_aws_provider(
 
         # Register AWS extensions
         register_aws_extensions(logger)
+
+        # Register AWS authentication strategies
+        register_aws_auth_strategies(logger)
 
         # Register AWS template factory if provided
         if template_factory:

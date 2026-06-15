@@ -226,6 +226,64 @@ def create_fastapi_app(server_config: Any) -> Any:
     return app
 
 
+def _build_strategy_kwargs(strategy_name: str, auth_config: Any) -> dict:
+    """
+    Build keyword arguments for the named authentication strategy.
+
+    Strategy-specific config extraction is centralised here so that
+    ``_create_auth_strategy`` can use a uniform registry dispatch.
+
+    Args:
+        strategy_name: Registered strategy name
+        auth_config: Authentication configuration object
+
+    Returns:
+        Keyword arguments to pass to the strategy factory
+    """
+    if strategy_name == "none":
+        return {"enabled": False}
+
+    if strategy_name == "bearer_token":
+        bearer_config = auth_config.bearer_token or {}
+        secret_key = bearer_config.get("secret_key")
+        if not secret_key:
+            raise ConfigurationError(
+                "Bearer token authentication requires a secret_key in auth.bearer_token config. "
+                "Set HF_AUTH_BEARER_SECRET_KEY or configure auth.bearer_token.secret_key."
+            )
+        if len(secret_key.encode()) < 32:
+            raise ConfigurationError(
+                "Bearer token secret_key must be at least 32 bytes for security."
+            )
+        return {
+            "secret_key": secret_key,
+            "algorithm": bearer_config.get("algorithm", "HS256"),
+            "token_expiry": bearer_config.get("token_expiry", 3600),
+            "enabled": True,
+        }
+
+    if strategy_name == "iam":
+        iam_config = (auth_config.provider_auth or {}).get("iam") or {}
+        return {
+            "region": iam_config.get("region", "us-east-1"),
+            "profile": iam_config.get("profile"),
+            "required_actions": iam_config.get("required_actions", []),
+            "enabled": True,
+        }
+
+    if strategy_name == "cognito":
+        cognito_config = (auth_config.provider_auth or {}).get("cognito") or {}
+        return {
+            "user_pool_id": cognito_config.get("user_pool_id", ""),
+            "client_id": cognito_config.get("client_id", ""),
+            "region": cognito_config.get("region", "us-east-1"),
+            "enabled": True,
+        }
+
+    # Unknown strategy — return empty dict; registry will raise ValueError
+    return {}
+
+
 def _create_auth_strategy(auth_config: Any) -> Any:
     """
     Create authentication strategy based on configuration.
@@ -241,72 +299,12 @@ def _create_auth_strategy(auth_config: Any) -> Any:
     strategy_name = getattr(auth_config, "strategy", "unknown")
     try:
         auth_registry = get_auth_registry()
+        kwargs = _build_strategy_kwargs(strategy_name, auth_config)
+        return auth_registry.get_strategy(strategy_name, **kwargs)
 
-        if strategy_name == "none":
-            return auth_registry.get_strategy("none", enabled=False)
-
-        elif strategy_name == "bearer_token":
-            bearer_config = auth_config.bearer_token or {}
-            secret_key = bearer_config.get("secret_key")
-            if not secret_key:
-                raise ConfigurationError(
-                    "Bearer token authentication requires a secret_key in auth.bearer_token config. "
-                    "Set HF_AUTH_BEARER_SECRET_KEY or configure auth.bearer_token.secret_key."
-                )
-            if len(secret_key.encode()) < 32:
-                raise ConfigurationError(
-                    "Bearer token secret_key must be at least 32 bytes for security."
-                )
-            return auth_registry.get_strategy(
-                "bearer_token",
-                secret_key=secret_key,
-                algorithm=bearer_config.get("algorithm", "HS256"),
-                token_expiry=bearer_config.get("token_expiry", 3600),
-                enabled=True,
-            )
-
-        elif strategy_name == "iam":
-            iam_config = (auth_config.provider_auth or {}).get("iam") or {}
-            # Register AWS IAM strategy if not already registered
-            try:
-                from orb.providers.aws.auth.iam_strategy import IAMAuthStrategy
-
-                auth_registry.register_strategy("iam", IAMAuthStrategy)
-            except ImportError:
-                logger.warning("AWS IAM strategy not available", exc_info=True)
-                return None
-
-            return auth_registry.get_strategy(
-                "iam",
-                region=iam_config.get("region", "us-east-1"),
-                profile=iam_config.get("profile"),
-                required_actions=iam_config.get("required_actions", []),
-                enabled=True,
-            )
-
-        elif strategy_name == "cognito":
-            cognito_config = (auth_config.provider_auth or {}).get("cognito") or {}
-            # Register AWS Cognito strategy if not already registered
-            try:
-                from orb.providers.aws.auth.cognito_strategy import CognitoAuthStrategy
-
-                auth_registry.register_strategy("cognito", CognitoAuthStrategy)
-            except ImportError:
-                logger.warning("AWS Cognito strategy not available", exc_info=True)
-                return None
-
-            return auth_registry.get_strategy(
-                "cognito",
-                user_pool_id=cognito_config.get("user_pool_id", ""),
-                client_id=cognito_config.get("client_id", ""),
-                region=cognito_config.get("region", "us-east-1"),
-                enabled=True,
-            )
-
-        else:
-            logger.error("Unknown authentication strategy: %s", strategy_name)
-            return None
-
+    except ValueError:
+        logger.error("Unknown authentication strategy: %s", strategy_name)
+        return None
     except Exception as e:
         raise ConfigurationError(f"Failed to create auth strategy '{strategy_name}': {e}") from e
 
