@@ -2,7 +2,7 @@
 
 import pytest
 
-from orb.config.schemas.storage_schema import StorageConfig
+from orb.config.schemas.storage_schema import StorageConfig, _get_valid_storage_strategies
 from orb.providers.aws.configuration.config import AWSProviderConfig
 from orb.providers.aws.storage.config import AWSStorageConfig
 
@@ -66,7 +66,35 @@ def test_aws_storage_config_both_none():
     assert cfg.aurora is None
 
 
-def test_storage_config_valid_strategies_unchanged():
-    """Regression guard: core StorageConfig must NOT accept dynamodb as a strategy."""
+def test_storage_config_rejects_unregistered_strategy():
+    """An unknown/unregistered strategy is still rejected."""
+    with pytest.raises(ValueError):
+        StorageConfig(strategy="not-a-real-backend")
+
+
+def test_storage_config_baseline_strategies_always_valid():
+    """json/sql are accepted regardless of registry state."""
+    assert StorageConfig(strategy="json").strategy == "json"
+    assert StorageConfig(strategy="sql").strategy == "sql"
+
+
+def test_storage_config_accepts_strategy_once_registered(monkeypatch):
+    """A backend becomes valid exactly when the storage registry advertises it.
+
+    The generic schema names no provider backend; validity is derived from the
+    registry, so 'dynamodb' is accepted only after it is registered.
+    """
+    # Not registered (registry reports baseline only) -> rejected.
+    monkeypatch.setattr(
+        "tests.unit.providers.aws.storage.test_aws_storage_config._get_valid_storage_strategies",
+        lambda: {"json", "sql"},
+    )
     with pytest.raises(ValueError):
         StorageConfig(strategy="dynamodb")
+
+    # Registered (registry now advertises it) -> accepted.
+    monkeypatch.setattr(
+        "tests.unit.providers.aws.storage.test_aws_storage_config._get_valid_storage_strategies",
+        lambda: {"json", "sql", "dynamodb"},
+    )
+    assert StorageConfig(strategy="dynamodb").strategy == "dynamodb"

@@ -4,6 +4,8 @@ Each backend (JSON, SQL/SQLite, DynamoDB/moto) must satisfy the same CRUD
 behaviour. Fixtures live in conftest.py.
 """
 
+from decimal import Decimal
+
 import pytest
 
 
@@ -55,3 +57,38 @@ class TestStorageStrategyBatch:
         storage_strategy.delete_batch(["p", "q"])
         assert storage_strategy.find_by_id("p") is None
         assert storage_strategy.find_by_id("q") is None
+
+
+@pytest.mark.integration
+class TestDynamoDBRichTypes:
+    """Round-trip non-string scalar types through the DynamoDB backend (moto).
+
+    Covers type handling that the {id, name} CRUD tests do not exercise:
+    a boolean must not come back as a number, and a timestamp must come
+    back as a string the domain layer can parse with fromisoformat.
+
+    Scoped to DynamoDB: the SQL backend uses a fixed {id, name} column
+    schema and drops arbitrary fields, so it cannot host these fields.
+    """
+
+    def test_bool_roundtrip(self, dynamodb_strategy):
+        dynamodb_strategy.save("rt-bool", {"id": "rt-bool", "dry_run": True})
+        loaded = dynamodb_strategy.find_by_id("rt-bool")
+        assert loaded is not None
+        # Must be a real bool, never a Decimal/int (regression: bool->Decimal).
+        assert loaded["dry_run"] is True
+
+    def test_number_roundtrip(self, dynamodb_strategy):
+        dynamodb_strategy.save("rt-num", {"id": "rt-num", "count": 2})
+        loaded = dynamodb_strategy.find_by_id("rt-num")
+        assert loaded is not None
+        assert loaded["count"] == Decimal("2")
+        assert not isinstance(loaded["count"], bool)
+
+    def test_timestamp_roundtrips_as_string(self, dynamodb_strategy):
+        ts = "2026-06-11T10:30:45+00:00"
+        dynamodb_strategy.save("rt-ts", {"id": "rt-ts", "created_at": ts})
+        loaded = dynamodb_strategy.find_by_id("rt-ts")
+        assert loaded is not None
+        # Storage must not pre-parse to datetime (regression: double-parse).
+        assert isinstance(loaded["created_at"], str)

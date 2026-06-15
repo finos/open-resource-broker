@@ -110,6 +110,8 @@ class AWSClient:
             self._sts_client = None
             self._cost_explorer_client = None
             self._ssm_client = None
+            self._dynamodb_client = None
+            self._dynamodb_resource = None
             self._account_id = None
             self._credentials_validated = False
 
@@ -383,6 +385,22 @@ class AWSClient:
             self._logger.debug("Initializing ELBv2 client on first use")
             self._elbv2_client = self.session.client("elbv2", config=self.boto_config)
         return self._elbv2_client
+
+    @property
+    def dynamodb_client(self):
+        """Lazy initialization of DynamoDB client."""
+        if self._dynamodb_client is None:
+            self._logger.debug("Initializing DynamoDB client on first use")
+            self._dynamodb_client = self.session.client("dynamodb", config=self.boto_config)
+        return self._dynamodb_client
+
+    @property
+    def dynamodb_resource(self):
+        """Lazy initialization of DynamoDB resource."""
+        if self._dynamodb_resource is None:
+            self._logger.debug("Initializing DynamoDB resource on first use")
+            self._dynamodb_resource = self.session.resource("dynamodb", config=self.boto_config)
+        return self._dynamodb_resource
 
     def _should_enable_aws_metrics(self) -> bool:
         """Check if AWS metrics should be enabled based on configuration."""
