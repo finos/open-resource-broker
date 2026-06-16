@@ -100,7 +100,9 @@ class RequestStatusService:
         mapped = state_map.get(fulfilment.state)
         if mapped is None:
             # Unknown state — treat as in_progress to be safe
-            self.logger.warning("Unknown fulfilment state '%s', treating as in_progress", fulfilment.state)
+            self.logger.warning(
+                "Unknown fulfilment state '%s', treating as in_progress", fulfilment.state
+            )
             return RequestStatus.IN_PROGRESS.value, fulfilment.message
 
         return mapped, fulfilment.message

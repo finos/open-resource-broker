@@ -438,9 +438,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             fulfilment=ProviderFulfilment(state=combined_state, message=combined_msg),
         )
 
-    def _check_single_fleet_status(
-        self, fleet_id: str, request: Request
-    ) -> CheckHostsStatusResult:
+    def _check_single_fleet_status(self, fleet_id: str, request: Request) -> CheckHostsStatusResult:
         """Check the status of instances in a single fleet."""
         try:
             fleet_type_value = request.metadata.get("fleet_type")
@@ -584,12 +582,8 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         pending_count == 0 AND failed_count == 0.
         """
         running_count = sum(1 for i in instances if i.get("status") == "running")
-        pending_count = sum(
-            1 for i in instances if i.get("status") in ("pending", "starting")
-        )
-        failed_count = sum(
-            1 for i in instances if i.get("status") in ("failed", "error")
-        )
+        pending_count = sum(1 for i in instances if i.get("status") in ("pending", "starting"))
+        failed_count = sum(1 for i in instances if i.get("status") in ("failed", "error"))
         target_units = target_capacity if target_capacity is not None else requested_count
 
         if fleet_type == AWSFleetType.INSTANT:

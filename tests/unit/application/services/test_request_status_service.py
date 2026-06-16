@@ -4,8 +4,9 @@ The acquire path now trusts ProviderFulfilment exclusively.
 The return path continues to use machine-state counting.
 """
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from orb.application.services.request_status_service import RequestStatusService
 from orb.domain.base.exceptions import ProviderContractError
@@ -34,9 +35,7 @@ def _make_machine(status: MachineStatus):
 
 def _fulfilment(state, message="test", **kwargs) -> dict:
     """Return metadata dict with a ProviderFulfilment as the acquire path expects."""
-    return {
-        "provider_fulfilment": ProviderFulfilment(state=state, message=message, **kwargs)
-    }
+    return {"provider_fulfilment": ProviderFulfilment(state=state, message=message, **kwargs)}
 
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-"""Unit tests for RunInstancesHandler.check_hosts_status."""
+"""Unit tests for RunInstancesHandler.check_hosts_status and ProviderFulfilment."""
 
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from botocore.exceptions import ClientError
 
+from orb.domain.base.provider_fulfilment import CheckHostsStatusResult
 from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError, AWSValidationError
 from orb.providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
 from orb.providers.aws.infrastructure.launch_template.manager import LTNetworkingState
@@ -21,13 +22,16 @@ def _make_handler() -> Any:
     return handler
 
 
-def _make_request(resource_ids=None, instance_ids=None, provider_data=None, metadata=None):
+def _make_request(
+    resource_ids=None, instance_ids=None, provider_data=None, metadata=None, requested_count=2
+):
     request = MagicMock()
     request.request_id = "req-ri-123"
     request.resource_ids = resource_ids or []
     request.provider_api = "RunInstances"
     request.provider_data = provider_data if provider_data is not None else {}
     request.metadata = metadata if metadata is not None else {}
+    request.requested_count = requested_count
     return request
 
 
@@ -56,29 +60,69 @@ def _formatted_instances(instance_ids, resource_id="r-test"):
 
 
 class TestRunInstancesHandlerCheckHostsStatus:
-    def test_check_hosts_status_all_running(self):
-        """All running instances → returns all."""
+    def test_check_hosts_status_returns_check_hosts_status_result(self):
+        """check_hosts_status returns CheckHostsStatusResult (not a plain list)."""
         handler = _make_handler()
         instance_ids = ["i-run1", "i-run2"]
         request = _make_request(
             resource_ids=["r-res1"],
             provider_data={"instance_ids": instance_ids, "reservation_id": "r-res1"},
+            requested_count=2,
         )
-
         with patch.object(
             handler,
             "_get_instance_details",
             return_value=_formatted_instances(instance_ids, "r-res1"),
         ):
             with patch.object(
-                handler,
-                "_format_instance_data",
-                side_effect=lambda insts, rid, api_val: insts,
+                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
+            ):
+                result = handler.check_hosts_status(request)
+        assert isinstance(result, CheckHostsStatusResult)
+
+    def test_check_hosts_status_all_running_fulfilled(self):
+        """All running instances → fulfilment state == 'fulfilled'."""
+        handler = _make_handler()
+        instance_ids = ["i-run1", "i-run2"]
+        request = _make_request(
+            resource_ids=["r-res1"],
+            provider_data={"instance_ids": instance_ids, "reservation_id": "r-res1"},
+            requested_count=2,
+        )
+        with patch.object(
+            handler,
+            "_get_instance_details",
+            return_value=_formatted_instances(instance_ids, "r-res1"),
+        ):
+            with patch.object(
+                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
             ):
                 result = handler.check_hosts_status(request)
 
-        assert len(result) == 2
-        returned_ids = {r["instance_id"] for r in result}
+        assert len(result.instances) == 2
+        assert result.fulfilment.state == "fulfilled"
+        assert result.fulfilment.running_count == 2
+
+    def test_check_hosts_status_all_running_instances_ids(self):
+        """All running instances → instance IDs present."""
+        handler = _make_handler()
+        instance_ids = ["i-run1", "i-run2"]
+        request = _make_request(
+            resource_ids=["r-res1"],
+            provider_data={"instance_ids": instance_ids, "reservation_id": "r-res1"},
+            requested_count=2,
+        )
+        with patch.object(
+            handler,
+            "_get_instance_details",
+            return_value=_formatted_instances(instance_ids, "r-res1"),
+        ):
+            with patch.object(
+                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
+            ):
+                result = handler.check_hosts_status(request)
+
+        returned_ids = {r["instance_id"] for r in result.instances}
         assert returned_ids == set(instance_ids)
 
     def test_check_hosts_status_mixed_states(self):
@@ -88,31 +132,31 @@ class TestRunInstancesHandlerCheckHostsStatus:
         request = _make_request(
             resource_ids=["r-mixed"],
             provider_data={"instance_ids": instance_ids, "reservation_id": "r-mixed"},
+            requested_count=3,
         )
-
         with patch.object(
             handler,
             "_get_instance_details",
             return_value=_formatted_instances(instance_ids, "r-mixed"),
         ):
             with patch.object(
-                handler,
-                "_format_instance_data",
-                side_effect=lambda insts, rid, api_val: insts,
+                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
             ):
                 result = handler.check_hosts_status(request)
 
-        assert len(result) == 3
+        assert len(result.instances) == 3
 
     def test_check_hosts_status_empty_resource_ids(self):
-        """No resource_ids and no instance_ids → returns []."""
+        """No resource_ids and no instance_ids → returns in_progress fulfilment."""
         handler = _make_handler()
         request = _make_request(resource_ids=[], provider_data={}, metadata={})
 
         with patch.object(handler, "_get_instance_details") as mock_get:
             result = handler.check_hosts_status(request)
 
-        assert result == []
+        assert isinstance(result, CheckHostsStatusResult)
+        assert result.instances == []
+        assert result.fulfilment.state == "in_progress"
         mock_get.assert_not_called()
 
     def test_check_hosts_status_aws_error(self):
@@ -123,7 +167,6 @@ class TestRunInstancesHandlerCheckHostsStatus:
             resource_ids=["r-err"],
             provider_data={"instance_ids": instance_ids, "reservation_id": "r-err"},
         )
-
         with patch.object(
             handler, "_get_instance_details", side_effect=_make_client_error("InternalError")
         ):
@@ -138,44 +181,40 @@ class TestRunInstancesHandlerCheckHostsStatus:
             resource_ids=["r-meta"],
             provider_data={},
             metadata={"instance_ids": instance_ids},
+            requested_count=2,
         )
-
         with patch.object(
             handler,
             "_get_instance_details",
             return_value=_formatted_instances(instance_ids, "r-meta"),
         ):
             with patch.object(
-                handler,
-                "_format_instance_data",
-                side_effect=lambda insts, rid, api_val: insts,
+                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
             ):
                 result = handler.check_hosts_status(request)
 
-        assert len(result) == 2
+        assert len(result.instances) == 2
 
     def test_check_hosts_status_returns_correct_count(self):
-        """Verify count matches instances returned."""
+        """Verify instance count in result matches instances returned."""
         handler = _make_handler()
         instance_ids = ["i-r1", "i-r2", "i-r3", "i-r4"]
         request = _make_request(
             resource_ids=["r-cnt"],
             provider_data={"instance_ids": instance_ids, "reservation_id": "r-cnt"},
+            requested_count=4,
         )
-
         with patch.object(
             handler,
             "_get_instance_details",
             return_value=_formatted_instances(instance_ids, "r-cnt"),
         ):
             with patch.object(
-                handler,
-                "_format_instance_data",
-                side_effect=lambda insts, rid, api_val: insts,
+                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
             ):
                 result = handler.check_hosts_status(request)
 
-        assert len(result) == 4
+        assert len(result.instances) == 4
 
     def test_check_hosts_status_preserves_instance_ids(self):
         """Instance IDs in result match input."""
@@ -184,61 +223,98 @@ class TestRunInstancesHandlerCheckHostsStatus:
         request = _make_request(
             resource_ids=["r-ids"],
             provider_data={"instance_ids": instance_ids, "reservation_id": "r-ids"},
+            requested_count=2,
         )
-
         with patch.object(
             handler,
             "_get_instance_details",
             return_value=_formatted_instances(instance_ids, "r-ids"),
         ):
             with patch.object(
-                handler,
-                "_format_instance_data",
-                side_effect=lambda insts, rid, api_val: insts,
+                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
             ):
                 result = handler.check_hosts_status(request)
 
-        returned_ids = {r["instance_id"] for r in result}
+        returned_ids = {r["instance_id"] for r in result.instances}
         assert returned_ids == set(instance_ids)
 
     def test_check_hosts_status_state_filtering_is_strict(self):
         """Only instances returned by _get_instance_details appear in result."""
         handler = _make_handler()
         launched_ids = ["i-strict1", "i-strict2"]
-        # Only one instance returned (the other was terminated/not found)
         returned_by_aws = _formatted_instances(["i-strict1"], "r-strict")
         request = _make_request(
             resource_ids=["r-strict"],
             provider_data={"instance_ids": launched_ids, "reservation_id": "r-strict"},
+            requested_count=2,
         )
-
         with patch.object(handler, "_get_instance_details", return_value=returned_by_aws):
             with patch.object(
-                handler,
-                "_format_instance_data",
-                side_effect=lambda insts, rid, api_val: insts,
+                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
             ):
                 result = handler.check_hosts_status(request)
 
-        assert len(result) == 1
-        assert result[0]["instance_id"] == "i-strict1"
+        assert len(result.instances) == 1
+        assert result.instances[0]["instance_id"] == "i-strict1"
 
     def test_check_hosts_status_uses_resource_ids_when_no_instance_ids(self):
         """Falls back to _find_instances_by_resource_ids when no instance_ids anywhere."""
         handler = _make_handler()
-        request = _make_request(
-            resource_ids=["r-fallback"],
-            provider_data={},
-            metadata={},
+        request = _make_request(resource_ids=["r-fallback"], provider_data={}, metadata={})
+        from orb.domain.base.provider_fulfilment import ProviderFulfilment
+
+        fallback_result = CheckHostsStatusResult(
+            instances=_formatted_instances(["i-fb1"], "r-fallback"),
+            fulfilment=ProviderFulfilment(state="in_progress", message="test"),
         )
-
-        fallback_result = _formatted_instances(["i-fb1"], "r-fallback")
-
         with patch.object(handler, "_find_instances_by_resource_ids", return_value=fallback_result):
             result = handler.check_hosts_status(request)
 
-        assert len(result) == 1
-        assert result[0]["instance_id"] == "i-fb1"
+        assert len(result.instances) == 1
+        assert result.instances[0]["instance_id"] == "i-fb1"
+
+
+class TestRunInstancesProviderFulfilment:
+    """Unit tests for RunInstances fulfilment computation."""
+
+    def _run(self, instances, requested_count):
+        handler = _make_handler()
+        return handler._compute_run_instances_fulfilment(instances, requested_count)
+
+    def _inst(self, status):
+        return {"instance_id": "i-x", "status": status}
+
+    def test_all_running_at_target_is_fulfilled(self):
+        instances = [self._inst("running"), self._inst("running")]
+        f = self._run(instances, 2)
+        assert f.state == "fulfilled"
+        assert f.running_count == 2
+
+    def test_running_exceeds_target_is_fulfilled(self):
+        instances = [self._inst("running")] * 3
+        f = self._run(instances, 2)
+        assert f.state == "fulfilled"
+
+    def test_pending_instances_is_in_progress(self):
+        instances = [self._inst("running"), self._inst("pending")]
+        f = self._run(instances, 2)
+        assert f.state == "in_progress"
+        assert f.pending_count == 1
+
+    def test_no_instances_is_in_progress(self):
+        f = self._run([], 2)
+        assert f.state == "in_progress"
+
+    def test_some_running_below_target_is_in_progress(self):
+        instances = [self._inst("running")]
+        f = self._run(instances, 2)
+        # 1 running, no pending → partial
+        assert f.state == "partial"
+
+    def test_all_failed_is_failed(self):
+        instances = [self._inst("failed"), self._inst("failed")]
+        f = self._run(instances, 2)
+        assert f.state == "failed"
 
 
 class TestRunInstancesHandlerMachineAdapterContext:
@@ -250,6 +326,7 @@ class TestRunInstancesHandlerMachineAdapterContext:
         request = _make_request(
             resource_ids=[resource_id],
             provider_data={"instance_ids": instance_ids, "reservation_id": resource_id},
+            requested_count=2,
         )
 
         with patch.object(handler, "_get_instance_details", return_value=[]) as mock_details:

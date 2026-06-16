@@ -5,7 +5,11 @@ from unittest.mock import MagicMock, patch
 
 from botocore.exceptions import ClientError
 
-from orb.domain.base.provider_fulfilment import CheckHostsStatusResult, FulfilmentState, ProviderFulfilment
+from orb.domain.base.provider_fulfilment import (
+    CheckHostsStatusResult,
+    FulfilmentState,
+    ProviderFulfilment,
+)
 from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from orb.providers.aws.infrastructure.handlers.asg.handler import ASGHandler
 

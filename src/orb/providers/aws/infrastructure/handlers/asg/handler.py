@@ -638,7 +638,9 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             if inst.get("LifecycleState") == "InService"
         )
         pending_raw = [
-            inst for inst in raw_instances if inst.get("LifecycleState") in ("Pending", "Pending:Wait", "Pending:Proceed")
+            inst
+            for inst in raw_instances
+            if inst.get("LifecycleState") in ("Pending", "Pending:Wait", "Pending:Proceed")
         ]
         pending_count = len(pending_raw)
         in_service_count = sum(
@@ -649,7 +651,9 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         instance_ids = [
             inst["InstanceId"]
             for inst in raw_instances
-            if inst.get("InstanceId") and inst.get("LifecycleState") not in ("Terminating", "Terminated", "Detaching", "Detached")
+            if inst.get("InstanceId")
+            and inst.get("LifecycleState")
+            not in ("Terminating", "Terminated", "Detaching", "Detached")
         ]
 
         if not instance_ids:
@@ -676,9 +680,11 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             instance_details = []
 
         provider_api_value = (getattr(self, "metadata", {}) or {}).get("provider_api", "ASG")
-        formatted = self._format_instance_data(
-            instance_details, asg_name, provider_api_value
-        ) if instance_details else []
+        formatted = (
+            self._format_instance_data(instance_details, asg_name, provider_api_value)
+            if instance_details
+            else []
+        )
 
         fulfilment = self._compute_asg_fulfilment(
             desired_capacity=desired_capacity,
@@ -702,14 +708,10 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         sum(WeightedCapacity for InService) >= DesiredCapacity AND
         pending_count == 0 AND failed_count == 0 → fulfilled.
         """
-        failed_count = sum(
-            1 for i in ec2_instances if i.get("status") in ("failed", "error")
-        )
+        failed_count = sum(1 for i in ec2_instances if i.get("status") in ("failed", "error"))
         running_count = sum(1 for i in ec2_instances if i.get("status") == "running")
 
-        asg_fully_fulfilled = (
-            desired_capacity > 0 and in_service_weighted >= desired_capacity
-        )
+        asg_fully_fulfilled = desired_capacity > 0 and in_service_weighted >= desired_capacity
 
         if asg_fully_fulfilled and pending_count == 0 and failed_count == 0:
             return ProviderFulfilment(

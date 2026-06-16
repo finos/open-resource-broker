@@ -5,7 +5,11 @@ from unittest.mock import MagicMock, patch
 
 from botocore.exceptions import ClientError
 
-from orb.domain.base.provider_fulfilment import CheckHostsStatusResult, FulfilmentState, ProviderFulfilment
+from orb.domain.base.provider_fulfilment import (
+    CheckHostsStatusResult,
+    FulfilmentState,
+    ProviderFulfilment,
+)
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
@@ -108,7 +112,9 @@ class TestSpotFleetHandlerCheckHostsStatus:
         with patch.object(
             handler,
             "_get_spot_fleet_status",
-            return_value=_fleet_status_result(active_ids, "sfr-222", state="in_progress", target_units=4, fulfilled_units=2),
+            return_value=_fleet_status_result(
+                active_ids, "sfr-222", state="in_progress", target_units=4, fulfilled_units=2
+            ),
         ):
             result = handler.check_hosts_status(request)
 
@@ -244,9 +250,7 @@ class TestSpotFleetHandlerCheckHostsStatus:
                 return _fleet_status_result(ids_a, "sfr-A")
             return _fleet_status_result(ids_b, "sfr-B")
 
-        with patch.object(
-            handler, "_get_spot_fleet_status", side_effect=get_status_side_effect
-        ):
+        with patch.object(handler, "_get_spot_fleet_status", side_effect=get_status_side_effect):
             result = handler.check_hosts_status(request)
 
         assert isinstance(result, CheckHostsStatusResult)

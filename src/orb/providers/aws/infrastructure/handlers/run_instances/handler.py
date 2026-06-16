@@ -497,9 +497,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
         no failed instances exist.
         """
         running_count = sum(1 for i in instances if i.get("status") == "running")
-        pending_count = sum(
-            1 for i in instances if i.get("status") in ("pending", "starting")
-        )
+        pending_count = sum(1 for i in instances if i.get("status") in ("pending", "starting"))
         failed_count = sum(
             1 for i in instances if i.get("status") in ("failed", "error", "shutting-down")
         )
