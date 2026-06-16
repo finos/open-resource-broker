@@ -7,6 +7,7 @@ from pydantic import Field
 
 from orb.application.dto.base import BaseDTO
 from orb.application.machine.result_mapping import map_machine_status_to_result
+from orb.domain.base.provider_fulfilment import ProviderFulfilment
 from orb.domain.machine.aggregate import Machine
 from orb.domain.request.aggregate import Request
 from orb.domain.request.request_types import RequestType
@@ -118,6 +119,13 @@ class RequestDTO(BaseDTO):
     # Structured error block surfaced when status is failed or partial.
     # Populated from error_details["aws_error"] when an AWS API error was captured.
     error: Optional[dict[str, Any]] = None
+    # Capacity fields from ProviderFulfilment — present when the provider emits them.
+    # For weighted fleets target_units and fulfilled_units reflect capacity units;
+    # for RunInstances they reflect instance count (1 unit = 1 instance).
+    target_units: Optional[int] = None
+    fulfilled_units: Optional[int] = None
+    running_count: Optional[int] = None
+    pending_count: Optional[int] = None
 
     @classmethod
     def from_domain(
@@ -125,6 +133,7 @@ class RequestDTO(BaseDTO):
         request: Request,
         verbose: bool = False,
         machine_references: Optional[list["MachineReferenceDTO"]] = None,
+        fulfilment: Optional[ProviderFulfilment] = None,
     ) -> "RequestDTO":
         """
         Create DTO from domain object.
@@ -186,6 +195,11 @@ class RequestDTO(BaseDTO):
             version=request.version,
             resource_ids=request.resource_ids,
             error=error_block,
+            # Capacity fields from ProviderFulfilment (present when caller supplies one)
+            target_units=fulfilment.target_units if fulfilment else None,
+            fulfilled_units=fulfilment.fulfilled_units if fulfilment else None,
+            running_count=fulfilment.running_count if fulfilment else None,
+            pending_count=fulfilment.pending_count if fulfilment else None,
         )
 
     def to_dict(self, verbose: bool = False) -> dict[str, Any]:
@@ -217,6 +231,11 @@ class RequestDTO(BaseDTO):
             result["error"] = self.error
         else:
             result.pop("error", None)
+
+        # Include capacity fields only when populated (fleet/weighted-capacity requests).
+        for cap_field in ("target_units", "fulfilled_units", "running_count", "pending_count"):
+            if result.get(cap_field) is None:
+                result.pop(cap_field, None)
 
         # Remove fields based on detail level
         if not include_details:
