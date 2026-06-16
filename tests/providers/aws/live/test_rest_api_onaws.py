@@ -109,36 +109,62 @@ class RequestTimeoutError(TimeoutError):
         self.status_response = status_response
 
 
+def _pick_free_port() -> int:
+    """Bind to port 0 and immediately release it to claim an OS-assigned ephemeral port.
+
+    Avoids hard-coded ports colliding across pytest-xdist workers running in parallel.
+    There is a small TOCTOU race between releasing and the server binding — acceptable
+    for test isolation; the kernel does not reuse a port immediately under normal load.
+    """
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
 class ORBServerManager:
     """Manage ORB server lifecycle for testing."""
 
     def __init__(
         self,
         host: str = scenarios_rest_api.REST_API_SERVER["host"],
-        port: int = scenarios_rest_api.REST_API_SERVER["port"],
+        port: Optional[int] = None,
         log_path: Optional[str] = None,
     ):
         self.host = host
-        self.port = port
+        # Auto-pick a free port per instance unless explicitly overridden.
+        # Configured `port` in scenarios is only honoured when explicitly passed
+        # (e.g. a single-worker run that wants to hit a known port).
+        self.port = port if port is not None else _pick_free_port()
         self.process = None
-        self.base_url = f"http://{host}:{port}"
+        # Health probe must target localhost (not 0.0.0.0 or wildcard host).
+        self.base_url = f"http://127.0.0.1:{self.port}"
         self.log_path = log_path
         self._log_file_handle = None
+        self._captured_log_path: Optional[str] = None
 
     def start(self, timeout: int | None = None):
-        """Start ORB server: orb system serve --host 0.0.0.0 --port 8000"""
+        """Start ORB server: orb system serve --host <host> --port <port>"""
         cmd = ["orb", "system", "serve", "--host", self.host, "--port", str(self.port)]
-        log.info(f"Starting ORB server: {' '.join(cmd)}")
+        log.info("Starting ORB server: %s", " ".join(cmd))
 
-        stdout_target = subprocess.PIPE
-        stderr_target = subprocess.PIPE
+        # Always capture server output to a file so a failed start has actionable detail.
+        if not self.log_path:
+            # Fall back to a temp file the test can surface in the error message.
+            import tempfile
 
-        # If a log path is provided, write combined stdout/stderr to that file
-        if self.log_path:
+            fd, self.log_path = tempfile.mkstemp(
+                prefix=f"orb-server-{self.port}-", suffix=".log"
+            )
+            os.close(fd)
+        else:
             os.makedirs(os.path.dirname(self.log_path), exist_ok=True)
-            self._log_file_handle = open(self.log_path, "w", encoding="utf-8")
-            stdout_target = self._log_file_handle
-            stderr_target = subprocess.STDOUT
+
+        self._captured_log_path = self.log_path
+        self._log_file_handle = open(self.log_path, "w", encoding="utf-8")
+        stdout_target = self._log_file_handle
+        stderr_target = subprocess.STDOUT
 
         if timeout is None:
             timeout = REST_TIMEOUTS["server_start"]
@@ -150,30 +176,49 @@ class ORBServerManager:
             text=True,
         )
 
-        # Wait for server to be ready
+        # Wait for server to be ready, AND fail fast if the process dies.
         start_time = time.time()
         while time.time() - start_time < timeout:
+            # If the process has exited, no point continuing to poll.
+            if self.process.poll() is not None:
+                break
             try:
                 response = requests.get(
                     f"{self.base_url}/health",
                     timeout=scenarios_rest_api.REST_API_SERVER["start_probe_timeout"],
                 )
                 if response.status_code == 200:
-                    log.info(f"ORB server started successfully on {self.base_url}")
+                    log.info("ORB server started successfully on %s", self.base_url)
                     return
             except requests.exceptions.RequestException:
                 time.sleep(scenarios_rest_api.REST_API_SERVER["start_probe_interval"])
 
-        # Server failed to start - capture output
-        try:
-            _stdout, stderr = self.process.communicate(
-                timeout=scenarios_rest_api.REST_API_SERVER["start_capture_timeout"]
-            )
-            error_msg = f"ORB server failed to start within {timeout}s. stderr: {stderr}"
-        except subprocess.TimeoutExpired:
-            error_msg = f"ORB server failed to start within {timeout}s (process still running)"
-
+        # Server failed to start — read captured output from the log file.
+        # The subprocess.PIPE/communicate dance doesn't work here because we
+        # already redirected output to the log file.
+        captured = self._read_captured_output()
+        exit_code = self.process.poll() if self.process else None
+        error_msg = (
+            f"ORB server failed to start within {timeout}s on {self.base_url} "
+            f"(exit_code={exit_code}, log={self._captured_log_path}).\n"
+            f"--- captured output (last 2KB) ---\n{captured}"
+        )
         raise RuntimeError(error_msg)
+
+    def _read_captured_output(self) -> str:
+        """Read the last 2KB of the server log for error context."""
+        try:
+            if self._log_file_handle:
+                self._log_file_handle.flush()
+            if not self._captured_log_path or not os.path.exists(self._captured_log_path):
+                return "(no log file)"
+            size = os.path.getsize(self._captured_log_path)
+            with open(self._captured_log_path, encoding="utf-8", errors="replace") as f:
+                if size > 2048:
+                    f.seek(size - 2048)
+                return f.read()
+        except Exception as exc:  # noqa: BLE001
+            return f"(failed to read log: {exc})"
 
     def stop(self):
         """Terminate ORB server process."""
