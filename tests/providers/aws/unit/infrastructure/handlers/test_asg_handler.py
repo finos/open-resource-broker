@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from botocore.exceptions import ClientError
 
+from orb.domain.base.provider_fulfilment import CheckHostsStatusResult, FulfilmentState, ProviderFulfilment
 from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from orb.providers.aws.infrastructure.handlers.asg.handler import ASGHandler
 
@@ -19,11 +20,12 @@ def _make_handler() -> Any:
     return handler
 
 
-def _make_request(resource_ids):
+def _make_request(resource_ids, requested_count=2):
     request = MagicMock()
     request.request_id = "req-asg-123"
     request.resource_ids = resource_ids
     request.metadata = {}
+    request.requested_count = requested_count
     return request
 
 
@@ -32,7 +34,7 @@ def _make_client_error(code="InternalError"):
 
 
 def _formatted_instances(instance_ids, resource_id="asg-test"):
-    """Return already-formatted instance dicts (as _get_asg_instances returns them)."""
+    """Return already-formatted instance dicts."""
     return [
         {
             "instance_id": iid,
@@ -51,157 +53,176 @@ def _formatted_instances(instance_ids, resource_id="asg-test"):
     ]
 
 
+def _asg_result(instance_ids, resource_id="asg-test", state: FulfilmentState = "fulfilled"):
+    """Build a CheckHostsStatusResult for mocking _get_asg_status."""
+    return CheckHostsStatusResult(
+        instances=_formatted_instances(instance_ids, resource_id),
+        fulfilment=ProviderFulfilment(state=state, message="test"),
+    )
+
+
 class TestASGHandlerCheckHostsStatus:
     def test_check_hosts_status_all_inservice(self):
-        """All InService instances → returns all."""
+        """All InService instances → CheckHostsStatusResult with all instances and fulfilled state."""
         handler = _make_handler()
         request = _make_request(["asg-111"])
         instance_ids = ["i-asg1", "i-asg2"]
 
         with patch.object(
             handler,
-            "_get_asg_instances",
-            return_value=_formatted_instances(instance_ids, "asg-111"),
+            "_get_asg_status",
+            return_value=_asg_result(instance_ids, "asg-111", state="fulfilled"),
         ):
-            with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
-            ):
-                result = handler.check_hosts_status(request)
+            result = handler.check_hosts_status(request)
 
-        assert len(result) == 2
-        returned_ids = {r["instance_id"] for r in result}
+        assert isinstance(result, CheckHostsStatusResult)
+        assert isinstance(result.fulfilment, ProviderFulfilment)
+        assert len(result.instances) == 2
+        returned_ids = {r["instance_id"] for r in result.instances}
         assert returned_ids == set(instance_ids)
+        assert result.fulfilment.state == "fulfilled"
 
     def test_check_hosts_status_mixed_lifecycle(self):
-        """_get_asg_instances extracts all instance IDs from ASG regardless of lifecycle state."""
+        """ASG with mixed lifecycle states — handler reports what _get_asg_status returns."""
         handler = _make_handler()
         request = _make_request(["asg-222"])
 
-        # ASG returns InService + Terminating instances — handler returns all from _get_asg_instances
         all_ids = ["i-inservice1", "i-inservice2", "i-terminating1"]
 
         with patch.object(
-            handler, "_get_asg_instances", return_value=_formatted_instances(all_ids, "asg-222")
+            handler,
+            "_get_asg_status",
+            return_value=_asg_result(all_ids, "asg-222", state="in_progress"),
         ):
-            with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
-            ):
-                result = handler.check_hosts_status(request)
+            result = handler.check_hosts_status(request)
 
-        assert len(result) == 3
+        assert isinstance(result, CheckHostsStatusResult)
+        assert isinstance(result.fulfilment, ProviderFulfilment)
+        assert len(result.instances) == 3
 
     def test_check_hosts_status_asg_not_found(self):
-        """_get_asg_instances returns [] when ASG not found → result is []."""
+        """_get_asg_status raises → exception logged and skipped; result has empty instances and in_progress."""
         handler = _make_handler()
         request = _make_request(["asg-missing"])
 
-        with patch.object(handler, "_get_asg_instances", return_value=[]):
+        with patch.object(
+            handler, "_get_asg_status", side_effect=AWSInfrastructureError("ASG not found")
+        ):
             result = handler.check_hosts_status(request)
 
-        assert result == []
+        assert isinstance(result, CheckHostsStatusResult)
+        assert isinstance(result.fulfilment, ProviderFulfilment)
+        assert result.instances == []
+        assert result.fulfilment.state == "in_progress"
 
     def test_check_hosts_status_aws_error(self):
-        """Exception inside per-ASG loop → logged and skipped; result is []."""
+        """Exception inside per-ASG loop → logged and skipped; empty instances, in_progress."""
         handler = _make_handler()
         request = _make_request(["asg-err"])
 
         with patch.object(
-            handler, "_get_asg_instances", side_effect=AWSInfrastructureError("AWS error")
+            handler, "_get_asg_status", side_effect=AWSInfrastructureError("AWS error")
         ):
             result = handler.check_hosts_status(request)
 
-        assert result == []
+        assert isinstance(result, CheckHostsStatusResult)
+        assert isinstance(result.fulfilment, ProviderFulfilment)
+        assert result.instances == []
+        assert result.fulfilment.state == "in_progress"
 
     def test_check_hosts_status_no_resource_ids(self):
-        """Empty resource_ids → returns [] immediately without calling AWS."""
+        """Empty resource_ids → CheckHostsStatusResult with empty instances and in_progress, no AWS calls."""
         handler = _make_handler()
         request = _make_request([])
 
-        with patch.object(handler, "_get_asg_instances") as mock_get:
+        with patch.object(handler, "_get_asg_status") as mock_get:
             result = handler.check_hosts_status(request)
 
-        assert result == []
+        assert isinstance(result, CheckHostsStatusResult)
+        assert isinstance(result.fulfilment, ProviderFulfilment)
+        assert result.instances == []
+        assert result.fulfilment.state == "in_progress"
         mock_get.assert_not_called()
 
     def test_check_hosts_status_returns_correct_count(self):
-        """Verify count matches instances in ASG."""
+        """Verify instance count in result.instances matches instances returned by _get_asg_status."""
         handler = _make_handler()
         request = _make_request(["asg-cnt"])
         instance_ids = ["i-cnt1", "i-cnt2", "i-cnt3"]
 
         with patch.object(
             handler,
-            "_get_asg_instances",
-            return_value=_formatted_instances(instance_ids, "asg-cnt"),
+            "_get_asg_status",
+            return_value=_asg_result(instance_ids, "asg-cnt", state="fulfilled"),
         ):
-            with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
-            ):
-                result = handler.check_hosts_status(request)
+            result = handler.check_hosts_status(request)
 
-        assert len(result) == 3
+        assert isinstance(result, CheckHostsStatusResult)
+        assert isinstance(result.fulfilment, ProviderFulfilment)
+        assert len(result.instances) == 3
+        assert result.fulfilment.state == "fulfilled"
 
     def test_check_hosts_status_preserves_instance_ids(self):
-        """Instance IDs in result match input."""
+        """Instance IDs in result.instances match input."""
         handler = _make_handler()
         request = _make_request(["asg-ids"])
         instance_ids = ["i-asg-preserve1", "i-asg-preserve2"]
 
         with patch.object(
             handler,
-            "_get_asg_instances",
-            return_value=_formatted_instances(instance_ids, "asg-ids"),
+            "_get_asg_status",
+            return_value=_asg_result(instance_ids, "asg-ids", state="fulfilled"),
         ):
-            with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
-            ):
-                result = handler.check_hosts_status(request)
+            result = handler.check_hosts_status(request)
 
-        returned_ids = {r["instance_id"] for r in result}
+        assert isinstance(result, CheckHostsStatusResult)
+        assert isinstance(result.fulfilment, ProviderFulfilment)
+        returned_ids = {r["instance_id"] for r in result.instances}
         assert returned_ids == set(instance_ids)
+        assert result.fulfilment.state == "fulfilled"
 
     def test_check_hosts_status_multiple_asgs(self):
-        """Multiple ASG names in resource_ids → aggregates results from all."""
+        """Multiple ASG names in resource_ids → aggregates instances from all ASGs."""
         handler = _make_handler()
         request = _make_request(["asg-A", "asg-B"])
 
         ids_a = ["i-a1", "i-a2"]
         ids_b = ["i-b1"]
 
-        def get_asg_instances_side_effect(asg_name, **kwargs):
+        def get_asg_status_side_effect(asg_name, **kwargs):
             if asg_name == "asg-A":
-                return _formatted_instances(ids_a, "asg-A")
-            return _formatted_instances(ids_b, "asg-B")
+                return _asg_result(ids_a, "asg-A", state="fulfilled")
+            return _asg_result(ids_b, "asg-B", state="fulfilled")
 
-        with patch.object(handler, "_get_asg_instances", side_effect=get_asg_instances_side_effect):
-            with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
-            ):
-                result = handler.check_hosts_status(request)
+        with patch.object(handler, "_get_asg_status", side_effect=get_asg_status_side_effect):
+            result = handler.check_hosts_status(request)
 
-        assert len(result) == 3
-        returned_ids = {r["instance_id"] for r in result}
+        assert isinstance(result, CheckHostsStatusResult)
+        assert isinstance(result.fulfilment, ProviderFulfilment)
+        assert len(result.instances) == 3
+        returned_ids = {r["instance_id"] for r in result.instances}
         assert returned_ids == {"i-a1", "i-a2", "i-b1"}
+        assert result.fulfilment.state == "fulfilled"
 
     def test_check_hosts_status_state_filtering_is_strict(self):
-        """Only instances returned by _get_asg_instances appear in result."""
+        """Only instances returned by _get_asg_status appear in result.instances."""
         handler = _make_handler()
         request = _make_request(["asg-strict"])
-        # Only one instance is active
         active_ids = ["i-strict-active"]
 
         with patch.object(
             handler,
-            "_get_asg_instances",
-            return_value=_formatted_instances(active_ids, "asg-strict"),
+            "_get_asg_status",
+            return_value=_asg_result(active_ids, "asg-strict", state="fulfilled"),
         ):
-            with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
-            ):
-                result = handler.check_hosts_status(request)
+            result = handler.check_hosts_status(request)
 
-        assert len(result) == 1
-        assert result[0]["instance_id"] == "i-strict-active"
+        assert isinstance(result, CheckHostsStatusResult)
+        assert isinstance(result.fulfilment, ProviderFulfilment)
+        assert len(result.instances) == 1
+        assert result.instances[0]["instance_id"] == "i-strict-active"
+        assert result.fulfilment.state == "fulfilled"
+        assert result.fulfilment.target_units is None
 
 
 class TestASGHandlerNameTag:
