@@ -4,6 +4,7 @@ import asyncio
 import sys
 from typing import Any
 
+from orb.bootstrap import Application
 from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
 from orb.infrastructure.logging.logger import get_logger
@@ -29,11 +30,16 @@ async def handle_mcp_serve(args) -> dict[str, Any]:
     host = getattr(args, "host", "localhost")
     stdio_mode = getattr(args, "stdio", False)
 
-    # Get application instance from DI container
-    container = get_container()
+    # Bootstrap the application so that the DI container has all providers,
+    # CQRS handlers, and configuration registered.  Without this the MCP tool
+    # handlers operate against a bare container and every request fails with
+    # "No strategy found for provider".
+    app = Application()
+    if not await app.initialize():
+        raise RuntimeError("Failed to initialize ORB application for MCP server")
 
-    # Create MCP server instance
-    mcp_server = OpenResourceBrokerMCPServer(app=container)
+    # Create MCP server instance with the initialized DI container
+    mcp_server = OpenResourceBrokerMCPServer(app=get_container())
 
     if stdio_mode:
         # Run in stdio mode for direct MCP client communication

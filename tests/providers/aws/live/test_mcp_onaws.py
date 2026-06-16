@@ -83,6 +83,11 @@ from tests.shared.constants import REQUEST_ID_RE
 @pytest.fixture
 def setup_mcp_test(request, test_session_id):
     """Generate per-test config dir, set env vars, construct MCP server, yield, teardown."""
+    import asyncio
+
+    from orb.bootstrap import Application
+    from orb.infrastructure.di import reset_container
+    from orb.infrastructure.di.container import get_container
     from orb.interface.mcp.server.core import OpenResourceBrokerMCPServer
 
     processor = TemplateProcessor()
@@ -115,7 +120,15 @@ def setup_mcp_test(request, test_session_id):
     os.environ["AWS_PROVIDER_LOG_DIR"] = str(test_config_dir / "logs")
     os.environ["HF_LOGDIR"] = str(test_config_dir / "logs")
 
-    mcp_server = OpenResourceBrokerMCPServer(app=None)
+    # Bootstrap ORB so the DI container has providers, CQRS handlers,
+    # configuration etc. registered before MCP tool handlers run.  Without
+    # this every MCP request fails with "No strategy found for provider".
+    reset_container()
+    app = Application(config_path=str(config_dir / "config.json"), skip_validation=True)
+    if not asyncio.run(app.initialize()):
+        raise RuntimeError("Failed to initialize ORB application for MCP test")
+
+    mcp_server = OpenResourceBrokerMCPServer(app=get_container())
 
     _tracked_request_ids: list[str] = []
 
@@ -348,19 +361,21 @@ async def _run_full_cycle_mcp(mcp_server, test_case: dict, tracked_request_ids: 
 
     return_request_id = _extract_request_id(return_result)
 
-    # 5. Poll return completion via list_return_requests
+    # 5. Poll return completion via get_request_status(return_request_id).
+    # The HostFactory getReturnRequests wire format flattens per-machine items
+    # without a per-request status, so the right way to ask "is this return
+    # complete?" under any scheduler is get_request_status(return_id).
     if return_request_id:
         deadline = time.time() + MCP_TIMEOUTS["return_completion"]
+        terminal = {"complete", "complete_with_error", "failed", "cancelled", "timeout"}
         while True:
-            list_result = await _call_tool(mcp_server, "list_return_requests", {})
-            requests = list_result.get("requests", [])
-            done = any(
-                (req.get("requestId") or req.get("request_id")) == return_request_id
-                and req.get("status") == "complete"
-                for req in requests
-                if isinstance(req, dict)
+            status_resp = await _call_tool(
+                mcp_server, "get_request_status", {"request_id": return_request_id}
             )
-            if done:
+            status = _extract_request_status(status_resp)
+            if status in terminal:
+                if status != "complete":
+                    pytest.fail(f"Return request ended with non-success status: {status}")
                 break
             if time.time() > deadline:
                 pytest.fail("Timed out waiting for return request to complete")
