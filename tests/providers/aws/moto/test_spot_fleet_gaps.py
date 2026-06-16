@@ -387,9 +387,9 @@ class TestCheckStatus:
         )
 
         status_request = _make_request(request_id="spot-status-cancel", resource_ids=[fleet_id])
-        status = handler.check_hosts_status(status_request)
+        result = handler.check_hosts_status(status_request)
 
-        assert status == []
+        assert result.instances == []
 
 
 # ---------------------------------------------------------------------------

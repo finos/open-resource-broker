@@ -375,9 +375,9 @@ class TestASGCheckStatus:
         asg_client.delete_auto_scaling_group(AutoScalingGroupName=asg_name, ForceDelete=True)
 
         status_request = _make_request(request_id="asg-status-001", resource_ids=[asg_name])
-        status = handler.check_hosts_status(status_request)
+        result = handler.check_hosts_status(status_request)
 
-        assert status == []
+        assert result.instances == []
 
 
 class TestASGTags:

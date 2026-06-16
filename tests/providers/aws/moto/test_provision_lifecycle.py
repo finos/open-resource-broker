@@ -316,11 +316,13 @@ class TestASGProvisionLifecycle:
         acquire_result = handler.acquire_hosts(request, template)
         asg_name = acquire_result["resource_ids"][0]
 
+        from orb.domain.base.provider_fulfilment import CheckHostsStatusResult
+
         status_request = _make_request(resource_ids=[asg_name])
         result = handler.check_hosts_status(status_request)
 
         # moto does not spin up ASG instances automatically
-        assert isinstance(result, list)
+        assert isinstance(result, CheckHostsStatusResult)
 
     def test_release_after_acquire(self, factory, subnet_id, sg_id, autoscaling_client):
         """release_hosts with empty machine_ids does not raise after acquire."""
@@ -375,10 +377,12 @@ class TestEC2FleetProvisionLifecycle:
         acquire_result = handler.acquire_hosts(request, template)
         fleet_id = acquire_result["resource_ids"][0]
 
+        from orb.domain.base.provider_fulfilment import CheckHostsStatusResult
+
         status_request = _make_request(resource_ids=[fleet_id])
         result = handler.check_hosts_status(status_request)
 
-        assert isinstance(result, list)
+        assert isinstance(result, CheckHostsStatusResult)
 
     def test_release_after_acquire(self, factory, subnet_id, sg_id):
         """release_hosts with empty machine_ids does not raise."""
@@ -432,10 +436,12 @@ class TestSpotFleetProvisionLifecycle:
         acquire_result = handler.acquire_hosts(request, template)
         fleet_id = acquire_result["resource_ids"][0]
 
+        from orb.domain.base.provider_fulfilment import CheckHostsStatusResult
+
         status_request = _make_request(resource_ids=[fleet_id])
         result = handler.check_hosts_status(status_request)
 
-        assert isinstance(result, list)
+        assert isinstance(result, CheckHostsStatusResult)
 
     def test_release_after_acquire(self, factory, subnet_id, sg_id):
         """release_hosts with empty machine_ids does not raise."""
@@ -500,8 +506,8 @@ class TestRunInstancesProvisionLifecycle:
         )
         result = handler.check_hosts_status(status_request)
 
-        assert len(result) == len(instance_ids)
-        assert result[0]["instance_id"] == instance_ids[0]
+        assert len(result.instances) == len(instance_ids)
+        assert result.instances[0]["instance_id"] == instance_ids[0]
 
     def test_release_terminates_instances(self, factory, subnet_id, sg_id, ec2_client):
         """release_hosts terminates the launched instances."""
@@ -542,7 +548,7 @@ class TestRunInstancesProvisionLifecycle:
             provider_data={"instance_ids": instance_ids, "reservation_id": reservation_id},
         )
         status = handler.check_hosts_status(status_request)
-        assert len(status) >= 1
+        assert len(status.instances) >= 1
 
         # Release
         handler.release_hosts(instance_ids)

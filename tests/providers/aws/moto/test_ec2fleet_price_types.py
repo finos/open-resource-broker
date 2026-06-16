@@ -378,7 +378,7 @@ class TestCheckStatusDeletedFleet:
         )
         result = handler.check_hosts_status(status_request)
 
-        assert result == []
+        assert result.instances == []
 
 
 # ---------------------------------------------------------------------------

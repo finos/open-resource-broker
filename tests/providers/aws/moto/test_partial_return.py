@@ -272,9 +272,9 @@ class TestPartialReturnRunInstances:
         )
         result = handler.check_hosts_status(status_request)
 
-        assert len(result) == 3
+        assert len(result.instances) == 3
 
-        statuses = {entry["instance_id"]: entry["status"] for entry in result}
+        statuses = {entry["instance_id"]: entry["status"] for entry in result.instances}
         terminated_entry = statuses[instance_ids[0]]
         assert terminated_entry in ("terminated", "shutting-down", "stopping")
 

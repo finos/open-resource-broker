@@ -204,9 +204,11 @@ class TestAWSAPIErrors:
 
     def test_check_hosts_status_nonexistent_asg_returns_empty(self, asg_handler):
         """check_hosts_status for a non-existent ASG returns [] without crashing."""
+        from orb.domain.base.provider_fulfilment import CheckHostsStatusResult
+
         request = make_request(resource_ids=["asg-totally-fake-does-not-exist"])
         result = asg_handler.check_hosts_status(request)
-        assert isinstance(result, list)
+        assert isinstance(result, CheckHostsStatusResult)
 
     def test_run_instances_invalid_ami_propagates_or_returns_failure(
         self, run_instances_handler, moto_vpc_resources
@@ -359,9 +361,11 @@ class TestEC2FleetHandlerEdgeCases:
         acquire_result = h.acquire_hosts(request, template)
         fleet_id = acquire_result["resource_ids"][0]  # type: ignore[index]
 
+        from orb.domain.base.provider_fulfilment import CheckHostsStatusResult
+
         status_request = make_request(resource_ids=[fleet_id], metadata={"fleet_type": "maintain"})
         result = h.check_hosts_status(status_request)
-        assert isinstance(result, list)
+        assert isinstance(result, CheckHostsStatusResult)
 
     def test_release_hosts_with_resource_mapping(self, handler, vpc):
         template = make_aws_template(
@@ -437,10 +441,12 @@ class TestSpotFleetHandlerEdgeCases:
             h.acquire_hosts(request, bad_template)
 
     def test_check_hosts_status_unknown_fleet_returns_empty(self, moto_aws):
+        from orb.domain.base.provider_fulfilment import CheckHostsStatusResult
+
         h = _make_spot_handler_patched(moto_aws)
         request = make_request(resource_ids=["sfr-00000000-0000-0000-0000-000000000000"])
         result = h.check_hosts_status(request)
-        assert isinstance(result, list)
+        assert isinstance(result, CheckHostsStatusResult)
 
     def test_release_hosts_with_resource_mapping(self, moto_aws, vpc):
         h = _make_spot_handler_patched(moto_aws)
@@ -526,13 +532,13 @@ class TestRunInstancesHandlerEdgeCases:
         )
         result = handler.check_hosts_status(status_request)
 
-        assert isinstance(result, list)
-        assert len(result) == 1
+        assert isinstance(result.instances, list)
+        assert len(result.instances) == 1
 
     def test_check_hosts_status_no_ids_returns_empty(self, handler):
         request = make_request(resource_ids=[], provider_data={})
         result = handler.check_hosts_status(request)
-        assert result == []
+        assert result.instances == []
 
     def test_check_hosts_status_multiple_instances(self, handler, vpc):
         template = make_aws_template(subnet_id=vpc["subnet_id"], sg_id=vpc["sg_id"])
@@ -549,8 +555,8 @@ class TestRunInstancesHandlerEdgeCases:
         )
         result = handler.check_hosts_status(status_request)
 
-        assert len(result) == len(instance_ids)
-        assert {r["instance_id"] for r in result} == set(instance_ids)
+        assert len(result.instances) == len(instance_ids)
+        assert {r["instance_id"] for r in result.instances} == set(instance_ids)
 
     def test_release_hosts_idempotent_on_already_terminated(self, handler, vpc):
         template = make_aws_template(subnet_id=vpc["subnet_id"], sg_id=vpc["sg_id"])

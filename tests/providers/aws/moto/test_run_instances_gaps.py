@@ -325,10 +325,10 @@ class TestRunInstancesGaps:
             resource_ids=[reservation_id],
             provider_data={"instance_ids": instance_ids, "reservation_id": reservation_id},
         )
-        status = handler.check_hosts_status(status_request)
+        result = handler.check_hosts_status(status_request)
 
-        assert len(status) == len(instance_ids)
-        assert status[0]["instance_id"] == instance_ids[0]
+        assert len(result.instances) == len(instance_ids)
+        assert result.instances[0]["instance_id"] == instance_ids[0]
 
     def test_check_status_instance_in_terminated_state(
         self, handler: RunInstancesHandler, subnet_id: str, sg_id: str, ec2: Any
@@ -348,10 +348,10 @@ class TestRunInstancesGaps:
             resource_ids=[reservation_id],
             provider_data={"instance_ids": instance_ids, "reservation_id": reservation_id},
         )
-        status = handler.check_hosts_status(status_request)
+        result = handler.check_hosts_status(status_request)
 
-        assert len(status) == len(instance_ids)
-        terminated_statuses = {entry["status"] for entry in status}
+        assert len(result.instances) == len(instance_ids)
+        terminated_statuses = {entry["status"] for entry in result.instances}
         assert terminated_statuses & {"terminated", "shutting-down", "stopping"}
 
     def test_release_partial_then_full_two_step(

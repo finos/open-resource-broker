@@ -202,7 +202,8 @@ def _build_request_dto_from_run_instances(
         resource_ids=[reservation_id],
         provider_data={"instance_ids": instance_ids, "reservation_id": reservation_id},
     )
-    machine_data_list = handler.check_hosts_status(status_request)
+    check_result = handler.check_hosts_status(status_request)
+    machine_data_list = check_result.instances
 
     # Build MachineReferenceDTOs from raw machine dicts returned by check_hosts_status
     machine_refs = []
@@ -488,7 +489,8 @@ class TestGetRequestStatusSchema:
             resource_ids=[reservation_id],
             provider_data={"instance_ids": instance_ids, "reservation_id": reservation_id},
         )
-        machine_data_list = handler.check_hosts_status(status_request)
+        check_result = handler.check_hosts_status(status_request)
+        machine_data_list = check_result.instances
 
         machines = []
         for m in machine_data_list:
