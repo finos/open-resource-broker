@@ -17,7 +17,6 @@ from orb.domain.base.ports.configuration_port import ConfigurationPort
 
 # Import AWS-specific components
 from orb.providers.aws.configuration.config import AWSProviderConfig
-from orb.providers.aws.exceptions.aws_exceptions import AWSConfigurationError
 from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.services.capability_service import AWSCapabilityService
 from orb.providers.aws.services.handler_registry import AWSHandlerRegistry
@@ -411,8 +410,15 @@ class AWSProviderStrategy(ProviderStrategy):
         logic for discovering instances from resource IDs. This delegates to the
         correct handler's check_hosts_status method rather than using a generic
         service that lacks per-handler context.
+
+        The handler returns a CheckHostsStatusResult containing both instance
+        details and a ProviderFulfilment verdict.  The fulfilment is forwarded
+        in metadata so RequestStatusService can consume it without any
+        provider-specific logic.
         """
         try:
+            from orb.domain.base.provider_fulfilment import ProviderFulfilment
+
             resource_ids = operation.parameters.get("resource_ids", [])
             provider_api = operation.parameters.get("provider_api", "RunInstances")
             provider_api_value = (
@@ -454,15 +460,20 @@ class AWSProviderStrategy(ProviderStrategy):
             )
             request.resource_ids = resource_ids
 
-            instance_details = handler.check_hosts_status(request)
+            check_result = handler.check_hosts_status(request)
+            instance_details = check_result.instances
+            fulfilment: ProviderFulfilment = check_result.fulfilment
 
             metadata: dict[str, Any] = {
                 "operation": "describe_resource_instances",
                 "resource_ids": resource_ids,
                 "provider_api": provider_api_value,
                 "instance_count": len(instance_details),
+                # Forward the provider's fulfilment verdict to the application layer.
+                # RequestStatusService reads this as "provider_fulfilment" and trusts
+                # it exclusively — no count math or AWS-specific key inspection.
+                "provider_fulfilment": fulfilment,
             }
-            self._augment_capacity_metadata(metadata, provider_api_value, resource_ids)
 
             if not instance_details:
                 self._logger.info("No instances found for resources: %s", resource_ids)
@@ -479,7 +490,10 @@ class AWSProviderStrategy(ProviderStrategy):
                 "DESCRIBE_RESOURCE_INSTANCES_ERROR",
             )
 
+    # -------------------------------------------------------------------------
     # Infrastructure discovery methods (delegated to service)
+    # -------------------------------------------------------------------------
+
     def discover_infrastructure(self, provider_config: dict[str, Any]) -> dict[str, Any]:
         """Discover AWS infrastructure for provider."""
         return self._get_infrastructure_service().discover_infrastructure(provider_config)
@@ -572,100 +586,6 @@ class AWSProviderStrategy(ProviderStrategy):
             self._initialized = False
         except Exception as e:
             self._logger.warning("Failed during AWS provider cleanup: %s", e, exc_info=True)
-
-    def _augment_capacity_metadata(
-        self, metadata: dict[str, Any], provider_api: str, resource_ids: list[str]
-    ) -> None:
-        """Add fleet capacity fulfillment data to metadata for fleet-based providers."""
-        if not resource_ids or not self.aws_client:
-            return
-        try:
-            resource_id = resource_ids[0]
-            capacity_fetchers: dict[str, Callable[[str], Optional[dict[str, Any]]]] = {
-                "EC2Fleet": self._fetch_ec2_fleet_capacity,
-                "SpotFleet": self._fetch_spot_fleet_capacity,
-                "ASG": self._fetch_asg_capacity,
-            }
-            fetcher = capacity_fetchers.get(provider_api)
-            if fetcher:
-                result = fetcher(resource_id)
-                if result is not None:
-                    metadata["fleet_capacity_fulfilment"] = result
-        except Exception as e:
-            self._logger.warning("Failed to augment capacity metadata: %s", e)
-
-    def _fetch_ec2_fleet_capacity(self, resource_id: str) -> Optional[dict[str, Any]]:
-        """Fetch capacity fulfillment data for an EC2Fleet resource."""
-        if self.aws_client is None:
-            raise AWSConfigurationError(
-                "aws_client must be injected before calling _fetch_ec2_fleet_capacity"
-            )
-        response = self.aws_client.ec2_client.describe_fleets(FleetIds=[resource_id])
-        fleets = response.get("Fleets", [])
-        if not fleets:
-            return None
-        fleet = fleets[0]
-        spec = fleet.get("TargetCapacitySpecification") or {}
-        target = spec.get("TotalTargetCapacity")
-        fulfilled = fleet.get("FulfilledCapacity") or 0
-        fleet_type_val = (fleet.get("Type") or "maintain").lower()
-        return {
-            "target_capacity_units": target,
-            "fulfilled_capacity_units": fulfilled,
-            "provisioned_instance_count": int(fulfilled),
-            "state": fleet.get("FleetState"),
-            "fleet_type": fleet_type_val,
-            "fulfillment_final": fleet_type_val == "instant",
-        }
-
-    def _fetch_spot_fleet_capacity(self, resource_id: str) -> Optional[dict[str, Any]]:
-        """Fetch capacity fulfillment data for a SpotFleet resource."""
-        if self.aws_client is None:
-            raise AWSConfigurationError(
-                "aws_client must be injected before calling _fetch_spot_fleet_capacity"
-            )
-        response = self.aws_client.ec2_client.describe_spot_fleet_requests(
-            SpotFleetRequestIds=[resource_id]
-        )
-        configs = response.get("SpotFleetRequestConfigs", [])
-        if not configs:
-            return None
-        cfg = configs[0].get("SpotFleetRequestConfig") or {}
-        fulfilled = cfg.get("FulfilledCapacity") or 0
-        return {
-            "target_capacity_units": cfg.get("TargetCapacity"),
-            "fulfilled_capacity_units": fulfilled,
-            "provisioned_instance_count": int(fulfilled),
-            "state": configs[0].get("SpotFleetRequestState"),
-            "fleet_type": (cfg.get("Type") or "request").lower(),
-        }
-
-    def _fetch_asg_capacity(self, resource_id: str) -> Optional[dict[str, Any]]:
-        """Fetch capacity fulfillment data for an Auto Scaling Group resource."""
-        if self.aws_client is None:
-            raise AWSConfigurationError(
-                "aws_client must be injected before calling _fetch_asg_capacity"
-            )
-        response = self.aws_client.autoscaling_client.describe_auto_scaling_groups(
-            AutoScalingGroupNames=[resource_id]
-        )
-        groups = response.get("AutoScalingGroups", [])
-        if not groups:
-            return None
-        group = groups[0]
-        instances = group.get("Instances") or []
-        fulfilled = sum(
-            int(inst.get("WeightedCapacity", 1))
-            for inst in instances
-            if inst.get("LifecycleState") == "InService"
-        )
-        provisioned = sum(1 for inst in instances if inst.get("LifecycleState") == "InService")
-        return {
-            "target_capacity_units": int(group.get("DesiredCapacity") or 0),
-            "fulfilled_capacity_units": fulfilled,
-            "provisioned_instance_count": provisioned,
-            "state": group.get("Status"),
-        }
 
     async def _handle_resolve_image(self, operation: ProviderOperation) -> ProviderResult:
         """Handle image resolution using registry-based service."""
