@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from botocore.exceptions import ClientError
 
+from orb.domain.base.provider_fulfilment import CheckHostsStatusResult, FulfilmentState, ProviderFulfilment
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
@@ -20,11 +21,12 @@ def _make_handler() -> Any:
     return handler
 
 
-def _make_request(resource_ids):
+def _make_request(resource_ids, requested_count: int = 3):
     request = MagicMock()
     request.request_id = "req-spot-123"
     request.resource_ids = resource_ids
     request.metadata = {}
+    request.requested_count = requested_count
     return request
 
 
@@ -33,7 +35,7 @@ def _make_client_error(code="InternalError"):
 
 
 def _formatted_instances(instance_ids, resource_id="sfr-test"):
-    """Return already-formatted instance dicts (as _get_spot_fleet_instances returns them)."""
+    """Return already-formatted instance dicts."""
     return [
         {
             "instance_id": iid,
@@ -52,170 +54,226 @@ def _formatted_instances(instance_ids, resource_id="sfr-test"):
     ]
 
 
+def _fleet_status_result(
+    instance_ids,
+    resource_id: str = "sfr-test",
+    state: FulfilmentState = "fulfilled",
+    target_units: int | None = None,
+    fulfilled_units: int | None = None,
+):
+    """Build a CheckHostsStatusResult for mocking _get_spot_fleet_status."""
+    instances = _formatted_instances(instance_ids, resource_id)
+    n = len(instance_ids)
+    return CheckHostsStatusResult(
+        instances=instances,
+        fulfilment=ProviderFulfilment(
+            state=state,
+            message="test",
+            target_units=target_units if target_units is not None else n,
+            fulfilled_units=fulfilled_units if fulfilled_units is not None else n,
+            running_count=n,
+            pending_count=0,
+            failed_count=0,
+        ),
+    )
+
+
 class TestSpotFleetHandlerCheckHostsStatus:
     def test_check_hosts_status_all_active(self):
-        """All instances active → returns all."""
+        """All instances active → CheckHostsStatusResult with instances and fulfilled state."""
         handler = _make_handler()
-        request = _make_request(["sfr-111"])
         instance_ids = ["i-s1", "i-s2", "i-s3"]
+        request = _make_request(["sfr-111"], requested_count=len(instance_ids))
 
         with patch.object(
             handler,
-            "_get_spot_fleet_instances",
-            return_value=_formatted_instances(instance_ids, "sfr-111"),
+            "_get_spot_fleet_status",
+            return_value=_fleet_status_result(instance_ids, "sfr-111"),
         ):
-            with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
-            ):
-                result = handler.check_hosts_status(request)
+            result = handler.check_hosts_status(request)
 
-        assert len(result) == 3
-        returned_ids = {r["instance_id"] for r in result}
+        assert isinstance(result, CheckHostsStatusResult)
+        assert len(result.instances) == 3
+        returned_ids = {r["instance_id"] for r in result.instances}
         assert returned_ids == set(instance_ids)
+        assert isinstance(result.fulfilment, ProviderFulfilment)
+        assert result.fulfilment.state == "fulfilled"
 
     def test_check_hosts_status_partial_active(self):
-        """AWS only returns active instances via describe_spot_fleet_instances — terminated excluded."""
+        """AWS only returns active instances — terminated excluded; result reflects active set."""
         handler = _make_handler()
-        request = _make_request(["sfr-222"])
         active_ids = ["i-active1", "i-active2"]
+        request = _make_request(["sfr-222"], requested_count=4)
 
         with patch.object(
             handler,
-            "_get_spot_fleet_instances",
-            return_value=_formatted_instances(active_ids, "sfr-222"),
+            "_get_spot_fleet_status",
+            return_value=_fleet_status_result(active_ids, "sfr-222", state="in_progress", target_units=4, fulfilled_units=2),
         ):
-            with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
-            ):
-                result = handler.check_hosts_status(request)
+            result = handler.check_hosts_status(request)
 
-        assert len(result) == 2
-        returned_ids = {r["instance_id"] for r in result}
+        assert isinstance(result, CheckHostsStatusResult)
+        assert len(result.instances) == 2
+        returned_ids = {r["instance_id"] for r in result.instances}
         assert returned_ids == set(active_ids)
+        assert isinstance(result.fulfilment, ProviderFulfilment)
 
     def test_check_hosts_status_fleet_not_found(self):
-        """_get_spot_fleet_instances returns [] when fleet not found → result is []."""
+        """_get_spot_fleet_status raises → error logged, skipped; result has empty instances."""
         handler = _make_handler()
         request = _make_request(["sfr-missing"])
 
-        with patch.object(handler, "_get_spot_fleet_instances", return_value=[]):
+        with patch.object(
+            handler,
+            "_get_spot_fleet_status",
+            side_effect=AWSInfrastructureError("Fleet not found"),
+        ):
             result = handler.check_hosts_status(request)
 
-        assert result == []
+        assert isinstance(result, CheckHostsStatusResult)
+        assert result.instances == []
+        assert isinstance(result.fulfilment, ProviderFulfilment)
+        assert result.fulfilment.state == "in_progress"
 
     def test_check_hosts_status_aws_error(self):
-        """Exception inside per-fleet loop → logged and skipped; result is []."""
+        """Exception inside per-fleet loop → logged and skipped; result has empty instances."""
         handler = _make_handler()
         request = _make_request(["sfr-err"])
 
         with patch.object(
-            handler, "_get_spot_fleet_instances", side_effect=AWSInfrastructureError("AWS error")
+            handler,
+            "_get_spot_fleet_status",
+            side_effect=AWSInfrastructureError("AWS error"),
         ):
             result = handler.check_hosts_status(request)
 
-        assert result == []
+        assert isinstance(result, CheckHostsStatusResult)
+        assert result.instances == []
+        assert isinstance(result.fulfilment, ProviderFulfilment)
 
     def test_check_hosts_status_no_resource_ids(self):
-        """Empty resource_ids → returns [] without calling AWS."""
+        """Empty resource_ids → returns CheckHostsStatusResult with empty instances, in_progress."""
         handler = _make_handler()
         request = _make_request([])
 
-        with patch.object(handler, "_get_spot_fleet_instances") as mock_get:
+        with patch.object(handler, "_get_spot_fleet_status") as mock_get:
             result = handler.check_hosts_status(request)
 
-        assert result == []
+        assert isinstance(result, CheckHostsStatusResult)
+        assert result.instances == []
+        assert isinstance(result.fulfilment, ProviderFulfilment)
+        assert result.fulfilment.state == "in_progress"
         mock_get.assert_not_called()
 
     def test_check_hosts_status_returns_correct_count(self):
-        """Verify count matches active instances."""
+        """Verify instance count in result matches instances returned."""
         handler = _make_handler()
-        request = _make_request(["sfr-cnt"])
         instance_ids = ["i-c1", "i-c2", "i-c3", "i-c4"]
+        request = _make_request(["sfr-cnt"], requested_count=len(instance_ids))
 
         with patch.object(
             handler,
-            "_get_spot_fleet_instances",
-            return_value=_formatted_instances(instance_ids, "sfr-cnt"),
+            "_get_spot_fleet_status",
+            return_value=_fleet_status_result(instance_ids, "sfr-cnt"),
         ):
-            with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
-            ):
-                result = handler.check_hosts_status(request)
+            result = handler.check_hosts_status(request)
 
-        assert len(result) == 4
+        assert isinstance(result, CheckHostsStatusResult)
+        assert len(result.instances) == 4
+        assert isinstance(result.fulfilment, ProviderFulfilment)
+        assert result.fulfilment.state == "fulfilled"
+        assert result.fulfilment.target_units == 4
+        assert result.fulfilment.fulfilled_units == 4
 
     def test_check_hosts_status_preserves_instance_ids(self):
-        """Instance IDs in result match input."""
+        """Instance IDs in result.instances match input."""
         handler = _make_handler()
-        request = _make_request(["sfr-ids"])
         instance_ids = ["i-spot-preserve1", "i-spot-preserve2"]
+        request = _make_request(["sfr-ids"], requested_count=len(instance_ids))
 
         with patch.object(
             handler,
-            "_get_spot_fleet_instances",
-            return_value=_formatted_instances(instance_ids, "sfr-ids"),
+            "_get_spot_fleet_status",
+            return_value=_fleet_status_result(instance_ids, "sfr-ids"),
         ):
-            with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
-            ):
-                result = handler.check_hosts_status(request)
+            result = handler.check_hosts_status(request)
 
-        returned_ids = {r["instance_id"] for r in result}
+        assert isinstance(result, CheckHostsStatusResult)
+        returned_ids = {r["instance_id"] for r in result.instances}
         assert returned_ids == set(instance_ids)
+        assert isinstance(result.fulfilment, ProviderFulfilment)
 
     def test_check_hosts_status_no_active_instances(self):
-        """Fleet exists but has no active instances → returns []."""
+        """Fleet exists but has no active instances → empty instances, in_progress."""
         handler = _make_handler()
         request = _make_request(["sfr-empty"])
 
-        with patch.object(handler, "_get_spot_fleet_instances", return_value=[]):
+        with patch.object(
+            handler,
+            "_get_spot_fleet_status",
+            return_value=CheckHostsStatusResult(
+                instances=[],
+                fulfilment=ProviderFulfilment(
+                    state="in_progress",
+                    message="Spot Fleet waiting for instances",
+                    target_units=3,
+                    fulfilled_units=0,
+                    running_count=0,
+                    pending_count=0,
+                    failed_count=0,
+                ),
+            ),
+        ):
             result = handler.check_hosts_status(request)
 
-        assert result == []
+        assert isinstance(result, CheckHostsStatusResult)
+        assert result.instances == []
+        assert isinstance(result.fulfilment, ProviderFulfilment)
+        assert result.fulfilment.state == "in_progress"
 
     def test_check_hosts_status_multiple_fleets(self):
-        """Multiple fleet IDs → aggregates results from all."""
+        """Multiple fleet IDs → aggregates instances from all; combined fulfilment state."""
         handler = _make_handler()
-        request = _make_request(["sfr-A", "sfr-B"])
+        request = _make_request(["sfr-A", "sfr-B"], requested_count=3)
 
         ids_a = ["i-sa1", "i-sa2"]
         ids_b = ["i-sb1"]
 
-        def get_instances_side_effect(fleet_id, request_id):
+        def get_status_side_effect(fleet_id, request_id, requested_count):
             if fleet_id == "sfr-A":
-                return _formatted_instances(ids_a, "sfr-A")
-            return _formatted_instances(ids_b, "sfr-B")
+                return _fleet_status_result(ids_a, "sfr-A")
+            return _fleet_status_result(ids_b, "sfr-B")
 
         with patch.object(
-            handler, "_get_spot_fleet_instances", side_effect=get_instances_side_effect
+            handler, "_get_spot_fleet_status", side_effect=get_status_side_effect
         ):
-            with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
-            ):
-                result = handler.check_hosts_status(request)
+            result = handler.check_hosts_status(request)
 
-        assert len(result) == 3
-        returned_ids = {r["instance_id"] for r in result}
+        assert isinstance(result, CheckHostsStatusResult)
+        assert len(result.instances) == 3
+        returned_ids = {r["instance_id"] for r in result.instances}
         assert returned_ids == {"i-sa1", "i-sa2", "i-sb1"}
+        assert isinstance(result.fulfilment, ProviderFulfilment)
+        assert result.fulfilment.state == "fulfilled"
 
     def test_check_hosts_status_state_filtering_is_strict(self):
-        """Only instances returned by _get_spot_fleet_instances appear in result."""
+        """Only instances returned by _get_spot_fleet_status appear in result."""
         handler = _make_handler()
-        request = _make_request(["sfr-strict"])
         active_ids = ["i-spot-strict-active"]
+        request = _make_request(["sfr-strict"], requested_count=1)
 
         with patch.object(
             handler,
-            "_get_spot_fleet_instances",
-            return_value=_formatted_instances(active_ids, "sfr-strict"),
+            "_get_spot_fleet_status",
+            return_value=_fleet_status_result(active_ids, "sfr-strict"),
         ):
-            with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
-            ):
-                result = handler.check_hosts_status(request)
+            result = handler.check_hosts_status(request)
 
-        assert len(result) == 1
-        assert result[0]["instance_id"] == "i-spot-strict-active"
+        assert isinstance(result, CheckHostsStatusResult)
+        assert len(result.instances) == 1
+        assert result.instances[0]["instance_id"] == "i-spot-strict-active"
+        assert isinstance(result.fulfilment, ProviderFulfilment)
+        assert result.fulfilment.state == "fulfilled"
 
 
 class TestSpotFleetHandlerNameTag:
