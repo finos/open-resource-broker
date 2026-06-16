@@ -154,9 +154,7 @@ class ORBServerManager:
             # Fall back to a temp file the test can surface in the error message.
             import tempfile
 
-            fd, self.log_path = tempfile.mkstemp(
-                prefix=f"orb-server-{self.port}-", suffix=".log"
-            )
+            fd, self.log_path = tempfile.mkstemp(prefix=f"orb-server-{self.port}-", suffix=".log")
             os.close(fd)
         else:
             os.makedirs(os.path.dirname(self.log_path), exist_ok=True)
@@ -1016,11 +1014,15 @@ def test_rest_api_partial_return_reduces_capacity(
     # Step 1: Request capacity
     templates_response = rest_api_client.get_templates()
     template_id = test_case.get("template_id") or test_case["test_name"]
+    scheduler = test_case.get("overrides", {}).get("scheduler", "default")
+    template_id_key = "templateId" if scheduler == "hostfactory" else "template_id"
+    provider_api_key = "providerApi" if scheduler == "hostfactory" else "provider_api"
+
     template_json = next(
         (
             template
             for template in templates_response["templates"]
-            if template.get("template_id") == template_id
+            if template.get(template_id_key) == template_id
         ),
         None,
     )
@@ -1028,14 +1030,14 @@ def test_rest_api_partial_return_reduces_capacity(
         pytest.fail(f"Template {template_id} not found for partial return test")
 
     provider_api = (
-        template_json.get("provider_api")
+        template_json.get(provider_api_key)
         or test_case.get("overrides", {}).get("providerApi")
         or "EC2Fleet"
     )
 
     log.info("Requesting %d instances", test_case["capacity_to_request"])
     request_response = rest_api_client.request_machines(
-        template_id=template_json["template_id"],
+        template_id=template_json[template_id_key],
         machine_count=test_case["capacity_to_request"],
     )
     log.debug("Request response: %s", json.dumps(request_response, indent=2))
@@ -1846,11 +1848,19 @@ def test_rest_api_control_loop(rest_api_client, setup_rest_api_environment, test
     # 1.2: Find target template
     log.info("1.2: Finding target template")
     template_id = test_case.get("template_id") or test_case["test_name"]
+    # Each scheduler defines its own wire format.  HostFactory uses camelCase
+    # (IBM Symphony spec); the default scheduler keeps ORB's domain snake_case.
+    # Tests must match the scheduler under test — otherwise a real wire-format
+    # regression would be hidden by a permissive lookup.
+    scheduler = test_case.get("overrides", {}).get("scheduler", "default")
+    template_id_key = "templateId" if scheduler == "hostfactory" else "template_id"
+    provider_api_key = "providerApi" if scheduler == "hostfactory" else "provider_api"
+
     template_json = next(
         (
             template
             for template in templates_response["templates"]
-            if template.get("template_id") == template_id
+            if template.get(template_id_key) == template_id
         ),
         None,
     )
@@ -1859,9 +1869,9 @@ def test_rest_api_control_loop(rest_api_client, setup_rest_api_environment, test
         log.warning(f"Template {template_id} not found, using first available template")
         template_json = templates_response["templates"][0]
 
-    log.info(f"Using template: {template_json.get('template_id')}")
+    log.info(f"Using template: {template_json.get(template_id_key)}")
     provider_api = (
-        template_json.get("provider_api")
+        template_json.get(provider_api_key)
         or test_case.get("overrides", {}).get("providerApi")
         or "EC2Fleet"
     )
@@ -1870,7 +1880,7 @@ def test_rest_api_control_loop(rest_api_client, setup_rest_api_environment, test
     # 1.3: Request machines via REST API
     log.info(f"1.3: Requesting {test_case['capacity_to_request']} machines")
     request_response = rest_api_client.request_machines(
-        template_id=template_json["template_id"],
+        template_id=template_json[template_id_key],
         machine_count=test_case["capacity_to_request"],
     )
     log.debug(f"Request response: {json.dumps(request_response, indent=2)}")
