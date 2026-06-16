@@ -11,13 +11,16 @@ import json
 import re
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Callable, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar
 
 from botocore.exceptions import ClientError
 
 from orb.application.base.provider_handlers import BaseProviderHandler
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.exceptions import InfrastructureError
+
+if TYPE_CHECKING:
+    from orb.domain.base.provider_fulfilment import CheckHostsStatusResult
 from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.request.aggregate import Request
@@ -166,15 +169,21 @@ class AWSHandler(ABC):
         """
 
     @abstractmethod
-    def check_hosts_status(self, request: Request) -> list[dict[str, Any]]:
-        """
-        Check the status of hosts for a request.
+    def check_hosts_status(self, request: Request) -> "CheckHostsStatusResult":
+        """Check the status of hosts for a request.
+
+        Returns a ``CheckHostsStatusResult`` containing both per-instance
+        detail dicts and the provider's ``ProviderFulfilment`` verdict.
+
+        Every concrete handler MUST emit a ``ProviderFulfilment`` — no
+        fallback to count-based logic is permitted.  The application layer
+        raises ``ProviderContractError`` if fulfilment is absent.
 
         Args:
             request: The request to check
 
         Returns:
-            List of instance details
+            CheckHostsStatusResult with instances and fulfilment verdict.
 
         Raises:
             AWSEntityNotFoundError: If the AWS resource is not found
