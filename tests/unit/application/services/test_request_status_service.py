@@ -1,4 +1,8 @@
-"""Unit tests for RequestStatusService.determine_status_from_machines — return request logic."""
+"""Unit tests for RequestStatusService.determine_status_from_machines.
+
+Covers both return-request completion logic and the partial-fulfillment guards
+for async-acceptance providers (EC2Fleet maintain/request, ASG, SpotFleet).
+"""
 
 from unittest.mock import MagicMock
 
@@ -11,10 +15,10 @@ def _make_service():
     return RequestStatusService(uow_factory=MagicMock(), logger=MagicMock())
 
 
-def _make_request(request_type="return"):
+def _make_request(request_type="return", requested_count=2):
     req = MagicMock()
     req.request_type.value = request_type
-    req.requested_count = 2
+    req.requested_count = requested_count
     return req
 
 
@@ -166,3 +170,197 @@ class TestPrematureCompletedRegression:
             provider_metadata={},
         )
         assert status == RequestStatus.COMPLETED.value
+
+
+class TestAcquirePartialFulfillmentGuard:
+    """Regression guard: COMPLETED must NOT fire for acquire when only fulfilled_capacity
+    reaches the target while instances are still pending.
+
+    Root cause: for EC2Fleet maintain/request and SpotFleet, FulfilledCapacity reflects
+    capacity *allocated* by the fleet, not instances that are actually running.  The fleet
+    can show FulfilledCapacity == target while instances are still in ``pending`` state.
+    Firing COMPLETED at that point exposes fewer running machines than the caller requested.
+    """
+
+    def setup_method(self):
+        self.svc = _make_service()
+
+    def _fleet_metadata(
+        self,
+        target: int,
+        fulfilled: float,
+        fulfillment_final: bool = False,
+    ) -> dict:
+        return {
+            "fleet_capacity_fulfilment": {
+                "target_capacity_units": target,
+                "fulfilled_capacity_units": fulfilled,
+                "fulfillment_final": fulfillment_final,
+            }
+        }
+
+    def test_fleet_fulfilled_but_instances_pending_is_in_progress(self):
+        """Fleet FulfilledCapacity == target, but 2/4 instances still pending → IN_PROGRESS."""
+        req = _make_request("acquire", requested_count=4)
+        machines = [
+            _make_machine(MachineStatus.RUNNING),
+            _make_machine(MachineStatus.RUNNING),
+            _make_machine(MachineStatus.PENDING),
+            _make_machine(MachineStatus.PENDING),
+        ]
+        metadata = self._fleet_metadata(target=4, fulfilled=4.0)
+        status, _ = self.svc.determine_status_from_machines(
+            db_machines=machines,  # type: ignore[arg-type]
+            provider_machines=machines,  # type: ignore[arg-type]
+            request=req,
+            provider_metadata=metadata,
+        )
+        # Must NOT be COMPLETED — 2 instances are still pending
+        assert status != RequestStatus.COMPLETED.value
+        assert status == RequestStatus.IN_PROGRESS.value
+
+    def test_all_running_with_fleet_metadata_is_completed(self):
+        """Fleet FulfilledCapacity == target AND all instances running → COMPLETED."""
+        req = _make_request("acquire", requested_count=4)
+        machines = [
+            _make_machine(MachineStatus.RUNNING),
+            _make_machine(MachineStatus.RUNNING),
+            _make_machine(MachineStatus.RUNNING),
+            _make_machine(MachineStatus.RUNNING),
+        ]
+        metadata = self._fleet_metadata(target=4, fulfilled=4.0)
+        status, _ = self.svc.determine_status_from_machines(
+            db_machines=machines,  # type: ignore[arg-type]
+            provider_machines=machines,  # type: ignore[arg-type]
+            request=req,
+            provider_metadata=metadata,
+        )
+        assert status == RequestStatus.COMPLETED.value
+
+    def test_no_fleet_metadata_running_count_gates_completed(self):
+        """Without fleet metadata, running_count >= requested_count triggers COMPLETED."""
+        req = _make_request("acquire", requested_count=2)
+        machines = [
+            _make_machine(MachineStatus.RUNNING),
+            _make_machine(MachineStatus.RUNNING),
+        ]
+        status, _ = self.svc.determine_status_from_machines(
+            db_machines=machines,  # type: ignore[arg-type]
+            provider_machines=machines,  # type: ignore[arg-type]
+            request=req,
+            provider_metadata={},
+        )
+        assert status == RequestStatus.COMPLETED.value
+
+    def test_instant_fleet_fulfillment_final_no_pending_is_partial(self):
+        """Instant fleet: fulfillment_final=True, pending=0, running < target → PARTIAL."""
+        req = _make_request("acquire", requested_count=4)
+        machines = [
+            _make_machine(MachineStatus.RUNNING),
+            _make_machine(MachineStatus.RUNNING),
+        ]
+        metadata = self._fleet_metadata(target=4, fulfilled=2.0, fulfillment_final=True)
+        status, _ = self.svc.determine_status_from_machines(
+            db_machines=machines,  # type: ignore[arg-type]
+            provider_machines=machines,  # type: ignore[arg-type]
+            request=req,
+            provider_metadata=metadata,
+        )
+        assert status == RequestStatus.PARTIAL.value
+
+    def test_fleet_partial_fulfilled_not_yet_complete_is_in_progress(self):
+        """Fleet FulfilledCapacity < target → IN_PROGRESS (waiting for more instances)."""
+        req = _make_request("acquire", requested_count=4)
+        machines = [
+            _make_machine(MachineStatus.RUNNING),
+            _make_machine(MachineStatus.RUNNING),
+            _make_machine(MachineStatus.PENDING),
+        ]
+        metadata = self._fleet_metadata(target=4, fulfilled=3.0)
+        status, _ = self.svc.determine_status_from_machines(
+            db_machines=machines,  # type: ignore[arg-type]
+            provider_machines=machines,  # type: ignore[arg-type]
+            request=req,
+            provider_metadata=metadata,
+        )
+        assert status == RequestStatus.IN_PROGRESS.value
+
+
+class TestReturnPartialDescribeGuard:
+    """Regression guard: COMPLETED must NOT fire for return when describe returns fewer
+    machines than requested_count (partial describe window before AWS propagates state).
+
+    Root cause: comparing ``effectively_done_count`` against ``len(provider_machines)``
+    allows an early COMPLETED when AWS hasn't yet returned all terminating instances.
+    Comparing against ``request.requested_count`` (== len(machine_ids) for return requests)
+    prevents this.
+    """
+
+    def setup_method(self):
+        self.svc = _make_service()
+
+    def test_partial_describe_terminated_not_complete(self):
+        """3 terminated visible, requested_count=4 → IN_PROGRESS (1 not yet in response)."""
+        req = _make_request("return", requested_count=4)
+        machines = [
+            _make_machine(MachineStatus.TERMINATED),
+            _make_machine(MachineStatus.TERMINATED),
+            _make_machine(MachineStatus.TERMINATED),
+        ]
+        status, _ = self.svc.determine_status_from_machines(
+            db_machines=machines,  # type: ignore[arg-type]
+            provider_machines=machines,  # type: ignore[arg-type]
+            request=req,
+            provider_metadata={},
+        )
+        # Only 3 of 4 terminated → not complete
+        assert status != RequestStatus.COMPLETED.value
+        assert status == RequestStatus.IN_PROGRESS.value
+
+    def test_all_requested_terminated_is_completed(self):
+        """requested_count terminated instances visible → COMPLETED."""
+        req = _make_request("return", requested_count=4)
+        machines = [
+            _make_machine(MachineStatus.TERMINATED),
+            _make_machine(MachineStatus.TERMINATED),
+            _make_machine(MachineStatus.TERMINATED),
+            _make_machine(MachineStatus.TERMINATED),
+        ]
+        status, _ = self.svc.determine_status_from_machines(
+            db_machines=machines,  # type: ignore[arg-type]
+            provider_machines=machines,  # type: ignore[arg-type]
+            request=req,
+            provider_metadata={},
+        )
+        assert status == RequestStatus.COMPLETED.value
+
+    def test_more_terminated_than_requested_is_completed(self):
+        """terminated_count > requested_count → COMPLETED (safe: at least all done)."""
+        req = _make_request("return", requested_count=2)
+        machines = [
+            _make_machine(MachineStatus.TERMINATED),
+            _make_machine(MachineStatus.TERMINATED),
+            _make_machine(MachineStatus.TERMINATED),  # extra synthetic entry
+        ]
+        status, _ = self.svc.determine_status_from_machines(
+            db_machines=machines,  # type: ignore[arg-type]
+            provider_machines=machines,  # type: ignore[arg-type]
+            request=req,
+            provider_metadata={},
+        )
+        assert status == RequestStatus.COMPLETED.value
+
+    def test_one_terminated_one_shutting_down_not_complete(self):
+        """1 terminated + 1 shutting-down (requested_count=2) → IN_PROGRESS."""
+        req = _make_request("return", requested_count=2)
+        machines = [
+            _make_machine(MachineStatus.TERMINATED),
+            _make_machine(MachineStatus.SHUTTING_DOWN),
+        ]
+        status, _ = self.svc.determine_status_from_machines(
+            db_machines=machines,  # type: ignore[arg-type]
+            provider_machines=machines,  # type: ignore[arg-type]
+            request=req,
+            provider_metadata={},
+        )
+        assert status == RequestStatus.IN_PROGRESS.value
