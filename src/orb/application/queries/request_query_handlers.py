@@ -80,6 +80,13 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             # no domain invariants are enforced here, no domain events are raised.
             # The alternative (background polling) requires infrastructure that doesn't
             # exist yet. If you want to remove this, implement a background sync first.
+            #
+            # Terminal requests are immutable — skip the provider describe round-trip
+            # and return the persisted machines directly.
+            db_machines: list = []
+            if request.status.is_terminal():
+                db_machines = await self._query_service.get_machines_for_request(request)
+                return self._dto_factory.create_from_domain(request, db_machines)
             try:
                 await self._machine_sync_service.populate_missing_machine_ids(request)
                 db_machines = await self._query_service.get_machines_for_request(request)
@@ -104,7 +111,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     query.request_id,
                     sync_err,
                 )
-                return self._dto_factory.create_from_domain(request, [])
+                return self._dto_factory.create_from_domain(request, db_machines)
 
             # Deliberate query-time mutation: record when this request was polled for status.
             # first_status_check is set once; last_status_check is updated on every poll.
@@ -243,16 +250,67 @@ class ListReturnRequestsHandler(BaseQueryHandler[ListReturnRequestsQuery, list[R
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
         generic_filter_service: GenericFilterService,
+        machine_sync_service: MachineSyncService,
     ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
         self._generic_filter_service = generic_filter_service
+        self._machine_sync_service = machine_sync_service
+        self._status_service = RequestStatusService(uow_factory, logger)
+
+        from orb.application.services.request_query_service import RequestQueryService
+
+        self._query_service = RequestQueryService(uow_factory, logger)
 
     async def execute_query(self, query: ListReturnRequestsQuery) -> list[RequestDTO]:
         """Execute list return requests query."""
         self.logger.info("Listing return requests")
 
         try:
+            with self.uow_factory.create_unit_of_work() as uow:
+                from orb.domain.request.value_objects import RequestType
+
+                return_requests = uow.requests.find_by_type(RequestType.RETURN)
+
+            # Read-through sync: refresh each non-terminal return request from
+            # live provider state so a return that has actually completed at the
+            # provider transitions to COMPLETED in the DB.  Without this, a
+            # caller polling list_return_requests would see a request stuck in
+            # IN_PROGRESS forever and may retry the return — triggering
+            # provider-side double-decrement (e.g. ASG capacity off by one).
+            for request in return_requests:
+                if request.status.is_terminal():
+                    continue
+                try:
+                    db_machines = await self._query_service.get_machines_for_request(request)
+                    (
+                        provider_machines,
+                        provider_metadata,
+                    ) = await self._machine_sync_service.fetch_provider_machines(
+                        request, db_machines
+                    )
+                    (
+                        synced_machines,
+                        _,
+                    ) = await self._machine_sync_service.sync_machines_with_provider(
+                        request, db_machines, provider_machines
+                    )
+                    new_status, status_message = (
+                        self._status_service.determine_status_from_machines(
+                            db_machines, synced_machines, request, provider_metadata
+                        )
+                    )
+                    if new_status:
+                        await self._status_service.update_request_status(
+                            request, new_status, status_message or ""
+                        )
+                except Exception as sync_err:
+                    self.logger.warning(
+                        "Sync failed for return request %s, returning stored state: %s",
+                        request.request_id.value,
+                        sync_err,
+                    )
+
             with self.uow_factory.create_unit_of_work() as uow:
                 from orb.domain.request.value_objects import RequestType
 
