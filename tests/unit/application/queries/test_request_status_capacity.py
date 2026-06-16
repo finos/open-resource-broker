@@ -221,7 +221,7 @@ def test_runinstances_timeout_when_no_instances_after_long_time():
         target_units=1,
         fulfilled_units=0,
     )
-    new_status, msg = service.determine_status_from_machines(
+    new_status, _msg = service.determine_status_from_machines(
         [], [], request, {"provider_fulfilment": fulfilment}
     )
     # No machines yet — service returns IN_PROGRESS (keep polling)
