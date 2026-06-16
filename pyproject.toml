@@ -273,6 +273,8 @@ ci = [
     "peewee>=3.18.3",
     # Security override for safety's vulnerable marshmallow dependency (CVE-2025-68480)
     "marshmallow>=4.1.2",
+    # Security override for lxml (CVE-2026-41066) — transitive via cyclonedx-bom + pip-audit
+    "lxml>=6.1.0",
 
     # Documentation
     "mkdocs>=1.5.0,<2.0.0",
