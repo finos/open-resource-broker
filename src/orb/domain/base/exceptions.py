@@ -92,3 +92,13 @@ class QuotaError(DomainException):
 
 class QuotaExceededError(QuotaError):
     """Raised when a specific provider quota is exceeded."""
+
+
+class ProviderContractError(DomainException):
+    """Raised when a provider violates the ProviderFulfilment contract.
+
+    Every call to ``check_hosts_status`` must return a ``CheckHostsStatusResult``
+    that includes a ``ProviderFulfilment``.  If the provider omits it the
+    application layer raises this error instead of silently falling back to
+    count-based logic, which is always wrong for weighted fleets.
+    """
