@@ -35,23 +35,42 @@ _ec2_client = None
 _autoscaling_client = None
 
 
+def _get_boto_profile_and_region() -> tuple[str | None, str]:
+    """Read AWS profile and region from ORB_CONFIG_DIR config, same as test_onaws._get_boto_clients."""
+    import json as _json
+
+    profile = None
+    region = None
+    config_dir = os.environ.get("ORB_CONFIG_DIR")
+    if config_dir:
+        try:
+            config_path = os.path.join(config_dir, "config.json")
+            with open(config_path) as _f:
+                config = _json.load(_f)
+            providers = config.get("provider", {}).get("providers", [])
+            if providers:
+                provider_cfg = providers[0].get("config", {})
+                profile = provider_cfg.get("profile")
+                region = provider_cfg.get("region")
+        except Exception:
+            pass
+    region = region or os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "eu-west-1"
+    return profile, region
+
+
 def _get_ec2_client():
     global _ec2_client
     if _ec2_client is None:
-        _region = (
-            os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "eu-west-1"
-        )
-        _ec2_client = boto3.Session().client("ec2", region_name=_region)
+        _profile, _region = _get_boto_profile_and_region()
+        _ec2_client = boto3.Session(profile_name=_profile, region_name=_region).client("ec2", region_name=_region)
     return _ec2_client
 
 
 def _get_autoscaling_client():
     global _autoscaling_client
     if _autoscaling_client is None:
-        _region = (
-            os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "eu-west-1"
-        )
-        _autoscaling_client = boto3.Session().client("autoscaling", region_name=_region)
+        _profile, _region = _get_boto_profile_and_region()
+        _autoscaling_client = boto3.Session(profile_name=_profile, region_name=_region).client("autoscaling", region_name=_region)
     return _autoscaling_client
 
 

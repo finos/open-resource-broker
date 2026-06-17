@@ -123,7 +123,17 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             machine_objects = await self._query_service.get_machines_for_request(request)
             request_dto = self._dto_factory.create_from_domain(request, machine_objects)
 
-            if self._cache_service and self._cache_service.is_caching_enabled():
+            # Only cache terminal requests.  Non-terminal requests (in_progress,
+            # pending, provisioning) must be re-synced against the provider on
+            # every poll so that status transitions (→ completed, → failed) are
+            # picked up promptly.  Caching in_progress responses causes the
+            # poll loop to receive stale status for the full TTL window and the
+            # request appears stuck until the cache expires.
+            if (
+                self._cache_service
+                and self._cache_service.is_caching_enabled()
+                and request.status.is_terminal()
+            ):
                 self._cache_service.cache_request(query.request_id, request_dto)
 
             self.logger.info("Retrieved request: %s", query.request_id)
