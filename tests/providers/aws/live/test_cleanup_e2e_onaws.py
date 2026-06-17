@@ -159,7 +159,7 @@ for _case in CLEANUP_E2E_CASES:
 # ---------------------------------------------------------------------------
 
 
-def _assert_asg_deleted(asg_name: str, timeout: int = 120) -> None:
+def _assert_asg_deleted(asg_name: str, timeout: int = 300) -> None:
     """Assert ASG is deleted or has zero desired capacity with no instances."""
     deadline = time.time() + timeout
     last_state = None
@@ -184,7 +184,7 @@ def _assert_asg_deleted(asg_name: str, timeout: int = 120) -> None:
     pytest.fail(f"ASG {asg_name} not deleted or zeroed within {timeout}s. Last state: {last_state}")
 
 
-def _assert_fleet_deleted(fleet_id: str, timeout: int = 120) -> None:
+def _assert_fleet_deleted(fleet_id: str, timeout: int = 300) -> None:
     """Assert EC2 Fleet is deleted or has zero total target capacity."""
     deadline = time.time() + timeout
     last_state = None
@@ -215,7 +215,7 @@ def _assert_fleet_deleted(fleet_id: str, timeout: int = 120) -> None:
     )
 
 
-def _assert_spot_fleet_deleted(sfr_id: str, timeout: int = 120) -> None:
+def _assert_spot_fleet_deleted(sfr_id: str, timeout: int = 300) -> None:
     """Assert Spot Fleet request is cancelled/deleted or has zero target capacity."""
     deadline = time.time() + timeout
     last_state = None
