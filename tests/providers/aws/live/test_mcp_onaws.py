@@ -343,15 +343,26 @@ async def _run_full_cycle_mcp(mcp_server, test_case: dict, tracked_request_ids: 
     )
 
     machine_ids = _extract_machine_ids(status_result)
-    # Weighted templates (vmTypes with weight > 1) launch fewer instances than the
-    # requested capacity units (AWS WeightedCapacity semantics). Assert that the
-    # fleet was fulfilled (status == complete already proves this) and that at
-    # least one instance is healthy. For unweighted templates instance count
-    # equals capacity, but the strict equality is enforced by the provider via
-    # the COMPLETED gate, not by this assertion.
-    assert len(machine_ids) >= 1, (
-        f"Expected at least one machine after complete status, got: {machine_ids}"
+
+    # Capacity-unit fulfilment check from provider response fields.
+    # target_units / fulfilled_units reflect capacity units for weighted fleets
+    # and instance count for unweighted templates (1 unit == 1 instance).
+    _req0 = status_result.get("requests", [{}])[0] if isinstance(status_result, dict) else {}
+    target_units = _req0.get("target_units") or capacity
+    fulfilled_units = _req0.get("fulfilled_units") or len(machine_ids)
+    assert fulfilled_units >= target_units, (
+        f"Fleet not fully fulfilled: fulfilled={fulfilled_units}, target={target_units}"
     )
+
+    # Template-aware instance count sanity check.
+    if scenarios.template_uses_weighted_capacity(test_case):
+        assert len(machine_ids) >= 1, (
+            f"Expected at least 1 machine (weighted template), got: {machine_ids}"
+        )
+    else:
+        assert len(machine_ids) == capacity, (
+            f"Expected {capacity} machines (unweighted template), got {len(machine_ids)}: {machine_ids}"
+        )
 
     for machine_id in machine_ids:
         state = get_instance_state(machine_id)
