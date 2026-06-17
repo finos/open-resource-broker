@@ -467,14 +467,26 @@ async def _run_cleanup_verification(
 
     # 3. Assert instances provisioned
     machine_ids = _extract_machine_ids(status_response)
-    # Weighted templates can fulfill capacity with fewer instances (AWS
-    # WeightedCapacity). The COMPLETED status above already proves the fleet
-    # reached its target capacity; assert only that at least one instance was
-    # launched.
-    assert len(machine_ids) >= 1, (
-        f"Expected at least one machine after complete status, got: {machine_ids}"
+
+    # Capacity-unit fulfilment check from provider response fields.
+    # target_units / fulfilled_units reflect capacity units for weighted fleets
+    # and instance count for unweighted templates (1 unit == 1 instance).
+    _req0 = status_response.get("requests", [{}])[0] if isinstance(status_response, dict) else {}
+    target_units = _req0.get("target_units") or capacity
+    fulfilled_units = _req0.get("fulfilled_units") or len(machine_ids)
+    assert fulfilled_units >= target_units, (
+        f"Fleet not fully fulfilled: fulfilled={fulfilled_units}, target={target_units}"
     )
-    _ = capacity  # retained for log context
+
+    # Template-aware instance count sanity check.
+    if scenarios.template_uses_weighted_capacity(test_case):
+        assert len(machine_ids) >= 1, (
+            f"Expected at least 1 machine (weighted template), got: {machine_ids}"
+        )
+    else:
+        assert len(machine_ids) == capacity, (
+            f"Expected {capacity} machines (unweighted template), got {len(machine_ids)}: {machine_ids}"
+        )
 
     returned_id = status_response.get("requests", [{}])[0].get("request_id") or status_response.get(
         "requests", [{}]

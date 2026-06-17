@@ -1482,6 +1482,31 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
 
     _check_all_ec2_hosts_are_being_provisioned(status_response)
 
+    # Capacity-unit fulfilment check from provider response fields.
+    # target_units / fulfilled_units reflect capacity units for weighted fleets
+    # and instance count for unweighted templates (1 unit == 1 instance).
+    _req0 = status_response.get("requests", [{}])[0] if isinstance(status_response, dict) else {}
+    _machine_ids_for_check = [
+        m.get("machineId") or m.get("machine_id")
+        for m in _req0.get("machines", [])
+        if m.get("machineId") or m.get("machine_id")
+    ]
+    _target_units = _req0.get("target_units") or capacity_to_request
+    _fulfilled_units = _req0.get("fulfilled_units") or len(_machine_ids_for_check)
+    assert _fulfilled_units >= _target_units, (
+        f"Fleet not fully fulfilled: fulfilled={_fulfilled_units}, target={_target_units}"
+    )
+    # Template-aware instance count sanity check.
+    if test_case and scenarios.template_uses_weighted_capacity(test_case):
+        assert len(_machine_ids_for_check) >= 1, (
+            f"Expected at least 1 machine (weighted template), got: {_machine_ids_for_check}"
+        )
+    else:
+        assert len(_machine_ids_for_check) == capacity_to_request, (
+            f"Expected {capacity_to_request} machines (unweighted template), "
+            f"got {len(_machine_ids_for_check)}: {_machine_ids_for_check}"
+        )
+
     # Validate instance attributes against template
     log.info("Starting instance attribute validation against template")
     attribute_validation_passed = validate_random_instance_attributes(
