@@ -54,14 +54,17 @@ os.environ.setdefault("AWS_PROVIDER_LOG_DIR", "./logs")
 os.environ["LOG_DESTINATION"] = "file"
 os.environ.setdefault("AWS_REGION", "eu-west-1")
 
-_boto_session = boto3.session.Session()
-_ec2_region = (
-    os.environ.get("AWS_REGION")
-    or os.environ.get("AWS_DEFAULT_REGION")
-    or _boto_session.region_name
-    or "eu-west-1"
-)
-ec2_client = _boto_session.client("ec2", region_name=_ec2_region)
+_ec2_client = None
+
+
+def _get_ec2_client():
+    global _ec2_client
+    if _ec2_client is None:
+        _region = (
+            os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "eu-west-1"
+        )
+        _ec2_client = boto3.session.Session().client("ec2", region_name=_region)
+    return _ec2_client
 
 log = logging.getLogger("mcp_test")
 log.setLevel(logging.DEBUG)
@@ -183,14 +186,14 @@ def setup_mcp_test(request, test_session_id):
                     for req_id in _tracked_request_ids
                     for mid in _get_machine_ids_from_ec2(req_id)
                 ],
-                ec2_client,
+                _get_ec2_client(),
             )
         except Exception as exc:
             log.warning("Fixture teardown: wait_for_instances_terminated failed: %s", exc)
 
         for req_id in _tracked_request_ids:
             try:
-                cleanup_launch_templates_for_request(req_id, ec2_client)
+                cleanup_launch_templates_for_request(req_id, _get_ec2_client())
             except Exception as exc:
                 log.warning(
                     "Fixture teardown: cleanup_launch_templates failed for %s: %s", req_id, exc
@@ -224,7 +227,7 @@ def setup_mcp_test(request, test_session_id):
 
 
 def _get_machine_ids_from_ec2(request_id: str) -> list[str]:
-    return _get_machine_ids_from_ec2_helper(request_id, ec2_client)
+    return _get_machine_ids_from_ec2_helper(request_id, _get_ec2_client())
 
 
 async def _call_tool(mcp_server, tool_name: str, arguments: dict, msg_id: int = 1) -> dict:

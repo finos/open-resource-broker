@@ -57,19 +57,30 @@ os.environ["LOG_DESTINATION"] = "file"
 # Force region to eu-west-1 for tests
 os.environ.setdefault("AWS_REGION", "eu-west-1")
 
-# AWS client setup
-_boto_session = boto3.Session()
-_ec2_region = (
-    os.environ.get("AWS_REGION")
-    or os.environ.get("AWS_DEFAULT_REGION")
-    or _boto_session.region_name
-    or "eu-west-1"
-)
-ec2_client = _boto_session.client("ec2", region_name=_ec2_region)
-asg_client = _boto_session.client("autoscaling", region_name=_ec2_region)
+# AWS client setup — lazy-init so the client is constructed after
+# pytest_sessionstart has exported AWS_PROFILE from the ORB config.
+_ec2_client = None
+_asg_client = None
 
-# Log the configured region for debugging
-print(f"AWS clients initialized with region: {_ec2_region}")
+
+def _get_ec2_client():
+    global _ec2_client
+    if _ec2_client is None:
+        _region = (
+            os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "eu-west-1"
+        )
+        _ec2_client = boto3.Session().client("ec2", region_name=_region)
+    return _ec2_client
+
+
+def _get_asg_client():
+    global _asg_client
+    if _asg_client is None:
+        _region = (
+            os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "eu-west-1"
+        )
+        _asg_client = boto3.Session().client("autoscaling", region_name=_region)
+    return _asg_client
 
 # Logger setup
 log = logging.getLogger("rest_api_test")
@@ -448,7 +459,7 @@ def _lookup_aws_capacity_progress(provider_api: str, resource_id: str) -> tuple[
 
     try:
         if "spotfleet" in provider_lower:
-            resp = ec2_client.describe_spot_fleet_requests(SpotFleetRequestIds=[resource_id])
+            resp = _get_ec2_client().describe_spot_fleet_requests(SpotFleetRequestIds=[resource_id])
             configs = resp.get("SpotFleetRequestConfigs") or []
             config = configs[0].get("SpotFleetRequestConfig", {}) if configs else {}
             target = int(config.get("TargetCapacity", 0) or 0)
@@ -456,7 +467,7 @@ def _lookup_aws_capacity_progress(provider_api: str, resource_id: str) -> tuple[
             return fulfilled, target
 
         if "ec2fleet" in provider_lower:
-            resp = ec2_client.describe_fleets(FleetIds=[resource_id])
+            resp = _get_ec2_client().describe_fleets(FleetIds=[resource_id])
             fleets = resp.get("Fleets") or []
             fleet = fleets[0] if fleets else {}
             target_spec = fleet.get("TargetCapacitySpecification", {}) or {}
@@ -465,7 +476,7 @@ def _lookup_aws_capacity_progress(provider_api: str, resource_id: str) -> tuple[
             return fulfilled, target
 
         if provider_lower == "asg" or "autoscaling" in provider_lower:
-            resp = asg_client.describe_auto_scaling_groups(AutoScalingGroupNames=[resource_id])
+            resp = _get_asg_client().describe_auto_scaling_groups(AutoScalingGroupNames=[resource_id])
             asg = (resp.get("AutoScalingGroups") or [{}])[0]
             target = int(asg.get("DesiredCapacity", 0) or 0)
             fulfilled = len(asg.get("Instances") or [])
@@ -628,7 +639,7 @@ def log_resource_history(resource_id: str, provider_api: str) -> None:
                     f"EC2Fleet history API call {api_call_count}/{config['max_api_calls']}, requesting up to {params['MaxResults']} records"
                 )
 
-                response = ec2_client.describe_fleet_history(**params)
+                response = _get_ec2_client().describe_fleet_history(**params)
                 all_records = response.get("HistoryRecords", [])
 
                 # Filter records to exclude already-seen records
@@ -673,7 +684,7 @@ def log_resource_history(resource_id: str, provider_api: str) -> None:
                 api_call_count += 1
                 log.debug(f"SpotFleet history API call {api_call_count}/{config['max_api_calls']}")
 
-                response = ec2_client.describe_spot_fleet_request_history(**params)
+                response = _get_ec2_client().describe_spot_fleet_request_history(**params)
                 all_records = response.get("HistoryRecords", [])
 
                 # Filter records to exclude already-seen records
@@ -702,7 +713,7 @@ def log_resource_history(resource_id: str, provider_api: str) -> None:
 
         elif provider_api == "ASG":
             log.debug(
-                f"Fetching ASG scaling activities for {resource_id} (region={asg_client.meta.region_name})"
+                f"Fetching ASG scaling activities for {resource_id} (region={_get_asg_client().meta.region_name})"
             )
             # ASG has a max limit of 100 records per call, so we need to paginate
             next_token = None
@@ -718,7 +729,7 @@ def log_resource_history(resource_id: str, provider_api: str) -> None:
                 api_call_count += 1
                 # log.debug(f"ASG history API call {api_call_count}, requesting up to {params['MaxRecords']} records")
 
-                response = asg_client.describe_scaling_activities(**params)
+                response = _get_asg_client().describe_scaling_activities(**params)
                 all_activities = response.get("Activities", [])
                 # log.debug(f"Retrieved {len(all_activities)} ASG activities from API")
 
@@ -1218,7 +1229,7 @@ def _describe_instances_bulk(instance_ids: list[str], chunk_size: int = 100) -> 
     for start in range(0, len(instance_ids), chunk_size):
         chunk = instance_ids[start : start + chunk_size]
         try:
-            resp = ec2_client.describe_instances(InstanceIds=chunk)
+            resp = _get_ec2_client().describe_instances(InstanceIds=chunk)
         except ClientError as exc:  # pragma: no cover - defensive
             log.warning("describe_instances failed for chunk %s: %s", chunk, exc)
             continue
@@ -1341,7 +1352,7 @@ def _capture_resource_history(resource_id: str, provider_api: str, test_name: st
                 log.info(f"Calling describe_fleets to determine fleet type for {resource_id}")
                 fleet_desc = None
                 try:
-                    fleet_resp = ec2_client.describe_fleets(FleetIds=[resource_id])
+                    fleet_resp = _get_ec2_client().describe_fleets(FleetIds=[resource_id])
                     fleet_desc = (fleet_resp.get("Fleets") or [None])[0]
                 except ClientError as exc:
                     log.warning("describe_fleets failed for %s: %s", resource_id, exc)
@@ -1376,7 +1387,7 @@ def _capture_resource_history(resource_id: str, provider_api: str, test_name: st
                         # As a last resort, ask AWS directly
                         if not ids:
                             try:
-                                inst_resp = ec2_client.describe_fleet_instances(FleetId=resource_id)
+                                inst_resp = _get_ec2_client().describe_fleet_instances(FleetId=resource_id)
                                 for entry in inst_resp.get("ActiveInstances", []) or []:
                                     iid = entry.get("InstanceId")
                                     if iid:
@@ -1405,7 +1416,7 @@ def _capture_resource_history(resource_id: str, provider_api: str, test_name: st
                     for start_idx in range(0, len(instance_ids), 100):
                         chunk = instance_ids[start_idx : start_idx + 100]
                         try:
-                            resp = ec2_client.describe_instances(InstanceIds=chunk)
+                            resp = _get_ec2_client().describe_instances(InstanceIds=chunk)
                         except ClientError as exc:
                             log.warning("describe_instances failed for chunk %s: %s", chunk, exc)
                             continue
@@ -1454,7 +1465,7 @@ def _capture_resource_history(resource_id: str, provider_api: str, test_name: st
                         params["NextToken"] = next_token
 
                     try:
-                        response = ec2_client.describe_fleet_history(**params)
+                        response = _get_ec2_client().describe_fleet_history(**params)
                     except ClientError as exc:
                         message = str(exc).lower()
                         if (
@@ -1486,7 +1497,7 @@ def _capture_resource_history(resource_id: str, provider_api: str, test_name: st
                     if next_token:
                         params["NextToken"] = next_token
 
-                    response = ec2_client.describe_spot_fleet_request_history(**params)
+                    response = _get_ec2_client().describe_spot_fleet_request_history(**params)
                     history_records.extend(response.get("HistoryRecords", []))
                     next_token = response.get("NextToken")
                     if not next_token:
@@ -1504,7 +1515,7 @@ def _capture_resource_history(resource_id: str, provider_api: str, test_name: st
                     if next_token:
                         params["NextToken"] = next_token
 
-                    response = asg_client.describe_scaling_activities(**params)
+                    response = _get_asg_client().describe_scaling_activities(**params)
                     history_records.extend(response.get("Activities", []))
                     next_token = response.get("NextToken")
                     if not next_token:
@@ -1559,7 +1570,7 @@ def _capture_resource_history(resource_id: str, provider_api: str, test_name: st
             for start in range(0, len(missing_ids), 100):
                 chunk = missing_ids[start : start + 100]
                 try:
-                    resp = ec2_client.describe_instances(InstanceIds=chunk)
+                    resp = _get_ec2_client().describe_instances(InstanceIds=chunk)
                 except ClientError as exc:
                     log.warning("describe_instances failed for chunk %s: %s", chunk, exc)
                     continue
@@ -1629,7 +1640,7 @@ def _capture_resource_history(resource_id: str, provider_api: str, test_name: st
         # tooling can compute request_time similarly to fleet history.
         if provider_api == "ASG":
             try:
-                response = asg_client.describe_auto_scaling_groups(
+                response = _get_asg_client().describe_auto_scaling_groups(
                     AutoScalingGroupNames=[resource_id]
                 )
                 groups = response.get("AutoScalingGroups", [])
@@ -1685,12 +1696,12 @@ def _terminate_backing_resource(resource_id: str, provider_api: str) -> None:
     try:
         if provider_api == "EC2Fleet":
             log.info(f"Deleting EC2Fleet: {resource_id}")
-            ec2_client.delete_fleets(FleetIds=[resource_id], TerminateInstances=True)
+            _get_ec2_client().delete_fleets(FleetIds=[resource_id], TerminateInstances=True)
             _wait_for_fleet_deletion(resource_id)
 
         elif provider_api == "SpotFleet":
             log.info(f"Cancelling SpotFleet: {resource_id}")
-            ec2_client.cancel_spot_fleet_requests(
+            _get_ec2_client().cancel_spot_fleet_requests(
                 SpotFleetRequestIds=[resource_id], TerminateInstances=True
             )
             _wait_for_spot_fleet_deletion(resource_id)
@@ -1698,7 +1709,7 @@ def _terminate_backing_resource(resource_id: str, provider_api: str) -> None:
         elif provider_api == "ASG":
             log.info(f"Checking Auto Scaling Group status: {resource_id}")
             try:
-                response = asg_client.describe_auto_scaling_groups(
+                response = _get_asg_client().describe_auto_scaling_groups(
                     AutoScalingGroupNames=[resource_id]
                 )
                 groups = response.get("AutoScalingGroups", [])
@@ -1714,7 +1725,7 @@ def _terminate_backing_resource(resource_id: str, provider_api: str) -> None:
                     return
 
                 log.info(f"Deleting Auto Scaling Group: {resource_id}")
-                asg_client.delete_auto_scaling_group(
+                _get_asg_client().delete_auto_scaling_group(
                     AutoScalingGroupName=resource_id, ForceDelete=True
                 )
                 _wait_for_asg_deletion(resource_id)
@@ -1749,7 +1760,7 @@ def _wait_for_fleet_deletion(fleet_id: str, timeout: int = 300) -> None:
     start = time.time()
     while time.time() - start < timeout:
         try:
-            response = ec2_client.describe_fleets(FleetIds=[fleet_id])
+            response = _get_ec2_client().describe_fleets(FleetIds=[fleet_id])
             fleets = response.get("Fleets", [])
             if not fleets or fleets[0]["FleetState"] in ["deleted_terminating", "deleted_running"]:
                 log.info(f"Fleet {fleet_id} is being deleted")
@@ -1767,7 +1778,7 @@ def _wait_for_spot_fleet_deletion(fleet_id: str, timeout: int = 300) -> None:
     start = time.time()
     while time.time() - start < timeout:
         try:
-            response = ec2_client.describe_spot_fleet_requests(SpotFleetRequestIds=[fleet_id])
+            response = _get_ec2_client().describe_spot_fleet_requests(SpotFleetRequestIds=[fleet_id])
             requests = response.get("SpotFleetRequestConfigs", [])
             if not requests or requests[0]["SpotFleetRequestState"] in [
                 "cancelled_terminating",
@@ -1788,7 +1799,7 @@ def _wait_for_asg_deletion(asg_name: str, timeout: int = 300) -> None:
     start = time.time()
     while time.time() - start < timeout:
         try:
-            response = asg_client.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name])
+            response = _get_asg_client().describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name])
             groups = response.get("AutoScalingGroups", [])
             if not groups:
                 log.info(f"ASG {asg_name} deleted")
