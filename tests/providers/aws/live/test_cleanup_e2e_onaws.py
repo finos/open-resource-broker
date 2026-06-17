@@ -52,15 +52,29 @@ os.environ.setdefault("AWS_PROVIDER_LOG_DIR", "./logs")
 os.environ["LOG_DESTINATION"] = "file"
 os.environ.setdefault("AWS_REGION", "eu-west-1")
 
-_boto_session = boto3.session.Session()
-_ec2_region = (
-    os.environ.get("AWS_REGION")
-    or os.environ.get("AWS_DEFAULT_REGION")
-    or _boto_session.region_name
-    or "eu-west-1"
-)
-ec2_client = _boto_session.client("ec2", region_name=_ec2_region)
-asg_client = _boto_session.client("autoscaling", region_name=_ec2_region)
+_ec2_client = None
+_asg_client = None
+
+
+def _get_ec2_client():
+    global _ec2_client
+    if _ec2_client is None:
+        _region = (
+            os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "eu-west-1"
+        )
+        _ec2_client = boto3.session.Session().client("ec2", region_name=_region)
+    return _ec2_client
+
+
+def _get_asg_client():
+    global _asg_client
+    if _asg_client is None:
+        _region = (
+            os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "eu-west-1"
+        )
+        _asg_client = boto3.session.Session().client("autoscaling", region_name=_region)
+    return _asg_client
+
 
 log = logging.getLogger("cleanup_e2e_test")
 log.setLevel(logging.DEBUG)
@@ -165,7 +179,7 @@ def _assert_asg_deleted(asg_name: str, timeout: int = 300) -> None:
     last_state = None
     while time.time() < deadline:
         try:
-            resp = asg_client.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name])
+            resp = _get_asg_client().describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name])
             groups = resp.get("AutoScalingGroups", [])
             if not groups:
                 log.info("ASG %s: not found (deleted)", asg_name)
@@ -191,7 +205,7 @@ def _assert_fleet_deleted(fleet_id: str, timeout: int = 300) -> None:
     deleted_states = {"deleted", "deleted-running", "deleted-terminating"}
     while time.time() < deadline:
         try:
-            resp = ec2_client.describe_fleets(FleetIds=[fleet_id])
+            resp = _get_ec2_client().describe_fleets(FleetIds=[fleet_id])
             fleets = resp.get("Fleets", [])
             if not fleets:
                 log.info("EC2 Fleet %s: not found (deleted)", fleet_id)
@@ -222,7 +236,7 @@ def _assert_spot_fleet_deleted(sfr_id: str, timeout: int = 300) -> None:
     terminal_states = {"cancelled", "cancelled_running", "cancelled_terminating", "failed"}
     while time.time() < deadline:
         try:
-            resp = ec2_client.describe_spot_fleet_requests(SpotFleetRequestIds=[sfr_id])
+            resp = _get_ec2_client().describe_spot_fleet_requests(SpotFleetRequestIds=[sfr_id])
             configs = resp.get("SpotFleetRequestConfigs", [])
             if not configs:
                 log.info("Spot Fleet %s: not found (deleted)", sfr_id)
@@ -249,7 +263,7 @@ def _assert_spot_fleet_deleted(sfr_id: str, timeout: int = 300) -> None:
 def _assert_launch_templates_deleted(request_id: str) -> None:
     """Assert no launch templates tagged orb:request-id=<request_id> exist."""
     try:
-        resp = ec2_client.describe_launch_templates(
+        resp = _get_ec2_client().describe_launch_templates(
             Filters=[{"Name": "tag:orb:request-id", "Values": [request_id]}]
         )
         templates = resp.get("LaunchTemplates", [])
@@ -285,7 +299,7 @@ def _extract_resource_ids(result) -> list[str]:
 
 
 def _get_machine_ids_from_ec2(request_id: str) -> list[str]:
-    return _get_machine_ids_from_ec2_helper(request_id, ec2_client)
+    return _get_machine_ids_from_ec2_helper(request_id, _get_ec2_client())
 
 
 # ---------------------------------------------------------------------------
@@ -378,13 +392,13 @@ def setup_cleanup_e2e(request, test_session_id):
             all_machine_ids = [
                 mid for req_id in _tracked_request_ids for mid in _get_machine_ids_from_ec2(req_id)
             ]
-            wait_for_instances_terminated(all_machine_ids, ec2_client)
+            wait_for_instances_terminated(all_machine_ids, _get_ec2_client())
         except Exception as exc:
             log.warning("Fixture teardown: wait_for_instances_terminated failed: %s", exc)
 
         for req_id in _tracked_request_ids:
             try:
-                cleanup_launch_templates_for_request(req_id, ec2_client)
+                cleanup_launch_templates_for_request(req_id, _get_ec2_client())
             except Exception as exc:
                 log.warning(
                     "Fixture teardown: cleanup_launch_templates failed for %s: %s", req_id, exc
@@ -538,7 +552,7 @@ async def _run_cleanup_verification(
             await asyncio.sleep(SDK_TIMEOUTS["poll_interval"])
 
     # 7. Wait for instance termination
-    wait_for_instances_terminated(machine_ids, ec2_client, timeout=300)
+    wait_for_instances_terminated(machine_ids, _get_ec2_client(), timeout=300)
 
     # 8. Assert all instances terminated
     all_terminated = _check_all_ec2_hosts_are_being_terminated(machine_ids)
@@ -706,10 +720,10 @@ class TestRunInstancesCleanupE2E:
                     await asyncio.sleep(SDK_TIMEOUTS["poll_interval"])
 
             # 6. Wait for instance termination
-            wait_for_instances_terminated(machine_ids, ec2_client, timeout=300)
+            wait_for_instances_terminated(machine_ids, _get_ec2_client(), timeout=300)
 
             # 7. Assert no instances remain in running state via describe_instances
-            resp = ec2_client.describe_instances(
+            resp = _get_ec2_client().describe_instances(
                 InstanceIds=machine_ids,
                 Filters=[{"Name": "instance-state-name", "Values": ["running", "pending"]}],
             )

@@ -31,15 +31,29 @@ os.environ["HF_LOGDIR"] = "./logs"
 os.environ["AWS_PROVIDER_LOG_DIR"] = "./logs"
 os.environ["LOG_DESTINATION"] = "file"
 
-_boto_session = boto3.Session()
-_ec2_region = (
-    os.environ.get("AWS_REGION")
-    or os.environ.get("AWS_DEFAULT_REGION")
-    or _boto_session.region_name
-    or "eu-west-1"
-)
-ec2_client = _boto_session.client("ec2", region_name=_ec2_region)
-autoscaling_client = _boto_session.client("autoscaling", region_name=_ec2_region)
+_ec2_client = None
+_autoscaling_client = None
+
+
+def _get_ec2_client():
+    global _ec2_client
+    if _ec2_client is None:
+        _region = (
+            os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "eu-west-1"
+        )
+        _ec2_client = boto3.Session().client("ec2", region_name=_region)
+    return _ec2_client
+
+
+def _get_autoscaling_client():
+    global _autoscaling_client
+    if _autoscaling_client is None:
+        _region = (
+            os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "eu-west-1"
+        )
+        _autoscaling_client = boto3.Session().client("autoscaling", region_name=_region)
+    return _autoscaling_client
+
 
 log = logging.getLogger("multi_asg_test")
 log.setLevel(logging.DEBUG)
@@ -57,7 +71,9 @@ MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC = 180
 def get_asg_instances(asg_name: str) -> List[str]:
     """Get all instance IDs from an ASG."""
     try:
-        response = autoscaling_client.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name])
+        response = _get_autoscaling_client().describe_auto_scaling_groups(
+            AutoScalingGroupNames=[asg_name]
+        )
         if not response["AutoScalingGroups"]:
             return []
 
@@ -74,7 +90,9 @@ def verify_asg_instances_detached(instance_ids: List[str]) -> bool:
         if not instance_ids:
             return True
 
-        response = autoscaling_client.describe_auto_scaling_instances(InstanceIds=instance_ids)
+        response = _get_autoscaling_client().describe_auto_scaling_instances(
+            InstanceIds=instance_ids
+        )
 
         # If any instances are still in ASGs, they will appear in the response
         remaining_asg_instances = response.get("AutoScalingInstances", [])
@@ -103,7 +121,7 @@ def verify_asg_instances_detached(instance_ids: List[str]) -> bool:
 def check_all_instances_terminating_or_terminated(instance_ids: List[str]) -> bool:
     """Check if all instances are in terminating or terminated state."""
     all_terminating = True
-    instance_states = get_instances_states(instance_ids, ec2_client)
+    instance_states = get_instances_states(instance_ids, _get_ec2_client())
 
     for instance_id, state in zip(instance_ids, instance_states):
         if state is not None:
@@ -188,7 +206,7 @@ def setup_multi_asg_templates(test_session_id):
     yield hfm, template_configs
 
     try:
-        cleanup_tracked_requests(_tracked_request_ids, hfm, ec2_client)
+        cleanup_tracked_requests(_tracked_request_ids, hfm, _get_ec2_client())
     except Exception as exc:
         log.warning("Fixture teardown: cleanup_tracked_requests failed: %s", exc)
 
@@ -283,7 +301,7 @@ def provision_asg_capacity(  # dead code - commented out
     # machines = status_response["requests"][0]["machines"]
     #
     # instance_ids = [machine.get("machineId") or machine.get("machine_id") for machine in machines]
-    # instance_states = get_instances_states(instance_ids, ec2_client)
+    # instance_states = get_instances_states(instance_ids, _get_ec2_client())
     #
     # for machine, state in zip(machines, instance_states):
     #     assert machine["status"] in ["running", "pending"]
@@ -479,7 +497,7 @@ def test_multi_asg_termination(setup_multi_asg_templates):
         instance_ids = [
             machine.get("machineId") or machine.get("machine_id") for machine in machines
         ]
-        instance_states = get_instances_states(instance_ids, ec2_client)
+        instance_states = get_instances_states(instance_ids, _get_ec2_client())
 
         for machine, state in zip(machines, instance_states):
             assert machine["status"] in ["running", "pending"]
@@ -505,7 +523,9 @@ def test_multi_asg_termination(setup_multi_asg_templates):
     # Get ASG names from the instances
     asg_names = set()
     try:
-        response = autoscaling_client.describe_auto_scaling_instances(InstanceIds=all_instance_ids)
+        response = _get_autoscaling_client().describe_auto_scaling_instances(
+            InstanceIds=all_instance_ids
+        )
 
         for instance_info in response.get("AutoScalingInstances", []):
             asg_name = instance_info.get("AutoScalingGroupName")
@@ -582,7 +602,7 @@ def test_multi_asg_termination(setup_multi_asg_templates):
     def check_asg_exists(asg_name: str) -> bool:
         """Check if an ASG still exists."""
         try:
-            response = autoscaling_client.describe_auto_scaling_groups(
+            response = _get_autoscaling_client().describe_auto_scaling_groups(
                 AutoScalingGroupNames=[asg_name]
             )
             return len(response.get("AutoScalingGroups", [])) > 0
@@ -607,7 +627,7 @@ def test_multi_asg_termination(setup_multi_asg_templates):
 
                 # Log current ASG status for debugging
                 try:
-                    response = autoscaling_client.describe_auto_scaling_groups(
+                    response = _get_autoscaling_client().describe_auto_scaling_groups(
                         AutoScalingGroupNames=[asg_name]
                     )
                     if response.get("AutoScalingGroups"):
@@ -642,7 +662,7 @@ def test_multi_asg_termination(setup_multi_asg_templates):
         # Log detailed information about remaining ASGs for debugging
         for asg_name in final_remaining_asgs:
             try:
-                response = autoscaling_client.describe_auto_scaling_groups(
+                response = _get_autoscaling_client().describe_auto_scaling_groups(
                     AutoScalingGroupNames=[asg_name]
                 )
                 if response.get("AutoScalingGroups"):

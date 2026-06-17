@@ -31,15 +31,29 @@ os.environ["HF_LOGDIR"] = "./logs"
 os.environ["AWS_PROVIDER_LOG_DIR"] = "./logs"
 os.environ["LOG_DESTINATION"] = "file"
 
-_boto_session = boto3.Session()
-_ec2_region = (
-    os.environ.get("AWS_REGION")
-    or os.environ.get("AWS_DEFAULT_REGION")
-    or _boto_session.region_name
-    or "eu-west-1"
-)
-ec2_client = _boto_session.client("ec2", region_name=_ec2_region)
-autoscaling_client = _boto_session.client("autoscaling", region_name=_ec2_region)
+_ec2_client = None
+_autoscaling_client = None
+
+
+def _get_ec2_client():
+    global _ec2_client
+    if _ec2_client is None:
+        _region = (
+            os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "eu-west-1"
+        )
+        _ec2_client = boto3.Session().client("ec2", region_name=_region)
+    return _ec2_client
+
+
+def _get_autoscaling_client():
+    global _autoscaling_client
+    if _autoscaling_client is None:
+        _region = (
+            os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "eu-west-1"
+        )
+        _autoscaling_client = boto3.Session().client("autoscaling", region_name=_region)
+    return _autoscaling_client
+
 
 log = logging.getLogger("multi_resource_test")
 log.setLevel(logging.DEBUG)
@@ -57,7 +71,7 @@ MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC = 180
 def check_all_instances_terminating_or_terminated(instance_ids: List[str]) -> bool:
     """Check if all instances are in terminating or terminated state."""
     all_terminating = True
-    instance_states = get_instances_states(instance_ids, ec2_client)
+    instance_states = get_instances_states(instance_ids, _get_ec2_client())
 
     for instance_id, state in zip(instance_ids, instance_states):
         if state is not None:
@@ -77,7 +91,7 @@ def categorize_instances_by_resource_type(instance_ids: List[str]) -> Dict[str, 
     categorized = {"ASG": [], "EC2Fleet": [], "SpotFleet": [], "RunInstances": []}
 
     try:
-        response = ec2_client.describe_instances(InstanceIds=instance_ids)
+        response = _get_ec2_client().describe_instances(InstanceIds=instance_ids)
 
         for reservation in response.get("Reservations", []):
             for instance in reservation.get("Instances", []):
@@ -108,7 +122,7 @@ def categorize_instances_by_resource_type(instance_ids: List[str]) -> Dict[str, 
         potential_asg_instances = categorized["RunInstances"].copy()
         if potential_asg_instances:
             try:
-                asg_response = autoscaling_client.describe_auto_scaling_instances(
+                asg_response = _get_autoscaling_client().describe_auto_scaling_instances(
                     InstanceIds=potential_asg_instances
                 )
 
@@ -219,7 +233,7 @@ def setup_multi_resource_templates(test_session_id):
     yield hfm, template_configs
 
     try:
-        cleanup_tracked_requests(_tracked_request_ids, hfm, ec2_client)
+        cleanup_tracked_requests(_tracked_request_ids, hfm, _get_ec2_client())
     except Exception as exc:
         log.warning("Fixture teardown: cleanup_tracked_requests failed: %s", exc)
 
@@ -312,7 +326,7 @@ def provision_resource_capacity(  # dead code - commented out
     # machines = status_response["requests"][0]["machines"]
     #
     # instance_ids = [machine.get("machineId") or machine.get("machine_id") for machine in machines]
-    # instance_states = get_instances_states(instance_ids, ec2_client)
+    # instance_states = get_instances_states(instance_ids, _get_ec2_client())
     #
     # for machine, state in zip(machines, instance_states):
     #     assert machine["status"] in ["running", "pending"]
@@ -520,7 +534,7 @@ def test_multi_resource_termination(setup_multi_resource_templates):
         instance_ids = [
             machine.get("machineId") or machine.get("machine_id") for machine in machines
         ]
-        instance_states = get_instances_states(instance_ids, ec2_client)
+        instance_states = get_instances_states(instance_ids, _get_ec2_client())
 
         for machine, state in zip(machines, instance_states):
             assert machine["status"] in ["running", "pending"]
@@ -601,7 +615,7 @@ def test_multi_resource_termination(setup_multi_resource_templates):
         current_categorization = categorize_instances_by_resource_type(all_instance_ids)
         for resource_type, instances in current_categorization.items():
             if instances:
-                instance_states = get_instances_states(instances, ec2_client)
+                instance_states = get_instances_states(instances, _get_ec2_client())
                 terminating_count = sum(
                     1 for state in instance_states if state in ["shutting-down", "terminated"]
                 )
@@ -657,7 +671,7 @@ def test_multi_resource_termination(setup_multi_resource_templates):
     for resource_type, instances in final_categorization.items():
         if instances:
             log.info(f"  {resource_type}: {len(instances)} instances")
-            instance_states = get_instances_states(instances, ec2_client)
+            instance_states = get_instances_states(instances, _get_ec2_client())
             for instance_id, state in zip(instances, instance_states):
                 log.info(f"    {instance_id}: {state if state is not None else 'terminated'}")
 
