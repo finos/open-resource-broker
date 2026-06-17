@@ -89,12 +89,17 @@ k8s = [
     "kubernetes",
 ]
 
-# Placeholder entries for future providers (add when provider is implemented)
-# azure = [
-#     "azure-mgmt-compute>=30.0.0",
-#     "azure-identity>=1.15.0",
-#     "azure-mgmt-network>=25.0.0",
-# ]
+azure = [
+    "azure-core>=1.38.2",
+    "azure-identity>=1.25.2",
+    "azure-mgmt-authorization>=4.0.0",
+    "azure-mgmt-compute>=37.2.0",
+    "azure-mgmt-monitor>=7.0.0",
+    "azure-mgmt-msi>=7.1.0",
+    "azure-mgmt-network>=30.2.0",
+    "azure-mgmt-resource>=25.0.0",
+    "azure-mgmt-resource-subscriptions>=1.0.0b1",
+]
 # gcp = [
 #     "google-cloud-compute>=1.14.0",
 #     "google-auth>=2.23.0",
@@ -103,6 +108,7 @@ k8s = [
 # Meta-extra: all currently implemented providers
 all-providers = [
     "orb-py[aws]",
+    "orb-py[azure]",
     "orb-py[k8s]",
 ]
 

@@ -120,6 +120,41 @@ class TestBootstrapIntegration:
 
     @pytest.mark.asyncio
     @patch("orb.infrastructure.logging.logger.setup_logging")
+    async def test_application_initialization_fails_when_provider_registration_returns_false(
+        self, mock_setup_logging
+    ):
+        """Configured-provider registration failures must fail startup loudly."""
+        provider_instance = Mock()
+        provider_instance.name = "azure-default"
+
+        provider_config = Mock()
+        provider_config.get_active_providers.return_value = [provider_instance]
+        provider_config.get_mode.return_value = Mock(value="single")
+
+        mock_config_manager = self._make_mock_config_manager(provider_type="azure")
+        mock_config_manager.get_provider_config.return_value = provider_config
+
+        mock_registry = Mock()
+        mock_registry.get_registered_providers.return_value = ["aws", "azure"]
+        mock_registry.get_registered_provider_instances.return_value = []
+        mock_registry.is_provider_instance_registered.return_value = False
+        mock_registry.ensure_provider_instance_registered_from_config.return_value = False
+
+        with patch("orb.infrastructure.di.container.get_container") as mock_get_container:
+            mock_container = self._make_mock_container(
+                mock_config_manager, mock_registry=mock_registry
+            )
+            mock_get_container.return_value = mock_container
+
+            app = Application(skip_validation=True)
+            with patch.object(app, "_preload_templates", new=AsyncMock(return_value=None)):
+                result = await app.initialize()
+
+        assert result is False
+        assert app._initialized is False
+
+    @pytest.mark.asyncio
+    @patch("orb.infrastructure.logging.logger.setup_logging")
     async def test_get_provider_info_integration(self, mock_setup_logging):
         """Test provider info retrieval integration."""
         mock_config_manager = self._make_mock_config_manager()
