@@ -1,7 +1,10 @@
 """Request DTO factory for data transformation."""
 
+from typing import Optional
+
 from orb.application.machine.result_mapping import map_machine_status_to_result
 from orb.application.request.dto import MachineReferenceDTO, RequestDTO
+from orb.domain.base.provider_fulfilment import ProviderFulfilment
 from orb.domain.machine.aggregate import Machine
 from orb.domain.request.aggregate import Request
 from orb.domain.request.request_types import RequestType
@@ -11,9 +14,21 @@ class RequestDTOFactory:
     """Factory for creating RequestDTOs from domain objects."""
 
     def create_from_domain(
-        self, request: Request, machines: list[Machine] | None = None
+        self,
+        request: Request,
+        machines: list[Machine] | None = None,
+        fulfilment: Optional[ProviderFulfilment] = None,
     ) -> RequestDTO:
-        """Create RequestDTO from domain objects."""
+        """Create RequestDTO from domain objects.
+
+        Args:
+            request: Request domain aggregate.
+            machines: Optional list of Machine aggregates to embed as references.
+            fulfilment: Optional ProviderFulfilment to surface capacity fields
+                (target_units, fulfilled_units, running_count, pending_count).
+                When None, ``RequestDTO.from_domain`` falls back to
+                ``request.metadata["last_fulfilment"]`` if present.
+        """
         if machines is None:
             machines = []
 
@@ -41,7 +56,9 @@ class RequestDTOFactory:
         ]
 
         # Create RequestDTO using existing factory method
-        return RequestDTO.from_domain(request, machine_references=machine_references)
+        return RequestDTO.from_domain(
+            request, machine_references=machine_references, fulfilment=fulfilment
+        )
 
     def map_machine_status_to_result(self, status: str, request_type: RequestType) -> str:
         """Map machine status to result code."""

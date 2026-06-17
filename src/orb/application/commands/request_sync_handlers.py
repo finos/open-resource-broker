@@ -170,7 +170,7 @@ class SyncRequestHandler(BaseCommandHandler[SyncRequestCommand, None]):  # type:
 
             if new_status:
                 await status_service.update_request_status(
-                    request, new_status, status_message or ""
+                    request, new_status, status_message or "", provider_metadata
                 )
 
             self.logger.info("Successfully synced request: %s", command.request_id)
