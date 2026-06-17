@@ -32,6 +32,10 @@ class AWSCapabilityService:
             self._logger.error("Error getting supported APIs: %s", e)
             supported_apis = []
 
+        # TODO: Keep AWS and Azure capability metadata dynamic together.
+        # These example regions / instance types and operational heuristics are
+        # still hard-coded in both providers, we should evaluate if they can be made
+        # dynamic
         return ProviderCapabilities(
             provider_type="aws",
             supported_operations=[

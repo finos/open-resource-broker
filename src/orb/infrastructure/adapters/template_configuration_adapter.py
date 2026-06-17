@@ -38,7 +38,7 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         """Get configuration for specific template."""
         template = self._template_manager.get_template(template_id)
         if template:
-            return template.model_dump()
+            return template.to_template_config()
         return None
 
     def validate_template_config(self, config: dict[str, Any]) -> list[str]:

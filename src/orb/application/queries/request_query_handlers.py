@@ -52,12 +52,32 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
         self._dto_factory = RequestDTOFactory()
 
     async def execute_query(self, query: GetRequestQuery) -> RequestDTO:
-        """Execute get request query."""
+        """Execute get request query.
+
+        Two modes controlled by ``query.lightweight``:
+
+        * **lightweight=False** (default): sync live provider state into the
+          DB, then return the result.  This is the only mode that detects
+          async provider-side transitions (e.g. Azure VMSS creation completing,
+          instances terminating).  Orchestrator polling loops must use this.
+
+        * **lightweight=True**: return stored DB state immediately with no
+          provider call.  Useful for cheap reads where freshness is not
+          critical (e.g. UI polling after a recent full sync).
+
+        Cache semantics:
+          * Full-sync queries populate the cache but never read from it —
+            callers asking for a sync want fresh data and would be confused
+            by a stale cache hit.
+          * Lightweight queries read from the cache (fast path) and skip the
+            write since the lightweight DTO is intentionally a partial view.
+        """
         self.logger.info("Getting request details for: %s", query.request_id)
 
         try:
             if (
-                not query.skip_cache
+                query.lightweight
+                and not query.skip_cache
                 and self._cache_service
                 and self._cache_service.is_caching_enabled()
             ):

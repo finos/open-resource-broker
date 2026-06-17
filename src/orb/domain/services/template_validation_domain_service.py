@@ -1,12 +1,15 @@
 """Template validation domain service."""
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from orb.domain.base.exceptions import ConfigurationError, EntityNotFoundError
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.results import ValidationLevel, ValidationResult
+
+if TYPE_CHECKING:
+    from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 
 
 @dataclass
@@ -30,6 +33,8 @@ class TemplateValidationDomainService:
     def __init__(self):
         self._config = None
         self._logger = None
+        self._provider_registry = None
+        self._initialized = False
 
     @property
     def config(self):
@@ -41,10 +46,16 @@ class TemplateValidationDomainService:
         # Return None if not available - service should handle gracefully
         return self._logger
 
-    def inject_dependencies(self, config: ConfigurationPort, logger: LoggingPort):
+    def inject_dependencies(
+        self,
+        config: ConfigurationPort,
+        logger: LoggingPort,
+        provider_registry: "ProviderRegistryPort | None" = None,
+    ):
         """Inject dependencies after container is ready."""
         self._config = config
         self._logger = logger
+        self._provider_registry = provider_registry
         self._initialized = False
 
     def _ensure_initialized(self):
@@ -126,6 +137,28 @@ class TemplateValidationDomainService:
         effective_handlers = provider_config.get_effective_handlers(provider_defaults)
         supported_apis = list(effective_handlers.keys())
 
+        if not supported_apis:
+            configured_capabilities = list(getattr(provider_config, "capabilities", None) or [])
+            if configured_capabilities:
+                return _ProviderCapabilities(
+                    provider_type=provider_config.type,
+                    supported_apis=configured_capabilities,
+                    features={"api_capabilities": {}},
+                )
+
+            # If this provider instance explicitly overrides handlers, respect the
+            # empty result as a real config choice rather than falling back to
+            # provider-type defaults from the strategy implementation.
+            if getattr(provider_config, "handlers", None) is None and getattr(
+                provider_config, "handler_overrides", None
+            ) is None:
+                fallback_capabilities = self._get_validator_based_capabilities(
+                    provider_instance,
+                    provider_config,
+                )
+                if fallback_capabilities is not None:
+                    return fallback_capabilities
+
         api_capabilities: dict[str, Any] = {}
         for api_name, handler_cfg in effective_handlers.items():
             extra = getattr(handler_cfg, "model_extra", None) or {}
@@ -142,6 +175,48 @@ class TemplateValidationDomainService:
             supported_apis=supported_apis,
             features={"api_capabilities": api_capabilities},
         )
+
+    def _get_validator_based_capabilities(
+        self,
+        provider_instance: str,
+        provider_config: Any,
+    ) -> _ProviderCapabilities | None:
+        """Fallback to validator-reported capabilities when config defaults are absent."""
+        if self._provider_registry is None:
+            return None
+
+        try:
+            validator = self._provider_registry.create_validator(
+                provider_config.type,
+                provider_config.config,
+            )
+            if validator is None:
+                return None
+
+            supported_apis = list(getattr(validator, "get_supported_provider_apis", lambda: [])() or [])
+            if not supported_apis:
+                return None
+
+            api_capabilities: dict[str, Any] = {}
+            for supported_api in supported_apis:
+                capability_resolver = getattr(validator, "get_api_capabilities", None)
+                if capability_resolver is None:
+                    continue
+                api_capabilities[supported_api] = dict(capability_resolver(supported_api) or {})
+
+            return _ProviderCapabilities(
+                provider_type=provider_config.type,
+                supported_apis=supported_apis,
+                features={"api_capabilities": api_capabilities},
+            )
+        except Exception as exc:
+            if self.logger:
+                self.logger.debug(
+                    "Could not resolve validator capabilities for %s: %s",
+                    provider_instance,
+                    exc,
+                )
+            return None
 
     def _validate_api_support(self, template: Any, capabilities: Any, result: Any) -> None:
         """Validate that provider supports the required API."""

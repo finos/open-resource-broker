@@ -145,9 +145,19 @@ def test_default_load_delegates_hf_file_to_hf_strategy(tmp_path):
 
     registry = get_scheduler_registry()
     if not registry.is_registered("hostfactory"):
-        registry.register("hostfactory", HostFactorySchedulerStrategy, lambda c: None)
+        registry.register(
+            "hostfactory",
+            HostFactorySchedulerStrategy,
+            lambda c: None,
+            strategy_class=HostFactorySchedulerStrategy,
+        )
     if not registry.is_registered("default"):
-        registry.register("default", DefaultSchedulerStrategy, lambda c: None)
+        registry.register(
+            "default",
+            DefaultSchedulerStrategy,
+            lambda c: None,
+            strategy_class=DefaultSchedulerStrategy,
+        )
 
     f = tmp_path / "hf_file.json"
     write_hf_file(f, [_MINIMAL_HF_TEMPLATE_ON_DISK])
@@ -163,9 +173,19 @@ def test_hf_load_delegates_default_file_to_default_strategy(tmp_path):
 
     registry = get_scheduler_registry()
     if not registry.is_registered("hostfactory"):
-        registry.register("hostfactory", HostFactorySchedulerStrategy, lambda c: None)
+        registry.register(
+            "hostfactory",
+            HostFactorySchedulerStrategy,
+            lambda c: None,
+            strategy_class=HostFactorySchedulerStrategy,
+        )
     if not registry.is_registered("default"):
-        registry.register("default", DefaultSchedulerStrategy, lambda c: None)
+        registry.register(
+            "default",
+            DefaultSchedulerStrategy,
+            lambda c: None,
+            strategy_class=DefaultSchedulerStrategy,
+        )
 
     f = tmp_path / "default_file.json"
     write_default_file(f, [_MINIMAL_SNAKE_TEMPLATE])
@@ -396,3 +416,20 @@ def test_default_round_trip_generate_write_load(tmp_path):
     assert len(loaded) == 1
     assert loaded[0]["template_id"] == _MINIMAL_SNAKE_TEMPLATE["template_id"]
     assert loaded[0]["max_instances"] == _MINIMAL_SNAKE_TEMPLATE["max_instances"]
+
+
+def test_base_strategy_infers_provider_type_from_config_when_registry_missing():
+    strategy = HostFactorySchedulerStrategy()
+
+    class _AppConfig:
+        @staticmethod
+        def model_dump():
+            return {"provider": {"active_provider": "azure-default"}}
+
+    class _ConfigManager:
+        app_config = _AppConfig()
+
+    strategy._config_manager = _ConfigManager()
+    strategy._provider_registry_service = None
+
+    assert strategy._get_active_provider_type() == "azure"

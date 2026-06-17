@@ -18,12 +18,12 @@ The Strategy pattern allows the plugin to:
 The core provider strategy interface defines the contract for all provider implementations:
 
 ```python
-# src/providers/base/strategy/provider_strategy.py
+# src/orb/providers/base/strategy/provider_strategy.py
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
-from src.domain.request.aggregate import Request
-from src.domain.machine.aggregate import Machine
-from src.domain.template.aggregate import Template
+from orb.domain.request.aggregate import Request
+from orb.domain.machine.aggregate import Machine
+from orb.domain.template.template_aggregate import Template
 
 class ProviderStrategy(ABC):
     """Abstract base class for provider strategies."""
@@ -69,13 +69,13 @@ class ProviderStrategy(ABC):
 The AWS provider strategy implements the provider interface for Amazon Web Services:
 
 ```python
-# src/providers/aws/strategy/aws_provider_strategy.py
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
-from src.providers.base.strategy.provider_strategy import ProviderStrategy
-from src.providers.aws.configuration.config import AWSProviderConfig
-from src.providers.aws.infrastructure.aws_client import AWSClient
-from src.providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
+# src/orb/providers/aws/strategy/aws_provider_strategy.py
+from orb.domain.base.dependency_injection import injectable
+from orb.domain.base.ports import LoggingPort
+from orb.providers.base.strategy.provider_strategy import ProviderStrategy
+from orb.providers.aws.configuration.config import AWSProviderConfig
+from orb.providers.aws.infrastructure.aws_client import AWSClient
+from orb.providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
 
 @injectable
 class AWSProviderStrategy(ProviderStrategy):
@@ -204,10 +204,10 @@ class AWSProviderStrategy(ProviderStrategy):
 The provider context manages strategy selection and execution:
 
 ```python
-# src/providers/base/strategy/provider_context.py
+# src/orb/providers/base/strategy/provider_context.py
 from typing import Dict, List, Optional, Any
-from src.domain.base.ports import LoggingPort
-from src.providers.base.strategy.provider_strategy import ProviderStrategy
+from orb.domain.base.ports import LoggingPort
+from orb.providers.base.strategy.provider_strategy import ProviderStrategy
 
 class ProviderContext:
     """Context for managing provider strategies."""

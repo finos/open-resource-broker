@@ -11,6 +11,8 @@ if TYPE_CHECKING:
 # Template extension imports for our new functionality
 from orb.domain.template.extensions import TemplateExtensionRegistry
 from orb.domain.template.factory import TemplateFactory
+from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
+from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec
 from orb.providers.aws.configuration.template_extension import AWSTemplateExtensionConfig
 
 
@@ -217,6 +219,7 @@ def register_aws_provider(
 
     try:
         from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
+        CLISpecRegistry.register("aws", AWSCLISpec())
 
         if instance_name:
             # Register as named instance

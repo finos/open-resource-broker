@@ -18,13 +18,13 @@ Clean Architecture organizes code into layers with clear dependency rules:
 The domain layer contains the core business logic and has no external dependencies.
 
 #### Location
-- `src/domain/`
+- `src/orb/domain/`
 
 #### Components
 
 **Entities (Aggregates)**
 ```python
-# src/domain/template/aggregate.py
+# src/orb/domain/template/template_aggregate.py
 class Template(BaseModel):
     """Template configuration representing VM template."""
     template_id: str
@@ -38,7 +38,7 @@ class Template(BaseModel):
 
 **Value Objects**
 ```python
-# src/domain/machine/machine_status.py
+# src/orb/domain/machine/value_objects.py
 class MachineStatus(Enum):
     """Machine status value object."""
     PENDING = "pending"
@@ -48,7 +48,7 @@ class MachineStatus(Enum):
 
 **Domain Services**
 ```python
-# src/domain/template/ami_resolver.py
+# src/orb/providers/aws/domain/services/ami_resolver.py
 class AMIResolver:
     """Domain service for AMI resolution logic."""
 
@@ -58,7 +58,7 @@ class AMIResolver:
 
 **Repository Interfaces**
 ```python
-# src/domain/template/repository.py
+# src/orb/domain/template/repository.py
 class TemplateRepository(ABC):
     """Abstract repository interface."""
 
@@ -78,13 +78,13 @@ class TemplateRepository(ABC):
 The application layer orchestrates domain objects and implements use cases.
 
 #### Location
-- `src/application/`
+- `src/orb/application/`
 
 #### Components
 
 **Application Services**
 ```python
-# src/application/service.py
+# src/orb/application/services/provisioning_orchestration_service.py
 @injectable
 class ApplicationService:
     """Main application orchestrator."""
@@ -92,13 +92,13 @@ class ApplicationService:
     def __init__(self,
                  command_bus: CommandBus,
                  query_bus: QueryBus,
-                 provider_context: ProviderContext):
+                 provider_selection_port: ProviderSelectionPort):
         # Dependencies injected, not created
 ```
 
 **Command Handlers (CQRS)**
 ```python
-# src/application/commands/template_handlers.py
+# src/orb/application/commands/template_handlers.py
 class GetTemplatesHandler:
     """Handle template retrieval commands."""
 
@@ -108,7 +108,7 @@ class GetTemplatesHandler:
 
 **Query Handlers (CQRS)**
 ```python
-# src/application/queries/handlers.py
+# src/orb/application/queries/template_query_handlers.py
 class TemplateQueryHandler:
     """Handle template queries."""
 
@@ -118,7 +118,7 @@ class TemplateQueryHandler:
 
 **Data Transfer Objects**
 ```python
-# src/application/dto/commands.py
+# src/orb/application/dto/commands.py
 class CreateRequestCommand:
     """Command for creating requests."""
     template_id: str
@@ -136,14 +136,14 @@ class CreateRequestCommand:
 The infrastructure layer implements external concerns and technical details.
 
 #### Location
-- `src/infrastructure/`
-- `src/providers/`
+- `src/orb/infrastructure/`
+- `src/orb/providers/`
 
 #### Components
 
 **Repository Implementations**
 ```python
-# src/infrastructure/storage/repositories/template_repository.py
+# src/orb/infrastructure/storage/repositories/template_repository.py
 class TemplateRepositoryImpl(TemplateRepository):
     """Template repository implementation."""
 
@@ -153,18 +153,18 @@ class TemplateRepositoryImpl(TemplateRepository):
 
 **External Service Adapters**
 ```python
-# src/providers/aws/managers/aws_instance_manager.py
+# src/orb/providers/aws/infrastructure/aws_client.py
 @injectable
-class AWSInstanceManager:
-    """AWS-specific instance management."""
+class AWSClient:
+    """Provider-specific resource management."""
 
-    def __init__(self, aws_client: AWSClient, logger: LoggingPort):
+    def __init__(self, config: ConfigurationPort, logger: LoggingPort):
         # Infrastructure dependencies
 ```
 
 **Dependency Injection Container**
 ```python
-# src/infrastructure/di/container.py
+# src/orb/infrastructure/di/container.py
 class DIContainer:
     """Dependency injection container."""
 
@@ -174,7 +174,7 @@ class DIContainer:
 
 **Configuration Management**
 ```python
-# src/infrastructure/config/manager.py
+# src/orb/config/managers/configuration_manager.py
 class ConfigurationManager:
     """Configuration management implementation."""
 ```
@@ -190,15 +190,15 @@ class ConfigurationManager:
 The interface layer provides external access points to the system.
 
 #### Location
-- `src/interface/`
-- `src/api/`
-- `src/cli/`
+- `src/orb/interface/`
+- `src/orb/api/`
+- `src/orb/cli/`
 
 #### Components
 
 **CLI Interface**
 ```python
-# src/cli/main.py
+# src/orb/cli/main.py
 def main():
     """CLI entry point."""
     # Parse arguments
@@ -208,7 +208,7 @@ def main():
 
 **REST API Interface**
 ```python
-# src/api/routers/templates.py
+# src/orb/api/routers/templates.py
 @router.get("/templates")
 async def get_templates():
     """REST API endpoint."""
@@ -219,7 +219,7 @@ async def get_templates():
 
 **Interface Command Handlers**
 ```python
-# src/interface/template_command_handlers.py
+# src/orb/interface/template_command_handlers.py
 class TemplateCommandHandler:
     """Handle CLI template commands."""
 

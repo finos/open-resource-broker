@@ -191,6 +191,55 @@ async def test_validate_handler_loads_by_template_id() -> None:
 
 
 @pytest.mark.asyncio
+async def test_validate_handler_preserves_azure_vm_size_candidates_from_stored_template() -> None:
+    dto = TemplateDTO(
+        template_id="azure-spot-placement-score-vmss",
+        name="azure-spot-placement-score-vmss",
+        provider_type="azure",
+        provider_name="azure-default",
+        provider_api="VMSS",
+        price_type="spot",
+        allocation_strategy="spotPlacementScore",
+        vm_size="Standard_D4s_v5",
+        vm_sizes=["Standard_D8s_v5", "Standard_D16s_v5"],
+        provider_config={
+            "resource_group": "rg",
+            "location": "eastus2",
+            "image": {
+                "publisher": "Canonical",
+                "offer": "0001-com-ubuntu-server-jammy",
+                "sku": "22_04-lts-gen2",
+                "version": "latest",
+            },
+            "ssh_public_keys": [
+                {
+                    "path": "/home/azureuser/.ssh/authorized_keys",
+                    "key_data": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCtest azure@example",
+                }
+            ],
+        },
+    )
+    template_manager = MagicMock()
+    template_manager.get_template_by_id = AsyncMock(return_value=dto)
+    template_manager.validate_template_config = MagicMock(return_value=[])
+
+    container = MagicMock()
+    container.get.return_value = template_manager
+
+    handler = _make_validate_handler(container)
+    result = await handler.execute_query(
+        ValidateTemplateQuery(template_id="azure-spot-placement-score-vmss")
+    )
+
+    validated_config = template_manager.validate_template_config.call_args.args[0]
+    assert validated_config["vm_size"] == "Standard_D4s_v5"
+    assert validated_config["vm_sizes"] == ["Standard_D8s_v5", "Standard_D16s_v5"]
+    assert validated_config["image"]["publisher"] == "Canonical"
+    assert validated_config["metadata"] == {}
+    assert result["valid"] is True
+
+
+@pytest.mark.asyncio
 async def test_validate_handler_not_found_propagates() -> None:
     """EntityNotFoundError from storage is re-raised, not swallowed."""
     template_manager = MagicMock()

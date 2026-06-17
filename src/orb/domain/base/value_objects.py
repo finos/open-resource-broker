@@ -298,3 +298,21 @@ class PriceType(str, Enum):
     SPOT = "spot"
     RESERVED = "reserved"
     HETEROGENEOUS = "heterogeneous"  # Mix of different pricing types
+
+
+class AllocationStrategy(str, Enum):
+    """Allocation strategy enumeration."""
+
+    LOWEST_PRICE = "lowestPrice"
+    DIVERSIFIED = "diversified"
+    CAPACITY_OPTIMIZED = "capacityOptimized"
+    CAPACITY_OPTIMIZED_PRIORITIZED = "capacityOptimizedPrioritized"
+    PRICE_CAPACITY_OPTIMIZED = "priceCapacityOptimized"
+    SPOT_PLACEMENT_SCORE = "spotPlacementScore"
+
+
+class PlacementSplitStrategy(str, Enum):
+    """Placement-plan split strategy enumeration."""
+
+    GREEDY = "greedy"
+    HYBRID = "hybrid"
