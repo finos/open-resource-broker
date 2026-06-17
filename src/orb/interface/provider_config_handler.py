@@ -163,13 +163,19 @@ async def handle_provider_update(args) -> dict[str, Any]:
                 return {"error": True, "message": "No updates specified.", "exit_code": 1}
             provider_config.update(partial)
         else:
-            # Fallback: apply any non-None aws_* attrs directly
+            # Fallback: apply any non-None provider attrs directly
             updated = False
             if getattr(args, "aws_region", None):
                 provider_config["region"] = args.aws_region
                 updated = True
             if getattr(args, "aws_profile", None):
                 provider_config["profile"] = args.aws_profile
+                updated = True
+            if getattr(args, "gcp_project_id", None):
+                provider_config["project_id"] = args.gcp_project_id
+                updated = True
+            if getattr(args, "gcp_region", None):
+                provider_config["region"] = args.gcp_region
                 updated = True
             if not updated:
                 return {"error": True, "message": "No updates specified.", "exit_code": 1}

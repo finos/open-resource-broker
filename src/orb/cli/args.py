@@ -304,6 +304,15 @@ def add_provider_actions(subparsers):
     )
     providers_add.add_argument("--aws-profile", help="AWS profile name")
     providers_add.add_argument("--aws-region", help="AWS region")
+    providers_add.add_argument("--gcp-project-id", help="GCP project ID")
+    providers_add.add_argument("--gcp-region", help="GCP region")
+    providers_add.add_argument("--gcp-zones", help="Comma-separated GCP zones")
+    providers_add.add_argument("--gcp-network", help="GCP VPC network")
+    providers_add.add_argument("--gcp-subnetwork", help="GCP subnetwork")
+    providers_add.add_argument(
+        "--gcp-service-account-email",
+        help="GCP service account email",
+    )
     providers_add.add_argument("--name", help="Provider instance name")
     providers_add.add_argument("--discover", action="store_true", help="Discover infrastructure")
 
@@ -316,6 +325,15 @@ def add_provider_actions(subparsers):
     providers_update.add_argument("provider_name", help="Provider instance name")
     providers_update.add_argument("--aws-region", help="Update region")
     providers_update.add_argument("--aws-profile", help="Update profile")
+    providers_update.add_argument("--gcp-project-id", help="Update GCP project ID")
+    providers_update.add_argument("--gcp-region", help="Update GCP region")
+    providers_update.add_argument("--gcp-zones", help="Update comma-separated GCP zones")
+    providers_update.add_argument("--gcp-network", help="Update GCP VPC network")
+    providers_update.add_argument("--gcp-subnetwork", help="Update GCP subnetwork")
+    providers_update.add_argument(
+        "--gcp-service-account-email",
+        help="Update GCP service account email",
+    )
 
     providers_set_default = subparsers.add_parser("set-default", help="Set default provider")
     add_global_arguments(providers_set_default)

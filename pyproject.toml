@@ -55,6 +55,7 @@ dependencies = [
     "requests>=2.31.0",
     "PyYAML>=6.0.0", # Exported API (lazy-loaded)
     "jsonschema>=4.17.0",
+    "google-cloud-compute>=1.39.0",
 ]
 
 [project.optional-dependencies]

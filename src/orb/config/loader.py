@@ -206,6 +206,7 @@ class ConfigurationLoader:
         merged: dict[str, Any] = {}
         provider_default_loaders = {
             "aws": cls._load_aws_provider_defaults,
+            "gcp": cls._load_gcp_provider_defaults,
         }
 
         for provider_type, load_defaults in provider_default_loaders.items():
@@ -222,6 +223,20 @@ class ConfigurationLoader:
         from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
         return AWSProviderStrategy.get_defaults_config()
+
+    @staticmethod
+    def _load_gcp_provider_defaults() -> dict[str, Any]:
+        from orb.providers.gcp.registration import get_gcp_extension_defaults
+
+        return {
+            "provider": {
+                "provider_defaults": {
+                    "gcp": {
+                        "template_defaults": get_gcp_extension_defaults(),
+                    }
+                }
+            }
+        }
 
     @classmethod
     def _load_default_config(cls) -> dict[str, Any]:
