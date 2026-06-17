@@ -61,7 +61,9 @@ def add_global_arguments(parser):
     parser.add_argument("--region", help="AWS region override")
     parser.add_argument("--profile", help="AWS profile override")
     parser.add_argument(
-        "--scheduler", choices=["default", "hostfactory"], help="Override scheduler strategy"
+        "--scheduler",
+        choices=["default", "hostfactory", "slurm"],
+        help="Override scheduler strategy",
     )
     parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
     parser.add_argument("--yes", "-y", action="store_true", help="Assume yes to all prompts")
@@ -132,6 +134,9 @@ def add_machine_actions(subparsers):
         "--count", "-c", type=int, dest="flag_machine_count", help="Number of machines to request"
     )
     machines_request.add_argument(
+        "--nodes", type=str, help="SLURM node list to associate with this request"
+    )
+    machines_request.add_argument(
         "--wait", action="store_true", help="Wait for machines to be ready"
     )
     machines_request.add_argument(
@@ -160,6 +165,9 @@ def add_machine_actions(subparsers):
         action="append",
         dest="machine_ids_flag",
         help="Machine ID to terminate",
+    )
+    machines_terminate.add_argument(
+        "--nodes", type=str, help="SLURM node list to terminate by node name"
     )
     machines_terminate.add_argument(
         "--wait", action="store_true", help="Wait for terminate request to complete"
@@ -416,6 +424,10 @@ def add_template_actions(subparsers):
         "--generic", action="store_true", help="Generate generic templates"
     )
     templates_generate.add_argument("--provider-type", help="Provider type (e.g., aws)")
+    templates_generate.add_argument(
+        "--slurm-conf",
+        help="Path to slurm.conf for SLURM-aware template generation",
+    )
 
 
 def build_parser() -> tuple[argparse.ArgumentParser, dict]:
@@ -686,7 +698,7 @@ For more information, visit: {DOCS_URL}
     add_force_argument(init_parser)
     init_parser.add_argument("--non-interactive", action="store_true", help="Non-interactive mode")
     init_parser.add_argument(
-        "--scheduler", choices=["default", "hostfactory"], help="Scheduler type"
+        "--scheduler", choices=["default", "hostfactory", "slurm"], help="Scheduler type"
     )
     init_parser.add_argument("--provider", default="aws", help="Provider type")
     init_parser.add_argument("--region", help="AWS region")

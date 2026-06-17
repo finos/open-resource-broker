@@ -40,10 +40,15 @@ class SchedulerRegistry(BaseRegistry):
             "display_name": "hostfactory",
             "description": "IBM Spectrum Symphony integration",
         },
+        "slurm": {
+            "display_name": "slurm",
+            "description": "SLURM workload manager integration",
+        },
     }
 
     _SCHEDULER_EXTRA_CONFIG: ClassVar[dict[str, dict[str, str]]] = {
         "hostfactory": {"config_root": "$ORB_CONFIG_DIR"},
+        "slurm": {"config_root": "$SLURM_ORB_CONFIG_DIR"},
     }
 
     def __init__(self) -> None:
