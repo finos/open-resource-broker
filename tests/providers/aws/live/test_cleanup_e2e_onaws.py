@@ -506,26 +506,20 @@ async def _run_cleanup_verification(
 
     return_request_id = _extract_request_id(return_result)
 
-    # 6. Poll return completion
+    # 6. Poll return completion via get_request_status(return_request_id).
+    # The HostFactory getReturnRequests wire op is for provider-initiated
+    # retirements (preempted/deleted machines), not user-initiated returns —
+    # `get_request_status(return_id)` is the correct API for "is this return
+    # complete?" under any scheduler.
     if return_request_id:
         deadline = time.time() + SDK_TIMEOUTS["return_completion"]
+        terminal = {"complete", "complete_with_error", "failed", "cancelled", "timeout"}
         while True:
-            ret_status = await sdk.list_return_requests()  # type: ignore[attr-defined]
-            requests = (
-                ret_status.get("requests", []) if isinstance(ret_status, dict) else ret_status or []
-            )
-            done = False
-            for req in requests:
-                rid = (
-                    req.get("requestId") or req.get("request_id")
-                    if isinstance(req, dict)
-                    else getattr(req, "request_id", None)
-                )
-                s = req.get("status") if isinstance(req, dict) else getattr(req, "status", None)
-                if rid == return_request_id and s == "complete":
-                    done = True
-                    break
-            if done:
+            status_response = await sdk.get_request_status(request_id=return_request_id)  # type: ignore[attr-defined]
+            status = _extract_request_status(status_response)
+            if status in terminal:
+                if status != "complete":
+                    pytest.fail(f"Return request ended with non-success status: {status}")
                 break
             if time.time() > deadline:
                 pytest.fail("Timed out waiting for return request to complete")
@@ -680,32 +674,20 @@ class TestRunInstancesCleanupE2E:
             return_result = await sdk.create_return_request(machine_ids=machine_ids)  # type: ignore[attr-defined]
             return_request_id = _extract_request_id(return_result)
 
-            # 5. Poll return completion
+            # 5. Poll return completion via get_request_status(return_request_id).
+            # See note above: list_return_requests maps to HF getReturnRequests
+            # wire op which is for provider-initiated retirements.
             if return_request_id:
                 deadline = time.time() + SDK_TIMEOUTS["return_completion"]
+                terminal = {"complete", "complete_with_error", "failed", "cancelled", "timeout"}
                 while True:
-                    ret_status = await sdk.list_return_requests()  # type: ignore[attr-defined]
-                    requests = (
-                        ret_status.get("requests", [])
-                        if isinstance(ret_status, dict)
-                        else ret_status or []
+                    status_response = await sdk.get_request_status(  # type: ignore[attr-defined]
+                        request_id=return_request_id
                     )
-                    done = False
-                    for req in requests:
-                        rid = (
-                            req.get("requestId") or req.get("request_id")
-                            if isinstance(req, dict)
-                            else getattr(req, "request_id", None)
-                        )
-                        s = (
-                            req.get("status")
-                            if isinstance(req, dict)
-                            else getattr(req, "status", None)
-                        )
-                        if rid == return_request_id and s == "complete":
-                            done = True
-                            break
-                    if done:
+                    status = _extract_request_status(status_response)
+                    if status in terminal:
+                        if status != "complete":
+                            pytest.fail(f"Return request ended with non-success status: {status}")
                         break
                     if time.time() > deadline:
                         pytest.fail("Timed out waiting for RunInstances return request to complete")
