@@ -575,7 +575,13 @@ class AWSProviderStrategy(ProviderStrategy):
             return
         from orb.providers.aws.health import register_aws_health_checks
 
-        register_aws_health_checks(health_check, self.aws_client)
+        storage_strategy = "json"
+        if self._config_port is not None:
+            try:
+                storage_strategy = self._config_port.get_storage_strategy()
+            except Exception:
+                pass
+        register_aws_health_checks(health_check, self.aws_client, storage_strategy)
 
     def cleanup(self) -> None:
         """Clean up AWS provider resources."""
