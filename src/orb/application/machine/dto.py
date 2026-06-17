@@ -42,7 +42,7 @@ class MachineDTO(BaseDTO):
     security_group_ids: Optional[list[str]] = Field(default_factory=list)
     status_reason: Optional[str] = None
     termination_time: Optional[Union[int, str]] = None
-    tags: Optional[Any] = None
+    tags: Optional[dict[str, str]] = None
     provider_data: dict[str, Any] = Field(default_factory=dict)
     version: int = 0
 
@@ -108,7 +108,7 @@ class MachineDTO(BaseDTO):
                 if machine.termination_time is not None
                 else None
             ),
-            tags=machine.tags,
+            tags=machine.tags.to_dict() if machine.tags else None,
         )
 
     def to_dict(self) -> dict[str, Any]:
