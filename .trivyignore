@@ -16,3 +16,9 @@ __pycache__/**
 htmlcov/**
 .tox/**
 .mypy_cache/**
+
+# CVE exceptions for transitive CI/dev-only dependencies with no upstream patch
+# nltk 3.9.4 — CVE-2026-54293 (HIGH). Pulled in transitively by `safety` (CI-only
+# security scanner). No fixed version available upstream as of 2026-06-17. Not
+# present in runtime install. Re-evaluate when nltk publishes a patched release.
+CVE-2026-54293
