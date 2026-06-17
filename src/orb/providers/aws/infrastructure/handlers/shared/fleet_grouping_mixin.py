@@ -119,11 +119,14 @@ class FleetGroupingMixin:
             self._collect_groups_from_instances(
                 instances_needing_lookup, groups, group_ids_to_fetch
             )
-            # Fetch details only for groups discovered via AWS lookup — groups resolved
-            # from the mapping are left with details=None so the release manager fetches
-            # them on demand (avoiding unnecessary describe calls on the return path).
-            if group_ids_to_fetch:
-                self._fetch_and_attach_group_details(group_ids_to_fetch, groups)
+
+        # Fetch details for all known group IDs regardless of how they were resolved.
+        # When all instances come from resource_mapping, instances_needing_lookup is empty
+        # but group_ids_to_fetch is still populated from the mapping loop above. Without
+        # this fetch, group details remain None and release_manager falls back to a raw
+        # describe that reads MinSize directly from AWS, creating a double-decrement risk.
+        if group_ids_to_fetch:
+            self._fetch_and_attach_group_details(group_ids_to_fetch, groups)
 
         # Log performance metrics and optimization results
         self._log_grouping_summary(
