@@ -153,7 +153,10 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 # lazily by the check_hosts_status / _check_single_fleet_status polling path.
                 instance_ids = fleet_result.get("instance_ids", [])
                 if instance_ids:
-                    instances = [{"instance_id": iid} for iid in instance_ids]
+                    instances = [
+                        {"instance_id": iid, "resource_id": fleet_id, "provider_api": "EC2Fleet"}
+                        for iid in instance_ids
+                    ]
                     self._logger.info(
                         "EC2Fleet instant fleet created with %d instance(s): %s",
                         len(instance_ids),

@@ -23,6 +23,7 @@ async def handle_templates_generate(args) -> Dict[str, Any]:
             provider_specific=getattr(args, "provider_specific", False),
             provider_type_filter=getattr(args, "provider_type", None),
             force_overwrite=getattr(args, "force", False),
+            slurm_conf=getattr(args, "slurm_conf", None),
         )
 
         # Use application service to generate templates

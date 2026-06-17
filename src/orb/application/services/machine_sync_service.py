@@ -251,7 +251,6 @@ class MachineSyncService:
                         existing.status != provider_machine.status
                         or existing.private_ip != provider_machine.private_ip
                         or existing.public_ip != provider_machine.public_ip
-                        or existing.name != provider_machine.name
                         or existing.private_dns_name != provider_machine.private_dns_name
                         or existing.public_dns_name != provider_machine.public_dns_name
                         or existing.price_type != provider_machine.price_type
@@ -274,7 +273,10 @@ class MachineSyncService:
                         machine_data["status"] = provider_machine.status
                         machine_data["private_ip"] = provider_machine.private_ip
                         machine_data["public_ip"] = provider_machine.public_ip
-                        machine_data["name"] = provider_machine.name
+                        # Preserve explicitly-set name (e.g. SLURM node name);
+                        # only adopt provider name if existing has no name
+                        if not existing.name:
+                            machine_data["name"] = provider_machine.name
                         machine_data["private_dns_name"] = provider_machine.private_dns_name
                         machine_data["public_dns_name"] = provider_machine.public_dns_name
                         machine_data["price_type"] = provider_machine.price_type

@@ -113,10 +113,59 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
             request = await self._status_service.update_request_from_provisioning(
                 request, provisioning_result
             )
+
+            # Sync per-machine tags (e.g. orb:node-name) to cloud resources
+            if provisioning_result.success and request.metadata.get("node_names"):
+                await self._sync_machine_tags_to_provider(request)
+
             # Persist final status
             await self._persist_and_publish(request)
 
         self.logger.info("Machine request created successfully: %s", request.request_id)
+
+    async def _sync_machine_tags_to_provider(self, request: Any) -> None:
+        """Push per-machine tags to cloud resources via TAG_INSTANCES operation.
+
+        Batched, fire-and-forget. Only called when machines have per-instance tags.
+        """
+        try:
+            from orb.domain.base.operations import (
+                Operation as ProviderOperation,
+                OperationType as ProviderOperationType,
+            )
+
+            with self.uow_factory.create_unit_of_work() as uow:
+                machines = uow.machines.find_by_request_id(str(request.request_id))
+
+            # Build per-instance tag map: {instance_id: {key: value, ...}}
+            instance_tags: dict[str, dict[str, str]] = {}
+            for m in machines:
+                if m.tags and m.tags.tags and str(m.machine_id).startswith("i-"):
+                    instance_tags[str(m.machine_id)] = m.tags.tags
+
+            if not instance_tags:
+                return
+
+            operation = ProviderOperation(
+                operation_type=ProviderOperationType.TAG_INSTANCES,
+                parameters={"instance_tags": instance_tags},
+                context={"correlation_id": str(request.request_id)},
+            )
+            await self._provider_selection_port.execute_operation(request.provider_name, operation)
+            self.logger.info(
+                "Synced tags to %d instances for request %s",
+                len(instance_tags),
+                request.request_id,
+            )
+        except Exception as e:
+            self.logger.error(
+                "Failed to sync machine tags to provider for request %s: %s",
+                request.request_id,
+                e,
+                exc_info=True,
+            )
+            # Don't re-raise -- tagging failure should not fail the whole provisioning request
+            # But DO log at ERROR level so it's visible in monitoring
 
     async def _load_template(self, template_id: str) -> Any:
         """Load template using CQRS QueryBus."""

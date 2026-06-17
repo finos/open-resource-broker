@@ -138,3 +138,14 @@ class SchedulerPort(ABC):
     @classmethod
     def get_defaults_config(cls) -> dict:
         return {}
+
+    def generate_scheduler_templates(self, **kwargs: Any) -> list[dict[str, Any]] | None:
+        """Generate templates from scheduler config (e.g. slurm.conf partitions).
+
+        Args:
+            **kwargs: Scheduler-specific options (e.g. slurm_conf="/path/to/slurm.conf")
+
+        Returns a list of template dicts if the scheduler can generate templates
+        from its own configuration, or None to fall back to provider example templates.
+        """
+        return None
