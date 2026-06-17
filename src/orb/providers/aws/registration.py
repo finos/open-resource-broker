@@ -96,7 +96,11 @@ def create_aws_strategy(provider_config: Any) -> Any:
 
             if strategy.aws_client is not None:
                 health_check = get_container().get(HealthCheckPort)
-                register_aws_health_checks(health_check, strategy.aws_client)
+                _storage_strategy = "json"
+                if config_port is not None:
+                    with suppress(Exception):
+                        _storage_strategy = config_port.get_storage_strategy()
+                register_aws_health_checks(health_check, strategy.aws_client, _storage_strategy)
 
         # Set provider name for identification
         if hasattr(strategy, "name") and provider_name:
