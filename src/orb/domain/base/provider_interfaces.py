@@ -9,6 +9,7 @@ class ProviderType(str, Enum):
     """Supported provider types."""
 
     AWS = "aws"
+    GCP = "gcp"
     PROVIDER1 = "provider1"
     Provider2 = "provider2"
 
