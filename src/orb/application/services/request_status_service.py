@@ -17,6 +17,7 @@ states (shutting-down → terminated) without a fleet-level capacity concept.
 The return path is unchanged.
 """
 
+import dataclasses
 from typing import Optional, Tuple
 
 from orb.domain.base import UnitOfWorkFactory
@@ -164,8 +165,20 @@ class RequestStatusService:
         else:
             return RequestStatus.IN_PROGRESS.value, "Instances terminating"
 
-    async def update_request_status(self, request: Request, status: str, message: str) -> Request:
-        """Update request status.
+    async def update_request_status(
+        self,
+        request: Request,
+        status: str,
+        message: str,
+        provider_metadata: Optional[dict] = None,
+    ) -> Request:
+        """Update request status and optionally cache the latest ProviderFulfilment.
+
+        When ``provider_metadata`` is supplied and contains a ``provider_fulfilment``
+        key, the fulfilment is serialised and stored as ``request.metadata["last_fulfilment"]``.
+        That snapshot is later read by ``RequestDTO.from_domain`` so capacity fields
+        (target_units, fulfilled_units, running_count, pending_count) appear in every
+        response without requiring the caller to re-pass the fulfilment explicitly.
 
         No-op if the request is already in a terminal state. Terminal requests
         (COMPLETED/FAILED/CANCELLED/TIMEOUT/PARTIAL) are immutable; re-evaluation
@@ -177,6 +190,14 @@ class RequestStatusService:
         try:
             status_enum = RequestStatus(status)
             updated_request = request.update_status(status_enum, message)
+
+            # Cache the latest ProviderFulfilment snapshot so DTO callers can surface it.
+            if provider_metadata:
+                fulfilment = provider_metadata.get("provider_fulfilment")
+                if fulfilment is not None:
+                    updated_request = updated_request.with_last_fulfilment(
+                        dataclasses.asdict(fulfilment)
+                    )
 
             # Save updated request
             with self.uow_factory.create_unit_of_work() as uow:
@@ -198,10 +219,9 @@ class RequestStatusService:
                 return "executing"
             else:
                 return "fail"
+        elif status == "running":
+            return "succeed"
+        elif status in ["pending", "launching"]:
+            return "executing"
         else:
-            if status == "running":
-                return "succeed"
-            elif status in ["pending", "launching"]:
-                return "executing"
-            else:
-                return "fail"
+            return "fail"

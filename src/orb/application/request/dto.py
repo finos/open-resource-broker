@@ -158,6 +158,17 @@ class RequestDTO(BaseDTO):
                     MachineReferenceDTO.from_machine(m, request.request_type) for m in domain_refs
                 ]
 
+        # Resolve the ProviderFulfilment to use for capacity fields.
+        # Priority: explicit arg > cached snapshot in metadata["last_fulfilment"].
+        resolved_fulfilment: Optional[ProviderFulfilment] = fulfilment
+        if resolved_fulfilment is None and request.metadata:
+            cached = request.metadata.get("last_fulfilment")
+            if isinstance(cached, dict):
+                try:
+                    resolved_fulfilment = ProviderFulfilment(**cached)
+                except (TypeError, KeyError):
+                    resolved_fulfilment = None
+
         # Build structured error block from error_details when available.
         error_block: Optional[dict[str, Any]] = (
             request.error_details.get("aws_error") if request.error_details else None
@@ -195,11 +206,12 @@ class RequestDTO(BaseDTO):
             version=request.version,
             resource_ids=request.resource_ids,
             error=error_block,
-            # Capacity fields from ProviderFulfilment (present when caller supplies one)
-            target_units=fulfilment.target_units if fulfilment else None,
-            fulfilled_units=fulfilment.fulfilled_units if fulfilment else None,
-            running_count=fulfilment.running_count if fulfilment else None,
-            pending_count=fulfilment.pending_count if fulfilment else None,
+            # Capacity fields — populated from resolved ProviderFulfilment when available.
+            # Falls back to metadata["last_fulfilment"] when no explicit arg is supplied.
+            target_units=resolved_fulfilment.target_units if resolved_fulfilment else None,
+            fulfilled_units=resolved_fulfilment.fulfilled_units if resolved_fulfilment else None,
+            running_count=resolved_fulfilment.running_count if resolved_fulfilment else None,
+            pending_count=resolved_fulfilment.pending_count if resolved_fulfilment else None,
         )
 
     def to_dict(self, verbose: bool = False) -> dict[str, Any]:

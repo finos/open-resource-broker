@@ -102,7 +102,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 )
                 if new_status:
                     await self._status_service.update_request_status(
-                        request, new_status, status_message or ""
+                        request, new_status, status_message or "", provider_metadata
                     )
                 request = await self._query_service.get_request(query.request_id)
             except Exception as sync_err:
@@ -302,7 +302,7 @@ class ListReturnRequestsHandler(BaseQueryHandler[ListReturnRequestsQuery, list[R
                     )
                     if new_status:
                         await self._status_service.update_request_status(
-                            request, new_status, status_message or ""
+                            request, new_status, status_message or "", provider_metadata
                         )
                 except Exception as sync_err:
                     self.logger.warning(
@@ -441,7 +441,7 @@ class ListActiveRequestsHandler(BaseQueryHandler[ListActiveRequestsQuery, list[R
                     )
                     if new_status:
                         await self._status_service.update_request_status(
-                            request, new_status, status_message or ""
+                            request, new_status, status_message or "", provider_metadata
                         )
                 except Exception as sync_err:
                     self.logger.warning(
