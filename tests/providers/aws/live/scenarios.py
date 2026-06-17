@@ -548,3 +548,19 @@ def get_test_cases() -> List[Dict[str, Any]]:
     all_scenarios.extend(CUSTOM_TEST_CASES)
 
     return all_scenarios
+
+
+def template_uses_weighted_capacity(test_case: Dict[str, Any]) -> bool:
+    """Return True if this template's vmTypes use weights > 1.
+
+    Weighted templates fulfil capacity in *capacity units*, not instance count.
+    AWS / GCP MIG / Azure VMSS Flex / OCI cluster networks all share this model:
+    when a template uses mixed-instance weighting, requested_count is in capacity
+    units and the actual instance count depends on which weights AWS picks.
+    """
+    overrides = test_case.get("overrides", {}) or {}
+    vm_types = overrides.get("vmTypes") or overrides.get("vm_types")
+    if not vm_types:
+        return False
+    weights = vm_types.values()
+    return any(int(w) > 1 for w in weights)
