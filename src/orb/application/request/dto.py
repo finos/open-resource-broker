@@ -20,7 +20,7 @@ class MachineReferenceDTO(BaseDTO):
     name: str = ""
     result: str  # 'executing', 'fail', or 'succeed'
     status: str
-    private_ip_address: str = ""
+    private_ip_address: Optional[str] = None
     public_ip_address: Optional[str] = None  # Already using the expected API field name
     instance_type: Optional[str] = None
     price_type: Optional[str] = None
@@ -55,7 +55,7 @@ class MachineReferenceDTO(BaseDTO):
             name=machine.display_name,
             result=map_machine_status_to_result(status, request_type=rt_str),
             status=status,
-            private_ip_address=machine.private_ip or "",
+            private_ip_address=machine.private_ip or None,
             public_ip_address=machine.public_ip,
             instance_type=str(machine.instance_type) if machine.instance_type else None,
             price_type=machine.price_type,

@@ -26,7 +26,7 @@ class RequestDTOFactory:
                     machine.status.value, request.request_type
                 ),
                 status=machine.status.value,
-                private_ip_address=machine.private_ip or "",
+                private_ip_address=machine.private_ip or None,
                 public_ip_address=machine.public_ip,
                 instance_type=str(machine.instance_type) if machine.instance_type else None,
                 price_type=machine.price_type,
