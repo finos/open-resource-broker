@@ -243,6 +243,27 @@ class Request(AggregateRoot):
         fields["version"] = self.version + 1
         return Request.model_validate(fields)
 
+    def with_last_fulfilment(self, fulfilment_dict: dict) -> "Request":
+        """Store a serialized ProviderFulfilment snapshot in metadata.
+
+        The snapshot is written under the key ``last_fulfilment``.  It is a
+        plain dict so it survives round-trips through any persistence layer.
+        The value is provider-agnostic — ProviderFulfilment is a domain value
+        object — so storing it here violates no domain boundary.
+
+        Args:
+            fulfilment_dict: Result of ``ProviderFulfilment``-like ``__dict__``
+                or ``dataclasses.asdict`` — a plain serialisable dict.
+
+        Returns:
+            Updated Request with ``metadata["last_fulfilment"]`` set.
+        """
+        new_metadata = {**self.metadata, "last_fulfilment": fulfilment_dict}
+        fields = self.model_dump()
+        fields["metadata"] = new_metadata
+        fields["version"] = self.version + 1
+        return Request.model_validate(fields)
+
     def with_launch_template_info(self, template_id: str, version: str) -> "Request":
         new_provider_data = {
             **self.provider_data,
