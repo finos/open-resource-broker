@@ -304,6 +304,33 @@ def add_provider_actions(subparsers):
     )
     providers_add.add_argument("--aws-profile", help="AWS profile name")
     providers_add.add_argument("--aws-region", help="AWS region")
+    providers_add.add_argument("--azure-subscription-id", help="Azure subscription ID")
+    providers_add.add_argument("--azure-resource-group", help="Azure resource group")
+    providers_add.add_argument("--azure-location", help="Azure location")
+    providers_add.add_argument("--azure-client-id", help="Azure managed identity client ID")
+    providers_add.add_argument("--azure-cyclecloud-url", help="Azure CycleCloud URL")
+    providers_add.add_argument(
+        "--azure-cyclecloud-credential-path",
+        help="Secret path or file path for CycleCloud credentials",
+    )
+    providers_add.add_argument(
+        "--azure-cyclecloud-auth-mode",
+        help="CycleCloud auth mode override",
+    )
+    providers_add.add_argument(
+        "--azure-cyclecloud-aad-scope",
+        help="CycleCloud AAD scope override",
+    )
+    providers_add.add_argument(
+        "--azure-cyclecloud-verify-ssl",
+        action="store_true",
+        help="Verify TLS certificates for CycleCloud",
+    )
+    providers_add.add_argument(
+        "--azure-cyclecloud-no-verify-ssl",
+        action="store_true",
+        help="Disable TLS certificate verification for CycleCloud",
+    )
     providers_add.add_argument("--name", help="Provider instance name")
     providers_add.add_argument("--discover", action="store_true", help="Discover infrastructure")
 
@@ -316,6 +343,33 @@ def add_provider_actions(subparsers):
     providers_update.add_argument("provider_name", help="Provider instance name")
     providers_update.add_argument("--aws-region", help="Update region")
     providers_update.add_argument("--aws-profile", help="Update profile")
+    providers_update.add_argument("--azure-subscription-id", help="Update Azure subscription ID")
+    providers_update.add_argument("--azure-resource-group", help="Update Azure resource group")
+    providers_update.add_argument("--azure-location", help="Update Azure location")
+    providers_update.add_argument("--azure-client-id", help="Update Azure managed identity client ID")
+    providers_update.add_argument("--azure-cyclecloud-url", help="Update CycleCloud URL")
+    providers_update.add_argument(
+        "--azure-cyclecloud-credential-path",
+        help="Update CycleCloud credential path",
+    )
+    providers_update.add_argument(
+        "--azure-cyclecloud-auth-mode",
+        help="Update CycleCloud auth mode override",
+    )
+    providers_update.add_argument(
+        "--azure-cyclecloud-aad-scope",
+        help="Update CycleCloud AAD scope override",
+    )
+    providers_update.add_argument(
+        "--azure-cyclecloud-verify-ssl",
+        action="store_true",
+        help="Enable TLS certificate verification for CycleCloud",
+    )
+    providers_update.add_argument(
+        "--azure-cyclecloud-no-verify-ssl",
+        action="store_true",
+        help="Disable TLS certificate verification for CycleCloud",
+    )
 
     providers_set_default = subparsers.add_parser("set-default", help="Set default provider")
     add_global_arguments(providers_set_default)
@@ -691,6 +745,33 @@ For more information, visit: {DOCS_URL}
     init_parser.add_argument("--provider", default="aws", help="Provider type")
     init_parser.add_argument("--region", help="AWS region")
     init_parser.add_argument("--profile", help="AWS profile")
+    init_parser.add_argument("--azure-subscription-id", help="Azure subscription ID")
+    init_parser.add_argument("--azure-resource-group", help="Azure resource group")
+    init_parser.add_argument("--azure-location", help="Azure location")
+    init_parser.add_argument("--azure-client-id", help="Azure managed identity client ID")
+    init_parser.add_argument("--azure-cyclecloud-url", help="Azure CycleCloud URL")
+    init_parser.add_argument(
+        "--azure-cyclecloud-credential-path",
+        help="Secret path or file path for CycleCloud credentials",
+    )
+    init_parser.add_argument(
+        "--azure-cyclecloud-auth-mode",
+        help="CycleCloud auth mode override",
+    )
+    init_parser.add_argument(
+        "--azure-cyclecloud-aad-scope",
+        help="CycleCloud AAD scope override",
+    )
+    init_parser.add_argument(
+        "--azure-cyclecloud-verify-ssl",
+        action="store_true",
+        help="Verify TLS certificates for CycleCloud",
+    )
+    init_parser.add_argument(
+        "--azure-cyclecloud-no-verify-ssl",
+        action="store_true",
+        help="Disable TLS certificate verification for CycleCloud",
+    )
     init_parser.add_argument("--config-dir", help="Custom configuration directory")
     init_parser.add_argument(
         "--scripts-dir",
