@@ -165,7 +165,8 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 instance_ids = fleet_result.get("instance_ids", [])
                 if instance_ids:
                     instances = [
-                        {"instance_id": iid, "resource_id": fleet_id} for iid in instance_ids
+                        {"instance_id": iid, "resource_id": fleet_id, "provider_api": "EC2Fleet"}
+                        for iid in instance_ids
                     ]
                     self._logger.info(
                         "EC2Fleet instant fleet created with %d instance(s): %s",
