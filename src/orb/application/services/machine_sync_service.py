@@ -80,6 +80,7 @@ class MachineSyncService:
                     "resource_ids": request.resource_ids,
                     "provider_api": request.provider_api,
                     "template_id": request.template_id,
+                    "requested_count": request.requested_count,
                 }
             # Fallback to instance-level discovery for requests without resource tracking
             elif db_machines:
