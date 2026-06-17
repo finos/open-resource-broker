@@ -388,6 +388,46 @@ def _get_resource_id_from_instance(instance_id: str, provider_api: str) -> Optio
     return None
 
 
+def _get_asg_instance_weight(instance_id: str, asg_name: str) -> int:
+    """Return the WeightedCapacity of an instance within an ASG.
+
+    Looks up the instance type via EC2 describe_instances (works even after the
+    instance is detached from the ASG), then finds the matching WeightedCapacity
+    in the ASG's MixedInstancesPolicy overrides.
+    Returns 1 if the ASG has no per-type weights (uniform fleet).
+    """
+    ec2_client, asg_client = _get_boto_clients()
+    try:
+        # Use EC2 describe_instances so we still get the instance type even
+        # after it has been detached from the ASG.
+        ec2_resp = ec2_client.describe_instances(InstanceIds=[instance_id])
+        reservations = ec2_resp.get("Reservations") or []
+        if not reservations:
+            return 1
+        instances = reservations[0].get("Instances") or []
+        if not instances:
+            return 1
+        instance_type = instances[0].get("InstanceType") or ""
+
+        asg_resp = asg_client.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name])
+        asgs = asg_resp.get("AutoScalingGroups") or [{}]
+        asg = asgs[0]
+
+        policy = asg.get("MixedInstancesPolicy") or {}
+        lt = policy.get("LaunchTemplate") or {}
+        overrides = lt.get("Overrides") or []
+
+        for override in overrides:
+            if override.get("InstanceType") == instance_type:
+                wc = override.get("WeightedCapacity")
+                if wc is not None:
+                    return int(wc)
+        return 1
+    except Exception as exc:
+        log.debug("Failed to look up ASG instance weight for %s: %s", instance_id, exc)
+        return 1
+
+
 def _get_capacity(provider_api: str, resource_id: str) -> int:
     """Return target/desired capacity for fleet or ASG."""
     ec2_client, asg_client = _get_boto_clients()
@@ -1888,7 +1928,21 @@ def test_partial_return_reduces_capacity(setup_host_factory_mock_with_scenario, 
 
     # 2.6: Verify capacity reduction
     log.info("2.6: Verifying capacity reduction")
-    expected_capacity = max(capacity_before - 1, 0)
+    # For ASGs with weighted instance types, returning one instance reduces
+    # DesiredCapacity by the instance's WeightedCapacity (e.g. 2 for t3.medium
+    # with weight=2), not just by 1.  Look up the actual weight so we assert the
+    # correct expected value regardless of which instance type AWS placed.
+    if provider_api == "ASG" or "asg" in provider_api.lower():
+        capacity_decrement = _get_asg_instance_weight(first_instance, resource_id)
+        log.info(
+            "ASG weighted capacity: instance %s has weight %d in ASG %s",
+            first_instance,
+            capacity_decrement,
+            resource_id,
+        )
+    else:
+        capacity_decrement = 1
+    expected_capacity = max(capacity_before - capacity_decrement, 0)
     # ASG operations can take longer than fleet operations
     timeout = 120 if provider_api == "ASG" or "asg" in provider_api.lower() else 60
     log.info("Waiting for capacity change with timeout=%ds", timeout)
