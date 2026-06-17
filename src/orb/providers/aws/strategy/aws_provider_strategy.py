@@ -450,10 +450,11 @@ class AWSProviderStrategy(ProviderStrategy):
                 operation.context.get("request_id") if operation.context else None
             )
 
+            requested_count = int(operation.parameters.get("requested_count") or 1)
             request = Request.create_new_request(
                 request_type=RequestType.ACQUIRE,
                 template_id=operation.parameters.get("template_id", "unknown"),
-                machine_count=1,
+                machine_count=requested_count,
                 provider_type="aws",
                 provider_name="aws-default",
                 request_id=request_id,

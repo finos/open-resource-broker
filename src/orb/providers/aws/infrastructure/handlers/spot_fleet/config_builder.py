@@ -268,7 +268,7 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
         if price_type in ("ondemand", "heterogeneous") or on_demand_capacity > 0:
             fleet_config["OnDemandTargetCapacity"] = on_demand_capacity
 
-        if template.fleet_type == AWSFleetType.MAINTAIN.value:
+        if template.fleet_type == AWSFleetType.MAINTAIN:
             fleet_config["ReplaceUnhealthyInstances"] = True
             fleet_config["TerminateInstancesWithExpiration"] = True
 

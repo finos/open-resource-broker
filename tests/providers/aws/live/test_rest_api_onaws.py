@@ -622,13 +622,10 @@ def log_resource_history(resource_id: str, provider_api: str) -> None:
             next_token = None
             # Add 60 second buffer to account for clock skew between client and AWS
             buffered_start_time = start_time - timedelta(seconds=3600)
-            # Set end time 5 hours in the future to ensure we get all events
-            end_time = current_time + timedelta(hours=5)
             while api_call_count < config["max_api_calls"]:
                 params = {
                     "FleetId": resource_id,
                     "StartTime": buffered_start_time,
-                    "EndTime": end_time,  # Use calculated end time for bounded queries
                     "MaxResults": config["max_records_per_call"],
                 }
                 if next_token:
