@@ -1887,7 +1887,8 @@ def test_rest_api_control_loop(rest_api_client, setup_rest_api_environment, test
 
     # 1.4: Validate request response
     log.info("1.4: Validating request response")
-    request_id = request_response.get("request_id")
+    request_id_key = "requestId" if scheduler == "hostfactory" else "request_id"
+    request_id = request_response.get(request_id_key)
     if not request_id:
         pytest.fail(f"Request ID missing in response: {request_response}")
     assert REQUEST_ID_RE.match(request_id), (
