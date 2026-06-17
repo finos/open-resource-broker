@@ -59,7 +59,7 @@ jobs:
       python-tags: ${{ steps.tags.outputs.python-tags }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
 
     - name: Calculate container tags
       id: tags
@@ -97,7 +97,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5  # v4
@@ -161,7 +161,7 @@ jobs:
         fi
 
     - name: Run Trivy security scan
-      uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8  # v0.36.0
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
       with:
         image-ref: "${{ needs.config.outputs.container-registry }}/${{ needs.config.outputs.container-image }}:${{ needs.config.outputs.package-version }}-python${{ matrix.python-version }}"
         format: 'sarif'
@@ -321,7 +321,7 @@ jobs:
 
     steps:
     - name: Delete old untagged container images
-      uses: actions/delete-package-versions@25ad4af5be03aef10e0b3376b248688b7a44c40b  # v5
+      uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55  # v5
       with:
         package-name: ${{ github.event.repository.name }}
         package-type: container
@@ -329,7 +329,7 @@ jobs:
         delete-only-untagged-versions: true
 
     - name: Delete old tagged versions (preserve releases and special tags)
-      uses: actions/delete-package-versions@25ad4af5be03aef10e0b3376b248688b7a44c40b  # v5
+      uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55  # v5
       with:
         package-name: ${{ github.event.repository.name }}
         package-type: container

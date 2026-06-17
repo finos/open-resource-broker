@@ -118,12 +118,12 @@ def create_sql_unit_of_work(config: Any) -> Any:
             echo=getattr(sql_config, "echo", False),
         )
 
-        return SQLUnitOfWork(engine)  # type: ignore[abstract]
+        return SQLUnitOfWork(engine)
     else:
         # For testing or other scenarios - assume it's a dict with connection info
         connection_string = config.get("connection_string", "sqlite:///data/test.db")
         engine = create_engine(connection_string)
-        return SQLUnitOfWork(engine)  # type: ignore[abstract]
+        return SQLUnitOfWork(engine)
 
 
 def register_sql_storage() -> None:

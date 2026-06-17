@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Generic, Optional, Protocol, TypeVar
 
-from .entity import AggregateRoot, Entity
+from .entity import AggregateRoot
 
 T = TypeVar("T")  # Generic type for domain entities/aggregates
 A = TypeVar("A", bound=AggregateRoot)
@@ -88,18 +88,6 @@ class UnitOfWork(Protocol):
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Exit the unit of work context."""
-        ...
-
-    def register_new(self, entity: Entity) -> None:
-        """Register a new entity."""
-        ...
-
-    def register_dirty(self, entity: Entity) -> None:
-        """Register a dirty entity."""
-        ...
-
-    def register_removed(self, entity: Entity) -> None:
-        """Register a removed entity."""
         ...
 
     @abstractmethod

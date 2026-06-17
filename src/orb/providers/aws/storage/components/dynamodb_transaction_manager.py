@@ -3,6 +3,7 @@
 from contextlib import contextmanager
 from typing import Any, Callable, Optional
 
+from boto3.dynamodb.types import TypeSerializer
 from botocore.exceptions import ClientError
 
 from orb.infrastructure.storage.components.transaction_manager import (
@@ -30,6 +31,11 @@ class DynamoDBTransactionManager(TransactionManager):
         self.client_manager = client_manager
         self.transaction_items: list[dict[str, Any]] = []
         self.max_transaction_items = 25  # DynamoDB limit
+        # transact_write_items uses the low-level Client API, which requires
+        # AttributeValue-tagged dicts (e.g. {"id": {"S": "abc"}}). The
+        # higher-level Resource API (used elsewhere) accepts plain dicts;
+        # this serializer converts at the boundary.
+        self._serializer = TypeSerializer()
 
     def begin_transaction(self) -> None:
         """Begin a new DynamoDB transaction."""
@@ -60,7 +66,8 @@ class DynamoDBTransactionManager(TransactionManager):
         if len(self.transaction_items) >= self.max_transaction_items:
             raise RuntimeError(f"Transaction cannot exceed {self.max_transaction_items} items")
 
-        put_request = {"Put": {"TableName": table_name, "Item": item}}
+        serialized_item = {k: self._serializer.serialize(v) for k, v in item.items()}
+        put_request = {"Put": {"TableName": table_name, "Item": serialized_item}}
 
         if condition_expression:
             put_request["Put"]["ConditionExpression"] = condition_expression
@@ -92,12 +99,16 @@ class DynamoDBTransactionManager(TransactionManager):
         if len(self.transaction_items) >= self.max_transaction_items:
             raise RuntimeError(f"Transaction cannot exceed {self.max_transaction_items} items")
 
+        serialized_key = {k: self._serializer.serialize(v) for k, v in key.items()}
+        serialized_values = {
+            k: self._serializer.serialize(v) for k, v in expression_attribute_values.items()
+        }
         update_request = {
             "Update": {
                 "TableName": table_name,
-                "Key": key,
+                "Key": serialized_key,
                 "UpdateExpression": update_expression,
-                "ExpressionAttributeValues": expression_attribute_values,
+                "ExpressionAttributeValues": serialized_values,
             }
         }
 
@@ -127,7 +138,8 @@ class DynamoDBTransactionManager(TransactionManager):
         if len(self.transaction_items) >= self.max_transaction_items:
             raise RuntimeError(f"Transaction cannot exceed {self.max_transaction_items} items")
 
-        delete_request = {"Delete": {"TableName": table_name, "Key": key}}
+        serialized_key = {k: self._serializer.serialize(v) for k, v in key.items()}
+        delete_request = {"Delete": {"TableName": table_name, "Key": serialized_key}}
 
         if condition_expression:
             delete_request["Delete"]["ConditionExpression"] = condition_expression

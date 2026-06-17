@@ -33,6 +33,7 @@ class SQLQueryBuilder(QueryManager):
             table_name: Name of the database table
             columns: Dictionary of column names and types
         """
+        super().__init__()
         self.table_name = table_name
         self.columns = columns
         self.logger = get_logger(__name__)
@@ -41,6 +42,64 @@ class SQLQueryBuilder(QueryManager):
         self._validate_identifier(table_name)
         for column in columns:
             self._validate_identifier(column)
+
+    def build_query(self, query_spec: dict[str, Any]) -> str:
+        """
+        Build a SQL query from specification (implements QueryManager interface).
+
+        Dispatches to existing build_* methods based on query_spec["type"].
+        """
+        query_type = query_spec.get("type", "").upper()
+        if query_type == "CREATE_TABLE":
+            return self.build_create_table()
+        if query_type == "SELECT_ALL":
+            return self.build_select_all()
+        if query_type == "SELECT_BY_ID":
+            id_column = query_spec.get("id_column", "id")
+            sql, _ = self.build_select_by_id(id_column)
+            return sql
+        if query_type == "INSERT":
+            sql, _ = self.build_insert(query_spec.get("data", {}))
+            return sql
+        if query_type == "UPDATE":
+            sql, _ = self.build_update(
+                query_spec.get("data", {}),
+                query_spec.get("id_column", "id"),
+                query_spec.get("entity_id", ""),
+            )
+            return sql
+        if query_type == "DELETE":
+            sql, _ = self.build_delete(query_spec.get("id_column", "id"))
+            return sql
+        raise ValueError(f"Unknown query type: {query_type}")
+
+    def execute_query(self, query: str, parameters: Optional[dict[str, Any]] = None) -> Any:
+        """
+        Reject direct execution — execution belongs to SQLConnectionManager.
+
+        SQLQueryBuilder is build-only; this method exists to satisfy the
+        QueryManager interface but should not be used. Callers must execute
+        the built query via SQLConnectionManager.execute_query.
+        """
+        raise NotImplementedError(
+            "SQLQueryBuilder does not execute queries; use SQLConnectionManager.execute_query"
+        )
+
+    def validate_query(self, query: str) -> bool:
+        """
+        Validate a SQL query string (implements QueryManager interface).
+
+        Performs basic structural validation: non-empty, contains a known
+        SQL keyword, and no unbalanced quotes.
+        """
+        if not query or not query.strip():
+            return False
+        keywords = ("SELECT", "INSERT", "UPDATE", "DELETE", "CREATE")
+        if not any(kw in query.upper() for kw in keywords):
+            return False
+        if query.count("'") % 2 != 0:
+            return False
+        return True
 
     def _validate_identifier(self, identifier: str) -> None:
         """

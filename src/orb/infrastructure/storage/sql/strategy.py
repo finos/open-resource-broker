@@ -43,7 +43,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
 
         # Initialize components
         self.connection_manager = SQLConnectionManager(config)
-        self.query_builder = SQLQueryBuilder(table_name, columns)  # type: ignore[abstract]
+        self.query_builder = SQLQueryBuilder(table_name, columns)
         self.serializer = SQLSerializer(id_column=self._get_id_column())
         self.lock_manager = LockManager("simple")  # Simple lock for SQL
 
@@ -265,7 +265,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
 
                 with self.connection_manager.get_session() as session:
                     for serialized_data in serialized_list:
-                        session.execute(query, serialized_data)
+                        session.execute(text(query), serialized_data)
                     session.commit()
 
                 self.logger.debug("Saved batch of %s entities", len(entities))
