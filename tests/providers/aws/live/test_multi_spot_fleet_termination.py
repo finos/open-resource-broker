@@ -31,14 +31,18 @@ os.environ["HF_LOGDIR"] = "./logs"
 os.environ["AWS_PROVIDER_LOG_DIR"] = "./logs"
 os.environ["LOG_DESTINATION"] = "file"
 
-_boto_session = boto3.Session()
-_ec2_region = (
-    os.environ.get("AWS_REGION")
-    or os.environ.get("AWS_DEFAULT_REGION")
-    or _boto_session.region_name
-    or "eu-west-1"
-)
-ec2_client = _boto_session.client("ec2", region_name=_ec2_region)
+_ec2_client = None
+
+
+def _get_ec2_client():
+    global _ec2_client
+    if _ec2_client is None:
+        _region = (
+            os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "eu-west-1"
+        )
+        _ec2_client = boto3.Session().client("ec2", region_name=_region)
+    return _ec2_client
+
 
 log = logging.getLogger("multi_spot_fleet_test")
 log.setLevel(logging.DEBUG)
@@ -56,7 +60,7 @@ MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC = 300
 def get_spot_fleet_instances(fleet_id: str) -> List[str]:
     """Get all instance IDs from a Spot Fleet."""
     try:
-        response = ec2_client.describe_spot_fleet_instances(SpotFleetRequestId=fleet_id)
+        response = _get_ec2_client().describe_spot_fleet_instances(SpotFleetRequestId=fleet_id)
         return [instance["InstanceId"] for instance in response.get("ActiveInstances", [])]
     except ClientError as e:
         log.error(f"Error getting Spot Fleet instances for {fleet_id}: {e}")
@@ -70,7 +74,7 @@ def verify_spot_fleet_instances_detached(instance_ids: List[str]) -> bool:
             return True
 
         # Get all spot fleet requests (no state filter parameter exists in AWS API)
-        response = ec2_client.describe_spot_fleet_requests()
+        response = _get_ec2_client().describe_spot_fleet_requests()
 
         # Check each fleet for our instances, but only active/modifying fleets
         for fleet in response.get("SpotFleetRequestConfigs", []):
@@ -81,7 +85,7 @@ def verify_spot_fleet_instances_detached(instance_ids: List[str]) -> bool:
                 continue
 
             try:
-                fleet_instances = ec2_client.describe_spot_fleet_instances(
+                fleet_instances = _get_ec2_client().describe_spot_fleet_instances(
                     SpotFleetRequestId=fleet_id
                 )
                 active_instance_ids = [
@@ -116,7 +120,7 @@ def verify_spot_fleet_instances_detached(instance_ids: List[str]) -> bool:
 def check_all_instances_terminating_or_terminated(instance_ids: List[str]) -> bool:
     """Check if all instances are in terminating or terminated state."""
     all_terminating = True
-    instance_states = get_instances_states(instance_ids, ec2_client)
+    instance_states = get_instances_states(instance_ids, _get_ec2_client())
 
     for instance_id, state in zip(instance_ids, instance_states):
         if state is not None:
@@ -207,7 +211,7 @@ def setup_multi_spot_fleet_templates(test_session_id):
     yield hfm, template_configs
 
     try:
-        cleanup_tracked_requests(_tracked_request_ids, hfm, ec2_client)
+        cleanup_tracked_requests(_tracked_request_ids, hfm, _get_ec2_client())
     except Exception as exc:
         log.warning("Fixture teardown: cleanup_tracked_requests failed: %s", exc)
 
@@ -302,7 +306,7 @@ def provision_spot_fleet_capacity(  # dead code - commented out
     # machines = status_response["requests"][0]["machines"]
     #
     # instance_ids = [machine.get("machineId") or machine.get("machine_id") for machine in machines]
-    # instance_states = get_instances_states(instance_ids, ec2_client)
+    # instance_states = get_instances_states(instance_ids, _get_ec2_client())
     #
     # for machine, state in zip(machines, instance_states):
     #     assert machine["status"] in ["running", "pending"]
@@ -499,7 +503,7 @@ def test_multi_spot_fleet_termination(setup_multi_spot_fleet_templates):
         instance_ids = [
             machine.get("machineId") or machine.get("machine_id") for machine in machines
         ]
-        instance_states = get_instances_states(instance_ids, ec2_client)
+        instance_states = get_instances_states(instance_ids, _get_ec2_client())
 
         for machine, state in zip(machines, instance_states):
             assert machine["status"] in ["running", "pending"]
@@ -525,7 +529,7 @@ def test_multi_spot_fleet_termination(setup_multi_spot_fleet_templates):
     # Get Spot Fleet IDs from the instances by checking tags
     spot_fleet_ids = set()
     try:
-        response = ec2_client.describe_instances(InstanceIds=all_instance_ids)
+        response = _get_ec2_client().describe_instances(InstanceIds=all_instance_ids)
 
         for reservation in response.get("Reservations", []):
             for instance in reservation.get("Instances", []):
@@ -609,7 +613,9 @@ def test_multi_spot_fleet_termination(setup_multi_spot_fleet_templates):
     log.info("Step 8: Documenting Spot Fleet request state (request-type fleets stay active)")
     for fleet_id in spot_fleet_ids:
         try:
-            response = ec2_client.describe_spot_fleet_requests(SpotFleetRequestIds=[fleet_id])
+            response = _get_ec2_client().describe_spot_fleet_requests(
+                SpotFleetRequestIds=[fleet_id]
+            )
             if response.get("SpotFleetRequestConfigs"):
                 fleet = response["SpotFleetRequestConfigs"][0]
                 state = fleet.get("SpotFleetRequestState", "unknown")
