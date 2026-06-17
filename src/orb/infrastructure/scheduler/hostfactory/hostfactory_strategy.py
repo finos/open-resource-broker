@@ -685,6 +685,20 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             if req_dict.get("provider_api"):
                 hf_request["providerApi"] = req_dict["provider_api"]
 
+            # Surface ProviderFulfilment capacity fields so callers can verify
+            # weighted-fleet fulfilment (target capacity units vs delivered).
+            # IBM Symphony spec is silent on these fields; expose as ORB
+            # extension keys when the provider has populated them.
+            for cap_field in (
+                "target_units",
+                "fulfilled_units",
+                "running_count",
+                "pending_count",
+            ):
+                value = req_dict.get(cap_field)
+                if value is not None:
+                    hf_request[cap_field] = value
+
             formatted_requests.append(hf_request)
 
         return {"requests": formatted_requests}
