@@ -368,7 +368,7 @@ def generate_scenarios_from_attributes(
     # Generate all combinations
     for combination in itertools.product(*attribute_values):
         # Create the overrides dictionary from the combination
-        overrides = dict(zip(attribute_names, combination))
+        overrides = dict(zip(attribute_names, combination, strict=False))
 
         # Generate test name
         if naming_template:
@@ -550,17 +550,64 @@ def get_test_cases() -> List[Dict[str, Any]]:
     return all_scenarios
 
 
+def _load_template_vm_types(template_id: str) -> Dict[str, Any]:
+    """Look up vmTypes for *template_id* from aws_templates.json.
+
+    Returns an empty dict when the file is absent or the template is not found.
+    """
+    templates_path = (
+        Path(__file__).parent.parent.parent.parent.parent / "config" / "aws_templates.json"
+    )
+    if not templates_path.exists():
+        return {}
+    try:
+        with open(templates_path) as f:
+            data = json.load(f)
+        for tpl in data.get("templates", []):
+            if tpl.get("templateId") == template_id:
+                return tpl.get("vmTypes") or {}
+    except Exception:
+        pass
+    return {}
+
+
+# Provider APIs that do not use capacity-unit weighting even when their template
+# config lists weights.  RunInstances always provisions one instance per unit.
+_UNWEIGHTED_PROVIDER_APIS = {"RunInstances"}
+
+
 def template_uses_weighted_capacity(test_case: Dict[str, Any]) -> bool:
-    """Return True if this template's vmTypes use weights > 1.
+    """Return True if this scenario's effective vmTypes use weights > 1.
 
     Weighted templates fulfil capacity in *capacity units*, not instance count.
-    AWS / GCP MIG / Azure VMSS Flex / OCI cluster networks all share this model:
-    when a template uses mixed-instance weighting, requested_count is in capacity
-    units and the actual instance count depends on which weights AWS picks.
+    AWS EC2Fleet / SpotFleet / ASG all support mixed-instance weighting: when a
+    template lists vmTypes with weights > 1, requested_count is in capacity units
+    and the actual instance count depends on which weights AWS picks.
+
+    Resolution order for vmTypes:
+    1. ``overrides["vmTypes"]`` — explicit per-scenario override takes precedence.
+    2. The template's own vmTypes read from ``config/aws_templates.json``.
+
+    RunInstances is always unweighted: the API provisions exactly one instance per
+    requested unit regardless of any weight values in the template config.
     """
     overrides = test_case.get("overrides", {}) or {}
-    vm_types = overrides.get("vmTypes") or overrides.get("vm_types")
+
+    # RunInstances never uses capacity-unit weighting.
+    provider_api = overrides.get("providerApi") or ""
+    if provider_api in _UNWEIGHTED_PROVIDER_APIS:
+        return False
+
+    # 1. Use explicit override if present.
+    vm_types: Dict[str, Any] | None = overrides.get("vmTypes") or overrides.get("vm_types")
+
+    # 2. Fall back to the template's own vmTypes.
+    if not vm_types:
+        template_id = test_case.get("template_id") or ""
+        if template_id:
+            vm_types = _load_template_vm_types(template_id) or None
+
     if not vm_types:
         return False
-    weights = vm_types.values()
-    return any(int(w) > 1 for w in weights)
+
+    return any(int(w) > 1 for w in vm_types.values())
