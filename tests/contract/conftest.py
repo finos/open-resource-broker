@@ -221,6 +221,14 @@ def default_strategy():
     return DefaultSchedulerStrategy(logger=_make_mock_logger())
 
 
+@pytest.fixture
+def slurm_strategy():
+    """SlurmSchedulerStrategy with no external dependencies."""
+    from orb.infrastructure.scheduler.slurm.slurm_strategy import SlurmSchedulerStrategy
+
+    return SlurmSchedulerStrategy(logger=_make_mock_logger())
+
+
 # ---------------------------------------------------------------------------
 # Minimal RequestDTO builder
 # ---------------------------------------------------------------------------

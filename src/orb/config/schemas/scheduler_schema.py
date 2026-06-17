@@ -10,8 +10,8 @@ from orb.config.platform_dirs import get_config_location
 class SchedulerConfig(BaseModel):
     """Scheduler configuration - single scheduler like storage strategy."""
 
-    type: Literal["default", "hostfactory"] = Field(
-        "default", description="Scheduler type (default, hostfactory)"
+    type: Literal["default", "hostfactory", "slurm"] = Field(
+        "default", description="Scheduler type (default, hostfactory, slurm)"
     )
     config_root: Optional[str] = Field(
         None, description="Root path for configs (supports $ENV_VAR expansion)"
