@@ -164,9 +164,7 @@ async def test_get_request_returns_synced_dto_on_success():
 
     # First call returns IN_PROGRESS so the handler takes the sync path.
     # Second call (after status update) returns COMPLETED so the cache is written.
-    mock_query_service.get_request = AsyncMock(
-        side_effect=[in_progress_request, completed_request]
-    )
+    mock_query_service.get_request = AsyncMock(side_effect=[in_progress_request, completed_request])
 
     query = GetRequestQuery(request_id=_ID_SUCCESS)
     result = await handler.execute_query(query)

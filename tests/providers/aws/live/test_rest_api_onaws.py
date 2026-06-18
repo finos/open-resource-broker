@@ -1298,9 +1298,7 @@ def _check_all_ec2_hosts_are_being_provisioned(status_response):
     machines = status_response["requests"][0]["machines"]
     # Resolve the instance ID regardless of which scheduler produced the response.
     # HostFactory uses machineId; the default scheduler uses machine_id.
-    instance_ids = [
-        m.get("machine_id") or m.get("machineId") for m in machines
-    ]
+    instance_ids = [m.get("machine_id") or m.get("machineId") for m in machines]
     states = _describe_instances_bulk(instance_ids)
 
     for machine in machines:

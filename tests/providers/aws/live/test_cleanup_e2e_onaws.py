@@ -251,9 +251,7 @@ def _assert_asg_deleted(asg_name: str, timeout: int = 300) -> None:
             # AND DesiredCapacity>0 with no active instances (weighted-ASG case where
             # ShouldDecrementDesiredCapacity decrements by instance count, not weight).
             if not active_instances and (desired == 0 or len(instances) == 0):
-                log.info(
-                    "ASG %s: no active instances (DesiredCapacity=%s)", asg_name, desired
-                )
+                log.info("ASG %s: no active instances (DesiredCapacity=%s)", asg_name, desired)
                 return
             log.debug("ASG %s: %s — waiting", asg_name, last_state)
         except Exception as exc:

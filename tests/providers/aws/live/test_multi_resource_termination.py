@@ -54,7 +54,12 @@ def _get_boto_profile_and_region() -> tuple[str | None, str]:
                 region = provider_cfg.get("region")
         except Exception:
             pass
-    region = region or os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "eu-west-1"
+    region = (
+        region
+        or os.environ.get("AWS_REGION")
+        or os.environ.get("AWS_DEFAULT_REGION")
+        or "eu-west-1"
+    )
     return profile, region
 
 
@@ -62,7 +67,9 @@ def _get_ec2_client():
     global _ec2_client
     if _ec2_client is None:
         _profile, _region = _get_boto_profile_and_region()
-        _ec2_client = boto3.Session(profile_name=_profile, region_name=_region).client("ec2", region_name=_region)
+        _ec2_client = boto3.Session(profile_name=_profile, region_name=_region).client(
+            "ec2", region_name=_region
+        )
     return _ec2_client
 
 
@@ -70,7 +77,9 @@ def _get_autoscaling_client():
     global _autoscaling_client
     if _autoscaling_client is None:
         _profile, _region = _get_boto_profile_and_region()
-        _autoscaling_client = boto3.Session(profile_name=_profile, region_name=_region).client("autoscaling", region_name=_region)
+        _autoscaling_client = boto3.Session(profile_name=_profile, region_name=_region).client(
+            "autoscaling", region_name=_region
+        )
     return _autoscaling_client
 
 
