@@ -63,24 +63,53 @@ _ec2_client = None
 _asg_client = None
 
 
+def _get_boto_profile_and_region() -> tuple[str | None, str]:
+    """Read AWS profile and region from ORB_CONFIG_DIR config."""
+    import json as _json
+
+    profile = None
+    region = None
+    config_dir = os.environ.get("ORB_CONFIG_DIR")
+    if config_dir:
+        try:
+            config_path = os.path.join(config_dir, "config.json")
+            with open(config_path) as _f:
+                config = _json.load(_f)
+            providers = config.get("provider", {}).get("providers", [])
+            if providers:
+                provider_cfg = providers[0].get("config", {})
+                profile = provider_cfg.get("profile")
+                region = provider_cfg.get("region")
+        except Exception:
+            pass
+    region = (
+        region
+        or os.environ.get("AWS_REGION")
+        or os.environ.get("AWS_DEFAULT_REGION")
+        or "eu-west-1"
+    )
+    return profile, region
+
+
 def _get_ec2_client():
     global _ec2_client
     if _ec2_client is None:
-        _region = (
-            os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "eu-west-1"
+        _profile, _region = _get_boto_profile_and_region()
+        _ec2_client = boto3.Session(profile_name=_profile, region_name=_region).client(
+            "ec2", region_name=_region
         )
-        _ec2_client = boto3.Session().client("ec2", region_name=_region)
     return _ec2_client
 
 
 def _get_asg_client():
     global _asg_client
     if _asg_client is None:
-        _region = (
-            os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "eu-west-1"
+        _profile, _region = _get_boto_profile_and_region()
+        _asg_client = boto3.Session(profile_name=_profile, region_name=_region).client(
+            "autoscaling", region_name=_region
         )
-        _asg_client = boto3.Session().client("autoscaling", region_name=_region)
     return _asg_client
+
 
 # Logger setup
 log = logging.getLogger("rest_api_test")
@@ -476,7 +505,9 @@ def _lookup_aws_capacity_progress(provider_api: str, resource_id: str) -> tuple[
             return fulfilled, target
 
         if provider_lower == "asg" or "autoscaling" in provider_lower:
-            resp = _get_asg_client().describe_auto_scaling_groups(AutoScalingGroupNames=[resource_id])
+            resp = _get_asg_client().describe_auto_scaling_groups(
+                AutoScalingGroupNames=[resource_id]
+            )
             asg = (resp.get("AutoScalingGroups") or [{}])[0]
             target = int(asg.get("DesiredCapacity", 0) or 0)
             fulfilled = len(asg.get("Instances") or [])
@@ -1384,7 +1415,9 @@ def _capture_resource_history(resource_id: str, provider_api: str, test_name: st
                         # As a last resort, ask AWS directly
                         if not ids:
                             try:
-                                inst_resp = _get_ec2_client().describe_fleet_instances(FleetId=resource_id)
+                                inst_resp = _get_ec2_client().describe_fleet_instances(
+                                    FleetId=resource_id
+                                )
                                 for entry in inst_resp.get("ActiveInstances", []) or []:
                                     iid = entry.get("InstanceId")
                                     if iid:
@@ -1775,7 +1808,9 @@ def _wait_for_spot_fleet_deletion(fleet_id: str, timeout: int = 300) -> None:
     start = time.time()
     while time.time() - start < timeout:
         try:
-            response = _get_ec2_client().describe_spot_fleet_requests(SpotFleetRequestIds=[fleet_id])
+            response = _get_ec2_client().describe_spot_fleet_requests(
+                SpotFleetRequestIds=[fleet_id]
+            )
             requests = response.get("SpotFleetRequestConfigs", [])
             if not requests or requests[0]["SpotFleetRequestState"] in [
                 "cancelled_terminating",
@@ -1796,7 +1831,9 @@ def _wait_for_asg_deletion(asg_name: str, timeout: int = 300) -> None:
     start = time.time()
     while time.time() - start < timeout:
         try:
-            response = _get_asg_client().describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name])
+            response = _get_asg_client().describe_auto_scaling_groups(
+                AutoScalingGroupNames=[asg_name]
+            )
             groups = response.get("AutoScalingGroups", [])
             if not groups:
                 log.info(f"ASG {asg_name} deleted")
