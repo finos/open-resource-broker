@@ -7,6 +7,7 @@ orchestrating operations through focused services while maintaining clean
 architecture and single responsibility principle.
 """
 
+import asyncio
 import time
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
@@ -461,7 +462,15 @@ class AWSProviderStrategy(ProviderStrategy):
             )
             request.resource_ids = resource_ids
 
-            check_result = handler.check_hosts_status(request)
+            # check_hosts_status makes blocking boto3 I/O calls (describe_fleet_instances,
+            # describe_instances, etc.).  Running it directly in an async handler blocks
+            # the uvicorn event loop, which prevents uvicorn from accepting any further
+            # connections until the call completes.  For large requests (e.g. 100 instances)
+            # this starvation causes all concurrent polls to fail with ConnectionError.
+            # Offloading to a thread pool executor keeps the event loop responsive.
+            check_result = await asyncio.get_event_loop().run_in_executor(
+                None, handler.check_hosts_status, request
+            )
             instance_details = check_result.instances
             fulfilment: ProviderFulfilment = check_result.fulfilment
 
