@@ -17,7 +17,7 @@ class FleetReleaseDecision:
 def compute_fleet_release_decision(
     fleet_type: str,
     current_capacity: int,
-    instances_to_return: int,
+    weighted_capacity_to_return: int,
 ) -> FleetReleaseDecision:
     """Compute what actions are required when returning instances from a fleet.
 
@@ -25,7 +25,10 @@ def compute_fleet_release_decision(
         fleet_type: Raw fleet type string (e.g. "maintain", "request", "instant").
                     Accepts enum values — normalised to lowercase string internally.
         current_capacity: Current TotalTargetCapacity / TargetCapacity of the fleet.
-        instances_to_return: Number of instances being returned in this call.
+        weighted_capacity_to_return: Sum of WeightedCapacity for all instances being
+                    returned.  For unweighted fleets this equals the instance count.
+                    Using the weighted sum prevents a race window where AWS refills
+                    capacity units that were not decremented by the right amount.
 
     Returns:
         A FleetReleaseDecision describing which actions the caller must take.
@@ -38,7 +41,7 @@ def compute_fleet_release_decision(
         raw = fleet_type.value  # type: ignore[union-attr]
     fleet_type_lower = str(raw).lower()
 
-    remaining = max(0, current_capacity - instances_to_return)
+    remaining = max(0, current_capacity - weighted_capacity_to_return)
     is_full = remaining == 0
 
     if fleet_type_lower == "maintain":
