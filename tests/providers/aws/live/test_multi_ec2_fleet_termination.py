@@ -95,16 +95,29 @@ def get_ec2_fleet_instances(fleet_id: str) -> List[str]:
         return []
 
 
-def verify_ec2_fleet_instances_detached(instance_ids: List[str]) -> bool:
-    """Verify that instances are no longer part of any EC2 Fleet."""
+def verify_ec2_fleet_instances_detached(
+    instance_ids: List[str],
+    fleet_ids: List[str] | None = None,
+) -> bool:
+    """Verify that instances are no longer part of any EC2 Fleet.
+
+    When *fleet_ids* is supplied the check is scoped to those specific fleets
+    (the ones created by this test run).  Without it the call falls back to
+    listing every active fleet in the region, which can be slow and may
+    include stale fleets from earlier test runs.
+    """
     try:
         if not instance_ids:
             return True
 
-        # Get all active EC2 fleets
-        response = _get_ec2_client().describe_fleets(
-            Filters=[{"Name": "fleet-state", "Values": ["active", "modifying"]}]
-        )
+        if fleet_ids:
+            # Fast path: only inspect the fleets we created in this test.
+            response = _get_ec2_client().describe_fleets(FleetIds=list(fleet_ids))
+        else:
+            # Fallback: scan every active fleet in the region.
+            response = _get_ec2_client().describe_fleets(
+                Filters=[{"Name": "fleet-state", "Values": ["active", "modifying"]}]
+            )
 
         # Check each fleet for our instances
         for fleet in response.get("Fleets", []):
@@ -612,7 +625,7 @@ def test_multi_ec2_fleet_termination(setup_multi_ec2_fleet_templates):
 
         # Check if instances are detached from EC2 Fleets
         if not termination_started:
-            detached = verify_ec2_fleet_instances_detached(all_instance_ids)
+            detached = verify_ec2_fleet_instances_detached(all_instance_ids, list(ec2_fleet_ids))
             if detached:
                 log.info("All instances successfully detached from EC2 Fleets")
                 termination_started = True
@@ -635,7 +648,7 @@ def test_multi_ec2_fleet_termination(setup_multi_ec2_fleet_templates):
     assert final_terminating, "Some instances are not in terminating/terminated state"
 
     # Verify instances are detached from EC2 Fleets
-    final_detached = verify_ec2_fleet_instances_detached(all_instance_ids)
+    final_detached = verify_ec2_fleet_instances_detached(all_instance_ids, list(ec2_fleet_ids))
     if not final_detached:
         log.info(
             "Note: Some instances still show EC2 Fleet attachment while terminating - this is expected AWS behavior"
