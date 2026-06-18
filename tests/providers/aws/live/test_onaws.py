@@ -61,6 +61,12 @@ def _get_boto_clients():
         except Exception:
             pass  # Fall back to defaults
 
+    # Fall back to AWS_PROFILE so the explicit profile_name is non-None when a
+    # profile is available.  pytest-env injects AWS_ACCESS_KEY_ID=testing for
+    # unit tests; botocore resolves env-var credentials before profile
+    # credentials, so any session without an explicit profile_name uses the
+    # fake creds and gets AuthFailure.  An explicit profile_name bypasses them.
+    profile = profile or os.environ.get("AWS_PROFILE")
     region = (
         region
         or os.environ.get("AWS_REGION")

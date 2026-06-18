@@ -13,6 +13,7 @@ import time
 
 import boto3.session
 import pytest
+from botocore.exceptions import ClientError
 
 from tests.providers.aws.live import scenarios
 from tests.providers.aws.live.cleanup_helpers import (
@@ -57,7 +58,17 @@ _asg_client = None
 
 
 def _get_boto_profile_and_region() -> tuple[str | None, str]:
-    """Read AWS profile and region from ORB_CONFIG_DIR config."""
+    """Read AWS profile and region from ORB_CONFIG_DIR config.
+
+    Falls back to AWS_PROFILE env var so that an explicit profile is always
+    passed to boto3.  This is necessary because pytest-env injects fake env
+    var credentials (AWS_ACCESS_KEY_ID=testing) for unit tests; botocore uses
+    env var credentials before profile credentials, so any session created
+    without an explicit profile_name ends up using the fake credentials and
+    gets AuthFailure from real AWS calls.  Passing an explicit profile_name
+    forces botocore into profile-based credential resolution, bypassing the
+    injected env vars.
+    """
     import json as _json
 
     profile = None
@@ -75,6 +86,10 @@ def _get_boto_profile_and_region() -> tuple[str | None, str]:
                 region = provider_cfg.get("region")
         except Exception:
             pass
+    # Fall back to AWS_PROFILE env var so the explicit profile_name is always
+    # non-None when a profile is available.  This forces botocore to use
+    # profile-based credentials and ignore injected fake env var credentials.
+    profile = profile or os.environ.get("AWS_PROFILE")
     region = (
         region
         or os.environ.get("AWS_REGION")
@@ -717,11 +732,16 @@ class TestRunInstancesCleanupE2E:
                 f"Expected {capacity} machines, got {len(machine_ids)}: {machine_ids}"
             )
             for machine_id in machine_ids:
-                state = get_instance_state(machine_id)
-                assert state["exists"], f"Instance {machine_id} not found in AWS"
-                assert state["state"] in ("running", "pending"), (
-                    f"Instance {machine_id} in unexpected state: {state['state']}"
-                )
+                try:
+                    resp = _get_ec2_client().describe_instances(InstanceIds=[machine_id])
+                    inst_state = resp["Reservations"][0]["Instances"][0]["State"]["Name"]
+                    assert inst_state in ("running", "pending"), (
+                        f"Instance {machine_id} in unexpected state: {inst_state}"
+                    )
+                except ClientError as exc:
+                    if exc.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
+                        pytest.fail(f"Instance {machine_id} not found in AWS")
+                    raise
             log.info("All %d RunInstances instances provisioned: %s", capacity, machine_ids)
 
             # 4. Return ALL machines
