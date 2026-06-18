@@ -806,16 +806,16 @@ class TestASGCapacityManagerMissingDetails:
         mgr.release_instances("asg-no-details", ["i-1"], {})
         cast(MagicMock, mgr._logger.warning).assert_called()
 
-    def test_empty_asg_details_does_not_call_detach(self):
+    def test_empty_asg_details_does_not_call_terminate_in_asg(self):
         mgr, aws_client, _cleanup_fn = _make_asg_capacity_manager()
         aws_client.autoscaling_client.describe_auto_scaling_groups.return_value = (
             self._empty_describe_response()
         )
         mgr.release_instances("asg-no-details", ["i-1"], {})
-        aws_client.autoscaling_client.detach_instances.assert_not_called()
+        aws_client.autoscaling_client.terminate_instance_in_auto_scaling_group.assert_not_called()
 
     def test_empty_asg_details_retry_succeeds_continues_normal_path(self):
-        """When the retry describe returns a valid ASG, normal detach+terminate path runs."""
+        """When the retry describe returns a valid ASG, terminate_instance_in_auto_scaling_group is called."""
         cleanup_fn = MagicMock()
         mgr, aws_client, _ = _make_asg_capacity_manager(cleanup_fn)
         aws_client.autoscaling_client.describe_auto_scaling_groups.return_value = {
@@ -824,8 +824,9 @@ class TestASGCapacityManagerMissingDetails:
         delete_fn = MagicMock()
         mgr.set_delete_asg_fn(delete_fn)
         mgr.release_instances("asg-retry-ok", ["i-1"], {})
-        aws_client.autoscaling_client.detach_instances.assert_called_once()
-        cast(MagicMock, mgr._aws_ops.terminate_instances_with_fallback).assert_called_once()
+        aws_client.autoscaling_client.terminate_instance_in_auto_scaling_group.assert_called_once_with(
+            InstanceId="i-1", ShouldDecrementDesiredCapacity=True
+        )
 
     def test_valid_asg_details_at_zero_capacity_calls_delete_and_cleanup(self):
         cleanup_fn = MagicMock()
