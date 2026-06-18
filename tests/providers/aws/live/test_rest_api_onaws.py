@@ -356,10 +356,10 @@ class RestApiClient:
         return self._handle_response(response)
 
     def get_request_details(self, request_id: str) -> dict:
-        """GET /api/v1/requests/{request_id}"""
-        log.debug(f"GET /api/v1/requests/{request_id}")
+        """GET /api/v1/requests/{request_id}/status — bare /requests/{id} was removed."""
+        log.debug(f"GET /api/v1/requests/{request_id}/status")
         response = self.session.get(
-            self._url(f"/requests/{request_id}"),
+            self._url(f"/requests/{request_id}/status"),
             timeout=self.timeout,
         )
         return self._handle_response(response)
@@ -1006,12 +1006,26 @@ def _wait_for_return_completion_rest(
             status_response = client.get_request_details(return_request_id)
             log.debug(f"Return request status: {json.dumps(status_response, indent=2)}")
 
-            # Check if request is complete
-            if status_response.get("status") == "complete":
+            # /requests/{id}/status wraps results in a "requests" list
+            req_list = status_response.get("requests", [])
+            req_status = req_list[0].get("status") if req_list else status_response.get("status")
+            if req_status == "complete":
                 log.info(f"Return request {return_request_id} completed")
                 return status_response
         except requests.HTTPError as e:
-            log.debug(f"Error checking return status: {e}")
+            status_code = e.response.status_code if e.response is not None else None
+            log.debug(f"Error checking return status (HTTP {status_code}): {e}")
+            # Non-retryable client errors (not 429 Too Many Requests or 503 Service Unavailable)
+            if (
+                status_code is not None
+                and status_code not in (429, 503)
+                and 400 <= status_code < 500
+            ):
+                log.warning(
+                    f"Non-retryable HTTP {status_code} for return request {return_request_id}; "
+                    "aborting poll"
+                )
+                return {}
 
         if time.time() - start_time > timeout:
             log.warning(f"Return request {return_request_id} did not complete within {timeout}s")
