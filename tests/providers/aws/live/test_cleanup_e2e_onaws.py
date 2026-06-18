@@ -267,7 +267,7 @@ def _assert_fleet_deleted(fleet_id: str, timeout: int = 300) -> None:
     """Assert EC2 Fleet is deleted or has zero total target capacity."""
     deadline = time.time() + timeout
     last_state = None
-    deleted_states = {"deleted", "deleted-running", "deleted-terminating"}
+    deleted_states = {"deleted", "deleted_running", "deleted_terminating"}
     while time.time() < deadline:
         try:
             resp = _get_ec2_client().describe_fleets(FleetIds=[fleet_id])
