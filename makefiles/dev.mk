@@ -94,8 +94,13 @@ test-docker: dev-install  ## Run Docker containerization tests
 	@./dev-tools/testing/test-docker.sh
 
 # Provider-aware test targets
-# Parallel worker count for pytest (override: make test-providers-aws-live PYTEST_WORKERS=4)
-PYTEST_WORKERS ?= auto
+# Parallel worker count for pytest. Capped at half the available CPU cores so
+# parallel test runs (especially live-AWS, which spawn ORB server subprocesses,
+# boto3 sessions, and long polls per worker) don't exhaust system memory or
+# saturate the network. Override per-invocation: make test-providers-aws-live PYTEST_WORKERS=4
+# Use $(shell ...) so the math runs once when make starts, not on every recipe.
+_HALF_CPU := $(shell python3 -c 'import os; print(max(1, (os.cpu_count() or 2) // 2))')
+PYTEST_WORKERS ?= $(_HALF_CPU)
 
 test-no-live: dev-install  ## Run all tests except live cloud suites (pre-PR check)
 	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) --ignore=tests/providers/aws/live
