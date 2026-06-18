@@ -203,7 +203,26 @@ class EC2FleetReleaseManager:
                         )
                     self._maybe_cleanup_launch_template(fleet_details)
                 elif not decision.has_fleet_record:
-                    # instant fleet — already deleted by AWS; only clean up the launch template.
+                    # instant fleet — AWS may or may not have auto-deleted the fleet record
+                    # (on-demand instant fleets in particular can remain in "active" state
+                    # indefinitely).  Always attempt an explicit delete so the fleet is
+                    # removed promptly; swallow any error in case it was already gone.
+                    try:
+                        self._retry(
+                            self._aws_client.ec2_client.delete_fleets,
+                            operation_type="critical",
+                            FleetIds=[fleet_id],
+                            TerminateInstances=True,
+                        )
+                        self._logger.info(
+                            "Deleted instant EC2 Fleet %s (instances already terminated)", fleet_id
+                        )
+                    except Exception as exc:
+                        self._logger.warning(
+                            "Could not delete instant EC2 Fleet %s (may already be gone): %s",
+                            fleet_id,
+                            exc,
+                        )
                     self._maybe_cleanup_launch_template(fleet_details)
             else:
                 self._delete_fleet(fleet_id)

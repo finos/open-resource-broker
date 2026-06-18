@@ -552,13 +552,17 @@ class TestEC2FleetReleaseManagerFleetTypes:
         )
         cleanup_fn.assert_called_once_with("ec2_fleet", "req-ec2-abc")
 
-    def test_instant_type_no_fleet_delete_but_calls_cleanup(self):
+    def test_instant_type_calls_delete_fleets_and_cleanup(self):
+        # Instant fleets are NOT guaranteed to be auto-deleted by AWS; ORB must
+        # issue an explicit delete_fleets so the fleet is cleaned up promptly.
         cleanup_fn = MagicMock()
         mgr, aws_client, _ = _make_ec2_fleet_release_manager(cleanup_fn)
         with patch.object(mgr, "_delete_fleet") as mock_delete:
             mgr.release("fleet-3", ["i-1"], self._fleet_details("instant", 1))
         mock_delete.assert_not_called()
-        aws_client.ec2_client.delete_fleets.assert_not_called()
+        aws_client.ec2_client.delete_fleets.assert_called_once_with(
+            FleetIds=["fleet-3"], TerminateInstances=True
+        )
         cleanup_fn.assert_called_once_with("ec2_fleet", "req-ec2-abc")
 
     def test_request_type_missing_request_id_tag_skips_cleanup_gracefully(self):
