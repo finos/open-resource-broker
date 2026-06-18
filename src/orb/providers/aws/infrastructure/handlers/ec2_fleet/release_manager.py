@@ -147,8 +147,43 @@ class EC2FleetReleaseManager:
                 )
                 self._logger.info("Terminated EC2 Fleet %s instances: %s", fleet_id, instance_ids)
 
-                if decision.is_full_return and decision.has_fleet_record:
-                    self._logger.info("EC2 Fleet %s capacity is zero, deleting fleet", fleet_id)
+                # Determine whether all fleet instances have been returned.
+                # decision.is_full_return computes (current_capacity - instance_count) == 0,
+                # which is INCORRECT for weighted fleets where a single instance can
+                # satisfy multiple capacity units.  As a secondary check we verify that
+                # no active instances remain in the fleet after our termination.
+                should_delete_fleet = decision.is_full_return
+                if not should_delete_fleet and decision.has_fleet_record:
+                    # Weighted-capacity fallback: the fleet may be logically empty even
+                    # if the capacity arithmetic suggests otherwise.
+                    should_delete_fleet = self._fleet_has_no_remaining_instances(
+                        fleet_id, set(instance_ids)
+                    )
+                    if should_delete_fleet:
+                        self._logger.info(
+                            "EC2 Fleet %s has no remaining active instances "
+                            "(weighted-capacity case); treating as full return",
+                            fleet_id,
+                        )
+                        # Force capacity to 0 before deletion to prevent AWS from
+                        # launching replacement instances during the delete window.
+                        if decision.requires_capacity_reduction:
+                            try:
+                                self._retry(
+                                    self._aws_client.ec2_client.modify_fleet,
+                                    operation_type="critical",
+                                    FleetId=fleet_id,
+                                    TargetCapacitySpecification={"TotalTargetCapacity": 0},
+                                )
+                            except Exception as exc:
+                                self._logger.warning(
+                                    "Failed to zero EC2 Fleet %s capacity before deletion: %s",
+                                    fleet_id,
+                                    exc,
+                                )
+
+                if should_delete_fleet and decision.has_fleet_record:
+                    self._logger.info("EC2 Fleet %s is empty, deleting fleet", fleet_id)
                     if decision.requires_capacity_reduction:
                         # maintain fleet — use _delete_fleet (TerminateInstances=True)
                         self._delete_fleet(fleet_id)
@@ -229,6 +264,47 @@ class EC2FleetReleaseManager:
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
+
+    def _fleet_has_no_remaining_instances(
+        self, fleet_id: str, excluded_ids: set[str]
+    ) -> bool:
+        """Return True when the EC2 Fleet has no active instances outside *excluded_ids*.
+
+        Used as a secondary full-return detector for weighted fleets where the
+        capacity arithmetic alone is insufficient: a single instance with
+        WeightedCapacity > 1 can satisfy a TotalTargetCapacity > 1, but the
+        capacity counter only decrements by 1 per instance detached.
+
+        Args:
+            fleet_id: EC2 Fleet ID to inspect.
+            excluded_ids: Instance IDs that have already been submitted for
+                termination and should be treated as gone.
+
+        Returns:
+            True when no active instances remain, False when any do (or on error).
+        """
+        try:
+            active = self._collect_with_next_token(
+                self._aws_client.ec2_client.describe_fleet_instances,
+                "ActiveInstances",
+                FleetId=fleet_id,
+            )
+            remaining = [
+                inst
+                for inst in active
+                if inst.get("InstanceId") not in excluded_ids
+            ]
+            return len(remaining) == 0
+        except Exception as exc:
+            self._logger.warning(
+                "Could not verify remaining instances for EC2 Fleet %s: %s — "
+                "assuming non-empty (safe default)",
+                fleet_id,
+                exc,
+            )
+            # Safe default: assume the fleet still has instances rather than
+            # accidentally deleting a fleet that has active instances.
+            return False
 
     def _delete_fleet(self, fleet_id: str) -> None:
         """Delete an EC2 Fleet, terminating its instances."""

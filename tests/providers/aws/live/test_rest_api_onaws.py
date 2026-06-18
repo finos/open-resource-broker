@@ -543,9 +543,9 @@ def _log_aws_capacity_progress(
 
     machines = first_request.get("machines") or []
     machine_ids = [
-        machine.get("machine_id")
+        machine.get("machineId") or machine.get("machine_id")
         for machine in machines
-        if isinstance(machine, dict) and machine.get("machine_id")
+        if isinstance(machine, dict) and (machine.get("machineId") or machine.get("machine_id"))
     ]
 
     if not machine_ids:
@@ -1251,6 +1251,11 @@ def _describe_instances_bulk(instance_ids: list[str], chunk_size: int = 100) -> 
     Returns a mapping of instance_id -> {"exists": bool, "state": str | None}.
     """
     states: dict[str, dict] = {}
+    # Filter out None values — HostFactory scheduler uses machineId (camelCase) while
+    # the default scheduler uses machine_id (snake_case).  Callers that only try one
+    # field name will produce a list of Nones when the wrong key is used; silently
+    # dropping Nones here prevents a botocore.ParamValidationError from crashing the check.
+    instance_ids = [iid for iid in instance_ids if iid is not None]
     if not instance_ids:
         return states
 
@@ -1285,18 +1290,30 @@ def _describe_instances_bulk(instance_ids: list[str], chunk_size: int = 100) -> 
 
 
 def _check_all_ec2_hosts_are_being_provisioned(status_response):
-    """Verify all EC2 instances are being provisioned."""
+    """Verify all EC2 instances are being provisioned.
+
+    Handles both HostFactory (camelCase ``machineId``) and default-scheduler
+    (snake_case ``machine_id``) response formats.
+    """
     machines = status_response["requests"][0]["machines"]
-    instance_ids = [m.get("machine_id") for m in machines]
+    # Resolve the instance ID regardless of which scheduler produced the response.
+    # HostFactory uses machineId; the default scheduler uses machine_id.
+    instance_ids = [
+        m.get("machine_id") or m.get("machineId") for m in machines
+    ]
     states = _describe_instances_bulk(instance_ids)
 
     for machine in machines:
-        ec2_instance_id = machine.get("machine_id")
+        ec2_instance_id = machine.get("machine_id") or machine.get("machineId")
         res = states.get(ec2_instance_id, {"exists": False, "state": None})
 
-        assert res["exists"] is True
+        assert res["exists"] is True, (
+            f"Instance {ec2_instance_id!r} not found in AWS describe_instances response"
+        )
         # EC2 host may still be initializing
-        assert res["state"] in ["running", "pending"]
+        assert res["state"] in ["running", "pending"], (
+            f"Instance {ec2_instance_id!r} is in unexpected state {res['state']!r}"
+        )
 
         log.debug(f"EC2 {ec2_instance_id} state: {json.dumps(res, indent=4)}")
 
@@ -1980,7 +1997,11 @@ def test_rest_api_control_loop(rest_api_client, setup_rest_api_environment, test
             requests_list = status_response.get("requests") or []
             first_request = requests_list[0] if requests_list else {}
             machines = first_request.get("machines") or []
-            machine_ids_tmp = [m.get("machine_id") for m in machines if m.get("machine_id")]
+            machine_ids_tmp = [
+                m.get("machineId") or m.get("machine_id")
+                for m in machines
+                if m.get("machineId") or m.get("machine_id")
+            ]
             if machine_ids_tmp:
                 history_resource_id = _get_resource_id_from_instance(
                     machine_ids_tmp[0], provider_api
@@ -2038,8 +2059,12 @@ def test_rest_api_control_loop(rest_api_client, setup_rest_api_environment, test
     if abis_requested:
         log.info("2.6: Verifying ABIS configuration")
         first_machine = status_response["requests"][0]["machines"][0]
-        instance_id = first_machine.get("machine_id")
-        assert instance_id is not None, "machine_id missing from first machine"
+        # HostFactory scheduler serialises the instance ID as camelCase "machineId";
+        # the default scheduler uses snake_case "machine_id".  Try both.
+        instance_id = first_machine.get("machineId") or first_machine.get("machine_id")
+        assert instance_id is not None, (
+            f"machine_id/machineId missing from first machine: {list(first_machine.keys())}"
+        )
         verify_abis_enabled_for_instance(instance_id)
         log.info("ABIS verification PASSED")
 
@@ -2048,7 +2073,12 @@ def test_rest_api_control_loop(rest_api_client, setup_rest_api_environment, test
 
     # 3.1: Extract instance IDs
     log.info("3.1: Extracting instance IDs")
-    machine_ids = [machine["machine_id"] for machine in status_response["requests"][0]["machines"]]
+    # HostFactory scheduler serialises instance IDs as camelCase "machineId";
+    # the default scheduler uses snake_case "machine_id".  Support both.
+    machine_ids = [
+        machine.get("machineId") or machine.get("machine_id")
+        for machine in status_response["requests"][0]["machines"]
+    ]
     log.info(f"Machine IDs to return: {machine_ids}")
 
     # Determine resource ID
@@ -2072,7 +2102,8 @@ def test_rest_api_control_loop(rest_api_client, setup_rest_api_environment, test
     return_response = rest_api_client.return_machines(machine_ids)
     log.debug(f"Return response: {json.dumps(return_response, indent=2)}")
 
-    return_request_id = return_response.get("request_id")
+    # HostFactory scheduler returns "requestId" (camelCase); default uses "request_id".
+    return_request_id = return_response.get("request_id") or return_response.get("requestId")
     if not return_request_id:
         log.warning(f"Return request ID missing in response: {return_response}")
     else:

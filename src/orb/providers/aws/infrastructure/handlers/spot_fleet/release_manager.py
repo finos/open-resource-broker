@@ -102,8 +102,40 @@ class SpotFleetReleaseManager:
                 )
                 self._logger.info("Terminated Spot Fleet %s instances: %s", fleet_id, instance_ids)
 
-                if decision.is_full_return and decision.has_fleet_record:
-                    self._logger.info("Spot Fleet %s capacity is zero, cancelling fleet", fleet_id)
+                # Determine whether all fleet instances have been returned.
+                # decision.is_full_return uses (current_capacity - instance_count) == 0,
+                # which is INCORRECT for weighted fleets where a single instance can
+                # satisfy multiple capacity units.  Use a secondary instance-count check.
+                should_cancel_fleet = decision.is_full_return
+                if not should_cancel_fleet and decision.has_fleet_record:
+                    should_cancel_fleet = self._fleet_has_no_remaining_instances(
+                        fleet_id, set(instance_ids)
+                    )
+                    if should_cancel_fleet:
+                        self._logger.info(
+                            "Spot Fleet %s has no remaining active instances "
+                            "(weighted-capacity case); treating as full return",
+                            fleet_id,
+                        )
+                        # Zero the capacity to prevent replacement before cancellation.
+                        if decision.requires_capacity_reduction:
+                            try:
+                                self._retry(
+                                    self._aws_client.ec2_client.modify_spot_fleet_request,
+                                    operation_type="critical",
+                                    SpotFleetRequestId=fleet_id,
+                                    TargetCapacity=0,
+                                    OnDemandTargetCapacity=0,
+                                )
+                            except Exception as exc:
+                                self._logger.warning(
+                                    "Failed to zero Spot Fleet %s capacity before cancellation: %s",
+                                    fleet_id,
+                                    exc,
+                                )
+
+                if should_cancel_fleet and decision.has_fleet_record:
+                    self._logger.info("Spot Fleet %s is empty, cancelling fleet", fleet_id)
                     self._retry(
                         self._aws_client.ec2_client.cancel_spot_fleet_requests,
                         operation_type="critical",
@@ -176,6 +208,44 @@ class SpotFleetReleaseManager:
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
+
+    def _fleet_has_no_remaining_instances(
+        self, fleet_id: str, excluded_ids: set[str]
+    ) -> bool:
+        """Return True when the Spot Fleet has no active instances outside *excluded_ids*.
+
+        Used as a secondary full-return detector for weighted fleets where the
+        capacity arithmetic alone is insufficient.
+
+        Args:
+            fleet_id: Spot Fleet request ID to inspect.
+            excluded_ids: Instance IDs that have already been submitted for
+                termination and should be treated as gone.
+
+        Returns:
+            True when no active instances remain, False when any do (or on error).
+        """
+        try:
+            resp = self._retry(
+                self._aws_client.ec2_client.describe_spot_fleet_instances,
+                operation_type="read_only",
+                SpotFleetRequestId=fleet_id,
+            )
+            active = resp.get("ActiveInstances", [])
+            remaining = [
+                inst
+                for inst in active
+                if inst.get("InstanceId") not in excluded_ids
+            ]
+            return len(remaining) == 0
+        except Exception as exc:
+            self._logger.warning(
+                "Could not verify remaining instances for Spot Fleet %s: %s — "
+                "assuming non-empty (safe default)",
+                fleet_id,
+                exc,
+            )
+            return False
 
     def _retry(self, func: Any, operation_type: str = "standard", **kwargs: Any) -> Any:
         """Delegate to the injected retry function if available, else call directly."""

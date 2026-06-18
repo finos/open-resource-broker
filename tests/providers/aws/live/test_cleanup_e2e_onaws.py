@@ -217,9 +217,19 @@ for _case in CLEANUP_E2E_CASES:
 
 
 def _assert_asg_deleted(asg_name: str, timeout: int = 300) -> None:
-    """Assert ASG is deleted or has zero desired capacity with no instances."""
+    """Assert ASG is deleted or has zero desired capacity with no active instances."""
     deadline = time.time() + timeout
     last_state = None
+    _terminal_lifecycle = frozenset(
+        {
+            "Terminating",
+            "Terminating:Wait",
+            "Terminating:Proceed",
+            "Terminated",
+            "Detaching",
+            "Detached",
+        }
+    )
     while time.time() < deadline:
         try:
             resp = _get_asg_client().describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name])
@@ -230,12 +240,26 @@ def _assert_asg_deleted(asg_name: str, timeout: int = 300) -> None:
             g = groups[0]
             desired = g.get("DesiredCapacity", -1)
             instances = g.get("Instances", [])
-            last_state = f"DesiredCapacity={desired}, Instances={len(instances)}"
-            if desired == 0 and not instances:
-                log.info("ASG %s: DesiredCapacity=0 with no instances", asg_name)
+            active_instances = [
+                i for i in instances if i.get("LifecycleState", "") not in _terminal_lifecycle
+            ]
+            last_state = (
+                f"DesiredCapacity={desired}, Instances={len(instances)}, "
+                f"ActiveInstances={len(active_instances)}"
+            )
+            # Accept both: DesiredCapacity==0 with no active instances (unweighted case)
+            # AND DesiredCapacity>0 with no active instances (weighted-ASG case where
+            # ShouldDecrementDesiredCapacity decrements by instance count, not weight).
+            if not active_instances and (desired == 0 or len(instances) == 0):
+                log.info(
+                    "ASG %s: no active instances (DesiredCapacity=%s)", asg_name, desired
+                )
                 return
             log.debug("ASG %s: %s — waiting", asg_name, last_state)
         except Exception as exc:
+            # Surface the exception type so it appears verbatim in test output
+            # instead of the opaque "Last state: None" message.
+            last_state = f"describe_error={type(exc).__name__}: {exc}"
             log.warning("_assert_asg_deleted: describe failed for %s: %s", asg_name, exc)
         time.sleep(10)
     pytest.fail(f"ASG {asg_name} not deleted or zeroed within {timeout}s. Last state: {last_state}")
@@ -265,6 +289,7 @@ def _assert_fleet_deleted(fleet_id: str, timeout: int = 300) -> None:
             if "InvalidFleetId" in str(exc) or "NotFound" in str(exc):
                 log.info("EC2 Fleet %s: not found (deleted)", fleet_id)
                 return
+            last_state = f"describe_error={type(exc).__name__}: {exc}"
             log.warning("_assert_fleet_deleted: describe failed for %s: %s", fleet_id, exc)
         time.sleep(10)
     pytest.fail(
@@ -296,6 +321,7 @@ def _assert_spot_fleet_deleted(sfr_id: str, timeout: int = 300) -> None:
             if "NotFound" in str(exc) or "InvalidSpotFleetRequestId" in str(exc):
                 log.info("Spot Fleet %s: not found (deleted)", sfr_id)
                 return
+            last_state = f"describe_error={type(exc).__name__}: {exc}"
             log.warning("_assert_spot_fleet_deleted: describe failed for %s: %s", sfr_id, exc)
         time.sleep(10)
     pytest.fail(

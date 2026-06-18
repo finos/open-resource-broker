@@ -675,6 +675,9 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
                 ),
                 "message": req_dict.get("message", ""),
                 "machines": machines,
+                # ORB extension: expose resource_ids so callers can discover the backing
+                # fleet / ASG identifier without a separate EC2 tag lookup.
+                "resource_ids": req_dict.get("resource_ids") or [],
             }
 
             # Add provider information if present

@@ -211,9 +211,19 @@ class ASGCapacityManager:
             self._logger.debug("Detached chunk from ASG %s: %s", asg_name, chunk)
         self._logger.info("Detached instances from ASG %s: %s", asg_name, instances_to_detach)
 
-        # Re-describe the ASG to get the live DesiredCapacity after detach, since
-        # ShouldDecrementDesiredCapacity=True may have already decremented it in AWS
-        # and the value in asg_details is now stale.
+        # Re-describe the ASG to get live state after detach.
+        # ShouldDecrementDesiredCapacity=True decrements DesiredCapacity by the
+        # *number of instances* detached, not by their WeightedCapacity.  For
+        # weighted ASGs (e.g. 1 instance with WeightedCapacity=2, DesiredCapacity=2)
+        # the live DesiredCapacity after detaching 1 instance would be 1, not 0,
+        # even though the ASG has no remaining instances.  Therefore we also examine
+        # the live Instances list when available to detect the "fleet is logically
+        # empty" case independently of the DesiredCapacity counter.
+        live_groups: list = []
+        live_desired = 0
+        # None  → describe did not return an Instances list (treat as unknown)
+        # []    → describe returned an explicit empty list (no instances)
+        live_instances_raw: list | None = None
         try:
             live_response = self._retry_with_backoff(
                 self._aws_client.autoscaling_client.describe_auto_scaling_groups,
@@ -221,7 +231,12 @@ class ASGCapacityManager:
                 AutoScalingGroupNames=[asg_name],
             )
             live_groups = live_response.get("AutoScalingGroups", [])
-            live_desired = live_groups[0].get("DesiredCapacity", 0) if live_groups else 0
+            if live_groups:
+                live_desired = live_groups[0].get("DesiredCapacity", 0) or 0
+                # Only use the instances list if the key is actually present in the
+                # response; a missing key is treated as "unknown" rather than "empty".
+                if "Instances" in live_groups[0]:
+                    live_instances_raw = live_groups[0]["Instances"]
         except Exception as exc:
             self._logger.warning(
                 "Failed to re-describe ASG %s after detach, falling back to computed capacity: %s",
@@ -246,8 +261,68 @@ class ASGCapacityManager:
         )
         self._logger.info("Terminated ASG %s instances: %s", asg_name, instance_ids)
 
-        if new_capacity == 0:
-            self._logger.info("ASG %s capacity is zero, deleting ASG", asg_name)
+        # Determine whether to delete the ASG.
+        #
+        # Primary check (unweighted case): DesiredCapacity reached 0 — the standard
+        # signal that all instances have been returned.
+        #
+        # Secondary check (weighted-capacity case): the live Instances list is
+        # available AND all remaining instances either belong to our detach set
+        # or are in a terminal lifecycle state.  This fires when a single heavy
+        # instance (WeightedCapacity > 1) satisfies a DesiredCapacity > 1 request,
+        # so AWS only decrements DesiredCapacity by 1 on detach, leaving a
+        # non-zero value even though the fleet is logically empty.
+        #
+        # The secondary check is ONLY used when the describe response explicitly
+        # included an Instances list (live_instances_raw is not None); if the key
+        # is absent we fall back to the capacity-only check to avoid false positives
+        # in partial-return scenarios where the mock / response omits Instances.
+        asg_is_empty = new_capacity == 0
+        if not asg_is_empty and live_instances_raw is not None:
+            _terminal_lifecycle = frozenset(
+                {"Detaching", "Detached", "Terminating", "Terminated"}
+            )
+            detached_set = set(instances_to_detach)
+            remaining_active = [
+                inst
+                for inst in live_instances_raw
+                if inst.get("LifecycleState", "") not in _terminal_lifecycle
+                and inst.get("InstanceId") not in detached_set
+            ]
+            if not remaining_active:
+                self._logger.info(
+                    "ASG %s has no remaining active instances after weighted detach "
+                    "(DesiredCapacity=%s); treating as empty",
+                    asg_name,
+                    new_capacity,
+                )
+                asg_is_empty = True
+
+        if asg_is_empty:
+            if new_capacity > 0:
+                # Force DesiredCapacity to 0 before deletion so AWS does not
+                # attempt to launch replacement instances while we are deleting.
+                self._logger.info(
+                    "ASG %s: forcing DesiredCapacity to 0 before deletion "
+                    "(weighted-capacity case, live desired=%s)",
+                    asg_name,
+                    new_capacity,
+                )
+                try:
+                    self._retry_with_backoff(
+                        self._aws_client.autoscaling_client.update_auto_scaling_group,
+                        operation_type="critical",
+                        AutoScalingGroupName=asg_name,
+                        DesiredCapacity=0,
+                        MinSize=0,
+                    )
+                except Exception as exc:
+                    self._logger.warning(
+                        "Failed to zero DesiredCapacity for ASG %s before deletion: %s",
+                        asg_name,
+                        exc,
+                    )
+            self._logger.info("ASG %s is empty, deleting ASG", asg_name)
             self._call_delete_asg(asg_name)
             self._cleanup_on_zero_capacity("asg", asg_name)
 
