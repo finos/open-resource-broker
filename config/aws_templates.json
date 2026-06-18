@@ -3,7 +3,7 @@
   "templates": [
     {
       "templateId": "EC2Fleet-Instant-OnDemand",
-      "maxNumber": 10,
+      "maxNumber": 100,
       "fleetType": "instant",
       "vmTypes": {
         "t3.medium": 2,
@@ -22,7 +22,7 @@
     },
     {
       "templateId": "EC2Fleet-Instant-Spot",
-      "maxNumber": 10,
+      "maxNumber": 100,
       "fleetType": "instant",
       "vmTypes": {
         "t3.medium": 2,
@@ -42,7 +42,7 @@
     },
     {
       "templateId": "EC2Fleet-Instant-Mixed",
-      "maxNumber": 10,
+      "maxNumber": 100,
       "fleetType": "instant",
       "vmTypes": {
         "t3.medium": 2,
@@ -63,7 +63,7 @@
     },
     {
       "templateId": "EC2Fleet-Request-OnDemand",
-      "maxNumber": 15,
+      "maxNumber": 100,
       "fleetType": "request",
       "vmTypes": {
         "t3.medium": 2,
@@ -82,7 +82,7 @@
     },
     {
       "templateId": "EC2Fleet-Request-Spot",
-      "maxNumber": 20,
+      "maxNumber": 100,
       "fleetType": "request",
       "vmTypes": {
         "t3.medium": 2,
@@ -102,7 +102,7 @@
     },
     {
       "templateId": "EC2Fleet-Request-Mixed",
-      "maxNumber": 25,
+      "maxNumber": 100,
       "fleetType": "request",
       "vmTypes": {
         "t3.medium": 2,
@@ -125,7 +125,7 @@
     },
     {
       "templateId": "EC2Fleet-Maintain-OnDemand",
-      "maxNumber": 12,
+      "maxNumber": 100,
       "fleetType": "maintain",
       "vmTypes": {
         "t3.medium": 2,
@@ -144,7 +144,7 @@
     },
     {
       "templateId": "EC2Fleet-Maintain-Spot",
-      "maxNumber": 30,
+      "maxNumber": 100,
       "fleetType": "maintain",
       "vmTypes": {
         "t3.medium": 2,
@@ -164,7 +164,7 @@
     },
     {
       "templateId": "EC2Fleet-Maintain-Mixed",
-      "maxNumber": 50,
+      "maxNumber": 100,
       "fleetType": "maintain",
       "vmTypes": {
         "t3.medium": 2,
@@ -187,7 +187,7 @@
     },
     {
       "templateId": "SpotFleet-Request-LowestPrice",
-      "maxNumber": 20,
+      "maxNumber": 100,
       "fleetType": "request",
       "vmTypes": {
         "t3.medium": 2,
@@ -208,7 +208,7 @@
     },
     {
       "templateId": "SpotFleet-Request-Diversified",
-      "maxNumber": 25,
+      "maxNumber": 100,
       "fleetType": "request",
       "vmTypes": {
         "t3.medium": 2,
@@ -229,7 +229,7 @@
     },
     {
       "templateId": "SpotFleet-Request-CapacityOptimized",
-      "maxNumber": 30,
+      "maxNumber": 100,
       "fleetType": "request",
       "vmTypes": {
         "t3.medium": 2,
@@ -250,7 +250,7 @@
     },
     {
       "templateId": "SpotFleet-Maintain-LowestPrice",
-      "maxNumber": 15,
+      "maxNumber": 100,
       "fleetType": "maintain",
       "vmTypes": {
         "t3.medium": 2,
@@ -271,7 +271,7 @@
     },
     {
       "templateId": "SpotFleet-Maintain-Diversified",
-      "maxNumber": 20,
+      "maxNumber": 100,
       "fleetType": "maintain",
       "vmTypes": {
         "t3.medium": 2,
@@ -292,7 +292,7 @@
     },
     {
       "templateId": "SpotFleet-Maintain-CapacityOptimized",
-      "maxNumber": 25,
+      "maxNumber": 100,
       "fleetType": "maintain",
       "vmTypes": {
         "t3.medium": 2,
@@ -313,7 +313,7 @@
     },
     {
       "templateId": "ASG-OnDemand",
-      "maxNumber": 15,
+      "maxNumber": 100,
       "vmTypes": {
         "t3.medium": 2,
         "t3.xlarge": 4
@@ -331,7 +331,7 @@
     },
     {
       "templateId": "ASG-Spot",
-      "maxNumber": 20,
+      "maxNumber": 100,
       "vmTypes": {
         "t3.medium": 2,
         "t3.xlarge": 4
@@ -350,7 +350,7 @@
     },
     {
       "templateId": "ASG-Mixed",
-      "maxNumber": 25,
+      "maxNumber": 100,
       "vmTypes": {
         "t3.medium": 2,
         "t3.large": 2,
@@ -370,7 +370,7 @@
     },
     {
       "templateId": "RunInstances-OnDemand",
-      "maxNumber": 5,
+      "maxNumber": 100,
       "vmTypes": {
         "t3.medium": 2
       },
@@ -387,7 +387,7 @@
     },
     {
       "templateId": "RunInstances-Spot",
-      "maxNumber": 10,
+      "maxNumber": 100,
       "vmTypes": {
         "t3.medium": 2
       },
