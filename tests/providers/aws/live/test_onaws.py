@@ -434,6 +434,35 @@ def _get_asg_instance_weight(instance_id: str, asg_name: str) -> int:
         return 1
 
 
+def _get_fleet_instance_weight(instance_id: str, fleet_id: str, provider_api: str) -> int:
+    """Return the WeightedCapacity of an instance in an EC2Fleet or SpotFleet.
+
+    Queries the fleet's active instance list and returns the WeightedCapacity
+    for the given instance.  Falls back to 1 if the instance is not found or
+    has no WeightedCapacity field (uniform fleet).
+    """
+    ec2_client, _ = _get_boto_clients()
+    try:
+        if "spotfleet" in provider_api.lower() or fleet_id.startswith("sfr-"):
+            resp = ec2_client.describe_spot_fleet_instances(SpotFleetRequestId=fleet_id)
+        else:
+            resp = ec2_client.describe_fleet_instances(FleetId=fleet_id)
+        for entry in resp.get("ActiveInstances", []):
+            if entry.get("InstanceId") == instance_id:
+                wc = entry.get("WeightedCapacity")
+                if wc is not None:
+                    return int(float(wc))
+        return 1
+    except Exception as exc:
+        log.debug(
+            "Failed to look up fleet instance weight for %s in %s: %s",
+            instance_id,
+            fleet_id,
+            exc,
+        )
+        return 1
+
+
 def _get_capacity(provider_api: str, resource_id: str) -> int:
     """Return target/desired capacity for fleet or ASG."""
     ec2_client, asg_client = _get_boto_clients()
@@ -1942,6 +1971,14 @@ def test_partial_return_reduces_capacity(setup_host_factory_mock_with_scenario, 
         capacity_decrement = _get_asg_instance_weight(first_instance, resource_id)
         log.info(
             "ASG weighted capacity: instance %s has weight %d in ASG %s",
+            first_instance,
+            capacity_decrement,
+            resource_id,
+        )
+    elif provider_api in ("EC2Fleet", "SpotFleet") or resource_id.startswith(("fleet-", "sfr-")):
+        capacity_decrement = _get_fleet_instance_weight(first_instance, resource_id, provider_api)
+        log.info(
+            "Fleet weighted capacity: instance %s has weight %d in fleet %s",
             first_instance,
             capacity_decrement,
             resource_id,
