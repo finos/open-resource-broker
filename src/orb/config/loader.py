@@ -155,7 +155,7 @@ class ConfigurationLoader:
     def _build_raw_config_from_dict(
         cls,
         config_dict: dict[str, Any],
-        config_manager: Optional["ConfigurationManager"] = None,
+        config_manager: Optional[ConfigurationManager] = None,
     ) -> dict[str, Any]:
         """
         Apply the full normalisation pipeline to an in-memory dict.
@@ -191,14 +191,7 @@ class ConfigurationLoader:
     @classmethod
     def _load_strategy_defaults(cls, config_manager=None) -> dict[str, Any]:
         merged: dict[str, Any] = {}
-        try:
-            from orb.providers.registry import get_provider_registry
-
-            registry = get_provider_registry()
-            registry.ensure_provider_type_registered("aws")
-            cls._merge_config(merged, registry.collect_defaults())
-        except Exception as e:
-            get_config_logger().warning("Failed to load provider defaults: %s", e)
+        cls._merge_config(merged, cls._load_provider_defaults())
         try:
             from orb.infrastructure.scheduler.registry import get_scheduler_registry
 
@@ -206,6 +199,44 @@ class ConfigurationLoader:
         except Exception as e:
             get_config_logger().warning("Failed to load scheduler defaults: %s", e)
         return merged
+
+    @classmethod
+    def _load_provider_defaults(cls) -> dict[str, Any]:
+        """Load static provider defaults without bootstrapping provider registries."""
+        merged: dict[str, Any] = {}
+        provider_default_loaders = {
+            "aws": cls._load_aws_provider_defaults,
+            "gcp": cls._load_gcp_provider_defaults,
+        }
+
+        for provider_type, load_defaults in provider_default_loaders.items():
+            try:
+                cls._merge_config(merged, load_defaults())
+            except Exception as e:
+                get_config_logger().warning(
+                    "Failed to load %s provider defaults: %s", provider_type, e
+                )
+        return merged
+
+    @staticmethod
+    def _load_aws_provider_defaults() -> dict[str, Any]:
+        from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
+
+        return AWSProviderStrategy.get_defaults_config()
+
+    @staticmethod
+    def _load_gcp_provider_defaults() -> dict[str, Any]:
+        from orb.providers.gcp.registration import get_gcp_extension_defaults
+
+        return {
+            "provider": {
+                "provider_defaults": {
+                    "gcp": {
+                        "template_defaults": get_gcp_extension_defaults(),
+                    }
+                }
+            }
+        }
 
     @classmethod
     def _load_default_config(cls) -> dict[str, Any]:
@@ -456,8 +487,7 @@ class ConfigurationLoader:
                 )
 
             # Propagate scripts_dir written by `orb init` back into the config model
-            if "scripts_dir" in config and config["scripts_dir"]:
-                scripts_dir = config["scripts_dir"]
+            if scripts_dir := config.get("scripts_dir"):
                 get_config_logger().debug("scripts_dir from config: %s", scripts_dir)
                 os.environ.setdefault("ORB_SCRIPTS_DIR", scripts_dir)
 

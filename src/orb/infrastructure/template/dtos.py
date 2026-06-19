@@ -1,12 +1,17 @@
-"""Template DTOs for infrastructure layer - avoiding direct domain aggregate imports."""
+"""Template DTOs for infrastructure layer."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import Field, model_validator
 
 from orb.application.dto.base import BaseDTO
+
+if TYPE_CHECKING:
+    from orb.domain.template.template_aggregate import Template
 
 
 class TemplateDTO(BaseDTO):
@@ -23,6 +28,9 @@ class TemplateDTO(BaseDTO):
     description: Optional[str] = None
 
     # Instance configuration
+    instance_type: Optional[str] = None
+    vm_size: Optional[str] = None
+    vm_sizes: list[str] = Field(default_factory=list)
     image_id: Optional[str] = None
     max_instances: int = 1
 
@@ -64,6 +72,7 @@ class TemplateDTO(BaseDTO):
     # Tags and metadata
     tags: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    provider_config: dict[str, Any] = Field(default_factory=dict)
 
     # Provider-specific data (keyed by provider name, e.g. {"aws": {...}})
     provider_data: dict[str, Any] = Field(default_factory=dict)
@@ -93,30 +102,15 @@ class TemplateDTO(BaseDTO):
         return data
 
     @classmethod
-    def from_domain(cls, template) -> "TemplateDTO":
+    def from_domain(cls, template: Template) -> TemplateDTO:
         """Convert domain template to DTO."""
-        # Pack AWS-specific fields into metadata.
-        _fleet_type = getattr(template, "fleet_type", None)
-        _fleet_type_str: Optional[str] = (
-            str(_fleet_type.value)
-            if _fleet_type is not None and hasattr(_fleet_type, "value")
-            else (_fleet_type if _fleet_type is None else str(_fleet_type))
-        )
-        _abis = getattr(template, "abis_instance_requirements", None)
-        _fleet_role = getattr(template, "fleet_role", None)
-        _percent_on_demand = getattr(template, "percent_on_demand", None)
-
-        aws_extras: dict[str, Any] = {}
-        if _fleet_type_str is not None:
-            aws_extras["fleet_type"] = _fleet_type_str
-        if _fleet_role is not None:
-            aws_extras["fleet_role"] = _fleet_role
-        if _percent_on_demand is not None:
-            aws_extras["percent_on_demand"] = _percent_on_demand
-        if _abis is not None:
-            aws_extras["abis_instance_requirements"] = _abis.to_aws_dict()
-
-        metadata = {**getattr(template, "metadata", {}), **aws_extras}
+        template_dump = template.model_dump(mode="json", exclude_none=True)
+        dto_fields = set(cls.model_fields.keys())
+        provider_specific_config = {
+            key: value
+            for key, value in template_dump.items()
+            if key not in dto_fields and key != "metadata"
+        }
 
         return cls(
             # Core fields
@@ -124,6 +118,9 @@ class TemplateDTO(BaseDTO):
             name=getattr(template, "name", None),
             description=getattr(template, "description", None),
             # Instance configuration
+            instance_type=getattr(template, "instance_type", None),
+            vm_size=getattr(template, "vm_size", None),
+            vm_sizes=getattr(template, "vm_sizes", []) or [],
             image_id=getattr(template, "image_id", None),
             max_instances=getattr(template, "max_instances", 1),
             # Machine types configuration (unified)
@@ -156,7 +153,8 @@ class TemplateDTO(BaseDTO):
             monitoring_enabled=getattr(template, "monitoring_enabled", None),
             # Tags and metadata
             tags=getattr(template, "tags", {}),
-            metadata=metadata,
+            metadata=getattr(template, "metadata", {}),
+            provider_config=provider_specific_config,
             provider_data=getattr(template, "provider_data", {}),
             # Provider configuration
             provider_type=getattr(template, "provider_type", None),
@@ -170,6 +168,14 @@ class TemplateDTO(BaseDTO):
             # Legacy fields
             version=getattr(template, "version", None),
         )
+
+    def to_template_config(self) -> dict[str, Any]:
+        """Return template config with provider-specific config promoted."""
+        template_config = self.model_dump(mode="json", exclude_none=True)
+        provider_config = dict(template_config.pop("provider_config", {}) or {})
+        for key, value in provider_config.items():
+            template_config.setdefault(key, value)
+        return template_config
 
 
 @dataclass

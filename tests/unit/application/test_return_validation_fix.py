@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Test for the return validation fix - filter instead of block."""
+"""Test return-request validation and lifecycle behavior."""
 
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
 from orb.application.commands.request_handlers import CreateReturnRequestHandler
 from orb.application.dto.commands import CreateReturnRequestCommand
+from orb.domain.request.request_types import RequestStatus
 
 
 class TestReturnValidationFix:
@@ -50,7 +51,7 @@ class TestReturnValidationFix:
 
         machine2 = Mock()
         machine2.machine_id = "machine-002"
-        machine2.return_request_id = "existing-return-req-123"  # Invalid - has pending return
+        machine2.return_request_id = "ret-00000000-0000-0000-0000-000000000123"
 
         machine3 = Mock()
         machine3.machine_id = "machine-003"
@@ -58,11 +59,12 @@ class TestReturnValidationFix:
 
         # Mock repository responses
         def mock_get_by_id(machine_id):
-            if machine_id == "machine-001":
+            key = getattr(machine_id, "value", machine_id)
+            if key == "machine-001":
                 return machine1
-            elif machine_id == "machine-002":
+            elif key == "machine-002":
                 return machine2
-            elif machine_id == "machine-003":
+            elif key == "machine-003":
                 return machine3
             return None
 
@@ -76,40 +78,10 @@ class TestReturnValidationFix:
         # Validation should pass (no exception for multiple machines)
         await self.handler.validate_command(command)
 
-        # Test the filtering logic directly by calling the filtering part
-        # This simulates what happens in execute_command
-        is_single_machine = len(command.machine_ids) == 1
-        assert not is_single_machine  # Should be multiple machines
-
-        # Simulate the filtering logic from execute_command
-        valid_machine_ids = []
-        skipped_machines = []
-
-        with self.mock_context_manager:
-            for machine_id in command.machine_ids:
-                machine = self.mock_uow.machines.get_by_id(machine_id)
-                if not machine:
-                    skipped_machines.append(
-                        {"machine_id": machine_id, "reason": "Machine not found"}
-                    )
-                    continue
-
-                if machine.return_request_id:
-                    skipped_machines.append(
-                        {
-                            "machine_id": machine_id,
-                            "reason": f"Machine already has pending return request: {machine.return_request_id}",
-                        }
-                    )
-                    continue
-
-                valid_machine_ids.append(machine_id)
+        valid_machines, skipped_machines = self.handler._filter_machines(command.machine_ids)
 
         # Verify filtering worked correctly
-        assert len(valid_machine_ids) == 2  # machine-001 and machine-003
-        assert "machine-001" in valid_machine_ids
-        assert "machine-003" in valid_machine_ids
-        assert "machine-002" not in valid_machine_ids
+        assert valid_machines == ["machine-001", "machine-003"]
 
         assert len(skipped_machines) == 1
         assert skipped_machines[0]["machine_id"] == "machine-002"
@@ -121,7 +93,7 @@ class TestReturnValidationFix:
         # For single machine operations, we should still validate strictly
         machine = Mock()
         machine.machine_id = "machine-001"
-        machine.return_request_id = "existing-return-req-123"
+        machine.return_request_id = "ret-00000000-0000-0000-0000-000000000123"
 
         self.mock_uow.machines.get_by_id.return_value = machine
 
@@ -139,16 +111,17 @@ class TestReturnValidationFix:
         # All machines have pending return requests
         machine1 = Mock()
         machine1.machine_id = "machine-001"
-        machine1.return_request_id = "existing-return-req-123"
+        machine1.return_request_id = "ret-00000000-0000-0000-0000-000000000123"
 
         machine2 = Mock()
         machine2.machine_id = "machine-002"
-        machine2.return_request_id = "existing-return-req-456"
+        machine2.return_request_id = "ret-00000000-0000-0000-0000-000000000456"
 
         def mock_get_by_id(machine_id):
-            if machine_id == "machine-001":
+            key = getattr(machine_id, "value", machine_id)
+            if key == "machine-001":
                 return machine1
-            elif machine_id == "machine-002":
+            elif key == "machine-002":
                 return machine2
             return None
 
@@ -159,37 +132,75 @@ class TestReturnValidationFix:
         # Validation should pass (no exception for multiple machines)
         await self.handler.validate_command(command)
 
-        # Test the filtering logic directly
-        is_single_machine = len(command.machine_ids) == 1
-        assert not is_single_machine  # Should be multiple machines
-
-        # Simulate the filtering logic from execute_command
-        valid_machine_ids = []
-        skipped_machines = []
-
-        with self.mock_context_manager:
-            for machine_id in command.machine_ids:
-                machine = self.mock_uow.machines.get_by_id(machine_id)
-                if not machine:
-                    skipped_machines.append(
-                        {"machine_id": machine_id, "reason": "Machine not found"}
-                    )
-                    continue
-
-                if machine.return_request_id:
-                    skipped_machines.append(
-                        {
-                            "machine_id": machine_id,
-                            "reason": f"Machine already has pending return request: {machine.return_request_id}",
-                        }
-                    )
-                    continue
-
-                valid_machine_ids.append(machine_id)
+        valid_machines, skipped_machines = self.handler._filter_machines(command.machine_ids)
 
         # All machines should be filtered out
-        assert len(valid_machine_ids) == 0
+        assert valid_machines == []
         assert len(skipped_machines) == 2
+
+    def test_update_machines_to_pending_sets_shutting_down(self):
+        machine = Mock()
+        machine.machine_id = "machine-001"
+
+        shutting_down_machine = Mock()
+        machine.update_status.return_value = shutting_down_machine
+
+        self.mock_uow.machines.get_by_id.return_value = machine
+
+        self.handler._update_machines_to_pending(["machine-001"])
+
+        machine.update_status.assert_called_once()
+        self.mock_uow.machines.save.assert_called_once_with(shutting_down_machine)
+
+    @pytest.mark.asyncio
+    async def test_successful_deprovisioning_persists_followup_context_and_stays_in_progress(self):
+        request = Mock()
+        request.request_id = "ret-001"
+        request.provider_data = {}
+
+        updated_request = Mock()
+        request.set_provider_data.return_value = updated_request
+        self.mock_uow.requests.save.return_value = []
+
+        command_bus = Mock()
+        command_bus.execute = AsyncMock()
+        self.mock_container.get.return_value = command_bus
+
+        self.handler._deprovisioning_orchestrator.execute_deprovisioning = AsyncMock(
+            return_value={
+                "success": True,
+                "provider_data": {
+                    "termination_requests": [
+                        {
+                            "pending_resource_cleanup": {
+                                "resource_group": "test-rg",
+                                "resource_id": "vmss-demo",
+                                "machine_ids": ["machine-001"],
+                                "delete_vmss_when_empty": True,
+                            }
+                        }
+                    ]
+                },
+            }
+        )
+        self.handler._machine_grouping_service.group_by_resource = Mock(return_value=({}, []))
+        self.handler._update_machines_to_pending = Mock()
+
+        await self.handler._execute_deprovisioning_for_request(
+            ["machine-001"], request, "azure-default"
+        )
+
+        request.set_provider_data.assert_called_once()
+        persisted_provider_data = request.set_provider_data.call_args.args[0]
+        assert persisted_provider_data["follow_up_context"]["termination_requests"][0][
+            "pending_resource_cleanup"
+        ]["resource_id"] == "vmss-demo"
+        saved_request = self.mock_uow.requests.save.call_args[0][0]
+        assert saved_request is updated_request
+        statuses = [call.args[0].status for call in command_bus.execute.await_args_list]
+        assert statuses == [RequestStatus.IN_PROGRESS, RequestStatus.IN_PROGRESS]
+        messages = [call.args[0].message for call in command_bus.execute.await_args_list]
+        assert messages[-1] == "Termination initiated, waiting for provider confirmation"
 
 
 if __name__ == "__main__":

@@ -104,6 +104,39 @@ async def test_create_saves_via_manager():
 
 
 @pytest.mark.asyncio
+async def test_create_preserves_provider_specific_configuration_in_provider_config():
+    manager = _make_manager(existing=None)
+    port = _make_template_port(manager)
+    handler = _make_create_handler(port)
+
+    command = CreateTemplateCommand(
+        template_id="azure-vmss",
+        provider_api="VMSS",
+        image_id="ignored-by-azure-command-contract",
+        configuration={
+            "provider_type": "azure",
+            "provider_name": "azure-default",
+            "vm_size": "Standard_D4s_v5",
+            "resource_group": "rg-test",
+            "location": "eastus2",
+            "image": {
+                "publisher": "Canonical",
+                "offer": "0001-com-ubuntu-server-jammy",
+                "sku": "22_04-lts-gen2",
+                "version": "latest",
+            },
+        },
+    )
+
+    await handler.handle(command)
+
+    saved: TemplateDTO = manager.save_template.call_args[0][0]
+    assert saved.vm_size == "Standard_D4s_v5"
+    assert saved.provider_config["resource_group"] == "rg-test"
+    assert saved.provider_config["image"]["publisher"] == "Canonical"
+
+
+@pytest.mark.asyncio
 async def test_create_duplicate_raises():
     """BusinessRuleError is raised when template already exists."""
     existing = _make_dto()
@@ -238,3 +271,29 @@ async def test_update_validation_errors_sets_updated_false() -> None:
     assert command.updated is False
     assert command.validation_errors == ["invalid field"]
     manager.save_template.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_update_validates_promoted_provider_specific_configuration() -> None:
+    existing = TemplateDTO(
+        template_id="azure-vmss",
+        name="azure-vmss",
+        provider_api="VMSS",
+        provider_type="azure",
+        provider_name="azure-default",
+        vm_size="Standard_D4s_v5",
+        provider_config={"resource_group": "rg-old", "location": "eastus2"},
+    )
+    manager = _make_manager(existing=existing)
+    port = _make_template_port(manager)
+    handler = _make_update_handler(port)
+
+    command = UpdateTemplateCommand(
+        template_id="azure-vmss",
+        configuration={"resource_group": "rg-new"},
+    )
+    await handler.handle(command)
+
+    validated_config = port.validate_template_config.call_args.args[0]
+    assert validated_config["resource_group"] == "rg-new"
+    assert "provider_config" not in validated_config

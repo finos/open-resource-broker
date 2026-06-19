@@ -77,12 +77,29 @@ def _register_template_services(container: DIContainer):
 
         factory = TemplateFactory(logger=c.get(LoggingPort))
         try:
-            from orb.providers.aws.registration import register_aws_template_factory
+            from orb.providers.aws.registration import (
+                register_aws_extensions,
+                register_aws_template_factory,
+            )
 
+            register_aws_extensions(c.get(LoggingPort))
             register_aws_template_factory(factory, c.get(LoggingPort))
         except ImportError as exc:
             c.get(LoggingPort).debug(
                 "AWS provider module not available; AWS-specific templates will not be registered: %s",
+                exc,
+            )
+        try:
+            from orb.providers.gcp.registration import (
+                register_gcp_extensions,
+                register_gcp_template_factory,
+            )
+
+            register_gcp_extensions(c.get(LoggingPort))
+            register_gcp_template_factory(factory, c.get(LoggingPort))
+        except ImportError as exc:
+            c.get(LoggingPort).debug(
+                "GCP provider module not available; GCP-specific templates will not be registered: %s",
                 exc,
             )
         return factory

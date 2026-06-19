@@ -89,7 +89,11 @@ async def test_routing_info_from_aws_strategy_reaches_provider_data():
     svc._container.get.return_value = scheduler
 
     result = await svc._dispatch_single_attempt(
-        _make_template(), _make_request(), _make_selection_result(), 1
+        _make_template(),
+        _make_request(),
+        _make_selection_result(),
+        1,
+        operation_timeout_seconds=60.0,
     )
 
     assert result.success is True
@@ -125,7 +129,11 @@ async def test_routing_info_from_fallback_strategy_reaches_provider_data():
     svc._container.get.return_value = scheduler
 
     result = await svc._dispatch_single_attempt(
-        _make_template(), _make_request(), _make_selection_result(), 1
+        _make_template(),
+        _make_request(),
+        _make_selection_result(),
+        1,
+        operation_timeout_seconds=60.0,
     )
 
     assert result.success is True
@@ -165,7 +173,11 @@ async def test_routing_info_from_composite_strategy_reaches_provider_data():
     svc._container.get.return_value = scheduler
 
     result = await svc._dispatch_single_attempt(
-        _make_template(), _make_request(), _make_selection_result(), 1
+        _make_template(),
+        _make_request(),
+        _make_selection_result(),
+        1,
+        operation_timeout_seconds=60.0,
     )
 
     assert result.success is True
@@ -196,7 +208,11 @@ async def test_no_routing_info_does_not_break_provider_data():
     svc._container.get.return_value = scheduler
 
     result = await svc._dispatch_single_attempt(
-        _make_template(), _make_request(), _make_selection_result(), 1
+        _make_template(),
+        _make_request(),
+        _make_selection_result(),
+        1,
+        operation_timeout_seconds=60.0,
     )
 
     assert result.success is True

@@ -48,7 +48,11 @@ def test_discover_infrastructure_uses_fresh_strategy():
             return_value=_mock_container(),
         ),
     ):
-        result = _mod._discover_infrastructure("aws", "us-east-1", "my-profile", mock_registry)
+        result = _mod._discover_infrastructure(
+            "aws",
+            {"region": "us-east-1", "profile": "my-profile"},
+            mock_registry,
+        )
 
     mock_registry.create_strategy_by_type.assert_called_once_with(
         "aws", {"region": "us-east-1", "profile": "my-profile"}
@@ -107,7 +111,11 @@ def test_discover_infrastructure_passes_correct_region_and_profile():
         patch("orb.providers.registry.get_provider_registry", return_value=mock_registry),
         patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
     ):
-        _mod._discover_infrastructure("aws", "eu-west-2", "my-prod-profile", mock_registry)
+        _mod._discover_infrastructure(
+            "aws",
+            {"region": "eu-west-2", "profile": "my-prod-profile"},
+            mock_registry,
+        )
 
     call_args = mock_registry.create_strategy_by_type.call_args
     assert call_args[0][1]["region"] == "eu-west-2"
@@ -293,3 +301,191 @@ def test_write_config_file_fleet_role_in_config_subnet_ids_in_template_defaults(
     assert "fleet_role" not in p.get("template_defaults", {}), (
         "fleet_role must not appear in template_defaults"
     )
+
+
+def test_interactive_setup_preserves_azure_provider_config():
+    """Interactive init must keep Azure-specific config instead of collapsing to profile/region."""
+    inputs = iter(
+        [
+            "1",  # scheduler
+            "1",  # provider
+            "1",  # credentials
+            "12345678-1234-1234-1234-123456789012",  # subscription_id
+            "orb-test-rg",  # resource_group
+            "eastus2",  # region
+            "managed-identity-client-id",  # client_id
+            "N",  # discover infrastructure
+            "N",  # add another provider
+        ]
+    )
+    strategy = MagicMock()
+    strategy.get_available_regions.return_value = []
+    strategy.get_default_region.return_value = "eastus2"
+
+    with (
+        patch("builtins.input", side_effect=inputs),
+        patch.object(_mod, "_test_provider_credentials", return_value=(True, "")),
+        patch.object(
+            _mod,
+            "_get_available_schedulers",
+            return_value=[{"type": "default", "display_name": "Default", "description": ""}],
+        ),
+        patch.object(
+            _mod,
+            "_get_available_providers",
+            return_value=[{"type": "azure", "display_name": "Azure", "description": ""}],
+        ),
+        patch.object(_mod, "_get_provider_strategy", return_value=strategy),
+        patch.object(_mod, "_get_credential_requirements", return_value={}),
+        patch.object(
+            _mod,
+            "_get_available_credential_sources",
+            return_value=[{"name": None, "description": "Default"}],
+        ),
+        patch.object(
+            _mod,
+            "_get_operational_requirements",
+            return_value={
+                "subscription_id": {"required": True, "description": "Azure subscription ID"},
+                "resource_group": {"required": True, "description": "Azure resource group"},
+                "region": {"required": True, "description": "Azure location"},
+                "client_id": {
+                    "required": False,
+                    "prompt": True,
+                    "description": "Managed identity client ID (optional)",
+                },
+            },
+        ),
+        patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
+    ):
+        result = _mod._interactive_setup()
+
+    provider = result["providers"][0]
+    assert provider["type"] == "azure"
+    assert provider["config"]["subscription_id"] == "12345678-1234-1234-1234-123456789012"
+    assert provider["config"]["resource_group"] == "orb-test-rg"
+    assert provider["config"]["region"] == "eastus2"
+    assert provider["config"]["client_id"] == "managed-identity-client-id"
+
+
+def test_get_default_config_preserves_azure_non_interactive_config():
+    """Non-interactive init must keep Azure-specific config from CLI args."""
+    args = MagicMock()
+    args.provider = "azure"
+    args.scheduler = "default"
+    args.region = None
+    args.profile = None
+    args.azure_subscription_id = "12345678-1234-1234-1234-123456789012"
+    args.azure_resource_group = "orb-test-rg"
+    args.azure_location = "eastus2"
+    args.azure_client_id = "managed-identity-client-id"
+    args.azure_cyclecloud_url = "https://cyclecloud.example.com"
+    args.azure_cyclecloud_credential_path = "op://vault/item/cred"
+    args.azure_cyclecloud_auth_mode = None
+    args.azure_cyclecloud_aad_scope = None
+    args.azure_cyclecloud_verify_ssl = False
+    args.azure_cyclecloud_no_verify_ssl = True
+
+    strategy = MagicMock()
+    strategy.get_default_region.return_value = "eastus2"
+    strategy.get_cli_provider_config.return_value = {
+        "subscription_id": args.azure_subscription_id,
+        "resource_group": args.azure_resource_group,
+        "region": args.azure_location,
+        "client_id": args.azure_client_id,
+        "cyclecloud": {
+            "url": args.azure_cyclecloud_url,
+            "credential_path": args.azure_cyclecloud_credential_path,
+            "verify_ssl": False,
+        },
+    }
+    strategy.get_cli_infrastructure_defaults.return_value = {}
+
+    with (
+        patch.object(
+            _mod,
+            "_get_available_providers",
+            return_value=[{"type": "azure", "display_name": "Azure", "description": ""}],
+        ),
+        patch.object(_mod, "_get_provider_strategy", return_value=strategy),
+    ):
+        result = _mod._get_default_config(args)
+
+    provider = result["providers"][0]
+    assert provider["config"]["subscription_id"] == args.azure_subscription_id
+    assert provider["config"]["resource_group"] == args.azure_resource_group
+    assert provider["config"]["region"] == args.azure_location
+    assert provider["config"]["client_id"] == args.azure_client_id
+    assert provider["config"]["cyclecloud"]["verify_ssl"] is False
+
+
+def test_write_config_file_preserves_azure_provider_config(tmp_path):
+    """init config writing must preserve Azure provider config fields."""
+    import json
+
+    config_file = tmp_path / "config.json"
+    user_config = {
+        "scheduler_type": "default",
+        "providers": [
+            {
+                "type": "azure",
+                "config": {
+                    "subscription_id": "12345678-1234-1234-1234-123456789012",
+                    "resource_group": "orb-test-rg",
+                    "region": "eastus2",
+                    "client_id": "managed-identity-client-id",
+                    "cyclecloud": {
+                        "url": "https://cyclecloud.example.com",
+                        "credential_path": "op://vault/item/cred",
+                        "verify_ssl": False,
+                    },
+                },
+                "is_default": True,
+                "infrastructure_defaults": {},
+            }
+        ],
+    }
+
+    mock_strategy = MagicMock()
+    mock_strategy.get_cli_extra_config_keys.return_value = set()
+    mock_strategy.generate_provider_name.return_value = "azure_12345678-1234-1234-1234-123456789012_eastus2"
+
+    mock_registry = MagicMock()
+    mock_registry.create_strategy_by_type.return_value = mock_strategy
+
+    mock_container = MagicMock()
+    mock_container.get.return_value = mock_registry
+
+    mock_scheduler_registry = MagicMock()
+    mock_scheduler_registry.get_extra_config_for_type.return_value = {}
+
+    fake_default = json.dumps({"scheduler": {}, "provider": {}})
+
+    class _FakeResource:
+        def read_text(self):
+            return fake_default
+
+    class _FakeFiles:
+        def joinpath(self, name):
+            return _FakeResource()
+
+    with (
+        patch("orb.interface.init_command_handler.get_container", return_value=mock_container),
+        patch(
+            "orb.infrastructure.scheduler.registry.get_scheduler_registry",
+            return_value=mock_scheduler_registry,
+        ),
+        patch("importlib.resources.files", return_value=_FakeFiles()),
+    ):
+        _mod._write_config_file(config_file, user_config)
+
+    with open(config_file) as f:
+        written = json.load(f)
+
+    provider = written["provider"]["providers"][0]
+    assert provider["name"] == "azure_12345678-1234-1234-1234-123456789012_eastus2"
+    assert provider["config"]["subscription_id"] == "12345678-1234-1234-1234-123456789012"
+    assert provider["config"]["resource_group"] == "orb-test-rg"
+    assert provider["config"]["region"] == "eastus2"
+    assert provider["config"]["client_id"] == "managed-identity-client-id"
+    assert provider["config"]["cyclecloud"]["credential_path"] == "op://vault/item/cred"

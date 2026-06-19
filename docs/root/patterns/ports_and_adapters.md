@@ -20,7 +20,7 @@ Ports are abstract interfaces defined in the domain layer that specify contracts
 #### Logging Port
 
 ```python
-# src/domain/base/ports/logging_port.py
+# src/orb/domain/base/ports/logging_port.py
 from abc import ABC, abstractmethod
 
 class LoggingPort(ABC):
@@ -50,7 +50,7 @@ class LoggingPort(ABC):
 #### Configuration Port
 
 ```python
-# src/domain/base/ports/configuration_port.py
+# src/orb/domain/base/ports/configuration_port.py
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
@@ -81,7 +81,7 @@ class ConfigurationPort(ABC):
 #### Container Port
 
 ```python
-# src/domain/base/ports/container_port.py
+# src/orb/domain/base/ports/container_port.py
 from abc import ABC, abstractmethod
 from typing import Type, TypeVar, Any
 
@@ -111,7 +111,7 @@ class ContainerPort(ABC):
 #### Template Repository Port
 
 ```python
-# src/domain/template/repository.py
+# src/orb/domain/template/repository.py
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any
 from .aggregate import Template
@@ -146,11 +146,11 @@ class TemplateRepository(ABC):
 #### Provider Strategy Port
 
 ```python
-# src/domain/base/provider_interfaces.py
+# src/orb/providers/base/strategy/provider_strategy.py
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
-from src.domain.request.aggregate import Request
-from src.domain.machine.aggregate import Machine
+from orb.domain.request.aggregate import Request
+from orb.domain.machine.aggregate import Machine
 
 class ProviderStrategy(ABC):
     """Abstract interface for cloud provider strategies."""
@@ -185,9 +185,9 @@ Adapters are concrete implementations of ports that handle specific technologies
 #### Logging Adapter
 
 ```python
-# src/infrastructure/adapters/logging_adapter.py
-from src.domain.base.ports import LoggingPort
-from src.infrastructure.logging.logger import get_logger
+# src/orb/infrastructure/adapters/logging_adapter.py
+from orb.domain.base.ports import LoggingPort
+from orb.infrastructure.logging.logger import get_logger
 import logging
 
 class LoggingAdapter(LoggingPort):
@@ -216,9 +216,9 @@ class LoggingAdapter(LoggingPort):
 #### Configuration Adapter
 
 ```python
-# src/infrastructure/adapters/configuration_adapter.py
-from src.domain.base.ports import ConfigurationPort
-from src.config.manager import ConfigurationManager
+# src/orb/infrastructure/adapters/configuration_adapter.py
+from orb.domain.base.ports import ConfigurationPort
+from orb.config.managers.configuration_manager import ConfigurationManager
 from typing import Any, Dict
 
 class ConfigurationAdapter(ConfigurationPort):
@@ -247,9 +247,9 @@ class ConfigurationAdapter(ConfigurationPort):
 #### Container Adapter
 
 ```python
-# src/infrastructure/adapters/container_adapter.py
-from src.domain.base.ports import ContainerPort
-from src.infrastructure.di.container import DIContainer
+# src/orb/infrastructure/adapters/container_adapter.py
+from orb.domain.base.ports import ContainerPort
+from orb.infrastructure.di.container import DIContainer
 from typing import Type, TypeVar
 
 T = TypeVar('T')
@@ -278,10 +278,10 @@ class ContainerAdapter(ContainerPort):
 #### AWS Template Adapter
 
 ```python
-# src/providers/aws/infrastructure/adapters/template_adapter.py
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort, ConfigurationPort
-from src.providers.aws.infrastructure.aws_client import AWSClient
+# src/orb/providers/aws/infrastructure/adapters/template_adapter.py
+from orb.domain.base.dependency_injection import injectable
+from orb.domain.base.ports import LoggingPort, ConfigurationPort
+from orb.providers.aws.infrastructure.aws_client import AWSClient
 from typing import Dict, Any, List
 
 @injectable
@@ -328,12 +328,12 @@ class AWSTemplateAdapter:
 #### AWS Provider Strategy Adapter
 
 ```python
-# src/providers/aws/strategy/aws_provider_strategy.py
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
-from src.domain.base.provider_interfaces import ProviderStrategy
-from src.providers.aws.configuration.config import AWSProviderConfig
-from src.providers.aws.infrastructure.aws_client import AWSClient
+# src/orb/providers/aws/strategy/aws_provider_strategy.py
+from orb.domain.base.dependency_injection import injectable
+from orb.domain.base.ports import LoggingPort
+from orb.providers.base.strategy.provider_strategy import ProviderStrategy
+from orb.providers.aws.configuration.config import AWSProviderConfig
+from orb.providers.aws.infrastructure.aws_client import AWSClient
 from typing import List, Dict, Any
 
 @injectable
@@ -385,10 +385,10 @@ class AWSProviderStrategy(ProviderStrategy):
 #### DynamoDB Template Repository
 
 ```python
-# src/infrastructure/storage/dynamodb/template_repository.py
-from src.domain.template.repository import TemplateRepository
-from src.domain.template.aggregate import Template
-from src.domain.base.ports import LoggingPort
+# src/orb/infrastructure/storage/dynamodb/template_repository.py
+from orb.domain.template.repository import TemplateRepository
+from orb.domain.template.template_aggregate import Template
+from orb.domain.base.ports import LoggingPort
 from typing import List, Optional, Dict, Any
 import boto3
 

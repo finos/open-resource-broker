@@ -1,5 +1,6 @@
 """Integrated retry decorator supporting multiple strategies."""
 
+import inspect
 import time
 from functools import wraps
 from typing import Any, Callable, TypeVar
@@ -80,6 +81,11 @@ def retry(
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> T:
             """Execute function with retry logic."""
+            if inspect.iscoroutinefunction(func):
+                raise TypeError(
+                    "retry decorator does not support coroutine functions; "
+                    "use an async-aware retry boundary instead"
+                )
             attempt = 0
 
             while True:

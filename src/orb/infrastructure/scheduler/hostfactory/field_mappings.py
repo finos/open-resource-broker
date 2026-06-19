@@ -59,6 +59,19 @@ class HostFactoryFieldMappings:
             "launchTemplateId": "launch_template_id",
             "userDataScript": "user_data",
         },
+        "gcp": {
+            "projectId": "project_id",
+            "zones": "zones",
+            "network": "network",
+            "subnetwork": "subnetwork",
+            "serviceAccountEmail": "service_account_email",
+            "networkTags": "network_tags",
+            "sourceImage": "source_image",
+            "sourceImageFamily": "source_image_family",
+            "sourceImageProject": "source_image_project",
+            "provisioningModel": "provisioning_model",
+            "migScope": "mig_scope",
+        },
     }
 
     @classmethod

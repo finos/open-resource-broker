@@ -33,8 +33,28 @@ class RequestStatusService:
 
             # Determine new status based on request type
             if request.request_type.value == "return":
-                # For return requests: empty provider_machines means instances are gone from AWS → COMPLETED
+                follow_up_pending_message = (
+                    "Return in progress: awaiting provider follow-up cleanup"
+                )
+                if provider_metadata.get("termination_follow_up_failed"):
+                    details = provider_metadata.get("termination_follow_up_details", [{}])
+                    error = details[0].get("last_delete_error") if details else None
+                    message = "Return request failed: provider follow-up cleanup failed"
+                    if error:
+                        message = f"{message}: {error}"
+                    return RequestStatus.FAILED.value, message
+                termination_follow_up_pending = bool(
+                    provider_metadata.get("termination_follow_up_pending", False)
+                )
+
+                # For return requests, provider disappearance is only final once
+                # any provider-owned follow-up cleanup has also completed.
                 if not provider_machines:
+                    if termination_follow_up_pending:
+                        return (
+                            RequestStatus.IN_PROGRESS.value,
+                            follow_up_pending_message,
+                        )
                     return (
                         RequestStatus.COMPLETED.value,
                         f"Return request completed: all machines terminated "
@@ -53,6 +73,15 @@ class RequestStatusService:
 
                 # shutting-down/stopping are transient — only terminated/stopped are truly done
                 effectively_done_count = terminated_count
+                if (
+                    effectively_done_count == total_count
+                    and running_count == 0
+                    and termination_follow_up_pending
+                ):
+                    return (
+                        RequestStatus.IN_PROGRESS.value,
+                        follow_up_pending_message,
+                    )
                 if effectively_done_count == total_count and running_count == 0:
                     return (
                         RequestStatus.COMPLETED.value,
@@ -78,10 +107,58 @@ class RequestStatusService:
             else:
                 machines_to_check = provider_machines if provider_machines else db_machines
 
+                fleet_errors = provider_metadata.get("fleet_errors") or []
+                fleet_capacity = provider_metadata.get("fleet_capacity_fulfilment") or {}
+                capacity_state = str(fleet_capacity.get("state") or "").lower()
+                terminal_error_message = provider_metadata.get("terminal_error_message")
+                unfulfilled_count = provider_metadata.get("unfulfilled_count")
+                if terminal_error_message and unfulfilled_count is not None and not isinstance(
+                    unfulfilled_count, int
+                ):
+                    return (
+                        RequestStatus.FAILED.value,
+                        "Provider reported malformed unfulfilled_count metadata",
+                    )
+                planned_terminal_shortfall = bool(terminal_error_message) and (
+                    unfulfilled_count is None or unfulfilled_count > 0
+                )
+
                 if not machines_to_check:
+                    if fleet_errors:
+                        error_message = next(
+                            (
+                                str(error.get("error_message"))
+                                for error in fleet_errors
+                                if isinstance(error, dict) and error.get("error_message")
+                            ),
+                            None,
+                        )
+                        error_code = next(
+                            (
+                                str(error.get("error_code"))
+                                for error in fleet_errors
+                                if isinstance(error, dict) and error.get("error_code")
+                            ),
+                            None,
+                        )
+                        detail = error_message or error_code or "Provider reported provisioning errors"
+                        return RequestStatus.FAILED.value, detail
+
+                    if capacity_state == "failed":
+                        return (
+                            RequestStatus.FAILED.value,
+                            "Provider reported failed state before any instances were visible",
+                        )
+
+                    if planned_terminal_shortfall:
+                        return RequestStatus.FAILED.value, str(terminal_error_message)
+
+                    # No machines yet and no terminal signal — provider may still
+                    # be submitting. Keep the request in_progress so the caller
+                    # polls again rather than stalling on a "no transition" None.
                     return (
                         RequestStatus.IN_PROGRESS.value,
-                        "Status determination failed — will retry",
+                        "No instances visible yet — continuing to poll",
                     )
 
                 running_count = sum(1 for m in machines_to_check if m.status.value == "running")
@@ -93,7 +170,6 @@ class RequestStatusService:
 
                 # Use fleet capacity metrics when available (fleets/ASGs report their own
                 # target and fulfilled capacity). Fall back to instance counts otherwise.
-                fleet_capacity = provider_metadata.get("fleet_capacity_fulfilment") or {}
                 effective_target = (
                     fleet_capacity.get("target_capacity_units") or request.requested_count
                 )
@@ -111,10 +187,25 @@ class RequestStatusService:
                 fleet_errors = provider_metadata.get("fleet_errors") or []
 
                 instance_target = request.requested_count
-                if (running_count >= instance_target and failed_count == 0) or (
-                    effective_fulfilled >= effective_target and failed_count == 0
+                if running_count >= instance_target and failed_count == 0:
+                    return RequestStatus.COMPLETED.value, "All instances running successfully"
+
+                # Capacity metadata can confirm that the provider fulfilled the requested
+                # count, but it must not promote the request to complete while any
+                # instance is still in a pending/starting state.
+                if (
+                    pending_count == 0
+                    and effective_fulfilled >= effective_target
+                    and failed_count == 0
                 ):
                     return RequestStatus.COMPLETED.value, "All instances running successfully"
+                elif planned_terminal_shortfall and pending_count == 0:
+                    if running_count > 0:
+                        return (
+                            RequestStatus.PARTIAL.value,
+                            f"{running_count}/{instance_target} instances running: {terminal_error_message}",
+                        )
+                    return RequestStatus.FAILED.value, str(terminal_error_message)
                 elif fulfillment_final and pending_count == 0:
                     error_detail = (
                         f": {'; '.join(e.get('error_code', '') for e in fleet_errors if e.get('error_code'))}"
@@ -156,10 +247,11 @@ class RequestStatusService:
         """Update request status."""
         try:
             status_enum = RequestStatus(status)
-            updated_request = request.update_status(status_enum, message)
 
             # Save updated request
             with self.uow_factory.create_unit_of_work() as uow:
+                current_request = uow.requests.get_by_id(request.request_id) or request
+                updated_request = current_request.update_status(status_enum, message)
                 uow.requests.save(updated_request)
 
             self.logger.info(f"Updated request {request.request_id.value} status to {status}")
@@ -178,10 +270,9 @@ class RequestStatusService:
                 return "executing"
             else:
                 return "fail"
+        elif status == "running":
+            return "succeed"
+        elif status in ["pending", "launching"]:
+            return "executing"
         else:
-            if status == "running":
-                return "succeed"
-            elif status in ["pending", "launching"]:
-                return "executing"
-            else:
-                return "fail"
+            return "fail"

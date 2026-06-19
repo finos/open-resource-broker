@@ -14,7 +14,6 @@ class TestHandlerMergeIntegration:
         template = Mock()
         template.tags = {}
         template.template_id = "test-template"
-        template.instance_types = []
         template.subnet_ids = []
         template.image_id = "ami-123"
         template.security_group_ids = []
