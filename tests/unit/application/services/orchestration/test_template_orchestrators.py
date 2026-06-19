@@ -91,6 +91,132 @@ class TestCreateTemplateOrchestrator:
         assert cmd.image_id == "ami-abc"
 
     @pytest.mark.asyncio
+    async def test_execute_requires_provider_api_for_non_oci(self, create_orch, mock_command_bus):
+        with pytest.raises(ValueError, match="provider_api is required"):
+            await create_orch.execute(CreateTemplateInput(template_id="t-1", image_id="ami-abc"))
+        mock_command_bus.execute.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_execute_resolves_provider_api_from_defaults_service(
+        self, mock_command_bus, mock_query_bus, mock_logger
+    ):
+        mock_defaults = MagicMock()
+        mock_defaults.resolve_template_defaults.return_value = {
+            "template_id": "t-oci",
+            "provider_api": "OCICompute",
+            "image_id": "ocid1.image.oc1..example",
+        }
+
+        async def _set(cmd):
+            cmd.created = True
+            cmd.validation_errors = []
+
+        mock_command_bus.execute.side_effect = _set
+        orch = CreateTemplateOrchestrator(
+            command_bus=mock_command_bus,
+            query_bus=mock_query_bus,
+            logger=mock_logger,
+            template_defaults_service=mock_defaults,
+        )
+
+        await orch.execute(
+            CreateTemplateInput(
+                template_id="t-oci",
+                image_id="ocid1.image.oc1..example",
+                provider_name="oci-primary",
+                configuration={"template_id": "t-oci"},
+            )
+        )
+
+        cmd = mock_command_bus.execute.call_args[0][0]
+        assert cmd.provider_api == "OCICompute"
+        assert cmd.image_id == "ocid1.image.oc1..example"
+        mock_defaults.resolve_template_defaults.assert_called_once_with(
+            {"template_id": "t-oci"},
+            provider_instance_name="oci-primary",
+        )
+
+    @pytest.mark.asyncio
+    async def test_execute_skips_defaults_for_aws_when_provider_api_is_supplied(
+        self, mock_command_bus, mock_query_bus, mock_logger
+    ):
+        mock_defaults = MagicMock()
+        mock_defaults.resolve_template_defaults.return_value = {
+            "template_id": "t-1",
+            "provider_api": "EC2Fleet",
+            "image_id": "ami-abc",
+        }
+
+        async def _set(cmd):
+            cmd.created = True
+            cmd.validation_errors = []
+
+        mock_command_bus.execute.side_effect = _set
+        orch = CreateTemplateOrchestrator(
+            command_bus=mock_command_bus,
+            query_bus=mock_query_bus,
+            logger=mock_logger,
+            template_defaults_service=mock_defaults,
+        )
+
+        await orch.execute(
+            CreateTemplateInput(
+                template_id="t-1",
+                provider_api="EC2Fleet",
+                image_id="ami-abc",
+                provider_name="aws-primary",
+            )
+        )
+
+        cmd = mock_command_bus.execute.call_args[0][0]
+        assert cmd.provider_api == "EC2Fleet"
+        assert cmd.image_id == "ami-abc"
+        mock_defaults.resolve_template_defaults.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_execute_resolves_full_template_defaults_before_create(
+        self, mock_command_bus, mock_query_bus, mock_logger
+    ):
+        mock_defaults = MagicMock()
+        mock_defaults.resolve_template_defaults.return_value = {
+            "template_id": "t-oci",
+            "provider_api": "OCICompute",
+            "image_id": "ocid1.image.oc1..default",
+            "subnet_ids": ["ocid1.subnet.oc1..default"],
+            "compartment_id": "ocid1.compartment.oc1..default",
+        }
+
+        async def _set(cmd):
+            cmd.created = True
+            cmd.validation_errors = []
+
+        mock_command_bus.execute.side_effect = _set
+        orch = CreateTemplateOrchestrator(
+            command_bus=mock_command_bus,
+            query_bus=mock_query_bus,
+            logger=mock_logger,
+            template_defaults_service=mock_defaults,
+        )
+
+        await orch.execute(
+            CreateTemplateInput(
+                template_id="t-oci",
+                image_id=None,
+                provider_name="oci-default",
+                configuration={"template_id": "t-oci", "provider_api": "OCICompute"},
+            )
+        )
+
+        cmd = mock_command_bus.execute.call_args[0][0]
+        assert cmd.provider_api == "OCICompute"
+        assert cmd.image_id == "ocid1.image.oc1..default"
+        assert cmd.configuration["subnet_ids"] == ["ocid1.subnet.oc1..default"]
+        mock_defaults.resolve_template_defaults.assert_called_once_with(
+            {"template_id": "t-oci", "provider_api": "OCICompute"},
+            provider_instance_name="oci-default",
+        )
+
+    @pytest.mark.asyncio
     async def test_execute_returns_create_template_output(self, create_orch, mock_command_bus):
         async def _set(cmd):
             cmd.created = True
@@ -328,6 +454,44 @@ class TestValidateTemplateOrchestrator:
         assert isinstance(query, ValidateTemplateQuery)
         assert query.template_id == "t-6"
         assert query.template_config == {"key": "val"}
+
+    @pytest.mark.asyncio
+    async def test_execute_resolves_template_defaults_before_validation(
+        self, mock_command_bus, mock_query_bus, mock_logger
+    ):
+        mock_defaults = MagicMock()
+        mock_defaults.resolve_template_defaults.return_value = {
+            "template_id": "t-oci",
+            "provider_api": "OCICompute",
+            "image_id": "ocid1.image.oc1..default",
+        }
+        mock_query_bus.execute.return_value = {
+            "valid": True,
+            "validation_errors": [],
+            "message": "ok",
+        }
+        orch = ValidateTemplateOrchestrator(
+            command_bus=mock_command_bus,
+            query_bus=mock_query_bus,
+            logger=mock_logger,
+            template_defaults_service=mock_defaults,
+        )
+
+        result = await orch.execute(
+            ValidateTemplateInput(
+                template_id="t-oci",
+                config={"template_id": "t-oci", "provider_api": "OCICompute"},
+                provider_name="oci-default",
+            )
+        )
+
+        assert result.valid is True
+        query = mock_query_bus.execute.call_args[0][0]
+        assert query.template_config["image_id"] == "ocid1.image.oc1..default"
+        mock_defaults.resolve_template_defaults.assert_called_once_with(
+            {"template_id": "t-oci", "provider_api": "OCICompute"},
+            provider_instance_name="oci-default",
+        )
 
     @pytest.mark.asyncio
     async def test_execute_returns_valid_true(self, validate_orch, mock_query_bus):

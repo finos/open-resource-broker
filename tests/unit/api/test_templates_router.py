@@ -156,6 +156,49 @@ class TestTemplatesRouter:
         inp = orchestrator.execute.call_args.args[0]
         assert inp.description == "my desc"
 
+    def test_create_template_without_provider_api_keeps_provider_unset(self, templates_app):
+        orchestrator = AsyncMock()
+        orchestrator.execute = AsyncMock(
+            return_value=CreateTemplateOutput(
+                template_id="tpl-oci-base",
+                created=True,
+            )
+        )
+        client = self._make_client(
+            templates_app, {get_create_template_orchestrator: lambda: orchestrator}
+        )
+
+        client.post("/templates/", json={"template_id": "tpl-oci-base", "image_id": "img-1"})
+
+        orchestrator.execute.assert_awaited_once()
+        inp = orchestrator.execute.call_args.args[0]
+        assert inp.provider_api is None
+
+    def test_create_template_passes_provider_name_to_orchestrator(self, templates_app):
+        orchestrator = AsyncMock()
+        orchestrator.execute = AsyncMock(
+            return_value=CreateTemplateOutput(
+                template_id="tpl-oci",
+                created=True,
+            )
+        )
+        client = self._make_client(
+            templates_app, {get_create_template_orchestrator: lambda: orchestrator}
+        )
+
+        client.post(
+            "/templates/",
+            json={
+                "template_id": "tpl-oci",
+                "image_id": "ocid1.image.oc1..example",
+                "provider_name": "oci-primary",
+            },
+        )
+
+        orchestrator.execute.assert_awaited_once()
+        inp = orchestrator.execute.call_args.args[0]
+        assert inp.provider_name == "oci-primary"
+
     def test_create_template_returns_validation_errors_in_body(self, templates_app):
         orchestrator = AsyncMock()
         orchestrator.execute = AsyncMock(

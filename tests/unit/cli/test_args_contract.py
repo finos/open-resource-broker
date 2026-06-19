@@ -122,6 +122,66 @@ def test_providers_exec_accepts_args_flag():
     assert ns.params == '{"key": "val"}'
 
 
+def test_providers_add_accepts_aws_flags():
+    sp_tuple = _make_subparsers()
+    _, sp = sp_tuple
+    add_provider_actions(sp)
+    ns = _parse(
+        sp_tuple,
+        [
+            "add",
+            "--provider-type",
+            "aws",
+            "--aws-profile",
+            "prod",
+            "--aws-region",
+            "us-east-1",
+        ],
+    )
+    assert ns.provider_type == "aws"
+    assert ns.aws_profile == "prod"
+    assert ns.aws_region == "us-east-1"
+
+
+def test_providers_update_accepts_aws_flags():
+    sp_tuple = _make_subparsers()
+    _, sp = sp_tuple
+    add_provider_actions(sp)
+    ns = _parse(
+        sp_tuple,
+        ["update", "aws-default", "--aws-region", "us-west-2"],
+    )
+    assert ns.provider_name == "aws-default"
+    assert ns.aws_region == "us-west-2"
+
+
+def test_providers_add_rejects_oci_flags():
+    sp_tuple = _make_subparsers()
+    _, sp = sp_tuple
+    add_provider_actions(sp)
+    with pytest.raises(SystemExit):
+        _parse(
+            sp_tuple,
+            [
+                "add",
+                "--provider-type",
+                "oci",
+                "--oci-profile",
+                "DEFAULT",
+                "--oci-region",
+                "us-phoenix-1",
+            ],
+        )
+
+
+def test_providers_update_rejects_oci_flags():
+    sp_tuple = _make_subparsers()
+    _, sp = sp_tuple
+    add_provider_actions(sp)
+    with pytest.raises(SystemExit):
+        _parse(sp_tuple, ["update", "oci-default", "--oci-region", "us-ashburn-1"])
+
+
 # ---------------------------------------------------------------------------
 # Task 2045 — requests list --offset forwarded to orchestrator
 # ---------------------------------------------------------------------------
@@ -230,6 +290,14 @@ def test_templates_validate_accepts_template_id_flag():
     ns = _parse(sp_tuple, ["validate", "--template-id", "tmpl-1"])
     tid = getattr(ns, "template_id", None) or getattr(ns, "flag_template_id", None)
     assert tid is not None
+
+
+def test_templates_create_rejects_template_id_flag():
+    sp_tuple = _make_subparsers()
+    _, sp = sp_tuple
+    add_template_actions(sp)
+    with pytest.raises(SystemExit):
+        _parse(sp_tuple, ["create", "--file", "template.json", "--template-id", "tmpl-1"])
 
 
 # ---------------------------------------------------------------------------

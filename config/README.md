@@ -1,6 +1,48 @@
 # Configuration Documentation
 
-This document explains the purpose and structure of the configuration used by the AWS Host Factory Plugin.
+This document explains the purpose and structure of the configuration used by Open Resource Broker providers.
+
+## Provider Credential Examples
+
+| Provider mode | Example file | Credential setting | Use when |
+|---|---|---|---|
+| AWS profile | `config.example.json` | `profile: "your-profile-name"` | Running ORB with AWS CLI or SDK credentials |
+| OCI local profile | `oci_config.local.example.json` | `credential_source: "profile"`, `profile: "DEFAULT"` | Running ORB from a laptop or workstation with `~/.oci/config` |
+| OCI remote instance principal | `oci_config.remote.example.json` | `credential_source: "instance_principal"` | Running ORB on an OCI Compute instance in a dynamic group |
+
+For OCI local profile auth, `DEFAULT` is the standard OCI CLI profile name. Replace it only if your `~/.oci/config` uses a different profile. For OCI remote instance-principal auth, do not set `profile`; ORB passes `--auth instance_principal` to the OCI CLI and does not require `~/.oci/config`.
+
+OCI auth precedence is:
+
+1. provider config `credential_source`
+2. `ORB_OCI_CREDENTIAL_SOURCE`
+3. `OCI_CLI_AUTH`
+4. `profile`
+
+## OCI Template Defaults
+
+OCI follows the same pattern as AWS: templates describe the compute/capacity grid, while deployment-specific IDs live in config defaults. The canonical OCI template file is `oci_templates.json`; image OCID, subnet OCID, compartment OCID, NSG IDs, SSH keys, tags, and user data are configured under:
+
+```json
+"provider": {
+  "provider_defaults": {
+    "oci": {
+      "template_defaults": {
+        "provider_api": "OCICompute",
+        "image_id": "ocid1.image.oc1..<replace-image-ocid>",
+        "subnet_ids": ["ocid1.subnet.oc1..<replace-subnet-ocid>"],
+        "security_group_ids": ["ocid1.networksecuritygroup.oc1..<replace-nsg-ocid>"],
+        "compartment_id": "ocid1.compartment.oc1..<replace-compartment-ocid>",
+        "ssh_authorized_keys": "<replace-with-public-key>"
+      }
+    }
+  }
+}
+```
+
+Use `oci_config.remote.example.json` as the production baseline for OCI-hosted brokers and `oci_config.local.example.json` for local development.
+
+For OCI, `orb init` discovery can write these environment-specific defaults into the generated config. `orb templates generate` only creates the example `oci_templates.json` file if it is missing; it does not rediscover images, subnets, compartments, or keys.
 
 ## Configuration Structure
 

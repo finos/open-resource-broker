@@ -200,6 +200,138 @@ def test_interactive_setup_returns_empty_on_credential_failure():
     assert result == {}
 
 
+def test_interactive_setup_oci_default_credentials_do_not_become_profile():
+    """OCI default auth should not persist the credential source as the profile name."""
+    inputs = iter(["1", "1", "1", "N", "N"])
+    strategy = _make_strategy(default_region="us-phoenix-1")
+
+    with (
+        patch("builtins.input", side_effect=inputs),
+        patch.object(_mod, "_test_provider_credentials", return_value=(True, "")) as test_creds,
+        patch.object(
+            _mod,
+            "_get_available_schedulers",
+            return_value=[{"type": "default", "display_name": "Default", "description": ""}],
+        ),
+        patch.object(
+            _mod,
+            "_get_available_providers",
+            return_value=[{"type": "oci", "display_name": "OCI", "description": ""}],
+        ),
+        patch.object(_mod, "_get_provider_strategy", return_value=strategy),
+        patch.object(_mod, "_get_credential_requirements", return_value={}),
+        patch.object(_mod, "_pick_region", return_value="us-phoenix-1"),
+        patch.object(
+            _mod,
+            "_get_available_credential_sources",
+            return_value=[
+                {"name": "default", "description": "Default OCI credentials"},
+                {"name": "profile", "description": "OCI config profile"},
+            ],
+        ),
+        patch.object(
+            _mod,
+            "_get_operational_requirements",
+            return_value={"region": {"required": True, "description": "OCI region"}},
+        ),
+        patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
+    ):
+        result = _mod._interactive_setup()
+
+    provider = result["providers"][0]
+    assert provider["credential_source"] == "default"
+    assert provider["profile"] is None
+    test_creds.assert_called_once()
+    assert test_creds.call_args.args[:2] == ("oci", "default")
+    assert "credential_source" not in test_creds.call_args.kwargs
+
+
+def test_interactive_setup_passes_oci_credential_source_to_discovery():
+    """OCI discovery needs the selected credential source, even though credential tests do not."""
+    inputs = iter(["1", "1", "1", "y", "N"])
+    strategy = _make_strategy(default_region="us-phoenix-1")
+
+    with (
+        patch("builtins.input", side_effect=inputs),
+        patch.object(_mod, "_test_provider_credentials", return_value=(True, "")),
+        patch.object(
+            _mod,
+            "_get_available_schedulers",
+            return_value=[{"type": "default", "display_name": "Default", "description": ""}],
+        ),
+        patch.object(
+            _mod,
+            "_get_available_providers",
+            return_value=[{"type": "oci", "display_name": "OCI", "description": ""}],
+        ),
+        patch.object(_mod, "_get_provider_strategy", return_value=strategy),
+        patch.object(_mod, "_get_credential_requirements", return_value={}),
+        patch.object(_mod, "_pick_region", return_value="us-phoenix-1"),
+        patch.object(
+            _mod,
+            "_get_available_credential_sources",
+            return_value=[{"name": "default", "description": "Default OCI credentials"}],
+        ),
+        patch.object(
+            _mod,
+            "_get_operational_requirements",
+            return_value={"region": {"required": True, "description": "OCI region"}},
+        ),
+        patch.object(_mod, "_discover_infrastructure", return_value={}) as discover,
+        patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
+    ):
+        _mod._interactive_setup()
+
+    assert discover.call_args.kwargs["provider_settings"]["credential_source"] == "default"
+
+
+def test_interactive_setup_oci_profile_prompts_for_profile_name():
+    """OCI profile auth should store the actual profile name, not the word 'profile'."""
+    inputs = iter(["1", "1", "2", "DEFAULT", "N", "N"])
+    strategy = _make_strategy(default_region="us-phoenix-1")
+
+    with (
+        patch("builtins.input", side_effect=inputs),
+        patch.object(_mod, "_test_provider_credentials", return_value=(True, "")) as test_creds,
+        patch.object(
+            _mod,
+            "_get_available_schedulers",
+            return_value=[{"type": "default", "display_name": "Default", "description": ""}],
+        ),
+        patch.object(
+            _mod,
+            "_get_available_providers",
+            return_value=[{"type": "oci", "display_name": "OCI", "description": ""}],
+        ),
+        patch.object(_mod, "_get_provider_strategy", return_value=strategy),
+        patch.object(_mod, "_get_credential_requirements", return_value={}),
+        patch.object(_mod, "_pick_region", return_value="us-phoenix-1"),
+        patch.object(
+            _mod,
+            "_get_available_credential_sources",
+            return_value=[
+                {"name": "default", "description": "Default OCI credentials"},
+                {"name": "profile", "description": "OCI config profile"},
+            ],
+        ),
+        patch.object(
+            _mod,
+            "_get_operational_requirements",
+            return_value={"region": {"required": True, "description": "OCI region"}},
+        ),
+        patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
+    ):
+        result = _mod._interactive_setup()
+
+    provider = result["providers"][0]
+    assert provider["credential_source"] == "profile"
+    assert provider["profile"] == "DEFAULT"
+    test_creds.assert_called_once()
+    assert test_creds.call_args.args[:2] == ("oci", "profile")
+    assert "credential_source" not in test_creds.call_args.kwargs
+    assert test_creds.call_args.kwargs["profile"] == "DEFAULT"
+
+
 def test_interactive_setup_raises_on_no_providers():
     """When no providers are registered, _interactive_setup raises ValueError."""
     import pytest

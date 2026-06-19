@@ -7,6 +7,8 @@ from orb.infrastructure.di.container import DIContainer
 
 def register_orchestrators(container: DIContainer) -> None:
     """Register all orchestrators with the DI container."""
+    from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
+
     from orb.application.services.orchestration.acquire_machines import AcquireMachinesOrchestrator
     from orb.application.services.orchestration.cancel_request import CancelRequestOrchestrator
     from orb.application.services.orchestration.create_template import CreateTemplateOrchestrator
@@ -155,6 +157,7 @@ def register_orchestrators(container: DIContainer) -> None:
                 command_bus=c.get(CommandBus),
                 query_bus=c.get(QueryBus),
                 logger=c.get(LoggingPort),
+                template_defaults_service=c.get_optional(TemplateDefaultsPort),
             ),
         )
     if not container.is_registered(UpdateTemplateOrchestrator):
@@ -182,6 +185,7 @@ def register_orchestrators(container: DIContainer) -> None:
                 command_bus=c.get(CommandBus),
                 query_bus=c.get(QueryBus),
                 logger=c.get(LoggingPort),
+                template_defaults_service=c.get_optional(TemplateDefaultsPort),
             ),
         )
     if not container.is_registered(RefreshTemplatesOrchestrator):

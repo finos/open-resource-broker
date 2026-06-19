@@ -67,9 +67,9 @@ class Application:
 
                 self._container = get_container()
 
-            # Pre-register ConfigurationManager with config_dict if provided,
-            # so DI container uses in-memory config instead of file discovery.
-            if self.config_dict is not None:
+            # Pre-register ConfigurationManager with explicit config inputs, so
+            # DI-managed services use the caller's config instead of discovery.
+            if self.config_path is not None or self.config_dict is not None:
                 from orb.config.managers.configuration_manager import ConfigurationManager
 
                 cm = ConfigurationManager(
