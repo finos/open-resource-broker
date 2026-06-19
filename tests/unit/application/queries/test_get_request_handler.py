@@ -165,6 +165,34 @@ async def test_get_request_returns_synced_dto_on_success():
 
 
 @pytest.mark.asyncio
+async def test_get_request_ignores_cache_for_syncing_queries():
+    request = _make_request(_ID_SUCCESS)
+    handler, _, mock_cache_service = _make_handler(request, sync_side_effect=None)
+    cached = MagicMock(spec=RequestDTO)
+    mock_cache_service.get_cached_request.return_value = cached
+
+    query = GetRequestQuery(request_id=_ID_SUCCESS, lightweight=False)
+    result = await handler.execute_query(query)
+
+    assert isinstance(result, RequestDTO)
+    mock_cache_service.get_cached_request.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_get_request_uses_cache_for_lightweight_queries():
+    request = _make_request(_ID_SUCCESS)
+    handler, _, mock_cache_service = _make_handler(request, sync_side_effect=None)
+    cached = MagicMock(spec=RequestDTO)
+    mock_cache_service.get_cached_request.return_value = cached
+
+    query = GetRequestQuery(request_id=_ID_SUCCESS, lightweight=True)
+    result = await handler.execute_query(query)
+
+    assert result is cached
+    mock_cache_service.get_cached_request.assert_called_once_with(_ID_SUCCESS)
+
+
+@pytest.mark.asyncio
 async def test_get_request_raises_entity_not_found_when_missing():
     """EntityNotFoundError (request missing) propagates — no swallowing."""
     request = _make_request(_ID_MISSING)

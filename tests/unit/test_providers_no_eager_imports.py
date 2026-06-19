@@ -2,47 +2,46 @@
 
 Importing orb.providers must not trigger loading of the provider factory or
 registry, which pull in heavy AWS dependencies at import time.
+
+The eager-load check runs in a subprocess so the test never has to mutate the
+parent process's ``sys.modules`` — earlier attempts at evicting and restoring
+modules left the parent ``orb.providers`` package without its submodule
+attributes (e.g. ``orb.providers.azure``), which broke unrelated downstream
+tests that rely on ``monkeypatch.setattr`` walking dotted import paths.
 """
 
+import subprocess
 import sys
-from contextlib import contextmanager
 
 
-@contextmanager
-def _isolated_providers_import():
-    """Temporarily evict orb.providers.* from sys.modules, then restore on exit.
+def _run_isolated_check(module_to_check: str) -> bool:
+    """Spawn a clean Python that imports orb.providers and reports whether
+    ``module_to_check`` got loaded as a side effect.
 
-    Restoring the original module objects prevents downstream tests from seeing
-    a second (re-imported) copy of the same module, which would break isinstance
-    checks on exception classes defined in those modules.
+    Returns True if the module was loaded (i.e. eager-import violation),
+    False otherwise.
     """
-    saved = {k: v for k, v in sys.modules.items() if k.startswith("orb.providers")}
-    for key in saved:
-        del sys.modules[key]
-    try:
-        yield
-    finally:
-        # Remove any modules loaded during the isolated import
-        for key in list(sys.modules):
-            if key.startswith("orb.providers"):
-                del sys.modules[key]
-        # Restore the original module objects
-        sys.modules.update(saved)
+    script = (
+        "import sys\n"
+        "import orb.providers  # noqa\n"
+        f"print('LOADED' if {module_to_check!r} in sys.modules else 'NOT_LOADED')\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip() == "LOADED"
 
 
 def test_providers_init_does_not_eagerly_load_factory():
-    with _isolated_providers_import():
-        import orb.providers  # noqa: F401  # type: ignore[reportUnusedImport]
-
-        assert "orb.providers.factory" not in sys.modules, (
-            "orb.providers.__init__ must not eagerly import orb.providers.factory"
-        )
+    assert not _run_isolated_check("orb.providers.factory"), (
+        "orb.providers.__init__ must not eagerly import orb.providers.factory"
+    )
 
 
 def test_providers_init_does_not_eagerly_load_registry():
-    with _isolated_providers_import():
-        import orb.providers  # noqa: F401  # type: ignore[reportUnusedImport]
-
-        assert "orb.providers.registry.provider_registry" not in sys.modules, (
-            "orb.providers.__init__ must not eagerly import orb.providers.registry.provider_registry"
-        )
+    assert not _run_isolated_check("orb.providers.registry.provider_registry"), (
+        "orb.providers.__init__ must not eagerly import orb.providers.registry.provider_registry"
+    )

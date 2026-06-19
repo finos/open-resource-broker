@@ -27,7 +27,7 @@ class TestBaseContextMixin:
         self.template.subnet_ids = ["subnet-123", "subnet-456"]
         self.template.security_group_ids = ["sg-123", "sg-456"]
         self.template.tags = {"Environment": "test", "Project": "hostfactory"}
-        self.template.instance_types = {"t3.medium": 1, "t3.large": 2}
+        self.template.machine_types = {"t3.medium": 1, "t3.large": 2}
         self.template.percent_on_demand = None
 
         self.request_id = "req-test-456"
@@ -213,7 +213,7 @@ class TestBaseContextMixin:
         """Test standard flag preparation with minimal template."""
         self.template.subnet_ids = None
         self.template.security_group_ids = None
-        self.template.instance_types = None
+        self.template.machine_types = None
 
         result = self.mixin._prepare_standard_flags(self.template)
 

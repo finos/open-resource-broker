@@ -5,6 +5,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from orb.domain.base.value_objects import PlacementSplitStrategy
+
 
 class Template(BaseModel):
     """Template configuration value object with both snake_case and camelCase support via aliases."""
@@ -22,6 +24,8 @@ class Template(BaseModel):
 
     # Instance configuration
     instance_type: Optional[str] = None
+    vm_size: Optional[str] = None
+    vm_sizes: list[str] = Field(default_factory=list)
     image_id: Optional[str] = None
     max_instances: int = 1
 
@@ -33,6 +37,10 @@ class Template(BaseModel):
     price_type: str = "ondemand"
     allocation_strategy: Optional[str] = None  # Will be set based on price_type
     max_price: Optional[float] = None
+    placement_split_strategy: PlacementSplitStrategy = PlacementSplitStrategy.HYBRID
+    placement_primary_share_percent: int = 80
+    placement_regions: list[str] = Field(default_factory=list)
+    placement_zones: list[str] = Field(default_factory=list)
 
     # Machine types configuration (unified for all providers)
     machine_types: dict[str, int] = Field(default_factory=dict)
@@ -124,6 +132,9 @@ class Template(BaseModel):
                 f"Tag keys must not start with 'orb:' (reserved for system use): "
                 f"{', '.join(sorted(reserved_keys))}"
             )
+
+        if self.placement_primary_share_percent < 0 or self.placement_primary_share_percent > 100:
+            raise ValueError("placement_primary_share_percent must be between 0 and 100")
 
         return self
 

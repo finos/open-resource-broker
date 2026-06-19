@@ -53,4 +53,4 @@ class ProviderConfigBuilder:
                 "Each provider must register a config factory via the provider registry."
             )
 
-        return config_factory(instance_config)
+        return config_factory(instance_config.config)

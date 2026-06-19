@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from orb.application.dto.commands import CreateReturnRequestCommand
+from orb.application.dto.queries import GetRequestQuery
 from orb.application.dto.queries import ListMachinesQuery
 from orb.application.services.orchestration.dtos import ReturnMachinesInput, ReturnMachinesOutput
 from orb.application.services.orchestration.return_machines import ReturnMachinesOrchestrator
@@ -189,3 +190,31 @@ class TestReturnMachinesOrchestrator:
         result = await orchestrator.execute(input)
         assert result.status == "pending"
         assert result.request_id == "ret-req-001"
+
+    @pytest.mark.asyncio
+    async def test_execute_wait_true_uses_syncing_request_status_query(
+        self, orchestrator, mock_command_bus, mock_query_bus
+    ):
+        async def set_request_ids(cmd):
+            cmd.created_request_ids = ["ret-req-001"]
+
+        mock_command_bus.execute.side_effect = set_request_ids
+
+        poll_result = MagicMock()
+        poll_result.status = MagicMock()
+        poll_result.status.value = "completed"
+        mock_query_bus.execute.return_value = poll_result
+
+        input = ReturnMachinesInput(machine_ids=["m-001"], wait=True, timeout_seconds=10)
+
+        from unittest.mock import patch
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            result = await orchestrator.execute(input)
+
+        query = mock_query_bus.execute.call_args[0][0]
+        assert isinstance(query, GetRequestQuery)
+        assert query.request_id == "ret-req-001"
+        assert query.lightweight is False
+        assert query.verbose is True
+        assert result.status == "completed"

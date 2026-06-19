@@ -9,6 +9,7 @@ from unittest.mock import Mock
 import pytest
 
 from orb.config.manager import ConfigurationManager
+from orb.infrastructure.scheduler.hostfactory.field_mapper import HostFactoryFieldMapper
 from orb.infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings
 from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
     HostFactorySchedulerStrategy,
@@ -222,6 +223,41 @@ class TestFieldMappingIntegration:
         """Test supported schedulers and providers listing."""
         providers = HostFactoryFieldMappings.get_supported_providers()
         assert "aws" in providers
+
+    def test_scheduler_field_mapping_azure_vmss(self):
+        """Azure HostFactory templates map to canonical Azure template fields."""
+        self.scheduler_strategy._field_mapper = HostFactoryFieldMapper("azure")
+
+        hf_template = {
+            "templateId": "azure-vmss-template",
+            "providerType": "azure",
+            "providerApi": "VMSS",
+            "resourceGroup": "orb-test-rg",
+            "location": "eastus2",
+            "vmType": "Standard_D4s_v5",
+            "vmTypes": {
+                "Standard_D4s_v5": 1,
+                "Standard_D8s_v5": 1,
+            },
+            "keyName": "azure-ssh-key",
+            "networkConfig": {
+                "subnet_id": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet/subnets/default"
+            },
+            "imageId": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/images/base-image",
+            "cyclecloudUrl": "https://cyclecloud.example.com",
+        }
+
+        mapped = self.scheduler_strategy._map_template_fields(hf_template)
+
+        assert mapped["template_id"] == "azure-vmss-template"
+        assert mapped["provider_type"] == "azure"
+        assert mapped["provider_api"] == "VMSS"
+        assert mapped["resource_group"] == "orb-test-rg"
+        assert mapped["location"] == "eastus2"
+        assert mapped["vm_size"] == "Standard_D4s_v5"
+        assert mapped["vm_sizes"] == ["Standard_D8s_v5"]
+        assert mapped["ssh_key_name"] == "azure-ssh-key"
+        assert mapped["cyclecloud_url"] == "https://cyclecloud.example.com"
 
 
 if __name__ == "__main__":

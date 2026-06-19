@@ -1,5 +1,6 @@
 """Unit tests for RequestStatusManagementService._update_request_status logic."""
 
+import pytest
 from unittest.mock import MagicMock
 
 from orb.application.services.provisioning_orchestration_service import ProvisioningResult
@@ -88,6 +89,7 @@ class TestUpdateRequestStatus:
 
     def test_zero_instances_sets_in_progress(self):
         req = _make_request(requested_count=3)
+        req.resource_ids = ["i-pending"]
         self.svc._update_request_status(
             request=req,
             instance_count=0,
@@ -97,6 +99,20 @@ class TestUpdateRequestStatus:
         )
         call_args = req.update_status.call_args[0]
         assert call_args[0] == RequestStatus.IN_PROGRESS
+
+    def test_zero_instances_with_errors_sets_failed(self):
+        req = _make_request(requested_count=3)
+        req.resource_ids = []
+        errors = [{"error_code": "GCPQuotaExceededError", "error_message": "Quota exceeded"}]
+        self.svc._update_request_status(
+            request=req,
+            instance_count=0,
+            requested_count=3,
+            has_api_errors=True,
+            provider_errors=errors,
+        )
+        call_args = req.update_status.call_args[0]
+        assert call_args[0] == RequestStatus.FAILED
 
     def test_error_summary_included_in_message(self):
         req = _make_request(requested_count=2)
@@ -157,6 +173,33 @@ def _make_result(**kwargs) -> ProvisioningResult:
     )
     defaults.update(kwargs)
     return ProvisioningResult(**defaults)
+
+
+class TestUpdateRequestFromProvisioning:
+    @pytest.mark.asyncio
+    async def test_provider_data_is_persisted_via_follow_up_context(self):
+        svc = _make_service()
+        req = _make_request(requested_count=1)
+        req.set_provider_data = MagicMock(return_value=req)
+
+        result = _make_result(
+            resource_ids=["req-123"],
+            provider_data={
+                "cluster_name": "cc-cluster",
+                "cyclecloud_credential_path": "secret://cyclecloud",
+            },
+        )
+
+        updated = await svc.update_request_from_provisioning(req, result)
+
+        req.set_provider_data.assert_called_once()
+        provider_data = req.set_provider_data.call_args.args[0]
+        assert provider_data["follow_up_context"]["cluster_name"] == "cc-cluster"
+        assert (
+            provider_data["follow_up_context"]["cyclecloud_credential_path"]
+            == "secret://cyclecloud"
+        )
+        assert updated is req
 
 
 class TestExtractMachineIds:

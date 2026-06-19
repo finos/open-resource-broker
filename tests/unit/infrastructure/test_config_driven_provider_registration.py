@@ -11,6 +11,42 @@ from orb.config.schemas.provider_strategy_schema import (
 class TestConfigDrivenProviderRegistration:
     """Test config-driven provider registration functionality."""
 
+    def test_register_all_provider_types_includes_aws(self):
+        """Canonical provider bootstrap must register built-in AWS support."""
+        from orb.providers.registration import register_all_provider_types
+        from orb.providers.registry import get_provider_registry
+
+        registry = get_provider_registry()
+        registry.clear_registrations()
+
+        register_all_provider_types()
+
+        assert registry.is_provider_registered("aws") is True
+
+    def test_provider_config_builder_accepts_aws_provider_instance_config(self):
+        """AWS config creation must use the provider instance's config mapping."""
+        from orb.providers.config_builder import ProviderConfigBuilder
+        from orb.providers.registration import register_all_provider_types
+        from orb.providers.registry import get_provider_registry
+
+        registry = get_provider_registry()
+        registry.clear_registrations()
+        register_all_provider_types()
+
+        logger = MagicMock()
+        builder = ProviderConfigBuilder(logger, registry)
+        provider_instance = ProviderInstanceConfig(  # type: ignore[call-arg]
+            name="aws-default",
+            type="aws",
+            enabled=True,
+            config={"region": "eu-west-1", "profile": "test-profile"},
+        )
+
+        aws_config = builder.build_config(provider_instance)
+
+        assert aws_config.region == "eu-west-1"
+        assert aws_config.profile == "test-profile"
+
     def test_register_providers_with_valid_config(self):
         """Test provider registration with valid configuration."""
         from orb.bootstrap.provider_services import register_provider_services

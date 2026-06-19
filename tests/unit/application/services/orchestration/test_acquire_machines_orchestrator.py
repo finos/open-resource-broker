@@ -95,6 +95,8 @@ class TestAcquireMachinesOrchestrator:
         query = mock_query_bus.execute.call_args[0][0]
         assert isinstance(query, GetRequestQuery)
         assert query.request_id == "req-123"
+        assert query.lightweight is False
+        assert query.verbose is True
         assert result.status == "completed"
 
     @pytest.mark.asyncio
