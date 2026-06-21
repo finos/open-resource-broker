@@ -170,9 +170,9 @@ class TestExtractAwsErrorFields:
             error_source="aws.ec2.run_instances",
         )
         result = _extract_aws_error_fields(exc)
-        assert result["aws_error_code"] == "UnauthorizedOperation"
-        assert result["aws_error_message"] == "You are not authorized."
-        assert result["aws_request_id"] == "rid-xyz"
+        assert result["provider_error_code"] == "UnauthorizedOperation"
+        assert result["provider_error_message"] == "You are not authorized."
+        assert result["provider_request_id"] == "rid-xyz"
         assert result["error_source"] == "aws.ec2.run_instances"
 
     def test_returns_none_values_for_generic_exception(self):
@@ -181,9 +181,9 @@ class TestExtractAwsErrorFields:
         )
 
         result = _extract_aws_error_fields(ValueError("some error"))
-        assert result["aws_error_code"] is None
-        assert result["aws_error_message"] is None
-        assert result["aws_request_id"] is None
+        assert result["provider_error_code"] is None
+        assert result["provider_error_message"] is None
+        assert result["provider_request_id"] is None
         assert result["error_source"] is None
 
     def test_partial_aws_error_attrs(self):
@@ -197,8 +197,8 @@ class TestExtractAwsErrorFields:
             aws_error_code="InsufficientInstanceCapacity",
         )
         result = _extract_aws_error_fields(exc)
-        assert result["aws_error_code"] == "InsufficientInstanceCapacity"
-        assert result["aws_error_message"] is None
+        assert result["provider_error_code"] == "InsufficientInstanceCapacity"
+        assert result["provider_error_message"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -239,9 +239,9 @@ class TestHandleProvisioningFailure:
             instances=instances if instances is not None else [],
             provider_data=provider_data if provider_data is not None else {},
             error_message=error_message,
-            aws_error_code=aws_error_code,
-            aws_error_message=aws_error_message,
-            aws_request_id=aws_request_id,
+            provider_error_code=aws_error_code,
+            provider_error_message=aws_error_message,
+            provider_request_id=aws_request_id,
             error_source=error_source,
         )
 

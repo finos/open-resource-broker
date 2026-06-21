@@ -39,11 +39,11 @@ class ProvisioningResult:
     ``Failed``           → ``is_final = True``
     ``None`` (legacy)    → honour the explicit ``is_final`` value
 
-    AWS-specific error fields (all optional, only set on failure from AWS):
-      ``aws_error_code``    — boto3 ``ClientError`` code (e.g. ``UnauthorizedOperation``)
-      ``aws_error_message`` — human-readable message from the AWS response
-      ``aws_request_id``    — AWS request ID for Support cases
-      ``error_source``      — service.operation label (e.g. ``aws.ec2.RunInstances``)
+    Provider error fields (all optional, only set on failure):
+      ``provider_error_code``    — provider API error code (e.g. ``UnauthorizedOperation``)
+      ``provider_error_message`` — human-readable message from the provider response
+      ``provider_request_id``    — provider request ID for support cases
+      ``error_source``           — service.operation label (e.g. ``aws.ec2.RunInstances``)
     """
 
     success: bool
@@ -55,11 +55,11 @@ class ProvisioningResult:
     fulfilled_count: int = 0
     is_final: bool = True
     outcome: OperationOutcome | None = field(default=None)
-    # AWS-specific error detail fields — populated when the failure originates from
-    # an AWS API call so callers can surface actionable diagnostics to the user.
-    aws_error_code: str | None = None
-    aws_error_message: str | None = None
-    aws_request_id: str | None = None
+    # Provider error detail fields — populated when the failure originates from
+    # a provider API call so callers can surface actionable diagnostics to the user.
+    provider_error_code: str | None = None
+    provider_error_message: str | None = None
+    provider_request_id: str | None = None
     error_source: str | None = None
 
     def __post_init__(self) -> None:
@@ -79,20 +79,20 @@ class ProvisioningResult:
 
 
 def _extract_aws_error_fields(exc: BaseException) -> dict[str, Any]:
-    """Extract AWS-specific error fields from an AWSError exception (if applicable).
+    """Extract provider error fields from a provider exception (if applicable).
 
     Returns a dict suitable for **-unpacking into ProvisioningResult.  When the
-    exception is not an AWSError the dict will contain only None values so the
-    ProvisioningResult fields stay empty (safe default).
+    exception carries no provider error attributes the dict will contain only
+    None values so the ProvisioningResult fields stay empty (safe default).
     """
-    aws_error_code: str | None = getattr(exc, "aws_error_code", None)
-    aws_error_message: str | None = getattr(exc, "aws_error_message", None)
-    aws_request_id: str | None = getattr(exc, "aws_request_id", None)
+    provider_error_code: str | None = getattr(exc, "aws_error_code", None)
+    provider_error_message: str | None = getattr(exc, "aws_error_message", None)
+    provider_request_id: str | None = getattr(exc, "aws_request_id", None)
     error_source: str | None = getattr(exc, "error_source", None)
     return {
-        "aws_error_code": aws_error_code,
-        "aws_error_message": aws_error_message,
-        "aws_request_id": aws_request_id,
+        "provider_error_code": provider_error_code,
+        "provider_error_message": provider_error_message,
+        "provider_request_id": provider_request_id,
         "error_source": error_source,
     }
 
