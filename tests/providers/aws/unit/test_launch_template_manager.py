@@ -8,6 +8,7 @@ that was moved out of the base handler to fix architectural violations.
 
 import os
 import sys
+from typing import cast
 from unittest.mock import Mock
 
 import pytest
@@ -273,7 +274,7 @@ class TestAWSLaunchTemplateManager:
         assert result.template_id == "lt-missing"
         assert result.is_new_template is False
         assert result.is_new_version is False
-        self.manager._logger.warning.assert_called()
+        cast(Mock, self.manager._logger).warning.assert_called()
 
     def test_use_existing_template_strategy_throttling_propagates(self):
         """Transient errors (Throttling) must propagate, not warn-and-pass-through."""
@@ -333,7 +334,7 @@ class TestAWSLaunchTemplateManager:
         result = self.manager.inspect_launch_template_networking("lt-x", "$Latest")
 
         assert result == LTNetworkingState.UNKNOWN_UNAUTHORIZED
-        self.manager._logger.warning.assert_called()
+        cast(Mock, self.manager._logger).warning.assert_called()
 
     def test_inspect_lt_networking_throttling_propagates(self):
         """Transient errors (Throttling) must propagate, not return UNKNOWN_UNAUTHORIZED."""
