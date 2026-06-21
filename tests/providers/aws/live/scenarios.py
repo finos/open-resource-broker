@@ -1,8 +1,11 @@
 import itertools
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, List
+
+logger = logging.getLogger(__name__)
 
 
 def _get_templates_for_resolution() -> List[Dict[str, Any]]:
@@ -566,8 +569,16 @@ def _load_template_vm_types(template_id: str) -> Dict[str, Any]:
         for tpl in data.get("templates", []):
             if tpl.get("templateId") == template_id:
                 return tpl.get("vmTypes") or {}
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
     except Exception:
-        pass
+        logger.warning(
+            "_load_template_vm_types: unexpected error reading %s for template %r",
+            templates_path,
+            template_id,
+            exc_info=True,
+        )
+        raise
     return {}
 
 
