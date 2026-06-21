@@ -54,6 +54,9 @@ from orb.providers.aws.infrastructure.handlers.ec2_fleet.release_manager import 
     EC2FleetReleaseManager,
 )
 from orb.providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
+from orb.providers.aws.infrastructure.handlers.shared.fleet_fulfilment import (
+    compute_capacity_based_fulfilment,
+)
 from orb.providers.aws.infrastructure.handlers.shared.fleet_grouping_mixin import FleetGroupingMixin
 from orb.providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
@@ -644,45 +647,14 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     )
         else:
             # Maintain / Request fleet: capacity-unit based fulfilment
-            fleet_fully_fulfilled = (
-                target_capacity is not None and fulfilled_capacity >= target_capacity
+            return compute_capacity_based_fulfilment(
+                target_capacity=target_capacity,
+                fulfilled_capacity=fulfilled_capacity,
+                running_count=running_count,
+                pending_count=pending_count,
+                failed_count=failed_count,
+                provider_label="Fleet",
             )
-            if fleet_fully_fulfilled and pending_count == 0 and failed_count == 0:
-                return ProviderFulfilment(
-                    state="fulfilled",
-                    message=(
-                        f"Fleet fulfilled: {running_count} instance(s) running "
-                        f"({fulfilled_capacity}/{target_capacity} capacity units)"
-                    ),
-                    target_units=target_units,
-                    fulfilled_units=int(fulfilled_capacity),
-                    running_count=running_count,
-                    pending_count=pending_count,
-                    failed_count=failed_count,
-                )
-            elif failed_count > 0 and running_count == 0 and pending_count == 0:
-                return ProviderFulfilment(
-                    state="failed",
-                    message=f"Fleet failed: {failed_count} instance(s) failed",
-                    target_units=target_units,
-                    fulfilled_units=int(fulfilled_capacity),
-                    running_count=running_count,
-                    pending_count=pending_count,
-                    failed_count=failed_count,
-                )
-            else:
-                return ProviderFulfilment(
-                    state="in_progress",
-                    message=(
-                        f"Fleet: {running_count} running, {pending_count} pending "
-                        f"({fulfilled_capacity}/{target_units} capacity units)"
-                    ),
-                    target_units=target_units,
-                    fulfilled_units=int(fulfilled_capacity),
-                    running_count=running_count,
-                    pending_count=pending_count,
-                    failed_count=failed_count,
-                )
 
     def release_hosts(
         self,
