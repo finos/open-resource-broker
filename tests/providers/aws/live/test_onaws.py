@@ -429,8 +429,8 @@ def _get_asg_instance_weight(instance_id: str, asg_name: str) -> int:
                 if wc is not None:
                     return int(wc)
         return 1
-    except Exception as exc:
-        log.debug("Failed to look up ASG instance weight for %s: %s", instance_id, exc)
+    except (ClientError, KeyError) as exc:
+        log.warning("Failed to look up ASG instance weight for %s: %s", instance_id, exc)
         return 1
 
 
@@ -484,8 +484,8 @@ def _get_fleet_instance_weight(instance_id: str, fleet_id: str, provider_api: st
                         if wc is not None:
                             return int(float(wc))
         return 1
-    except Exception as exc:
-        log.debug(
+    except (ClientError, KeyError) as exc:
+        log.warning(
             "Failed to look up fleet instance weight for %s in %s: %s",
             instance_id,
             fleet_id,
@@ -1597,8 +1597,14 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
         for m in _req0.get("machines", [])
         if m.get("machineId") or m.get("machine_id")
     ]
-    _target_units = _req0.get("target_units") or capacity_to_request
-    _fulfilled_units = _req0.get("fulfilled_units") or len(_machine_ids_for_check)
+    _target_units = (
+        _req0["target_units"] if _req0.get("target_units") is not None else capacity_to_request
+    )
+    _fulfilled_units = (
+        _req0["fulfilled_units"]
+        if _req0.get("fulfilled_units") is not None
+        else len(_machine_ids_for_check)
+    )
     assert _fulfilled_units >= _target_units, (
         f"Fleet not fully fulfilled: fulfilled={_fulfilled_units}, target={_target_units}"
     )

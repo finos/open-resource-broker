@@ -347,8 +347,10 @@ async def _run_full_cycle(sdk, test_case: dict, tracked_request_ids: list[str]) 
     # target_units / fulfilled_units reflect capacity units for weighted fleets
     # and instance count for unweighted templates (1 unit == 1 instance).
     _req0 = status_response.get("requests", [{}])[0] if isinstance(status_response, dict) else {}
-    target_units = _req0.get("target_units") or capacity
-    fulfilled_units = _req0.get("fulfilled_units") or len(machine_ids)
+    target_units = _req0["target_units"] if _req0.get("target_units") is not None else capacity
+    fulfilled_units = (
+        _req0["fulfilled_units"] if _req0.get("fulfilled_units") is not None else len(machine_ids)
+    )
     assert fulfilled_units >= target_units, (
         f"Fleet not fully fulfilled: fulfilled={fulfilled_units}, target={target_units}"
     )
