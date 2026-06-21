@@ -36,9 +36,7 @@ def compute_capacity_based_fulfilment(
         fleet_type: Optional sub-type string appended to failed/in-progress messages.
     """
     target_units = target_capacity if target_capacity is not None else int(fulfilled_capacity)
-    fleet_fully_fulfilled = (
-        target_capacity is not None and fulfilled_capacity >= target_capacity
-    )
+    fleet_fully_fulfilled = target_capacity is not None and fulfilled_capacity >= target_capacity
 
     if fleet_fully_fulfilled and pending_count == 0 and failed_count == 0:
         return ProviderFulfilment(

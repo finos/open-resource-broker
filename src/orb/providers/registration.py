@@ -90,7 +90,7 @@ def register_all_provider_cli_specs() -> None:
     as part of ``initialize_<name>_provider``.  This alias is retained so that
     ``cli/args.py`` and other early-bootstrap callers continue to work.
     """
-    from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
+    from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
 
     try:
         from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec

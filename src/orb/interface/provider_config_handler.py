@@ -5,10 +5,10 @@ from typing import Any, Dict, Union
 
 from orb.application.dto.interface_response import InterfaceResponse
 from orb.config.platform_dirs import get_config_location
-from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
 from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
 from orb.infrastructure.logging.logger import get_logger
+from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
 from orb.interface.response_formatting_service import ResponseFormattingService
 
 logger = get_logger(__name__)

@@ -27,7 +27,6 @@ _DOMAIN_DIR = SRC_ORB / "domain"
 _KNOWN_PYDANTIC_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
     {
         ("domain/template/template_aggregate.py", "pydantic"),
-        ("domain/template/extensions.py", "pydantic"),
         ("domain/machine/aggregate.py", "pydantic"),
         ("domain/machine/machine_metadata.py", "pydantic"),
         ("domain/machine/machine_identifiers.py", "pydantic"),

@@ -18,7 +18,7 @@ from orb.application.dto.interface_response import InterfaceResponse
 @pytest.fixture(autouse=True)
 def register_aws_cli_spec():
     """Register AWS CLI spec for all tests in this module."""
-    from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
+    from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
     from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec
 
     CLISpecRegistry.register("aws", AWSCLISpec())

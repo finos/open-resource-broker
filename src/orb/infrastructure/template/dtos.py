@@ -7,7 +7,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field, field_serializer, model_validator
 
 from orb.application.dto.base import BaseDTO
-from orb.domain.template.extensions import TemplateExtensionRegistry
+from orb.infrastructure.registry.template_extension_registry import TemplateExtensionRegistry
 
 
 class TemplateDTO(BaseDTO):

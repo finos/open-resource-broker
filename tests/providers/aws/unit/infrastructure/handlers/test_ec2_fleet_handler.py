@@ -57,9 +57,7 @@ def _formatted_instances(instance_ids, resource_id="fleet-test"):
     return [_inst(iid, resource_id) for iid in instance_ids]
 
 
-def _fleet_result(
-    instance_ids, resource_id="fleet-test", state: FulfilmentState = "fulfilled"
-):
+def _fleet_result(instance_ids, resource_id="fleet-test", state: FulfilmentState = "fulfilled"):
     """Build a CheckHostsStatusResult for mocking _check_single_fleet_status."""
     return CheckHostsStatusResult(
         instances=_formatted_instances(instance_ids, resource_id),

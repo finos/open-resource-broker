@@ -13,10 +13,10 @@ from orb.config.platform_dirs import (
     get_work_location,
 )
 from orb.domain.base.ports.console_port import ConsolePort
-from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
 from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 from orb.infrastructure.di.container import get_container
 from orb.infrastructure.logging.logger import get_logger
+from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
 
 logger = get_logger(__name__)
 

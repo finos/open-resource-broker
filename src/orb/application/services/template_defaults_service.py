@@ -7,10 +7,10 @@ from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 from orb.domain.base.utils import extract_provider_type
-from orb.domain.template.extensions import TemplateExtensionRegistry
 from orb.domain.template.factory import TemplateFactoryPort
 from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
 from orb.domain.template.template_aggregate import Template
+from orb.infrastructure.registry.template_extension_registry import TemplateExtensionRegistry
 
 
 @injectable

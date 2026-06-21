@@ -12,9 +12,9 @@ import sys
 # Optional: Rich formatting for help text
 import sys as _sys
 
-from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
 from orb.domain.machine.machine_status import MachineStatus
 from orb.domain.request.value_objects import RequestStatus
+from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
 
 try:
     import rich.console as _rich_console  # type: ignore[import-untyped,import-not-found]

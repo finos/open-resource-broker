@@ -537,9 +537,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         try:
             command_bus = self._container.get(CommandBusPort)
             await command_bus.execute(update_command)
-            self.logger.info(
-                "Updated request %s status to %s", request.request_id, status
-            )
+            self.logger.info("Updated request %s status to %s", request.request_id, status)
         except Exception as update_error:
             self.logger.error(
                 "Failed to update request %s status to %s: %s",

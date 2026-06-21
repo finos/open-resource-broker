@@ -34,6 +34,7 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
         ("cli/main.py", "orb.infrastructure.mocking.dry_run_context"),
         ("cli/main.py", "orb.infrastructure.di.container"),
         ("cli/factories/provider_command_factory.py", "orb.infrastructure.utilities.json_utils"),
+        ("cli/args.py", "orb.infrastructure.registry.cli_spec_registry"),
     }
 )
 

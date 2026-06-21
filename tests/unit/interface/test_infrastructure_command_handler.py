@@ -388,7 +388,7 @@ class TestShowProviderInfrastructure:
         """Known provider types use CLISpecRegistry.format_display for display."""
         from unittest.mock import MagicMock, patch
 
-        from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
+        from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
         from orb.interface.infrastructure_command_handler import _show_provider_infrastructure
 
         mock_spec = MagicMock()
@@ -422,7 +422,7 @@ class TestShowProviderInfrastructure:
         """Unknown provider types fall back to raw key/value display."""
         from unittest.mock import MagicMock, patch
 
-        from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
+        from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
         from orb.interface.infrastructure_command_handler import _show_provider_infrastructure
 
         mock_console = MagicMock()

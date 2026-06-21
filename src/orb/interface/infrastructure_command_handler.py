@@ -5,9 +5,9 @@ from typing import Any, Dict, List
 
 from orb.config.platform_dirs import get_config_location
 from orb.domain.base.ports.console_port import ConsolePort
-from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
 from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
+from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
 
 
 @handle_interface_exceptions(context="infrastructure_discover", interface_type="cli")

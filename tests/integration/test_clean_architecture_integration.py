@@ -6,9 +6,9 @@ import pytest
 
 from orb.application.services.template_defaults_service import TemplateDefaultsService
 from orb.domain.base.ports.logging_port import LoggingPort
-from orb.domain.template.extensions import TemplateExtensionRegistry
 from orb.domain.template.factory import TemplateFactory
 from orb.domain.template.template_aggregate import Template
+from orb.infrastructure.registry.template_extension_registry import TemplateExtensionRegistry
 from orb.providers.aws.configuration.template_extension import AWSTemplateExtensionConfig
 
 
