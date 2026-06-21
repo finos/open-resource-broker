@@ -195,9 +195,11 @@ def test_enhanced_bearer_from_auth_config():
     """from_auth_config builds strategy from typed BearerTokenAuthSubConfig."""
     from orb.config.schemas.server_schema import AuthConfig, BearerTokenAuthSubConfig
 
-    auth_config = AuthConfig(
+    auth_config = AuthConfig(  # type: ignore[call-arg]  # pydantic default fields
         strategy="bearer_token_enhanced",
-        bearer_token=BearerTokenAuthSubConfig(secret_key=_SECRET),
+        bearer_token=BearerTokenAuthSubConfig(  # type: ignore[call-arg]  # pydantic default fields
+            secret_key=_SECRET
+        ),
     )
 
     strategy = EnhancedBearerTokenStrategy.from_auth_config(auth_config)
@@ -212,7 +214,7 @@ def test_enhanced_bearer_from_auth_config_missing_bearer_token():
     from orb.config.schemas.server_schema import AuthConfig
     from orb.domain.base.exceptions import ConfigurationError
 
-    auth_config = AuthConfig(strategy="bearer_token_enhanced")
+    auth_config = AuthConfig(strategy="bearer_token_enhanced")  # type: ignore[call-arg]  # pydantic default fields
 
     with pytest.raises(ConfigurationError):
         EnhancedBearerTokenStrategy.from_auth_config(auth_config)
