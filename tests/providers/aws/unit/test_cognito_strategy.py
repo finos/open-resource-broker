@@ -331,3 +331,56 @@ async def test_cognito_validate_token_unknown_kid_returns_invalid():
         result = await strategy.validate_token(token)
 
     assert result.status == AuthStatus.INVALID
+
+
+# ---------------------------------------------------------------------------
+# _get_public_key — raise_for_status called on JWKS response
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_get_public_key_calls_raise_for_status():
+    """_get_public_key must call raise_for_status() on the JWKS HTTP response.
+
+    A Cognito 403 or 503 returns a non-keys JSON body; without raise_for_status()
+    the kid-lookup silently returns None and every token is rejected with an
+    opaque "Unable to verify token signature" error that is hard to diagnose.
+    """
+    strategy = _make_strategy()
+
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"keys": []}
+
+    with patch("requests.get", return_value=mock_response) as mock_get:
+        await strategy._get_public_key("any-kid")
+
+    mock_response.raise_for_status.assert_called_once()
+    mock_get.assert_called_once_with(strategy.jwks_url, timeout=30)
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_get_public_key_non_2xx_propagates_as_invalid_token():
+    """An HTTP error from the JWKS endpoint propagates and causes INVALID token result.
+
+    The HTTPError raised by raise_for_status() is caught by the outer except clause
+    in _get_public_key, logged, and returns None — which validate_token converts
+    to an INVALID AuthResult rather than swallowing the error silently.
+    """
+    import requests as req
+
+    strategy = _make_strategy()
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status.side_effect = req.exceptions.HTTPError("403 Forbidden")
+
+    with patch(
+        "orb.providers.aws.auth.cognito_strategy.jwt.get_unverified_header",
+        return_value={"kid": "test-kid"},
+    ):
+        with patch("requests.get", return_value=mock_response):
+            result = await strategy.validate_token("some.bearer.token")
+
+    assert result.status == AuthStatus.INVALID
+    assert "Unable to verify token signature" in (result.error_message or "")

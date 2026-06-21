@@ -330,6 +330,7 @@ class CognitoAuthStrategy(AuthPort):
 
             # Add timeout to prevent hanging connections (security best practice)
             response = requests.get(self.jwks_url, timeout=30)
+            response.raise_for_status()
             jwks = response.json()
 
             for key in jwks.get("keys", []):
