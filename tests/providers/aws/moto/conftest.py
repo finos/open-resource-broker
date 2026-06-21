@@ -27,6 +27,22 @@ from tests.providers.aws.conftest import (  # noqa: F401
     make_spot_fleet_handler,
 )
 
+__all__ = [
+    "REGION",
+    "_inject_moto_factory",
+    "_make_config_port",
+    "_make_launch_template_manager",
+    "_make_logger",
+    "_make_moto_aws_client",
+    "make_asg_handler",
+    "make_aws_template",
+    "make_ec2_fleet_handler",
+    "make_patch_moto_compat",
+    "make_request",
+    "make_run_instances_handler",
+    "make_spot_fleet_handler",
+]
+
 
 @pytest.fixture(autouse=True)
 def patch_moto_compat():
