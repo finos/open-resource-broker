@@ -177,7 +177,7 @@ def test_iam_from_auth_config_defaults():
     """from_auth_config builds strategy using IAMAuthSubConfig defaults."""
     from orb.config.schemas.server_schema import AuthConfig
 
-    auth_config = AuthConfig(strategy="iam")
+    auth_config = AuthConfig(strategy="iam")  # type: ignore[call-arg]  # pydantic default fields
 
     with patch("orb.providers.aws.auth.iam_strategy.AWSSessionFactory") as mock_factory:
         mock_session = MagicMock()

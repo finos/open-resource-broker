@@ -163,7 +163,7 @@ def test_cognito_from_auth_config_defaults():
     """from_auth_config builds strategy with defaults when no sub-config given."""
     from orb.config.schemas.server_schema import AuthConfig
 
-    auth_config = AuthConfig(strategy="cognito")
+    auth_config = AuthConfig(strategy="cognito")  # type: ignore[call-arg]  # pydantic default fields
 
     with patch("boto3.client") as _mock:
         _mock.return_value = MagicMock()
