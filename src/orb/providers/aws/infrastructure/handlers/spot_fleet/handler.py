@@ -45,6 +45,9 @@ from orb.providers.aws.infrastructure.adapters.machine_adapter import AWSMachine
 from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.infrastructure.handlers.base_handler import AWSHandler
 from orb.providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
+from orb.providers.aws.infrastructure.handlers.shared.fleet_fulfilment import (
+    compute_capacity_based_fulfilment,
+)
 from orb.providers.aws.infrastructure.handlers.shared.fleet_grouping_mixin import FleetGroupingMixin
 from orb.providers.aws.infrastructure.handlers.spot_fleet.config_builder import (
     SpotFleetConfigBuilder,
@@ -425,48 +428,14 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         running_count = sum(1 for i in instances if i.get("status") == "running")
         pending_count = sum(1 for i in instances if i.get("status") in ("pending", "starting"))
         failed_count = sum(1 for i in instances if i.get("status") in ("failed", "error"))
-        target_units = target_capacity if target_capacity is not None else requested_count
-
-        fleet_fully_fulfilled = (
-            target_capacity is not None and fulfilled_capacity >= target_capacity
+        return compute_capacity_based_fulfilment(
+            target_capacity=target_capacity,
+            fulfilled_capacity=fulfilled_capacity,
+            running_count=running_count,
+            pending_count=pending_count,
+            failed_count=failed_count,
+            provider_label="Spot Fleet",
         )
-
-        if fleet_fully_fulfilled and pending_count == 0 and failed_count == 0:
-            return ProviderFulfilment(
-                state="fulfilled",
-                message=(
-                    f"Spot Fleet fulfilled: {running_count} instance(s) running "
-                    f"({fulfilled_capacity}/{target_capacity} capacity units)"
-                ),
-                target_units=target_units,
-                fulfilled_units=int(fulfilled_capacity),
-                running_count=running_count,
-                pending_count=pending_count,
-                failed_count=failed_count,
-            )
-        elif failed_count > 0 and running_count == 0 and pending_count == 0:
-            return ProviderFulfilment(
-                state="failed",
-                message=f"Spot Fleet failed: {failed_count} instance(s) failed",
-                target_units=target_units,
-                fulfilled_units=int(fulfilled_capacity),
-                running_count=running_count,
-                pending_count=pending_count,
-                failed_count=failed_count,
-            )
-        else:
-            return ProviderFulfilment(
-                state="in_progress",
-                message=(
-                    f"Spot Fleet: {running_count} running, {pending_count} pending "
-                    f"({fulfilled_capacity}/{target_units} capacity units)"
-                ),
-                target_units=target_units,
-                fulfilled_units=int(fulfilled_capacity),
-                running_count=running_count,
-                pending_count=pending_count,
-                failed_count=failed_count,
-            )
 
     def _get_spot_fleet_instances(
         self,
