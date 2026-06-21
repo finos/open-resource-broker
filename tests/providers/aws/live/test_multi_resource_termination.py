@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import time
 import uuid
 from pathlib import Path
@@ -98,6 +99,7 @@ console_handler.setFormatter(formatter)
 log.addHandler(console_handler)
 
 MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC = 180
+_IPV4_RE = re.compile(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$")
 
 
 def check_all_instances_terminating_or_terminated(instance_ids: List[str]) -> bool:
@@ -571,6 +573,12 @@ def test_multi_resource_termination(setup_multi_resource_templates):
         for machine, state in zip(machines, instance_states):
             assert machine["status"] in ["running", "pending"]
             instance_id = machine.get("machineId") or machine.get("machine_id")
+            if machine["status"] == "running":
+                ip = machine.get("privateIpAddress") or machine.get("private_ip_address")
+                assert ip, f"Running machine {instance_id} has empty privateIpAddress"
+                assert _IPV4_RE.match(ip), (
+                    f"Running machine {instance_id} has invalid privateIpAddress: {ip!r}"
+                )
             assert state is not None
             assert state in ["running", "pending"]
             log.debug(f"EC2 {instance_id} state: {state}")
