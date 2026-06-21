@@ -468,9 +468,7 @@ class AWSProviderStrategy(ProviderStrategy):
             # connections until the call completes.  For large requests (e.g. 100 instances)
             # this starvation causes all concurrent polls to fail with ConnectionError.
             # Offloading to a thread pool executor keeps the event loop responsive.
-            check_result = await asyncio.get_event_loop().run_in_executor(
-                None, handler.check_hosts_status, request
-            )
+            check_result = await asyncio.to_thread(handler.check_hosts_status, request)
             instance_details = check_result.instances
             fulfilment: ProviderFulfilment = check_result.fulfilment
 
