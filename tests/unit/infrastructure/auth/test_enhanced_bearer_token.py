@@ -12,22 +12,22 @@ from orb.infrastructure.adapters.ports.auth import AuthContext, AuthStatus
 from orb.infrastructure.auth.strategy.bearer_token_strategy_enhanced import (
     EnhancedBearerTokenStrategy,
 )
-from orb.infrastructure.auth.token_blacklist.in_memory_blacklist import InMemoryTokenBlacklist
+from orb.infrastructure.auth.token_denylist.in_memory_denylist import InMemoryTokenDenylist
 
 _SECRET = "a" * 32  # exactly 32 bytes — minimum valid length
 
 
-def _make_blacklist() -> InMemoryTokenBlacklist:
-    return InMemoryTokenBlacklist()
+def _make_denylist() -> InMemoryTokenDenylist:
+    return InMemoryTokenDenylist()
 
 
 def _make_strategy(
-    blacklist: InMemoryTokenBlacklist | None = None,
+    denylist: InMemoryTokenDenylist | None = None,
     rate_limit_enabled: bool = False,
 ) -> EnhancedBearerTokenStrategy:
     return EnhancedBearerTokenStrategy(
         secret_key=_SECRET,
-        blacklist=blacklist or _make_blacklist(),
+        denylist=denylist or _make_denylist(),
         rate_limit_enabled=rate_limit_enabled,
     )
 
@@ -99,19 +99,19 @@ async def test_enhanced_bearer_authenticate_missing_header():
 
 
 # ---------------------------------------------------------------------------
-# authenticate() — blacklisted token
+# authenticate() — denylisted token
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 @pytest.mark.unit
-async def test_enhanced_bearer_authenticate_blacklisted_token():
-    """validate_token() returns INVALID for a blacklisted token."""
-    blacklist = _make_blacklist()
-    strategy = _make_strategy(blacklist=blacklist)
+async def test_enhanced_bearer_authenticate_denylisted_token():
+    """validate_token() returns INVALID for a denylisted token."""
+    denylist = _make_denylist()
+    strategy = _make_strategy(denylist=denylist)
     token = _make_token()
 
-    await blacklist.add_token(token)
+    await denylist.add_token(token)
     result = await strategy.validate_token(token)
 
     assert result.status == AuthStatus.INVALID
@@ -129,7 +129,7 @@ async def test_enhanced_bearer_rate_limit():
     """authenticate() returns FAILED when rate limit is exceeded."""
     strategy = EnhancedBearerTokenStrategy(
         secret_key=_SECRET,
-        blacklist=_make_blacklist(),
+        denylist=_make_denylist(),
         rate_limit_enabled=True,
         max_attempts=1,
         rate_window=60,
@@ -154,14 +154,14 @@ async def test_enhanced_bearer_rate_limit():
 @pytest.mark.asyncio
 @pytest.mark.unit
 async def test_enhanced_bearer_revoke_token():
-    """revoke_token() adds the token to the blacklist."""
-    blacklist = _make_blacklist()
-    strategy = _make_strategy(blacklist=blacklist)
+    """revoke_token() adds the token to the denylist."""
+    denylist = _make_denylist()
+    strategy = _make_strategy(denylist=denylist)
     token = _make_token()
 
     success = await strategy.revoke_token(token)
     assert success is True
-    assert await blacklist.is_blacklisted(token) is True
+    assert await denylist.is_denylisted(token) is True
 
 
 # ---------------------------------------------------------------------------
@@ -236,5 +236,5 @@ def test_enhanced_bearer_short_key_raises_configuration_error():
     with pytest.raises(ConfigurationError, match="32 bytes"):
         EnhancedBearerTokenStrategy(
             secret_key=short_key,
-            blacklist=_make_blacklist(),
+            denylist=_make_denylist(),
         )

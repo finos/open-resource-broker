@@ -1,86 +1,86 @@
-"""Tests for token blacklist implementations."""
+"""Tests for token denylist implementations."""
 
 import time
 
 import pytest
 
-from orb.infrastructure.auth.token_blacklist import InMemoryTokenBlacklist
+from orb.infrastructure.auth.token_denylist import InMemoryTokenDenylist
 
 
 @pytest.mark.asyncio
-async def test_in_memory_blacklist_add_token():
-    """Test adding token to blacklist."""
-    blacklist = InMemoryTokenBlacklist()
+async def test_in_memory_denylist_add_token():
+    """Test adding token to denylist."""
+    denylist = InMemoryTokenDenylist()
 
     token = "test_token_123"
     expires_at = int(time.time()) + 3600
 
-    result = await blacklist.add_token(token, expires_at)
+    result = await denylist.add_token(token, expires_at)
     assert result is True
 
-    is_blacklisted = await blacklist.is_blacklisted(token)
-    assert is_blacklisted is True
+    is_denylisted = await denylist.is_denylisted(token)
+    assert is_denylisted is True
 
 
 @pytest.mark.asyncio
-async def test_in_memory_blacklist_remove_token():
-    """Test removing token from blacklist."""
-    blacklist = InMemoryTokenBlacklist()
+async def test_in_memory_denylist_remove_token():
+    """Test removing token from denylist."""
+    denylist = InMemoryTokenDenylist()
 
     token = "test_token_123"
-    await blacklist.add_token(token)
+    await denylist.add_token(token)
 
-    result = await blacklist.remove_token(token)
+    result = await denylist.remove_token(token)
     assert result is True
 
-    is_blacklisted = await blacklist.is_blacklisted(token)
-    assert is_blacklisted is False
+    is_denylisted = await denylist.is_denylisted(token)
+    assert is_denylisted is False
 
 
 @pytest.mark.asyncio
-async def test_in_memory_blacklist_expired_token():
+async def test_in_memory_denylist_expired_token():
     """Test that expired tokens are automatically removed."""
-    blacklist = InMemoryTokenBlacklist()
+    denylist = InMemoryTokenDenylist()
 
     token = "test_token_123"
     expires_at = int(time.time()) - 1  # Already expired
 
-    await blacklist.add_token(token, expires_at)
+    await denylist.add_token(token, expires_at)
 
     # Token should be removed when checked
-    is_blacklisted = await blacklist.is_blacklisted(token)
-    assert is_blacklisted is False
+    is_denylisted = await denylist.is_denylisted(token)
+    assert is_denylisted is False
 
 
 @pytest.mark.asyncio
-async def test_in_memory_blacklist_cleanup():
+async def test_in_memory_denylist_cleanup():
     """Test cleanup of expired tokens."""
-    blacklist = InMemoryTokenBlacklist()
+    denylist = InMemoryTokenDenylist()
 
     # Add expired token
     expired_token = "expired_token"
-    await blacklist.add_token(expired_token, int(time.time()) - 1)
+    await denylist.add_token(expired_token, int(time.time()) - 1)
 
     # Add valid token
     valid_token = "valid_token"
-    await blacklist.add_token(valid_token, int(time.time()) + 3600)
+    await denylist.add_token(valid_token, int(time.time()) + 3600)
 
     # Run cleanup
-    removed = await blacklist.cleanup_expired()
+    removed = await denylist.cleanup_expired()
     assert removed == 1
 
     # Valid token should still be there
-    assert await blacklist.is_blacklisted(valid_token) is True
+    assert await denylist.is_denylisted(valid_token) is True
 
 
 @pytest.mark.asyncio
-async def test_in_memory_blacklist_size():
-    """Test getting blacklist size."""
-    blacklist = InMemoryTokenBlacklist()
+async def test_in_memory_denylist_size():
+    """Test getting denylist size."""
+    denylist = InMemoryTokenDenylist()
 
-    assert await blacklist.get_blacklist_size() == 0
+    assert await denylist.get_denylist_size() == 0
 
-    await blacklist.add_token("token1")
-    await blacklist.add_token("token2")
+    await denylist.add_token("token1")
+    await denylist.add_token("token2")
 
-    assert await blacklist.get_blacklist_size() == 2
+    assert await denylist.get_denylist_size() == 2

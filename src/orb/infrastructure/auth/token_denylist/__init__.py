@@ -1,11 +1,11 @@
-"""Token blacklist implementation for JWT revocation."""
+"""Token denylist implementation for JWT revocation."""
 
-from .blacklist_port import TokenBlacklistPort
-from .in_memory_blacklist import InMemoryTokenBlacklist
-from .redis_blacklist import RedisTokenBlacklist
+from .denylist_port import TokenDenylistPort
+from .in_memory_denylist import InMemoryTokenDenylist
+from .redis_denylist import RedisTokenDenylist
 
 __all__ = [
-    "TokenBlacklistPort",
-    "InMemoryTokenBlacklist",
-    "RedisTokenBlacklist",
+    "TokenDenylistPort",
+    "InMemoryTokenDenylist",
+    "RedisTokenDenylist",
 ]
