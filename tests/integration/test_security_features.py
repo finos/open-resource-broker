@@ -1,4 +1,4 @@
-"""Integration tests for security features: JWT blacklist, input validation, auth middleware."""
+"""Integration tests for security features: JWT denylist, input validation, auth middleware."""
 
 import time
 from unittest.mock import AsyncMock, MagicMock
@@ -11,7 +11,7 @@ from orb.infrastructure.auth.strategy.bearer_token_strategy_enhanced import (
     EnhancedBearerTokenStrategy,
     RateLimiter,
 )
-from orb.infrastructure.auth.token_blacklist import InMemoryTokenBlacklist, RedisTokenBlacklist
+from orb.infrastructure.auth.token_denylist import InMemoryTokenDenylist, RedisTokenDenylist
 from orb.infrastructure.validation.input_validator import InputValidator, ValidationError
 
 # ---------------------------------------------------------------------------
@@ -36,15 +36,15 @@ def _make_context(
 
 
 def _make_strategy(
-    blacklist=None,
+    denylist=None,
     rate_limit_enabled: bool = False,
     token_expiry: int = 3600,
 ) -> EnhancedBearerTokenStrategy:
-    if blacklist is None:
-        blacklist = InMemoryTokenBlacklist()
+    if denylist is None:
+        denylist = InMemoryTokenDenylist()
     return EnhancedBearerTokenStrategy(
         secret_key=SECRET,
-        blacklist=blacklist,
+        denylist=denylist,
         algorithm="HS256",
         token_expiry=token_expiry,
         enabled=True,
@@ -53,18 +53,18 @@ def _make_strategy(
 
 
 # ===========================================================================
-# JWT Token Blacklist – InMemory
+# JWT Token Denylist – InMemory
 # ===========================================================================
 
 
-class TestInMemoryBlacklistIntegration:
-    """Integration tests for InMemoryTokenBlacklist."""
+class TestInMemoryDenylistIntegration:
+    """Integration tests for InMemoryTokenDenylist."""
 
     @pytest.mark.asyncio
     async def test_revoke_then_reject(self):
-        """Token added to blacklist must be rejected by the strategy."""
-        blacklist = InMemoryTokenBlacklist()
-        strategy = _make_strategy(blacklist)
+        """Token added to denylist must be rejected by the strategy."""
+        denylist = InMemoryTokenDenylist()
+        strategy = _make_strategy(denylist)
 
         token = strategy._create_access_token("user1", ["user"], ["read"])
 
@@ -82,10 +82,10 @@ class TestInMemoryBlacklistIntegration:
         assert result.status == AuthStatus.INVALID
 
     @pytest.mark.asyncio
-    async def test_blacklist_does_not_affect_other_tokens(self):
+    async def test_denylist_does_not_affect_other_tokens(self):
         """Revoking one token must not affect other valid tokens."""
-        blacklist = InMemoryTokenBlacklist()
-        strategy = _make_strategy(blacklist)
+        denylist = InMemoryTokenDenylist()
+        strategy = _make_strategy(denylist)
 
         token_a = strategy._create_access_token("userA", ["user"], ["read"])
         token_b = strategy._create_access_token("userB", ["user"], ["read"])
@@ -99,72 +99,72 @@ class TestInMemoryBlacklistIntegration:
         assert result_b.is_authenticated
 
     @pytest.mark.asyncio
-    async def test_expired_blacklist_entry_auto_removed(self):
-        """Blacklist entries with past expiry are treated as not blacklisted."""
-        blacklist = InMemoryTokenBlacklist()
+    async def test_expired_denylist_entry_auto_removed(self):
+        """Denylist entries with past expiry are treated as not denylisted."""
+        denylist = InMemoryTokenDenylist()
         token = "some.jwt.token"
         past_expiry = int(time.time()) - 10  # already expired
 
-        await blacklist.add_token(token, expires_at=past_expiry)
+        await denylist.add_token(token, expires_at=past_expiry)
 
-        # Should NOT be blacklisted because the entry itself has expired
-        assert await blacklist.is_blacklisted(token) is False
+        # Should NOT be denylisted because the entry itself has expired
+        assert await denylist.is_denylisted(token) is False
 
     @pytest.mark.asyncio
     async def test_cleanup_removes_only_expired(self):
         """cleanup_expired removes expired entries and keeps valid ones."""
-        blacklist = InMemoryTokenBlacklist()
+        denylist = InMemoryTokenDenylist()
 
-        await blacklist.add_token("expired1", int(time.time()) - 5)
-        await blacklist.add_token("expired2", int(time.time()) - 1)
-        await blacklist.add_token("valid1", int(time.time()) + 3600)
+        await denylist.add_token("expired1", int(time.time()) - 5)
+        await denylist.add_token("expired2", int(time.time()) - 1)
+        await denylist.add_token("valid1", int(time.time()) + 3600)
 
-        removed = await blacklist.cleanup_expired()
+        removed = await denylist.cleanup_expired()
 
         assert removed == 2
-        assert await blacklist.is_blacklisted("valid1") is True
-        assert await blacklist.get_blacklist_size() == 1
+        assert await denylist.is_denylisted("valid1") is True
+        assert await denylist.get_denylist_size() == 1
 
     @pytest.mark.asyncio
-    async def test_remove_token_from_blacklist(self):
-        """Explicitly removed token is no longer blacklisted."""
-        blacklist = InMemoryTokenBlacklist()
+    async def test_remove_token_from_denylist(self):
+        """Explicitly removed token is no longer denylisted."""
+        denylist = InMemoryTokenDenylist()
         token = "removable.token"
 
-        await blacklist.add_token(token)
-        assert await blacklist.is_blacklisted(token) is True
+        await denylist.add_token(token)
+        assert await denylist.is_denylisted(token) is True
 
-        removed = await blacklist.remove_token(token)
+        removed = await denylist.remove_token(token)
         assert removed is True
-        assert await blacklist.is_blacklisted(token) is False
+        assert await denylist.is_denylisted(token) is False
 
     @pytest.mark.asyncio
     async def test_remove_nonexistent_token_returns_false(self):
         """Removing a token that was never added returns False."""
-        blacklist = InMemoryTokenBlacklist()
-        result = await blacklist.remove_token("ghost.token")
+        denylist = InMemoryTokenDenylist()
+        result = await denylist.remove_token("ghost.token")
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_blacklist_size_tracks_additions(self):
-        """get_blacklist_size reflects the number of active entries."""
-        blacklist = InMemoryTokenBlacklist()
-        assert await blacklist.get_blacklist_size() == 0
+    async def test_denylist_size_tracks_additions(self):
+        """get_denylist_size reflects the number of active entries."""
+        denylist = InMemoryTokenDenylist()
+        assert await denylist.get_denylist_size() == 0
 
-        await blacklist.add_token("t1")
-        await blacklist.add_token("t2")
-        await blacklist.add_token("t3")
+        await denylist.add_token("t1")
+        await denylist.add_token("t2")
+        await denylist.add_token("t3")
 
-        assert await blacklist.get_blacklist_size() == 3
+        assert await denylist.get_denylist_size() == 3
 
 
 # ===========================================================================
-# JWT Token Blacklist – Redis (mocked)
+# JWT Token Denylist – Redis (mocked)
 # ===========================================================================
 
 
-class TestRedisBlacklistIntegration:
-    """Integration tests for RedisTokenBlacklist with a mocked Redis client."""
+class TestRedisDenylistIntegration:
+    """Integration tests for RedisTokenDenylist with a mocked Redis client."""
 
     def _make_redis_mock(self) -> MagicMock:
         redis = MagicMock()
@@ -172,17 +172,17 @@ class TestRedisBlacklistIntegration:
         redis.set = AsyncMock(return_value=True)
         redis.exists = AsyncMock(return_value=1)
         redis.delete = AsyncMock(return_value=1)
-        redis.keys = AsyncMock(return_value=["token_blacklist:tok1", "token_blacklist:tok2"])
+        redis.keys = AsyncMock(return_value=["token_denylist:tok1", "token_denylist:tok2"])
         return redis
 
     @pytest.mark.asyncio
     async def test_add_token_with_expiry_calls_setex(self):
         """add_token with expiry uses Redis SETEX."""
         redis = self._make_redis_mock()
-        blacklist = RedisTokenBlacklist(redis_client=redis)
+        denylist = RedisTokenDenylist(redis_client=redis)
 
         future_expiry = int(time.time()) + 3600
-        result = await blacklist.add_token("mytoken", expires_at=future_expiry)
+        result = await denylist.add_token("mytoken", expires_at=future_expiry)
 
         assert result is True
         redis.setex.assert_called_once()
@@ -191,56 +191,56 @@ class TestRedisBlacklistIntegration:
     async def test_add_token_without_expiry_calls_set(self):
         """add_token without expiry uses Redis SET."""
         redis = self._make_redis_mock()
-        blacklist = RedisTokenBlacklist(redis_client=redis)
+        denylist = RedisTokenDenylist(redis_client=redis)
 
-        result = await blacklist.add_token("mytoken")
+        result = await denylist.add_token("mytoken")
 
         assert result is True
         redis.set.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_is_blacklisted_returns_true_when_key_exists(self):
-        """is_blacklisted returns True when Redis key exists."""
+    async def test_is_denylisted_returns_true_when_key_exists(self):
+        """is_denylisted returns True when Redis key exists."""
         redis = self._make_redis_mock()
         redis.exists = AsyncMock(return_value=1)
-        blacklist = RedisTokenBlacklist(redis_client=redis)
+        denylist = RedisTokenDenylist(redis_client=redis)
 
-        assert await blacklist.is_blacklisted("mytoken") is True
+        assert await denylist.is_denylisted("mytoken") is True
 
     @pytest.mark.asyncio
-    async def test_is_blacklisted_returns_false_when_key_missing(self):
-        """is_blacklisted returns False when Redis key does not exist."""
+    async def test_is_denylisted_returns_false_when_key_missing(self):
+        """is_denylisted returns False when Redis key does not exist."""
         redis = self._make_redis_mock()
         redis.exists = AsyncMock(return_value=0)
-        blacklist = RedisTokenBlacklist(redis_client=redis)
+        denylist = RedisTokenDenylist(redis_client=redis)
 
-        assert await blacklist.is_blacklisted("mytoken") is False
+        assert await denylist.is_denylisted("mytoken") is False
 
     @pytest.mark.asyncio
     async def test_redis_error_fails_secure(self):
-        """On Redis error, is_blacklisted fails secure (returns True)."""
+        """On Redis error, is_denylisted fails secure (returns True)."""
         redis = self._make_redis_mock()
         redis.exists = AsyncMock(side_effect=ConnectionError("Redis down"))
-        blacklist = RedisTokenBlacklist(redis_client=redis)
+        denylist = RedisTokenDenylist(redis_client=redis)
 
-        # Fail-secure: assume blacklisted on error
-        assert await blacklist.is_blacklisted("anytoken") is True
+        # Fail-secure: assume denylisted on error
+        assert await denylist.is_denylisted("anytoken") is True
 
     @pytest.mark.asyncio
     async def test_fallback_to_in_memory_when_no_redis(self):
-        """Without a Redis client, RedisTokenBlacklist falls back to in-memory."""
-        blacklist = RedisTokenBlacklist(redis_client=None)
+        """Without a Redis client, RedisTokenDenylist falls back to in-memory."""
+        denylist = RedisTokenDenylist(redis_client=None)
 
-        await blacklist.add_token("fallback_token")
-        assert await blacklist.is_blacklisted("fallback_token") is True
+        await denylist.add_token("fallback_token")
+        assert await denylist.is_denylisted("fallback_token") is True
 
     @pytest.mark.asyncio
-    async def test_get_blacklist_size_counts_keys(self):
-        """get_blacklist_size counts matching Redis keys."""
+    async def test_get_denylist_size_counts_keys(self):
+        """get_denylist_size counts matching Redis keys."""
         redis = self._make_redis_mock()
-        blacklist = RedisTokenBlacklist(redis_client=redis)
+        denylist = RedisTokenDenylist(redis_client=redis)
 
-        size = await blacklist.get_blacklist_size()
+        size = await denylist.get_denylist_size()
         assert size == 2  # matches the two keys in the mock
 
 
@@ -300,10 +300,10 @@ class TestEnhancedBearerTokenStrategyIntegration:
         assert not result.is_authenticated
 
     @pytest.mark.asyncio
-    async def test_blacklisted_token_rejected_via_authenticate(self):
+    async def test_denylisted_token_rejected_via_authenticate(self):
         """authenticate rejects a token that has been revoked."""
-        blacklist = InMemoryTokenBlacklist()
-        strategy = _make_strategy(blacklist)
+        denylist = InMemoryTokenDenylist()
+        strategy = _make_strategy(denylist)
 
         token = strategy._create_access_token("bob", ["user"], ["read"])
         await strategy.revoke_token(token)
@@ -393,11 +393,11 @@ class TestEnhancedBearerTokenStrategyIntegration:
     @pytest.mark.asyncio
     async def test_revoked_refresh_token_rejected(self):
         """A revoked refresh token cannot be used to get a new access token."""
-        blacklist = InMemoryTokenBlacklist()
-        strategy = _make_strategy(blacklist)
+        denylist = InMemoryTokenDenylist()
+        strategy = _make_strategy(denylist)
 
         refresh = strategy.create_refresh_token("frank", ["user"], ["read"])
-        await blacklist.add_token(refresh)
+        await denylist.add_token(refresh)
 
         result = await strategy.refresh_token(refresh)
 
@@ -454,10 +454,10 @@ class TestRateLimiterIntegration:
     @pytest.mark.asyncio
     async def test_rate_limited_ip_gets_failed_auth_result(self):
         """Strategy returns FAILED when IP is rate-limited."""
-        blacklist = InMemoryTokenBlacklist()
+        denylist = InMemoryTokenDenylist()
         strategy = EnhancedBearerTokenStrategy(
             secret_key=SECRET,
-            blacklist=blacklist,
+            denylist=denylist,
             algorithm="HS256",
             enabled=True,
             rate_limit_enabled=True,

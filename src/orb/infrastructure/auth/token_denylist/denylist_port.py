@@ -1,19 +1,19 @@
-"""Token blacklist port interface."""
+"""Token denylist port interface."""
 
 from abc import ABC, abstractmethod
 from typing import Optional
 
 
-class TokenBlacklistPort(ABC):
-    """Port interface for token blacklist implementations."""
+class TokenDenylistPort(ABC):
+    """Port interface for token denylist implementations."""
 
     @abstractmethod
     async def add_token(self, token: str, expires_at: Optional[int] = None) -> bool:
         """
-        Add token to blacklist.
+        Add token to denylist.
 
         Args:
-            token: Token to blacklist
+            token: Token to add to the denylist
             expires_at: Unix timestamp when token expires (for automatic cleanup)
 
         Returns:
@@ -21,21 +21,21 @@ class TokenBlacklistPort(ABC):
         """
 
     @abstractmethod
-    async def is_blacklisted(self, token: str) -> bool:
+    async def is_denylisted(self, token: str) -> bool:
         """
-        Check if token is blacklisted.
+        Check if token is on the denylist.
 
         Args:
             token: Token to check
 
         Returns:
-            True if token is blacklisted
+            True if token is on the denylist
         """
 
     @abstractmethod
     async def remove_token(self, token: str) -> bool:
         """
-        Remove token from blacklist.
+        Remove token from denylist.
 
         Args:
             token: Token to remove
@@ -47,17 +47,17 @@ class TokenBlacklistPort(ABC):
     @abstractmethod
     async def cleanup_expired(self) -> int:
         """
-        Remove expired tokens from blacklist.
+        Remove expired tokens from denylist.
 
         Returns:
             Number of tokens removed
         """
 
     @abstractmethod
-    async def get_blacklist_size(self) -> int:
+    async def get_denylist_size(self) -> int:
         """
-        Get number of tokens in blacklist.
+        Get number of tokens on the denylist.
 
         Returns:
-            Number of blacklisted tokens
+            Number of denylisted tokens
         """

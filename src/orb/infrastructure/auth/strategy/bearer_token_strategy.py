@@ -184,10 +184,10 @@ class BearerTokenStrategy(AuthPort):
 
     async def revoke_token(self, token: str) -> bool:
         """
-        Revoke token (add to blacklist).
+        Revoke token (add to denylist).
 
         Note: This is a simplified implementation. In production,
-        you would maintain a token blacklist in a database or cache.
+        you would maintain a token denylist in a database or cache.
 
         Args:
             token: Token to revoke
