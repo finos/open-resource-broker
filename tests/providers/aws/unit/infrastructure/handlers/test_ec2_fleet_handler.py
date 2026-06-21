@@ -5,7 +5,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 from botocore.exceptions import ClientError
 
-from orb.domain.base.provider_fulfilment import CheckHostsStatusResult, ProviderFulfilment
+from orb.domain.base.provider_fulfilment import (
+    CheckHostsStatusResult,
+    FulfilmentState,
+    ProviderFulfilment,
+)
 from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
 
@@ -53,7 +57,9 @@ def _formatted_instances(instance_ids, resource_id="fleet-test"):
     return [_inst(iid, resource_id) for iid in instance_ids]
 
 
-def _fleet_result(instance_ids, resource_id="fleet-test", state="fulfilled"):
+def _fleet_result(
+    instance_ids, resource_id="fleet-test", state: FulfilmentState = "fulfilled"
+):
     """Build a CheckHostsStatusResult for mocking _check_single_fleet_status."""
     return CheckHostsStatusResult(
         instances=_formatted_instances(instance_ids, resource_id),
