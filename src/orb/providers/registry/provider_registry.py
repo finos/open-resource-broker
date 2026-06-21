@@ -1,8 +1,15 @@
 """Provider Registry - Registry pattern for provider strategy factories."""
 
 import importlib
+import re
 import threading
 from typing import Any, Callable, List, Optional
+
+# Only allow simple snake_case identifiers as provider types to prevent
+# module-injection via crafted provider_type strings (e.g. containing dots
+# or path-traversal sequences) that would be interpolated directly into the
+# dynamic importlib.import_module() call.
+_VALID_PROVIDER_TYPE_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 from orb.domain.base.exceptions import ConfigurationError
 from orb.domain.base.ports.configuration_port import ConfigurationPort
@@ -143,6 +150,9 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
             return True
 
         # Try to dynamically import and register
+        if not _VALID_PROVIDER_TYPE_RE.match(provider_type):
+            raise ValueError(f"Invalid provider type: {provider_type!r}")
+
         module_name = f"orb.providers.{provider_type}.registration"
         try:
             if self._logger:
@@ -207,6 +217,9 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
 
         try:
             provider_type = provider_instance.type
+
+            if not _VALID_PROVIDER_TYPE_RE.match(provider_type):
+                raise ValueError(f"Invalid provider type: {provider_type!r}")
 
             if self._logger:
                 self._logger.debug("Registering provider instance: %s", provider_instance.name)

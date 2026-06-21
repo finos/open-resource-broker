@@ -1,7 +1,7 @@
-"""Tests for ProviderRegistry._provider_supports_api — no hardcoded AWS API list."""
+"""Tests for ProviderRegistry — no hardcoded AWS API list and provider_type allowlist."""
 
 from typing import cast
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -160,3 +160,123 @@ class TestProviderSupportsApiNoHardcode:
         registry = _make_registry(provider, strategy=strategy)
 
         assert registry._provider_supports_api(provider, "SpotFleet") is True
+
+
+# ---------------------------------------------------------------------------
+# Provider type allowlist — ensure_provider_type_registered and
+# ensure_provider_instance_registered_from_config must reject provider_type
+# values that would allow module-injection via importlib.import_module.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestProviderTypeAllowlist:
+    """ensure_provider_type_registered must reject non-alphanumeric provider types."""
+
+    def _make_bare_registry(self) -> ProviderRegistry:
+        registry = cast(ProviderRegistry, ProviderRegistry.__new__(ProviderRegistry))
+        registry._type_registrations = {}
+        registry._instance_registrations = {}
+        registry._registry_lock = __import__("threading").RLock()
+        registry.mode = __import__(
+            "orb.infrastructure.registry.base_registry", fromlist=["RegistryMode"]
+        ).RegistryMode.MULTI_CHOICE
+        registry._factory = None
+        registry._initialized = True
+        registry._strategy_cache = {}
+        registry._health_states = {}
+        registry._fallback_strategy = None
+        registry._config_port = None
+        registry._logger = MagicMock()
+        return registry
+
+    # --- ensure_provider_type_registered ---
+
+    def test_valid_provider_type_attempts_import(self):
+        """A valid snake_case type like 'aws' attempts the dynamic import (no ValueError)."""
+        registry = self._make_bare_registry()
+
+        with patch("importlib.import_module", side_effect=ImportError("no module")) as mock_import:
+            result = registry.ensure_provider_type_registered("aws")
+
+        # ImportError → returns False, but the import WAS attempted (no ValueError raised)
+        mock_import.assert_called_once_with("orb.providers.aws.registration")
+        assert result is False
+
+    def test_valid_provider_type_with_underscores(self):
+        """Types like 'my_provider' pass the allowlist."""
+        registry = self._make_bare_registry()
+
+        with patch("importlib.import_module", side_effect=ImportError("no module")):
+            # Should not raise ValueError
+            registry.ensure_provider_type_registered("my_provider")
+
+    def test_valid_provider_type_with_digits(self):
+        """Types like 'provider1' pass the allowlist."""
+        registry = self._make_bare_registry()
+
+        with patch("importlib.import_module", side_effect=ImportError("no module")):
+            registry.ensure_provider_type_registered("provider1")
+
+    def test_dot_in_provider_type_raises_value_error(self):
+        """A provider_type containing a dot (e.g. 'os.path') must raise ValueError."""
+        registry = self._make_bare_registry()
+
+        with pytest.raises(ValueError, match="Invalid provider type"):
+            registry.ensure_provider_type_registered("os.path")
+
+    def test_path_traversal_raises_value_error(self):
+        """A path-traversal string must raise ValueError."""
+        registry = self._make_bare_registry()
+
+        with pytest.raises(ValueError, match="Invalid provider type"):
+            registry.ensure_provider_type_registered("../../etc/passwd")
+
+    def test_uppercase_raises_value_error(self):
+        """Uppercase letters are not permitted (consistent snake_case convention)."""
+        registry = self._make_bare_registry()
+
+        with pytest.raises(ValueError, match="Invalid provider type"):
+            registry.ensure_provider_type_registered("AWS")
+
+    def test_leading_digit_raises_value_error(self):
+        """A provider_type starting with a digit must raise ValueError."""
+        registry = self._make_bare_registry()
+
+        with pytest.raises(ValueError, match="Invalid provider type"):
+            registry.ensure_provider_type_registered("1provider")
+
+    def test_space_in_provider_type_raises_value_error(self):
+        """A provider_type with whitespace must raise ValueError."""
+        registry = self._make_bare_registry()
+
+        with pytest.raises(ValueError, match="Invalid provider type"):
+            registry.ensure_provider_type_registered("aws provider")
+
+    # --- ensure_provider_instance_registered_from_config ---
+
+    def test_instance_registration_dot_in_type_raises_value_error(self):
+        """ensure_provider_instance_registered_from_config rejects dotted provider types."""
+        registry = self._make_bare_registry()
+
+        provider_instance = MagicMock()
+        provider_instance.name = "my-instance"
+        provider_instance.type = "malicious.module"
+        # Not yet registered
+        registry._instance_registrations = {}
+
+        with pytest.raises(ValueError, match="Invalid provider type"):
+            registry.ensure_provider_instance_registered_from_config(provider_instance)
+
+    def test_instance_registration_valid_type_attempts_import(self):
+        """ensure_provider_instance_registered_from_config passes validation for 'aws'."""
+        registry = self._make_bare_registry()
+
+        provider_instance = MagicMock()
+        provider_instance.name = "aws-east"
+        provider_instance.type = "aws"
+
+        with patch("importlib.import_module", side_effect=ImportError("no module")):
+            result = registry.ensure_provider_instance_registered_from_config(provider_instance)
+
+        assert result is False  # ImportError → False, but no ValueError
