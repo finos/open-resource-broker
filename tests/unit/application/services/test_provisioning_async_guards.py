@@ -6,6 +6,7 @@ Covers:
 """
 
 import asyncio
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -92,7 +93,7 @@ class TestDispatchTimeout:
 
         scheduler = MagicMock()
         scheduler.format_template_for_provider.return_value = {}
-        svc._container.get.return_value = scheduler
+        cast(MagicMock, svc._container).get.return_value = scheduler
 
         result = await svc._dispatch_single_attempt(
             _make_template(),
@@ -118,7 +119,7 @@ class TestDispatchTimeout:
 
         scheduler = MagicMock()
         scheduler.format_template_for_provider.return_value = {}
-        svc._container.get.return_value = scheduler
+        cast(MagicMock, svc._container).get.return_value = scheduler
 
         await svc._dispatch_single_attempt(
             _make_template(),
@@ -128,8 +129,8 @@ class TestDispatchTimeout:
             dispatch_timeout_seconds=0.05,
         )
 
-        svc._logger.warning.assert_called()
-        warning_call_args = str(svc._logger.warning.call_args_list)
+        cast(MagicMock, svc._logger).warning.assert_called()
+        warning_call_args = str(cast(MagicMock, svc._logger).warning.call_args_list)
         assert "timed out" in warning_call_args.lower() or "timeout" in warning_call_args.lower()
 
     @pytest.mark.asyncio
@@ -151,7 +152,7 @@ class TestDispatchTimeout:
 
         scheduler = MagicMock()
         scheduler.format_template_for_provider.return_value = {}
-        svc._container.get.return_value = scheduler
+        cast(MagicMock, svc._container).get.return_value = scheduler
 
         result = await svc._dispatch_single_attempt(
             _make_template(),
@@ -180,7 +181,7 @@ class TestDispatchTimeout:
 
         scheduler = MagicMock()
         scheduler.format_template_for_provider.return_value = {}
-        svc._container.get.return_value = scheduler
+        cast(MagicMock, svc._container).get.return_value = scheduler
 
         request = _make_request(count=1)
         # Make update_metadata return a fresh mock that also has metadata={} and matching attrs
@@ -237,7 +238,7 @@ class TestPersistAcquiringToThread:
 
         scheduler = MagicMock()
         scheduler.format_template_for_provider.return_value = {}
-        svc._container.get.return_value = scheduler
+        cast(MagicMock, svc._container).get.return_value = scheduler
 
         to_thread_calls: list = []
 
@@ -309,7 +310,7 @@ class TestPersistAcquiringToThread:
 
         scheduler = MagicMock()
         scheduler.format_template_for_provider.return_value = {}
-        svc._container.get.return_value = scheduler
+        cast(MagicMock, svc._container).get.return_value = scheduler
 
         request = MagicMock()
         request.request_id = "req-persist-fail"
@@ -334,6 +335,6 @@ class TestPersistAcquiringToThread:
             await svc.execute_provisioning(_make_template(), request, _make_selection_result())
 
         # Loop should have continued despite persist failure
-        svc._logger.warning.assert_called()
-        warning_msgs = " ".join(str(c) for c in svc._logger.warning.call_args_list)
+        cast(MagicMock, svc._logger).warning.assert_called()
+        warning_msgs = " ".join(str(c) for c in cast(MagicMock, svc._logger).warning.call_args_list)
         assert "ACQUIRING persist failed" in warning_msgs or "persist" in warning_msgs.lower()
