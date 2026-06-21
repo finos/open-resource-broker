@@ -216,19 +216,34 @@ class TestHandleProvisioningFailure:
 
         return RequestStatusManagementService(uow_factory=MagicMock(), logger=MagicMock())
 
-    def _make_provisioning_result(self, **kwargs):
+    def _make_provisioning_result(
+        self,
+        *,
+        success: bool = False,
+        resource_ids: list[str] | None = None,
+        machine_ids: list[str] | None = None,
+        instances: list[dict] | None = None,
+        provider_data: dict | None = None,
+        error_message: str | None = "Provisioning failed",
+        aws_error_code: str | None = None,
+        aws_error_message: str | None = None,
+        aws_request_id: str | None = None,
+        error_source: str | None = None,
+    ):
         from orb.application.services.provisioning_orchestration_service import ProvisioningResult
 
-        defaults = dict(
-            success=False,
-            resource_ids=[],
-            machine_ids=[],
-            instances=[],
-            provider_data={},
-            error_message="Provisioning failed",
+        return ProvisioningResult(
+            success=success,
+            resource_ids=resource_ids if resource_ids is not None else [],
+            machine_ids=machine_ids if machine_ids is not None else [],
+            instances=instances if instances is not None else [],
+            provider_data=provider_data if provider_data is not None else {},
+            error_message=error_message,
+            aws_error_code=aws_error_code,
+            aws_error_message=aws_error_message,
+            aws_request_id=aws_request_id,
+            error_source=error_source,
         )
-        defaults.update(kwargs)
-        return ProvisioningResult(**defaults)
 
     def _make_real_request(self):
         """Build a real Request aggregate (not a mock) so model_copy works."""
