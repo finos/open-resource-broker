@@ -53,6 +53,10 @@ def _get_boto_profile_and_region() -> tuple[str | None, str]:
                 region = provider_cfg.get("region")
         except Exception:
             pass
+    # Fall back to AWS_PROFILE env var so the explicit profile_name is always
+    # non-None when a profile is available.  This forces botocore to use
+    # profile-based credentials and ignore injected fake env var credentials.
+    profile = profile or os.environ.get("AWS_PROFILE")
     region = (
         region
         or os.environ.get("AWS_REGION")
