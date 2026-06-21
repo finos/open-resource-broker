@@ -12,12 +12,14 @@ from orb.application.dto.queries import (
     ListReturnRequestsQuery,
 )
 from orb.application.dto.responses import RequestDTO
+from orb.application.factories.request_dto_factory import RequestDTOFactory
 from orb.application.request.queries import ListRequestsQuery
 from orb.application.services.machine_sync_service import MachineSyncService
 from orb.application.services.provider_registry_service import ProviderRegistryService
+from orb.application.services.request_query_service import RequestQueryService
 from orb.application.services.request_status_service import RequestStatusService
 from orb.domain.base import UnitOfWorkFactory
-from orb.domain.base.exceptions import EntityNotFoundError
+from orb.domain.base.exceptions import EntityNotFoundError, ProviderContractError
 from orb.domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
 from orb.domain.services.generic_filter_service import GenericFilterService
 
@@ -43,9 +45,6 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
         self._machine_sync_service = machine_sync_service
         self._cache_service = self._get_cache_service()
         self.event_publisher = self._get_event_publisher()
-
-        from orb.application.factories.request_dto_factory import RequestDTOFactory
-        from orb.application.services.request_query_service import RequestQueryService
 
         self._query_service = RequestQueryService(uow_factory, logger)
         self._status_service = RequestStatusService(uow_factory, logger)
@@ -105,6 +104,8 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                         request, new_status, status_message or "", provider_metadata
                     )
                 request = await self._query_service.get_request(query.request_id)
+            except ProviderContractError:
+                raise
             except Exception as sync_err:
                 self.logger.warning(
                     "Error syncing request %s, returning stored state: %s",
@@ -223,15 +224,13 @@ class ListRequestsHandler(BaseQueryHandler[ListRequestsQuery, list[RequestDTO]])
                 end_idx = start_idx + (query.limit or 50)
                 requests = requests[start_idx:end_idx]
 
+                dto_factory = RequestDTOFactory()
                 request_dtos = []
                 for request in requests:
                     machines = []
                     if request.machine_ids:
                         machines = uow.machines.find_by_ids(request.machine_ids)
 
-                    from orb.application.factories.request_dto_factory import RequestDTOFactory
-
-                    dto_factory = RequestDTOFactory()
                     request_dto = dto_factory.create_from_domain(request, machines)
                     request_dtos.append(request_dto)
 
@@ -267,10 +266,8 @@ class ListReturnRequestsHandler(BaseQueryHandler[ListReturnRequestsQuery, list[R
         self._generic_filter_service = generic_filter_service
         self._machine_sync_service = machine_sync_service
         self._status_service = RequestStatusService(uow_factory, logger)
-
-        from orb.application.services.request_query_service import RequestQueryService
-
         self._query_service = RequestQueryService(uow_factory, logger)
+        self._dto_factory = RequestDTOFactory()
 
     async def execute_query(self, query: ListReturnRequestsQuery) -> list[RequestDTO]:
         """Execute list return requests query."""
@@ -332,10 +329,7 @@ class ListReturnRequestsHandler(BaseQueryHandler[ListReturnRequestsQuery, list[R
                     if request.machine_ids:
                         machines = uow.machines.find_by_ids(request.machine_ids)
 
-                    from orb.application.factories.request_dto_factory import RequestDTOFactory
-
-                    dto_factory = RequestDTOFactory()
-                    request_dto = dto_factory.create_from_domain(request, machines)
+                    request_dto = self._dto_factory.create_from_domain(request, machines)
                     request_dtos.append(request_dto)
 
                 if query.machine_names:
@@ -398,10 +392,8 @@ class ListActiveRequestsHandler(BaseQueryHandler[ListActiveRequestsQuery, list[R
         self._generic_filter_service = generic_filter_service
         self._machine_sync_service = machine_sync_service
         self._status_service = RequestStatusService(uow_factory, logger)
-
-        from orb.application.services.request_query_service import RequestQueryService
-
         self._query_service = RequestQueryService(uow_factory, logger)
+        self._dto_factory = RequestDTOFactory()
 
     async def execute_query(self, query: ListActiveRequestsQuery) -> list[RequestDTO]:
         """Execute list active requests query."""
@@ -465,10 +457,7 @@ class ListActiveRequestsHandler(BaseQueryHandler[ListActiveRequestsQuery, list[R
                 request = await self._query_service.get_request(str(request.request_id.value))
                 db_machines = await self._query_service.get_machines_for_request(request)
 
-                from orb.application.factories.request_dto_factory import RequestDTOFactory
-
-                dto_factory = RequestDTOFactory()
-                request_dto = dto_factory.create_from_domain(request, db_machines)
+                request_dto = self._dto_factory.create_from_domain(request, db_machines)
                 request_dtos.append(request_dto)
 
             if query.filter_expressions:
