@@ -2234,8 +2234,10 @@ def test_rest_api_unknown_template_returns_error(setup_rest_api_environment):
             client.request_machines("NonExistent-Template-XYZ", 1)
             pytest.fail("Expected HTTPError for unknown template but no exception was raised")
         except _requests.HTTPError as exc:
-            assert exc.response.status_code >= 400, (
-                f"Expected 4xx for unknown template, got {exc.response.status_code}"
+            response = exc.response
+            assert response is not None, "HTTPError raised with no response attached"
+            assert response.status_code >= 400, (
+                f"Expected 4xx for unknown template, got {response.status_code}"
             )
         except Exception as exc:
             # Any other exception is also acceptable — server rejected the request
