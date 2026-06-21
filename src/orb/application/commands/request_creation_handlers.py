@@ -516,53 +516,68 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                     )
                     uow.machines.save(updated_machine)
 
-    async def _update_request_to_failed(self, request: Any, errors: list[str]) -> None:
-        """Update request status to failed."""
+    async def _update_request_status(self, request: Any, status: Any, message: str) -> None:
+        """Update request status via the command bus with a UoW fallback for FAILED.
+
+        On command-bus failure the error is logged.  For FAILED status a direct
+        UoW write is attempted so the request always reaches a terminal state and
+        callers do not poll forever.  For all other statuses the caller decides
+        how to handle the failure (e.g. _update_request_to_terminating re-raises
+        so the deprovisioning loop can apply its own fallback).
+        """
+        from orb.application.dto.commands import UpdateRequestStatusCommand
+        from orb.application.ports.command_bus_port import CommandBusPort
+        from orb.domain.request.request_types import RequestStatus
+
+        update_command = UpdateRequestStatusCommand(
+            request_id=str(request.request_id),
+            status=status,
+            message=message,
+        )
         try:
-            from orb.application.dto.commands import UpdateRequestStatusCommand
-            from orb.application.ports.command_bus_port import CommandBusPort
-            from orb.domain.request.request_types import RequestStatus
-
-            error_message = "; ".join(errors) if errors else "Deprovisioning failed"
-
-            update_command = UpdateRequestStatusCommand(
-                request_id=str(request.request_id),
-                status=RequestStatus.FAILED,
-                message=f"Return request failed: {error_message}",
-            )
-
             command_bus = self._container.get(CommandBusPort)
             await command_bus.execute(update_command)
-
-            self.logger.info("Updated request %s status to failed", request.request_id)
-
+            self.logger.info(
+                "Updated request %s status to %s", request.request_id, status
+            )
         except Exception as update_error:
             self.logger.error(
-                "Failed to update request status: %s",
+                "Failed to update request %s status to %s: %s",
+                request.request_id,
+                status,
                 update_error,
                 exc_info=True,
             )
-            # Force-write terminal status directly to prevent permanent stuck state
-            try:
-                from orb.domain.request.request_types import RequestStatus
+            if status == RequestStatus.FAILED:
+                # Force-write terminal status directly to prevent permanent stuck state
+                try:
+                    with self.uow_factory.create_unit_of_work() as uow:
+                        stuck_request = uow.requests.get_by_id(request.request_id)
+                        if stuck_request:
+                            stuck_request = stuck_request.update_status(
+                                RequestStatus.FAILED,
+                                "System error: failed to update status after double failure",
+                                force=True,
+                            )
+                            uow.requests.save(stuck_request)
+                except Exception as final_error:
+                    self.logger.critical(
+                        "CRITICAL: Failed to mark request %s as failed after double failure. "
+                        "Request is stuck in IN_PROGRESS. Manual intervention required. Error: %s",
+                        request.request_id,
+                        final_error,
+                    )
+            else:
+                raise
 
-                with self.uow_factory.create_unit_of_work() as uow:
-                    stuck_request = uow.requests.get_by_id(request.request_id)
-                    if stuck_request:
-                        stuck_request = stuck_request.update_status(
-                            RequestStatus.FAILED,
-                            "System error: failed to update status after double failure",
-                            force=True,
-                        )
-                        uow.requests.save(stuck_request)
-            except Exception as final_error:
-                self.logger.critical(
-                    "CRITICAL: Failed to mark request %s as failed after double failure. "
-                    "Request is stuck in IN_PROGRESS. Manual intervention required. Error: %s",
-                    request.request_id,
-                    final_error,
-                )
-                # Nothing more we can do
+    async def _update_request_to_failed(self, request: Any, errors: list[str]) -> None:
+        """Update request status to failed."""
+        from orb.domain.request.request_types import RequestStatus
+
+        error_message = "; ".join(errors) if errors else "Deprovisioning failed"
+        await self._update_request_status(
+            request, RequestStatus.FAILED, f"Return request failed: {error_message}"
+        )
 
     async def _update_request_to_terminating(self, request: Any) -> None:
         """Set return request to IN_PROGRESS after termination is accepted by provider.
@@ -571,50 +586,25 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         are still ``shutting-down``.  Using IN_PROGRESS here lets the background sync
         poll AWS and transition to COMPLETED only when all instances reach ``terminated``.
         """
-        try:
-            from orb.application.dto.commands import UpdateRequestStatusCommand
-            from orb.application.ports.command_bus_port import CommandBusPort
-            from orb.domain.request.request_types import RequestStatus
+        from orb.domain.request.request_types import RequestStatus
 
-            update_command = UpdateRequestStatusCommand(
-                request_id=str(request.request_id),
-                status=RequestStatus.IN_PROGRESS,
-                message="Termination accepted: waiting for instances to reach terminated state",
-            )
-            command_bus = self._container.get(CommandBusPort)
-            await command_bus.execute(update_command)
-            self.logger.info(
-                "Request %s set to IN_PROGRESS: termination accepted, polling for completion",
-                request.request_id,
-            )
-        except Exception as update_error:
-            self.logger.error(
-                "Failed to update request status to in_progress after termination: %s",
-                update_error,
-                exc_info=True,
-            )
+        await self._update_request_status(
+            request,
+            RequestStatus.IN_PROGRESS,
+            "Termination accepted: waiting for instances to reach terminated state",
+        )
 
     async def _update_request_to_completed(self, request: Any) -> None:
         """Update return request status to completed and persist."""
-        try:
-            from orb.application.dto.commands import UpdateRequestStatusCommand
-            from orb.application.ports.command_bus_port import CommandBusPort
-            from orb.domain.request.request_types import RequestStatus
+        from orb.domain.request.request_types import RequestStatus
 
-            update_command = UpdateRequestStatusCommand(
-                request_id=str(request.request_id),
-                status=RequestStatus.COMPLETED,
-                message="Return request completed: termination initiated",
+        try:
+            await self._update_request_status(
+                request,
+                RequestStatus.COMPLETED,
+                "Return request completed: termination initiated",
             )
-            command_bus = self._container.get(CommandBusPort)
-            await command_bus.execute(update_command)
-            self.logger.info("Updated request %s status to completed", request.request_id)
         except Exception as update_error:
-            self.logger.error(
-                "Failed to update request status to completed: %s",
-                update_error,
-                exc_info=True,
-            )
             # Ensure the request reaches a terminal status so callers don't poll forever
             await self._update_request_to_failed(
                 request, [f"Failed to mark completed: {update_error}"]
