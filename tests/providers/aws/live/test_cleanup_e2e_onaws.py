@@ -216,8 +216,19 @@ for _case in CLEANUP_E2E_CASES:
 # ---------------------------------------------------------------------------
 
 
-def _assert_asg_deleted(asg_name: str, timeout: int = 300) -> None:
-    """Assert ASG is deleted or has zero desired capacity with no active instances."""
+def _assert_asg_deleted(asg_name: str, timeout: int = 300, weighted: bool = False) -> None:
+    """Assert ASG is deleted or has zero desired capacity with no active instances.
+
+    Args:
+        asg_name: Name of the Auto Scaling Group to check.
+        timeout: Maximum seconds to wait.
+        weighted: When True (weighted-capacity template), the lenient condition is used:
+            no active instances is sufficient even if DesiredCapacity > 0, because
+            ``ShouldDecrementDesiredCapacity=False`` decrements by instance count rather
+            than by capacity weight, so the counter may not reach zero.
+            When False (unweighted template), the strict condition is required:
+            DesiredCapacity must be 0 AND there must be no active instances.
+    """
     deadline = time.time() + timeout
     last_state = None
     _terminal_lifecycle = frozenset(
@@ -247,10 +258,15 @@ def _assert_asg_deleted(asg_name: str, timeout: int = 300) -> None:
                 f"DesiredCapacity={desired}, Instances={len(instances)}, "
                 f"ActiveInstances={len(active_instances)}"
             )
-            # Accept both: DesiredCapacity==0 with no active instances (unweighted case)
-            # AND DesiredCapacity>0 with no active instances (weighted-ASG case where
-            # ShouldDecrementDesiredCapacity decrements by instance count, not weight).
-            if not active_instances and (desired == 0 or len(instances) == 0):
+            if weighted:
+                # Lenient check for weighted templates: no active instances is sufficient.
+                # ShouldDecrementDesiredCapacity decrements by instance count, not weight,
+                # so DesiredCapacity may remain > 0 after all instances are gone.
+                passed = not active_instances
+            else:
+                # Strict check for unweighted templates: DesiredCapacity must reach 0.
+                passed = desired == 0 and not active_instances
+            if passed:
                 log.info("ASG %s: no active instances (DesiredCapacity=%s)", asg_name, desired)
                 return
             log.debug("ASG %s: %s — waiting", asg_name, last_state)
@@ -634,7 +650,10 @@ async def _run_cleanup_verification(
     # 9. Assert backing resource deleted / zeroed
     if resource_id:
         if provider_api == "ASG":
-            _assert_asg_deleted(resource_id)
+            _assert_asg_deleted(
+                resource_id,
+                weighted=scenarios.template_uses_weighted_capacity(test_case),
+            )
         elif provider_api == "EC2Fleet":
             _assert_fleet_deleted(resource_id)
         elif provider_api == "SpotFleet":

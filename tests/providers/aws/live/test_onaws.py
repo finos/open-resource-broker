@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import time
 from typing import Optional
 
@@ -1145,11 +1146,21 @@ def setup_host_factory_mock_with_scenario(request, monkeypatch, test_session_id)
         log.info("--keep-logs set: preserving test directory %s", test_config_dir)
 
 
+_IPV4_RE = re.compile(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$")
+
+
 def _check_request_machines_response_status(status_response):
     assert status_response["requests"][0]["status"] == "complete"
     for machine in status_response["requests"][0]["machines"]:
         # it is possible that ec2 host is still initialising
         assert machine["status"] in ["running", "pending"]
+        if machine["status"] == "running":
+            machine_id = machine.get("machineId") or machine.get("machine_id")
+            ip = machine.get("privateIpAddress") or machine.get("private_ip_address")
+            assert ip, f"Running machine {machine_id} has empty privateIpAddress"
+            assert _IPV4_RE.match(ip), (
+                f"Running machine {machine_id} has invalid privateIpAddress: {ip!r}"
+            )
 
 
 def _check_all_ec2_hosts_are_being_provisioned(status_response):
