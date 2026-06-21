@@ -437,21 +437,52 @@ def _get_asg_instance_weight(instance_id: str, asg_name: str) -> int:
 def _get_fleet_instance_weight(instance_id: str, fleet_id: str, provider_api: str) -> int:
     """Return the WeightedCapacity of an instance in an EC2Fleet or SpotFleet.
 
-    Queries the fleet's active instance list and returns the WeightedCapacity
-    for the given instance.  Falls back to 1 if the instance is not found or
-    has no WeightedCapacity field (uniform fleet).
+    Reads the instance type via EC2 ``describe_instances`` (works even after
+    the instance is detached / terminated by the fleet), then looks up the
+    matching ``WeightedCapacity`` in the fleet's launch-template overrides.
+    Falls back to 1 if the fleet has no per-type weights.
+
+    ``describe_fleet_instances`` / ``describe_spot_fleet_instances`` only list
+    *currently active* instances, so they return nothing for instances that
+    have already been returned — the older implementation always saw an empty
+    list at this point and silently fell back to 1.
     """
     ec2_client, _ = _get_boto_clients()
     try:
-        if "spotfleet" in provider_api.lower() or fleet_id.startswith("sfr-"):
-            resp = ec2_client.describe_spot_fleet_instances(SpotFleetRequestId=fleet_id)
+        ec2_resp = ec2_client.describe_instances(InstanceIds=[instance_id])
+        reservations = ec2_resp.get("Reservations") or []
+        if not reservations:
+            return 1
+        instances = reservations[0].get("Instances") or []
+        if not instances:
+            return 1
+        instance_type = instances[0].get("InstanceType") or ""
+
+        is_spot = "spotfleet" in provider_api.lower() or fleet_id.startswith("sfr-")
+        if is_spot:
+            resp = ec2_client.describe_spot_fleet_requests(SpotFleetRequestIds=[fleet_id])
+            configs = resp.get("SpotFleetRequestConfigs") or [{}]
+            sfr = configs[0].get("SpotFleetRequestConfig") or {}
+            for spec in sfr.get("LaunchSpecifications") or []:
+                if spec.get("InstanceType") == instance_type:
+                    wc = spec.get("WeightedCapacity")
+                    if wc is not None:
+                        return int(float(wc))
+            for tpl in sfr.get("LaunchTemplateConfigs") or []:
+                for override in tpl.get("Overrides") or []:
+                    if override.get("InstanceType") == instance_type:
+                        wc = override.get("WeightedCapacity")
+                        if wc is not None:
+                            return int(float(wc))
         else:
-            resp = ec2_client.describe_fleet_instances(FleetId=fleet_id)
-        for entry in resp.get("ActiveInstances", []):
-            if entry.get("InstanceId") == instance_id:
-                wc = entry.get("WeightedCapacity")
-                if wc is not None:
-                    return int(float(wc))
+            resp = ec2_client.describe_fleets(FleetIds=[fleet_id])
+            fleets = resp.get("Fleets") or [{}]
+            for ltc in fleets[0].get("LaunchTemplateConfigs") or []:
+                for override in ltc.get("Overrides") or []:
+                    if override.get("InstanceType") == instance_type:
+                        wc = override.get("WeightedCapacity")
+                        if wc is not None:
+                            return int(float(wc))
         return 1
     except Exception as exc:
         log.debug(
