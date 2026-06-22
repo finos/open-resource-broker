@@ -82,6 +82,18 @@ def test_hf_map_input_instance_tags_dict_passthrough():
     assert result["tags"] == {"env": "prod"}
 
 
+def test_hf_map_input_azure_vm_type_maps_to_vm_size():
+    mapper = HostFactoryFieldMapper("azure")
+    result = mapper.map_input_fields({"vmType": "Standard_D4s_v5"})
+    assert result["vm_size"] == "Standard_D4s_v5"
+
+
+def test_hf_map_input_azure_key_name_maps_to_ssh_key_name():
+    mapper = HostFactoryFieldMapper("azure")
+    result = mapper.map_input_fields({"keyName": "azure-ssh-key"})
+    assert result["ssh_key_name"] == "azure-ssh-key"
+
+
 # ---------------------------------------------------------------------------
 # HF mapper — output direction (snake_case → camelCase)
 # ---------------------------------------------------------------------------

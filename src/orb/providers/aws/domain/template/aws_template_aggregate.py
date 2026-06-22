@@ -12,6 +12,7 @@ from pydantic import (
     model_validator,
 )
 
+from orb.domain.base.value_objects import AllocationStrategy
 from orb.domain.template.template_aggregate import Template
 from orb.providers.aws.domain.template.value_objects import (
     AWSAllocationStrategy,
@@ -248,10 +249,29 @@ class AWSTemplate(Template):
 
     @model_validator(mode="after")
     def validate_aws_template(self) -> "AWSTemplate":
-        """AWS-specific template validation."""
+        """AWS-specific template validation.
+
+        NOTE: This validator currently mutates fields via object.__setattr__
+        (fleet_type defaulting, metadata promotion). These are defaulting
+        decisions, not domain invariants, and should be moved to the strategy's
+        template config builder (the AWS equivalent of Azure's
+        _build_azure_template_config) so this validator is purely rejecting.
+        See the Azure provider for the corrected pattern.
+        """
         # AWS-specific required fields — only enforced when values are present
         # (generic/example templates may have empty subnet_ids/image_id, filled at runtime
         # from provider.template_defaults via _coalesce_merge)
+
+        if self.allocation_strategy == AllocationStrategy.SPOT_PLACEMENT_SCORE.value:
+            if self.price_type != "spot":
+                raise ValueError("spotPlacementScore allocation strategy requires price_type='spot'")
+            candidate_types = list((self.machine_types or {}).keys())
+            if self.instance_type and self.instance_type not in candidate_types:
+                candidate_types.insert(0, self.instance_type)
+            if len(candidate_types) < 2:
+                raise ValueError(
+                    "spotPlacementScore allocation strategy requires at least two candidate instance types"
+                )
 
         # Auto-assign default fleet_type if not provided
         # Set fleet_type from metadata if not already set
@@ -402,6 +422,13 @@ class AWSTemplate(Template):
                 value=str(data.get("vm_type", data.get("instance_type", "")))
             ),
             "image_id": data.get("image_id"),
+            # Shared runtime templates still use max_instances even though older
+            # config/HostFactory-facing AWS shapes use max_number/maxNumber.
+            # This normalization exists only because the shared model names are
+            # inconsistent; if we reconcile them repo-wide, remove this bridge.
+            # If not, we may want this logic in shared code not replicated in
+            # each template - currently both AWS and Azure use max_instances and
+            # re-write max_number to max_instances.
             "max_instances": data.get("max_number", data.get("max_instances", 1)),
             "subnet_ids": data.get(
                 "subnet_ids", [data.get("subnet_id")] if data.get("subnet_id") else []

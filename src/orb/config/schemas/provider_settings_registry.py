@@ -1,23 +1,23 @@
-"""Registry for provider-specific BaseSettings classes."""
+"""Registry for provider-specific config model classes."""
 
 from typing import Type
 
-from pydantic_settings import BaseSettings
+from orb.infrastructure.interfaces.provider import BaseProviderConfig
 
 
 class ProviderSettingsRegistry:
-    """Registry for provider-specific BaseSettings classes."""
+    """Registry for provider-specific config model classes."""
 
-    _settings_classes = {
+    _settings_classes: dict[str, type[BaseProviderConfig]] = {
         # Provider settings classes will be registered dynamically
         # "aws": AWSProviderSettings,  # Will be added when AWS provider is registered
     }
 
     @classmethod
     def register_provider_settings(
-        cls, provider_type: str, settings_class: Type[BaseSettings]
+        cls, provider_type: str, settings_class: Type[BaseProviderConfig]
     ) -> None:
-        """Register a provider-specific settings class."""
+        """Register a provider-specific config model class."""
         cls._settings_classes[provider_type] = settings_class
 
     @classmethod
@@ -26,5 +26,5 @@ class ProviderSettingsRegistry:
         return list(cls._settings_classes.keys())
 
     @classmethod
-    def get_settings_class(cls, provider_type: str) -> Type[BaseSettings]:
-        return cls._settings_classes.get(provider_type, BaseSettings)
+    def get_settings_class(cls, provider_type: str) -> Type[BaseProviderConfig]:
+        return cls._settings_classes.get(provider_type, BaseProviderConfig)

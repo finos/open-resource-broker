@@ -69,8 +69,27 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
         ("config/schemas/cleanup_schema.py", "orb.providers.aws.configuration.cleanup_config"),
         # loader collects strategy-contributed defaults at load time — intentional bootstrap wiring
         ("config/loader.py", "orb.providers.registry"),
+        # Loader's static defaults loader imports each provider's defaults function directly
+        # so collecting defaults stays side-effect-free (no full ConfigurationManager wiring).
+        ("config/loader.py", "orb.providers.aws.strategy.aws_provider_strategy"),
     }
 )
+
+
+def _is_provider_registration_wiring(rel: str, import_string: str) -> bool:
+    """Return whether an import is intentional provider registration wiring."""
+    if rel not in {
+        "bootstrap/infrastructure_services.py",
+        "config/loader.py",
+    }:
+        return False
+    parts = import_string.split(".")
+    return (
+        len(parts) == 4
+        and parts[0] == "orb"
+        and parts[1] == "providers"
+        and parts[3] == "registration"
+    )
 
 
 @pytest.mark.parametrize("filepath", _NON_PROVIDER_FILES, ids=lambda p: str(p.relative_to(SRC_ORB)))
@@ -85,6 +104,7 @@ def test_no_new_provider_leak(filepath: Path) -> None:
         for imp in imports
         if (imp == "orb.providers" or imp.startswith("orb.providers."))
         and (rel, imp) not in _KNOWN_VIOLATIONS
+        and not _is_provider_registration_wiring(rel, imp)
     ]
     assert new_violations == [], (
         f"{rel} has NEW provider leaks (not in known-violations whitelist): {new_violations}"

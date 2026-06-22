@@ -8,6 +8,9 @@ from orb.application.dto.commands import (
     PopulateMachineIdsCommand,
     SyncRequestCommand,
 )
+from orb.application.services.request_follow_up_context import (
+    merge_request_metadata_with_follow_up_context,
+)
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.exceptions import EntityNotFoundError
 from orb.domain.base.ports import (
@@ -75,6 +78,7 @@ class PopulateMachineIdsHandler(BaseCommandHandler[PopulateMachineIdsCommand, No
                     "resource_ids": request.resource_ids,
                     "provider_api": request.provider_api,
                     "template_id": request.template_id,
+                    "request_metadata": self._build_request_metadata(request),
                 },
             )
 
@@ -113,6 +117,11 @@ class PopulateMachineIdsHandler(BaseCommandHandler[PopulateMachineIdsCommand, No
                 },
             )
             return []
+
+    @staticmethod
+    def _build_request_metadata(request) -> dict:
+        """Merge durable request metadata with persisted provider follow-up context."""
+        return merge_request_metadata_with_follow_up_context(request)
 
 
 @command_handler(SyncRequestCommand)  # type: ignore[arg-type]

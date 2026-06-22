@@ -44,6 +44,18 @@ REQUIRED_AWS_FIELDS = [
     "userDataScript",
 ]
 
+REQUIRED_AZURE_FIELDS = [
+    "vmType",
+    "vmTypes",
+    "keyName",
+    "resourceGroup",
+    "vmSize",
+    "vmSizes",
+    "sshKeyName",
+    "networkConfig",
+    "cyclecloudUrl",
+]
+
 
 class TestFieldMappingCoverage:
     """Verify HostFactoryFieldMappings covers all known HF-spec fields."""
@@ -67,6 +79,19 @@ class TestFieldMappingCoverage:
         missing = [f for f in all_required if f not in combined]
         assert not missing, f"get_mappings('aws') is missing fields: {missing}"
 
+    def test_azure_fields_present_in_azure_mappings(self):
+        """Every required Azure-specific field must exist in the azure mapping table."""
+        azure = HostFactoryFieldMappings.MAPPINGS.get("azure", {})
+        missing = [f for f in REQUIRED_AZURE_FIELDS if f not in azure]
+        assert not missing, f"Missing Azure field mappings: {missing}"
+
+    def test_get_mappings_azure_includes_all_fields(self):
+        """get_mappings('azure') must return the union of generic and Azure fields."""
+        combined = HostFactoryFieldMappings.get_mappings("azure")
+        all_required = REQUIRED_GENERIC_FIELDS + REQUIRED_AZURE_FIELDS
+        missing = [f for f in all_required if f not in combined]
+        assert not missing, f"get_mappings('azure') is missing fields: {missing}"
+
     def test_generic_fields_map_to_non_empty_internal_names(self):
         """Every generic mapping must resolve to a non-empty internal field name."""
         generic = HostFactoryFieldMappings.MAPPINGS.get("generic", {})
@@ -82,6 +107,10 @@ class TestFieldMappingCoverage:
     def test_aws_is_a_supported_provider(self):
         """'aws' must appear in the list of supported providers."""
         assert "aws" in HostFactoryFieldMappings.get_supported_providers()
+
+    def test_azure_is_a_supported_provider(self):
+        """'azure' must appear in the list of supported providers."""
+        assert "azure" in HostFactoryFieldMappings.get_supported_providers()
 
     def test_no_overlap_between_generic_and_aws_keys(self):
         """Generic and AWS mapping tables must not share the same HF field name."""

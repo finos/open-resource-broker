@@ -174,17 +174,31 @@ class Application:
     def _register_configured_providers(self) -> None:
         """Register providers from configuration with registry."""
         try:
-            provider_config = self._config_manager.get_provider_config()
-            if provider_config:
-                for provider_instance in provider_config.get_active_providers():
-                    if not self._provider_registry.is_provider_instance_registered(
-                        provider_instance.name
-                    ):
-                        self._provider_registry.ensure_provider_instance_registered_from_config(
-                            provider_instance
+            try:
+                provider_config = self._config_manager.get_provider_config()
+            except AttributeError:
+                return
+
+            if not provider_config:
+                return
+
+            for provider_instance in provider_config.get_active_providers():
+                if not self._provider_registry.is_provider_instance_registered(
+                    provider_instance.name
+                ):
+                    registered = self._provider_registry.ensure_provider_instance_registered_from_config(
+                        provider_instance
+                    )
+                    if not registered:
+                        # Fail startup loudly — a configured provider that
+                        # cannot register is a misconfiguration, not a soft
+                        # warning to silently continue past.
+                        raise RuntimeError(
+                            f"Failed to register configured provider '{provider_instance.name}'"
                         )
         except Exception as e:
             self.logger.error("Failed to register configured providers: %s", e, exc_info=True)
+            raise
 
     def _log_provider_configuration(self, config_manager) -> None:
         """Log provider configuration information during initialization."""
