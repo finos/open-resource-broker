@@ -25,7 +25,9 @@ from orb.domain.base.ports import (
     LoggingPort,
     ProviderSelectionPort,
 )
+from orb.domain.request.aggregate import Request
 from orb.domain.request.request_identifiers import RequestId
+from orb.domain.request.request_types import RequestStatus
 from orb.domain.request.value_objects import RequestType
 
 
@@ -135,8 +137,6 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
 
     def _handle_dry_run(self, request: Any) -> Any:
         """Handle dry-run request."""
-        from orb.domain.request.value_objects import RequestStatus
-
         self.logger.info(
             "Skipping actual provisioning for request %s (dry-run mode)",
             request.request_id,
@@ -255,8 +255,6 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         self.logger.info("Creating return request for machines: %s", command.machine_ids)
 
         try:
-            from orb.domain.request.aggregate import Request
-
             domain_config = self._container.get(DomainConfigurationService)
             prefix = domain_config.get_return_request_prefix()
             force_return = command.force_return or False
@@ -423,7 +421,6 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         try:
             from orb.application.dto.commands import UpdateRequestStatusCommand
             from orb.application.ports.command_bus_port import CommandBusPort
-            from orb.domain.request.request_types import RequestStatus
 
             update_command = UpdateRequestStatusCommand(
                 request_id=str(request.request_id),
@@ -467,7 +464,6 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                 if skipped_ids:
                     from orb.application.dto.commands import UpdateRequestStatusCommand
                     from orb.application.ports.command_bus_port import CommandBusPort
-                    from orb.domain.request.request_types import RequestStatus
 
                     skipped_str = ", ".join(skipped_ids)
                     update_command = UpdateRequestStatusCommand(
@@ -516,7 +512,9 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                     )
                     uow.machines.save(updated_machine)
 
-    async def _update_request_status(self, request: Any, status: Any, message: str) -> None:
+    async def _update_request_status(
+        self, request: Request, status: RequestStatus, message: str
+    ) -> None:
         """Update request status via the command bus with a UoW fallback for FAILED.
 
         On command-bus failure the error is logged.  For FAILED status a direct
@@ -527,7 +525,6 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         """
         from orb.application.dto.commands import UpdateRequestStatusCommand
         from orb.application.ports.command_bus_port import CommandBusPort
-        from orb.domain.request.request_types import RequestStatus
 
         update_command = UpdateRequestStatusCommand(
             request_id=str(request.request_id),
@@ -570,8 +567,6 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
 
     async def _update_request_to_failed(self, request: Any, errors: list[str]) -> None:
         """Update request status to failed."""
-        from orb.domain.request.request_types import RequestStatus
-
         error_message = "; ".join(errors) if errors else "Deprovisioning failed"
         await self._update_request_status(
             request, RequestStatus.FAILED, f"Return request failed: {error_message}"
@@ -584,8 +579,6 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         are still ``shutting-down``.  Using IN_PROGRESS here lets the background sync
         poll AWS and transition to COMPLETED only when all instances reach ``terminated``.
         """
-        from orb.domain.request.request_types import RequestStatus
-
         await self._update_request_status(
             request,
             RequestStatus.IN_PROGRESS,
@@ -594,8 +587,6 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
 
     async def _update_request_to_completed(self, request: Any) -> None:
         """Update return request status to completed and persist."""
-        from orb.domain.request.request_types import RequestStatus
-
         try:
             await self._update_request_status(
                 request,
