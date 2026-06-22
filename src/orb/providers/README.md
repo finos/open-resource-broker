@@ -11,7 +11,7 @@ The provider layer contains cloud-specific implementations that extend the core 
 When accessing provider extension configurations, always use the `TemplateExtensionRegistry`:
 
 ```python
-from src.domain.template.extensions import TemplateExtensionRegistry
+from orb.infrastructure.registry.template_extension_registry import TemplateExtensionRegistry
 
 # Get extension config with schema defaults
 extension_config = TemplateExtensionRegistry.create_extension_config(
