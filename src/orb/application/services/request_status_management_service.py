@@ -117,7 +117,7 @@ class RequestStatusManagementService:
 
             # Merge into error_details so it survives serialization / persistence.
             current = dict(request.error_details) if request.error_details else {}
-            current["aws_error"] = aws_error_block
+            current["provider_error"] = aws_error_block
             # Pydantic freeze-safe: use model_copy for the error_details field.
             from orb.domain.request.aggregate import Request as RequestAggregate
 
