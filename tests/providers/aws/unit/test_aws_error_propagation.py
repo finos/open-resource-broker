@@ -8,9 +8,9 @@ Covers:
     and returns None values for non-AWSError exceptions.
   - ProvisioningResult carries AWS error fields through from the exception.
   - RequestStatusManagementService._handle_provisioning_failure writes
-    error_details["aws_error"] onto the Request aggregate.
-  - RequestDTO.from_domain exposes error_details["aws_error"] as the top-level
-    error field; to_dict includes the error block only when present.
+    error_details["provider_error"] onto the Request aggregate.
+  - RequestDTO.from_domain exposes error_details["provider_error"] (or legacy
+    "aws_error") as the top-level error field; to_dict includes it only when present.
 """
 
 from __future__ import annotations
@@ -207,7 +207,7 @@ class TestExtractAwsErrorFields:
 
 
 class TestHandleProvisioningFailure:
-    """error_details["aws_error"] is written when provisioning fails with AWS context."""
+    """error_details["provider_error"] is written when provisioning fails with AWS context."""
 
     def _make_service(self):
         from orb.application.services.request_status_management_service import (
@@ -265,10 +265,10 @@ class TestHandleProvisioningFailure:
         result = self._make_provisioning_result(error_message="generic error")
         updated = svc._handle_provisioning_failure(request, result)
         # aws_error key should be absent when no AWS details are available
-        assert "aws_error" not in updated.error_details
+        assert "provider_error" not in updated.error_details
 
     def test_aws_error_code_written_to_error_details(self):
-        """UnauthorizedOperation is stored in error_details["aws_error"]["code"]."""
+        """UnauthorizedOperation is stored in error_details["provider_error"]["code"]."""
         svc = self._make_service()
         request = self._make_real_request()
         result = self._make_provisioning_result(
@@ -279,7 +279,7 @@ class TestHandleProvisioningFailure:
             error_source="aws.ec2.run_instances",
         )
         updated = svc._handle_provisioning_failure(request, result)
-        aws_err = updated.error_details.get("aws_error", {})
+        aws_err = updated.error_details.get("provider_error", {})
         assert aws_err["code"] == "UnauthorizedOperation"
         assert aws_err["message"] == "You are not authorized."
         assert aws_err["aws_request_id"] == "rid-aws-001"
@@ -295,7 +295,7 @@ class TestHandleProvisioningFailure:
             # aws_error_message, aws_request_id, error_source intentionally absent
         )
         updated = svc._handle_provisioning_failure(request, result)
-        aws_err = updated.error_details.get("aws_error", {})
+        aws_err = updated.error_details.get("provider_error", {})
         assert aws_err["code"] == "InsufficientInstanceCapacity"
         assert "message" not in aws_err
         assert "aws_request_id" not in aws_err

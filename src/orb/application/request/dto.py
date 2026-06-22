@@ -117,7 +117,8 @@ class RequestDTO(BaseDTO):
     version: int = 0
     resource_ids: list[str] = Field(default_factory=list)
     # Structured error block surfaced when status is failed or partial.
-    # Populated from error_details["aws_error"] when an AWS API error was captured.
+    # Populated from error_details["provider_error"] (or legacy "aws_error") when
+    # an AWS API error was captured.
     error: Optional[dict[str, Any]] = None
     # Capacity fields from ProviderFulfilment — present when the provider emits them.
     # For weighted fleets target_units and fulfilled_units reflect capacity units;
@@ -170,9 +171,13 @@ class RequestDTO(BaseDTO):
                     resolved_fulfilment = None
 
         # Build structured error block from error_details when available.
-        error_block: Optional[dict[str, Any]] = (
-            request.error_details.get("aws_error") if request.error_details else None
-        )
+        # Accept both "provider_error" (new) and legacy "aws_error" so that
+        # records persisted before this deploy continue to surface the error block.
+        error_block: Optional[dict[str, Any]] = None
+        if request.error_details:
+            error_block = request.error_details.get("provider_error") or request.error_details.get(
+                "aws_error"
+            )
 
         # Create the DTO with all available fields
         return cls(
