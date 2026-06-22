@@ -56,7 +56,7 @@ REST_API_SERVER = {
 
 # Centralized timeouts/constants for REST API tests
 REST_API_TIMEOUTS = {
-    "rest_api_timeout": 60,  # Per-request HTTP timeout for REST calls
+    "rest_api_timeout": 120,  # Per-request HTTP timeout for REST calls (large ABIS scenarios may exceed 60s)
     "rest_api_retry_attempts": 3,  # Retry attempts for REST calls (when implemented)
     "server_start": 30,  # How long to wait for the server to start responding to health
     "health_check": 5,  # Health endpoint timeout
