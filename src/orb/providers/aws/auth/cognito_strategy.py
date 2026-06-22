@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
 from base64 import urlsafe_b64decode
 from typing import TYPE_CHECKING, Any, Optional
 
 import boto3
 import jwt
+import requests
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
@@ -33,6 +36,11 @@ if TYPE_CHECKING:
 @injectable
 class CognitoAuthStrategy(AuthPort):
     """Authentication strategy using AWS Cognito User Pools."""
+
+    # Class-level JWKS cache: maps jwks_url → {"fetched_at": float, "keys": list[dict]}
+    # Shared across all instances so pool restarts benefit from warm entries.
+    _jwks_cache: dict[str, dict[str, Any]] = {}
+    _cache_ttl_seconds: int = 3600
 
     def __init__(
         self,
@@ -311,8 +319,15 @@ class CognitoAuthStrategy(AuthPort):
         """
         Get public key from Cognito JWKS endpoint.
 
-        Fetches the JWKS, locates the entry matching ``kid``, and converts it
-        to a ``cryptography`` RSAPublicKey object suitable for use with PyJWT.
+        Fetches the JWKS (using the class-level cache; re-fetches after TTL),
+        locates the entry matching ``kid``, and converts it to a ``cryptography``
+        RSAPublicKey object suitable for use with PyJWT.
+
+        The synchronous ``requests.get`` call is offloaded via
+        ``asyncio.to_thread`` so the event loop is not blocked during the fetch.
+
+        On ``jwt.InvalidTokenError`` (non-RSA key) the cache entry is evicted so
+        that a key rotation does not lock out valid tokens indefinitely.
 
         Args:
             kid: Key ID from token header
@@ -324,18 +339,13 @@ class CognitoAuthStrategy(AuthPort):
             jwt.InvalidTokenError: If the matched key is not an RSA key
         """
         try:
-            # In production, you would cache JWKS and implement appropriate key rotation
-            # This is a simplified implementation
-            import requests
-
-            # Add timeout to prevent hanging connections (security best practice)
-            response = requests.get(self.jwks_url, timeout=30)
-            response.raise_for_status()
-            jwks = response.json()
+            jwks = await self._fetch_jwks_cached()
 
             for key in jwks.get("keys", []):
                 if key.get("kid") == kid:
                     if key.get("kty") != "RSA":
+                        # Evict the cache entry so a subsequent rotation is picked up.
+                        self._jwks_cache.pop(self.jwks_url, None)
                         raise jwt.InvalidTokenError(
                             f"Unsupported key type: {key.get('kty')!r}. Only RSA keys are supported."
                         )
@@ -350,6 +360,28 @@ class CognitoAuthStrategy(AuthPort):
         except Exception as e:
             self._logger.error("Failed to get public key: %s", e)
             return None
+
+    async def _fetch_jwks_cached(self) -> dict[str, Any]:
+        """Return the JWKS document for this strategy's endpoint.
+
+        Serves from the class-level cache when the entry is younger than
+        ``_cache_ttl_seconds``; otherwise fetches fresh via
+        ``asyncio.to_thread`` and repopulates the cache.
+        """
+        cached = self._jwks_cache.get(self.jwks_url)
+        if cached is not None:
+            age = time.monotonic() - cached["fetched_at"]
+            if age < self._cache_ttl_seconds:
+                return cached["jwks"]  # type: ignore[return-value]
+
+        def _do_fetch() -> dict[str, Any]:
+            response = requests.get(self.jwks_url, timeout=30)
+            response.raise_for_status()
+            return response.json()  # type: ignore[no-any-return]
+
+        jwks: dict[str, Any] = await asyncio.to_thread(_do_fetch)
+        self._jwks_cache[self.jwks_url] = {"fetched_at": time.monotonic(), "jwks": jwks}
+        return jwks
 
     def _map_groups_to_roles(self, groups: list[str]) -> list[str]:
         """
