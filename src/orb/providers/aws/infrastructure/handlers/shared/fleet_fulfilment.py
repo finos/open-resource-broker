@@ -20,7 +20,6 @@ def compute_capacity_based_fulfilment(
     pending_count: int,
     failed_count: int,
     provider_label: str,
-    fleet_type: Optional[str] = None,
 ) -> ProviderFulfilment:
     """Compute ProviderFulfilment for a capacity-unit based fleet.
 
@@ -33,7 +32,6 @@ def compute_capacity_based_fulfilment(
         pending_count: Number of instances whose status is "pending" or "starting".
         failed_count: Number of instances whose status is "failed" or "error".
         provider_label: Label used in messages, e.g. "Fleet" or "Spot Fleet".
-        fleet_type: Optional sub-type string appended to failed/in-progress messages.
     """
     target_units = target_capacity if target_capacity is not None else int(fulfilled_capacity)
     fleet_fully_fulfilled = target_capacity is not None and fulfilled_capacity >= target_capacity
