@@ -9,8 +9,10 @@ from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 from orb.domain.base.utils import extract_provider_type
 from orb.domain.template.factory import TemplateFactoryPort
 from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
+from orb.domain.template.ports.template_extension_registry_port import (
+    TemplateExtensionRegistryPort,
+)
 from orb.domain.template.template_aggregate import Template
-from orb.infrastructure.registry.template_extension_registry import TemplateExtensionRegistry
 
 
 @injectable
@@ -33,7 +35,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         config_manager: ConfigurationPort,
         logger: LoggingPort,
         template_factory: Optional[TemplateFactoryPort] = None,
-        extension_registry: Optional[TemplateExtensionRegistry] = None,
+        extension_registry: Optional[TemplateExtensionRegistryPort] = None,
         provider_registry: Optional[ProviderRegistryPort] = None,
     ) -> None:
         """
@@ -43,13 +45,13 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             config_manager: Configuration port for accessing defaults
             logger: Logger for debugging and monitoring
             template_factory: Factory for creating domain templates
-            extension_registry: Registry for provider extensions
+            extension_registry: Registry port for provider extension defaults
             provider_registry: Registry for resolving provider-contributed defaults
         """
         self.config_manager = config_manager
         self.logger = logger
         self.template_factory = template_factory
-        self.extension_registry = extension_registry or TemplateExtensionRegistry
+        self.extension_registry = extension_registry
         self.provider_registry = provider_registry
 
     def resolve_template_defaults(
@@ -469,6 +471,9 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         """
         extension_defaults = {}
 
+        if self.extension_registry is None:
+            return extension_defaults
+
         try:
             # 1. Get provider type extension defaults — safe for unknown providers (returns {})
             type_extension_defaults = self.extension_registry.get_extension_defaults(provider_type)
@@ -514,13 +519,15 @@ class TemplateDefaultsService(TemplateDefaultsPort):
                         and hasattr(provider, "extensions")
                         and provider.extensions
                     ):
-                        # Delegate to extension registry — returns {} for unknown providers,
-                        # so this is safe to call unconditionally.
-                        result = self.extension_registry.get_extension_defaults(
-                            provider_type, provider.extensions
-                        )
-                        # Fall back to raw extensions dict when registry has no entry.
-                        return result if result else provider.extensions
+                        if self.extension_registry is not None:
+                            # Delegate to extension registry — returns {} for unknown providers,
+                            # so this is safe to call unconditionally.
+                            result = self.extension_registry.get_extension_defaults(
+                                provider_type, provider.extensions
+                            )
+                            # Fall back to raw extensions dict when registry has no entry.
+                            return result if result else provider.extensions
+                        return provider.extensions
 
             return {}
 

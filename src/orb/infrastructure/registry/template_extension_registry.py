@@ -145,6 +145,21 @@ class TemplateExtensionRegistry:
         cls._extension_instances.clear()
 
 
+class TemplateExtensionRegistryAdapter:
+    """Instance adapter that satisfies ``TemplateExtensionRegistryPort``.
+
+    Delegates every call to the ``TemplateExtensionRegistry`` classmethods so
+    that callers in the application layer receive an ordinary injected object
+    rather than reaching for the global registry directly.
+    """
+
+    def get_extension_defaults(
+        self, provider_type: str, config_data: Optional[dict[str, Any]] = None
+    ) -> dict[str, Any]:
+        """Delegate to ``TemplateExtensionRegistry.get_extension_defaults``."""
+        return TemplateExtensionRegistry.get_extension_defaults(provider_type, config_data)
+
+
 # Convenience functions for common operations
 def register_provider_extension(provider_type: str, extension_class: type[BaseModel]) -> None:
     """Register a provider extension."""

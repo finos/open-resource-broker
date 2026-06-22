@@ -35,10 +35,14 @@ def _register_template_services(container: DIContainer):
         from orb.application.services.template_defaults_service import (
             TemplateDefaultsService,
         )
+        from orb.infrastructure.registry.template_extension_registry import (
+            TemplateExtensionRegistryAdapter,
+        )
 
         return TemplateDefaultsService(
             config_manager=c.get(ConfigurationPort),
             logger=c.get(LoggingPort),
+            extension_registry=TemplateExtensionRegistryAdapter(),
         )
 
     from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
