@@ -310,6 +310,11 @@ class TestEC2FleetCleanupOnReturn:
         with (
             patch.object(handler._fleet_release_manager, "_delete_fleet") as mock_delete_fleet,
             patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt,
+            patch.object(
+                handler._fleet_release_manager,
+                "_fleet_has_no_remaining_instances",
+                return_value=False,
+            ),
         ):
             handler._release_hosts_for_single_ec2_fleet(
                 "fleet-123",
@@ -390,7 +395,14 @@ class TestSpotFleetCleanupOnReturn:
         config_port = _make_config_port()
         handler = _make_spot_fleet_handler(config_port=config_port)
 
-        with patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt:
+        with (
+            patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt,
+            patch.object(
+                handler._release_manager,
+                "_fleet_has_no_remaining_instances",
+                return_value=False,
+            ),
+        ):
             handler._release_hosts_for_single_spot_fleet(
                 "sfr-123",
                 ["i-1"],
