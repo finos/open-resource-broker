@@ -34,8 +34,6 @@ class IAMAuthStrategy(AuthPort):
 
     _DEFAULT_ADMIN_ROLE_PATTERNS: frozenset[str] = frozenset({"Admin", "Administrator", "OrbAdmin"})
 
-    ASSUME_ALL_PERMISSIONS: bool = False
-
     def __init__(
         self,
         logger: LoggingPort,
