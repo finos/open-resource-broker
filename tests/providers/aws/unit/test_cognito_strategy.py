@@ -37,6 +37,9 @@ def _make_strategy(enabled: bool = True) -> Any:
 
     logger = _make_logger()
 
+    # Clear the class-level JWKS cache so each test starts from a clean state.
+    CognitoAuthStrategy._jwks_cache.clear()
+
     with patch("boto3.client") as _mock_boto3:
         _mock_boto3.return_value = MagicMock()
         strategy = CognitoAuthStrategy(
@@ -384,3 +387,67 @@ async def test_get_public_key_non_2xx_propagates_as_invalid_token():
 
     assert result.status == AuthStatus.INVALID
     assert "Unable to verify token signature" in (result.error_message or "")
+
+
+# ---------------------------------------------------------------------------
+# JWKS caching behaviour
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_jwks_fetch_is_cached():
+    """_get_public_key called twice with the same kid only fetches JWKS once."""
+    strategy = _make_strategy()
+
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"keys": []}  # kid not found → returns None both times
+
+    with patch("requests.get", return_value=mock_response) as mock_get:
+        await strategy._get_public_key("some-kid")
+        await strategy._get_public_key("some-kid")
+
+    # The HTTP fetch should happen only once; second call should hit the cache.
+    mock_get.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_jwks_cache_evicted_on_invalid_key_type():
+    """Cache entry is evicted when _get_public_key raises InvalidTokenError for a non-RSA key.
+
+    A subsequent call should re-fetch from the endpoint so that a key rotation
+    is picked up without requiring a process restart.
+    """
+    import jwt as pyjwt
+
+    strategy = _make_strategy()
+
+    ec_jwks = {
+        "keys": [
+            {
+                "kid": "ec-kid",
+                "kty": "EC",
+                "crv": "P-256",
+                "x": "abc",
+                "y": "def",
+            }
+        ]
+    }
+
+    mock_response = MagicMock()
+    mock_response.json.return_value = ec_jwks
+
+    with patch("requests.get", return_value=mock_response) as mock_get:
+        # First call: fetches JWKS and raises because key type is not RSA.
+        with pytest.raises(pyjwt.InvalidTokenError):
+            await strategy._get_public_key("ec-kid")
+
+        # Cache entry must have been evicted on the error.
+        assert strategy.jwks_url not in strategy._jwks_cache
+
+        # Second call: must re-fetch (not serve from cache).
+        with pytest.raises(pyjwt.InvalidTokenError):
+            await strategy._get_public_key("ec-kid")
+
+    assert mock_get.call_count == 2
