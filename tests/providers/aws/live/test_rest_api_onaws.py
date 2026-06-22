@@ -1742,11 +1742,11 @@ def _capture_resource_history(resource_id: str, provider_api: str, test_name: st
         log.info(f"Writing history to file: {history_file}")
         with open(history_file, "w") as f:
             json.dump(history_data, f, indent=2, default=str)
-        log.info(f"✅ Resource history saved successfully to: {history_file}")
+        log.info(f"Resource history saved successfully to: {history_file}")
         log.info(f"File size: {os.path.getsize(history_file)} bytes")
 
     except Exception as exc:
-        log.error(f"❌ Failed to capture resource history: {exc}", exc_info=True)
+        log.error(f"Failed to capture resource history: {exc}", exc_info=True)
         try:
             failure_payload = {
                 "resource_id": resource_id,
@@ -2201,13 +2201,13 @@ def test_rest_api_control_loop(rest_api_client, setup_rest_api_environment, test
     )
 
     if not cleanup_verified:
-        log.error("⚠️  Cleanup verification failed - some resources may still exist")
+        log.error("Cleanup verification failed - some resources may still exist")
         for instance_id in machine_ids:
             state_info = get_instance_state(instance_id)
             if state_info["exists"]:
                 log.error(f"Instance {instance_id} still exists in state: {state_info['state']}")
     else:
-        log.info("✅ All resources successfully cleaned up")
+        log.info("All resources successfully cleaned up")
 
     log.info("=" * 80)
     log.info(f"REST API test completed: {test_case['test_name']}")

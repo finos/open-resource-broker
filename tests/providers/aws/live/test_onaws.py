@@ -1321,9 +1321,9 @@ def _verify_all_resources_cleaned(
             instances_cleaned = False
 
     if instances_cleaned:
-        log.info("✅ All instances are terminated or terminating")
+        log.info("All instances are terminated or terminating")
     else:
-        log.error("❌ Some instances are still running")
+        log.error("Some instances are still running")
 
     # Check backing resource
     resource_cleaned = True
@@ -1343,10 +1343,10 @@ def _verify_all_resources_cleaned(
                             log.error("ASG %s still has %d instances", resource_id, len(instances))
                             resource_cleaned = False
                         else:
-                            log.info("✅ ASG %s has no instances", resource_id)
+                            log.info("ASG %s has no instances", resource_id)
                 except ClientError as e:
                     if e.response["Error"]["Code"] == "ValidationError":
-                        log.info("✅ ASG %s no longer exists", resource_id)
+                        log.info("ASG %s no longer exists", resource_id)
                     else:
                         log.error("Error checking ASG %s: %s", resource_id, e)
                         resource_cleaned = False
@@ -1358,18 +1358,16 @@ def _verify_all_resources_cleaned(
                         log.error("Fleet %s still has capacity: %d", resource_id, capacity)
                         resource_cleaned = False
                     else:
-                        log.info("✅ Fleet %s has zero capacity", resource_id)
+                        log.info("Fleet %s has zero capacity", resource_id)
                 except Exception as e:
-                    log.info(
-                        "✅ Fleet %s appears to be deleted or inaccessible: %s", resource_id, e
-                    )
+                    log.info("Fleet %s appears to be deleted or inaccessible: %s", resource_id, e)
         except Exception as e:
             log.warning("Could not verify backing resource cleanup: %s", e)
 
     if resource_cleaned:
-        log.info("✅ Backing resource is properly cleaned")
+        log.info("Backing resource is properly cleaned")
     else:
-        log.error("❌ Backing resource still has active resources")
+        log.error("Backing resource still has active resources")
 
     return instances_cleaned and resource_cleaned
 
@@ -1759,14 +1757,14 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
     cleanup_verified = _verify_all_resources_cleaned(ec2_instance_ids, resource_id, provider_api)
 
     if not cleanup_verified:
-        log.error("⚠️  Cleanup verification failed - some resources may still exist")
+        log.error("Cleanup verification failed - some resources may still exist")
         # Log remaining resources for debugging
         for instance_id in ec2_instance_ids:
             state_info = get_instance_state(instance_id)
             if state_info["exists"]:
                 log.error("Instance %s still exists in state: %s", instance_id, state_info["state"])
     else:
-        log.info("✅ All resources successfully cleaned up")
+        log.info("All resources successfully cleaned up")
 
 
 @pytest.mark.aws
@@ -2114,7 +2112,7 @@ def test_partial_return_reduces_capacity(setup_host_factory_mock_with_scenario, 
         cleanup_verified = _verify_all_resources_cleaned(remaining_ids, resource_id, provider_api)
 
         if not cleanup_verified:
-            log.error("⚠️  Cleanup verification failed - some resources may still exist")
+            log.error("Cleanup verification failed - some resources may still exist")
             # Log remaining resources for debugging
             for instance_id in remaining_ids:
                 state_info = get_instance_state(instance_id)
@@ -2123,7 +2121,7 @@ def test_partial_return_reduces_capacity(setup_host_factory_mock_with_scenario, 
                         "Instance %s still exists in state: %s", instance_id, state_info["state"]
                     )
         else:
-            log.info("✅ All resources successfully cleaned up")
+            log.info("All resources successfully cleaned up")
 
     else:
         log.info("3.1: No remaining instances to clean up")
