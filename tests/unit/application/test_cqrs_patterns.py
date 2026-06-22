@@ -168,6 +168,15 @@ class TestCommandQuerySeparation:
 
         mock_provisioning_service = Mock()
 
+        mock_selection_result = Mock()
+        mock_selection_result.provider_type = "aws"
+        mock_selection_result.provider_name = "test-provider"
+        mock_selection_result.selection_reason = "test"
+        mock_provider_validation_service = AsyncMock()
+        mock_provider_validation_service.select_and_validate_provider.return_value = (
+            mock_selection_result
+        )
+
         handler = CreateRequestHandler(
             uow_factory=mock_uow_factory,
             logger=mock_logger,
@@ -177,6 +186,7 @@ class TestCommandQuerySeparation:
             query_bus=mock_query_bus,
             provider_selection_port=mock_provider_selection,
             provisioning_service=mock_provisioning_service,
+            provider_validation_service=mock_provider_validation_service,
         )
 
         # Execute command with dry_run — PENDING→COMPLETED is now valid
@@ -470,6 +480,17 @@ class TestCommandHandlerImplementation:
         mock_provider_port = Mock()
         mock_provider_port.available_strategies = ["test-strategy"]
 
+        mock_selection_result = Mock()
+        mock_selection_result.provider_instance = "test-provider"
+        mock_selection_result.provider_type = "aws"
+        mock_selection_result.provider_name = "test-provider"
+        mock_selection_result.selection_reason = "test"
+        mock_selection_result.confidence = 1.0
+        mock_provider_validation_service = AsyncMock()
+        mock_provider_validation_service.select_and_validate_provider.return_value = (
+            mock_selection_result
+        )
+
         handler = CreateRequestHandler(
             uow_factory=mock_uow_factory,
             logger=mock_logger,
@@ -479,6 +500,7 @@ class TestCommandHandlerImplementation:
             query_bus=mock_query_bus,
             provider_selection_port=mock_provider_selection,
             provisioning_service=Mock(),
+            provider_validation_service=mock_provider_validation_service,
         )
 
         # Valid command
@@ -492,20 +514,6 @@ class TestCommandHandlerImplementation:
         mock_template.provider_api = "RunInstances"
         mock_template.to_dict.return_value = {"template_id": "test-template"}
         mock_query_bus.execute.return_value = mock_template
-
-        mock_selection_result = Mock()
-        mock_selection_result.provider_instance = "test-provider"
-        mock_selection_result.provider_type = "aws"
-        mock_selection_result.provider_name = "test-provider"
-        mock_selection_result.selection_reason = "test"
-        mock_selection_result.confidence = 1.0
-        mock_provider_selection.select_provider_for_template.return_value = mock_selection_result
-        mock_provider_validation_result = Mock()
-        mock_provider_validation_result.is_valid = True
-        mock_provider_validation_result.warnings = []
-        mock_provider_selection.validate_template_requirements.return_value = (
-            mock_provider_validation_result
-        )
 
         mock_provider_capability = Mock()
         mock_validation_result = Mock()
@@ -564,21 +572,9 @@ class TestCommandHandlerImplementation:
         mock_selection_result.provider_name = "test-provider"
         mock_selection_result.selection_reason = "test"
         mock_selection_result.confidence = 1.0
-        mock_provider_selection.select_provider_for_template.return_value = mock_selection_result
-        mock_provider_validation_result = Mock()
-        mock_provider_validation_result.is_valid = True
-        mock_provider_validation_result.warnings = []
-        mock_provider_selection.validate_template_requirements.return_value = (
-            mock_provider_validation_result
-        )
-
-        mock_provider_capability = Mock()
-        mock_validation_result = Mock()
-        mock_validation_result.is_valid = True
-        mock_validation_result.supported_features = []
-        mock_validation_result.warnings = []
-        mock_provider_capability.validate_template_requirements.return_value = (
-            mock_validation_result
+        mock_provider_validation_service = AsyncMock()
+        mock_provider_validation_service.select_and_validate_provider.return_value = (
+            mock_selection_result
         )
 
         mock_provider_port = Mock()
@@ -593,6 +589,7 @@ class TestCommandHandlerImplementation:
             query_bus=mock_query_bus,
             provider_selection_port=mock_provider_selection,
             provisioning_service=Mock(),
+            provider_validation_service=mock_provider_validation_service,
         )
 
         # Execute command with dry_run — PENDING→COMPLETED is now valid
@@ -634,6 +631,7 @@ class TestCommandHandlerImplementation:
             query_bus=mock_query_bus,
             provider_selection_port=mock_provider_selection,
             provisioning_service=Mock(),
+            provider_validation_service=Mock(),
         )
 
         # Should have event publisher

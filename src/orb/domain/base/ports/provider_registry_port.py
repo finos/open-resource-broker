@@ -83,3 +83,11 @@ class ProviderRegistryPort(ABC):
     def create_validator(self, provider_type: str) -> Optional[Any]:
         """Create a template validator using the registered factory for the given provider type."""
         pass  # type: ignore[return]
+
+    @abstractmethod
+    def get_default_api(self, provider_type: str) -> Optional[str]:
+        """Return the default API name contributed by the given provider type's registration.
+
+        Returns None if the provider type is not registered or has no default API.
+        """
+        pass  # type: ignore[return]

@@ -1,6 +1,8 @@
 """AWS Provider Registration - Register AWS provider with the provider registry."""
 
+import json
 from contextlib import suppress
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
 # Use TYPE_CHECKING to avoid direct infrastructure import
@@ -9,9 +11,10 @@ if TYPE_CHECKING:
     from orb.providers.registry import ProviderRegistry
 
 # Template extension imports for our new functionality
-from orb.domain.template.extensions import TemplateExtensionRegistry
 from orb.domain.template.factory import TemplateFactory
+from orb.infrastructure.registry.template_extension_registry import TemplateExtensionRegistry
 from orb.providers.aws.configuration.template_extension import AWSTemplateExtensionConfig
+from orb.providers.aws.domain.template.aws_template_dto_config import AWSTemplateDTOConfig
 
 
 def create_aws_strategy(provider_config: Any) -> Any:
@@ -93,7 +96,11 @@ def create_aws_strategy(provider_config: Any) -> Any:
 
             if strategy.aws_client is not None:
                 health_check = get_container().get(HealthCheckPort)
-                register_aws_health_checks(health_check, strategy.aws_client)
+                _storage_strategy = "json"
+                if config_port is not None:
+                    with suppress(Exception):
+                        _storage_strategy = config_port.get_storage_strategy()
+                register_aws_health_checks(health_check, strategy.aws_client, _storage_strategy)
 
         # Set provider name for identification
         if hasattr(strategy, "name") and provider_name:
@@ -197,6 +204,26 @@ def create_aws_validator(provider_config: Any = None) -> Any:
         raise RuntimeError(f"Failed to create AWS validator: {e!s}")
 
 
+def _load_aws_default_api() -> Optional[str]:
+    """Extract the default provider API from aws_defaults.json.
+
+    Returns the value at provider.provider_defaults.aws.template_defaults.provider_api,
+    or None if the file cannot be read or the key is absent.
+    """
+    try:
+        defaults_file = Path(__file__).parent / "config" / "aws_defaults.json"
+        data = json.loads(defaults_file.read_text())
+        return (
+            data.get("provider", {})
+            .get("provider_defaults", {})
+            .get("aws", {})
+            .get("template_defaults", {})
+            .get("provider_api")
+        )
+    except Exception:
+        return None
+
+
 def register_aws_provider(
     registry: "Optional[ProviderRegistry]" = None,
     logger: "Optional[LoggingPort]" = None,
@@ -237,6 +264,7 @@ def register_aws_provider(
                 resolver_factory=create_aws_resolver,
                 validator_factory=create_aws_validator,
                 strategy_class=AWSProviderStrategy,
+                default_api=_load_aws_default_api(),
             )
 
         # Register AWS template store
@@ -358,12 +386,13 @@ def register_aws_extensions(logger: Optional["LoggingPort"] = None) -> None:
         logger: Optional logger for registration messages
     """
     try:
-        # Register AWS template extension configuration
-        TemplateExtensionRegistry.register_extension("aws", AWSTemplateExtensionConfig)
+        # Register AWS DTO config as the typed provider_config class for TemplateDTO
+        # serialisation.  AWSTemplateDTOConfig covers the fields that were previously
+        # split between the top-level TemplateDTO and the opaque metadata dict.
+        TemplateExtensionRegistry.register_extension("aws", AWSTemplateDTOConfig)
 
         if logger:
             logger.debug("AWS template extensions registered successfully")
-        # Remove print statement - should use structured logging
 
     except Exception as e:
         error_msg = f"Failed to register AWS template extensions: {e}"
@@ -413,6 +442,43 @@ def get_aws_extension_defaults() -> dict:
     return default_config.to_template_defaults()
 
 
+def register_aws_auth_strategies(logger: "Optional[LoggingPort]" = None) -> None:
+    """Register AWS authentication strategies with the auth registry.
+
+    Registers the ``iam`` and ``cognito`` strategies so that ``AuthRegistry``
+    can resolve them without server.py importing provider-specific classes.
+
+    Args:
+        logger: Optional logger for registration messages
+    """
+    try:
+        from orb.infrastructure.auth.registry import get_auth_registry
+
+        registry = get_auth_registry()
+
+        if not registry.is_registered("iam"):
+            from orb.providers.aws.auth.iam_strategy import IAMAuthStrategy
+
+            registry.register_strategy("iam", IAMAuthStrategy)
+            if logger:
+                logger.debug("AWS IAM auth strategy registered")
+
+        if not registry.is_registered("cognito"):
+            from orb.providers.aws.auth.cognito_strategy import CognitoAuthStrategy
+
+            registry.register_strategy("cognito", CognitoAuthStrategy)
+            if logger:
+                logger.debug("AWS Cognito auth strategy registered")
+
+    except ImportError as e:
+        if logger:
+            logger.warning("AWS auth strategies not available: %s", e)
+    except Exception as e:
+        if logger:
+            logger.error("Failed to register AWS auth strategies: %s", e, exc_info=True)
+        raise
+
+
 def initialize_aws_provider(
     template_factory: Optional[TemplateFactory] = None,
     logger: Optional["LoggingPort"] = None,
@@ -433,15 +499,32 @@ def initialize_aws_provider(
         # Register AWS extensions
         register_aws_extensions(logger)
 
+        # Register AWS authentication strategies
+        register_aws_auth_strategies(logger)
+
         # Register AWS template factory if provided
         if template_factory:
             register_aws_template_factory(template_factory, logger)
 
         # Register AWS CLI spec
-        from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
+        from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
         from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec
 
         CLISpecRegistry.register("aws", AWSCLISpec())
+
+        # Register AWS HostFactory field-mapping adapter
+        from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import (
+            FieldMappingRegistry,
+        )
+        from orb.providers.aws.scheduler.hostfactory_field_mapping import AWSFieldMapping
+
+        FieldMappingRegistry.register("aws", AWSFieldMapping())
+
+        # Register AWS defaults loader
+        from orb.providers.aws.defaults_loader import AWSDefaultsLoader
+        from orb.providers.registry.defaults_loader_registry import DefaultsLoaderRegistry
+
+        DefaultsLoaderRegistry.register("aws", AWSDefaultsLoader())
 
         if logger:
             logger.info("AWS provider initialization completed successfully")

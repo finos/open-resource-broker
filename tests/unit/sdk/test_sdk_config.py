@@ -102,6 +102,30 @@ class TestSDKConfigFromDict:
         config = SDKConfig.from_dict({})
         assert config.provider == "aws"
 
+    def test_scheduler_dict_not_absorbed_as_string_override(self):
+        # Regression: when loading from an ORB config.json the top-level "scheduler" key
+        # is a nested config dict {"type": "hostfactory", "config_root": "..."}.
+        # from_dict must NOT ingest that dict as the SDKConfig.scheduler string override
+        # because that propagates a dict into ConfigurationManager.override_scheduler_strategy
+        # which then surfaces as "unhashable type: 'dict'" deep in the DI factory chain.
+        orb_config = {
+            "provider": {"type": "aws"},
+            "scheduler": {"type": "hostfactory", "config_root": "$ORB_CONFIG_DIR"},
+        }
+        config = SDKConfig.from_dict(orb_config)
+        # scheduler field must remain None (no string override set)
+        assert config.scheduler is None
+        # the original dict is preserved in custom_config so nothing is silently dropped
+        assert config.custom_config.get("scheduler") == {
+            "type": "hostfactory",
+            "config_root": "$ORB_CONFIG_DIR",
+        }
+
+    def test_scheduler_string_override_is_still_accepted(self):
+        # Explicit string scheduler overrides (e.g. passed programmatically) must still work.
+        config = SDKConfig.from_dict({"provider": "aws", "scheduler": "default"})
+        assert config.scheduler == "default"
+
 
 class TestSDKConfigFromFile:
     def test_loads_json_file(self, tmp_path):

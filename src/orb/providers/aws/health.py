@@ -12,12 +12,25 @@ if TYPE_CHECKING:
     from orb.providers.aws.infrastructure.aws_client import AWSClient
 
 
-def register_aws_health_checks(health_check: HealthCheckPort, aws_client: "AWSClient") -> None:
+def register_aws_health_checks(
+    health_check: HealthCheckPort,
+    aws_client: "AWSClient",
+    storage_strategy: str = "json",
+) -> None:
     """Register AWS-specific health checks with the given HealthCheck instance.
+
+    The ``aws`` (STS) and ``ec2`` checks are always registered because they
+    validate core AWS connectivity.  The ``dynamodb`` check is only registered
+    when the configured storage backend is ``"dynamodb"``; registering it
+    unconditionally causes ``/health`` to return 503 when the default
+    file/JSON storage is in use because the ``dynamodb:ListTables`` call
+    fails with no credentials or permissions.
 
     Args:
         health_check: The application HealthCheckPort to register checks on.
         aws_client: Authenticated AWS client used by the checks.
+        storage_strategy: The configured storage backend (e.g. ``"json"``,
+            ``"sql"``, ``"dynamodb"``).  Defaults to ``"json"``.
     """
 
     def _check_aws_health() -> HealthStatus:
@@ -85,4 +98,5 @@ def register_aws_health_checks(health_check: HealthCheckPort, aws_client: "AWSCl
 
     health_check.register_check("aws", _check_aws_health)
     health_check.register_check("ec2", _check_ec2_health)
-    health_check.register_check("dynamodb", _check_dynamodb_health)
+    if storage_strategy == "dynamodb":
+        health_check.register_check("dynamodb", _check_dynamodb_health)

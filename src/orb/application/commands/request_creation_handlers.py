@@ -11,6 +11,7 @@ from orb.application.dto.commands import (
     CreateReturnRequestCommand,
 )
 from orb.application.ports.query_bus_port import QueryBusPort
+from orb.application.services.provider_validation_service import ProviderValidationService
 from orb.application.services.provisioning_orchestration_service import (
     ProvisioningOrchestrationService,
 )
@@ -24,7 +25,9 @@ from orb.domain.base.ports import (
     LoggingPort,
     ProviderSelectionPort,
 )
+from orb.domain.request.aggregate import Request
 from orb.domain.request.request_identifiers import RequestId
+from orb.domain.request.request_types import RequestStatus
 from orb.domain.request.value_objects import RequestType
 
 
@@ -46,6 +49,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
         query_bus: QueryBusPort,  # QueryBus is required for template lookup
         provider_selection_port: ProviderSelectionPort,
         provisioning_service: ProvisioningOrchestrationService,
+        provider_validation_service: ProviderValidationService,
     ) -> None:
         """Initialize the instance."""
         super().__init__(logger, event_publisher, error_handler)
@@ -55,7 +59,6 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
         self._provider_selection_port = provider_selection_port
 
         # Initialize services
-        from orb.application.services.provider_validation_service import ProviderValidationService
         from orb.application.services.request_creation_service import RequestCreationService
         from orb.application.services.request_status_management_service import (
             RequestStatusManagementService,
@@ -64,9 +67,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
         self._request_creation_service = RequestCreationService(logger)
         self._provisioning_service = provisioning_service
         self._status_service = RequestStatusManagementService(uow_factory, logger)
-        self._provider_validation_service = ProviderValidationService(
-            container, logger, provider_selection_port
-        )
+        self._provider_validation_service = provider_validation_service
 
     async def validate_command(self, command: CreateRequestCommand) -> None:
         """Validate create request command."""
@@ -136,8 +137,6 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
 
     def _handle_dry_run(self, request: Any) -> Any:
         """Handle dry-run request."""
-        from orb.domain.request.value_objects import RequestStatus
-
         self.logger.info(
             "Skipping actual provisioning for request %s (dry-run mode)",
             request.request_id,
@@ -256,8 +255,6 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         self.logger.info("Creating return request for machines: %s", command.machine_ids)
 
         try:
-            from orb.domain.request.aggregate import Request
-
             domain_config = self._container.get(DomainConfigurationService)
             prefix = domain_config.get_return_request_prefix()
             force_return = command.force_return or False
@@ -424,7 +421,6 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         try:
             from orb.application.dto.commands import UpdateRequestStatusCommand
             from orb.application.ports.command_bus_port import CommandBusPort
-            from orb.domain.request.request_types import RequestStatus
 
             update_command = UpdateRequestStatusCommand(
                 request_id=str(request.request_id),
@@ -468,7 +464,6 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                 if skipped_ids:
                     from orb.application.dto.commands import UpdateRequestStatusCommand
                     from orb.application.ports.command_bus_port import CommandBusPort
-                    from orb.domain.request.request_types import RequestStatus
 
                     skipped_str = ", ".join(skipped_ids)
                     update_command = UpdateRequestStatusCommand(
@@ -489,8 +484,8 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                         skipped_str,
                     )
                 else:
-                    await self._update_request_to_completed(request)
-                    self.logger.info("Termination initiated for request %s", request.request_id)
+                    await self._update_request_to_terminating(request)
+                    self.logger.info("Termination accepted for request %s", request.request_id)
             else:
                 await self._update_request_to_failed(request, provisioning_result.get("errors", []))
 
@@ -517,75 +512,88 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                     )
                     uow.machines.save(updated_machine)
 
-    async def _update_request_to_failed(self, request: Any, errors: list[str]) -> None:
-        """Update request status to failed."""
+    async def _update_request_status(
+        self, request: Request, status: RequestStatus, message: str
+    ) -> None:
+        """Update request status via the command bus with a UoW fallback for FAILED.
+
+        On command-bus failure the error is logged.  For FAILED status a direct
+        UoW write is attempted so the request always reaches a terminal state and
+        callers do not poll forever.  For all other statuses the caller decides
+        how to handle the failure (e.g. _update_request_to_terminating re-raises
+        so the deprovisioning loop can apply its own fallback).
+        """
+        from orb.application.dto.commands import UpdateRequestStatusCommand
+        from orb.application.ports.command_bus_port import CommandBusPort
+
+        update_command = UpdateRequestStatusCommand(
+            request_id=str(request.request_id),
+            status=status,
+            message=message,
+        )
         try:
-            from orb.application.dto.commands import UpdateRequestStatusCommand
-            from orb.application.ports.command_bus_port import CommandBusPort
-            from orb.domain.request.request_types import RequestStatus
-
-            error_message = "; ".join(errors) if errors else "Deprovisioning failed"
-
-            update_command = UpdateRequestStatusCommand(
-                request_id=str(request.request_id),
-                status=RequestStatus.FAILED,
-                message=f"Return request failed: {error_message}",
-            )
-
             command_bus = self._container.get(CommandBusPort)
             await command_bus.execute(update_command)
-
-            self.logger.info("Updated request %s status to failed", request.request_id)
-
+            self.logger.info("Updated request %s status to %s", request.request_id, status)
         except Exception as update_error:
             self.logger.error(
-                "Failed to update request status: %s",
+                "Failed to update request %s status to %s: %s",
+                request.request_id,
+                status,
                 update_error,
                 exc_info=True,
             )
-            # Force-write terminal status directly to prevent permanent stuck state
-            try:
-                from orb.domain.request.request_types import RequestStatus
+            if status == RequestStatus.FAILED:
+                # Force-write terminal status directly to prevent permanent stuck state
+                try:
+                    with self.uow_factory.create_unit_of_work() as uow:
+                        stuck_request = uow.requests.get_by_id(request.request_id)
+                        if stuck_request:
+                            stuck_request = stuck_request.update_status(
+                                RequestStatus.FAILED,
+                                "System error: failed to update status after double failure",
+                                force=True,
+                            )
+                            uow.requests.save(stuck_request)
+                except Exception as final_error:
+                    self.logger.critical(
+                        "CRITICAL: Failed to mark request %s as failed after double failure. "
+                        "Request is stuck in IN_PROGRESS. Manual intervention required. Error: %s",
+                        request.request_id,
+                        final_error,
+                    )
+            else:
+                raise
 
-                with self.uow_factory.create_unit_of_work() as uow:
-                    stuck_request = uow.requests.get_by_id(request.request_id)
-                    if stuck_request:
-                        stuck_request = stuck_request.update_status(
-                            RequestStatus.FAILED,
-                            "System error: failed to update status after double failure",
-                            force=True,
-                        )
-                        uow.requests.save(stuck_request)
-            except Exception as final_error:
-                self.logger.critical(
-                    "CRITICAL: Failed to mark request %s as failed after double failure. "
-                    "Request is stuck in IN_PROGRESS. Manual intervention required. Error: %s",
-                    request.request_id,
-                    final_error,
-                )
-                # Nothing more we can do
+    async def _update_request_to_failed(self, request: Any, errors: list[str]) -> None:
+        """Update request status to failed."""
+        error_message = "; ".join(errors) if errors else "Deprovisioning failed"
+        await self._update_request_status(
+            request, RequestStatus.FAILED, f"Return request failed: {error_message}"
+        )
+
+    async def _update_request_to_terminating(self, request: Any) -> None:
+        """Set return request to IN_PROGRESS after termination is accepted by provider.
+
+        Termination is asynchronous — the provider accepted the request but instances
+        are still ``shutting-down``.  Using IN_PROGRESS here lets the background sync
+        poll AWS and transition to COMPLETED only when all instances reach ``terminated``.
+        """
+        await self._update_request_status(
+            request,
+            RequestStatus.IN_PROGRESS,
+            "Termination accepted: waiting for instances to reach terminated state",
+        )
 
     async def _update_request_to_completed(self, request: Any) -> None:
         """Update return request status to completed and persist."""
         try:
-            from orb.application.dto.commands import UpdateRequestStatusCommand
-            from orb.application.ports.command_bus_port import CommandBusPort
-            from orb.domain.request.request_types import RequestStatus
-
-            update_command = UpdateRequestStatusCommand(
-                request_id=str(request.request_id),
-                status=RequestStatus.COMPLETED,
-                message="Return request completed: termination initiated",
+            await self._update_request_status(
+                request,
+                RequestStatus.COMPLETED,
+                "Return request completed: termination initiated",
             )
-            command_bus = self._container.get(CommandBusPort)
-            await command_bus.execute(update_command)
-            self.logger.info("Updated request %s status to completed", request.request_id)
         except Exception as update_error:
-            self.logger.error(
-                "Failed to update request status to completed: %s",
-                update_error,
-                exc_info=True,
-            )
             # Ensure the request reaches a terminal status so callers don't poll forever
             await self._update_request_to_failed(
                 request, [f"Failed to mark completed: {update_error}"]

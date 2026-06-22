@@ -73,6 +73,7 @@ class ReturnMachinesOutput:
     status: str
     message: str = ""
     skipped_machines: list[str] = dataclasses.field(default_factory=list)
+    machine_ids: list[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -155,8 +156,8 @@ class GetTemplateOutput:
 @dataclasses.dataclass(frozen=True)
 class CreateTemplateInput:
     template_id: str
-    provider_api: str
     image_id: str
+    provider_api: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
     instance_type: Optional[str] = None

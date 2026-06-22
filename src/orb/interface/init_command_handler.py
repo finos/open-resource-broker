@@ -16,6 +16,7 @@ from orb.domain.base.ports.console_port import ConsolePort
 from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 from orb.infrastructure.di.container import get_container
 from orb.infrastructure.logging.logger import get_logger
+from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
 
 logger = get_logger(__name__)
 
@@ -602,10 +603,22 @@ def _get_default_config(args) -> Dict[str, Any]:
         strategy.get_cli_infrastructure_defaults(args) if strategy is not None else {}
     )
 
+    # Use the registered CLI spec to extract provider config when available.
+    # Fall back to the init-level --profile / --region flags for backward
+    # compatibility with callers that have not yet adopted provider-specific flags.
+    spec = CLISpecRegistry.get(provider_type)
+    if spec is not None:
+        spec_config = spec.extract_config(args)
+        profile = spec_config.get("profile") or getattr(args, "profile", None) or None
+        region = spec_config.get("region") or getattr(args, "region", None) or default_region
+    else:
+        profile = getattr(args, "profile", None) or None
+        region = getattr(args, "region", None) or default_region
+
     first_provider = {
         "type": provider_type,
-        "profile": args.profile or None,
-        "region": args.region or default_region,
+        "profile": profile,
+        "region": region,
         "infrastructure_defaults": infrastructure_defaults,
     }
 

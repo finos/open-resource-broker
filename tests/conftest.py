@@ -8,7 +8,25 @@ def pytest_addoption(parser):
         "--run-aws",
         action="store_true",
         default=False,
-        help="Run tests requiring real AWS credentials",
+        help="Alias for --live (backward compat): run tests requiring real AWS credentials",
+    )
+    parser.addoption(
+        "--live",
+        action="store_true",
+        default=False,
+        help="Enable tests under tests/providers/<name>/live/ (require real credentials)",
+    )
+    parser.addoption(
+        "--no-mocked",
+        action="store_true",
+        default=False,
+        help="Skip mocked/moto tests under tests/providers/<name>/moto/",
+    )
+    parser.addoption(
+        "--provider",
+        action="store",
+        default=None,
+        help="Filter to tests under tests/providers/<name>/ only (e.g. --provider aws)",
     )
     parser.addoption(
         "--keep-logs",
@@ -18,15 +36,74 @@ def pytest_addoption(parser):
     )
 
 
+def _is_live_test(item) -> bool:
+    """Return True when the test lives under a providers/<name>/live/ subtree."""
+    path = str(item.fspath)
+    return "/providers/" in path and "/live/" in path
+
+
+def _is_moto_test(item) -> bool:
+    """Return True when the test lives under a providers/<name>/moto/ subtree."""
+    path = str(item.fspath)
+    return "/providers/" in path and "/moto/" in path
+
+
 def pytest_collection_modifyitems(config, items):
-    if config.getoption("--run-aws"):
-        return
-    if any("onaws" in str(a) for a in config.args):
-        return
-    skip = pytest.mark.skip(reason="requires real AWS credentials — pass --run-aws to run")
+    live_enabled = config.getoption("--live") or config.getoption("--run-aws")
+    no_mocked = config.getoption("--no-mocked")
+    provider_filter = config.getoption("--provider")
+
+    # Also honour legacy path-based live detection (e.g. pytest tests/providers/aws/live)
+    explicit_live = any("live" in str(a) or "onaws" in str(a) for a in config.args)
+    if explicit_live:
+        live_enabled = True
+
+    skip_live = pytest.mark.skip(
+        reason="requires real credentials — pass --live (or --run-aws) to run"
+    )
+    skip_mocked = pytest.mark.skip(reason="moto tests skipped — remove --no-mocked to run")
+    skip_provider = pytest.mark.skip(reason=f"filtered to --provider {provider_filter}")
+
+    # Auto-skip AWS provider tests when boto3 is not installed
+    try:
+        import boto3 as _boto3  # noqa: F401
+
+        aws_available = True
+    except ImportError:
+        aws_available = False
+
+    skip_no_aws = pytest.mark.skip(reason="[aws] extra not installed — boto3 unavailable")
+
     for item in items:
-        if item.get_closest_marker("aws") and not item.get_closest_marker("provider_contract"):
-            item.add_marker(skip)
+        path = str(item.fspath)
+
+        # Auto-skip AWS provider tests when [aws] extra is not installed
+        if not aws_available and "/providers/aws/" in path:
+            item.add_marker(skip_no_aws)
+
+        # Provider filter
+        if provider_filter and f"/providers/{provider_filter}" not in path:
+            if "/providers/" in path:
+                item.add_marker(skip_provider)
+
+        # Live gate
+        if _is_live_test(item) and not live_enabled:
+            item.add_marker(skip_live)
+            continue
+
+        # Moto gate
+        if _is_moto_test(item) and no_mocked:
+            item.add_marker(skip_mocked)
+            continue
+
+        # Legacy marker-based gate (non-provider-tree tests marked @pytest.mark.aws)
+        if (
+            item.get_closest_marker("aws")
+            and not item.get_closest_marker("provider_contract")
+            and not live_enabled
+            and not _is_live_test(item)
+        ):
+            item.add_marker(skip_live)
 
 
 import json
@@ -59,7 +136,12 @@ except ImportError:
         yield
 
 
-import boto3
+try:
+    import boto3
+
+    AWS_AVAILABLE = True
+except ImportError:
+    AWS_AVAILABLE = False
 
 from orb.config.manager import ConfigurationManager
 from orb.config.schemas.app_schema import AppConfig
@@ -223,18 +305,24 @@ def aws_mocks():
 @pytest.fixture
 def ec2_client(aws_mocks):
     """Create a mocked EC2 client."""
+    if not AWS_AVAILABLE:
+        pytest.skip("boto3 not installed — install [aws] extra")
     return boto3.client("ec2", region_name="us-east-1")
 
 
 @pytest.fixture
 def autoscaling_client(aws_mocks):
     """Create a mocked Auto Scaling client."""
+    if not AWS_AVAILABLE:
+        pytest.skip("boto3 not installed — install [aws] extra")
     return boto3.client("autoscaling", region_name="us-east-1")
 
 
 @pytest.fixture
 def ssm_client(aws_mocks):
     """Create a mocked SSM client."""
+    if not AWS_AVAILABLE:
+        pytest.skip("boto3 not installed — install [aws] extra")
     return boto3.client("ssm", region_name="us-east-1")
 
 

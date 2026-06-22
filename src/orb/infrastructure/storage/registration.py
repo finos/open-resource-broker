@@ -22,13 +22,16 @@ def register_all_storage_types() -> None:
 
     register_sql_storage()
 
-    from orb.providers.aws.storage.registration import (
-        register_aurora_storage,
-        register_dynamodb_storage,
-    )
+    try:
+        from orb.providers.aws.storage.registration import (
+            register_aurora_storage,
+            register_dynamodb_storage,
+        )
 
-    register_dynamodb_storage()
-    register_aurora_storage()
+        register_dynamodb_storage()
+        register_aurora_storage()
+    except ImportError:
+        pass  # [aws] extra not installed; DynamoDB and Aurora storage unavailable
 
 
 def get_available_storage_types() -> list:

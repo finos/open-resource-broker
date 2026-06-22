@@ -477,11 +477,27 @@ class ORBClient:
             return scheduler.format_request_response(raw)
         return raw
 
-    async def get_request_status(self, request_ids: list, **kwargs) -> dict:
-        """Get status for one or more requests via GetRequestStatusOrchestrator."""
+    async def get_request_status(
+        self,
+        request_ids: "list | None" = None,
+        *,
+        request_id: "str | None" = None,
+        **kwargs,
+    ) -> dict:
+        """Get status for one or more requests via GetRequestStatusOrchestrator.
+
+        Accepts either ``request_ids`` (list) or ``request_id`` (str, singular alias
+        for single-ID callers).  Both are merged into a single list before dispatch.
+        """
         if not self._initialized:
             raise SDKError("SDK not initialized. Use as async context manager.")
         assert self._container is not None
+
+        # Resolve the list of IDs from either parameter name.
+        ids: list = list(request_ids) if request_ids is not None else []
+        if request_id is not None:
+            if request_id not in ids:
+                ids.append(request_id)
 
         from orb.application.ports.scheduler_port import SchedulerPort
         from orb.application.services.orchestration.dtos import GetRequestStatusInput
@@ -492,7 +508,7 @@ class ORBClient:
         orchestrator = self._container.get(GetRequestStatusOrchestrator)
         result = await orchestrator.execute(
             GetRequestStatusInput(
-                request_ids=list(request_ids),
+                request_ids=ids,
                 all_requests=kwargs.get("all_requests", False),
                 verbose=kwargs.get("verbose", False),
             )

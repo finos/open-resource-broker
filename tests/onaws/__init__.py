@@ -1,1 +1,0 @@
-# AWS-specific tests package

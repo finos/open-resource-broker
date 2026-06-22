@@ -153,7 +153,7 @@ def main():
         markers.append("e2e")
 
     if args.onaws:
-        test_paths.append("tests/onaws")
+        test_paths.append("tests/providers/aws/live")
         markers.append("aws")
 
     if args.fast:

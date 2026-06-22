@@ -35,9 +35,9 @@ _NON_PROVIDER_FILES = [
 _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
     {
         ("bootstrap/core_services.py", "orb.providers.registry"),
-        ("bootstrap/infrastructure_services.py", "orb.providers.aws.registration"),
+        ("bootstrap/infrastructure_services.py", "orb.providers.registration"),
         ("bootstrap/provider_services.py", "orb.providers.registry"),
-        ("bootstrap/provider_services.py", "orb.providers.aws.registration"),
+        ("bootstrap/provider_services.py", "orb.providers.registration"),
         ("bootstrap/services.py", "orb.providers.registration"),
         ("interface/health_command_handler.py", "orb.providers.registry"),
         ("interface/system_command_handlers.py", "orb.providers.registry"),
@@ -48,8 +48,6 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
         ("interface/init_command_handler.py", "orb.providers.factory"),
         ("interface/machine_command_handlers.py", "orb.providers.base.strategy"),
         ("interface/mcp/server/core.py", "orb.providers.registry"),
-        ("api/server.py", "orb.providers.aws.auth.iam_strategy"),
-        ("api/server.py", "orb.providers.aws.auth.cognito_strategy"),
         ("config/managers/provider_manager.py", "orb.providers.registry"),
         ("application/services/provider_registry_service.py", "orb.providers.registry"),
         ("infrastructure/template/configuration_manager.py", "orb.providers.base.strategy"),
@@ -57,18 +55,17 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
         ("infrastructure/adapters/provider_discovery_adapter.py", "orb.providers.registry"),
         # DI wiring — intentional: storage registration must wire AWS provider
         ("infrastructure/storage/registration.py", "orb.providers.aws.storage.registration"),
-        # hostfactory is inherently AWS/HPC-specific — provider import is expected
-        (
-            "infrastructure/scheduler/hostfactory/field_mapper.py",
-            "orb.providers.aws.utilities.ec2.instances",
-        ),
-        (
-            "infrastructure/scheduler/hostfactory/hostfactory_strategy.py",
-            "orb.providers.aws.utilities.ec2.instances",
-        ),
+        # The cpu/ram lookup (derive_cpu_ram_from_instance_type) has been moved
+        # into providers/aws/scheduler/hostfactory_field_mapping.py.  The shared
+        # hostfactory infrastructure no longer imports from orb.providers.aws.*.
         ("config/schemas/cleanup_schema.py", "orb.providers.aws.configuration.cleanup_config"),
         # loader collects strategy-contributed defaults at load time — intentional bootstrap wiring
         ("config/loader.py", "orb.providers.registry"),
+        ("config/loader.py", "orb.providers"),
+        ("config/loader.py", "orb.providers.registration"),
+        # CLI spec bootstrap: build_parser triggers lightweight CLI-spec registration
+        # so that provider flags (e.g. --aws-profile) are available before app init.
+        ("cli/args.py", "orb.providers.registration"),
     }
 )
 

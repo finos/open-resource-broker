@@ -4,8 +4,8 @@
   "provider_leaks_non_di": 29,
   "scheduler_leaks": 0,
   "storage_leaks_non_storage": 4,
-  "domain_pydantic_violations": 13,
+  "domain_pydantic_violations": 12,
   "interface_provider_direct_imports": 16,
   "circular_dependency_cycles": 18,
-  "cli_infrastructure_direct_imports": 13
+  "cli_infrastructure_direct_imports": 14
 }

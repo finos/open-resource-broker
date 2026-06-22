@@ -5,8 +5,10 @@ termination in an Auto Scaling Group:
 
 1. Pre-termination capacity reduction — lower DesiredCapacity and MinSize so
    AWS does not replace the instances we are about to terminate.
-2. Instance detachment with capacity decrement — detach specific instances from
-   a known ASG, lower MinSize if needed, then terminate.
+2. Instance termination with weight-aware capacity decrement — call
+   terminate_instance_in_auto_scaling_group per instance so AWS decrements
+   DesiredCapacity by the instance's WeightedCapacity (not by 1), which is
+   symmetric with scale-up behaviour in Mixed Instance Policy ASGs.
 """
 
 from typing import Any, Callable, Optional
@@ -128,11 +130,13 @@ class ASGCapacityManager:
     def release_instances(
         self, asg_name: str, instance_ids: list[str], asg_details: dict[str, Any]
     ) -> None:
-        """Detach instances from an ASG, adjust MinSize if needed, then terminate.
+        """Terminate instances via the ASG API, adjusting MinSize if needed.
 
+        Uses terminate_instance_in_auto_scaling_group so DesiredCapacity is
+        decremented by WeightedCapacity (weight-aware, unlike detach_instances).
         If asg_details is empty the instances are terminated directly without
         attempting ASG-specific operations.  When DesiredCapacity reaches zero
-        after detachment the ASG and its associated launch template are deleted.
+        the ASG and its associated launch template are deleted.
         """
         self._logger.info("Processing ASG %s with %s instances", asg_name, len(instance_ids))
 
@@ -172,21 +176,61 @@ class ASGCapacityManager:
             self._cleanup_on_zero_capacity("asg", asg_name)
             return
 
-        # Detach instances (API limit: 50 per call; use 20 for safety)
-        for chunk in self._chunk_list(instance_ids, 20):
+        # Guard against double-execution: only terminate instances that are currently
+        # members of this ASG.  If release_instances is called a second time for the
+        # same set (e.g. due to an IN_PROGRESS status retry or a race), the instances
+        # are already gone and this check prevents a second DesiredCapacity decrement.
+        instances_to_terminate = self._filter_asg_members(asg_name, instance_ids)
+        if not instances_to_terminate:
+            self._logger.info(
+                "ASG %s: all %d instance(s) already terminated/detached — skipping ASG termination",
+                asg_name,
+                len(instance_ids),
+            )
+            # Instances may still be running (standalone after a prior partial operation);
+            # terminate them directly so the return request can complete.
+            self._aws_ops.terminate_instances_with_fallback(
+                instance_ids, self._request_adapter, f"ASG {asg_name} instances (already detached)"
+            )
+            return
+
+        skipped = [i for i in instance_ids if i not in instances_to_terminate]
+        if skipped:
+            self._logger.info(
+                "ASG %s: %d instance(s) already terminated/detached (skipping): %s",
+                asg_name,
+                len(skipped),
+                skipped,
+            )
+
+        # Use terminate_instance_in_auto_scaling_group (one instance per API call).
+        # Unlike detach_instances — which decrements DesiredCapacity by the *count*
+        # of instances (always 1 per instance regardless of weight) — this API
+        # decrements DesiredCapacity by the instance's WeightedCapacity, which is
+        # symmetric with scale-up in Mixed Instance Policy ASGs.  It also handles
+        # both the termination and the capacity decrement atomically, so no
+        # separate EC2 terminate step is needed.
+        for instance_id in instances_to_terminate:
             self._retry_with_backoff(
-                self._aws_client.autoscaling_client.detach_instances,
+                self._aws_client.autoscaling_client.terminate_instance_in_auto_scaling_group,
                 operation_type="critical",
-                AutoScalingGroupName=asg_name,
-                InstanceIds=chunk,
+                InstanceId=instance_id,
                 ShouldDecrementDesiredCapacity=True,
             )
-            self._logger.debug("Detached chunk from ASG %s: %s", asg_name, chunk)
-        self._logger.info("Detached instances from ASG %s: %s", asg_name, instance_ids)
+            self._logger.debug(
+                "Terminated instance %s in ASG %s with weight-aware capacity decrement",
+                instance_id,
+                asg_name,
+            )
+        self._logger.info(
+            "Terminated instances in ASG %s (weight-aware): %s", asg_name, instances_to_terminate
+        )
 
-        # Re-describe the ASG to get the live DesiredCapacity after detach, since
-        # ShouldDecrementDesiredCapacity=True may have already decremented it in AWS
-        # and the value in asg_details is now stale.
+        # Re-describe the ASG to get live state after termination.
+        # terminate_instance_in_auto_scaling_group decrements DesiredCapacity by
+        # WeightedCapacity, so DesiredCapacity == 0 reliably signals an empty fleet
+        # for both unweighted and weighted ASGs.  No secondary instance-list check needed.
+        live_desired = 0
         try:
             live_response = self._retry_with_backoff(
                 self._aws_client.autoscaling_client.describe_auto_scaling_groups,
@@ -194,14 +238,15 @@ class ASGCapacityManager:
                 AutoScalingGroupNames=[asg_name],
             )
             live_groups = live_response.get("AutoScalingGroups", [])
-            live_desired = live_groups[0].get("DesiredCapacity", 0) if live_groups else 0
+            if live_groups:
+                live_desired = live_groups[0].get("DesiredCapacity", 0) or 0
         except Exception as exc:
             self._logger.warning(
-                "Failed to re-describe ASG %s after detach, falling back to computed capacity: %s",
+                "Failed to re-describe ASG %s after termination, falling back to computed capacity: %s",
                 asg_name,
                 exc,
             )
-            live_desired = max(0, asg_details["DesiredCapacity"] - len(instance_ids))
+            live_desired = max(0, asg_details["DesiredCapacity"] - len(instances_to_terminate))
 
         new_capacity = max(0, live_desired)
 
@@ -214,19 +259,74 @@ class ASGCapacityManager:
             )
             self._logger.info("Reduced ASG %s MinSize to %s", asg_name, new_capacity)
 
-        self._aws_ops.terminate_instances_with_fallback(
-            instance_ids, self._request_adapter, f"ASG {asg_name} instances"
-        )
-        self._logger.info("Terminated ASG %s instances: %s", asg_name, instance_ids)
-
         if new_capacity == 0:
-            self._logger.info("ASG %s capacity is zero, deleting ASG", asg_name)
+            self._logger.info("ASG %s is empty, deleting ASG", asg_name)
             self._call_delete_asg(asg_name)
             self._cleanup_on_zero_capacity("asg", asg_name)
 
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
+
+    def _filter_asg_members(self, asg_name: str, instance_ids: list[str]) -> list[str]:
+        """Return the subset of instance_ids that are currently attached to asg_name.
+
+        Used as an idempotency guard in release_instances: if an instance has already
+        been terminated or detached (e.g. by a prior call), it is excluded so that
+        ShouldDecrementDesiredCapacity=True is not applied a second time.
+        """
+        if not instance_ids:
+            return []
+        try:
+            response = self._retry_with_backoff(
+                self._aws_client.autoscaling_client.describe_auto_scaling_instances,
+                operation_type="read_only",
+                InstanceIds=instance_ids,
+            )
+            entries = response.get("AutoScalingInstances", [])
+            # If describe returned no entries, the API call did not give us
+            # actionable membership info — fall back to processing all
+            # instances rather than silently dropping them. This matches the
+            # exception-path behaviour below.
+            if not entries:
+                return list(instance_ids)
+            # Only terminate instances that are currently in a state where
+            # ShouldDecrementDesiredCapacity=True is meaningful.  Instances in
+            # Detaching / Detached / Terminated already had their DesiredCapacity
+            # decremented on the first call; including them again would double-count.
+            _DETACHABLE_STATES = {"InService", "Standby"}
+
+            # Map: instance_id → lifecycle_state for every entry belonging to asg_name.
+            state_by_id = {
+                entry["InstanceId"]: entry.get("LifecycleState", "")
+                for entry in entries
+                if entry.get("AutoScalingGroupName") == asg_name
+            }
+
+            if not state_by_id:
+                # None of the requested instances appeared in describe output at all.
+                # Could mean: (a) instances were never in this ASG, (b) describe had a
+                # gap.  Fall back to processing all instances to be safe — the original
+                # guard logic below will fall through to terminate_instances_with_fallback.
+                return list(instance_ids)
+
+            # Return only the instances in a detachable lifecycle state.
+            filtered = [iid for iid in instance_ids if state_by_id.get(iid) in _DETACHABLE_STATES]
+            # instances not in state_by_id are not (or no longer) in this ASG;
+            # they can be skipped (no longer need weight-aware termination).
+            return filtered
+        except Exception as exc:
+            self._logger.warning(
+                "Failed to verify ASG %s membership for instances %s; "
+                "proceeding with all instances to avoid leaving them running: %s",
+                asg_name,
+                instance_ids,
+                exc,
+            )
+            # On error, be conservative: attempt termination for all instances.
+            # A "not a member" error from terminate_instance_in_auto_scaling_group
+            # is better than skipping a needed capacity decrement.
+            return list(instance_ids)
 
     def _call_delete_asg(self, asg_name: str) -> None:
         """Invoke the registered delete-ASG callback, or fall back to direct deletion."""

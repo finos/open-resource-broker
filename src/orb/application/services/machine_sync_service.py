@@ -80,6 +80,7 @@ class MachineSyncService:
                     "resource_ids": request.resource_ids,
                     "provider_api": request.provider_api,
                     "template_id": request.template_id,
+                    "requested_count": request.requested_count,
                 }
             # Fallback to instance-level discovery for requests without resource tracking
             elif db_machines:
@@ -261,6 +262,7 @@ class MachineSyncService:
                         or existing.vpc_id != provider_machine.vpc_id
                         or existing.status_reason != provider_machine.status_reason
                         or existing.provider_data != provider_machine.provider_data
+                        or (provider_machine.resource_id and not existing.resource_id)
                     )
 
                     # Debug logging
@@ -288,6 +290,8 @@ class MachineSyncService:
                         machine_data["vpc_id"] = provider_machine.vpc_id
                         machine_data["version"] = existing.version + 1
                         machine_data["tags"] = provider_machine.tags
+                        if provider_machine.resource_id and not existing.resource_id:
+                            machine_data["resource_id"] = provider_machine.resource_id
 
                         updated_machine = Machine.model_validate(machine_data)
                         to_upsert.append(updated_machine)

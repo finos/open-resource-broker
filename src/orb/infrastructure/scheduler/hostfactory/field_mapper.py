@@ -9,13 +9,13 @@ from orb.infrastructure.scheduler.hostfactory.field_mappings import HostFactoryF
 class HostFactoryFieldMapper(SchedulerFieldMapper):
     """HostFactory-specific field mapping and transformations."""
 
-    def __init__(self, provider_type: str = "aws"):
+    def __init__(self, provider_type: str | None = None):
         self.provider_type = provider_type
 
     @property
     def field_mappings(self) -> Dict[str, str]:
         """Get HostFactory field mappings for the provider."""
-        return HostFactoryFieldMappings.get_mappings(self.provider_type)
+        return HostFactoryFieldMappings.get_mappings(self.provider_type or "")
 
     def map_input_fields(self, external_template: Dict[str, Any]) -> Dict[str, Any]:
         """Map HostFactory format → internal format with transformations."""
@@ -141,13 +141,26 @@ class HostFactoryFieldMapper(SchedulerFieldMapper):
         return {k: v for k, v in mapped.items() if v is not None and v != {} and v != []}
 
     def _create_hf_attributes(self, instance_type: str) -> Dict[str, List[str]]:
-        """Create HostFactory attributes from instance type."""
-        from orb.providers.aws.utilities.ec2.instances import derive_cpu_ram_from_instance_type
+        """Create HostFactory attributes from instance type via the per-provider registry.
 
-        ncpus, nram = derive_cpu_ram_from_instance_type(instance_type)
+        Delegates to the registered ``FieldMappingPort.derive_attributes`` for
+        the active provider type.  Falls back to a minimal placeholder when no
+        adapter is registered (non-AWS providers that don't supply cpu/ram
+        lookup yet).
+        """
+        from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import (
+            FieldMappingRegistry,
+        )
 
+        adapter = FieldMappingRegistry.get(self.provider_type or "")
+        if adapter is not None:
+            result = adapter.derive_attributes(instance_type)
+            if result is not None:
+                return result  # type: ignore[return-value]
+
+        # Fallback: return a minimal attributes object so HF spec is still satisfied.
         return {
             "type": ["String", "X86_64"],
-            "ncpus": ["Numeric", str(ncpus)],
-            "nram": ["Numeric", str(nram)],
+            "ncpus": ["Numeric", "1"],
+            "nram": ["Numeric", "1024"],
         }

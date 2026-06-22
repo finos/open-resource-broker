@@ -2,30 +2,105 @@
 
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+_ALLOWED_JWT_ALGORITHMS = frozenset({"HS256", "HS384", "HS512"})
+
+
+class BearerTokenAuthSubConfig(BaseModel):
+    """Typed sub-configuration for the bearer_token auth strategy."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    secret_key: str = Field(..., description="Secret key for JWT signing/verification (>=32 bytes)")
+    algorithm: str = Field("HS256", description="JWT algorithm (HS256, HS384, or HS512)")
+    token_expiry: int = Field(3600, description="Token expiry in seconds")
+
+    @field_validator("algorithm")
+    @classmethod
+    def _validate_algorithm(cls, value: str) -> str:
+        """Restrict to HMAC algorithms; explicitly reject 'none' and unknown values."""
+        if value.lower() == "none":
+            raise ValueError(
+                "Algorithm 'none' is not permitted — it disables signature verification."
+            )
+        if value not in _ALLOWED_JWT_ALGORITHMS:
+            raise ValueError(
+                f"Unsupported JWT algorithm {value!r}. "
+                f"Allowed values: {sorted(_ALLOWED_JWT_ALGORITHMS)}"
+            )
+        return value
+
+
+class IAMAuthSubConfig(BaseModel):
+    """Typed sub-configuration for AWS IAM auth strategy.
+
+    **Security note — assume_permissions:**
+    Setting ``assume_permissions=True`` bypasses real AWS IAM evaluation and grants
+    every action in ``required_actions`` to any authenticated principal.  This is a
+    deliberate development/testing escape hatch and MUST NOT be enabled in production.
+    The IAMAuthStrategy enforces this by requiring the environment variable
+    ``ORB_IAM_ASSUME_PERMISSIONS_DEV_ONLY=true`` to be set alongside the config flag;
+    without it the flag is ignored and permissions are denied by default.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    region: str = Field("us-east-1", description="AWS region")
+    profile: Optional[str] = Field(None, description="AWS profile")
+    required_actions: list[str] = Field(default_factory=list, description="Required IAM actions")
+    assume_permissions: bool = Field(
+        False,
+        description=(
+            "DEV/TEST ONLY — grant all required_actions without AWS evaluation. "
+            "Has no effect unless ORB_IAM_ASSUME_PERMISSIONS_DEV_ONLY=true is also set."
+        ),
+    )
+
+
+class CognitoAuthSubConfig(BaseModel):
+    """Typed sub-configuration for AWS Cognito auth strategy."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    user_pool_id: str = Field("", description="Cognito User Pool ID")
+    client_id: str = Field("", description="Cognito App Client ID")
+    region: str = Field("us-east-1", description="AWS region")
+    jwks_url: Optional[str] = Field(None, description="JWKS URL (auto-generated if omitted)")
+
+
+class ProviderAuthSubConfig(BaseModel):
+    """Typed sub-configuration for provider-specific auth strategies."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    iam: Optional[IAMAuthSubConfig] = Field(None, description="IAM auth sub-configuration")
+    cognito: Optional[CognitoAuthSubConfig] = Field(
+        None, description="Cognito auth sub-configuration"
+    )
 
 
 class AuthConfig(BaseModel):
     """Authentication configuration."""
 
-    model_config = ConfigDict(extra="allow")  # Allow provider-specific auth configs
+    model_config = ConfigDict(extra="forbid")
 
     enabled: bool = Field(False, description="Enable authentication")
     strategy: str = Field(
         "none",
-        description="Authentication strategy (none, bearer_token, iam, cognito, oauth)",
+        description="Authentication strategy (none, bearer_token, bearer_token_enhanced, iam, cognito)",
     )
 
     # Bearer token configuration
-    bearer_token: Optional[dict[str, Any]] = Field(
+    bearer_token: Optional[BearerTokenAuthSubConfig] = Field(
         None, description="Bearer token strategy configuration"
     )
 
-    # OAuth configuration
+    # OAuth configuration (kept as untyped dict for forward compatibility)
     oauth: Optional[dict[str, Any]] = Field(None, description="OAuth strategy configuration")
 
     # Provider-specific auth configurations
-    provider_auth: Optional[dict[str, Any]] = Field(
+    provider_auth: Optional[ProviderAuthSubConfig] = Field(
         None, description="Provider-specific auth configuration"
     )
 

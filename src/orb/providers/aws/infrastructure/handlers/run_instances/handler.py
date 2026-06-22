@@ -34,6 +34,7 @@ from botocore.exceptions import ClientError
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
+from orb.domain.base.provider_fulfilment import CheckHostsStatusResult, ProviderFulfilment
 from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
@@ -410,8 +411,15 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
 
         return params
 
-    def check_hosts_status(self, request: Request) -> list[dict[str, Any]]:
-        """Check the status of instances created by RunInstances."""
+    def check_hosts_status(self, request: Request) -> CheckHostsStatusResult:
+        """Check the status of instances created by RunInstances.
+
+        Fulfilment semantics:
+            RunInstances is a synchronous API — each instance equals 1 capacity
+            unit.  The request is ``fulfilled`` when running_count >= requested_count
+            and failed_count == 0.  If the describe response is empty we treat
+            that as still in_progress so the next poll can confirm.
+        """
         try:
             # Get instance IDs from provider_data (preferred) or fallback to metadata for backward compatibility
             instance_ids = (
@@ -433,7 +441,17 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                         "No instance IDs or resource IDs found in request %s",
                         request.request_id,
                     )
-                    return []
+                    return CheckHostsStatusResult(
+                        instances=[],
+                        fulfilment=ProviderFulfilment(
+                            state="in_progress",
+                            message="No instance IDs yet — waiting for provisioning",
+                            target_units=request.requested_count,
+                            running_count=0,
+                            pending_count=0,
+                            failed_count=0,
+                        ),
+                    )
 
             # Get resource ID from provider_data (preferred) or domain field or fallback to metadata
             resource_id = (
@@ -459,17 +477,85 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 provider_api="RunInstances",
             )
 
-            return self._format_instance_data(
+            instances = self._format_instance_data(
                 instance_details, resource_id, self._resolve_provider_api(request)
             )
+            fulfilment = self._compute_run_instances_fulfilment(instances, request.requested_count)
+            return CheckHostsStatusResult(instances=instances, fulfilment=fulfilment)
 
         except Exception as e:
             self._logger.error("Unexpected error checking RunInstances status: %s", str(e))
             raise AWSInfrastructureError(f"Failed to check RunInstances status: {e!s}")
 
+    def _compute_run_instances_fulfilment(
+        self, instances: list[dict[str, Any]], requested_count: int
+    ) -> ProviderFulfilment:
+        """Compute ProviderFulfilment for a RunInstances-style request.
+
+        RunInstances is sync/simple: 1 instance == 1 capacity unit.
+        The request is fulfilled when running_count >= requested_count and
+        no failed instances exist.
+        """
+        running_count = sum(1 for i in instances if i.get("status") == "running")
+        pending_count = sum(1 for i in instances if i.get("status") in ("pending", "starting"))
+        failed_count = sum(
+            1 for i in instances if i.get("status") in ("failed", "error", "shutting-down")
+        )
+
+        if running_count >= requested_count and failed_count == 0:
+            return ProviderFulfilment(
+                state="fulfilled",
+                message=f"All {running_count} instance(s) running",
+                target_units=requested_count,
+                fulfilled_units=running_count,
+                running_count=running_count,
+                pending_count=pending_count,
+                failed_count=failed_count,
+            )
+        elif pending_count > 0:
+            return ProviderFulfilment(
+                state="in_progress",
+                message=f"{running_count}/{requested_count} running, {pending_count} pending",
+                target_units=requested_count,
+                fulfilled_units=running_count,
+                running_count=running_count,
+                pending_count=pending_count,
+                failed_count=failed_count,
+            )
+        elif failed_count == len(instances) and len(instances) > 0:
+            return ProviderFulfilment(
+                state="failed",
+                message=f"All {failed_count} instance(s) failed",
+                target_units=requested_count,
+                fulfilled_units=0,
+                running_count=running_count,
+                pending_count=pending_count,
+                failed_count=failed_count,
+            )
+        elif running_count > 0:
+            return ProviderFulfilment(
+                state="partial",
+                message=f"{running_count}/{requested_count} instance(s) running",
+                target_units=requested_count,
+                fulfilled_units=running_count,
+                running_count=running_count,
+                pending_count=pending_count,
+                failed_count=failed_count,
+            )
+        else:
+            return ProviderFulfilment(
+                state="in_progress",
+                message="Instances starting",
+                target_units=requested_count,
+                fulfilled_units=0,
+                running_count=running_count,
+                pending_count=pending_count,
+                failed_count=failed_count,
+            )
+
     def _find_instances_by_resource_ids(
         self, request: Request, resource_ids: list[str]
-    ) -> list[dict[str, Any]]:
+    ) -> CheckHostsStatusResult:
         """Find instances using resource IDs (reservation IDs for RunInstances)."""
         try:
             all_instances: list[dict[str, Any]] = []
@@ -522,7 +608,10 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 resource_ids,
             )
 
-            return all_instances
+            fulfilment = self._compute_run_instances_fulfilment(
+                all_instances, request.requested_count
+            )
+            return CheckHostsStatusResult(instances=all_instances, fulfilment=fulfilment)
 
         except Exception as e:
             self._logger.error(
@@ -534,7 +623,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
 
     def _find_instances_by_tags_fallback(
         self, request: Request, resource_ids: list[str]
-    ) -> list[dict[str, Any]]:
+    ) -> CheckHostsStatusResult:
         """Fallback method to find instances by tags when reservation-id filter is not supported."""
         try:
             response = self.aws_client.ec2_client.describe_instances()
@@ -565,11 +654,24 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                     )
                 )
 
-            return formatted_instances
+            fulfilment = self._compute_run_instances_fulfilment(
+                formatted_instances, request.requested_count
+            )
+            return CheckHostsStatusResult(instances=formatted_instances, fulfilment=fulfilment)
 
         except Exception as e:
             self._logger.error("FALLBACK: Fallback method failed to find instances: %s", e)
-            return []
+            return CheckHostsStatusResult(
+                instances=[],
+                fulfilment=ProviderFulfilment(
+                    state="in_progress",
+                    message="Instance lookup failed — will retry",
+                    target_units=request.requested_count,
+                    running_count=0,
+                    pending_count=0,
+                    failed_count=0,
+                ),
+            )
 
     def release_hosts(
         self,
@@ -677,7 +779,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 description="On-demand instances using RunInstances API",
                 provider_api="RunInstances",
                 machine_types={"t3.medium": 2},
-                max_instances=5,
+                max_instances=100,
                 price_type="ondemand",
                 subnet_ids=[],
                 security_group_ids=[],
@@ -689,7 +791,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 description="Spot instances using RunInstances API",
                 provider_api="RunInstances",
                 machine_types={"t3.medium": 2},
-                max_instances=10,
+                max_instances=100,
                 price_type="spot",
                 max_price=0.10,
                 subnet_ids=[],

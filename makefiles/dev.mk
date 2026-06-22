@@ -53,8 +53,8 @@ test: dev-install  ## Run tests (usage: make test [unit|integration|e2e|coverage
 test-report: dev-install  ## Generate comprehensive test report (PRESERVE: used by ci.yml)
 	./dev-tools/testing/run_tests.py --all --coverage --junit-xml=test-results-combined.xml --cov-xml=coverage-combined.xml --html-coverage --maxfail=1 --timeout=60
 
-system-tests: dev-install  ## Run system integration tests
-	@uv run python -m pytest tests/onaws/test_onaws.py -v -m manual_aws --no-cov --tb=long
+system-tests: dev-install  ## Run system integration tests (real AWS)
+	@uv run python -m pytest tests/providers/aws/live/test_onaws.py -v -m manual_aws --no-cov --tb=long
 
 # Backward compatibility aliases (direct calls to avoid loops)
 test-unit: dev-install
@@ -92,6 +92,36 @@ test-html: dev-install
 
 test-docker: dev-install  ## Run Docker containerization tests
 	@./dev-tools/testing/test-docker.sh
+
+# Provider-aware test targets
+# Parallel worker count for pytest. Capped at half the available CPU cores so
+# parallel test runs (especially live-AWS, which spawn ORB server subprocesses,
+# boto3 sessions, and long polls per worker) don't exhaust system memory or
+# saturate the network. Override per-invocation: make test-providers-aws-live PYTEST_WORKERS=4
+# Use $(shell ...) so the math runs once when make starts, not on every recipe.
+_HALF_CPU := $(shell python3 -c 'import os; print(max(1, (os.cpu_count() or 2) // 2))')
+PYTEST_WORKERS ?= $(_HALF_CPU)
+
+test-no-live: dev-install  ## Run all tests except live cloud suites (pre-PR check)
+	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) --ignore=tests/providers/aws/live
+
+test-providers: dev-install  ## Run all provider tests except live
+	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/providers --ignore=tests/providers/aws/live
+
+test-providers-aws: dev-install  ## Run AWS provider unit + moto tests
+	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/providers/aws/unit tests/providers/aws/moto
+
+test-providers-aws-unit: dev-install  ## Run AWS provider unit tests only
+	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/providers/aws/unit
+
+test-providers-aws-moto: dev-install  ## Run AWS moto (mocked) tests only
+	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/providers/aws/moto
+
+test-providers-aws-live: dev-install  ## Run AWS live tests (requires real AWS credentials; parallel by default)
+	@uv run --extra api pytest --no-cov -q -ra -n $(PYTEST_WORKERS) --live tests/providers/aws/live
+
+test-architecture: dev-install  ## Run architecture compliance tests
+	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/unit/architecture tests/unit/test_architectural_compliance.py
 
 # Dummy targets removed (consolidated in quality.mk)
 

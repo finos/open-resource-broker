@@ -71,22 +71,28 @@ class SpotFleetReleaseManager:
             on_demand_capacity = int(fleet_config.get("OnDemandTargetCapacity", 0) or 0)
 
             if instance_ids:
+                weighted_capacity_to_return = self._sum_weighted_capacity(
+                    fleet_id, fleet_config, instance_ids
+                )
+
                 decision = compute_fleet_release_decision(
                     fleet_type=fleet_type,
                     current_capacity=target_capacity,
-                    instances_to_return=len(instance_ids),
+                    weighted_capacity_to_return=weighted_capacity_to_return,
                 )
 
                 if decision.requires_capacity_reduction:
-                    new_target_capacity = max(0, target_capacity - len(instance_ids))
+                    new_target_capacity = max(0, target_capacity - weighted_capacity_to_return)
                     new_on_demand_capacity = min(on_demand_capacity, new_target_capacity)
 
                     self._logger.info(
-                        "Reducing %s Spot Fleet %s capacity from %s to %s before terminating instances",
+                        "Reducing %s Spot Fleet %s capacity from %s to %s "
+                        "(weighted_capacity_to_return=%s) before terminating instances",
                         fleet_type,
                         fleet_id,
                         target_capacity,
                         new_target_capacity,
+                        weighted_capacity_to_return,
                     )
 
                     self._retry(
@@ -102,8 +108,40 @@ class SpotFleetReleaseManager:
                 )
                 self._logger.info("Terminated Spot Fleet %s instances: %s", fleet_id, instance_ids)
 
-                if decision.is_full_return and decision.has_fleet_record:
-                    self._logger.info("Spot Fleet %s capacity is zero, cancelling fleet", fleet_id)
+                # Determine whether all fleet instances have been returned.
+                # decision.is_full_return is based on the weighted capacity sum, so it
+                # correctly handles weighted fleets.  The secondary instance-count check
+                # below acts as a defensive net for races.
+                should_cancel_fleet = decision.is_full_return
+                if not should_cancel_fleet and decision.has_fleet_record:
+                    should_cancel_fleet = self._fleet_has_no_remaining_instances(
+                        fleet_id, set(instance_ids)
+                    )
+                    if should_cancel_fleet:
+                        self._logger.info(
+                            "Spot Fleet %s has no remaining active instances "
+                            "(weighted-capacity case); treating as full return",
+                            fleet_id,
+                        )
+                        # Zero the capacity to prevent replacement before cancellation.
+                        if decision.requires_capacity_reduction:
+                            try:
+                                self._retry(
+                                    self._aws_client.ec2_client.modify_spot_fleet_request,
+                                    operation_type="critical",
+                                    SpotFleetRequestId=fleet_id,
+                                    TargetCapacity=0,
+                                    OnDemandTargetCapacity=0,
+                                )
+                            except Exception as exc:
+                                self._logger.warning(
+                                    "Failed to zero Spot Fleet %s capacity before cancellation: %s",
+                                    fleet_id,
+                                    exc,
+                                )
+
+                if should_cancel_fleet and decision.has_fleet_record:
+                    self._logger.info("Spot Fleet %s is empty, cancelling fleet", fleet_id)
                     self._retry(
                         self._aws_client.ec2_client.cancel_spot_fleet_requests,
                         operation_type="critical",
@@ -176,6 +214,134 @@ class SpotFleetReleaseManager:
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
+
+    def _fleet_has_no_remaining_instances(self, fleet_id: str, excluded_ids: set[str]) -> bool:
+        """Return True when the Spot Fleet has no active instances outside *excluded_ids*.
+
+        Used as a secondary full-return detector for weighted fleets where the
+        capacity arithmetic alone is insufficient.
+
+        Args:
+            fleet_id: Spot Fleet request ID to inspect.
+            excluded_ids: Instance IDs that have already been submitted for
+                termination and should be treated as gone.
+
+        Returns:
+            True when no active instances remain, False when any do (or on error).
+        """
+        try:
+            resp = self._retry(
+                self._aws_client.ec2_client.describe_spot_fleet_instances,
+                operation_type="read_only",
+                SpotFleetRequestId=fleet_id,
+            )
+            active = resp.get("ActiveInstances", [])
+            remaining = [inst for inst in active if inst.get("InstanceId") not in excluded_ids]
+            return len(remaining) == 0
+        except Exception as exc:
+            self._logger.warning(
+                "Could not verify remaining instances for Spot Fleet %s: %s — "
+                "assuming non-empty (safe default)",
+                fleet_id,
+                exc,
+            )
+            return False
+
+    def _sum_weighted_capacity(
+        self,
+        fleet_id: str,
+        fleet_config: dict[str, Any],
+        instance_ids: list[str],
+    ) -> int:
+        """Return the total WeightedCapacity consumed by *instance_ids* in this Spot Fleet.
+
+        Queries ``describe_spot_fleet_instances`` (which includes ``WeightedCapacity``
+        directly on each ``ActiveInstances`` entry) to resolve each returning instance's
+        weight.  Falls back to the ``LaunchSpecifications`` / ``LaunchTemplateConfigs``
+        weight-by-type map when an instance is absent from ``ActiveInstances``
+        (already terminated or in a race).  Instances with no resolvable weight
+        default to 1.
+
+        Args:
+            fleet_id: Spot Fleet request ID.
+            fleet_config: ``SpotFleetRequestConfig`` dict from the describe response.
+            instance_ids: The specific instance IDs being returned.
+
+        Returns:
+            Sum of weighted capacity units to subtract from TargetCapacity.
+        """
+        # Build a fallback map of instance_type → WeightedCapacity from the fleet spec.
+        weight_by_type: dict[str, int] = {}
+        for spec in fleet_config.get("LaunchSpecifications", []):
+            itype = spec.get("InstanceType")
+            raw_weight = spec.get("WeightedCapacity")
+            if itype and raw_weight is not None:
+                try:
+                    weight_by_type[itype] = int(float(raw_weight))
+                except (TypeError, ValueError):
+                    pass
+        for lt_config in fleet_config.get("LaunchTemplateConfigs", []):
+            for override in lt_config.get("Overrides", []):
+                itype = override.get("InstanceType")
+                raw_weight = override.get("WeightedCapacity")
+                if itype and raw_weight is not None:
+                    try:
+                        weight_by_type[itype] = int(float(raw_weight))
+                    except (TypeError, ValueError):
+                        pass
+
+        # Fetch the active instance list; the API returns WeightedCapacity per entry.
+        weight_by_instance_id: dict[str, int] = {}
+        instance_type_by_id: dict[str, str] = {}
+        try:
+            resp = self._retry(
+                self._aws_client.ec2_client.describe_spot_fleet_instances,
+                operation_type="read_only",
+                SpotFleetRequestId=fleet_id,
+            )
+            for item in resp.get("ActiveInstances", []):
+                iid = item.get("InstanceId")
+                itype = item.get("InstanceType")
+                raw_weight = item.get("WeightedCapacity")
+                if iid:
+                    if itype:
+                        instance_type_by_id[iid] = itype
+                    if raw_weight is not None:
+                        try:
+                            weight_by_instance_id[iid] = int(float(raw_weight))
+                        except (TypeError, ValueError):
+                            pass
+        except Exception as exc:
+            self._logger.warning(
+                "Could not fetch active instances for Spot Fleet %s to compute "
+                "weighted capacity; defaulting all instance weights to 1: %s",
+                fleet_id,
+                exc,
+            )
+
+        total = 0
+        for iid in instance_ids:
+            # Prefer the per-instance weight from the live describe response.
+            if iid in weight_by_instance_id:
+                total += weight_by_instance_id[iid]
+            else:
+                # Fall back to the weight-by-type map from the fleet config.
+                itype = instance_type_by_id.get(iid)
+                if itype and itype in weight_by_type:
+                    total += weight_by_type[itype]
+                else:
+                    # Instance not found or type has no weight → default to 1.
+                    total += 1
+
+        if not weight_by_type:
+            self._logger.debug(
+                "Spot Fleet %s has no WeightedCapacity overrides; "
+                "using instance count %d as capacity decrement",
+                fleet_id,
+                len(instance_ids),
+            )
+
+        return max(1, total)
 
     def _retry(self, func: Any, operation_type: str = "standard", **kwargs: Any) -> Any:
         """Delegate to the injected retry function if available, else call directly."""

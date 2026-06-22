@@ -10,7 +10,6 @@ if TYPE_CHECKING:
     from orb.domain.template.template_aggregate import Template
 
 from orb.domain.base.ports import ContainerPort, LoggingPort, ProviderSelectionPort
-from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.provider_validation_port import ProviderValidationPort
 from orb.domain.base.results import ProviderSelectionResult
 
@@ -29,25 +28,6 @@ class ProviderValidationService:
         self.logger = logger
         self._provider_selection_port = provider_selection_port
         self._validator = validator
-
-    async def validate_provider_availability(self) -> None:
-        """Validate that providers are available."""
-        config_manager = self._container.get(ConfigurationPort)
-        provider_config = config_manager.get_provider_config()
-
-        if provider_config:
-            for provider_instance in provider_config.get_active_providers():
-                self._provider_selection_port.register_provider_strategy(
-                    provider_instance.type, provider_instance
-                )
-
-        available_strategies = self._provider_selection_port.get_available_strategies()
-        if not available_strategies:
-            error_msg = "No provider strategies available - cannot create machine requests"
-            self.logger.error(error_msg)
-            raise ValueError(error_msg)
-
-        self.logger.debug("Available provider strategies: %s", available_strategies)
 
     async def select_and_validate_provider(self, template: Template) -> ProviderSelectionResult:
         """Select provider and validate template compatibility."""

@@ -14,7 +14,6 @@ from pydantic import (
 
 from orb.domain.template.template_aggregate import Template
 from orb.providers.aws.domain.template.value_objects import (
-    AWSAllocationStrategy,
     AWSConfiguration,
     AWSFleetType,
     AWSInstanceType,
@@ -22,8 +21,8 @@ from orb.providers.aws.domain.template.value_objects import (
     AWSSubnetId,
     AWSTags,
     ProviderApi,
-    normalise_allocation_strategy,
 )
+from orb.providers.aws.value_objects import AWSAllocationStrategy, normalise_allocation_strategy
 
 
 class AWSOptionalIntegerRange(BaseModel):
@@ -203,6 +202,11 @@ class AWSTemplate(Template):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
+    # Typed provider-config forwarded from TemplateDTO (round-trip via model_dump).
+    # Accepts a dict (serialised AWSTemplateDTOConfig) or None; values are promoted
+    # to their respective fields in validate_aws_template before use.
+    provider_config: Optional[dict[str, Any]] = None
+
     # AWS-specific fields
     provider_api: Optional[ProviderApi] = None  # type: ignore[assignment]
     fleet_type: Optional[AWSFleetType] = None
@@ -252,6 +256,38 @@ class AWSTemplate(Template):
         # AWS-specific required fields — only enforced when values are present
         # (generic/example templates may have empty subnet_ids/image_id, filled at runtime
         # from provider.template_defaults via _coalesce_merge)
+
+        # Promote AWS-specific fields from provider_config dict (DTO round-trip path).
+        # provider_config is injected by TemplateDTO.from_domain via AWSTemplateDTOConfig.
+        _pc = getattr(self, "provider_config", None)
+        if isinstance(_pc, dict):
+            if not self.fleet_type:
+                _ft = _pc.get("fleet_type")
+                if _ft:
+                    try:
+                        object.__setattr__(self, "fleet_type", AWSFleetType(str(_ft).lower()))
+                    except (ValueError, TypeError):
+                        pass
+            if not self.fleet_role:
+                _fr = _pc.get("fleet_role")
+                if _fr:
+                    object.__setattr__(self, "fleet_role", _fr)
+            if self.percent_on_demand is None:
+                _pod = _pc.get("percent_on_demand")
+                if _pod is not None:
+                    object.__setattr__(self, "percent_on_demand", int(_pod))
+            if not self.launch_template_id:
+                _ltid = _pc.get("launch_template_id")
+                if _ltid:
+                    object.__setattr__(self, "launch_template_id", _ltid)
+            if self.abis_instance_requirements is None:
+                _abis = _pc.get("abis_instance_requirements")
+                if _abis is not None:
+                    object.__setattr__(
+                        self,
+                        "abis_instance_requirements",
+                        ABISInstanceRequirements.model_validate(_abis),
+                    )
 
         # Auto-assign default fleet_type if not provided
         # Set fleet_type from metadata if not already set

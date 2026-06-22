@@ -42,9 +42,7 @@ classifiers = [
 requires-python = ">=3.10"
 
 dependencies = [
-    # Core dependencies (always needed)
-    "boto3>=1.42.21",
-    "botocore>=1.42.21",
+    # Core dependencies (always needed, never provider-specific)
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
     "sqlalchemy>=2.0.0",
@@ -55,9 +53,43 @@ dependencies = [
     "requests>=2.31.0",
     "PyYAML>=6.0.0", # Exported API (lazy-loaded)
     "jsonschema>=4.17.0",
+    # AWS provider deps — currently in core for backward compatibility.
+    # The canonical install path going forward is `pip install orb-py[aws]`,
+    # which already works today.  When the second provider lands these will
+    # move to the [aws] extra and a major-version bump will signal the
+    # breaking change for operators who installed without extras.
+    "boto3>=1.42.21",
+    "botocore>=1.42.21",
 ]
 
 [project.optional-dependencies]
+# ── Provider extras ────────────────────────────────────────────────────────
+# AWS provider — explicit opt-in alias for the AWS deps currently in core.
+# Pinning the same versions keeps `pip install orb-py[aws]` resolving identically
+# to the bare install and future-proofs operator install commands for the day
+# AWS deps move out of core.
+aws = [
+    "boto3>=1.42.21",
+    "botocore>=1.42.21",
+]
+
+# Placeholder entries for future providers (add when provider is implemented)
+# azure = [
+#     "azure-mgmt-compute>=30.0.0",
+#     "azure-identity>=1.15.0",
+#     "azure-mgmt-network>=25.0.0",
+# ]
+# gcp = [
+#     "google-cloud-compute>=1.14.0",
+#     "google-auth>=2.23.0",
+# ]
+
+# Meta-extra: all currently implemented providers
+all-providers = [
+    "orb-py[aws]",
+]
+
+# ── Feature extras ─────────────────────────────────────────────────────────
 # CLI enhancements (colored output)
 cli = [
     "rich>=13.3.0",
@@ -72,20 +104,34 @@ api = [
     "jinja2>=3.1.0",
 ]
 
-# Monitoring & observability (for API/production deployments)
+# Monitoring & observability (provider-neutral — no boto3 instrumentation here)
 monitoring = [
     "opentelemetry-api>=1.20.0",
     "opentelemetry-sdk>=1.20.0",
     "opentelemetry-instrumentation-fastapi>=0.41b0",
-    "opentelemetry-instrumentation-boto>=0.41b0",
     "opentelemetry-instrumentation-sqlalchemy>=0.41b0",
     "prometheus-client>=0.17.0",
     "psutil>=5.9.0",
 ]
 
-# All optional features
+# AWS-specific monitoring (boto3 instrumentation; requires [aws])
+monitoring-aws = [
+    "orb-py[aws,monitoring]",
+    "opentelemetry-instrumentation-boto>=0.41b0",
+]
+
+# All optional features (providers + features)
 all = [
-    "orb-py[cli,api,monitoring]",
+    "orb-py[cli,api,monitoring,all-providers]",
+]
+
+# ── Test extras ────────────────────────────────────────────────────────────
+# AWS test dependencies — moto + response mocking
+test-aws = [
+    "orb-py[aws]",
+    "moto[ec2,iam,ec2instanceconnect,autoscaling,ssm,dynamodb,sts,sqs,sns]>=5.1.19,<6.0.0",
+    "responses>=0.24.0,<1.0.0",
+    "requests-mock>=1.11.0,<2.0.0",
 ]
 
 # ---------------------------------------------------------------------------
@@ -151,7 +197,7 @@ ci = [
     "wheel>=0.41.3,<1.0.0",
 ]
 dev = [
-    "orb-py[ci]",
+    "orb-py[ci,all-providers]",
     "virtualenv>=20.26.6",
     "pre-commit>=3.5.0,<5.0.0",
     "bump2version>=1.0.1,<2.0.0",
@@ -227,6 +273,8 @@ ci = [
     "peewee>=3.18.3",
     # Security override for safety's vulnerable marshmallow dependency (CVE-2025-68480)
     "marshmallow>=4.1.2",
+    # Security override for lxml (CVE-2026-41066) — transitive via cyclonedx-bom + pip-audit
+    "lxml>=6.1.0",
 
     # Documentation
     "mkdocs>=1.5.0,<2.0.0",
@@ -291,7 +339,7 @@ include-package-data = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-norecursedirs = ["tests/onaws"]
+norecursedirs = ["tests/providers/aws/live"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -323,6 +371,7 @@ markers = [
     "simulator_limitation: Assertion weakened due to known simulator gap",
     "requires_real_provider: Skipped unless --run-real-provider flag passed",
     "moto: Tests using moto-mocked AWS (no real credentials required)",
+    "live: Tests requiring real AWS credentials (enabled with --live or --run-aws)",
     "sdk: Tests exercising the ORBClient SDK interface",
     "cli: marks CLI integration tests",
     "benchmark: marks benchmark/performance tests",
@@ -373,7 +422,7 @@ title = "Open Resource Broker Coverage Report"
 output = "coverage.xml"
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 100
 exclude = [
     ".eggs",

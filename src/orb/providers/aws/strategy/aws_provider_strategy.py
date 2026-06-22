@@ -7,16 +7,17 @@ orchestrating operations through focused services while maintaining clean
 architecture and single responsibility principle.
 """
 
+import asyncio
 import time
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from orb.domain.base.dependency_injection import injectable
+from orb.domain.base.operation_outcome import Accepted, Completed, Failed, OperationOutcome
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 
 # Import AWS-specific components
 from orb.providers.aws.configuration.config import AWSProviderConfig
-from orb.providers.aws.exceptions.aws_exceptions import AWSConfigurationError
 from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.services.capability_service import AWSCapabilityService
 from orb.providers.aws.services.handler_registry import AWSHandlerRegistry
@@ -30,6 +31,7 @@ from orb.providers.aws.services.instance_operation_service import AWSInstanceOpe
 from orb.providers.aws.services.template_validation_service import AWSTemplateValidationService
 
 if TYPE_CHECKING:
+    from orb.domain.request.aggregate import Request
     from orb.monitoring.health import HealthCheck
     from orb.providers.aws.infrastructure.adapters.aws_provisioning_adapter import (
         AWSProvisioningAdapter,
@@ -409,8 +411,15 @@ class AWSProviderStrategy(ProviderStrategy):
         logic for discovering instances from resource IDs. This delegates to the
         correct handler's check_hosts_status method rather than using a generic
         service that lacks per-handler context.
+
+        The handler returns a CheckHostsStatusResult containing both instance
+        details and a ProviderFulfilment verdict.  The fulfilment is forwarded
+        in metadata so RequestStatusService can consume it without any
+        provider-specific logic.
         """
         try:
+            from orb.domain.base.provider_fulfilment import ProviderFulfilment
+
             resource_ids = operation.parameters.get("resource_ids", [])
             provider_api = operation.parameters.get("provider_api", "RunInstances")
             provider_api_value = (
@@ -442,25 +451,37 @@ class AWSProviderStrategy(ProviderStrategy):
                 operation.context.get("request_id") if operation.context else None
             )
 
+            requested_count = int(operation.parameters.get("requested_count") or 1)
             request = Request.create_new_request(
                 request_type=RequestType.ACQUIRE,
                 template_id=operation.parameters.get("template_id", "unknown"),
-                machine_count=1,
+                machine_count=requested_count,
                 provider_type="aws",
                 provider_name="aws-default",
                 request_id=request_id,
             )
             request.resource_ids = resource_ids
 
-            instance_details = handler.check_hosts_status(request)
+            # check_hosts_status makes blocking boto3 I/O calls (describe_fleet_instances,
+            # describe_instances, etc.).  Running it directly in an async handler blocks
+            # the uvicorn event loop, which prevents uvicorn from accepting any further
+            # connections until the call completes.  For large requests (e.g. 100 instances)
+            # this starvation causes all concurrent polls to fail with ConnectionError.
+            # Offloading to a thread pool executor keeps the event loop responsive.
+            check_result = await asyncio.to_thread(handler.check_hosts_status, request)
+            instance_details = check_result.instances
+            fulfilment: ProviderFulfilment = check_result.fulfilment
 
             metadata: dict[str, Any] = {
                 "operation": "describe_resource_instances",
                 "resource_ids": resource_ids,
                 "provider_api": provider_api_value,
                 "instance_count": len(instance_details),
+                # Forward the provider's fulfilment verdict to the application layer.
+                # RequestStatusService reads this as "provider_fulfilment" and trusts
+                # it exclusively — no count math or AWS-specific key inspection.
+                "provider_fulfilment": fulfilment,
             }
-            self._augment_capacity_metadata(metadata, provider_api_value, resource_ids)
 
             if not instance_details:
                 self._logger.info("No instances found for resources: %s", resource_ids)
@@ -477,7 +498,10 @@ class AWSProviderStrategy(ProviderStrategy):
                 "DESCRIBE_RESOURCE_INSTANCES_ERROR",
             )
 
+    # -------------------------------------------------------------------------
     # Infrastructure discovery methods (delegated to service)
+    # -------------------------------------------------------------------------
+
     def discover_infrastructure(self, provider_config: dict[str, Any]) -> dict[str, Any]:
         """Discover AWS infrastructure for provider."""
         return self._get_infrastructure_service().discover_infrastructure(provider_config)
@@ -559,7 +583,13 @@ class AWSProviderStrategy(ProviderStrategy):
             return
         from orb.providers.aws.health import register_aws_health_checks
 
-        register_aws_health_checks(health_check, self.aws_client)
+        storage_strategy = "json"
+        if self._config_port is not None:
+            try:
+                storage_strategy = self._config_port.get_storage_strategy()
+            except Exception:
+                pass
+        register_aws_health_checks(health_check, self.aws_client, storage_strategy)
 
     def cleanup(self) -> None:
         """Clean up AWS provider resources."""
@@ -570,100 +600,6 @@ class AWSProviderStrategy(ProviderStrategy):
             self._initialized = False
         except Exception as e:
             self._logger.warning("Failed during AWS provider cleanup: %s", e, exc_info=True)
-
-    def _augment_capacity_metadata(
-        self, metadata: dict[str, Any], provider_api: str, resource_ids: list[str]
-    ) -> None:
-        """Add fleet capacity fulfillment data to metadata for fleet-based providers."""
-        if not resource_ids or not self.aws_client:
-            return
-        try:
-            resource_id = resource_ids[0]
-            capacity_fetchers: dict[str, Callable[[str], Optional[dict[str, Any]]]] = {
-                "EC2Fleet": self._fetch_ec2_fleet_capacity,
-                "SpotFleet": self._fetch_spot_fleet_capacity,
-                "ASG": self._fetch_asg_capacity,
-            }
-            fetcher = capacity_fetchers.get(provider_api)
-            if fetcher:
-                result = fetcher(resource_id)
-                if result is not None:
-                    metadata["fleet_capacity_fulfilment"] = result
-        except Exception as e:
-            self._logger.warning("Failed to augment capacity metadata: %s", e)
-
-    def _fetch_ec2_fleet_capacity(self, resource_id: str) -> Optional[dict[str, Any]]:
-        """Fetch capacity fulfillment data for an EC2Fleet resource."""
-        if self.aws_client is None:
-            raise AWSConfigurationError(
-                "aws_client must be injected before calling _fetch_ec2_fleet_capacity"
-            )
-        response = self.aws_client.ec2_client.describe_fleets(FleetIds=[resource_id])
-        fleets = response.get("Fleets", [])
-        if not fleets:
-            return None
-        fleet = fleets[0]
-        spec = fleet.get("TargetCapacitySpecification") or {}
-        target = spec.get("TotalTargetCapacity")
-        fulfilled = fleet.get("FulfilledCapacity") or 0
-        fleet_type_val = (fleet.get("Type") or "maintain").lower()
-        return {
-            "target_capacity_units": target,
-            "fulfilled_capacity_units": fulfilled,
-            "provisioned_instance_count": int(fulfilled),
-            "state": fleet.get("FleetState"),
-            "fleet_type": fleet_type_val,
-            "fulfillment_final": fleet_type_val == "instant",
-        }
-
-    def _fetch_spot_fleet_capacity(self, resource_id: str) -> Optional[dict[str, Any]]:
-        """Fetch capacity fulfillment data for a SpotFleet resource."""
-        if self.aws_client is None:
-            raise AWSConfigurationError(
-                "aws_client must be injected before calling _fetch_spot_fleet_capacity"
-            )
-        response = self.aws_client.ec2_client.describe_spot_fleet_requests(
-            SpotFleetRequestIds=[resource_id]
-        )
-        configs = response.get("SpotFleetRequestConfigs", [])
-        if not configs:
-            return None
-        cfg = configs[0].get("SpotFleetRequestConfig") or {}
-        fulfilled = cfg.get("FulfilledCapacity") or 0
-        return {
-            "target_capacity_units": cfg.get("TargetCapacity"),
-            "fulfilled_capacity_units": fulfilled,
-            "provisioned_instance_count": int(fulfilled),
-            "state": configs[0].get("SpotFleetRequestState"),
-            "fleet_type": (cfg.get("Type") or "request").lower(),
-        }
-
-    def _fetch_asg_capacity(self, resource_id: str) -> Optional[dict[str, Any]]:
-        """Fetch capacity fulfillment data for an Auto Scaling Group resource."""
-        if self.aws_client is None:
-            raise AWSConfigurationError(
-                "aws_client must be injected before calling _fetch_asg_capacity"
-            )
-        response = self.aws_client.autoscaling_client.describe_auto_scaling_groups(
-            AutoScalingGroupNames=[resource_id]
-        )
-        groups = response.get("AutoScalingGroups", [])
-        if not groups:
-            return None
-        group = groups[0]
-        instances = group.get("Instances") or []
-        fulfilled = sum(
-            int(inst.get("WeightedCapacity", 1))
-            for inst in instances
-            if inst.get("LifecycleState") == "InService"
-        )
-        provisioned = sum(1 for inst in instances if inst.get("LifecycleState") == "InService")
-        return {
-            "target_capacity_units": int(group.get("DesiredCapacity") or 0),
-            "fulfilled_capacity_units": fulfilled,
-            "provisioned_instance_count": provisioned,
-            "state": group.get("Status"),
-        }
 
     async def _handle_resolve_image(self, operation: ProviderOperation) -> ProviderResult:
         """Handle image resolution using registry-based service."""
@@ -711,6 +647,182 @@ class AWSProviderStrategy(ProviderStrategy):
             cache=cache,
             logger=self._logger,
         )
+
+    # ------------------------------------------------------------------
+    # Typed provisioning interface — OperationOutcome
+    # ------------------------------------------------------------------
+
+    async def acquire(self, request: "Request") -> OperationOutcome:
+        """Submit an acquisition request to AWS.
+
+        AWS provider operations are asynchronous: the API call (EC2Fleet,
+        SpotFleet, RunInstances, ASG) returns a request/fleet ID immediately
+        while instances transition through ``pending``.  The outcome is
+        therefore always ``Accepted`` on success.
+
+        Args:
+            request: Domain request describing resources to acquire.
+
+        Returns:
+            ``Accepted`` with pending instance IDs on success.
+            ``Failed`` on provider rejection or configuration error.
+        """
+        try:
+            # Build operation using the strategy-layer types already imported at the
+            # module level (ProviderOperation / ProviderOperationType from
+            # orb.providers.base.strategy).  These are what execute_operation() expects.
+            operation = ProviderOperation(
+                operation_type=ProviderOperationType.CREATE_INSTANCES,
+                parameters={
+                    "template_config": {},
+                    "count": request.requested_count,
+                    "request_id": str(request.request_id),
+                    "request_metadata": dict(request.metadata),
+                },
+                context={
+                    "correlation_id": str(request.request_id),
+                    "request_id": str(request.request_id),
+                    "dry_run": request.metadata.get("dry_run", False),
+                },
+            )
+            result = await self.execute_operation(operation)
+
+            if not result.success:
+                return Failed(
+                    error=result.error_message or "AWS acquire failed",
+                    recoverable=False,
+                )
+
+            resource_ids: list[str] = (result.data or {}).get("resource_ids", [])
+            request_id = str(request.request_id)
+
+            self._logger.info(
+                "AWS acquire accepted: request_id=%s, pending_resource_ids=%s",
+                request_id,
+                resource_ids,
+            )
+            return Accepted(
+                request_id=request_id,
+                pending_resource_ids=resource_ids,
+                metadata=result.metadata or {},
+            )
+
+        except Exception as exc:
+            self._logger.error("AWS acquire failed: %s", exc, exc_info=True)
+            return Failed(error=str(exc), recoverable=False)
+
+    async def return_machines(self, machine_ids: list[str], request: "Request") -> OperationOutcome:
+        """Submit a return (termination) request to AWS.
+
+        AWS terminates asynchronously — ``TerminateInstances`` returns
+        immediately while instances move through ``shutting-down``.  The
+        outcome is therefore ``Accepted`` with the terminating IDs.
+
+        Args:
+            machine_ids: EC2 instance IDs to terminate.
+            request: Domain request providing context.
+
+        Returns:
+            ``Accepted`` with terminating instance IDs on success.
+            ``Failed`` on provider rejection or configuration error.
+        """
+        try:
+            operation = ProviderOperation(
+                operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+                parameters={
+                    "instance_ids": machine_ids,
+                    "request_id": str(request.request_id),
+                    "template_id": request.template_id,
+                    "provider_api": request.provider_api or "RunInstances",
+                },
+                context={
+                    "correlation_id": str(request.request_id),
+                    "request_id": str(request.request_id),
+                },
+            )
+            result = await self.execute_operation(operation)
+
+            if not result.success:
+                return Failed(
+                    error=result.error_message or "AWS return_machines failed",
+                    recoverable=False,
+                )
+
+            self._logger.info(
+                "AWS termination accepted: request_id=%s, terminating=%s",
+                request.request_id,
+                machine_ids,
+            )
+            return Accepted(
+                request_id=str(request.request_id),
+                pending_resource_ids=list(machine_ids),
+                metadata=result.metadata or {},
+            )
+
+        except Exception as exc:
+            self._logger.error("AWS return_machines failed: %s", exc, exc_info=True)
+            return Failed(error=str(exc), recoverable=False)
+
+    async def get_status(self, resource_ids: list[str], request: "Request") -> OperationOutcome:
+        """Query AWS instance status for previously submitted resources.
+
+        Returns ``Completed`` only when *all* instances have reached a
+        terminal state (``running`` for acquire, ``terminated`` for return).
+        Returns ``Accepted`` (still in-progress) otherwise.
+
+        Args:
+            resource_ids: EC2 instance or resource IDs to check.
+            request: Domain request providing context.
+
+        Returns:
+            ``Completed`` when all instances are terminal.
+            ``Accepted``  when one or more instances are still transitioning.
+            ``Failed``    when all instances failed or a hard error occurred.
+        """
+        try:
+            operation = ProviderOperation(
+                operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
+                parameters={
+                    "instance_ids": resource_ids,
+                    "template_id": request.template_id,
+                    "provider_api": request.provider_api or "RunInstances",
+                },
+                context={
+                    "correlation_id": str(request.request_id),
+                    "request_id": str(request.request_id),
+                },
+            )
+            result = await self.execute_operation(operation)
+
+            if not result.success:
+                return Failed(
+                    error=result.error_message or "AWS get_status failed",
+                    recoverable=True,
+                )
+
+            instances: list[dict[str, Any]] = (result.data or {}).get("instances", [])
+            terminal_states = frozenset({"running", "terminated", "stopped", "failed"})
+            non_terminal = [
+                inst for inst in instances if inst.get("status", "") not in terminal_states
+            ]
+
+            if non_terminal:
+                still_pending = [inst.get("instance_id", "") for inst in non_terminal]
+                return Accepted(
+                    request_id=str(request.request_id),
+                    pending_resource_ids=still_pending,
+                    metadata=result.metadata or {},
+                )
+
+            completed_ids = [inst.get("instance_id", "") for inst in instances]
+            return Completed(
+                resource_ids=completed_ids,
+                metadata=result.metadata or {},
+            )
+
+        except Exception as exc:
+            self._logger.error("AWS get_status failed: %s", exc, exc_info=True)
+            return Failed(error=str(exc), recoverable=True)
 
     def __str__(self) -> str:
         """Return string representation for debugging."""

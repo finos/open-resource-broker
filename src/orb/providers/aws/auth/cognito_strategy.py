@@ -1,11 +1,18 @@
 """AWS Cognito authentication strategy."""
 
-from typing import Optional
+from __future__ import annotations
+
+import asyncio
+import time
+from base64 import urlsafe_b64decode
+from typing import TYPE_CHECKING, Any, Optional
 
 import boto3
 import jwt
+import requests
 from botocore.config import Config
 from botocore.exceptions import ClientError
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
 
 _DEFAULT_CONFIG = Config(
     connect_timeout=10,
@@ -22,10 +29,18 @@ from orb.infrastructure.adapters.ports.auth import (
     AuthStatus,
 )
 
+if TYPE_CHECKING:
+    pass
+
 
 @injectable
 class CognitoAuthStrategy(AuthPort):
     """Authentication strategy using AWS Cognito User Pools."""
+
+    # Class-level JWKS cache: maps jwks_url → {"fetched_at": float, "keys": list[dict]}
+    # Shared across all instances so pool restarts benefit from warm entries.
+    _jwks_cache: dict[str, dict[str, Any]] = {}
+    _cache_ttl_seconds: int = 3600
 
     def __init__(
         self,
@@ -228,6 +243,54 @@ class CognitoAuthStrategy(AuthPort):
             self._logger.error("Token revocation error: %s", e)
             return False
 
+    @classmethod
+    def from_auth_config(cls, auth_config: Any) -> CognitoAuthStrategy:
+        """
+        Build strategy instance from AuthConfig.
+
+        Extracts the provider_auth.cognito sub-config and constructs a
+        CognitoAuthStrategy.  A LoggingPort is obtained from the DI container
+        when available; otherwise a plain logging adapter is used.
+
+        Args:
+            auth_config: AuthConfig instance with optional provider_auth.cognito sub-config
+
+        Returns:
+            Configured CognitoAuthStrategy
+        """
+        from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
+
+        provider_auth = getattr(auth_config, "provider_auth", None)
+        cognito_cfg = getattr(provider_auth, "cognito", None) if provider_auth is not None else None
+
+        user_pool_id: str = (
+            getattr(cognito_cfg, "user_pool_id", "") if cognito_cfg is not None else ""
+        )
+        client_id: str = getattr(cognito_cfg, "client_id", "") if cognito_cfg is not None else ""
+        region: str = (
+            getattr(cognito_cfg, "region", "us-east-1") if cognito_cfg is not None else "us-east-1"
+        )
+        jwks_url: Optional[str] = (
+            getattr(cognito_cfg, "jwks_url", None) if cognito_cfg is not None else None
+        )
+
+        try:
+            from orb.domain.base.ports import LoggingPort
+            from orb.infrastructure.di.container import get_container
+
+            logger: LoggingPort = get_container().get(LoggingPort)
+        except Exception:
+            logger = LoggingAdapter()  # type: ignore[assignment]
+
+        return cls(
+            logger=logger,
+            user_pool_id=user_pool_id,
+            client_id=client_id,
+            region=region,
+            jwks_url=jwks_url,
+            enabled=True,
+        )
+
     def get_strategy_name(self) -> str:
         """
         Get strategy name.
@@ -246,36 +309,79 @@ class CognitoAuthStrategy(AuthPort):
         """
         return self.enabled
 
-    async def _get_public_key(self, kid: str) -> Optional[str]:
+    @staticmethod
+    def _b64url_to_int(val: str) -> int:
+        """Decode a base64url-encoded string to an integer (used for RSA key fields)."""
+        padded = val + "=" * (-len(val) % 4)
+        return int.from_bytes(urlsafe_b64decode(padded), "big")
+
+    async def _get_public_key(self, kid: str) -> Any:
         """
         Get public key from Cognito JWKS endpoint.
+
+        Fetches the JWKS (using the class-level cache; re-fetches after TTL),
+        locates the entry matching ``kid``, and converts it to a ``cryptography``
+        RSAPublicKey object suitable for use with PyJWT.
+
+        The synchronous ``requests.get`` call is offloaded via
+        ``asyncio.to_thread`` so the event loop is not blocked during the fetch.
+
+        On ``jwt.InvalidTokenError`` (non-RSA key) the cache entry is evicted so
+        that a key rotation does not lock out valid tokens indefinitely.
 
         Args:
             kid: Key ID from token header
 
         Returns:
-            Public key for token verification
+            RSAPublicKey for token verification, or None if not found
+
+        Raises:
+            jwt.InvalidTokenError: If the matched key is not an RSA key
         """
         try:
-            # In production, you would cache JWKS and implement appropriate key rotation
-            # This is a simplified implementation
-            import requests
-
-            # Add timeout to prevent hanging connections (security best practice)
-            response = requests.get(self.jwks_url, timeout=30)
-            jwks = response.json()
+            jwks = await self._fetch_jwks_cached()
 
             for key in jwks.get("keys", []):
                 if key.get("kid") == kid:
-                    # Convert JWK to PEM format (simplified)
-                    # In production, use a appropriate JWK library
-                    return key  # Return the key dict for now
+                    if key.get("kty") != "RSA":
+                        # Evict the cache entry so a subsequent rotation is picked up.
+                        self._jwks_cache.pop(self.jwks_url, None)
+                        raise jwt.InvalidTokenError(
+                            f"Unsupported key type: {key.get('kty')!r}. Only RSA keys are supported."
+                        )
+                    n = self._b64url_to_int(key["n"])
+                    e = self._b64url_to_int(key["e"])
+                    return RSAPublicNumbers(e=e, n=n).public_key()
 
             return None
 
+        except jwt.InvalidTokenError:
+            raise
         except Exception as e:
             self._logger.error("Failed to get public key: %s", e)
             return None
+
+    async def _fetch_jwks_cached(self) -> dict[str, Any]:
+        """Return the JWKS document for this strategy's endpoint.
+
+        Serves from the class-level cache when the entry is younger than
+        ``_cache_ttl_seconds``; otherwise fetches fresh via
+        ``asyncio.to_thread`` and repopulates the cache.
+        """
+        cached = self._jwks_cache.get(self.jwks_url)
+        if cached is not None:
+            age = time.monotonic() - cached["fetched_at"]
+            if age < self._cache_ttl_seconds:
+                return cached["jwks"]  # type: ignore[return-value]
+
+        def _do_fetch() -> dict[str, Any]:
+            response = requests.get(self.jwks_url, timeout=30)
+            response.raise_for_status()
+            return response.json()  # type: ignore[no-any-return]
+
+        jwks: dict[str, Any] = await asyncio.to_thread(_do_fetch)
+        self._jwks_cache[self.jwks_url] = {"fetched_at": time.monotonic(), "jwks": jwks}
+        return jwks
 
     def _map_groups_to_roles(self, groups: list[str]) -> list[str]:
         """

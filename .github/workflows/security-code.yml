@@ -118,12 +118,17 @@ jobs:
         # in their PyPI METADATA. The compound string is treated as a single
         # non-allowlisted license. Each exemption below has been verified by reading
         # the package's METADATA license / License-Expression directly:
-        #   werkzeug         BSD-3-Clause AND LicenseRef-scancode-unknown-license-reference -> BSD-3-Clause
-        #   lark             MIT AND MPL-2.0                                                -> MIT (METADATA: License: MIT)
-        #   mcp              MIT AND Python-2.0                                             -> MIT (METADATA: License: MIT)
-        #   rfc3987-syntax   Apache-2.0 AND GPL-1.0-or-later AND MIT                        -> MIT (METADATA: License-Expression: MIT)
-        #   wcwidth          MIT AND HPND-Markus-Kuhn                                       -> MIT (METADATA: License-Expression: MIT)
-        allow-dependencies-licenses: 'pkg:pypi/werkzeug, pkg:githubactions/trufflesecurity/trufflehog, pkg:pypi/lark, pkg:pypi/mcp, pkg:pypi/rfc3987-syntax, pkg:pypi/wcwidth'
+        #   werkzeug                BSD-3-Clause AND LicenseRef-scancode-unknown-license-reference -> BSD-3-Clause
+        #   lark                    MIT AND MPL-2.0                                                -> MIT (METADATA: License: MIT)
+        #   mcp                     MIT AND Python-2.0                                             -> MIT (METADATA: License: MIT)
+        #   rfc3987-syntax          Apache-2.0 AND GPL-1.0-or-later AND MIT                        -> MIT (METADATA: License-Expression: MIT)
+        #   wcwidth                 MIT AND HPND-Markus-Kuhn                                       -> MIT (METADATA: License-Expression: MIT)
+        #   lxml                    BSD-3-Clause AND GPL-1.0-or-later                              -> BSD-3-Clause (METADATA: License: BSD-3-Clause; GPL applies to a single legacy source file)
+        #   protobuf                BSD-3-Clause AND LicenseRef-scancode-protobuf                  -> 3-Clause BSD (METADATA License text)
+        #   pywin32                 PSF-2.0                                                        -> PSF-2.0 (permissive, equivalent to BSD)
+        #   cyclonedx-python-lib    no detected license                                            -> Apache-2.0 (METADATA: License: Apache-2.0)
+        #   fastapi                 no detected license                                            -> MIT (METADATA: License-Expression: MIT)
+        allow-dependencies-licenses: 'pkg:pypi/werkzeug, pkg:githubactions/trufflesecurity/trufflehog, pkg:pypi/lark, pkg:pypi/mcp, pkg:pypi/rfc3987-syntax, pkg:pypi/wcwidth, pkg:pypi/lxml, pkg:pypi/protobuf, pkg:pypi/pywin32, pkg:pypi/cyclonedx-python-lib, pkg:pypi/fastapi'
 
   codeql-analysis:
     name: CodeQL Analysis

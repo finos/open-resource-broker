@@ -192,11 +192,28 @@ class ConfigurationLoader:
     def _load_strategy_defaults(cls, config_manager=None) -> dict[str, Any]:
         merged: dict[str, Any] = {}
         try:
-            from orb.providers.registry import get_provider_registry
+            from orb.providers.registry import DefaultsLoaderRegistry
 
-            registry = get_provider_registry()
-            registry.ensure_provider_type_registered("aws")
-            cls._merge_config(merged, registry.collect_defaults())
+            # Ensure at least the built-in loaders are registered even when
+            # _load_strategy_defaults is called before a full application
+            # bootstrap (e.g. bare config loading in tests or the CLI parser).
+            # This mirrors what the old pkgutil.iter_modules approach did
+            # implicitly — importing each provider's registration module
+            # triggered side-effect registrations.
+            if not DefaultsLoaderRegistry.registered_providers():
+                from orb.providers.registration import register_all_defaults_loaders
+
+                register_all_defaults_loaders()
+
+            for provider_type, loader in DefaultsLoaderRegistry.all().items():
+                try:
+                    defaults = loader.load_defaults()
+                    if defaults:
+                        cls._merge_config(merged, defaults)
+                except Exception as e:
+                    get_config_logger().warning(
+                        "Failed to load defaults from provider '%s': %s", provider_type, e
+                    )
         except Exception as e:
             get_config_logger().warning("Failed to load provider defaults: %s", e)
         try:

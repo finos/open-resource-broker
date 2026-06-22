@@ -98,6 +98,19 @@ class TestUpdateRequestStatus:
         call_args = req.update_status.call_args[0]
         assert call_args[0] == RequestStatus.IN_PROGRESS
 
+    def test_zero_instances_no_resource_ids_sets_failed(self):
+        req = _make_request(requested_count=3)
+        req.resource_ids = []
+        self.svc._update_request_status(
+            request=req,
+            instance_count=0,
+            requested_count=3,
+            has_api_errors=False,
+            provider_errors=[],
+        )
+        call_args = req.update_status.call_args[0]
+        assert call_args[0] == RequestStatus.FAILED
+
     def test_error_summary_included_in_message(self):
         req = _make_request(requested_count=2)
         errors = [{"error_code": "InsufficientCapacity", "error_message": "No capacity"}]

@@ -82,20 +82,22 @@ def _run_handler_with_requests(all_requests, query):
     mock_uow_factory = MagicMock()
     mock_uow_factory.create_unit_of_work.return_value = mock_uow
 
-    handler = ListRequestsHandler(
-        uow_factory=mock_uow_factory,
-        logger=mock_logger,
-        error_handler=mock_error_handler,
-        generic_filter_service=mock_filter_service,
-    )
-
-    # Patch RequestDTOFactory so we don't need full domain wiring
-    with patch("orb.application.factories.request_dto_factory.RequestDTOFactory") as MockFactory:
+    # Patch RequestDTOFactory at the import site so we don't need full domain wiring.
+    # Patch must wrap handler construction because the handler eagerly instantiates
+    # self._dto_factory = RequestDTOFactory() in __init__.
+    with patch("orb.application.queries.request_query_handlers.RequestDTOFactory") as MockFactory:
         mock_dto_factory = MagicMock()
         MockFactory.return_value = mock_dto_factory
         mock_dto_factory.create_from_domain.side_effect = lambda req, machines: SimpleNamespace(
             request_id=str(req.request_id.value),
             request_type=req.request_type.value,
+        )
+
+        handler = ListRequestsHandler(
+            uow_factory=mock_uow_factory,
+            logger=mock_logger,
+            error_handler=mock_error_handler,
+            generic_filter_service=mock_filter_service,
         )
 
         import asyncio

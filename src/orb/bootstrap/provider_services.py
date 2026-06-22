@@ -62,26 +62,41 @@ def _register_application_services(container: DIContainer) -> None:
 
 
 def _register_provider_utility_services(container: DIContainer) -> None:
-    """Register provider-specific utility services only (not provider instances)."""
+    """Register provider-specific utility services for all registered providers."""
+    import importlib
+    import importlib.util
+
+    from orb.providers.registration import _REGISTERED_PROVIDERS
+
     logger = get_logger(__name__)
 
-    # Register AWS utility services if available
-    try:
-        import importlib.util
+    for name in _REGISTERED_PROVIDERS:
+        mod_path = f"orb.providers.{name}.registration"
+        try:
+            spec = importlib.util.find_spec(mod_path)
+        except (ImportError, ValueError) as e:
+            logger.debug("%s find_spec raised %s; skipping", name, type(e).__name__)
+            continue
+        if spec is None:
+            logger.debug("%s provider not available, skipping utility service registration", name)
+            continue
+        try:
+            mod = importlib.import_module(mod_path)
 
-        # Check if AWS provider is available
-        if importlib.util.find_spec("orb.providers.aws"):
-            try:
-                from orb.providers.aws.registration import register_aws_services_with_di
+            # Register DI utility services (e.g. AWS template adapter, clients)
+            di_fn = getattr(mod, f"register_{name}_services_with_di", None)
+            if di_fn is not None:
+                di_fn(container)
+                logger.debug("%s utility services registered with DI", name)
 
-                register_aws_services_with_di(container)
-                logger.debug("AWS utility services registered with DI")
-            except Exception as e:
-                logger.warning("Failed to register AWS utility services: %s", str(e))
+            # Register auth strategies so the auth registry can resolve them
+            # without server.py importing provider classes directly.
+            # Pass None for the logging port; registration is best-effort and
+            # the bootstrap logger (ContextLogger) does not implement LoggingPort.
+            auth_fn = getattr(mod, f"register_{name}_auth_strategies", None)
+            if auth_fn is not None:
+                auth_fn(None)
+                logger.debug("%s auth strategies registered", name)
 
-        else:
-            logger.debug("AWS provider not available, skipping AWS utility service registration")
-    except ImportError:
-        logger.debug("AWS provider not available, skipping AWS utility service registration")
-    except Exception as e:
-        logger.warning("Failed to register AWS utility services: %s", str(e))
+        except Exception as e:
+            logger.warning("Failed to register %s utility services: %s", name, str(e))

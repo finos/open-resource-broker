@@ -1,16 +1,8 @@
 """Provider interfaces for domain layer - comprehensive provider abstraction."""
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum  # retained for ProviderInstanceState
 from typing import Optional, Protocol
-
-
-class ProviderType(str, Enum):
-    """Supported provider types."""
-
-    AWS = "aws"
-    PROVIDER1 = "provider1"
-    Provider2 = "provider2"
 
 
 class ProviderInstanceState(str, Enum):
@@ -51,7 +43,7 @@ class ProviderResourceTag:
 class ProviderResourceIdentifier:
     """Provider-agnostic resource identifier."""
 
-    provider_type: ProviderType
+    provider_type: str  # e.g. "aws"
     resource_type: str  # e.g., "instance", "volume", "network"
     identifier: str  # Provider-specific ID
     region: Optional[str] = None
@@ -109,8 +101,8 @@ class ProviderAdapter(Protocol):
     """Main provider adapter interface."""
 
     @property
-    def provider_type(self) -> ProviderType:
-        """Get the provider type."""
+    def provider_type(self) -> str:
+        """Get the provider type (e.g. ``"aws"``)."""
         ...
 
     @property
@@ -140,10 +132,10 @@ class ProviderAdapter(Protocol):
 class ProviderAdapterFactory(Protocol):
     """Factory for creating provider adapters."""
 
-    def create_adapter(self, provider_type: ProviderType) -> ProviderAdapter:
-        """Create a provider adapter for the specified type."""
+    def create_adapter(self, provider_type: str) -> ProviderAdapter:
+        """Create a provider adapter for the specified type (e.g. ``"aws"``)."""
         ...
 
-    def get_supported_providers(self) -> list[ProviderType]:
-        """Get list of supported provider types."""
+    def get_supported_providers(self) -> list[str]:
+        """Get list of supported provider type names."""
         ...

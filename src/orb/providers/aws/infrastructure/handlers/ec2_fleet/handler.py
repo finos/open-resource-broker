@@ -33,13 +33,14 @@ from botocore.exceptions import ClientError
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
+from orb.domain.base.provider_fulfilment import CheckHostsStatusResult, ProviderFulfilment
 from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from orb.infrastructure.error.decorators import handle_infrastructure_exceptions
 from orb.infrastructure.resilience import CircuitBreakerOpenError
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from orb.providers.aws.domain.template.value_objects import AWSAllocationStrategy, AWSFleetType
+from orb.providers.aws.domain.template.value_objects import AWSFleetType
 from orb.providers.aws.exceptions.aws_exceptions import (
     AWSEntityNotFoundError,
     AWSInfrastructureError,
@@ -53,11 +54,15 @@ from orb.providers.aws.infrastructure.handlers.ec2_fleet.release_manager import 
     EC2FleetReleaseManager,
 )
 from orb.providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
+from orb.providers.aws.infrastructure.handlers.shared.fleet_fulfilment import (
+    compute_capacity_based_fulfilment,
+)
 from orb.providers.aws.infrastructure.handlers.shared.fleet_grouping_mixin import FleetGroupingMixin
 from orb.providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
 )
 from orb.providers.aws.utilities.aws_operations import AWSOperations
+from orb.providers.aws.value_objects import AWSAllocationStrategy
 
 
 @injectable
@@ -153,7 +158,9 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 # lazily by the check_hosts_status / _check_single_fleet_status polling path.
                 instance_ids = fleet_result.get("instance_ids", [])
                 if instance_ids:
-                    instances = [{"instance_id": iid} for iid in instance_ids]
+                    instances = [
+                        {"instance_id": iid, "resource_id": fleet_id} for iid in instance_ids
+                    ]
                     self._logger.info(
                         "EC2Fleet instant fleet created with %d instance(s): %s",
                         len(instance_ids),
@@ -372,24 +379,71 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             lt_version=launch_template_version,
         )
 
-    def check_hosts_status(self, request: Request) -> list[dict[str, Any]]:
-        """Check the status of instances in the fleet."""
+    def check_hosts_status(self, request: Request) -> CheckHostsStatusResult:
+        """Check the status of instances in the fleet.
+
+        Fulfilment semantics (per fleet type):
+        - Instant: same as RunInstances — running_count >= requested_count
+          and failed_count == 0 → fulfilled.  ``fulfillment_final=True`` so
+          partial/failed can be detected when pending reaches zero.
+        - Maintain / Request: FulfilledCapacity >= TargetCapacity AND
+          pending_count == 0 AND failed_count == 0 → fulfilled.  This is the
+          weighted-fleet path that fixes the live test timeout.
+        """
         self._logger.debug(f" check_hosts_status {request}")
         if not request.resource_ids:
             raise AWSInfrastructureError("No Fleet ID found in request")
 
-        all_results: list[dict] = []
+        all_instances: list[dict] = []
+        # For multi-fleet requests collect instances; compute combined fulfilment at the end.
+        fleet_results: list[CheckHostsStatusResult] = []
         for fleet_id in request.resource_ids:
             try:
-                results = self._check_single_fleet_status(fleet_id, request)
-                all_results.extend(results)
+                result = self._check_single_fleet_status(fleet_id, request)
+                all_instances.extend(result.instances)
+                fleet_results.append(result)
             except Exception as e:
                 self._logger.warning(
                     "Failed to check status for fleet %s, skipping: %s", fleet_id, e
                 )
-        return all_results
 
-    def _check_single_fleet_status(self, fleet_id: str, request: Request) -> list[dict]:
+        if not fleet_results:
+            return CheckHostsStatusResult(
+                instances=[],
+                fulfilment=ProviderFulfilment(
+                    state="in_progress",
+                    message="No fleet status available — will retry",
+                ),
+            )
+
+        # For a single fleet (typical case) return its result directly.
+        if len(fleet_results) == 1:
+            return CheckHostsStatusResult(
+                instances=all_instances,
+                fulfilment=fleet_results[0].fulfilment,
+            )
+
+        # Multiple fleets: aggregate — all must be fulfilled for overall fulfilled.
+        states = [r.fulfilment.state for r in fleet_results]
+        if all(s == "fulfilled" for s in states):
+            combined_state = "fulfilled"
+            combined_msg = f"All {len(fleet_results)} fleets fulfilled"
+        elif any(s == "failed" for s in states):
+            combined_state = "failed"
+            combined_msg = "One or more fleets failed"
+        elif any(s == "partial" for s in states):
+            combined_state = "partial"
+            combined_msg = "One or more fleets partially fulfilled"
+        else:
+            combined_state = "in_progress"
+            combined_msg = "Waiting for fleet(s) to fulfil"
+
+        return CheckHostsStatusResult(
+            instances=all_instances,
+            fulfilment=ProviderFulfilment(state=combined_state, message=combined_msg),
+        )
+
+    def _check_single_fleet_status(self, fleet_id: str, request: Request) -> CheckHostsStatusResult:
         """Check the status of instances in a single fleet."""
         try:
             fleet_type_value = request.metadata.get("fleet_type")
@@ -434,11 +488,16 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
             self._logger.debug(f" check_hosts_status final fleet_type: {fleet_type}")
 
+            # Read capacity data from DescribeFleets (already called above — no extra API call)
+            spec = fleet.get("TargetCapacitySpecification") or {}
+            target_capacity = spec.get("TotalTargetCapacity")
+            fulfilled_capacity = fleet.get("FulfilledCapacity") or 0
+
             self._logger.debug(
                 "Fleet status: %s, Target capacity: %s, Fulfilled capacity: %s",
                 fleet.get("FleetState"),
-                fleet.get("TargetCapacitySpecification", {}).get("TotalTargetCapacity"),
-                fleet.get("FulfilledCapacity", 0),
+                target_capacity,
+                fulfilled_capacity,
             )
 
             instance_ids = []
@@ -478,7 +537,14 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
             if not instance_ids:
                 self._logger.info("No active instances found in fleet %s", fleet_id)
-                return []
+                fulfilment = self._compute_ec2fleet_fulfilment(
+                    fleet_type=fleet_type,
+                    instances=[],
+                    target_capacity=target_capacity,
+                    fulfilled_capacity=fulfilled_capacity,
+                    requested_count=request.requested_count,
+                )
+                return CheckHostsStatusResult(instances=[], fulfilment=fulfilment)
 
             instance_details = self._get_instance_details(
                 instance_ids,
@@ -486,9 +552,17 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 resource_id=fleet_id,
                 provider_api="EC2Fleet",
             )
-            return self._format_instance_data(
+            instances = self._format_instance_data(
                 instance_details, fleet_id, self._resolve_provider_api(request)
             )
+            fulfilment = self._compute_ec2fleet_fulfilment(
+                fleet_type=fleet_type,
+                instances=instances,
+                target_capacity=target_capacity,
+                fulfilled_capacity=fulfilled_capacity,
+                requested_count=request.requested_count,
+            )
+            return CheckHostsStatusResult(instances=instances, fulfilment=fulfilment)
 
         except ClientError as e:
             error = self._convert_client_error(e)
@@ -497,6 +571,90 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         except Exception as e:
             self._logger.error("Unexpected error checking EC2 Fleet status: %s", str(e))
             raise AWSInfrastructureError(f"Failed to check EC2 Fleet status: {e!s}")
+
+    def _compute_ec2fleet_fulfilment(
+        self,
+        fleet_type: Optional[AWSFleetType],
+        instances: list[dict[str, Any]],
+        target_capacity: Optional[int],
+        fulfilled_capacity: float,
+        requested_count: int,
+    ) -> ProviderFulfilment:
+        """Compute ProviderFulfilment for an EC2 Fleet request.
+
+        Instant fleets: running_count >= requested_count — same as RunInstances.
+        Maintain/Request fleets: FulfilledCapacity >= TargetCapacity AND
+        pending_count == 0 AND failed_count == 0.
+        """
+        running_count = sum(1 for i in instances if i.get("status") == "running")
+        pending_count = sum(1 for i in instances if i.get("status") in ("pending", "starting"))
+        failed_count = sum(1 for i in instances if i.get("status") in ("failed", "error"))
+        target_units = target_capacity if target_capacity is not None else requested_count
+
+        if fleet_type == AWSFleetType.INSTANT:
+            # Instant fleet: synchronous result, count-based (same as RunInstances)
+            if running_count >= requested_count and failed_count == 0:
+                return ProviderFulfilment(
+                    state="fulfilled",
+                    message=f"Instant fleet: {running_count} instance(s) running",
+                    target_units=target_units,
+                    fulfilled_units=running_count,
+                    running_count=running_count,
+                    pending_count=pending_count,
+                    failed_count=failed_count,
+                )
+            elif pending_count > 0:
+                return ProviderFulfilment(
+                    state="in_progress",
+                    message=f"Instant fleet: {running_count}/{requested_count} running, {pending_count} pending",
+                    target_units=target_units,
+                    fulfilled_units=running_count,
+                    running_count=running_count,
+                    pending_count=pending_count,
+                    failed_count=failed_count,
+                )
+            else:
+                # fulfillment_final=True for instant — no more instances coming
+                if running_count > 0:
+                    return ProviderFulfilment(
+                        state="partial",
+                        message=f"Instant fleet: {running_count}/{requested_count} instance(s) running",
+                        target_units=target_units,
+                        fulfilled_units=running_count,
+                        running_count=running_count,
+                        pending_count=pending_count,
+                        failed_count=failed_count,
+                    )
+                elif not instances:
+                    return ProviderFulfilment(
+                        state="in_progress",
+                        message="Instant fleet: waiting for instances",
+                        target_units=target_units,
+                        fulfilled_units=0,
+                        running_count=0,
+                        pending_count=0,
+                        failed_count=0,
+                    )
+                else:
+                    return ProviderFulfilment(
+                        state="failed",
+                        message="Instant fleet: all instances failed",
+                        target_units=target_units,
+                        fulfilled_units=0,
+                        running_count=running_count,
+                        pending_count=pending_count,
+                        failed_count=failed_count,
+                    )
+        else:
+            # Maintain / Request fleet: capacity-unit based fulfilment
+            return compute_capacity_based_fulfilment(
+                target_capacity=target_capacity,
+                fulfilled_capacity=fulfilled_capacity,
+                running_count=running_count,
+                pending_count=pending_count,
+                failed_count=failed_count,
+                provider_label="Fleet",
+            )
 
     def release_hosts(
         self,
@@ -729,7 +887,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with instant fulfillment using on-demand instances",
                 provider_api="EC2Fleet",
                 machine_types={"t3.medium": 2, "t3.xlarge": 4},
-                max_instances=10,
+                max_instances=100,
                 price_type="ondemand",
                 subnet_ids=[],
                 security_group_ids=[],
@@ -742,7 +900,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with instant fulfillment using spot instances",
                 provider_api="EC2Fleet",
                 machine_types={"t3.medium": 2, "t3.xlarge": 4},
-                max_instances=10,
+                max_instances=100,
                 price_type="spot",
                 max_price=0.10,
                 subnet_ids=[],
@@ -756,7 +914,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with instant fulfillment using mixed pricing",
                 provider_api="EC2Fleet",
                 machine_types={"t3.medium": 2, "t3.xlarge": 4},
-                max_instances=10,
+                max_instances=100,
                 price_type="heterogeneous",
                 percent_on_demand=30,
                 allocation_strategy="diversified",
@@ -773,7 +931,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with request fulfillment using on-demand instances",
                 provider_api="EC2Fleet",
                 machine_types={"t3.medium": 2, "t3.xlarge": 4},
-                max_instances=15,
+                max_instances=100,
                 price_type="ondemand",
                 subnet_ids=[],
                 security_group_ids=[],
@@ -786,7 +944,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with request fulfillment using spot instances",
                 provider_api="EC2Fleet",
                 machine_types={"t3.medium": 2, "t3.xlarge": 4},
-                max_instances=20,
+                max_instances=100,
                 price_type="spot",
                 allocation_strategy="capacityOptimized",
                 max_price=0.10,
@@ -801,7 +959,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with request fulfillment using mixed pricing",
                 provider_api="EC2Fleet",
                 machine_types={"t3.medium": 2, "t3.large": 2, "t3.xlarge": 4},
-                max_instances=25,
+                max_instances=100,
                 price_type="heterogeneous",
                 percent_on_demand=40,
                 allocation_strategy="diversified",
@@ -819,7 +977,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with maintain capacity using on-demand instances",
                 provider_api="EC2Fleet",
                 machine_types={"t3.medium": 2, "t3.xlarge": 4},
-                max_instances=12,
+                max_instances=100,
                 price_type="ondemand",
                 subnet_ids=[],
                 security_group_ids=[],
@@ -832,7 +990,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with maintain capacity using spot instances",
                 provider_api="EC2Fleet",
                 machine_types={"t3.medium": 2, "t3.xlarge": 4},
-                max_instances=30,
+                max_instances=100,
                 price_type="spot",
                 allocation_strategy="priceCapacityOptimized",
                 max_price=0.10,
@@ -847,7 +1005,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with maintain capacity using mixed pricing",
                 provider_api="EC2Fleet",
                 machine_types={"t3.medium": 2, "t3.large": 2, "t3.xlarge": 4},
-                max_instances=50,
+                max_instances=100,
                 price_type="heterogeneous",
                 percent_on_demand=50,
                 allocation_strategy="capacityOptimized",

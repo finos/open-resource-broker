@@ -434,4 +434,10 @@ class TemplateRepositoryImpl(TemplateRepository):
 Unit Tests (Domain + Application)
 ```
 
+## Adding a New Provider
+
+The provider layer is the primary extensibility surface for new cloud platforms. For a step-by-step guide covering the mandatory glue points and all extension point registries, see:
+
+- [Adding a Provider](../developer_guide/adding_a_provider.md)
+
 This Clean Architecture implementation ensures that the Open Resource Broker maintains clear separation of concerns, high testability, and flexibility for future changes while adhering to established software engineering principles.

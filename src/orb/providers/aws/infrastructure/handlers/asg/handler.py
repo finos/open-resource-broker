@@ -33,6 +33,7 @@ from botocore.exceptions import ClientError
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
+from orb.domain.base.provider_fulfilment import CheckHostsStatusResult, ProviderFulfilment
 from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
@@ -520,35 +521,234 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
     def _grouping_label(self) -> str:
         return "ASG"
 
-    def check_hosts_status(self, request: Request) -> list[dict[str, Any]]:
-        """Check the status of instances across all ASGs in the request."""
+    def check_hosts_status(self, request: Request) -> CheckHostsStatusResult:
+        """Check the status of instances across all ASGs in the request.
+
+        Fulfilment semantics:
+            sum(WeightedCapacity for InService instances) >= DesiredCapacity
+            AND pending_count == 0 AND failed_count == 0 → fulfilled.
+
+        For ASGs without WeightedCapacity (uniform instance types) each
+        InService instance contributes 1 unit.
+        """
         try:
             if not request.resource_ids:
                 self._logger.info("No ASG names found in request")
-                return []
+                return CheckHostsStatusResult(
+                    instances=[],
+                    fulfilment=ProviderFulfilment(
+                        state="in_progress",
+                        message="No ASG names yet — waiting for provisioning",
+                        target_units=request.requested_count,
+                        running_count=0,
+                        pending_count=0,
+                        failed_count=0,
+                    ),
+                )
 
-            all_instances = []
+            all_instances: list[dict[str, Any]] = []
+            asg_results: list[CheckHostsStatusResult] = []
 
-            # Process all ASG names instead of just the first one
             for asg_name in request.resource_ids:
                 try:
-                    asg_instances = self._get_asg_instances(
+                    result = self._get_asg_status(
                         asg_name,
                         request_id=str(request.request_id),
-                        resource_id=asg_name,
+                        requested_count=request.requested_count,
                     )
-                    if asg_instances:
-                        formatted_instances = self._format_instance_data(
-                            asg_instances, asg_name, self._resolve_provider_api(request)
-                        )
-                        all_instances.extend(formatted_instances)
+                    all_instances.extend(result.instances)
+                    asg_results.append(result)
                 except Exception as e:
                     self._logger.error("Failed to get instances for ASG %s: %s", asg_name, e)
                     continue
-            return all_instances
+
+            if not asg_results:
+                return CheckHostsStatusResult(
+                    instances=[],
+                    fulfilment=ProviderFulfilment(
+                        state="in_progress",
+                        message="No ASG status available — will retry",
+                    ),
+                )
+
+            if len(asg_results) == 1:
+                return CheckHostsStatusResult(
+                    instances=all_instances,
+                    fulfilment=asg_results[0].fulfilment,
+                )
+
+            states = [r.fulfilment.state for r in asg_results]
+            if all(s == "fulfilled" for s in states):
+                combined_state = "fulfilled"
+                combined_msg = f"All {len(asg_results)} ASGs fulfilled"
+            elif any(s == "failed" for s in states):
+                combined_state = "failed"
+                combined_msg = "One or more ASGs failed"
+            elif any(s == "partial" for s in states):
+                combined_state = "partial"
+                combined_msg = "One or more ASGs partially fulfilled"
+            else:
+                combined_state = "in_progress"
+                combined_msg = "Waiting for ASG(s) to fulfil"
+
+            return CheckHostsStatusResult(
+                instances=all_instances,
+                fulfilment=ProviderFulfilment(state=combined_state, message=combined_msg),
+            )
+
         except Exception as e:
             self._logger.error("Unexpected error checking ASG status: %s", str(e))
             raise AWSInfrastructureError(f"Failed to check ASG status: {e!s}")
+
+    def _get_asg_status(
+        self,
+        asg_name: str,
+        request_id: str = "",
+        requested_count: int = 1,
+    ) -> CheckHostsStatusResult:
+        """Get status + fulfilment for a specific ASG."""
+        response = self._retry_with_backoff(
+            self.aws_client.autoscaling_client.describe_auto_scaling_groups,
+            operation_type="standard",
+            AutoScalingGroupNames=[asg_name],
+        )
+        groups = response.get("AutoScalingGroups", [])
+        if not groups:
+            self._logger.warning("ASG %s not found", asg_name)
+            return CheckHostsStatusResult(
+                instances=[],
+                fulfilment=ProviderFulfilment(
+                    state="in_progress",
+                    message=f"ASG {asg_name} not yet visible — waiting",
+                    target_units=requested_count,
+                    running_count=0,
+                    pending_count=0,
+                    failed_count=0,
+                ),
+            )
+
+        group = groups[0]
+        desired_capacity: int = group.get("DesiredCapacity") or 0
+        raw_instances = group.get("Instances") or []
+
+        # Compute weighted fulfilment from ASG Instances list
+        in_service_weighted = sum(
+            int(inst.get("WeightedCapacity") or 1)
+            for inst in raw_instances
+            if inst.get("LifecycleState") == "InService"
+        )
+        pending_raw = [
+            inst
+            for inst in raw_instances
+            if inst.get("LifecycleState") in ("Pending", "Pending:Wait", "Pending:Proceed")
+        ]
+        pending_count = len(pending_raw)
+        in_service_count = sum(
+            1 for inst in raw_instances if inst.get("LifecycleState") == "InService"
+        )
+
+        # Get full EC2 instance details for instances in the ASG
+        instance_ids = [
+            inst["InstanceId"]
+            for inst in raw_instances
+            if inst.get("InstanceId")
+            and inst.get("LifecycleState")
+            not in ("Terminating", "Terminated", "Detaching", "Detached")
+        ]
+
+        if not instance_ids:
+            return CheckHostsStatusResult(
+                instances=[],
+                fulfilment=self._compute_asg_fulfilment(
+                    desired_capacity=desired_capacity,
+                    in_service_weighted=in_service_weighted,
+                    pending_count=pending_count,
+                    in_service_count=in_service_count,
+                    ec2_instances=[],
+                ),
+            )
+
+        try:
+            instance_details = self._get_instance_details(
+                instance_ids,
+                request_id=request_id,
+                resource_id=asg_name,
+                provider_api="ASG",
+            )
+        except Exception as e:
+            self._logger.warning("Failed to describe EC2 instances for ASG %s: %s", asg_name, e)
+            instance_details = []
+
+        provider_api_value = (getattr(self, "metadata", {}) or {}).get("provider_api", "ASG")
+        formatted = (
+            self._format_instance_data(instance_details, asg_name, provider_api_value)
+            if instance_details
+            else []
+        )
+
+        fulfilment = self._compute_asg_fulfilment(
+            desired_capacity=desired_capacity,
+            in_service_weighted=in_service_weighted,
+            pending_count=pending_count,
+            in_service_count=in_service_count,
+            ec2_instances=formatted,
+        )
+        return CheckHostsStatusResult(instances=formatted, fulfilment=fulfilment)
+
+    def _compute_asg_fulfilment(
+        self,
+        desired_capacity: int,
+        in_service_weighted: int,
+        pending_count: int,
+        in_service_count: int,
+        ec2_instances: list[dict[str, Any]],
+    ) -> ProviderFulfilment:
+        """Compute ProviderFulfilment for an ASG request.
+
+        sum(WeightedCapacity for InService) >= DesiredCapacity AND
+        pending_count == 0 AND failed_count == 0 → fulfilled.
+        """
+        failed_count = sum(1 for i in ec2_instances if i.get("status") in ("failed", "error"))
+        running_count = sum(1 for i in ec2_instances if i.get("status") == "running")
+
+        asg_fully_fulfilled = desired_capacity > 0 and in_service_weighted >= desired_capacity
+
+        if asg_fully_fulfilled and pending_count == 0 and failed_count == 0:
+            return ProviderFulfilment(
+                state="fulfilled",
+                message=(
+                    f"ASG fulfilled: {in_service_count} instance(s) InService "
+                    f"({in_service_weighted}/{desired_capacity} weighted capacity)"
+                ),
+                target_units=desired_capacity,
+                fulfilled_units=in_service_weighted,
+                running_count=running_count,
+                pending_count=pending_count,
+                failed_count=failed_count,
+            )
+        elif failed_count > 0 and in_service_count == 0 and pending_count == 0:
+            return ProviderFulfilment(
+                state="failed",
+                message=f"ASG failed: {failed_count} instance(s) in failure state",
+                target_units=desired_capacity,
+                fulfilled_units=in_service_weighted,
+                running_count=running_count,
+                pending_count=pending_count,
+                failed_count=failed_count,
+            )
+        else:
+            return ProviderFulfilment(
+                state="in_progress",
+                message=(
+                    f"ASG: {in_service_count} InService, {pending_count} pending "
+                    f"({in_service_weighted}/{desired_capacity} weighted capacity)"
+                ),
+                target_units=desired_capacity,
+                fulfilled_units=in_service_weighted,
+                running_count=running_count,
+                pending_count=pending_count,
+                failed_count=failed_count,
+            )
 
     @classmethod
     def get_example_templates(cls) -> list[Template]:
@@ -560,7 +760,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Auto Scaling Group with on-demand instances only",
                 provider_api="ASG",
                 machine_types={"t3.medium": 2, "t3.xlarge": 4},
-                max_instances=15,
+                max_instances=100,
                 price_type="ondemand",
                 subnet_ids=[],
                 security_group_ids=[],
@@ -572,7 +772,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Auto Scaling Group with spot instances only",
                 provider_api="ASG",
                 machine_types={"t3.medium": 2, "t3.xlarge": 4},
-                max_instances=20,
+                max_instances=100,
                 price_type="spot",
                 max_price=0.10,
                 subnet_ids=[],
@@ -585,7 +785,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Auto Scaling Group with mixed on-demand and spot instances",
                 provider_api="ASG",
                 machine_types={"t3.medium": 2, "t3.large": 2, "t3.xlarge": 4},
-                max_instances=25,
+                max_instances=100,
                 price_type="heterogeneous",
                 percent_on_demand=30,
                 allocation_strategy="lowestPrice",
