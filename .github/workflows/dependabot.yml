@@ -50,6 +50,12 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+          # On a Dependabot pull_request the default checkout target is the
+          # synthesised merge ref, which lands as a detached HEAD.  The
+          # subsequent commit succeeds but the push errors with
+          # `fatal: You are not currently on a branch`.  Pin to the PR head
+          # branch by name so push has an upstream to write to.
+          ref: ${{ github.head_ref }}
 
       - name: Setup Python and UV
         uses: ./.github/actions/setup-uv-cached
