@@ -103,6 +103,11 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           ref: ${{ github.head_ref }}
+          # See semantic-release.yml for the rationale - the App-token URL
+          # set by the composite below must be the only credential source
+          # so the auto-format push lands as the ORB CICD App rather than
+          # falling back to github-actions[bot] via the persisted extraheader.
+          persist-credentials: false
 
       - name: ORB CICD App token
         id: cicd
