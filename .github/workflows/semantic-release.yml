@@ -89,6 +89,15 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           fetch-depth: 0
+          # The composite below mints the App token and resets the remote
+          # URL to authenticate as the ORB CICD App.  If actions/checkout
+          # also persists the default GITHUB_TOKEN as an extraheader git
+          # config entry, that header beats the URL-embedded token at push
+          # time and the request lands as github-actions[bot] - which is
+          # not in the main branch protection bypass list and is rejected
+          # with GH006.  Skip the persistence so the composite's remote
+          # URL is the sole credential source.
+          persist-credentials: false
 
       - name: ORB CICD App token
         id: cicd
