@@ -70,7 +70,7 @@ jobs:
         run: |
           if [[ -n $(git status --porcelain) ]]; then
             git add uv.lock
-            git commit -m "chore: update uv.lock after dependabot changes"
+            git commit -m "chore(deps): update uv.lock after dependabot changes"
             git push
           else
             echo "No changes to commit"
@@ -206,8 +206,8 @@ jobs:
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1  # v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: monthly dependency maintenance"
-          title: "chore: monthly dependency maintenance"
+          commit-message: "chore(deps): monthly dependency maintenance"
+          title: "chore(deps): monthly dependency maintenance"
           body: |
             ## Monthly Dependency Maintenance
 
