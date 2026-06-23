@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+/* Enable class-based dark mode for Tailwind v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+    background-color: #f8f9fa;
+    color: #1a1a1a;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .dark body {
+    background-color: #0f1117;
+    color: #e5e7eb;
+  }
+
+  #root {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+  }
+}
+
+@keyframes pulse-amber {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.badge-pulse {
+  animation: pulse-amber 2s ease-in-out infinite;
+}
+
+.mono {
+  font-family: ui-monospace, Consolas, 'Courier New', monospace;
+}
+
+/* Smooth theme transitions */
+*, *::before, *::after {
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.1s ease;
+}
