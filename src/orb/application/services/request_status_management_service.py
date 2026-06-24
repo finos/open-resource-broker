@@ -246,4 +246,5 @@ class RequestStatusManagementService:
             public_ip=instance_data.get("public_ip"),
             launch_time=launch_time,
             metadata=instance_data.get("metadata", {}),
+            provider_data=instance_data.get("provider_data", {}),
         )
