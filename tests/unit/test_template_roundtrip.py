@@ -19,6 +19,7 @@ from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
 from orb.infrastructure.template.dtos import TemplateDTO
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
+from orb.providers.azure.configuration.template_extension import AzureTemplateExtensionConfig
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 
 
@@ -253,6 +254,7 @@ class TestTemplateRoundTrip:
         result = dto.to_template_config()
 
         assert dto.metadata == {"custom_key": "custom-value"}
-        assert "custom_key" not in dto.provider_config
+        assert isinstance(dto.provider_config, AzureTemplateExtensionConfig)
+        assert "custom_key" not in dto.provider_config.model_dump(exclude_none=True)
         assert result["metadata"]["custom_key"] == "custom-value"
         AzureTemplate.model_validate(result)
