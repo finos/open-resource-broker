@@ -128,7 +128,11 @@ jobs:
         #   pywin32                 PSF-2.0                                                        -> PSF-2.0 (permissive, equivalent to BSD)
         #   cyclonedx-python-lib    no detected license                                            -> Apache-2.0 (METADATA: License: Apache-2.0)
         #   fastapi                 no detected license                                            -> MIT (METADATA: License-Expression: MIT)
-        allow-dependencies-licenses: 'pkg:pypi/werkzeug, pkg:githubactions/trufflesecurity/trufflehog, pkg:pypi/lark, pkg:pypi/mcp, pkg:pypi/rfc3987-syntax, pkg:pypi/wcwidth, pkg:pypi/lxml, pkg:pypi/protobuf, pkg:pypi/pywin32, pkg:pypi/cyclonedx-python-lib, pkg:pypi/fastapi'
+        #   aiohappyeyeballs        0BSD AND BSD-3-Clause AND GPL-1.0-or-later AND PSF-2.0 AND Python-2.0  -> PSF-2.0 (METADATA: License-Expression: PSF-2.0; permissive)
+        #   aiohttp                 no detected license                                            -> Apache-2.0 (METADATA: License-Expression: Apache-2.0 AND MIT; dual permissive)
+        #   docutils                BSD-2-Clause AND BSD-3-Clause AND CC-PDDC AND GPL-1.0-or-later AND GPL-3.0-only AND GPL-3.0-or-later AND ...  -> public-domain + BSD-2-Clause (METADATA: License: public domain, Python, 2-Clause BSD; GPL applies to a few isolated source files in the docutils source tree)
+        #   scramp                  no detected license                                            -> MIT-0 (METADATA: License-Expression: MIT No Attribution; permissive)
+        allow-dependencies-licenses: 'pkg:pypi/werkzeug, pkg:githubactions/trufflesecurity/trufflehog, pkg:pypi/lark, pkg:pypi/mcp, pkg:pypi/rfc3987-syntax, pkg:pypi/wcwidth, pkg:pypi/lxml, pkg:pypi/protobuf, pkg:pypi/pywin32, pkg:pypi/cyclonedx-python-lib, pkg:pypi/fastapi, pkg:pypi/aiohappyeyeballs, pkg:pypi/aiohttp, pkg:pypi/docutils, pkg:pypi/scramp'
 
   codeql-analysis:
     name: CodeQL Analysis

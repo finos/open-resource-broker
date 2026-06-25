@@ -1,0 +1,149 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# Require HOME to be set by the environment
+: "${HOME:?HOME environment variable must be set}"
+
+service_account="${GCLOUD_HMAC_SERVICE_ACCOUNT:?}"
+kube_secret="${GCLOUD_HMAC_K8S_SECRET:-gcloud-hmac-secret}"
+sync_interval_seconds="${GCLOUD_HMAC_SYNC_INTERVAL_SECONDS:-43200}"
+clean_old_keys_after_hours="${GCLOUD_HMAC_CLEAN_OLD_KEYS_AFTER_HOURS:-24}"
+
+
+function log() {
+  # Log messages with timestamp
+  local log_level="$1"
+  shift
+  echo "$(date +"%Y-%m-%d %H:%M:%S") [$log_level] $*"
+}
+
+# List all HMAC keys for the service account, sorted oldest to newest
+function list_hmac_keys() {
+    gcloud storage hmac list                            \
+        --service-account="$service_account"            \
+        --long --format="json" --sort-by timeCreated |  \
+        jq -c '.[] | {id: .accessId, created: (.timeCreated | sub("\\..*";"") | strptime("%Y-%m-%dT%H:%M:%S") | mktime)}'
+}
+
+# Delete keys older than cutoff (not the two newest)
+function delete_old_keys() {
+    local -n _key_json=$1
+    local _epoch_cutoff=$2
+    local key_count=${#_key_json[@]}
+    for ((i=0; i<key_count-2; i++)); do
+        local kid kcreated
+        kid=$(echo "${_key_json[i]}" | jq -r .id)
+        kcreated=$(echo "${_key_json[i]}" | jq -r .created)
+        if (( kcreated < _epoch_cutoff )); then
+            # shellcheck disable=SC2086
+            log INFO "Deleting old HMAC key: $kid (created $(date -d @$kcreated))"
+            delete_hmac_key "$kid"
+        else
+            log INFO "Keeping key $kid (not old enough for deletion)"
+        fi
+    done
+}
+
+# Try to make room for a new key if at limit, only deleting old keys
+function ensure_room_for_new_key() {
+    local -n _key_json=$1
+    local _epoch_cutoff=$2
+    local key_count=${#_key_json[@]}
+    if (( key_count < 10 )); then
+        return 0
+    fi
+    # Try to delete one old key
+    for ((i=0; i<key_count-2; i++)); do
+        local kid kcreated
+        kid=$(echo "${_key_json[i]}" | jq -r .id)
+        kcreated=$(echo "${_key_json[i]}" | jq -r .created)
+        if (( kcreated < _epoch_cutoff )); then
+            # shellcheck disable=SC2086
+            log INFO "Deleting old HMAC key: $kid (created $(date -d @$kcreated))"
+            delete_hmac_key "$kid"
+            return 0
+        fi
+    done
+    log ERROR "Cannot create new HMAC key: 10 keys exist and none are old enough for deletion."
+    return 1
+}
+
+function create_hmac_key() {
+    # Create a new HMAC key for the service account and update the Kubernetes secret
+    log INFO "Creating HMAC key for service account: $service_account"
+    local key_id_secret
+    key_id_secret=$(gcloud storage hmac create                           \
+                    "$service_account"                                   \
+                    --format="json"                                      \
+                    | jq -r '[.metadata.accessId, .secret] | @tsv')
+    log INFO "HMAC key created with ID: $(echo "$key_id_secret" | cut -f1)"
+    update_k8s_secret "$(echo "$key_id_secret" | cut -f1)" "$(echo "$key_id_secret" | cut -f2)"
+}
+
+function update_k8s_secret() {
+    # Update the Kubernetes secret with the new HMAC key
+    local key_id="$1"
+    local secret="$2"
+
+    log INFO "Updating Kubernetes secret with new HMAC key: $key_id"
+    if kubectl create secret generic "$kube_secret"         \
+        --from-literal=AWS_ACCESS_KEY_ID="$key_id"          \
+        --from-literal=AWS_SECRET_ACCESS_KEY="$secret"      \
+        --dry-run=client -o yaml | kubectl apply -f -; then
+        log INFO "Secret updated successfully."
+    else
+        log ERROR "Failed to update secret."
+        exit 1
+    fi
+}
+
+function delete_hmac_key() {
+    # Delete the existing HMAC key
+    local key_id="$1"
+    log INFO "Deleting HMAC key: $key_id"
+    gcloud storage hmac update "$key_id" --deactivate
+    gcloud storage hmac delete "$key_id"
+}
+
+function sync_hmac_keys() {
+    log INFO "Syncing HMAC keys for service account: $service_account"
+    local now epoch_cutoff key_count
+
+    now=$(date +%s)
+    epoch_cutoff=$(echo "$now - ($clean_old_keys_after_hours * 3600)" | bc)
+    epoch_cutoff=${epoch_cutoff%.*}  # convert to integer (strip decimal)
+
+    # Get all keys
+    mapfile -t key_json < <(list_hmac_keys)
+    key_count=${#key_json[@]}
+
+    if (( key_count < 2 )); then
+        create_hmac_key
+        log INFO "Created new HMAC key (count was $key_count)"
+        return
+    fi
+
+    # If at key limit, try to make room by deleting old keys
+    if ! ensure_room_for_new_key key_json "$epoch_cutoff"; then
+        return
+    fi
+
+    # Now safe to create a new key
+    create_hmac_key
+
+    # Refresh key list after creation
+    mapfile -t key_json < <(list_hmac_keys)
+    key_count=${#key_json[@]}
+
+    # Clean up any remaining old keys (not the two newest)
+    delete_old_keys key_json "$epoch_cutoff"
+
+    log INFO "HMAC keys synced successfully."
+}
+
+while true; do
+    sync_hmac_keys
+    log INFO "Sleeping for $sync_interval_seconds seconds before next sync."
+    sleep "$sync_interval_seconds"
+done

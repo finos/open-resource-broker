@@ -2,7 +2,7 @@
   "pythonVersion": "3.12",
   "pythonPlatform": "Linux",
   "include": ["src/orb"],
-  "exclude": [".venv", "build", "dist"],
+  "exclude": [".venv", "build", "dist", "src/orb/k8s_legacy"],
   "extraPaths": ["src"],
   "typeCheckingMode": "basic",
   "reportMissingImports": true,

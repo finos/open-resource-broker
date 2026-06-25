@@ -154,6 +154,7 @@ nav:
     - Operations:
       - Backup and Recovery: operational/backup_recovery.md
       - Migration: operational/migration.md
+      - Migrate from open-resource-broker: operational/from-open-resource-broker.md
       - Performance: operational/performance.md
       - Monitoring: operational/monitoring.md
       - Tools: operational/tools.md

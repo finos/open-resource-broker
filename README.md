@@ -373,6 +373,27 @@ curl http://localhost:8000/health
 
 </details>
 
+## Symphony HostFactory on Kubernetes (legacy)
+
+The `k8s-legacy` module is a Symphony HostFactory custom provider plugin for Kubernetes, predating the modern multi-cloud ORB architecture.  It is now bundled with `orb-py` as an optional install extra rather than as a separate PyPI package.
+
+Install with:
+
+```bash
+pip install "orb-py[k8s-legacy]"
+```
+
+Confirm the install by listing available templates:
+
+```bash
+orb k8s-legacy get-available-templates
+```
+
+The plugin is in maintenance mode.  A modern Kubernetes provider with native ORB integration is in development; existing deployments remain fully supported.
+
+- **Upgrading from `open-resource-broker`?** See the [migration guide](docs/root/operational/from-open-resource-broker.md).
+- **Deploying the Symphony HF plugin?** See the [k8s-legacy deployment guide](k8s-legacy/README.md).
+
 ## Project
 
 Architecture, development, and documentation.

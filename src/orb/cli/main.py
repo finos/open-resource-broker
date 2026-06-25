@@ -62,7 +62,8 @@ async def main() -> None:
             raise
 
         # Setup environment after arg parse — skip for init (it calls get_config_location() directly)
-        if args.resource != "init":
+        # and skip for k8s-legacy (handled entirely by the legacy package itself)
+        if args.resource not in ("init", "k8s-legacy"):
             from orb.run import setup_environment
 
             setup_environment()
@@ -163,6 +164,15 @@ async def main() -> None:
 
             result = await handle_init(args)
             sys.exit(result)
+
+        # k8s-legacy: bypass application init, delegate straight to legacy click groups.
+        # handle_k8s_legacy() always calls sys.exit() and never returns.
+        if args.resource == "k8s-legacy":
+            from orb.interface.cli.k8s_legacy import handle_k8s_legacy
+
+            handle_k8s_legacy(args)
+            # unreachable — handle_k8s_legacy always exits
+            sys.exit(0)  # pragma: no cover
 
         if args.resource in ["templates", "template"] and args.action == "generate":
             from orb.interface.templates_generate_handler import handle_templates_generate

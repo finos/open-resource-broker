@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
+- The legacy Symphony-on-Kubernetes HostFactory plugin is now bundled with `orb-py` as an optional install extra rather than as a separate `open-resource-broker` PyPI package.  Install with `pip install "orb-py[k8s-legacy]"` and invoke via `orb k8s-legacy <command>`.  See `docs/root/operational/from-open-resource-broker.md` for details.  Runtime semantics are unchanged.
 - `[monitoring]` extra no longer includes `opentelemetry-instrumentation-boto` (use `[monitoring-aws]`).
 - `[all]` extra now includes `[all-providers]` so `pip install orb-py[all]` still pulls everything.
 - `[dev]` shim extra now includes `[all-providers]` for full local development.

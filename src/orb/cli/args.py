@@ -689,6 +689,11 @@ For more information, visit: {DOCS_URL}
         help="Logging level for MCP server",
     )
 
+    # k8s-legacy — optional plugin; lazy-imports orb_k8s_legacy only when invoked
+    from orb.interface.cli.k8s_legacy import add_k8s_legacy_subparser
+
+    add_k8s_legacy_subparser(subparsers)
+
     # Init
     init_parser = subparsers.add_parser("init", help="Initialize ORB configuration")
     add_force_argument(init_parser)
