@@ -27,6 +27,7 @@ from orb.providers.k8s.handlers.statefulset_handler import K8sStatefulSetHandler
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 from orb.providers.k8s.value_objects import KubernetesProviderApi
 from orb.providers.k8s.watch.multi_namespace import MultiNamespaceWatcher
+from orb.providers.k8s.watch.node_state_cache import K8sNodeStateCache
 
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
     from orb.domain.request.aggregate import Request
@@ -58,6 +59,7 @@ class K8sHandlerRegistry:
         plugin_factories: Callable[[], dict[str, Callable[..., K8sHandlerBase]]],
         native_spec_service_provider: Callable[[], Optional[Any]],
         handler_overrides: Optional[dict[str, K8sHandlerBase]] = None,
+        node_state_cache_provider: Optional[Callable[[], Optional[K8sNodeStateCache]]] = None,
     ) -> None:
         self._config = config
         self._logger = logger
@@ -65,6 +67,10 @@ class K8sHandlerRegistry:
         self._watch_manager_provider = watch_manager_provider
         self._plugin_factories = plugin_factories
         self._native_spec_service_provider = native_spec_service_provider
+        # Node-state cache provider.  When non-None, handlers look up node
+        # metadata (instance type, zone, capacity type) by node_name to
+        # enrich the per-instance ``provider_data`` block.
+        self._node_state_cache_provider = node_state_cache_provider
         # Handler cache keyed by provider_api value.  Tests can pre-seed
         # this via ``handler_overrides`` to inject mock handlers.
         self._handlers: dict[str, K8sHandlerBase] = dict(handler_overrides or {})
@@ -99,6 +105,11 @@ class K8sHandlerRegistry:
         cache = watch_manager.cache if watch_manager is not None else None
         alive = (lambda m=watch_manager: m.is_healthy()) if watch_manager is not None else None
         native_spec_service = self._native_spec_service_provider()
+        node_cache = (
+            self._node_state_cache_provider()
+            if self._node_state_cache_provider is not None
+            else None
+        )
 
         if provider_api == KubernetesProviderApi.POD.value:
             handler = K8sPodHandler(
@@ -108,6 +119,7 @@ class K8sHandlerRegistry:
                 pod_state_cache=cache,
                 cache_alive=alive,
                 native_spec_service=native_spec_service,
+                node_state_cache=node_cache,
             )
             self._handlers[provider_api] = handler
             return handler
@@ -119,6 +131,7 @@ class K8sHandlerRegistry:
                 pod_state_cache=cache,
                 cache_alive=alive,
                 native_spec_service=native_spec_service,
+                node_state_cache=node_cache,
             )
             self._handlers[provider_api] = handler
             return handler
@@ -130,6 +143,7 @@ class K8sHandlerRegistry:
                 pod_state_cache=cache,
                 cache_alive=alive,
                 native_spec_service=native_spec_service,
+                node_state_cache=node_cache,
             )
             self._handlers[provider_api] = handler
             return handler
@@ -141,6 +155,7 @@ class K8sHandlerRegistry:
                 pod_state_cache=cache,
                 cache_alive=alive,
                 native_spec_service=native_spec_service,
+                node_state_cache=node_cache,
             )
             self._handlers[provider_api] = handler
             return handler

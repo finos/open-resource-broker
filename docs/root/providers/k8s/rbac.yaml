@@ -130,6 +130,15 @@ rules:
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["get", "list", "watch"]
+  # Nodes — required when ``node_watch_enabled: true`` in K8sProviderConfig.
+  # The node watcher streams CoreV1Api.list_node to cache per-node metadata
+  # (instance type, availability zone, capacity type, CPU/memory capacity)
+  # and enriches per-instance provider_data in get_status responses.
+  # Nodes are cluster-scoped; a namespaced Role cannot grant this permission.
+  # Omit this rule when node_watch_enabled is False (the default).
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
 
   # apps/v1 — required for the Deployment and StatefulSet handlers.
   - apiGroups: ["apps"]
