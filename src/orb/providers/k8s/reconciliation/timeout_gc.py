@@ -1,7 +1,7 @@
-"""Pod-stuck-in-Pending timeout detection helpers.
+"""Pod-stuck-in-Pending timeout detection and deletion helpers.
 
-Pure functions invoked by handler ``check_hosts_status`` paths.  When a
-pod has been Pending for longer than
+Pure-transform functions invoked by handler ``check_hosts_status`` paths.
+When a pod has been Pending for longer than
 :attr:`K8sProviderConfig.pod_timeout_seconds`, the handler
 rewrites the per-instance dict in place:
 
@@ -13,26 +13,31 @@ rewrites the per-instance dict in place:
   ``PodScheduled=False`` reason (``"Unschedulable"``).  Falls back to
   the original ``status_reason`` when no condition reason is present.
 
-The detector is intentionally read-only: it does NOT call
-``delete_namespaced_pod``.  Operators may want to debug a stuck pod
-(``kubectl describe``, event log) before the GC removes it.  The
-orphan-GC sweep is the channel that removes pods at scale, gated by
-``auto_cleanup_orphans``.
+When :attr:`K8sProviderConfig.delete_timed_out_pods` is ``True``
+(the default), the timeout GC also **deletes** the stuck pod via
+``CoreV1Api.delete_namespaced_pod`` with ``grace_period_seconds=0``.
+This prevents pods leaking indefinitely on busy HPC clusters.
+Set ``delete_timed_out_pods = False`` to revert to the old read-only
+behaviour (status rewrite only, no deletion).
 
-The module exposes two helpers:
+The module exposes:
 
-* :func:`is_pod_timed_out` — boolean predicate on the per-instance
-  dict + the configured timeout.
-* :func:`apply_pod_timeout` — pure transform on a list of per-instance
-  dicts that returns a new list with timed-out entries rewritten.  No
-  mutation of the input.
+* :func:`is_pod_timed_out` — boolean predicate on a single instance dict.
+* :func:`apply_pod_timeout` — pure transform that rewrites timed-out
+  entries; no mutation of the input.
+* :func:`delete_timed_out_pod_async` — async helper that deletes a single
+  timed-out pod via the Kubernetes ``CoreV1Api``; 404 is tolerated.
 """
 
 from __future__ import annotations
 
+import asyncio
 import time
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:  # pragma: no cover — type-checking only
+    from orb.domain.base.ports import LoggingPort
 
 # Default condition reason emitted when scheduling is blocked.  The
 # kubelet uses the exact string "Unschedulable" so this is a stable
@@ -129,6 +134,79 @@ def _rewrite_timed_out_instance(instance: dict[str, Any]) -> dict[str, Any]:
     return rewritten
 
 
+async def delete_timed_out_pod_async(
+    core_v1: Any,
+    *,
+    name: str,
+    namespace: str,
+    reason: str,
+    logger: "LoggingPort",
+) -> None:
+    """Delete a single timed-out pod via ``CoreV1Api.delete_namespaced_pod``.
+
+    Runs the blocking SDK call inside :func:`asyncio.to_thread` so the
+    event loop is not blocked.  A ``404 Not Found`` response (pod already
+    gone) is silently swallowed and logged at DEBUG level — this avoids a
+    double-delete error when two concurrent check paths both decide the
+    same pod is timed out.  Any other exception is caught, logged at
+    WARNING level, and not re-raised so a single deletion failure does not
+    interrupt the broader ``check_hosts_status`` scan.
+
+    Args:
+        core_v1:   A live ``kubernetes.client.CoreV1Api`` instance.
+        name:      Pod name.
+        namespace: Pod namespace.
+        reason:    Human-readable reason string (from ``pod.status.conditions``
+                   or the ``status_reason`` fallback).  Included in the INFO
+                   log entry on successful deletion.
+        logger:    Injected :class:`~orb.domain.base.ports.LoggingPort`
+                   for structured log output.
+    """
+
+    def _delete() -> None:
+        try:
+            from kubernetes.client import V1DeleteOptions as _V1DeleteOptions  # noqa: PLC0415
+        except ImportError:  # pragma: no cover — extra not installed
+            logger.warning(
+                "kubernetes SDK not installed; cannot delete timed-out pod %s/%s",
+                namespace,
+                name,
+            )
+            return
+
+        try:
+            core_v1.delete_namespaced_pod(
+                name=name,
+                namespace=namespace,
+                body=_V1DeleteOptions(grace_period_seconds=0),
+            )
+            logger.info(
+                "Deleted timed-out pod %s/%s (reason: %s)",
+                namespace,
+                name,
+                reason,
+            )
+        except Exception as exc:  # noqa: BLE001
+            # 404 — pod was already removed by another path; not an error.
+            status = getattr(exc, "status", None)
+            if status == 404:
+                logger.debug(
+                    "Timed-out pod %s/%s already gone (404); skipping delete.",
+                    namespace,
+                    name,
+                )
+                return
+            logger.warning(
+                "Failed to delete timed-out pod %s/%s: %s",
+                namespace,
+                name,
+                exc,
+                exc_info=True,
+            )
+
+    await asyncio.to_thread(_delete)
+
+
 def _parse_iso_timestamp(value: str) -> Optional[float]:
     """Best-effort parse of a kubernetes ``start_time`` string.
 
@@ -156,5 +234,6 @@ def _parse_iso_timestamp(value: str) -> Optional[float]:
 
 __all__ = [
     "apply_pod_timeout",
+    "delete_timed_out_pod_async",
     "is_pod_timed_out",
 ]

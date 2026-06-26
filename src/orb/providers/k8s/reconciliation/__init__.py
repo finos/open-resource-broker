@@ -34,6 +34,7 @@ from orb.providers.k8s.reconciliation.startup_reconciler import (
 )
 from orb.providers.k8s.reconciliation.timeout_gc import (
     apply_pod_timeout,
+    delete_timed_out_pod_async,
     is_pod_timed_out,
 )
 
@@ -42,5 +43,6 @@ __all__ = [
     "ReconciliationReport",
     "StartupReconciler",
     "apply_pod_timeout",
+    "delete_timed_out_pod_async",
     "is_pod_timed_out",
 ]

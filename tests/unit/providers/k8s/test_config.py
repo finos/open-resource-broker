@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 from pydantic import ValidationError
 
@@ -87,3 +89,46 @@ def test_cluster_scoped_namespaces_marker_accepted() -> None:
     """``namespaces=['*']`` is the cluster-scoped watch sentinel."""
     cfg = K8sProviderConfig(namespaces=["*"])
     assert cfg.namespaces == ["*"]
+
+
+# ---------------------------------------------------------------------------
+# Namespace auto-detection
+# ---------------------------------------------------------------------------
+
+
+def test_namespace_explicit_value_is_preserved() -> None:
+    """An explicit ``namespace`` value is never overridden by auto-detection."""
+    cfg = K8sProviderConfig(namespace="orb-system")
+    assert cfg.namespace == "orb-system"
+
+
+def test_namespace_auto_detected_from_in_cluster_file(tmp_path: "pytest.TempPathFactory") -> None:
+    """When the ServiceAccount namespace file exists, its content is used."""
+    ns_file = tmp_path / "namespace"
+    ns_file.write_text("kube-production\n", encoding="utf-8")
+
+    mock_path = MagicMock()
+    mock_path.exists.return_value = True
+    mock_path.read_text.return_value = "kube-production\n"
+
+    with patch(
+        "orb.providers.k8s.configuration.config._SA_NAMESPACE_FILE",
+        mock_path,
+    ):
+        cfg = K8sProviderConfig()
+
+    assert cfg.namespace == "kube-production"
+
+
+def test_namespace_defaults_to_default_when_no_in_cluster_file() -> None:
+    """When the ServiceAccount file is absent (out-of-cluster), namespace is ``"default"``."""
+    mock_path = MagicMock()
+    mock_path.exists.return_value = False
+
+    with patch(
+        "orb.providers.k8s.configuration.config._SA_NAMESPACE_FILE",
+        mock_path,
+    ):
+        cfg = K8sProviderConfig()
+
+    assert cfg.namespace == "default"

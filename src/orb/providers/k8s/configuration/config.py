@@ -128,7 +128,7 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         description=(
             "Single-namespace mode target namespace; used when ``namespaces`` is None.  "
             "When None (the default) the provider auto-detects the namespace from the "
-            "in-cluster ServiceAccount token file and falls back to \"default\" when "
+            'in-cluster ServiceAccount token file and falls back to "default" when '
             "not running inside a pod."
         ),
     )

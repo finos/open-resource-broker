@@ -24,7 +24,10 @@ from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.resilience import retry
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
-from orb.providers.k8s.reconciliation.timeout_gc import apply_pod_timeout
+from orb.providers.k8s.reconciliation.timeout_gc import (
+    apply_pod_timeout,
+    delete_timed_out_pod_async,
+)
 from orb.providers.k8s.utilities.pod_spec import request_id_label_selector
 from orb.providers.k8s.utilities.pod_state import (
     extract_status_reason,
@@ -130,6 +133,9 @@ class K8sHandlerBase(ABC):
         if candidate is None:
             candidate = self._config.namespace
 
+        # _resolve_namespace model_validator guarantees this is always a str.
+        assert candidate is not None, "namespace must be resolved by model_validator"
+
         allowed = self._config.namespaces
         if allowed and allowed != ["*"] and candidate not in allowed:
             raise ValueError(
@@ -214,11 +220,85 @@ class K8sHandlerBase(ABC):
         the rewrite semantics — chiefly: ``status="terminated"`` and
         ``provider_data.unschedulable_reason`` populated from
         ``pod.status.conditions``.
+
+        When :attr:`K8sProviderConfig.delete_timed_out_pods` is ``True``
+        (the default), each newly-timed-out pod is also scheduled for
+        immediate deletion via :func:`delete_timed_out_pod_async`.  The
+        deletion is fired as a background asyncio task so the synchronous
+        check path is not blocked.  404 responses and other errors are
+        swallowed inside the async helper and logged without surfacing.
+        When there is no running event loop (CLI / unit-test context) the
+        deletion step is silently skipped.
         """
-        return apply_pod_timeout(
+        rewritten = apply_pod_timeout(
             instances,
             pod_timeout_seconds=float(self._config.pod_timeout_seconds),
         )
+
+        if self._config.delete_timed_out_pods:
+            self._schedule_timed_out_pod_deletions(instances, rewritten)
+
+        return rewritten
+
+    def _schedule_timed_out_pod_deletions(
+        self,
+        original: list[dict[str, Any]],
+        rewritten: list[dict[str, Any]],
+    ) -> None:
+        """Schedule fire-and-forget deletion tasks for pods newly timed out.
+
+        Identifies instance dicts that transitioned to
+        ``provider_data["timed_out"] = True`` in this pass (i.e. were not
+        already marked timed-out on entry) and creates one async deletion
+        task per pod.  Requires a running event loop; silently skips when
+        none is available (CLI / synchronous test context).
+        """
+        import asyncio  # noqa: PLC0415
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running event loop — CLI or sync-test context; skip deletion.
+            return
+
+        # Build a set of identifiers for pods that were already timed-out on
+        # entry so we do not re-schedule their deletions on every poll cycle.
+        already_timed_out: set[str] = {
+            str(inst.get("instance_id") or inst.get("name") or "")
+            for inst in original
+            if (inst.get("provider_data") or {}).get("timed_out")
+        }
+
+        core_v1 = self._kubernetes_client.core_v1
+
+        for inst in rewritten:
+            provider_data: dict[str, Any] = inst.get("provider_data") or {}
+            if not provider_data.get("timed_out"):
+                continue
+            pod_id = str(inst.get("instance_id") or inst.get("name") or "")
+            if pod_id in already_timed_out:
+                continue
+
+            pod_name: str = str(inst.get("name") or inst.get("instance_id") or "")
+            namespace: str = str(provider_data.get("namespace") or self._config.namespace)
+            reason: str = str(
+                provider_data.get("unschedulable_reason")
+                or inst.get("status_reason")
+                or "Unschedulable"
+            )
+
+            if not pod_name:
+                continue
+
+            loop.create_task(
+                delete_timed_out_pod_async(
+                    core_v1,
+                    name=pod_name,
+                    namespace=namespace,
+                    reason=reason,
+                    logger=self._logger,
+                )
+            )
 
     def is_not_found(self, exc: BaseException) -> bool:
         """Return ``True`` when ``exc`` is (or wraps) a kubernetes 404 ``ApiException``.
@@ -400,7 +480,10 @@ class K8sHandlerBase(ABC):
             ns = provider_data.get("namespace")
             if isinstance(ns, str) and ns:
                 return ns
-        return self._config.namespace
+        # _resolve_namespace model_validator guarantees this is always a str.
+        namespace = self._config.namespace
+        assert namespace is not None, "namespace must be resolved by model_validator"
+        return namespace
 
     def _read_from_cache(self, request: Request) -> Optional[CheckHostsStatusResult]:
         """Cache-first read path.
