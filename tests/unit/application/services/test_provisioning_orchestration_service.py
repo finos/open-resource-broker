@@ -233,15 +233,15 @@ class TestDispatchSingleAttemptOutcome:
         assert result.is_final is False
 
     @pytest.mark.asyncio
-    async def test_full_fulfillment_yields_completed_outcome(self):
-        """All instances returned → Completed."""
+    async def test_full_fulfillment_with_provider_signal_yields_completed(self):
+        """Synchronous provider (fulfillment_final=True) + full count → Completed."""
         from orb.providers.base.strategy.provider_strategy import ProviderResult
 
         svc = _make_service()
         provider_result = ProviderResult.success_result(
             data={
                 "resource_ids": ["fleet-1"],
-                "instances": [{"id": "i-1"}, {"id": "i-2"}],  # 2 of 2
+                "instances": [{"id": "i-1"}, {"id": "i-2"}],
                 "instance_ids": ["i-1", "i-2"],
             },
             metadata={"fulfillment_final": True},
@@ -262,6 +262,44 @@ class TestDispatchSingleAttemptOutcome:
         assert result.success is True
         assert isinstance(result.outcome, Completed)
         assert result.is_final is True
+
+    @pytest.mark.asyncio
+    async def test_full_fulfillment_without_signal_yields_accepted(self):
+        """Async provider (no fulfillment_final flag) + full count → Accepted.
+
+        Until the provider signals fulfilment is final, the orchestrator must
+        keep polling. Instances exist but may still be pending. This guards
+        the AccecptedAccepted-vs-Completed branch from collapsing into a
+        constant: a future regression where the orchestrator wrongly emits
+        Completed on every success would break here.
+        """
+        from orb.providers.base.strategy.provider_strategy import ProviderResult
+
+        svc = _make_service()
+        provider_result = ProviderResult.success_result(
+            data={
+                "resource_ids": ["fleet-1"],
+                "instances": [{"id": "i-1"}, {"id": "i-2"}],
+                "instance_ids": ["i-1", "i-2"],
+            },
+            metadata={},  # no fulfillment_final → not final
+        )
+        svc._provider_selection_port.execute_operation = AsyncMock(return_value=provider_result)
+
+        scheduler = MagicMock()
+        scheduler.format_template_for_provider.return_value = {}
+        svc._container.get.return_value = scheduler
+
+        result = await svc._dispatch_single_attempt(
+            MagicMock(template_id="t-1"),
+            _make_request(count=2),
+            _make_selection_result(),
+            count=2,
+        )
+
+        assert result.success is True
+        assert isinstance(result.outcome, Accepted)
+        assert result.is_final is False
 
     @pytest.mark.asyncio
     async def test_provider_failure_yields_failed_outcome(self):
