@@ -31,6 +31,11 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
+from orb.providers.k8s.utilities.pod_state import (
+    extract_status_reason,
+    is_pod_ready,
+    pod_status_string,
+)
 from orb.providers.k8s.watch.pod_state_cache import PodState, PodStateCache
 
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
@@ -418,9 +423,9 @@ class K8sWatcher:
             list(getattr(status, "container_statuses", None) or []) if status is not None else []
         )
 
-        ready = _is_pod_ready(conditions)
-        status_str = _pod_status_string(phase, ready)
-        reason = _extract_status_reason(container_statuses, conditions)
+        ready = is_pod_ready(conditions)
+        status_str = pod_status_string(phase, ready)
+        reason = extract_status_reason(container_statuses, conditions)
 
         return PodState(
             request_id=request_id,
@@ -437,62 +442,6 @@ class K8sWatcher:
             labels=labels,
             deleted=deleted,
         )
-
-
-# ---------------------------------------------------------------------------
-# Status mapping helpers — duplicated from K8sPodHandler so the
-# watcher can compute the cached status without importing the handler
-# (handler -> watcher coupling stays one-way).
-# ---------------------------------------------------------------------------
-
-
-def _is_pod_ready(conditions: list[Any]) -> bool:
-    """Return ``True`` iff ``conditions`` has a ``Ready=True`` entry."""
-    for cond in conditions:
-        ctype = getattr(cond, "type", None)
-        cstatus = getattr(cond, "status", None)
-        if ctype == "Ready" and cstatus == "True":
-            return True
-    return False
-
-
-def _pod_status_string(phase: Optional[str], ready: bool) -> str:
-    """Mirror of :meth:`K8sPodHandler._pod_status_string`."""
-    if phase == "Running":
-        return "running" if ready else "starting"
-    if phase == "Succeeded":
-        return "running"
-    if phase == "Failed":
-        return "failed"
-    return "pending"
-
-
-def _extract_status_reason(
-    container_statuses: list[Any],
-    conditions: list[Any],
-) -> Optional[str]:
-    """Mirror of :meth:`K8sPodHandler._extract_status_reason`."""
-    for cs in container_statuses:
-        state = getattr(cs, "state", None)
-        if state is None:
-            continue
-        terminated = getattr(state, "terminated", None)
-        if terminated is not None:
-            reason = getattr(terminated, "reason", None)
-            if reason:
-                return str(reason)
-        waiting = getattr(state, "waiting", None)
-        if waiting is not None:
-            reason = getattr(waiting, "reason", None)
-            if reason:
-                return str(reason)
-    for cond in conditions:
-        ctype = getattr(cond, "type", None)
-        cstatus = getattr(cond, "status", None)
-        reason = getattr(cond, "reason", None)
-        if ctype == "PodScheduled" and cstatus == "False" and reason:
-            return str(reason)
-    return None
 
 
 class _ResourceTooOld(Exception):

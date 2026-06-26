@@ -32,7 +32,7 @@ from orb.providers.k8s.utilities.pod_spec import (
     build_pod_spec,
     make_pod_name,
 )
-from orb.providers.k8s.watch.pod_state_cache import PodState, PodStateCache
+from orb.providers.k8s.watch.pod_state_cache import PodStateCache
 
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
     from kubernetes.client import V1Pod
@@ -75,23 +75,11 @@ class K8sPodHandler(K8sHandlerBase):
             kubernetes_client=kubernetes_client,
             config=config,
             logger=logger,
+            pod_state_cache=pod_state_cache,
+            cache_alive=cache_alive,
+            stale_cache_timeout_seconds=stale_cache_timeout_seconds,
         )
         self._max_concurrent_creates = max_concurrent_creates
-        # Watch-cache wiring: when both the cache and the ``cache_alive``
-        # callable are supplied, :meth:`check_hosts_status` reads from
-        # the cache first.  When ``cache_alive()`` is ``False`` (watcher
-        # dead) or the cache has no entry for the request (cold start),
-        # the handler falls back to a scoped list.  When the cache
-        # contains entries but they are older than
-        # ``stale_cache_timeout_seconds`` the cache is treated as stale
-        # and the same fallback path is taken.
-        self._pod_state_cache = pod_state_cache
-        self._cache_alive = cache_alive
-        self._stale_cache_timeout_seconds = (
-            stale_cache_timeout_seconds
-            if stale_cache_timeout_seconds is not None
-            else float(config.stale_cache_timeout_seconds)
-        )
 
     # ------------------------------------------------------------------
     # acquire_hosts
@@ -211,7 +199,9 @@ class K8sPodHandler(K8sHandlerBase):
         """
         cached = self._read_from_cache(request)
         if cached is not None:
-            return cached
+            cached_instances = self.apply_pod_timeouts(list(cached.instances))
+            fulfilment = self._compute_fulfilment(cached_instances, request.requested_count)
+            return CheckHostsStatusResult(instances=cached_instances, fulfilment=fulfilment)
 
         namespace = self._resolve_request_namespace(request)
         selector = self.build_label_selector(request)
@@ -251,211 +241,6 @@ class K8sPodHandler(K8sHandlerBase):
         instances = self.apply_pod_timeouts(instances)
         fulfilment = self._compute_fulfilment(instances, request.requested_count)
         return CheckHostsStatusResult(instances=instances, fulfilment=fulfilment)
-
-    def _read_from_cache(self, request: Request) -> Optional[CheckHostsStatusResult]:
-        """Cache-first read path.
-
-        Returns:
-
-        * ``None`` when the cache is not wired, the watcher reports
-          dead, the cache has no entry for ``request.request_id``
-          (cold start), or the cached entries are stale.
-        * Otherwise a :class:`CheckHostsStatusResult` computed from
-          the cached :class:`PodState` snapshots.
-
-        Stale-entry policy: if *any* cached entry for the request is
-        older than ``stale_cache_timeout_seconds`` the entire cache hit
-        is rejected and the handler falls back to the list path.  The
-        stale entries are dropped from the cache as a side effect so
-        subsequent reads do not pay the staleness check repeatedly.
-        """
-        cache = self._pod_state_cache
-        if cache is None:
-            return None
-        if self._cache_alive is not None and not self._cache_alive():
-            return None
-
-        request_id = str(request.request_id)
-        # Drop and discard entries older than the staleness window
-        # before we consult the cache so the cache hit is consistent.
-        dropped = cache.mark_stale(request_id, self._stale_cache_timeout_seconds)
-        if dropped:
-            self._logger.debug(
-                "Dropped %s stale pod cache entr%s for request %s",
-                len(dropped),
-                "y" if len(dropped) == 1 else "ies",
-                request_id,
-            )
-            # After dropping stale entries the cache may still have
-            # fresh entries; fall through to read what is left.
-
-        states = cache.get(request_id)
-        if states is None:
-            return None
-
-        instances = [self._instance_dict_for_state(state) for state in states]
-        instances = self.apply_pod_timeouts(instances)
-        fulfilment = self._compute_fulfilment(instances, request.requested_count)
-        return CheckHostsStatusResult(instances=instances, fulfilment=fulfilment)
-
-    def _instance_dict_for_state(self, state: PodState) -> dict[str, Any]:
-        """Convert a cached :class:`PodState` into the instance-dict shape.
-
-        Mirrors :meth:`_instance_dict_for_pod` so the list-fed and
-        cache-fed code paths produce identical dicts downstream.
-        """
-        return {
-            "instance_id": state.pod_name,
-            "resource_id": state.pod_name,
-            "name": state.pod_name,
-            "status": state.status,
-            "status_reason": state.status_reason,
-            "private_ip": state.pod_ip,
-            "public_ip": state.host_ip,
-            "launch_time": state.start_time,
-            "instance_type": "",
-            "image_id": "",
-            "subnet_id": None,
-            "security_group_ids": [],
-            "vpc_id": None,
-            "tags": dict(state.labels),
-            "price_type": None,
-            "provider_api": self.PROVIDER_API,
-            "provider_data": {
-                "namespace": state.namespace,
-                "node_name": state.node_name,
-                "phase": state.phase,
-                "ready": state.ready,
-            },
-            "metadata": {},
-        }
-
-    def _resolve_request_namespace(self, request: Request) -> str:
-        """Resolve a request's namespace using saved provider_data when present."""
-        provider_data = getattr(request, "provider_data", None) or {}
-        if isinstance(provider_data, dict):
-            ns = provider_data.get("namespace")
-            if isinstance(ns, str) and ns:
-                return ns
-        return self._config.namespace
-
-    def _instance_dict_for_pod(self, pod: Any, namespace: str) -> dict[str, Any]:
-        """Convert a ``V1Pod`` to the per-instance dict shape ORB expects.
-
-        The dict mirrors the AWS provider's ``_format_instance_data``
-        output — flat snake_case fields plus a ``provider_data`` block
-        for per-handler bookkeeping.
-        """
-        metadata = getattr(pod, "metadata", None)
-        status = getattr(pod, "status", None)
-        spec = getattr(pod, "spec", None)
-
-        name = getattr(metadata, "name", "") if metadata is not None else ""
-        labels = dict(getattr(metadata, "labels", None) or {}) if metadata is not None else {}
-        phase = getattr(status, "phase", None) if status is not None else None
-        pod_ip = getattr(status, "pod_ip", None) if status is not None else None
-        host_ip = getattr(status, "host_ip", None) if status is not None else None
-        node_name = getattr(spec, "node_name", None) if spec is not None else None
-        start_time = getattr(status, "start_time", None) if status is not None else None
-        conditions = list(getattr(status, "conditions", None) or []) if status is not None else []
-        container_statuses = (
-            list(getattr(status, "container_statuses", None) or []) if status is not None else []
-        )
-
-        ready = self._is_pod_ready(conditions)
-        status_str = self._pod_status_string(phase, ready)
-        status_reason = self._extract_status_reason(container_statuses, conditions)
-
-        return {
-            "instance_id": name,
-            "resource_id": name,
-            "name": name,
-            "status": status_str,
-            "status_reason": status_reason,
-            "private_ip": pod_ip,
-            "public_ip": host_ip,
-            "launch_time": str(start_time) if start_time is not None else None,
-            "instance_type": "",
-            "image_id": "",
-            "subnet_id": None,
-            "security_group_ids": [],
-            "vpc_id": None,
-            "tags": labels,
-            "price_type": None,
-            "provider_api": self.PROVIDER_API,
-            "provider_data": {
-                "namespace": namespace,
-                "node_name": node_name,
-                "phase": phase,
-                "ready": ready,
-            },
-            "metadata": {},
-        }
-
-    @staticmethod
-    def _is_pod_ready(conditions: list[Any]) -> bool:
-        """Return ``True`` iff ``conditions`` has a ``Ready=True`` entry."""
-        for cond in conditions:
-            ctype = getattr(cond, "type", None)
-            cstatus = getattr(cond, "status", None)
-            if ctype == "Ready" and cstatus == "True":
-                return True
-        return False
-
-    @staticmethod
-    def _pod_status_string(phase: Optional[str], ready: bool) -> str:
-        """Map ``pod.status.phase`` (+ readiness) to an ORB instance-status string.
-
-        The string set mirrors the AWS provider's EC2 instance statuses so
-        the downstream domain code (fulfilment math, status display) does
-        not need to special-case kubernetes phases.
-
-        * ``Pending``  -> ``"pending"``
-        * ``Running`` (not ready)  -> ``"starting"``
-        * ``Running`` (ready)      -> ``"running"``
-        * ``Succeeded``            -> ``"running"``  (job-style success)
-        * ``Failed``               -> ``"failed"``
-        * ``Unknown``/None         -> ``"pending"``
-        """
-        if phase == "Running":
-            return "running" if ready else "starting"
-        if phase == "Succeeded":
-            return "running"
-        if phase == "Failed":
-            return "failed"
-        return "pending"
-
-    @staticmethod
-    def _extract_status_reason(
-        container_statuses: list[Any],
-        conditions: list[Any],
-    ) -> Optional[str]:
-        """Best-effort extraction of a human-readable status reason.
-
-        Order of preference: terminated container reason, waiting
-        container reason, ``PodScheduled=False`` condition reason.
-        """
-        for cs in container_statuses:
-            state = getattr(cs, "state", None)
-            if state is None:
-                continue
-            terminated = getattr(state, "terminated", None)
-            if terminated is not None:
-                reason = getattr(terminated, "reason", None)
-                if reason:
-                    return str(reason)
-            waiting = getattr(state, "waiting", None)
-            if waiting is not None:
-                reason = getattr(waiting, "reason", None)
-                if reason:
-                    return str(reason)
-        for cond in conditions:
-            ctype = getattr(cond, "type", None)
-            cstatus = getattr(cond, "status", None)
-            reason = getattr(cond, "reason", None)
-            if ctype == "PodScheduled" and cstatus == "False" and reason:
-                return str(reason)
-        return None
 
     def _compute_fulfilment(
         self,
@@ -632,23 +417,22 @@ class K8sPodHandler(K8sHandlerBase):
     @classmethod
     def get_example_templates(cls) -> list[Template]:
         """Return one example template that submits as a ``Pod``."""
+        from orb.providers.k8s.domain.template.k8s_template import (  # noqa: PLC0415
+            K8sResourceQuantities,
+            K8sTemplate,
+        )
+
         return [
-            Template(
+            K8sTemplate(
                 template_id="k8s-pod-example",
                 name="Kubernetes Pod example",
                 description="Submit a single pod via the kubernetes provider.",
-                provider_type="k8s",
                 provider_api="Pod",
                 image_id="busybox:latest",
                 max_instances=1,
-                provider_data={
-                    "k8s": {
-                        "container_image": "busybox:latest",
-                        "resource_requests": {"cpu": "100m", "memory": "128Mi"},
-                        "resource_limits": {"cpu": "500m", "memory": "256Mi"},
-                        "command": ["sh", "-c", "sleep 3600"],
-                    },
-                },
+                resource_requests=K8sResourceQuantities(cpu="100m", memory="128Mi"),
+                resource_limits=K8sResourceQuantities(cpu="500m", memory="256Mi"),
+                command=["sh", "-c", "sleep 3600"],
             ),
         ]
 

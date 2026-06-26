@@ -70,7 +70,7 @@ from orb.providers.k8s.utilities.statefulset_spec import (
     make_statefulset_name,
     parse_statefulset_pod_ordinal,
 )
-from orb.providers.k8s.watch.pod_state_cache import PodState, PodStateCache
+from orb.providers.k8s.watch.pod_state_cache import PodStateCache
 
 
 @injectable
@@ -102,17 +102,9 @@ class K8sStatefulSetHandler(K8sHandlerBase):
             kubernetes_client=kubernetes_client,
             config=config,
             logger=logger,
-        )
-        # Cache wiring matches the Pod / Deployment handlers: when the
-        # watcher is alive and the cache has entries for the request, the
-        # read path skips the list call.  See
-        # :meth:`K8sPodHandler._read_from_cache` for the semantics.
-        self._pod_state_cache = pod_state_cache
-        self._cache_alive = cache_alive
-        self._stale_cache_timeout_seconds = (
-            stale_cache_timeout_seconds
-            if stale_cache_timeout_seconds is not None
-            else float(config.stale_cache_timeout_seconds)
+            pod_state_cache=pod_state_cache,
+            cache_alive=cache_alive,
+            stale_cache_timeout_seconds=stale_cache_timeout_seconds,
         )
 
     # ------------------------------------------------------------------
@@ -254,40 +246,6 @@ class K8sStatefulSetHandler(K8sHandlerBase):
         )
         return CheckHostsStatusResult(instances=instances, fulfilment=fulfilment)
 
-    def _read_from_cache(self, request: Request) -> Optional[CheckHostsStatusResult]:
-        """Cache-first read path; mirrors the Pod / Deployment handlers' logic."""
-        cache = self._pod_state_cache
-        if cache is None:
-            return None
-        if self._cache_alive is not None and not self._cache_alive():
-            return None
-
-        request_id = str(request.request_id)
-        dropped = cache.mark_stale(request_id, self._stale_cache_timeout_seconds)
-        if dropped:
-            self._logger.debug(
-                "Dropped %s stale pod cache entr%s for statefulset request %s",
-                len(dropped),
-                "y" if len(dropped) == 1 else "ies",
-                request_id,
-            )
-
-        states = cache.get(request_id)
-        if states is None:
-            return None
-
-        instances = [self._instance_dict_for_state(state) for state in states]
-        # Caller (``check_hosts_status``) rebases the fulfilment on the
-        # controller view; here we just need the per-pod instance list.
-        return CheckHostsStatusResult(
-            instances=instances,
-            fulfilment=ProviderFulfilment(
-                state="in_progress",
-                message="placeholder (rebased by caller)",
-                target_units=request.requested_count,
-            ),
-        )
-
     def _read_statefulset_status(self, namespace: str, statefulset_name: str) -> dict[str, Any]:
         """Read controller view from ``apps/v1 StatefulSet.status``.
 
@@ -349,130 +307,6 @@ class K8sStatefulSetHandler(K8sHandlerBase):
             "replicas": getattr(spec, "replicas", None) if spec is not None else None,
             "conditions": conditions_list,
         }
-
-    def _instance_dict_for_state(self, state: PodState) -> dict[str, Any]:
-        """Convert a cached :class:`PodState` into the instance-dict shape."""
-        return {
-            "instance_id": state.pod_name,
-            "resource_id": state.pod_name,
-            "name": state.pod_name,
-            "status": state.status,
-            "status_reason": state.status_reason,
-            "private_ip": state.pod_ip,
-            "public_ip": state.host_ip,
-            "launch_time": state.start_time,
-            "instance_type": "",
-            "image_id": "",
-            "subnet_id": None,
-            "security_group_ids": [],
-            "vpc_id": None,
-            "tags": dict(state.labels),
-            "price_type": None,
-            "provider_api": self.PROVIDER_API,
-            "provider_data": {
-                "namespace": state.namespace,
-                "node_name": state.node_name,
-                "phase": state.phase,
-                "ready": state.ready,
-            },
-            "metadata": {},
-        }
-
-    def _instance_dict_for_pod(self, pod: Any, namespace: str) -> dict[str, Any]:
-        """Convert a ``V1Pod`` to the per-instance dict shape ORB expects."""
-        metadata = getattr(pod, "metadata", None)
-        status = getattr(pod, "status", None)
-        spec = getattr(pod, "spec", None)
-
-        name = getattr(metadata, "name", "") if metadata is not None else ""
-        labels = dict(getattr(metadata, "labels", None) or {}) if metadata is not None else {}
-        phase = getattr(status, "phase", None) if status is not None else None
-        pod_ip = getattr(status, "pod_ip", None) if status is not None else None
-        host_ip = getattr(status, "host_ip", None) if status is not None else None
-        node_name = getattr(spec, "node_name", None) if spec is not None else None
-        start_time = getattr(status, "start_time", None) if status is not None else None
-        conditions = list(getattr(status, "conditions", None) or []) if status is not None else []
-        container_statuses = (
-            list(getattr(status, "container_statuses", None) or []) if status is not None else []
-        )
-
-        ready = self._is_pod_ready(conditions)
-        status_str = self._pod_status_string(phase, ready)
-        status_reason = self._extract_status_reason(container_statuses, conditions)
-
-        return {
-            "instance_id": name,
-            "resource_id": name,
-            "name": name,
-            "status": status_str,
-            "status_reason": status_reason,
-            "private_ip": pod_ip,
-            "public_ip": host_ip,
-            "launch_time": str(start_time) if start_time is not None else None,
-            "instance_type": "",
-            "image_id": "",
-            "subnet_id": None,
-            "security_group_ids": [],
-            "vpc_id": None,
-            "tags": labels,
-            "price_type": None,
-            "provider_api": self.PROVIDER_API,
-            "provider_data": {
-                "namespace": namespace,
-                "node_name": node_name,
-                "phase": phase,
-                "ready": ready,
-            },
-            "metadata": {},
-        }
-
-    @staticmethod
-    def _is_pod_ready(conditions: list[Any]) -> bool:
-        for cond in conditions:
-            ctype = getattr(cond, "type", None)
-            cstatus = getattr(cond, "status", None)
-            if ctype == "Ready" and cstatus == "True":
-                return True
-        return False
-
-    @staticmethod
-    def _pod_status_string(phase: Optional[str], ready: bool) -> str:
-        """Map ``pod.status.phase`` (+ readiness) to an ORB instance status."""
-        if phase == "Running":
-            return "running" if ready else "starting"
-        if phase == "Succeeded":
-            return "running"
-        if phase == "Failed":
-            return "failed"
-        return "pending"
-
-    @staticmethod
-    def _extract_status_reason(
-        container_statuses: list[Any],
-        conditions: list[Any],
-    ) -> Optional[str]:
-        """Best-effort extraction of a human-readable status reason."""
-        for cs in container_statuses:
-            state = getattr(cs, "state", None)
-            if state is None:
-                continue
-            terminated = getattr(state, "terminated", None)
-            if terminated is not None:
-                reason = getattr(terminated, "reason", None)
-                if reason:
-                    return str(reason)
-            waiting = getattr(state, "waiting", None)
-            if waiting is not None:
-                reason = getattr(waiting, "reason", None)
-                if reason:
-                    return str(reason)
-        for cond in conditions:
-            ctype = getattr(cond, "type", None)
-            cstatus = getattr(cond, "status", None)
-            reason = getattr(cond, "reason", None)
-            if ctype == "PodScheduled" and cstatus == "False" and reason:
-                return str(reason)
-        return None
 
     def _compute_fulfilment(
         self,
@@ -792,15 +626,6 @@ class K8sStatefulSetHandler(K8sHandlerBase):
     # Helpers
     # ------------------------------------------------------------------
 
-    def _resolve_request_namespace(self, request: Request) -> str:
-        """Resolve a request's namespace using saved provider_data when present."""
-        provider_data = getattr(request, "provider_data", None) or {}
-        if isinstance(provider_data, dict):
-            ns = provider_data.get("namespace")
-            if isinstance(ns, str) and ns:
-                return ns
-        return self._config.namespace
-
     def _resolve_statefulset_name(self, request: Request) -> str:
         """Recover the StatefulSet name created at acquire time.
 
@@ -824,23 +649,22 @@ class K8sStatefulSetHandler(K8sHandlerBase):
     @classmethod
     def get_example_templates(cls) -> list[Template]:
         """Return one example template that submits as a ``StatefulSet``."""
+        from orb.providers.k8s.domain.template.k8s_template import (  # noqa: PLC0415
+            K8sResourceQuantities,
+            K8sTemplate,
+        )
+
         return [
-            Template(
+            K8sTemplate(
                 template_id="k8s-statefulset-example",
                 name="Kubernetes StatefulSet example",
                 description="Submit a StatefulSet-managed pod set via the kubernetes provider.",
-                provider_type="k8s",
                 provider_api="StatefulSet",
                 image_id="busybox:latest",
                 max_instances=3,
-                provider_data={
-                    "k8s": {
-                        "container_image": "busybox:latest",
-                        "resource_requests": {"cpu": "100m", "memory": "128Mi"},
-                        "resource_limits": {"cpu": "500m", "memory": "256Mi"},
-                        "command": ["sh", "-c", "sleep 3600"],
-                    },
-                },
+                resource_requests=K8sResourceQuantities(cpu="100m", memory="128Mi"),
+                resource_limits=K8sResourceQuantities(cpu="500m", memory="256Mi"),
+                command=["sh", "-c", "sleep 3600"],
             ),
         ]
 
