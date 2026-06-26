@@ -178,6 +178,24 @@ class HostFactoryResponseFormatter:
             if req_dict.get("provider_api"):
                 hf_request["providerApi"] = req_dict["provider_api"]
 
+            # Lifecycle timestamps. HostFactory's wire spec is silent on
+            # these but our UI drawer + dashboard activity stepper rely on
+            # them. Forwarding when present keeps HF clients ignoring them
+            # (they're additional fields) while giving the UI what it needs.
+            for ts_field in (
+                "created_at",
+                "started_at",
+                "first_status_check",
+                "last_status_check",
+                "completed_at",
+                "request_type",
+                "successful_count",
+                "requested_count",
+                "template_id",
+            ):
+                if req_dict.get(ts_field) is not None:
+                    hf_request[ts_field] = req_dict[ts_field]
+
             formatted_requests.append(hf_request)
 
         return {"requests": formatted_requests}

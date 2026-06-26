@@ -266,24 +266,56 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
         return d
 
     def format_machine_details_response(self, machine_data: dict) -> dict:
-        """Format machine details with default fields, including provider_data fields."""
+        """Format machine details with default fields, including provider_data fields.
+
+        Returns the full enrichment surface the UI's machine drawer needs:
+        provider identifiers (provider_name/api/type), the EC2/ASG resource
+        id, lineage (request_id/template_id/return_request_id), provider_data
+        blob, price_type, DNS names, and version. The list endpoint already
+        surfaces these; the detail endpoint must match so a drawer fetched by
+        primary key is not strictly less informative than the list row.
+        """
         provider_data: dict[str, Any] = machine_data.get("provider_data") or {}
 
+        # machine_id is the canonical PK; "id" was a legacy alias. Pass both
+        # so older clients keep working.
+        machine_id = machine_data.get("machine_id") or machine_data.get("id")
+
         result: dict[str, Any] = {
-            "id": machine_data.get("id"),
+            "id": machine_id,
+            "machine_id": machine_id,
             "name": machine_data.get("name"),
             "status": machine_data.get("status"),
             "provider": "default",
+            # Provider identifiers (previously dropped — caused empty
+            # "Provider" section in the machine drawer).
+            "provider_name": machine_data.get("provider_name"),
+            "provider_api": machine_data.get("provider_api"),
+            "provider_type": machine_data.get("provider_type"),
+            "resource_id": machine_data.get("resource_id"),
+            # Lineage (request that created it, template, return-request).
+            "request_id": machine_data.get("request_id"),
+            "return_request_id": machine_data.get("return_request_id"),
+            "template_id": machine_data.get("template_id"),
+            # Instance / network detail.
             "instance_type": machine_data.get("instance_type"),
             "image_id": machine_data.get("image_id"),
             "private_ip": machine_data.get("private_ip"),
             "public_ip": machine_data.get("public_ip"),
+            "private_dns_name": machine_data.get("private_dns_name"),
+            "public_dns_name": machine_data.get("public_dns_name"),
             "subnet_id": machine_data.get("subnet_id"),
             "security_group_ids": machine_data.get("security_group_ids"),
+            "price_type": machine_data.get("price_type"),
             "status_reason": machine_data.get("status_reason"),
+            "message": machine_data.get("message"),
+            "result": machine_data.get("result"),
             "launch_time": machine_data.get("launch_time"),
             "termination_time": machine_data.get("termination_time"),
             "tags": machine_data.get("tags"),
+            "metadata": machine_data.get("metadata"),
+            "provider_data": provider_data or None,
+            "version": machine_data.get("version"),
         }
 
         # Provider_data fields — prefer top-level if already present, else pull from provider_data

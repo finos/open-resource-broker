@@ -349,7 +349,17 @@ class EnhancedBearerTokenStrategy(AuthPort):
             raise ConfigurationError(
                 "Enhanced bearer token authentication requires auth.bearer_token configuration."
             )
-        secret_key: str = getattr(bearer_cfg, "secret_key", "") or ""
+        raw_secret = getattr(bearer_cfg, "secret_key", None)
+        if raw_secret is None:
+            raise ConfigurationError(
+                "Enhanced bearer token authentication requires a secret_key in auth.bearer_token config."
+            )
+        # SecretStr — call .get_secret_value() to obtain the plain string for JWT ops.
+        secret_key: str = (
+            raw_secret.get_secret_value()
+            if hasattr(raw_secret, "get_secret_value")
+            else str(raw_secret)
+        )
         if not secret_key:
             raise ConfigurationError(
                 "Enhanced bearer token authentication requires a secret_key in auth.bearer_token config."
