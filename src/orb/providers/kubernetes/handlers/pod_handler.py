@@ -18,7 +18,7 @@ in-memory cache; until then ``check_hosts_status`` issues a single
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
@@ -32,6 +32,7 @@ from orb.providers.kubernetes.utilities.pod_spec import (
     build_pod_spec,
     make_pod_name,
 )
+from orb.providers.kubernetes.watch.pod_state_cache import PodState, PodStateCache
 
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
     from kubernetes.client import V1Pod
@@ -65,6 +66,10 @@ class KubernetesPodHandler(KubernetesHandlerBase):
         config: KubernetesProviderConfig,
         logger: LoggingPort,
         max_concurrent_creates: int = _MAX_CONCURRENT_CREATES,
+        *,
+        pod_state_cache: Optional[PodStateCache] = None,
+        cache_alive: Optional[Callable[[], bool]] = None,
+        stale_cache_timeout_seconds: Optional[float] = None,
     ) -> None:
         super().__init__(
             kubernetes_client=kubernetes_client,
@@ -72,6 +77,21 @@ class KubernetesPodHandler(KubernetesHandlerBase):
             logger=logger,
         )
         self._max_concurrent_creates = max_concurrent_creates
+        # Phase C wiring: when both the cache and the ``cache_alive``
+        # callable are supplied, :meth:`check_hosts_status` reads from
+        # the cache first.  When ``cache_alive()`` is ``False`` (watcher
+        # dead) or the cache has no entry for the request (cold start),
+        # the handler falls back to a scoped list.  When the cache
+        # contains entries but they are older than
+        # ``stale_cache_timeout_seconds`` the cache is treated as stale
+        # and the same fallback path is taken.
+        self._pod_state_cache = pod_state_cache
+        self._cache_alive = cache_alive
+        self._stale_cache_timeout_seconds = (
+            stale_cache_timeout_seconds
+            if stale_cache_timeout_seconds is not None
+            else float(config.stale_cache_timeout_seconds)
+        )
 
     # ------------------------------------------------------------------
     # acquire_hosts
@@ -182,11 +202,17 @@ class KubernetesPodHandler(KubernetesHandlerBase):
     def check_hosts_status(self, request: Request) -> CheckHostsStatusResult:
         """Return per-pod details + the fulfilment verdict for ``request``.
 
-        Implementation is on-demand: a single
-        ``list_namespaced_pod(label_selector=orb.io/request-id=<id>)`` is
-        issued per call.  Phase C swaps this for an in-memory cache
-        populated by the watch task.
+        Cache-first read path (Phase C): when a :class:`PodStateCache`
+        has been injected and the watcher reports alive, the handler
+        reads the cached :class:`PodState` snapshots for ``request_id``.
+        A cache miss (no entry) or a stale cache (any entry older than
+        :attr:`KubernetesProviderConfig.stale_cache_timeout_seconds`)
+        falls back to a single ``list_namespaced_pod`` call.
         """
+        cached = self._read_from_cache(request)
+        if cached is not None:
+            return cached
+
         namespace = self._resolve_request_namespace(request)
         selector = self.build_label_selector(request)
 
@@ -224,6 +250,83 @@ class KubernetesPodHandler(KubernetesHandlerBase):
         ]
         fulfilment = self._compute_fulfilment(instances, request.requested_count)
         return CheckHostsStatusResult(instances=instances, fulfilment=fulfilment)
+
+    def _read_from_cache(self, request: Request) -> Optional[CheckHostsStatusResult]:
+        """Cache-first read path.
+
+        Returns:
+
+        * ``None`` when the cache is not wired, the watcher reports
+          dead, the cache has no entry for ``request.request_id``
+          (cold start), or the cached entries are stale.
+        * Otherwise a :class:`CheckHostsStatusResult` computed from
+          the cached :class:`PodState` snapshots.
+
+        Stale-entry policy: if *any* cached entry for the request is
+        older than ``stale_cache_timeout_seconds`` the entire cache hit
+        is rejected and the handler falls back to the list path.  The
+        stale entries are dropped from the cache as a side effect so
+        subsequent reads do not pay the staleness check repeatedly.
+        """
+        cache = self._pod_state_cache
+        if cache is None:
+            return None
+        if self._cache_alive is not None and not self._cache_alive():
+            return None
+
+        request_id = str(request.request_id)
+        # Drop and discard entries older than the staleness window
+        # before we consult the cache so the cache hit is consistent.
+        dropped = cache.mark_stale(request_id, self._stale_cache_timeout_seconds)
+        if dropped:
+            self._logger.debug(
+                "Dropped %s stale pod cache entr%s for request %s",
+                len(dropped),
+                "y" if len(dropped) == 1 else "ies",
+                request_id,
+            )
+            # After dropping stale entries the cache may still have
+            # fresh entries; fall through to read what is left.
+
+        states = cache.get(request_id)
+        if states is None:
+            return None
+
+        instances = [self._instance_dict_for_state(state) for state in states]
+        fulfilment = self._compute_fulfilment(instances, request.requested_count)
+        return CheckHostsStatusResult(instances=instances, fulfilment=fulfilment)
+
+    def _instance_dict_for_state(self, state: PodState) -> dict[str, Any]:
+        """Convert a cached :class:`PodState` into the instance-dict shape.
+
+        Mirrors :meth:`_instance_dict_for_pod` so the list-fed and
+        cache-fed code paths produce identical dicts downstream.
+        """
+        return {
+            "instance_id": state.pod_name,
+            "resource_id": state.pod_name,
+            "name": state.pod_name,
+            "status": state.status,
+            "status_reason": state.status_reason,
+            "private_ip": state.pod_ip,
+            "public_ip": state.host_ip,
+            "launch_time": state.start_time,
+            "instance_type": "",
+            "image_id": "",
+            "subnet_id": None,
+            "security_group_ids": [],
+            "vpc_id": None,
+            "tags": dict(state.labels),
+            "price_type": None,
+            "provider_api": self.PROVIDER_API,
+            "provider_data": {
+                "namespace": state.namespace,
+                "node_name": state.node_name,
+                "phase": state.phase,
+                "ready": state.ready,
+            },
+            "metadata": {},
+        }
 
     def _resolve_request_namespace(self, request: Request) -> str:
         """Resolve a request's namespace using saved provider_data when present."""

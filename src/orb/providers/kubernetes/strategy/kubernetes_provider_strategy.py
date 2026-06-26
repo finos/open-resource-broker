@@ -42,6 +42,7 @@ from orb.providers.kubernetes.handlers.base_handler import KubernetesHandlerBase
 from orb.providers.kubernetes.handlers.pod_handler import KubernetesPodHandler
 from orb.providers.kubernetes.infrastructure.kubernetes_client import KubernetesClient
 from orb.providers.kubernetes.value_objects import KubernetesProviderApi
+from orb.providers.kubernetes.watch.multi_namespace import MultiNamespaceWatcher
 
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
     from orb.domain.request.aggregate import Request
@@ -72,6 +73,7 @@ class KubernetesProviderStrategy(ProviderStrategy):
         console: Optional[Any] = None,
         kubernetes_client: Optional[KubernetesClient] = None,
         handler_overrides: Optional[dict[str, KubernetesHandlerBase]] = None,
+        watch_manager: Optional[MultiNamespaceWatcher] = None,
     ) -> None:
         if not isinstance(config, KubernetesProviderConfig):
             raise ValueError("KubernetesProviderStrategy requires KubernetesProviderConfig")
@@ -87,6 +89,10 @@ class KubernetesProviderStrategy(ProviderStrategy):
         # Handler cache keyed by provider_api value.  Tests can pre-seed
         # this via ``handler_overrides`` to inject mock handlers.
         self._handlers: dict[str, KubernetesHandlerBase] = dict(handler_overrides or {})
+        # Watch fan-out.  Constructed lazily by :meth:`initialize` when
+        # ``config.watch_enabled`` is True and no override has been
+        # provided.  Tests inject a stub via ``watch_manager``.
+        self._watch_manager: Optional[MultiNamespaceWatcher] = watch_manager
 
     # ------------------------------------------------------------------
     # Provider identity
@@ -126,6 +132,7 @@ class KubernetesProviderStrategy(ProviderStrategy):
                 self._k8s_config.namespace,
                 self._k8s_config.in_cluster,
             )
+            self._maybe_start_watch_manager()
             self._initialized = True
             return True
         except Exception as exc:
@@ -136,6 +143,12 @@ class KubernetesProviderStrategy(ProviderStrategy):
 
     def cleanup(self) -> None:
         try:
+            if self._watch_manager is not None:
+                # ``stop`` is async; schedule it on the running loop if
+                # there is one, otherwise drive it synchronously via
+                # ``asyncio.run``.  CLI cleanup paths typically have no
+                # loop running while daemon paths do.
+                self._stop_watch_manager_sync()
             if self._kubernetes_client is not None:
                 self._kubernetes_client.cleanup()
             self._kubernetes_client = None
@@ -144,6 +157,56 @@ class KubernetesProviderStrategy(ProviderStrategy):
             self._logger.warning(
                 "Failed during Kubernetes provider cleanup: %s", exc, exc_info=True
             )
+
+    def _maybe_start_watch_manager(self) -> None:
+        """Start the watch fleet when enabled by config and a loop is available.
+
+        The fleet runs as an asyncio task and therefore needs a running
+        event loop.  When ``initialize`` is called from a synchronous
+        context (e.g. CLI bootstrap) we skip startup and let the
+        cache-less fallback path serve reads.  Daemon / REST callers
+        typically run inside an event loop and pick up the watcher.
+        """
+        if not self._k8s_config.watch_enabled:
+            return
+        if self._watch_manager is None:
+            self._watch_manager = MultiNamespaceWatcher(
+                kubernetes_client=self.kubernetes_client,
+                config=self._k8s_config,
+                logger=self._logger,
+            )
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            self._logger.debug(
+                "Skipping Kubernetes watcher startup: no running event loop "
+                "(cache-less fallback will serve reads)."
+            )
+            return
+        try:
+            self._watch_manager.start()
+        except Exception as exc:
+            self._logger.warning("Failed to start Kubernetes watcher fleet: %s", exc, exc_info=True)
+
+    def _stop_watch_manager_sync(self) -> None:
+        """Stop the watch manager from a sync-or-async cleanup context."""
+        manager = self._watch_manager
+        if manager is None or not manager.is_started():
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop is None:
+            try:
+                asyncio.run(manager.stop())
+            except Exception as exc:
+                self._logger.debug(
+                    "Watch manager stop raised during cleanup: %s", exc, exc_info=True
+                )
+            return
+        # Inside a running loop — schedule stop and let the loop drain.
+        loop.create_task(manager.stop())
 
     # ------------------------------------------------------------------
     # Operation dispatch — Phase B onwards
@@ -340,10 +403,18 @@ class KubernetesProviderStrategy(ProviderStrategy):
         if handler is not None:
             return handler
         if provider_api == KubernetesProviderApi.POD.value:
+            cache = self._watch_manager.cache if self._watch_manager is not None else None
+            alive = (
+                (lambda m=self._watch_manager: m.is_healthy())
+                if self._watch_manager is not None
+                else None
+            )
             handler = KubernetesPodHandler(
                 kubernetes_client=self.kubernetes_client,
                 config=self._k8s_config,
                 logger=self._logger,
+                pod_state_cache=cache,
+                cache_alive=alive,
             )
             self._handlers[provider_api] = handler
             return handler
