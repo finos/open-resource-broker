@@ -1,6 +1,6 @@
 """Kubernetes reconciliation and garbage collection.
 
-Phase G deliverables:
+Components:
 
 * :class:`~orb.providers.k8s.reconciliation.startup_reconciler.StartupReconciler`
   — runs once at provider :meth:`initialize`, before the watch task is

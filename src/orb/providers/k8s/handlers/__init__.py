@@ -1,10 +1,13 @@
 """Kubernetes provider handlers.
 
 Mirrors :mod:`orb.providers.aws.infrastructure.handlers` in shape — the
-handler ABC plus concrete handlers, one per provider-API key.  Phase B
-introduces :class:`K8sHandlerBase` and :class:`K8sPodHandler`;
-Phase D adds :class:`K8sDeploymentHandler`; Phase E adds
-:class:`K8sStatefulSetHandler` and :class:`K8sJobHandler`.
+handler ABC plus concrete handlers, one per provider-API key:
+
+* :class:`K8sHandlerBase`         — abstract base
+* :class:`K8sPodHandler`          — ``provider_api="Pod"``
+* :class:`K8sDeploymentHandler`   — ``provider_api="Deployment"``
+* :class:`K8sStatefulSetHandler`  — ``provider_api="StatefulSet"``
+* :class:`K8sJobHandler`          — ``provider_api="Job"``
 """
 
 from orb.providers.k8s.handlers.base_handler import K8sHandlerBase

@@ -8,8 +8,8 @@ from pydantic import ValidationError
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 
 
-def test_defaults_match_phase_a_spec() -> None:
-    """Default field values match the Phase A specification verbatim."""
+def test_defaults_match_documented_spec() -> None:
+    """Default field values match the documented specification verbatim."""
     cfg = K8sProviderConfig()
 
     assert cfg.provider_type == "k8s"

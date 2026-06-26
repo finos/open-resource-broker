@@ -43,7 +43,7 @@ def test_create_k8s_config_from_dict() -> None:
 
 
 def test_create_k8s_resolver_returns_none() -> None:
-    """Phase A: no provider-side resolver is shipped yet."""
+    """No provider-side resolver is shipped — generic fallback applies."""
     assert create_k8s_resolver() is None
 
 

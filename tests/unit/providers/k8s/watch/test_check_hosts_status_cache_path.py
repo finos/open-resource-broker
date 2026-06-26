@@ -1,6 +1,6 @@
 """Cache-first read path for :meth:`K8sPodHandler.check_hosts_status`.
 
-Validates Phase C behaviour:
+Validates the cache-aware behaviour:
 
 * When a :class:`PodStateCache` is injected and the watcher reports
   alive, the handler reads from the cache without calling
@@ -177,7 +177,7 @@ def test_cache_hit_fulfilment_states(status: str, expected_state: str) -> None:
 
 
 def test_handler_without_cache_uses_list_path() -> None:
-    """Constructed without a cache, the handler keeps the Phase B behaviour."""
+    """Constructed without a cache, the handler keeps the on-demand list behaviour."""
     client = MagicMock()
     client.core_v1.list_namespaced_pod.return_value = SimpleNamespace(items=[])
     config = K8sProviderConfig(namespace="orb-test")

@@ -1,4 +1,4 @@
-"""Unit tests for :class:`K8sStatefulSetHandler` (Phase E).
+"""Unit tests for :class:`K8sStatefulSetHandler`.
 
 Mocks ``CoreV1Api`` and ``AppsV1Api`` so no cluster is required.
 Covers:

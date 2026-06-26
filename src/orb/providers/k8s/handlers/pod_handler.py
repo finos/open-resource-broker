@@ -1,6 +1,6 @@
 """K8sPodHandler — direct ``v1/Pod`` provisioning handler.
 
-Implements the Phase B contract:
+Contract:
 
 * ``acquire_hosts``   — creates N pods concurrently via
   :meth:`CoreV1Api.create_namespaced_pod` wrapped in :func:`asyncio.to_thread`.
@@ -9,10 +9,10 @@ Implements the Phase B contract:
 * ``release_hosts``   — deletes pods by name; 404s are treated as
   best-effort (already gone) and logged at debug.
 
-The handler uses on-demand polling — no watch task is required.  Phase C
-adds the asyncio watcher and switches the read-path over to an
-in-memory cache; until then ``check_hosts_status`` issues a single
-``list_namespaced_pod`` per call.
+The handler falls back to on-demand polling when no
+:class:`PodStateCache` is wired in.  When a cache is provided the read
+path is served from the asyncio watcher's in-memory state instead of
+issuing a ``list_namespaced_pod`` per call.
 """
 
 from __future__ import annotations
@@ -77,7 +77,7 @@ class K8sPodHandler(K8sHandlerBase):
             logger=logger,
         )
         self._max_concurrent_creates = max_concurrent_creates
-        # Phase C wiring: when both the cache and the ``cache_alive``
+        # Watch-cache wiring: when both the cache and the ``cache_alive``
         # callable are supplied, :meth:`check_hosts_status` reads from
         # the cache first.  When ``cache_alive()`` is ``False`` (watcher
         # dead) or the cache has no entry for the request (cold start),
@@ -202,8 +202,8 @@ class K8sPodHandler(K8sHandlerBase):
     def check_hosts_status(self, request: Request) -> CheckHostsStatusResult:
         """Return per-pod details + the fulfilment verdict for ``request``.
 
-        Cache-first read path (Phase C): when a :class:`PodStateCache`
-        has been injected and the watcher reports alive, the handler
+        Cache-first read path: when a :class:`PodStateCache` has been
+        injected and the watcher reports alive, the handler
         reads the cached :class:`PodState` snapshots for ``request_id``.
         A cache miss (no entry) or a stale cache (any entry older than
         :attr:`K8sProviderConfig.stale_cache_timeout_seconds`)

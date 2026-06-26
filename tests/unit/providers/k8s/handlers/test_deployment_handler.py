@@ -1,4 +1,4 @@
-"""Unit tests for :class:`K8sDeploymentHandler` (Phase D).
+"""Unit tests for :class:`K8sDeploymentHandler`.
 
 Mocks ``CoreV1Api`` and ``AppsV1Api`` so no cluster is required.
 Covers:

@@ -1,4 +1,4 @@
-"""Unit tests for :class:`K8sProviderStrategy` Phase A surface.
+"""Unit tests for the :class:`K8sProviderStrategy` strategy shell.
 
 Covers:
 
@@ -6,8 +6,8 @@ Covers:
 * health check happy-path + failure-path using a mocked ``K8sClient``;
 * capability advertisement;
 * identity + naming helpers;
-* the ``NotImplementedError`` stubs for the typed provisioning interface
-  that Phase B fills in.
+* dispatch of the typed provisioning interface to the registered
+  per-API handlers.
 """
 
 from __future__ import annotations
@@ -120,7 +120,7 @@ def test_provider_name_pattern() -> None:
 
 @pytest.mark.asyncio
 async def test_execute_operation_health_check_dispatches() -> None:
-    """The Phase A dispatcher handles HEALTH_CHECK end-to-end."""
+    """The untyped operation dispatcher handles HEALTH_CHECK end-to-end."""
     from orb.providers.base.strategy import ProviderOperation
 
     strategy = _make_strategy()
@@ -135,7 +135,7 @@ async def test_execute_operation_health_check_dispatches() -> None:
 
 @pytest.mark.asyncio
 async def test_execute_operation_unsupported_returns_error() -> None:
-    """Resource-lifecycle operations are NOT supported in Phase A."""
+    """Resource-lifecycle operations are not supported via the untyped dispatch path."""
     from orb.providers.base.strategy import ProviderOperation
 
     strategy = _make_strategy()
@@ -150,7 +150,7 @@ async def test_execute_operation_unsupported_returns_error() -> None:
 
 @pytest.mark.asyncio
 async def test_typed_provisioning_methods_route_to_pod_handler() -> None:
-    """Phase B routes typed entry points to the Pod handler when ``provider_api='Pod'``."""
+    """Typed entry points route to the Pod handler when ``provider_api='Pod'``."""
     from orb.domain.base.operation_outcome import Accepted
 
     strategy = _make_strategy()

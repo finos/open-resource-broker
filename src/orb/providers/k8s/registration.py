@@ -9,13 +9,13 @@ provider has parity with the AWS integration surface from day one:
 * ``CLISpecRegistry``            — only when the CLI spec module is present
 * ``FieldMappingRegistry``       — only when the HostFactory field-mapping module is present
 * ``DefaultsLoaderRegistry``     — provider defaults loader
-* ``AuthRegistry``               — provider-side auth strategies (placeholder in Phase A)
-* ``TemplateExtensionRegistry``  — only when the AWS-style DTO config exists (Phase B+)
-* ``TemplateAdapterPort``        — only when the AWS-style adapter exists (Phase B+)
-* ``TemplateExampleGeneratorPort`` — only when the example generator exists (Phase G)
+* ``AuthRegistry``               — provider-side auth strategies (placeholder)
+* ``TemplateExtensionRegistry``  — only when the AWS-style DTO config exists
+* ``TemplateAdapterPort``        — only when the AWS-style adapter exists
+* ``TemplateExampleGeneratorPort`` — only when the example generator exists
 
-Registrations that depend on phase-B+ modules are wrapped in defensive
-``ImportError`` guards so this module imports cleanly in Phase A.
+Optional integrations are wrapped in defensive ``ImportError`` guards so
+this module imports cleanly even when those modules are absent.
 """
 
 from __future__ import annotations
@@ -123,17 +123,16 @@ def create_k8s_config(data: dict[str, Any]) -> Any:
 
 
 def create_k8s_resolver() -> Any:
-    """Phase A: no provider-side template resolver is needed."""
+    """No provider-side template resolver is needed."""
     return None
 
 
 def create_k8s_validator(provider_config: Any = None) -> Any:
-    """Phase A: no provider-side template validator is shipped yet.
+    """No provider-side template validator is shipped yet.
 
     Returns ``None`` so the provider registry falls back to the generic
-    validation surface.  Phase B (Pod handler) introduces a concrete
-    validator implementation in
-    ``orb.providers.k8s.infrastructure.adapters``.
+    validation surface.  Handler-level validation is performed inside
+    each per-API handler at submit time.
     """
     return None
 
@@ -201,17 +200,17 @@ def get_k8s_extension_defaults() -> dict[str, Any]:
 def register_k8s_auth_strategies(logger: "Optional[LoggingPort]" = None) -> None:
     """Register Kubernetes auth strategies with the auth registry.
 
-    Phase A: the kubernetes provider does not yet ship an inbound HTTP auth
+    The kubernetes provider does not currently ship an inbound HTTP auth
     strategy.  The kube-API auth helpers
     (:mod:`orb.providers.k8s.auth.in_cluster` and
     :mod:`orb.providers.k8s.auth.kubeconfig`) are separate concerns —
     they bootstrap the kubernetes API client, not the ORB REST surface.
     This function is wired into ``initialize_k8s_provider`` so the
-    integration point exists; concrete strategies arrive when needed.
+    integration point exists; concrete strategies can be added later.
     """
     if logger:
         logger.debug(
-            "Kubernetes provider has no inbound HTTP auth strategies in Phase A; "
+            "Kubernetes provider has no inbound HTTP auth strategies; "
             "kube-API auth is handled via providers.k8s.auth.*"
         )
 
@@ -221,26 +220,30 @@ def register_k8s_template_factory(
 ) -> None:
     """Register the Kubernetes template class with the template factory.
 
-    The concrete template aggregate ships in Phase B; until then this is
-    a defensive no-op that logs at debug level.
+    When the concrete template aggregate is unavailable the registration
+    is a defensive no-op that logs at debug level so callers can keep
+    importing this module unconditionally.
     """
     try:
-        from orb.providers.k8s.domain.template.k8s_template_aggregate import (  # type: ignore[import-not-found]  # noqa: PLC0415
-            KubernetesTemplate,
+        from orb.providers.k8s.domain.template.k8s_template import (  # noqa: PLC0415
+            K8sTemplate,
         )
 
-        factory.register_provider_template_class("k8s", KubernetesTemplate)
+        factory.register_provider_template_class("k8s", K8sTemplate)
         if logger:
             logger.info("Kubernetes template class registered with factory")
     except ImportError:
         if logger:
             logger.debug(
-                "Kubernetes template class not yet available "
-                "(introduced in Phase B alongside the Pod handler)."
+                "Kubernetes template aggregate not available; skipping factory registration."
             )
     except Exception as exc:
         if logger:
-            logger.warning("Failed to register Kubernetes template factory: %s", exc, exc_info=True)
+            logger.warning(
+                "Failed to register Kubernetes template factory: %s",
+                exc,
+                exc_info=True,
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -360,9 +363,9 @@ def register_k8s_services_with_di(container) -> None:
     either binding from the container.
 
     The :class:`TemplateExampleGeneratorPort` registration is wrapped in
-    ``suppress(ImportError)`` so this function remains operational before
-    Phase G ships the example-generator adapter under
-    ``providers/k8s/adapters/``.
+    ``suppress(ImportError)`` so this function remains operational even
+    when the example-generator adapter under ``providers/k8s/adapters/``
+    is not yet available.
     """
     from orb.domain.base.ports import LoggingPort
     from orb.domain.base.ports.template_adapter_port import TemplateAdapterPort
@@ -377,8 +380,8 @@ def register_k8s_services_with_di(container) -> None:
     container.register_singleton(TemplateAdapterPort, create_k8s_template_adapter)
     logger.debug("Kubernetes Template Adapter registered with DI container")
 
-    # Example generator arrives in Phase G; the import is guarded so this
-    # function works regardless of phase ordering.
+    # Example generator adapter is optional; the import is guarded so
+    # this function works regardless of whether it is present.
     with suppress(ImportError):
         from orb.domain.base.ports.template_example_generator_port import (
             TemplateExampleGeneratorPort,

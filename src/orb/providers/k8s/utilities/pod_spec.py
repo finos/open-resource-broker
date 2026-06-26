@@ -5,10 +5,11 @@ metadata.  Lives under ``providers/k8s/`` so that the kubernetes
 SDK imports stay confined to the provider tree (enforced by the
 ``test_k8s_leak_detection`` architecture test).
 
-The pod-spec construction is intentionally minimal in Phase B: one
-container per pod, image + optional resource requests + optional
-node-selector / tolerations / image-pull-secret defaults from the
-provider config.  Later phases add richer template merging.
+The pod-spec construction is intentionally minimal: one container per
+pod, image + optional resource requests + optional node-selector /
+tolerations / image-pull-secret defaults from the provider config.
+Richer template merging can be layered on later without touching this
+module's call sites.
 """
 
 from __future__ import annotations
@@ -116,14 +117,14 @@ def request_id_label_selector(
 def _resolve_container_image(template: Template) -> str:
     """Pick the container image string from a generic ``Template``.
 
-    The kubernetes provider does not extend ``Template`` yet (the
-    handler-side ``KubernetesTemplate`` lands later); for Phase B we look
-    in two well-known places:
+    The kubernetes provider does not extend ``Template`` yet (a
+    handler-side ``KubernetesTemplate`` may be introduced later); for now
+    the resolver looks in two well-known places:
 
     1. ``template.image_id`` — repurposed as the container image string
        (the field is provider-agnostic at the domain layer).
-    2. ``template.provider_data["k8s"]["container_image"]``  —
-       structured field consumed by Phase B+.
+    2. ``template.provider_data["k8s"]["container_image"]`` — structured
+       field consumed by the kubernetes provider.
 
     The second wins when both are set.
     """

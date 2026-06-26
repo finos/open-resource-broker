@@ -1,8 +1,8 @@
 """Kubernetes provider defaults loader.
 
-Phase A ships an empty defaults bundle — the Kubernetes provider has no
-provider-level defaults yet.  Phase G introduces template-defaults JSON
-under ``orb/providers/k8s/config/`` and this loader reads from
+The Kubernetes provider currently ships an empty defaults bundle — it has
+no provider-level defaults yet.  When template-defaults JSON is later
+added under ``orb/providers/k8s/config/`` this loader can read it from
 ``importlib.resources`` exactly like the AWS counterpart in
 :mod:`orb.providers.aws.defaults_loader`.
 """
@@ -22,8 +22,8 @@ class KubernetesDefaultsLoader:
         """Return Kubernetes provider defaults.
 
         Returns:
-            Empty dict in Phase A; populated in Phase G when the bundled
-            ``kubernetes_defaults.json`` lands.
+            Empty dict.  Populated once a bundled
+            ``kubernetes_defaults.json`` is shipped alongside the package.
         """
         return {}
 

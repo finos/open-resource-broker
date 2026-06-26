@@ -1,9 +1,9 @@
 """Kubernetes resource-quantity parsers (CPU and memory).
 
-Copied as new code from ``src/orb/k8s_legacy/k8sutils.py`` per the Phase B
-plan — the modern provider does not import from the legacy tree, but the
-quantity-string parsing logic is pure and well-tested in production so we
-re-use the behaviour verbatim while shedding the legacy module dependency.
+The modern provider does not import from the legacy tree, but the
+quantity-string parsing logic is pure and well-tested in production so
+the behaviour is re-used verbatim here while shedding the legacy module
+dependency.
 
 The functions accept the same string shapes the kubernetes API uses for
 ``resources.requests`` and ``resources.limits``:

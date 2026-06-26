@@ -1,4 +1,4 @@
-"""Unit tests for :class:`K8sJobHandler` (Phase E).
+"""Unit tests for :class:`K8sJobHandler`.
 
 Mocks ``CoreV1Api`` and ``BatchV1Api`` so no cluster is required.
 Covers:

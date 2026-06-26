@@ -1,4 +1,4 @@
-"""Unit tests for :class:`K8sPodHandler` (Phase B).
+"""Unit tests for :class:`K8sPodHandler`.
 
 Mocks ``CoreV1Api`` so no cluster is required.  Covers:
 

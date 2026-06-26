@@ -37,8 +37,7 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
     * ``namespaces`` — multi-namespace mode.  ``None`` falls back to
       ``namespace``; an explicit list runs one watch task per entry;
       ``["*"]`` runs a cluster-scoped watch and requires cluster-level
-      RBAC (see ``docs/providers/k8s/rbac.yaml`` — added in
-      Phase G).
+      RBAC (see ``docs/providers/k8s/rbac.yaml``).
     * ``label_prefix`` — DNS-subdomain prefix used for the ``managed``,
       ``request-id``, ``machine-id`` and ``provider-api`` labels.
     * ``emit_legacy_labels`` — when ``True`` (default), in addition to the
@@ -121,7 +120,7 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         ),
     )
 
-    # Pod defaults (applied at template-merge time in Phase B)
+    # Pod defaults (applied at template-merge time by each handler)
     default_node_selector: Optional[dict[str, str]] = Field(
         None, description="Default ``nodeSelector`` applied to every managed pod."
     )

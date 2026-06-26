@@ -11,8 +11,7 @@ in shape and responsibility split:
 * ``get_available_regions`` — returns ``[]`` because Kubernetes uses
   contexts rather than regions.
 * ``acquire`` / ``return_machines`` / ``get_status`` — dispatch to the
-  per-provider-API handler.  Phase B wires the Pod handler; Deployment /
-  StatefulSet / Job handlers arrive in Phases E and F.
+  per-provider-API handler (Pod / Deployment / StatefulSet / Job).
 
 The strategy adopts the same constructor signature, lazy-getter style and
 DI-friendly contract as the AWS counterpart so that the registration
@@ -63,11 +62,10 @@ if TYPE_CHECKING:  # pragma: no cover — type-checking only
 class K8sProviderStrategy(ProviderStrategy):
     """Kubernetes implementation of the :class:`ProviderStrategy` interface.
 
-    Phase A wires the shell: config validation, lazy K8sClient
-    construction, health check, capabilities, and the typed
-    provisioning interface stubs.  Phase B onwards fills in the handler
-    services and the typed ``acquire`` / ``return_machines`` / ``get_status``
-    paths.
+    Wires the strategy shell — config validation, lazy K8sClient
+    construction, health check, capabilities — and dispatches the typed
+    ``acquire`` / ``return_machines`` / ``get_status`` operations to the
+    per-provider-API handlers.
     """
 
     _SUPPORTED_APIS: tuple[str, ...] = tuple(api.value for api in KubernetesProviderApi)
@@ -152,8 +150,9 @@ class K8sProviderStrategy(ProviderStrategy):
         # ``config.watch_enabled`` is True and no override has been
         # provided.  Tests inject a stub via ``watch_manager``.
         self._watch_manager: Optional[MultiNamespaceWatcher] = watch_manager
-        # Phase G wiring: startup reconciler + orphan GC.  ``known_request_ids``
-        # is the storage closure the strategy hands to both — when the
+        # Reconciliation wiring: startup reconciler + orphan GC.
+        # ``known_request_ids`` is the storage closure the strategy hands
+        # to both — when the
         # caller does not supply it the reconciler treats every managed
         # pod as an orphan (safest signal) and the GC is wired to an
         # empty set.  Tests can override both subsystems wholesale.
@@ -298,7 +297,7 @@ class K8sProviderStrategy(ProviderStrategy):
         loop.create_task(manager.stop())
 
     # ------------------------------------------------------------------
-    # Reconciliation / orphan-GC lifecycle (Phase G)
+    # Reconciliation / orphan-GC lifecycle
     # ------------------------------------------------------------------
 
     @property
@@ -388,15 +387,16 @@ class K8sProviderStrategy(ProviderStrategy):
         loop.create_task(gc.stop())
 
     # ------------------------------------------------------------------
-    # Operation dispatch — Phase B onwards
+    # Operation dispatch
     # ------------------------------------------------------------------
 
     async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
         """Execute a provider operation.
 
-        Phase A only services ``HEALTH_CHECK`` end-to-end; the resource
-        lifecycle operations return an ``UNSUPPORTED_OPERATION`` error
-        with a clear message until the handler layer arrives in Phase B.
+        Only ``HEALTH_CHECK`` is serviced through this entry point.
+        Resource-lifecycle operations are dispatched via the typed
+        ``acquire`` / ``return_machines`` / ``get_status`` entry points
+        and return an ``UNSUPPORTED_OPERATION`` error here.
         """
         self._logger.debug("Kubernetes strategy executing operation: %s", operation.operation_type)
 
@@ -419,8 +419,9 @@ class K8sProviderStrategy(ProviderStrategy):
                 )
             else:
                 result = ProviderResult.error_result(
-                    f"Operation {operation.operation_type} not yet supported by the "
-                    "kubernetes provider (lands in Phase B+).",
+                    f"Operation {operation.operation_type} is not supported on the "
+                    "kubernetes provider's untyped dispatch path; use the typed "
+                    "acquire/return_machines/get_status entry points instead.",
                     "UNSUPPORTED_OPERATION",
                 )
 
@@ -740,10 +741,10 @@ class K8sProviderStrategy(ProviderStrategy):
     def _build_template_for_request(self, request: "Request") -> "Template":
         """Resolve the :class:`Template` carried by ``request``.
 
-        Phase B does not yet wire the full template-aggregate registration
-        (lands in Phase G).  For now we pick up the template payload from
-        ``request.metadata['template']`` (REST/CLI submission shape) and
-        fall back to a minimal template assembled from request fields.
+        The kubernetes provider currently picks up the template payload
+        from ``request.metadata['template']`` (REST/CLI submission shape)
+        and falls back to a minimal template assembled from the request
+        fields when nothing richer is available.
         """
         from orb.domain.template.template_aggregate import Template as _Template  # noqa: PLC0415
 

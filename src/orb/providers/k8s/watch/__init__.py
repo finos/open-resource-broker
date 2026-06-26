@@ -1,6 +1,6 @@
 """Kubernetes watch-based event ingestion.
 
-Phase C deliverables:
+Components:
 
 * :class:`~orb.providers.k8s.watch.pod_state_cache.PodStateCache`
   — in-process pod-state cache keyed by ``(request_id, pod_name)``.

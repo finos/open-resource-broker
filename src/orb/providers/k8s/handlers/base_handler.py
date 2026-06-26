@@ -1,9 +1,9 @@
 """Base class for Kubernetes provider handlers.
 
 Mirrors :class:`orb.providers.aws.infrastructure.handlers.base_handler.AWSHandler`
-in role: every per-resource-API handler (Pod in Phase B; Deployment /
-StatefulSet / Job in later phases) inherits from this class to share
-client wiring, label-injection, namespace resolution, and retry helpers.
+in role: every per-resource-API handler (Pod, Deployment, StatefulSet,
+Job) inherits from this class to share client wiring, label-injection,
+namespace resolution, and retry helpers.
 
 The base class is intentionally thin — Kubernetes does not need launch
 templates, tagging mode toggles, or AMI resolution.  All the heavy

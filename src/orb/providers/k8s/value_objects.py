@@ -1,7 +1,7 @@
 """Public Kubernetes provider value objects.
 
-Phase A introduces the provider-api enum stub.  Later phases (B, E, F)
-fill in the handler-side template aggregate types under
+Exposes the provider-api enum that callers route on.  Handler-side
+template aggregate types live alongside their respective handlers under
 ``orb.providers.k8s.domain.template``.
 """
 
@@ -15,13 +15,12 @@ class KubernetesProviderApi(str, Enum):
 
     Mirrors the AWS provider's
     :class:`orb.providers.aws.domain.template.value_objects.ProviderApi`
-    enum.  Each value maps one-to-one to a handler implementation that
-    arrives in subsequent phases:
+    enum.  Each value maps one-to-one to a concrete handler class:
 
-    * ``Pod``         — Phase B
-    * ``Deployment``  — Phase E
-    * ``StatefulSet`` — Phase E
-    * ``Job``         — Phase F
+    * ``Pod``         — :class:`K8sPodHandler`
+    * ``Deployment``  — :class:`K8sDeploymentHandler`
+    * ``StatefulSet`` — :class:`K8sStatefulSetHandler`
+    * ``Job``         — :class:`K8sJobHandler`
     """
 
     POD = "Pod"
