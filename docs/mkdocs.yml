@@ -164,6 +164,14 @@ nav:
       - Feature Mapping: hostfactory/feature_mapping.md
       - Deployment Scenarios: hostfactory/deployment_scenarios.md
       - Supported APIs: hostfactory/supported-apis.md
+  - Providers:
+    - Kubernetes:
+      - Overview: providers/kubernetes/index.md
+      - Configuration: providers/kubernetes/configuration.md
+      - Handlers: providers/kubernetes/handlers.md
+      - Authentication: providers/kubernetes/auth.md
+      - Migrating from k8s-legacy: providers/kubernetes/migrating-from-k8s-legacy.md
+      - Plugin Authoring: providers/kubernetes/plugin-authoring.md
   - CLI Reference:
     - Overview: cli/README.md
     - Full CLI Reference: cli/cli-reference.md

@@ -13,11 +13,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - New `[aws]` extra (alias for AWS deps currently in core). The canonical install
   command going forward is `pip install orb-py[aws]`. This continues to work
   unchanged when AWS deps move out of core in a future major version.
+- New `[kubernetes]` extra: modern first-class Kubernetes provider with Pod, Deployment, StatefulSet, and Job handlers, watch-based ingestion, startup reconciliation, and orphan garbage collection. Install with `pip install "orb-py[kubernetes]"`. See `docs/root/providers/kubernetes/index.md` for the full reference.
 - New `[all-providers]` meta-extra: pulls in all currently implemented providers.
 - New `[monitoring-aws]` extra: AWS-specific OpenTelemetry boto instrumentation (previously bundled inside `[monitoring]`).
 - New `[test-aws]` extra: moto + response-mocking deps for AWS test suites.
 - Architecture test `test_boto3_leak_detection.py`: asserts boto3/botocore are never imported outside `providers/aws/` except by guarded backward-compat shims.
 - Unit tests `test_no_provider_install.py`: verifies ORB core modules boot cleanly when AWS deps are absent.
+- Third-party provider plugin discovery via the `orb.providers` entry-point group. Plugins are loaded by `discover_provider_plugins()` after the built-in providers register; failures are logged and tolerated so a broken plugin cannot prevent ORB from starting. See `docs/root/providers/kubernetes/plugin-authoring.md` for the plugin contract and a worked Kubeflow MPIJob example.
+- `KubernetesProviderStrategy.register_handler` classmethod: plugin extension point for attaching a new `provider_api` handler to the Kubernetes provider without forking the strategy.
+- Kubernetes provider documentation under `docs/root/providers/kubernetes/`: overview, configuration reference, handlers guide, authentication guide, RBAC example, migration guide from `orb.k8s_legacy`, and plugin-authoring walkthrough.
 
 ### Changed
 

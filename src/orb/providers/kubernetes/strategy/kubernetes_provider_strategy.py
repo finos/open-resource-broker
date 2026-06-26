@@ -72,6 +72,53 @@ class KubernetesProviderStrategy(ProviderStrategy):
 
     _SUPPORTED_APIS: tuple[str, ...] = tuple(api.value for api in KubernetesProviderApi)
 
+    # Plugin extension point — class-level registry of handler factories
+    # keyed by ``provider_api`` value.  Third-party plugins call
+    # :meth:`register_handler` from their ``orb.providers`` entry-point
+    # callable to attach a handler to the Kubernetes provider without
+    # forking the strategy.  See
+    # ``docs/root/providers/kubernetes/plugin-authoring.md``.
+    _HANDLER_FACTORIES: dict[str, Callable[..., KubernetesHandlerBase]] = {}
+
+    @classmethod
+    def register_handler(
+        cls,
+        provider_api: str,
+        handler_class: Callable[..., KubernetesHandlerBase],
+    ) -> None:
+        """Register a handler class against a ``provider_api`` key.
+
+        The ``handler_class`` must accept the standard handler kwargs:
+        ``kubernetes_client``, ``config``, ``logger``, ``pod_state_cache``,
+        and ``cache_alive``.  Plugin authors typically subclass
+        :class:`orb.providers.kubernetes.handlers.base_handler.KubernetesHandlerBase`
+        which already accepts those kwargs.
+
+        Args:
+            provider_api: The ``provider_api`` template field this handler
+                will service (e.g. ``"KubernetesMPIJob"``).
+            handler_class: A callable that returns a configured handler
+                instance — usually a subclass of ``KubernetesHandlerBase``.
+
+        Raises:
+            ValueError: If ``provider_api`` is already registered to a
+                different handler class.  Idempotent re-registration of
+                the same class is allowed so that plugin reloads do not
+                fail.
+        """
+        existing = cls._HANDLER_FACTORIES.get(provider_api)
+        if existing is not None and existing is not handler_class:
+            raise ValueError(
+                f"provider_api {provider_api!r} is already registered to a "
+                f"different handler class ({existing!r}); refusing to overwrite."
+            )
+        cls._HANDLER_FACTORIES[provider_api] = handler_class
+
+    @classmethod
+    def unregister_handler(cls, provider_api: str) -> None:
+        """Remove a plugin-registered handler (intended for tests / reload)."""
+        cls._HANDLER_FACTORIES.pop(provider_api, None)
+
     def __init__(
         self,
         config: KubernetesProviderConfig,
@@ -580,9 +627,24 @@ class KubernetesProviderStrategy(ProviderStrategy):
             )
             self._handlers[provider_api] = handler
             return handler
+        # Plugin-supplied handlers — see ``register_handler`` and
+        # ``docs/root/providers/kubernetes/plugin-authoring.md``.
+        factory = self._HANDLER_FACTORIES.get(provider_api)
+        if factory is not None:
+            handler = factory(
+                kubernetes_client=self.kubernetes_client,
+                config=self._k8s_config,
+                logger=self._logger,
+                pod_state_cache=cache,
+                cache_alive=alive,
+            )
+            self._handlers[provider_api] = handler
+            return handler
         raise NotImplementedError(
             f"Kubernetes handler for provider_api={provider_api!r} is not yet implemented "
-            "(Pod, Deployment, StatefulSet and Job are implemented)."
+            "(Pod, Deployment, StatefulSet and Job are implemented; third-party "
+            "plugins may register additional handlers via "
+            "KubernetesProviderStrategy.register_handler)."
         )
 
     # ------------------------------------------------------------------

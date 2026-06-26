@@ -1,0 +1,141 @@
+# Kubernetes provider - authentication
+
+The Kubernetes provider supports two authentication paths to the
+kube-API server:
+
+* **In-cluster** - ORB itself runs as a pod and uses its mounted
+  service-account token.
+* **kubeconfig** - ORB runs outside the cluster and loads a kubeconfig
+  file (the same one `kubectl` uses).
+
+The decision happens at provider initialisation and is influenced by the
+`in_cluster`, `kubeconfig_path`, and `context` fields on
+[`KubernetesProviderConfig`](configuration.md).
+
+## Decision matrix
+
+| `in_cluster` config | `/var/run/secrets/kubernetes.io` exists | Outcome                                       |
+|---------------------|----------------------------------------|-----------------------------------------------|
+| `None` (default)    | yes                                    | In-cluster auth                                |
+| `None` (default)    | no                                     | kubeconfig (path / KUBECONFIG / `~/.kube/config`) |
+| `True`              | yes                                    | In-cluster auth                                |
+| `True`              | no                                     | `KubernetesAuthError` - sentinel missing       |
+| `False`             | yes                                    | kubeconfig (the in-cluster mount is ignored)   |
+| `False`             | no                                     | kubeconfig                                     |
+
+The sentinel path is the canonical one used by the upstream
+`kubernetes` Python client, so detection matches the wider ecosystem.
+
+## In-cluster auth
+
+This is the recommended deployment shape for ORB-as-a-controller: ORB
+runs inside the same cluster it manages, scoped to a ServiceAccount
+with a tightly-scoped Role.
+
+### When it triggers
+
+* `in_cluster: True` is set explicitly, **or**
+* the sentinel `/var/run/secrets/kubernetes.io` exists at process start
+  (which is automatically the case for every pod that has a mounted
+  service-account token).
+
+### What ORB needs
+
+* A ServiceAccount in the namespace ORB will manage.
+* A Role (or ClusterRole, for cluster-scoped watches) granting the verbs
+  listed in [`rbac.yaml`](rbac.yaml).
+* A RoleBinding (or ClusterRoleBinding) tying the two together.
+
+The minimum-viable manifest lives at [`rbac.yaml`](rbac.yaml) and can be
+applied directly.
+
+### Token rotation
+
+Modern Kubernetes uses **projected ServiceAccount tokens** with
+automatic rotation.  The `kubernetes` Python client picks up the
+rotated token on the next API call, so ORB does not need to restart on
+rotation.  No action required.
+
+### Troubleshooting
+
+| Symptom                                                                | Likely cause                                            | Fix                                                                    |
+|------------------------------------------------------------------------|----------------------------------------------------------|------------------------------------------------------------------------|
+| `KubernetesAuthError: Failed to load in-cluster config`                | Pod's ServiceAccount token is missing or unreadable      | Confirm the pod spec mounts a SA token; check `automountServiceAccountToken`. |
+| `403 Forbidden` on `list_namespaced_pod`                               | Role missing `pods/list`                                 | Apply [`rbac.yaml`](rbac.yaml).                                        |
+| `404 Not Found` on `delete_namespaced_pod`                             | Operating in the wrong namespace                         | Set `ORB_KUBERNETES_NAMESPACE` to the namespace the SA is bound to.   |
+| Watch task dies repeatedly                                             | API-server timing out long-running connections           | The provider auto-restarts watches; persistent failures usually point to an upstream proxy with aggressive idle timeouts. |
+
+## kubeconfig auth
+
+This path is used for development against a remote cluster
+(`kind`/`minikube`/EKS via `aws eks update-kubeconfig`) and for
+out-of-cluster control planes.
+
+### Precedence
+
+ORB resolves the kubeconfig file path in this order:
+
+1. The `kubeconfig_path` field in provider config.
+2. The `KUBECONFIG` environment variable (the standard kubernetes
+   precedence).
+3. The default `~/.kube/config`.
+
+The context is resolved in this order:
+
+1. The `context` field in provider config.
+2. The `current-context` field in the kubeconfig itself.
+
+### What ORB needs
+
+* A user / token / certificate entry in the kubeconfig that maps to a
+  ClusterRole or Role with the verbs in [`rbac.yaml`](rbac.yaml).
+* For EKS, the standard `aws eks update-kubeconfig` flow plus an IAM
+  user/role mapped via `aws-auth`.
+
+### Worked examples
+
+#### Local kind cluster
+
+```bash
+kind create cluster --name orb-dev
+kubectl --context kind-orb-dev apply -f docs/root/providers/kubernetes/rbac.yaml
+export ORB_KUBERNETES_CONTEXT="kind-orb-dev"
+export ORB_KUBERNETES_NAMESPACE="orb"
+orb machines request my-template 3
+```
+
+#### EKS via federated identity
+
+```bash
+aws eks update-kubeconfig --region eu-west-1 --name prod
+kubectl --context arn:aws:eks:eu-west-1:123456789012:cluster/prod \
+  apply -f docs/root/providers/kubernetes/rbac.yaml
+export ORB_KUBERNETES_CONTEXT="arn:aws:eks:eu-west-1:123456789012:cluster/prod"
+export ORB_KUBERNETES_NAMESPACE="orb"
+orb machines request my-template 3
+```
+
+#### Multiple kubeconfigs
+
+```bash
+export ORB_KUBERNETES_KUBECONFIG_PATH="/etc/orb/kubeconfig-prod"
+export ORB_KUBERNETES_CONTEXT="prod"
+```
+
+### Troubleshooting
+
+| Symptom                                                            | Likely cause                                | Fix                                                                |
+|--------------------------------------------------------------------|---------------------------------------------|--------------------------------------------------------------------|
+| `KubernetesAuthError: Failed to load kubeconfig (config_file=None, ...)` | No kubeconfig discoverable                  | Set `kubeconfig_path` or `KUBECONFIG`, or place a file at `~/.kube/config`. |
+| `KubernetesAuthError: ... unknown context`                         | Typo in `context` field                     | Run `kubectl config get-contexts` to list valid names.             |
+| Auth works locally but fails when ORB runs as a system service     | The service env does not inherit `$HOME`    | Set `ORB_KUBERNETES_KUBECONFIG_PATH` to an absolute path.          |
+| Auth works initially then 401s after some hours (EKS)              | Federated token expired                     | Use `aws eks update-kubeconfig` with a long-lived identity, or run ORB in-cluster with IRSA. |
+
+## Why two wrappers?
+
+ORB confines every `kubernetes` SDK import to
+`src/orb/providers/kubernetes/`.  The two auth helpers
+(`auth/in_cluster.py` and `auth/kubeconfig.py`) are the only modules
+that call into `kubernetes.config`; the rest of the provider uses the
+configured global client.  This makes the SDK trivially mockable from
+unit tests and keeps the architecture-test allowlist small.
