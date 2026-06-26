@@ -189,7 +189,11 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     "resource_type": "ec2_fleet",
                     "fleet_type": fleet_type_value,
                     "fleet_errors": fleet_errors,
-                    "fulfillment_final": fleet_type is not AWSFleetType.INSTANT,
+                    # INSTANT fleets return running instances synchronously
+                    # in the create_fleet response, so the result is the
+                    # final word. MAINTAIN / REQUEST fleets stay open and
+                    # need check_hosts_status to confirm running_count.
+                    "fulfillment_final": fleet_type is AWSFleetType.INSTANT,
                     "capacity_constrained": capacity_constrained,
                 },
             }
@@ -424,10 +428,25 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             )
 
         # Multiple fleets: aggregate — all must be fulfilled for overall fulfilled.
+        # Priority order matters here:
+        #   1. all fulfilled              -> fulfilled
+        #   2. ANY in_progress            -> in_progress  (transient — wait)
+        #   3. all failed (or only fail+partial with no progress signal)
+        #                                 -> failed
+        #   4. any partial (no in_progress) -> partial   (terminal partial)
+        #   5. fallback                   -> in_progress
+        #
+        # in_progress is checked BEFORE partial because we don't want a
+        # request to flip to terminal-partial while another fleet is still
+        # booting; that classification can only be made once every fleet
+        # has reached a terminal verdict.
         states = [r.fulfilment.state for r in fleet_results]
         if all(s == "fulfilled" for s in states):
             combined_state = "fulfilled"
             combined_msg = f"All {len(fleet_results)} fleets fulfilled"
+        elif any(s == "in_progress" for s in states):
+            combined_state = "in_progress"
+            combined_msg = "One or more fleets still provisioning"
         elif any(s == "failed" for s in states):
             combined_state = "failed"
             combined_msg = "One or more fleets failed"
@@ -535,6 +554,25 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     f" check_hosts_status instance_ids: {fleet_id} :: {instance_ids}"
                 )
 
+            # Per-fleet requested_count: AWS describe_fleets is the canonical
+            # source. TargetCapacitySpecification.TotalTargetCapacity tells us
+            # exactly how many instances this fleet was asked to provision —
+            # independent of the ORB request total (which is the SUM across
+            # all fleets and only meaningful for single-fleet requests).
+            #
+            # Without this, a request split across N fleets would have each
+            # fleet's running count compared against the request total, so a
+            # fully-running N-way split would look only 1/N fulfilled per
+            # fleet and the aggregator would emit a wrong partial verdict.
+            #
+            # Fallback to request.requested_count is for the rare case where
+            # AWS returns the fleet without TargetCapacitySpecification.
+            per_fleet_requested = (
+                int(target_capacity)
+                if target_capacity is not None
+                else request.requested_count
+            )
+
             if not instance_ids:
                 self._logger.info("No active instances found in fleet %s", fleet_id)
                 fulfilment = self._compute_ec2fleet_fulfilment(
@@ -542,7 +580,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     instances=[],
                     target_capacity=target_capacity,
                     fulfilled_capacity=fulfilled_capacity,
-                    requested_count=request.requested_count,
+                    requested_count=per_fleet_requested,
                 )
                 return CheckHostsStatusResult(instances=[], fulfilment=fulfilment)
 
@@ -560,7 +598,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 instances=instances,
                 target_capacity=target_capacity,
                 fulfilled_capacity=fulfilled_capacity,
-                requested_count=request.requested_count,
+                requested_count=per_fleet_requested,
             )
             return CheckHostsStatusResult(instances=instances, fulfilment=fulfilment)
 

@@ -143,6 +143,12 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                     "resource_type": "run_instances",
                     "reservation_id": resource_id,
                     "instance_ids": instance_ids,
+                    # RunInstances returns instance IDs synchronously but
+                    # instances are still 'pending' (booting). Mark
+                    # non-final so the request stays IN_PROGRESS until
+                    # ProviderFulfilment (check_hosts_status) confirms
+                    # running_count >= target.
+                    "fulfillment_final": False,
                 },
             }
         except Exception as e:

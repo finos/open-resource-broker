@@ -37,14 +37,16 @@ async def handle_list_templates(
         provider_name = input_data.get("provider_api") or input_data.get("provider_name")
         provider_api = input_data.get("provider_api")
         active_only = input_data.get("active_only", True)
-        limit = input_data.get("limit", 50)
-        offset = input_data.get("offset", 0)
+        limit = input_data.get("limit") or 50
+        offset = input_data.get("offset") or 0
     else:
         provider_name = getattr(args, "provider", None) or getattr(args, "provider_name", None)
         provider_api = getattr(args, "provider_api", None)
         active_only = getattr(args, "active_only", True)
-        limit = getattr(args, "limit", 50)
-        offset = getattr(args, "offset", 0)
+        # argparse leaves --limit/--offset as None when omitted; coerce here
+        # so the orchestrator never sees None where it expects int.
+        limit = getattr(args, "limit", None) or 50
+        offset = getattr(args, "offset", None) or 0
 
     result = await orchestrator.execute(
         ListTemplatesInput(

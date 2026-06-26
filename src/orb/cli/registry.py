@@ -160,7 +160,6 @@ def build_registry() -> None:
     register("providers", "select", handle_select_provider_strategy)
 
     # --- system ---
-    from orb.interface.serve_command_handler import handle_serve_api
     from orb.interface.system_command_handlers import (
         handle_reload_provider_config,
         handle_system_health,
@@ -168,11 +167,27 @@ def build_registry() -> None:
         handle_system_status,
     )
 
-    register("system", "serve", handle_serve_api)
     register("system", "status", handle_system_status)
     register("system", "health", handle_system_health)
     register("system", "metrics", handle_system_metrics)
     register("system", "reload", handle_reload_provider_config)
+
+    # --- server (process lifecycle) ---
+    from orb.interface.server_command_handlers import (
+        handle_server_logs,
+        handle_server_reload,
+        handle_server_restart,
+        handle_server_start,
+        handle_server_status,
+        handle_server_stop,
+    )
+
+    register("server", "start", handle_server_start)
+    register("server", "stop", handle_server_stop)
+    register("server", "status", handle_server_status)
+    register("server", "restart", handle_server_restart)
+    register("server", "reload", handle_server_reload)
+    register("server", "logs", handle_server_logs)
 
     # --- templates ---
     from orb.interface.template_command_handlers import (

@@ -73,7 +73,12 @@ def add_global_arguments(parser):
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
     parser.add_argument("--quiet", action="store_true", help="Suppress output")
     parser.add_argument("--no-color", action="store_true", help="Disable colored output")
-    parser.add_argument("--limit", type=int, help="Maximum number of results to return")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Maximum number of results to return (handler-specific default applies when omitted)",
+    )
     parser.add_argument("--offset", type=int, default=0, help="Number of results to skip")
     parser.add_argument(
         "--filter",
@@ -534,19 +539,71 @@ For more information, visit: {DOCS_URL}
     system_reload = system_subparsers.add_parser("reload", help="Reload provider configuration")
     add_global_arguments(system_reload)
 
-    system_serve = system_subparsers.add_parser("serve", help="Start REST API server")
-    add_global_arguments(system_serve)
-    system_serve.add_argument("--host", default="0.0.0.0", help="Server host")  # nosec B104 - intentional default, overridable via CLI flag
-    system_serve.add_argument("--port", type=int, default=8000, help="Server port")
-    system_serve.add_argument("--workers", type=int, default=1, help="Number of workers")
-    system_serve.add_argument("--reload", action="store_true", help="Enable auto-reload")
-    system_serve.add_argument("--server-log-level", default="info", help="Server log level")
-    system_serve.add_argument(
-        "--socket-path",
-        dest="socket_path",
-        default=None,
-        help="Unix domain socket path for IPC (alternative to --host/--port, used by programmatic callers like orb-go)",
+    # Server (process lifecycle — local daemon control)
+    server_parser = subparsers.add_parser(
+        "server",
+        help="ORB server process lifecycle (start/stop/status/restart/logs/reload)",
     )
+    resource_parsers["server"] = server_parser
+    server_subparsers = server_parser.add_subparsers(
+        dest="action", help="Server actions", required=True
+    )
+
+    def _add_server_start_args(p):
+        add_global_arguments(p)
+        # Intentional binding for server deployment.
+        p.add_argument("--host", default=None, help="Server host (overrides config)")  # nosec B104
+        p.add_argument("--port", type=int, default=None, help="Server port (overrides config)")
+        p.add_argument("--workers", type=int, default=None, help="Number of workers")
+        p.add_argument("--reload", action="store_true", help="Enable uvicorn auto-reload (dev)")
+        p.add_argument("--server-log-level", default=None, help="Server log level")
+        p.add_argument(
+            "--socket-path",
+            dest="socket_path",
+            default=None,
+            help="Unix domain socket path for IPC (alternative to --host/--port)",
+        )
+        p.add_argument(
+            "--foreground", "-F",
+            action="store_true",
+            help="Run in the foreground instead of daemonising",
+        )
+        p.add_argument(
+            "--api-only",
+            dest="api_only",
+            action="store_true",
+            help="Skip embedded UI even if ui.enabled=true",
+        )
+
+    server_start = server_subparsers.add_parser("start", help="Start the ORB server (daemonised by default)")
+    _add_server_start_args(server_start)
+
+    server_stop = server_subparsers.add_parser("stop", help="Stop the running ORB server")
+    add_global_arguments(server_stop)
+    server_stop.add_argument(
+        "--timeout", type=int, default=None,
+        help="Seconds to wait for graceful shutdown before SIGKILL (defaults to config)",
+    )
+
+    server_status = server_subparsers.add_parser("status", help="Show ORB server status + health")
+    add_global_arguments(server_status)
+
+    server_restart = server_subparsers.add_parser("restart", help="Restart the ORB server")
+    _add_server_start_args(server_restart)
+    server_restart.add_argument(
+        "--restart-timeout", type=int, default=None,
+        dest="timeout",
+        help="Seconds to wait for graceful shutdown before SIGKILL during stop phase",
+    )
+
+    server_logs = server_subparsers.add_parser("logs", help="Tail the ORB server log file")
+    add_global_arguments(server_logs)
+    server_logs.add_argument("-n", "--lines", type=int, default=50, help="Lines to tail")
+
+    server_reload_cmd = server_subparsers.add_parser(
+        "reload", help="Send SIGHUP to the running ORB server"
+    )
+    add_global_arguments(server_reload_cmd)
 
     # Infrastructure
     infrastructure_parser = subparsers.add_parser("infrastructure", help="Infrastructure discovery")

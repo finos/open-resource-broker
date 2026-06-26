@@ -11,6 +11,12 @@ try:
     import psutil  # type: ignore[import-not-found]
 
     PSUTIL_AVAILABLE = True
+    # Seed psutil.cpu_percent so subsequent ``interval=None`` calls return
+    # an average since the previous call rather than the spike-prone
+    # zeroth value. Without this seed, the first health probe always
+    # reports CPU=0 and the next probe can report a wildly inflated %
+    # which trips the >95 unhealthy threshold for one cycle.
+    psutil.cpu_percent(interval=None)
 except ImportError:
     PSUTIL_AVAILABLE = False
     psutil = None
@@ -88,13 +94,19 @@ class HealthCheck(HealthCheckPort):
         # Register default health checks
         self._register_default_checks()
 
-    def register_check(self, name: str, check_fn: Any) -> None:
-        """Register a named health check function (idempotent — first registration wins)."""
+    def register_check(self, name: str, check_fn: Any, *, force: bool = False) -> None:
+        """Register a named health check function.
+
+        First-write-wins by default. Pass ``force=True`` to overwrite an
+        existing registration — used by the bootstrap to replace the
+        placeholder ``database`` check with a storage-backed one once the
+        active StoragePort is resolved.
+        """
         with self._lock:
-            if name in self.checks:
+            if name in self.checks and not force:
                 return
             self.checks[name] = check_fn
-            self.status_history[name] = []
+            self.status_history.setdefault(name, [])
 
     def run_check(self, name: str) -> dict[str, Any]:
         """Run a specific health check by name and return its result as a dict."""
@@ -163,7 +175,17 @@ class HealthCheck(HealthCheckPort):
         self.register_check("application", self._check_application_health)
 
     def _check_system_health(self) -> HealthStatus:
-        """Check system health."""
+        """Check CPU and memory pressure.
+
+        Disk is intentionally NOT included here — ``_check_disk_health``
+        is the canonical disk signal and includes a write-probe. Mixing
+        disk into ``system`` causes the same disk-full host to trip two
+        separate checks, doubling the noise.
+
+        Uses a short blocking ``cpu_percent`` sample so each probe
+        returns a real value rather than the zeroth/garbage value
+        ``cpu_percent()`` returns when called without an interval.
+        """
         if not PSUTIL_AVAILABLE:
             return HealthStatus(
                 name="system",
@@ -173,14 +195,13 @@ class HealthCheck(HealthCheckPort):
             )
 
         try:
-            cpu_percent = psutil.cpu_percent()  # type: ignore[union-attr]
+            cpu_percent = psutil.cpu_percent(interval=0.1)  # type: ignore[union-attr]
             memory = psutil.virtual_memory()  # type: ignore[union-attr]
-            disk = psutil.disk_usage("/")  # type: ignore[union-attr]
 
             status = "healthy"
-            if cpu_percent > 90 or memory.percent > 90 or disk.percent > 90:
+            if cpu_percent > 90 or memory.percent > 90:
                 status = "degraded"
-            if cpu_percent > 95 or memory.percent > 95 or disk.percent > 95:
+            if cpu_percent > 95 or memory.percent > 95:
                 status = "unhealthy"
 
             return HealthStatus(
@@ -189,7 +210,6 @@ class HealthCheck(HealthCheckPort):
                 details={
                     "cpu_percent": cpu_percent,
                     "memory_percent": memory.percent,
-                    "disk_percent": disk.percent,
                 },
                 dependencies=["os"],
             )
@@ -294,3 +314,60 @@ class HealthCheck(HealthCheckPort):
                 details={"error": str(e)},
                 dependencies=["system", "aws", "database"],
             )
+
+
+def register_storage_health_checks(
+    health_check: HealthCheckPort,
+    storage_port: Any,
+) -> None:
+    """Replace the default ``database`` health check with a storage-aware one.
+
+    The default ``HealthCheck._check_database_health`` returns ``unknown``
+    because the core monitoring module doesn't know which backend is
+    configured. ``StoragePort`` implementations expose ``is_healthy()``
+    (returning ``(bool, details)``), and this registers a check that
+    delegates to the active strategy regardless of provider.
+
+    Idempotent: safe to call multiple times (the registry overwrites by
+    name).
+
+    Args:
+        health_check: The application HealthCheck instance.
+        storage_port: A concrete StoragePort with an ``is_healthy`` method.
+            If the object doesn't implement ``is_healthy`` the default
+            ``unknown`` placeholder is left in place.
+    """
+    probe = getattr(storage_port, "is_healthy", None)
+    if not callable(probe):
+        return
+
+    def _check_storage_backend_health() -> HealthStatus:
+        try:
+            result = probe()
+        except Exception as exc:
+            return HealthStatus(
+                name="database",
+                status="unhealthy",
+                details={"error": str(exc)},
+                dependencies=["database"],
+            )
+        # Normalise the return shape — strategies return (bool, dict),
+        # but tolerate the legacy bare-bool form too.
+        if isinstance(result, tuple) and len(result) == 2:
+            healthy_raw, details_raw = result
+            healthy = bool(healthy_raw)
+            details: dict[str, Any] = dict(details_raw) if isinstance(details_raw, dict) else {}
+        else:
+            healthy = bool(result)
+            details = {}
+        return HealthStatus(
+            name="database",
+            status="healthy" if healthy else "unhealthy",
+            details=details,
+            dependencies=["database"],
+        )
+
+    # Replace the placeholder ``database`` check installed by the
+    # HealthCheck constructor. force=True is required because the
+    # default is first-write-wins.
+    health_check.register_check("database", _check_storage_backend_health, force=True)

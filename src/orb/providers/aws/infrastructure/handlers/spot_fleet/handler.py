@@ -145,7 +145,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 "resource_ids": [fleet_id],
                 "instance_ids": [],  # SpotFleet doesn't return instance IDs immediately
                 "instances": instances,
-                "provider_data": {"resource_type": "spot_fleet", "fulfillment_final": True},
+                "provider_data": {"resource_type": "spot_fleet", "fulfillment_final": False},
             }
         except Exception as e:
             self._logger.error("SpotFleet creation failed: %s", e)

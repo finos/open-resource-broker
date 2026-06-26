@@ -185,8 +185,11 @@ class ORBServerManager:
         self._captured_log_path: Optional[str] = None
 
     def start(self, timeout: int | None = None):
-        """Start ORB server: orb system serve --host <host> --port <port>"""
-        cmd = ["orb", "system", "serve", "--host", self.host, "--port", str(self.port)]
+        """Start ORB server: orb server start --foreground --api-only --host <h> --port <p>"""
+        cmd = [
+            "orb", "server", "start", "--foreground", "--api-only",
+            "--host", self.host, "--port", str(self.port),
+        ]
         log.info("Starting ORB server: %s", " ".join(cmd))
 
         # Always capture server output to a file so a failed start has actionable detail.

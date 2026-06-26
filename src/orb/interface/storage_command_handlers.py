@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
+
 from typing import TYPE_CHECKING, Any, Union
 
 from orb.application.dto.interface_response import InterfaceResponse
@@ -130,6 +133,91 @@ async def handle_storage_health(
         return formatter.format_config(raw)
     except ImportError:
         return formatter.format_error("Storage health query not available")
+
+
+@handle_interface_exceptions(context="storage_migrate", interface_type="cli")
+async def handle_storage_migrate(
+    args: "argparse.Namespace",
+) -> "Union[dict[str, Any], InterfaceResponse]":
+    """Run Alembic migrations for the SQL storage strategy.
+
+    Subcommands: up (upgrade head), down (downgrade -1), current, history.
+    The database URL is read from the ORB configuration so it respects
+    whatever connection string the operator has configured.
+    """
+    container = get_container()
+    formatter = container.get(ResponseFormattingService)
+
+    subcommand = getattr(args, "migrate_subcommand", "up")
+
+    alembic_cmd_map = {
+        "up": ["upgrade", "head"],
+        "down": ["downgrade", "-1"],
+        "current": ["current"],
+        "history": ["history"],
+    }
+
+    alembic_args = alembic_cmd_map.get(subcommand)
+    if alembic_args is None:
+        return formatter.format_error(
+            f"Unknown migrate subcommand '{subcommand}'. "
+            "Valid values: up, down, current, history"
+        )
+
+    try:
+        # Guard: alembic is an optional dependency shipped in the [sql] extra.
+        # Give a clear install hint before attempting the subprocess so the
+        # error message is actionable rather than a generic "No module named alembic".
+        import importlib.util
+
+        if importlib.util.find_spec("alembic") is None:
+            return formatter.format_error(
+                "Alembic is not installed.  "
+                "Run: pip install orb-py[sql]  (or: pip install alembic>=1.13)"
+            )
+
+        # Resolve the DB URL from config and pass via environment variable so
+        # alembic env.py can pick it up without touching alembic.ini at runtime.
+        import os
+
+        db_url: str | None = None
+        try:
+            from orb.config.manager import ConfigurationManager
+            from orb.config.schemas.storage_schema import StorageConfig
+
+            cfg = container.get(ConfigurationManager)
+            storage_cfg = cfg.get_typed(StorageConfig)
+            sql_cfg = storage_cfg.sql_strategy
+            if sql_cfg.type == "sqlite":
+                db_url = f"sqlite:///{sql_cfg.name}"
+            elif sql_cfg.type == "postgresql":
+                db_url = (
+                    f"postgresql://{sql_cfg.username}:{sql_cfg.password}"
+                    f"@{sql_cfg.host}:{sql_cfg.port}/{sql_cfg.name}"
+                )
+        except Exception:
+            pass  # Fall back to alembic.ini default
+
+        env = os.environ.copy()
+        if db_url:
+            env["ORB_SQL_URL"] = db_url
+
+        import orb  # noqa: F401 — find the package root for alembic.ini lookup
+
+        pkg_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(orb.__file__))))
+        result = subprocess.run(
+            [sys.executable, "-m", "alembic", "--config", os.path.join(pkg_root, "alembic.ini")]
+            + alembic_args,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        output = (result.stdout + result.stderr).strip()
+        if result.returncode != 0:
+            return formatter.format_error(f"Alembic migration failed:\n{output}")
+        return formatter.format_success({"message": f"Migration '{subcommand}' completed", "output": output})
+    except Exception as exc:
+        return formatter.format_error(f"Migration error: {exc}")
 
 
 @handle_interface_exceptions(context="storage_metrics", interface_type="cli")

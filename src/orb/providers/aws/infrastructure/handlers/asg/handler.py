@@ -147,7 +147,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 "success": True,
                 "resource_ids": [asg_name],
                 "instances": [],  # ASG instances come later
-                "provider_data": {"resource_type": "asg", "fulfillment_final": True},
+                "provider_data": {"resource_type": "asg", "fulfillment_final": False},
             }
         except Exception as e:
             return {
