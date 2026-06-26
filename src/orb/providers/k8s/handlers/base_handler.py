@@ -29,11 +29,13 @@ from orb.providers.k8s.reconciliation.timeout_gc import (
     delete_timed_out_pod_async,
 )
 from orb.providers.k8s.utilities.pod_spec import request_id_label_selector
+from orb.providers.k8s.utilities.pod_spec_audit import audit_pod_spec
 from orb.providers.k8s.utilities.pod_state import (
     extract_status_reason,
     is_pod_ready,
     pod_status_string,
 )
+from orb.providers.k8s.watch.node_state_cache import K8sNodeStateCache
 from orb.providers.k8s.watch.pod_state_cache import PodState, PodStateCache
 
 T = TypeVar("T")
@@ -70,6 +72,7 @@ class K8sHandlerBase(ABC):
         cache_alive: Optional[Callable[[], bool]] = None,
         stale_cache_timeout_seconds: Optional[float] = None,
         native_spec_service: Optional[Any] = None,
+        node_state_cache: Optional[K8sNodeStateCache] = None,
     ) -> None:
         self._kubernetes_client = kubernetes_client
         self._config = config
@@ -101,6 +104,13 @@ class K8sHandlerBase(ABC):
             if stale_cache_timeout_seconds is not None
             else float(config.stale_cache_timeout_seconds)
         )
+        # Node-state cache.  When ``node_watch_enabled=True`` the strategy
+        # wires in a populated ``K8sNodeStateCache`` so handlers can look up
+        # per-node metadata (instance type, zone, capacity type) by node_name
+        # and attach it to the per-instance ``provider_data`` block.  When
+        # ``None`` (the default) the lookup is silently skipped and the
+        # provider_data block only contains the fields derived from the pod.
+        self._node_state_cache = node_state_cache
 
     # ------------------------------------------------------------------
     # Common helpers — used by every concrete handler
@@ -113,6 +123,51 @@ class K8sHandlerBase(ABC):
     @property
     def config(self) -> K8sProviderConfig:
         return self._config
+
+    def _audit_spec_body(self, body: Any) -> None:
+        """Audit *body* for high-risk pod-spec fields.
+
+        Called by each handler's ``acquire_hosts`` after the workload body
+        is built and before it is submitted to the apiserver.  Behaviour
+        is controlled by two :class:`K8sProviderConfig` flags:
+
+        * ``audit_high_risk_pod_fields`` (default ``True``) — when
+          ``False``, the entire audit is skipped silently.
+        * ``reject_high_risk_pod_fields`` (default ``False``) — when
+          ``True`` *and* findings are non-empty, a
+          :class:`orb.providers.k8s.exceptions.k8s_errors.K8sError` is
+          raised with the joined findings so the acquire call fails fast
+          before touching the apiserver.
+
+        *body* may be a plain ``dict`` (native-spec path, camelCase keys)
+        or a Kubernetes SDK object whose ``.to_dict()`` produces a
+        snake_case dict.  Both shapes are handled by converting SDK
+        objects before passing to :func:`audit_pod_spec`.
+        """
+        if not self._config.audit_high_risk_pod_fields:
+            return
+
+        spec_dict: dict[str, Any]
+        if isinstance(body, dict):
+            spec_dict = body
+        else:
+            # SDK object (e.g. V1Pod, V1Deployment) — convert to a plain
+            # dict so audit_pod_spec can walk the key/value pairs without
+            # importing any kubernetes SDK types.
+            try:
+                spec_dict = body.to_dict()
+            except AttributeError:
+                # Unexpected type; skip rather than crash acquire.
+                return
+
+        findings = audit_pod_spec(spec_dict, self._logger)
+
+        if findings and self._config.reject_high_risk_pod_fields:
+            from orb.providers.k8s.exceptions.k8s_errors import K8sError  # noqa: PLC0415
+
+            raise K8sError(
+                "Acquire rejected: pod spec contains high-risk fields — " + "; ".join(findings)
+            )
 
     def resolve_namespace(self, template: Template) -> str:
         """Return the namespace this request should target.
@@ -382,9 +437,14 @@ class K8sHandlerBase(ABC):
         return is_pod_ready(conditions)
 
     @staticmethod
-    def _pod_status_string(phase: Optional[str], ready: bool) -> str:
+    def _pod_status_string(
+        phase: Optional[str],
+        ready: bool,
+        *,
+        provider_api: Optional[str] = None,
+    ) -> str:
         """Thin delegate to :func:`pod_state.pod_status_string` for subclass use."""
-        return pod_status_string(phase, ready)
+        return pod_status_string(phase, ready, provider_api=provider_api)
 
     @staticmethod
     def _extract_status_reason(
@@ -420,8 +480,26 @@ class K8sHandlerBase(ABC):
         )
 
         ready = is_pod_ready(conditions)
-        status_str = pod_status_string(phase, ready)
+        status_str = pod_status_string(phase, ready, provider_api=self.PROVIDER_API)
         status_reason = extract_status_reason(container_statuses, conditions)
+
+        if phase == "Succeeded":
+            if status_str == "running":
+                # Deployment / StatefulSet pods that reach Succeeded are in a
+                # transient state — the controller will respawn them.  Log a
+                # warning so operators can investigate unexpected pod completions
+                # without being misled by a silent status flip.
+                self._logger.warning(
+                    "Pod %s reached Succeeded under %s — controller will respawn; "
+                    "treating as running until the new pod is ready",
+                    name,
+                    self.PROVIDER_API,
+                )
+            else:
+                # Bare pod or Job: run-to-completion semantics.  Supply a
+                # human-readable fallback reason when kubernetes did not set one.
+                if status_reason is None:
+                    status_reason = "Container completed successfully"
 
         # DisruptionTarget condition — Karpenter preemption signal.
         disrupted_reason: Optional[str] = None
@@ -440,6 +518,24 @@ class K8sHandlerBase(ABC):
             int(getattr(cs, "restart_count", 0) or 0) for cs in container_statuses
         )
 
+        provider_data: dict[str, Any] = {
+            "namespace": namespace,
+            "node_name": node_name,
+            "phase": phase,
+            "ready": ready,
+            "restart_count": restart_count,
+            "disrupted_reason": disrupted_reason,
+            "disrupted_message": disrupted_message,
+        }
+        # Enrich with node metadata when the node watcher is active and the
+        # pod has been scheduled to a node.
+        if node_name and self._node_state_cache is not None:
+            node_state = self._node_state_cache.get(node_name)
+            if node_state is not None:
+                provider_data["node_instance_type"] = node_state.instance_type
+                provider_data["node_zone"] = node_state.zone
+                provider_data["node_capacity_type"] = node_state.capacity_type
+
         return {
             "instance_id": name,
             "resource_id": name,
@@ -457,15 +553,7 @@ class K8sHandlerBase(ABC):
             "tags": labels,
             "price_type": None,
             "provider_api": self.PROVIDER_API,
-            "provider_data": {
-                "namespace": namespace,
-                "node_name": node_name,
-                "phase": phase,
-                "ready": ready,
-                "restart_count": restart_count,
-                "disrupted_reason": disrupted_reason,
-                "disrupted_message": disrupted_message,
-            },
+            "provider_data": provider_data,
             "metadata": {},
         }
 
@@ -475,6 +563,24 @@ class K8sHandlerBase(ABC):
         Mirrors :meth:`_instance_dict_for_pod` so the list-fed and
         cache-fed code paths produce identical dicts downstream.
         """
+        provider_data: dict[str, Any] = {
+            "namespace": state.namespace,
+            "node_name": state.node_name,
+            "phase": state.phase,
+            "ready": state.ready,
+            "restart_count": state.restart_count,
+            "disrupted_reason": state.disrupted_reason,
+            "disrupted_message": state.disrupted_message,
+        }
+        # Enrich with node metadata when the node watcher is active and the
+        # pod has been scheduled to a node.
+        if state.node_name and self._node_state_cache is not None:
+            node_state = self._node_state_cache.get(state.node_name)
+            if node_state is not None:
+                provider_data["node_instance_type"] = node_state.instance_type
+                provider_data["node_zone"] = node_state.zone
+                provider_data["node_capacity_type"] = node_state.capacity_type
+
         return {
             "instance_id": state.pod_name,
             "resource_id": state.pod_name,
@@ -492,15 +598,7 @@ class K8sHandlerBase(ABC):
             "tags": dict(state.labels),
             "price_type": None,
             "provider_api": self.PROVIDER_API,
-            "provider_data": {
-                "namespace": state.namespace,
-                "node_name": state.node_name,
-                "phase": state.phase,
-                "ready": state.ready,
-                "restart_count": state.restart_count,
-                "disrupted_reason": state.disrupted_reason,
-                "disrupted_message": state.disrupted_message,
-            },
+            "provider_data": provider_data,
             "metadata": {},
         }
 

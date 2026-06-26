@@ -112,6 +112,8 @@ workloads).
 * [RBAC example](rbac.yaml) - minimum ServiceAccount + Role + RoleBinding.
 * [Migrating from `orb.k8s_legacy`](migrating-from-k8s-legacy.md) - template field
   mapping, label deltas, coexistence guidance.
+* [Security hardening](security-hardening.md) - pod-spec audit, high-risk
+  field warnings, and how to enable reject mode.
 * [Authoring a provider plugin](plugin-authoring.md) - extending the
   provider via the `orb.providers` entry-point group, with a worked
   MPIJob example.

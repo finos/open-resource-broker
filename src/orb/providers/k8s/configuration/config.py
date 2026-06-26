@@ -237,6 +237,43 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         ),
     )
 
+    # Pod-spec security audit
+    audit_high_risk_pod_fields: bool = Field(
+        True,
+        description=(
+            "When True (default), ORB inspects the rendered pod spec for high-risk fields "
+            "(hostNetwork, hostPID, hostIPC, hostPath volumes, privileged containers, "
+            "dangerous capabilities) at acquire time and logs each finding at WARNING level. "
+            "Set to False to silence all audit warnings."
+        ),
+    )
+    reject_high_risk_pod_fields: bool = Field(
+        False,
+        description=(
+            "When True, ORB raises a K8sError instead of logging a warning when the "
+            "rendered pod spec contains high-risk fields.  Requires "
+            "``audit_high_risk_pod_fields=True`` (the default) to take effect.  "
+            "Default False so operators opt in to hard rejection deliberately."
+        ),
+    )
+
+    # Node watching
+    node_watch_enabled: bool = Field(
+        False,
+        description=(
+            "Opt-in flag for the node-state watch background task.  When True, ORB "
+            "starts a K8sNodeWatcher that streams ``CoreV1Api.list_node`` events and "
+            "caches per-node metadata (instance type, zone, capacity type, CPU/memory "
+            "capacity and allocatable values, and Ready condition).  The cached "
+            "metadata is then surfaced in the ``provider_data`` block of each "
+            "per-instance status dict returned by ``get_status``.  Default ``False`` "
+            "because the node watcher requires a cluster-scoped RBAC grant "
+            "(``ClusterRole`` with ``nodes: get/list/watch``) that is not needed for "
+            "namespace-scoped pod management — see "
+            "``docs/root/providers/k8s/rbac.yaml`` for the required rule."
+        ),
+    )
+
     # Native spec escape hatch
     native_spec_enabled: bool = Field(
         False,

@@ -49,6 +49,8 @@ from orb.providers.k8s.reconciliation.startup_reconciler import (
 from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
 from orb.providers.k8s.value_objects import KubernetesProviderApi
 from orb.providers.k8s.watch.multi_namespace import MultiNamespaceWatcher
+from orb.providers.k8s.watch.node_state_cache import K8sNodeStateCache
+from orb.providers.k8s.watch.node_watcher import K8sNodeWatcher
 from orb.providers.k8s.watch.pod_state_cache import PodStateCache
 
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
@@ -130,6 +132,8 @@ class K8sProviderStrategy(ProviderStrategy):
         known_request_ids: Optional[Callable[[], Iterable[str]]] = None,
         startup_reconciler: Optional[StartupReconciler] = None,
         orphan_gc: Optional[OrphanGarbageCollector] = None,
+        node_watcher: Optional[K8sNodeWatcher] = None,
+        node_state_cache: Optional[K8sNodeStateCache] = None,
     ) -> None:
         if not isinstance(config, K8sProviderConfig):
             raise ValueError("K8sProviderStrategy requires K8sProviderConfig")
@@ -156,6 +160,13 @@ class K8sProviderStrategy(ProviderStrategy):
         self._startup_reconciler: Optional[StartupReconciler] = startup_reconciler
         self._orphan_gc: Optional[OrphanGarbageCollector] = orphan_gc
         self._last_reconciliation_report: Optional[ReconciliationReport] = None
+        # Node watching.  When ``node_watch_enabled=True`` (opt-in via
+        # K8sProviderConfig) the strategy starts a K8sNodeWatcher on the
+        # background thread and exposes the populated K8sNodeStateCache to
+        # handlers so per-instance status dicts carry node metadata.
+        # Tests inject both via the constructor kwargs to avoid real threads.
+        self._node_state_cache: K8sNodeStateCache = node_state_cache or K8sNodeStateCache()
+        self._node_watcher: Optional[K8sNodeWatcher] = node_watcher
         # Native-spec escape hatch.  Resolved lazily on first handler
         # construction so tests / CLI bootstrap paths without a DI
         # container do not pay the resolution cost up front.  ``None``
@@ -177,6 +188,7 @@ class K8sProviderStrategy(ProviderStrategy):
             plugin_factories=lambda: type(self)._HANDLER_FACTORIES,
             native_spec_service_provider=self._resolve_native_spec_service,
             handler_overrides=handler_overrides,
+            node_state_cache_provider=lambda: self._node_state_cache,
         )
 
     # ------------------------------------------------------------------
@@ -230,6 +242,7 @@ class K8sProviderStrategy(ProviderStrategy):
             self._run_startup_reconciler()
             self._maybe_start_watch_manager()
             self._maybe_start_orphan_gc()
+            self._maybe_start_node_watcher()
             self._initialized = True
             return True
         except Exception as exc:
@@ -248,6 +261,9 @@ class K8sProviderStrategy(ProviderStrategy):
                 # ``asyncio.run``.  CLI cleanup paths typically have no
                 # loop running while daemon paths do.
                 self._stop_watch_manager_sync()
+            if self._node_watcher is not None:
+                self._node_watcher.stop()
+                self._node_watcher = None
             if self._kubernetes_client is not None:
                 self._kubernetes_client.cleanup()
             self._kubernetes_client = None
@@ -463,6 +479,42 @@ class K8sProviderStrategy(ProviderStrategy):
                 self._logger.debug("Orphan GC stop raised during cleanup: %s", exc, exc_info=True)
             return
         loop.create_task(gc.stop())
+
+    # ------------------------------------------------------------------
+    # Node watcher lifecycle
+    # ------------------------------------------------------------------
+
+    @property
+    def node_state_cache(self) -> K8sNodeStateCache:
+        """The shared node-state cache used to enrich per-instance status dicts.
+
+        Always present (never ``None``) — when ``node_watch_enabled`` is
+        ``False`` it is simply an empty cache that returns ``None`` for
+        every lookup.
+        """
+        return self._node_state_cache
+
+    def _maybe_start_node_watcher(self) -> None:
+        """Start the node watcher when enabled by config.
+
+        Unlike the asyncio pod watcher, the node watcher runs on a
+        plain background daemon thread so it does not require a running
+        event loop.  This means it can start from both synchronous
+        (CLI bootstrap) and async (daemon) contexts.
+        """
+        if not self._k8s_config.node_watch_enabled:
+            return
+        if self._node_watcher is None:
+            self._node_watcher = K8sNodeWatcher(
+                kubernetes_client=self.kubernetes_client,
+                cache=self._node_state_cache,
+                logger=self._logger,
+            )
+        try:
+            self._node_watcher.start()
+            self._logger.info("Kubernetes node watcher started (node_watch_enabled=True)")
+        except Exception as exc:
+            self._logger.warning("Failed to start Kubernetes node watcher: %s", exc, exc_info=True)
 
     # ------------------------------------------------------------------
     # Operation dispatch

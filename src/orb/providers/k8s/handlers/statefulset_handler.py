@@ -100,6 +100,7 @@ class K8sStatefulSetHandler(K8sHandlerBase):
         cache_alive: Optional[Callable[[], bool]] = None,
         stale_cache_timeout_seconds: Optional[float] = None,
         native_spec_service: Optional[Any] = None,
+        node_state_cache: Optional[Any] = None,
     ) -> None:
         super().__init__(
             kubernetes_client=kubernetes_client,
@@ -109,6 +110,7 @@ class K8sStatefulSetHandler(K8sHandlerBase):
             cache_alive=cache_alive,
             stale_cache_timeout_seconds=stale_cache_timeout_seconds,
             native_spec_service=native_spec_service,
+            node_state_cache=node_state_cache,
         )
         self._status_resolver = StatefulSetStatusResolver(self)
 
@@ -170,6 +172,8 @@ class K8sStatefulSetHandler(K8sHandlerBase):
                 provider_api=self.PROVIDER_API,
                 config=self._config,
             )
+
+        self._audit_spec_body(body)
 
         await asyncio.to_thread(
             self.with_retry,

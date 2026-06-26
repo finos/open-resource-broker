@@ -64,6 +64,7 @@ class K8sPodHandler(K8sHandlerBase):
         cache_alive: Optional[Callable[[], bool]] = None,
         stale_cache_timeout_seconds: Optional[float] = None,
         native_spec_service: Optional[Any] = None,
+        node_state_cache: Optional[Any] = None,
     ) -> None:
         super().__init__(
             kubernetes_client=kubernetes_client,
@@ -73,6 +74,7 @@ class K8sPodHandler(K8sHandlerBase):
             cache_alive=cache_alive,
             stale_cache_timeout_seconds=stale_cache_timeout_seconds,
             native_spec_service=native_spec_service,
+            node_state_cache=node_state_cache,
         )
         self._max_concurrent_creates = max_concurrent_creates
         self._status_resolver = PodStatusResolver(self)
@@ -119,6 +121,7 @@ class K8sPodHandler(K8sHandlerBase):
 
         sem = asyncio.Semaphore(self._max_concurrent_creates)
         pods_to_create: list[tuple[str, Any]] = []
+        _audited = False
         for seq in range(count):
             pod_name = make_pod_name(str(request.request_id), seq)
             if native_pod_body is not None:
@@ -139,6 +142,11 @@ class K8sPodHandler(K8sHandlerBase):
                     provider_api=self.PROVIDER_API,
                     config=self._config,
                 )
+            # Audit the spec once per acquire call (all pods share the same
+            # spec shape so auditing the first body is sufficient).
+            if not _audited:
+                self._audit_spec_body(pod_body)
+                _audited = True
             pods_to_create.append((pod_name, pod_body))
 
         results = await asyncio.gather(
