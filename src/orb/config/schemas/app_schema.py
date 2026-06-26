@@ -40,7 +40,7 @@ class AppConfig(BaseModel):
     circuit_breaker: CircuitBreakerConfig = Field(default_factory=lambda: CircuitBreakerConfig())  # type: ignore[call-arg]
     performance: PerformanceConfig = Field(default_factory=lambda: PerformanceConfig())  # type: ignore[call-arg]
     server: ServerConfig = Field(default_factory=lambda: ServerConfig())  # type: ignore[call-arg]
-    ui: UIConfig = Field(default_factory=lambda: UIConfig())  # type: ignore[call-arg]
+    ui: UIConfig = Field(default_factory=UIConfig)  # type: ignore[arg-type]
     native_spec: NativeSpecConfig = Field(default_factory=lambda: NativeSpecConfig())  # type: ignore[call-arg]
     environment: str = Field("development", description="Environment")
     debug: bool = Field(False, description="Debug mode")
