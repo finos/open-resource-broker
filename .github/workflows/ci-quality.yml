@@ -93,7 +93,13 @@ jobs:
     name: Auto-Format Code
     # Same-repo PRs only: push commits as the ORB CICD App.
     # Fork PRs are handled by the auto-format-suggest job below.
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    # Skip when the commit being checked is itself the auto-format
+    # bot's push — without this guard the job would infinitely
+    # re-trigger itself (push → format → push → format → …).
+    if: |
+      github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.actor != 'open-resource-broker-cicd[bot]'
     runs-on: ubuntu-latest
     needs: [config, setup-cache]
     permissions:
@@ -134,7 +140,12 @@ jobs:
         run: |
           git add .
           if ! git diff --staged --quiet; then
-            git commit -m "style: auto-format code with ruff [skip ci]"
+            # Drop ``[skip ci]`` so the push re-triggers the upstream
+            # workflows on the new SHA. The format job itself is gated
+            # on ``github.actor`` so it does not re-fire on its own
+            # commits — the rest of CI runs naturally against the
+            # format-fixed tree.
+            git commit -m "style: auto-format code with ruff"
             git push
           fi
 

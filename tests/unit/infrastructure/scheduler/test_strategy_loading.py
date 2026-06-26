@@ -144,10 +144,23 @@ def test_default_load_delegates_hf_file_to_hf_strategy(tmp_path):
     from orb.infrastructure.scheduler.registry import get_scheduler_registry
 
     registry = get_scheduler_registry()
+    # register(type_name, strategy_factory, config_factory, **kwargs) — the
+    # strategy class itself goes in via the strategy_class kwarg so
+    # get_strategy_class() can resolve it without instantiation.
     if not registry.is_registered("hostfactory"):
-        registry.register("hostfactory", HostFactorySchedulerStrategy, lambda c: None)
+        registry.register(
+            "hostfactory",
+            lambda c: HostFactorySchedulerStrategy(c),
+            lambda c: None,
+            strategy_class=HostFactorySchedulerStrategy,
+        )
     if not registry.is_registered("default"):
-        registry.register("default", DefaultSchedulerStrategy, lambda c: None)
+        registry.register(
+            "default",
+            lambda c: DefaultSchedulerStrategy(c),
+            lambda c: None,
+            strategy_class=DefaultSchedulerStrategy,
+        )
 
     f = tmp_path / "hf_file.json"
     write_hf_file(f, [_MINIMAL_HF_TEMPLATE_ON_DISK])
@@ -162,10 +175,23 @@ def test_hf_load_delegates_default_file_to_default_strategy(tmp_path):
     from orb.infrastructure.scheduler.registry import get_scheduler_registry
 
     registry = get_scheduler_registry()
+    # register(type_name, strategy_factory, config_factory, **kwargs) — the
+    # strategy class itself goes in via the strategy_class kwarg so
+    # get_strategy_class() can resolve it without instantiation.
     if not registry.is_registered("hostfactory"):
-        registry.register("hostfactory", HostFactorySchedulerStrategy, lambda c: None)
+        registry.register(
+            "hostfactory",
+            lambda c: HostFactorySchedulerStrategy(c),
+            lambda c: None,
+            strategy_class=HostFactorySchedulerStrategy,
+        )
     if not registry.is_registered("default"):
-        registry.register("default", DefaultSchedulerStrategy, lambda c: None)
+        registry.register(
+            "default",
+            lambda c: DefaultSchedulerStrategy(c),
+            lambda c: None,
+            strategy_class=DefaultSchedulerStrategy,
+        )
 
     f = tmp_path / "default_file.json"
     write_default_file(f, [_MINIMAL_SNAKE_TEMPLATE])
