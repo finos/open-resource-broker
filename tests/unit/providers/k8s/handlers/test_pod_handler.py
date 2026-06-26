@@ -200,7 +200,7 @@ async def test_acquire_hosts_all_failures_raises() -> None:
         ("Pending", False, None, "Unschedulable", "pending", "Unschedulable"),
         ("Running", False, None, None, "starting", None),
         ("Running", True, None, None, "running", None),
-        ("Succeeded", False, None, None, "running", None),
+        ("Succeeded", False, None, None, "terminated", "Container completed successfully"),
         ("Failed", False, "OOMKilled", None, "failed", "OOMKilled"),
         ("Failed", False, "Error", None, "failed", "Error"),
         ("Unknown", False, None, None, "pending", None),

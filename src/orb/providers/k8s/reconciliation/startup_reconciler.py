@@ -38,6 +38,7 @@ from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
+from orb.providers.k8s.utilities.pod_state import pod_status_string as _canonical_pod_status_string
 from orb.providers.k8s.watch.pod_state_cache import PodState, PodStateCache
 
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
@@ -323,8 +324,12 @@ def _pod_to_state(pod: "V1Pod", *, request_id: str, namespace: str) -> PodState:
         list(getattr(status, "container_statuses", None) or []) if status is not None else []
     )
 
+    # Read provider-API type from pod label for context-aware Succeeded mapping.
+    label_prefix = "orb.io"
+    pod_provider_api: Optional[str] = labels.get(f"{label_prefix}/provider-api")
+
     ready = _is_pod_ready(conditions)
-    status_str = _pod_status_string(phase, ready)
+    status_str = _pod_status_string(phase, ready, provider_api=pod_provider_api)
     reason = _extract_status_reason(container_statuses, conditions)
 
     return PodState(
@@ -353,14 +358,11 @@ def _is_pod_ready(conditions: list[Any]) -> bool:
     return False
 
 
-def _pod_status_string(phase: Optional[str], ready: bool) -> str:
-    if phase == "Running":
-        return "running" if ready else "starting"
-    if phase == "Succeeded":
-        return "running"
-    if phase == "Failed":
-        return "failed"
-    return "pending"
+def _pod_status_string(
+    phase: Optional[str], ready: bool, *, provider_api: Optional[str] = None
+) -> str:
+    """Delegate to the canonical :func:`pod_state.pod_status_string`."""
+    return _canonical_pod_status_string(phase, ready, provider_api=provider_api)
 
 
 def _extract_status_reason(

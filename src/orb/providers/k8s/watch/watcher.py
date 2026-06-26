@@ -88,6 +88,11 @@ class K8sWatcher:
             to ``"orb.io/managed=true"``.
         request_id_label: Label key carrying the ORB request id; reads
             from the pod's metadata to key the cache.
+        provider_api_label: Label key carrying the provider-API type
+            (e.g. ``"orb.io/provider-api"``).  Used to apply context-aware
+            ``Succeeded`` phase semantics — controller-managed workloads
+            (Deployment, StatefulSet) are kept ``"running"`` while bare pods
+            and Jobs are mapped to ``"terminated"``.
         watch_timeout_seconds: ``timeout_seconds`` parameter forwarded
             to the apiserver.  The kubernetes client treats expiry as
             a clean end-of-stream and the outer loop reconnects.
@@ -107,6 +112,7 @@ class K8sWatcher:
         namespace: Optional[str],
         label_selector: str = "orb.io/managed=true",
         request_id_label: str = "orb.io/request-id",
+        provider_api_label: str = "orb.io/provider-api",
         watch_timeout_seconds: int = _DEFAULT_WATCH_TIMEOUT_SECONDS,
         base_backoff_seconds: float = _DEFAULT_BASE_BACKOFF_SECONDS,
         max_backoff_seconds: float = _DEFAULT_MAX_BACKOFF_SECONDS,
@@ -118,6 +124,7 @@ class K8sWatcher:
         self._namespace = namespace
         self._label_selector = label_selector
         self._request_id_label = request_id_label
+        self._provider_api_label = provider_api_label
         self._watch_timeout_seconds = watch_timeout_seconds
         self._base_backoff_seconds = base_backoff_seconds
         self._max_backoff_seconds = max_backoff_seconds
@@ -434,9 +441,25 @@ class K8sWatcher:
             list(getattr(status, "container_statuses", None) or []) if status is not None else []
         )
 
+        # Read the provider-API type from the pod label so the Succeeded
+        # phase mapping can apply the correct semantics per workload kind.
+        pod_provider_api: Optional[str] = labels.get(self._provider_api_label)
+
         ready = is_pod_ready(conditions)
-        status_str = pod_status_string(phase, ready)
+        status_str = pod_status_string(phase, ready, provider_api=pod_provider_api)
         reason = extract_status_reason(container_statuses, conditions)
+
+        # Controller-managed pods (Deployment, StatefulSet) that reach
+        # Succeeded are in a transient state — the controller will respawn
+        # them.  Log a warning so operators can investigate.
+        if phase == "Succeeded" and status_str == "running":
+            self._logger.warning(
+                "Pod %s reached Succeeded under %s/%s — controller will respawn; "
+                "treating as running until the new pod is ready",
+                name,
+                pod_provider_api or "unknown",
+                name,
+            )
 
         # DisruptionTarget condition — Karpenter preemption signal.
         disrupted_reason: Optional[str] = None

@@ -15,6 +15,15 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+# Provider-API types whose pods are managed by a controller that will
+# automatically restart Succeeded pods.  For these types the ``Succeeded``
+# phase is transient — the controller reconciliation loop will respawn the
+# pod almost immediately — so ORB must not surface it as ``terminated``.
+# Bare pods (``Pod``) and ``Job``-owned pods have no such controller: once
+# they reach ``Succeeded`` they stay there, and ORB should treat them as
+# ``terminated`` so the fulfilment math and status display reflect reality.
+_CONTROLLER_RESPAWNS_SUCCEEDED: frozenset[str] = frozenset({"Deployment", "StatefulSet"})
+
 
 def is_pod_ready(conditions: list[Any]) -> bool:
     """Return ``True`` iff ``conditions`` has a ``Ready=True`` entry."""
@@ -26,7 +35,12 @@ def is_pod_ready(conditions: list[Any]) -> bool:
     return False
 
 
-def pod_status_string(phase: Optional[str], ready: bool) -> str:
+def pod_status_string(
+    phase: Optional[str],
+    ready: bool,
+    *,
+    provider_api: Optional[str] = None,
+) -> str:
     """Map ``pod.status.phase`` (+ readiness) to an ORB instance-status string.
 
     The string set mirrors the AWS provider's EC2 instance statuses so
@@ -36,14 +50,28 @@ def pod_status_string(phase: Optional[str], ready: bool) -> str:
     * ``Pending``  -> ``"pending"``
     * ``Running`` (not ready)  -> ``"starting"``
     * ``Running`` (ready)      -> ``"running"``
-    * ``Succeeded``            -> ``"running"``  (job-style success)
+    * ``Succeeded`` (Deployment / StatefulSet) -> ``"running"``
+      The controller will respawn the pod; ``Succeeded`` is transient here.
+    * ``Succeeded`` (Pod / Job / unknown) -> ``"terminated"``
+      Run-to-completion semantics: the pod finished and will not restart.
     * ``Failed``               -> ``"failed"``
     * ``Unknown``/None         -> ``"pending"``
     """
     if phase == "Running":
         return "running" if ready else "starting"
     if phase == "Succeeded":
-        return "running"
+        # Controller-managed pods (Deployment, StatefulSet) are respawned by
+        # their controller when they complete — ``Succeeded`` is a transient
+        # phase here, not a terminal one.  Return ``"running"`` so the
+        # fulfilment math does not count them as lost capacity until the
+        # controller has had time to restart them.
+        #
+        # Bare pods and Job pods run to completion exactly once.  Mapping
+        # them to ``"terminated"`` lets check_hosts_status and the
+        # orchestrator surface the correct state immediately.
+        if provider_api in _CONTROLLER_RESPAWNS_SUCCEEDED:
+            return "running"
+        return "terminated"
     if phase == "Failed":
         return "failed"
     return "pending"
