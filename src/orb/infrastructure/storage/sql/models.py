@@ -6,7 +6,7 @@ The column-dict helpers in unit_of_work.py have been removed in favour of
 these models.  Run ``alembic upgrade head`` to apply schema changes.
 """
 
-from sqlalchemy import BIGINT, Boolean, Integer, String, Text
+from sqlalchemy import BIGINT, Boolean, Integer, String, Text, text as sa_text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -19,17 +19,19 @@ class RequestModel(Base):
 
     __tablename__ = "requests"
 
-    # Identity
+    # Identity — domain invariants. Request pydantic aggregate requires
+    # template_id, request_type, and provider_type; SQL mirrors that.
     request_id: Mapped[str] = mapped_column(String(255), primary_key=True)
-    template_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    request_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    template_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    request_type: Mapped[str] = mapped_column(String(50), nullable=False)
     status: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
-    # Counts
-    requested_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    desired_capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    successful_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    failed_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Counts — pydantic defaults to non-zero values; SQL mirrors NOT NULL
+    # with matching server_default so direct inserts still succeed.
+    requested_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    desired_capacity: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    successful_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    failed_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
 
     # Timing (stored as ISO-8601 TEXT for dialect portability)
     created_at: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -43,10 +45,10 @@ class RequestModel(Base):
     error_details: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON-encoded
     success_rate: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # Provider
+    # Provider — provider_type is a domain invariant on Request.
     provider_api: Mapped[str | None] = mapped_column(String(255), nullable=True)
     provider_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    provider_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    provider_type: Mapped[str] = mapped_column(String(255), nullable=False)
     provider_data: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON-encoded TEXT
 
     # Resources
@@ -60,7 +62,7 @@ class RequestModel(Base):
 
     # Misc
     duration: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     schema_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
     # NOTE: 'metadata' is reserved by SQLAlchemy DeclarativeBase; the column is
     # named 'metadata' in the DB but accessed as `extra_metadata` on the model.
@@ -79,11 +81,11 @@ class MachineModel(Base):
 
     __tablename__ = "machines"
 
-    # Identity
+    # Identity — instance_type is a domain invariant on Machine.
     machine_id: Mapped[str] = mapped_column(String(255), primary_key=True)
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    instance_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    instance_type: Mapped[str] = mapped_column(String(50), nullable=False)
 
     # Network
     private_ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
@@ -94,26 +96,32 @@ class MachineModel(Base):
     # Timing (BIGINT unix epoch for launch_time; ISO-8601 TEXT for others)
     launch_time: Mapped[int | None] = mapped_column(BIGINT, nullable=True)
     termination_time: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # provisioning_started_at: set by Machine.start_launching() and used for
+    # uptime diagnostics. Previously had no SQL column and was silently dropped.
+    provisioning_started_at: Mapped[str | None] = mapped_column(Text, nullable=True)
     uptime_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    # Provider — provider_api is a domain-level invariant (Machine.provider_api
-    # is required on the aggregate). The SQL constraint mirrors that.
+    # Provider — provider_api + provider_name are domain invariants on
+    # Machine.  The SQL constraints mirror that.
     provider_api: Mapped[str] = mapped_column(String(255), nullable=False)
     provider_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    provider_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    provider_name: Mapped[str] = mapped_column(String(255), nullable=False)
     resource_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     cloud_host_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     provider_data: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON-encoded
 
-    # Relations (no FK constraints — strategies vary)
+    # Relations — template_id is a domain invariant on Machine.
     request_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    template_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    template_id: Mapped[str] = mapped_column(String(255), nullable=False)
     return_request_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Location
     availability_zone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     region: Mapped[str | None] = mapped_column(Text, nullable=True)
     subnet_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # vpc_id is an optional domain field that previously had no SQL column;
+    # the value was silently dropped on save.
+    vpc_id: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Tags / metadata
     tags: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON-encoded
@@ -124,14 +132,14 @@ class MachineModel(Base):
     # Pricing
     price_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
-    # Misc
+    # Misc — image_id is a domain invariant on Machine.
     result: Mapped[str | None] = mapped_column(String(255), nullable=True)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
     vcpus: Mapped[int | None] = mapped_column(Integer, nullable=True)
     security_group_ids: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON-encoded
-    image_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    image_id: Mapped[str] = mapped_column(String(255), nullable=False)
     status_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     schema_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # Timestamps (ISO-8601 TEXT)
@@ -148,7 +156,7 @@ class TemplateModel(Base):
     template_id: Mapped[str] = mapped_column(String(255), primary_key=True)
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    is_active: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa_text("1"))
 
     # Provider
     provider_api: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -158,7 +166,7 @@ class TemplateModel(Base):
 
     # Instance
     image_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    max_instances: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_instances: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     instance_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # Machine types (JSON-encoded dicts)
