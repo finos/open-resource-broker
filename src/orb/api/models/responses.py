@@ -6,40 +6,18 @@ from typing import Any, Optional, Union
 
 from pydantic import BaseModel, ConfigDict
 
+from orb.application.request.dto import MachineReferenceDTO
 from orb.infrastructure.error.exception_handler import InfrastructureErrorResponse
 
 # ---------------------------------------------------------------------------
 # Pydantic response models (snake_case, default scheduler canonical format)
 # ---------------------------------------------------------------------------
 
-
-class MachineRefItem(BaseModel):
-    """
-    Canonical machine reference used inside request items.
-
-    Mirrors MachineReferenceDTO exactly, including all fields the DTO exposes.
-    """
-
-    model_config = ConfigDict(extra="ignore")
-
-    machine_id: Optional[str] = None
-    name: Optional[str] = None
-    status: Optional[str] = None
-    instance_type: Optional[str] = None
-    private_ip_address: Optional[str] = None
-    public_ip_address: Optional[str] = None
-    result: Optional[str] = None
-    request_id: Optional[str] = None
-    return_request_id: Optional[str] = None
-    message: Optional[str] = None
-    cloud_host_id: Optional[str] = None
-    launch_time: Optional[Union[int, str]] = None
-    price_type: Optional[str] = None
-    tags: Optional[dict[str, str]] = None
-
-
-# Backward-compatible alias — existing code referencing MachineReference keeps working.
-MachineReference = MachineRefItem
+# MachineRefItem was a duplicate of MachineReferenceDTO. Alias the DTO so
+# the API contract layer reuses the single source of truth — adding a
+# field to the DTO automatically reflects in the API schema.
+MachineRefItem = MachineReferenceDTO
+MachineReference = MachineReferenceDTO
 
 
 class RequestItem(BaseModel):
