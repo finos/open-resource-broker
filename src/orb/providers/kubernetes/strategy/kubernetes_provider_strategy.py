@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
 
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.operation_outcome import Accepted, Completed, Failed, OperationOutcome
@@ -44,8 +44,14 @@ from orb.providers.kubernetes.handlers.job_handler import KubernetesJobHandler
 from orb.providers.kubernetes.handlers.pod_handler import KubernetesPodHandler
 from orb.providers.kubernetes.handlers.statefulset_handler import KubernetesStatefulSetHandler
 from orb.providers.kubernetes.infrastructure.kubernetes_client import KubernetesClient
+from orb.providers.kubernetes.reconciliation.orphan_gc import OrphanGarbageCollector
+from orb.providers.kubernetes.reconciliation.startup_reconciler import (
+    ReconciliationReport,
+    StartupReconciler,
+)
 from orb.providers.kubernetes.value_objects import KubernetesProviderApi
 from orb.providers.kubernetes.watch.multi_namespace import MultiNamespaceWatcher
+from orb.providers.kubernetes.watch.pod_state_cache import PodStateCache
 
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
     from orb.domain.request.aggregate import Request
@@ -77,6 +83,9 @@ class KubernetesProviderStrategy(ProviderStrategy):
         kubernetes_client: Optional[KubernetesClient] = None,
         handler_overrides: Optional[dict[str, KubernetesHandlerBase]] = None,
         watch_manager: Optional[MultiNamespaceWatcher] = None,
+        known_request_ids: Optional[Callable[[], Iterable[str]]] = None,
+        startup_reconciler: Optional[StartupReconciler] = None,
+        orphan_gc: Optional[OrphanGarbageCollector] = None,
     ) -> None:
         if not isinstance(config, KubernetesProviderConfig):
             raise ValueError("KubernetesProviderStrategy requires KubernetesProviderConfig")
@@ -96,6 +105,15 @@ class KubernetesProviderStrategy(ProviderStrategy):
         # ``config.watch_enabled`` is True and no override has been
         # provided.  Tests inject a stub via ``watch_manager``.
         self._watch_manager: Optional[MultiNamespaceWatcher] = watch_manager
+        # Phase G wiring: startup reconciler + orphan GC.  ``known_request_ids``
+        # is the storage closure the strategy hands to both — when the
+        # caller does not supply it the reconciler treats every managed
+        # pod as an orphan (safest signal) and the GC is wired to an
+        # empty set.  Tests can override both subsystems wholesale.
+        self._known_request_ids_fn: Callable[[], Iterable[str]] = known_request_ids or (lambda: ())
+        self._startup_reconciler: Optional[StartupReconciler] = startup_reconciler
+        self._orphan_gc: Optional[OrphanGarbageCollector] = orphan_gc
+        self._last_reconciliation_report: Optional[ReconciliationReport] = None
 
     # ------------------------------------------------------------------
     # Provider identity
@@ -135,7 +153,14 @@ class KubernetesProviderStrategy(ProviderStrategy):
                 self._k8s_config.namespace,
                 self._k8s_config.in_cluster,
             )
+            # Startup reconciliation runs synchronously BEFORE the watch
+            # task is spawned so the cache is warm by the time the first
+            # ``check_hosts_status`` call lands.  Failures inside the
+            # reconciler are logged and tolerated — the watcher will
+            # converge on the correct state in steady-state.
+            self._run_startup_reconciler()
             self._maybe_start_watch_manager()
+            self._maybe_start_orphan_gc()
             self._initialized = True
             return True
         except Exception as exc:
@@ -146,6 +171,8 @@ class KubernetesProviderStrategy(ProviderStrategy):
 
     def cleanup(self) -> None:
         try:
+            if self._orphan_gc is not None:
+                self._stop_orphan_gc_sync()
             if self._watch_manager is not None:
                 # ``stop`` is async; schedule it on the running loop if
                 # there is one, otherwise drive it synchronously via
@@ -161,6 +188,23 @@ class KubernetesProviderStrategy(ProviderStrategy):
                 "Failed during Kubernetes provider cleanup: %s", exc, exc_info=True
             )
 
+    def _ensure_watch_manager(self) -> MultiNamespaceWatcher:
+        """Lazily construct (but do NOT start) the watch fan-out.
+
+        Exposed so the startup reconciler can share the watcher's
+        :class:`PodStateCache`: the reconciler warms the cache before
+        the watcher spawns, then the watcher takes over.  The watcher
+        is only started later by :meth:`_maybe_start_watch_manager`
+        when an event loop is available.
+        """
+        if self._watch_manager is None:
+            self._watch_manager = MultiNamespaceWatcher(
+                kubernetes_client=self.kubernetes_client,
+                config=self._k8s_config,
+                logger=self._logger,
+            )
+        return self._watch_manager
+
     def _maybe_start_watch_manager(self) -> None:
         """Start the watch fleet when enabled by config and a loop is available.
 
@@ -172,12 +216,7 @@ class KubernetesProviderStrategy(ProviderStrategy):
         """
         if not self._k8s_config.watch_enabled:
             return
-        if self._watch_manager is None:
-            self._watch_manager = MultiNamespaceWatcher(
-                kubernetes_client=self.kubernetes_client,
-                config=self._k8s_config,
-                logger=self._logger,
-            )
+        manager = self._ensure_watch_manager()
         try:
             asyncio.get_running_loop()
         except RuntimeError:
@@ -187,7 +226,7 @@ class KubernetesProviderStrategy(ProviderStrategy):
             )
             return
         try:
-            self._watch_manager.start()
+            manager.start()
         except Exception as exc:
             self._logger.warning("Failed to start Kubernetes watcher fleet: %s", exc, exc_info=True)
 
@@ -210,6 +249,96 @@ class KubernetesProviderStrategy(ProviderStrategy):
             return
         # Inside a running loop — schedule stop and let the loop drain.
         loop.create_task(manager.stop())
+
+    # ------------------------------------------------------------------
+    # Reconciliation / orphan-GC lifecycle (Phase G)
+    # ------------------------------------------------------------------
+
+    @property
+    def last_reconciliation_report(self) -> Optional[ReconciliationReport]:
+        """Surface the most recent :class:`ReconciliationReport` for diagnostics."""
+        return self._last_reconciliation_report
+
+    def _shared_cache(self) -> PodStateCache:
+        """Return the cache used by both reconciler and watcher.
+
+        Constructed via :meth:`_ensure_watch_manager` so reconciler and
+        watcher always share the same instance — populating one
+        warms the other.
+        """
+        return self._ensure_watch_manager().cache
+
+    def _run_startup_reconciler(self) -> None:
+        """Run the startup reconciler before the watch task spawns.
+
+        The reconciler is constructed lazily here so tests that pass
+        ``startup_reconciler=`` directly into the strategy can skip the
+        default construction path entirely.
+        """
+        reconciler = self._startup_reconciler
+        if reconciler is None:
+            reconciler = StartupReconciler(
+                kubernetes_client=self.kubernetes_client,
+                config=self._k8s_config,
+                cache=self._shared_cache(),
+                logger=self._logger,
+                known_request_ids=self._known_request_ids_fn,
+            )
+            self._startup_reconciler = reconciler
+        try:
+            self._last_reconciliation_report = reconciler.run()
+        except Exception as exc:  # noqa: BLE001 — defensive
+            self._logger.warning(
+                "Kubernetes startup reconciler raised: %s (provider continues)",
+                exc,
+                exc_info=True,
+            )
+
+    def _maybe_start_orphan_gc(self) -> None:
+        """Spawn the orphan GC task when enabled and an event loop is available."""
+        if not self._k8s_config.orphan_gc_enabled:
+            return
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            self._logger.debug(
+                "Skipping orphan GC startup: no running event loop "
+                "(GC will not run in this process)."
+            )
+            return
+        if self._orphan_gc is None:
+            self._orphan_gc = OrphanGarbageCollector(
+                kubernetes_client=self.kubernetes_client,
+                config=self._k8s_config,
+                logger=self._logger,
+                known_request_ids=self._known_request_ids_fn,
+            )
+        try:
+            self._orphan_gc.start()
+            self._logger.info(
+                "Kubernetes orphan GC started (interval=%ss, auto_cleanup=%s)",
+                self._k8s_config.orphan_gc_interval_seconds,
+                self._k8s_config.auto_cleanup_orphans,
+            )
+        except Exception as exc:
+            self._logger.warning("Failed to start Kubernetes orphan GC: %s", exc, exc_info=True)
+
+    def _stop_orphan_gc_sync(self) -> None:
+        """Stop the orphan GC from a sync-or-async cleanup context."""
+        gc = self._orphan_gc
+        if gc is None or not gc.is_running():
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop is None:
+            try:
+                asyncio.run(gc.stop())
+            except Exception as exc:
+                self._logger.debug("Orphan GC stop raised during cleanup: %s", exc, exc_info=True)
+            return
+        loop.create_task(gc.stop())
 
     # ------------------------------------------------------------------
     # Operation dispatch — Phase B onwards

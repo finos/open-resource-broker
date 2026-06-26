@@ -56,6 +56,15 @@ class KubernetesProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignor
       ``WatchManager`` presence — this flag is the operator-level override).
     * ``min_kubernetes_version`` — minimum K8s API server version the
       provider supports.  Validated on health check.
+    * ``auto_cleanup_orphans`` — when ``True`` the orphan GC deletes
+      pods carrying the ``orb.io/managed=true`` label that have no
+      matching record in ORB storage.  Default ``False`` so operators
+      can debug pods themselves; orphans are logged either way.
+    * ``orphan_gc_enabled`` — kill-switch for the periodic orphan-GC
+      asyncio task.  Default ``False``; turn on once the operator is
+      comfortable with the reconciler's behaviour in their environment.
+    * ``orphan_gc_interval_seconds`` — how often the orphan GC task
+      polls the cluster for managed pods.  Default 300 seconds (5 minutes).
     """
 
     model_config = SettingsConfigDict(  # type: ignore[assignment]
@@ -149,6 +158,31 @@ class KubernetesProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignor
     min_kubernetes_version: str = Field(
         "1.28",
         description="Minimum supported Kubernetes API server version (validated on health check).",
+    )
+
+    # Reconciliation / garbage collection
+    auto_cleanup_orphans: bool = Field(
+        False,
+        description=(
+            "When True the orphan garbage collector deletes managed pods that "
+            "have no matching record in ORB storage.  Default False so operators "
+            "can debug orphans; they are always logged regardless of this flag."
+        ),
+    )
+    orphan_gc_enabled: bool = Field(
+        False,
+        description=(
+            "Operator-level enable flag for the periodic orphan garbage-collection "
+            "asyncio task.  Default False; flip to True once the operator is "
+            "happy with the reconciler's behaviour in their environment."
+        ),
+    )
+    orphan_gc_interval_seconds: int = Field(
+        300,
+        description=(
+            "How often (in seconds) the orphan GC asyncio task polls the cluster "
+            "for managed pods.  Default 300 (5 minutes)."
+        ),
     )
 
     @field_validator("namespaces")

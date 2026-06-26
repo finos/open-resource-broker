@@ -187,13 +187,14 @@ class KubernetesJobHandler(KubernetesHandlerBase):
             # fulfilment verdict on the Job status because the
             # controller's view is authoritative for run-to-completion
             # semantics.
+            cached_instances = self.apply_pod_timeouts(list(cached.instances))
             controller_view = self._read_job_status(namespace, job_name)
             fulfilment = self._compute_fulfilment(
-                cached.instances,
+                cached_instances,
                 request.requested_count,
                 controller_view=controller_view,
             )
-            return CheckHostsStatusResult(instances=cached.instances, fulfilment=fulfilment)
+            return CheckHostsStatusResult(instances=cached_instances, fulfilment=fulfilment)
 
         selector = self.build_label_selector(request)
 
@@ -227,6 +228,7 @@ class KubernetesJobHandler(KubernetesHandlerBase):
         instances: list[dict[str, Any]] = [
             self._instance_dict_for_pod(pod, namespace=namespace) for pod in pods
         ]
+        instances = self.apply_pod_timeouts(instances)
         controller_view = self._read_job_status(namespace, job_name)
         fulfilment = self._compute_fulfilment(
             instances,

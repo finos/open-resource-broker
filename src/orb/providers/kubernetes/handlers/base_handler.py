@@ -23,6 +23,7 @@ from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.resilience import retry
 from orb.providers.kubernetes.configuration.config import KubernetesProviderConfig
 from orb.providers.kubernetes.infrastructure.kubernetes_client import KubernetesClient
+from orb.providers.kubernetes.reconciliation.timeout_gc import apply_pod_timeout
 from orb.providers.kubernetes.utilities.pod_spec import request_id_label_selector
 
 T = TypeVar("T")
@@ -109,6 +110,25 @@ class KubernetesHandlerBase(ABC):
     def build_label_selector(self, request: Request) -> str:
         """Convenience: build the ``label_selector=orb.io/request-id=<id>`` string."""
         return request_id_label_selector(request, label_prefix=self._config.label_prefix)
+
+    def apply_pod_timeouts(
+        self,
+        instances: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Rewrite per-instance dicts for pods stuck Pending past the timeout.
+
+        Wrapper around
+        :func:`orb.providers.kubernetes.reconciliation.timeout_gc.apply_pod_timeout`
+        that pulls the timeout from the provider config so handler call
+        sites stay one line.  See the timeout_gc module docstring for
+        the rewrite semantics — chiefly: ``status="terminated"`` and
+        ``provider_data.unschedulable_reason`` populated from
+        ``pod.status.conditions``.
+        """
+        return apply_pod_timeout(
+            instances,
+            pod_timeout_seconds=float(self._config.pod_timeout_seconds),
+        )
 
     def is_not_found(self, exc: BaseException) -> bool:
         """Return ``True`` when ``exc`` is (or wraps) a kubernetes 404 ``ApiException``.

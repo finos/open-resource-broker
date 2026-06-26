@@ -248,6 +248,7 @@ class KubernetesPodHandler(KubernetesHandlerBase):
         instances: list[dict[str, Any]] = [
             self._instance_dict_for_pod(pod, namespace=namespace) for pod in pods
         ]
+        instances = self.apply_pod_timeouts(instances)
         fulfilment = self._compute_fulfilment(instances, request.requested_count)
         return CheckHostsStatusResult(instances=instances, fulfilment=fulfilment)
 
@@ -293,6 +294,7 @@ class KubernetesPodHandler(KubernetesHandlerBase):
             return None
 
         instances = [self._instance_dict_for_state(state) for state in states]
+        instances = self.apply_pod_timeouts(instances)
         fulfilment = self._compute_fulfilment(instances, request.requested_count)
         return CheckHostsStatusResult(instances=instances, fulfilment=fulfilment)
 

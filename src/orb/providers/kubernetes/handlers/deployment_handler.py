@@ -221,13 +221,14 @@ class KubernetesDeploymentHandler(KubernetesHandlerBase):
             # When the cache served the per-pod list, still rebase the
             # fulfilment verdict on the Deployment status because the
             # controller's view is authoritative for selective scale.
+            cached_instances = self.apply_pod_timeouts(list(cached.instances))
             controller_view = self._read_deployment_status(namespace, deployment_name)
             fulfilment = self._compute_fulfilment(
-                cached.instances,
+                cached_instances,
                 request.requested_count,
                 controller_view=controller_view,
             )
-            return CheckHostsStatusResult(instances=cached.instances, fulfilment=fulfilment)
+            return CheckHostsStatusResult(instances=cached_instances, fulfilment=fulfilment)
 
         selector = self.build_label_selector(request)
 
@@ -261,6 +262,7 @@ class KubernetesDeploymentHandler(KubernetesHandlerBase):
         instances: list[dict[str, Any]] = [
             self._instance_dict_for_pod(pod, namespace=namespace) for pod in pods
         ]
+        instances = self.apply_pod_timeouts(instances)
         controller_view = self._read_deployment_status(namespace, deployment_name)
         fulfilment = self._compute_fulfilment(
             instances,
