@@ -90,10 +90,6 @@ ci-tests-e2e:  ## Run end-to-end tests only (matches ci.yml e2e-tests job)
 	@echo "Running end-to-end tests..."
 	$(call run-tool,pytest,$(TESTS_E2E) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-e2e.xml --junitxml=junit-e2e.xml)
 
-ci-tests-onmoto:  ## Run onmoto (mocked AWS) tests only (matches ci.yml onmoto-tests job)
-	@echo "Running onmoto tests..."
-	$(call run-tool,pytest,$(TESTS_ONMOTO) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-onmoto.xml --junitxml=junit-onmoto.xml)
-
 ci-tests-matrix:  ## Run comprehensive test matrix (matches test-matrix.yml workflow)
 	@echo "Running comprehensive test matrix..."
 	$(call run-tool,pytest,$(TESTS) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-matrix.xml --junitxml=junit-matrix.xml)
@@ -102,9 +98,16 @@ ci-tests-performance:  ## Run performance tests only (matches ci.yml performance
 	@echo "Running performance tests..."
 	$(call run-tool,pytest,$(TESTS_PERFORMANCE) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-performance.xml --junitxml=junit-performance.xml)
 
-ci-tests-providers:  ## Run providers tests only (matches ci.yml providers-tests job)
-	@echo "Running providers tests..."
-	$(call run-tool,pytest,$(TESTS_PROVIDERS) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-providers.xml --junitxml=junit-providers.xml)
+# Per-provider matrix target. Pass PROVIDER=<name> to scope the run to a
+# single provider's test subtree (e.g. PROVIDER=aws → tests/providers/aws).
+# CI's per-provider matrix invokes this with PROVIDER set for each entry;
+# local dev can omit it to run the full tests/providers tree.
+PROVIDER ?=
+PROVIDER_SUFFIX := $(if $(PROVIDER),-$(PROVIDER),)
+PROVIDER_PATH := $(if $(PROVIDER),$(TESTS_PROVIDERS)/$(PROVIDER),$(TESTS_PROVIDERS))
+ci-tests-providers:  ## Run providers tests (PROVIDER=<name> scopes to one provider)
+	@echo "Running provider tests: $(if $(PROVIDER),$(PROVIDER),all)..."
+	$(call run-tool,pytest,$(PROVIDER_PATH) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-providers$(PROVIDER_SUFFIX).xml --junitxml=junit-providers$(PROVIDER_SUFFIX).xml)
 
 ci-tests-infrastructure:  ## Run infrastructure tests only (matches ci.yml infrastructure-tests job)
 	@echo "Running infrastructure tests..."

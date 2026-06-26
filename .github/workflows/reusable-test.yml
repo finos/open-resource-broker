@@ -4,9 +4,14 @@ on:
   workflow_call:
     inputs:
       test-type:
-        description: 'Type of tests to run (unit, integration, e2e, performance)'
+        description: 'Type of tests to run (unit, integration, e2e, performance, providers, infrastructure)'
         required: true
         type: string
+      provider:
+        description: 'When test-type=providers, scope the run to a single provider subtree (e.g. aws, k8s).'
+        required: false
+        type: string
+        default: ''
       python-version:
         description: 'Python version to test with'
         required: false
@@ -65,7 +70,7 @@ env:
 
 jobs:
   test:
-    name: ${{ inputs.test-type == 'unit' && 'Unit Tests' || inputs.test-type == 'integration' && 'Integration Tests' || inputs.test-type == 'e2e' && 'End-to-End Tests' || format('{0} Tests', inputs.test-type) }}
+    name: ${{ inputs.test-type == 'unit' && 'Unit Tests' || inputs.test-type == 'integration' && 'Integration Tests' || inputs.test-type == 'e2e' && 'End-to-End Tests' || (inputs.test-type == 'providers' && inputs.provider != '') && format('Providers Tests ({0})', inputs.provider) || format('{0} Tests', inputs.test-type) }}
     runs-on: ${{ inputs.os }}
     permissions:
       contents: read
@@ -81,14 +86,14 @@ jobs:
           fail-on-cache-miss: false
 
       - name: Run tests
-        run: make ci-tests-${{ inputs.test-type }}
+        run: make ci-tests-${{ inputs.test-type }} PROVIDER=${{ inputs.provider }}
         continue-on-error: ${{ inputs.continue-on-error }}
 
       - name: Upload test results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         if: always()
         with:
-          name: test-results-${{ inputs.test-type }}-${{ inputs.os }}-py${{ inputs.python-version || inputs.default-python-version }}
+          name: test-results-${{ inputs.test-type }}${{ inputs.provider != '' && format('-{0}', inputs.provider) || '' }}-${{ inputs.os }}-py${{ inputs.python-version || inputs.default-python-version }}
           retention-days: 30
           path: |
             junit-*.xml
@@ -100,9 +105,9 @@ jobs:
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage-${{ inputs.test-type }}.xml
-          flags: ${{ inputs.test-type }}
-          name: ${{ inputs.test-type }}-tests
+          files: coverage-${{ inputs.test-type }}${{ inputs.provider != '' && format('-{0}', inputs.provider) || '' }}.xml
+          flags: ${{ inputs.test-type }}${{ inputs.provider != '' && format('-{0}', inputs.provider) || '' }}
+          name: ${{ inputs.test-type }}${{ inputs.provider != '' && format('-{0}', inputs.provider) || '' }}-tests
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -110,4 +115,4 @@ jobs:
         uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3  # v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: junit-${{ inputs.test-type }}.xml
+          files: junit-${{ inputs.test-type }}${{ inputs.provider != '' && format('-{0}', inputs.provider) || '' }}.xml

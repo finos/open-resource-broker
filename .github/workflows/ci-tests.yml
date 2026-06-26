@@ -84,27 +84,21 @@ jobs:
       environment: ${{ needs.config.outputs.environment }}
       testing-flag: ${{ needs.config.outputs.testing-flag }}
 
-  onmoto-tests:
-    name: Onmoto Tests (Default Python)
-    needs: [config, setup-cache]
-    uses: ./.github/workflows/reusable-test.yml
-    with:
-      test-type: onmoto
-      python-version: ${{ needs.config.outputs.default-python-version }}
-      default-python-version: ${{ needs.config.outputs.default-python-version }}
-      continue-on-error: false
-      aws-region: ${{ needs.config.outputs.aws-region }}
-      aws-access-key: ${{ needs.config.outputs.aws-access-key }}
-      aws-secret-key: ${{ needs.config.outputs.aws-secret-key }}
-      environment: ${{ needs.config.outputs.environment }}
-      testing-flag: ${{ needs.config.outputs.testing-flag }}
-
+  # Per-provider matrix. One job per provider subtree under
+  # tests/providers/. New providers land here as new matrix entries —
+  # no separate onmoto job needed (moto-mocked tests live under
+  # tests/providers/aws/moto and run as part of the aws entry).
   providers-tests:
-    name: Providers & Infrastructure Tests (Default Python)
+    name: Providers Tests
     needs: [config, setup-cache]
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [aws]
     uses: ./.github/workflows/reusable-test.yml
     with:
       test-type: providers
+      provider: ${{ matrix.provider }}
       python-version: ${{ needs.config.outputs.default-python-version }}
       default-python-version: ${{ needs.config.outputs.default-python-version }}
       continue-on-error: false
@@ -161,7 +155,7 @@ jobs:
   test-report:
     name: Generate Test Report
     runs-on: ubuntu-latest
-    needs: [config, setup-cache, tests, integration-tests, e2e-tests, onmoto-tests, providers-tests, infrastructure-tests]
+    needs: [config, setup-cache, tests, integration-tests, e2e-tests, providers-tests, infrastructure-tests]
     if: always()
     permissions:
       contents: read
