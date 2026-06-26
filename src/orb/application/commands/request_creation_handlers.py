@@ -215,10 +215,6 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         self._deprovisioning_orchestrator = DeprovisioningOrchestrator(
             uow_factory, logger, container, query_bus, provider_selection_port
         )
-        # Hold strong references to background deprovisioning tasks so the
-        # event loop's weak-reference set doesn't GC them mid-flight. Each
-        # task removes itself via done_callback once complete.
-        self._background_tasks: set[Any] = set()
 
     async def validate_command(self, command: CreateReturnRequestCommand):
         """Validate create return request command."""
@@ -323,39 +319,24 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             command.processed_machines = valid_machines
             command.skipped_machines = skipped_machines
 
-            # Fire deprovisioning in the background and return immediately.
-            # The HTTP caller (UI / CLI) only needs the request IDs to land —
-            # actual provider termination (TerminateInstances / DeleteFleet)
-            # can take 15-60s on AWS which exceeds typical UI timeouts and
-            # leaves the operator looking at a "failed" toast even though
-            # the return request was created successfully and is processing.
-            #
-            # Errors raised inside the background coroutine are logged but
-            # never surface to the original HTTP caller; the request's
-            # status_message + error_details fields capture them for the UI's
-            # next sync. ``asyncio.create_task`` requires a running event
-            # loop, which is always present here because execute_command is
-            # awaited from FastAPI.
-            async def _deprovision_all() -> None:
-                for machine_ids, request, provider_name in pending_deprovision:
-                    try:
-                        await self._execute_deprovisioning_for_request(
-                            machine_ids, request, provider_name
-                        )
-                    except Exception as deprov_err:
-                        self.logger.error(
-                            "Background deprovisioning failed for request %s: %s",
-                            request.request_id,
-                            deprov_err,
-                            exc_info=True,
-                        )
-
-            # Detach — caller does not await. Strong-reference the task on
-            # the handler so the event loop's weak-set doesn't GC it
-            # mid-flight; discard once the coroutine settles.
-            _task = asyncio.create_task(_deprovision_all())
-            self._background_tasks.add(_task)
-            _task.add_done_callback(self._background_tasks.discard)
+            # Synchronous deprovisioning: await provider termination before
+            # returning. Integration tests + the CLI rely on the handler
+            # reaching a terminal status by the time it returns; UI-side
+            # responsiveness is addressed at the API layer (the HTTP
+            # caller can return early via a 202 + background task at the
+            # router level, not here in the command handler).
+            for machine_ids, request, provider_name in pending_deprovision:
+                try:
+                    await self._execute_deprovisioning_for_request(
+                        machine_ids, request, provider_name
+                    )
+                except Exception as deprov_err:
+                    self.logger.error(
+                        "Deprovisioning failed for request %s: %s",
+                        request.request_id,
+                        deprov_err,
+                        exc_info=True,
+                    )
 
         except Exception as e:
             self.logger.error(
