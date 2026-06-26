@@ -246,13 +246,11 @@ def start(
     os.setsid()
     grandchild = os.fork()
     if grandchild > 0:
-        _terminate_intermediate()
+        # Intermediate fork exits without running atexit / finally clauses;
+        # the grandchild owns the daemon lifecycle from here on.
+        os._exit(0)
     _run_daemon_grandchild(write_fd, pid_path, log_path, wd_path, runtime)
-
-
-def _terminate_intermediate() -> NoReturn:
-    """Intermediate fork exits without running atexit / finally clauses."""
-    os._exit(0)
+    raise AssertionError("unreachable: _run_daemon_grandchild is NoReturn")
 
 
 def stop(
