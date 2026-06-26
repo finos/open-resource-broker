@@ -106,8 +106,8 @@ complete, flip it to `false`.
 | `attributes.tolerations`          | `tolerations`                                  | Same `list[dict]` shape.                                                     |
 | `attributes.resources.requests`   | `resource_requests`                            | Same `dict[str,str]` shape (e.g. `{"cpu":"1","memory":"2Gi"}`).              |
 | `attributes.resources.limits`     | `resource_limits`                              | Same shape as requests.                                                      |
-| `attributes.environment`          | `environment_variables`                        | `dict[str,str]`.                                                             |
-| `attributes.imagePullSecrets`     | `image_pull_secrets`                           | `list[str]`.                                                                 |
+| `attributes.environment`          | `env`                                          | `dict[str,str]`.                                                             |
+| `attributes.imagePullSecrets`     | `image_pull_secret`                            | `str` — single image-pull secret name.                                       |
 | `attributes.labels`               | `labels`                                       | ORB-emitted labels always win when key conflicts arise.                      |
 | `attributes.annotations`          | `annotations`                                  | Free-form passthrough.                                                       |
 | n/a                               | `provider_api`                                 | New required field - `Pod`, `Deployment`, `StatefulSet`, or `Job`. |

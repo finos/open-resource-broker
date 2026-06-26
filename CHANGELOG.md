@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - New `[aws]` extra (alias for AWS deps currently in core). The canonical install
   command going forward is `pip install orb-py[aws]`. This continues to work
   unchanged when AWS deps move out of core in a future major version.
-- New `[kubernetes]` extra: modern first-class Kubernetes provider with Pod, Deployment, StatefulSet, and Job handlers, watch-based ingestion, startup reconciliation, and orphan garbage collection. Install with `pip install "orb-py[kubernetes]"`. See `docs/root/providers/kubernetes/index.md` for the full reference.
+- New `[k8s]` extra: modern first-class Kubernetes provider with Pod, Deployment, StatefulSet, and Job handlers, watch-based ingestion, startup reconciliation, and orphan garbage collection. Install with `pip install "orb-py[k8s]"`. See `docs/root/providers/kubernetes/index.md` for the full reference.
 - New `[all-providers]` meta-extra: pulls in all currently implemented providers.
 - New `[monitoring-aws]` extra: AWS-specific OpenTelemetry boto instrumentation (previously bundled inside `[monitoring]`).
 - New `[test-aws]` extra: moto + response-mocking deps for AWS test suites.

@@ -65,10 +65,6 @@ rules:
   - apiGroups: ["apps"]
     resources: ["deployments/scale", "statefulsets/scale"]
     verbs: ["get", "patch"]
-  - apiGroups: ["apps"]
-    resources: ["replicasets"]
-    verbs: ["get", "list", "watch"]
-
   # batch/v1 — required for the Job handler.
   - apiGroups: ["batch"]
     resources: ["jobs"]
@@ -91,4 +87,83 @@ subjects:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
+  name: orb
+
+# ---------------------------------------------------------------------------
+# Cluster-scoped variant
+# ---------------------------------------------------------------------------
+# Use this section INSTEAD of the Role + RoleBinding above when you set
+# `namespaces: ["*"]` in K8sProviderConfig (cluster-scoped watch mode).
+# The watcher must be able to list/watch the target resource types across all
+# namespaces; a namespaced Role cannot grant that.
+#
+# Apply with:
+#     kubectl apply -f docs/root/providers/k8s/rbac-cluster-scoped.yaml
+# or inline by replacing the Role + RoleBinding section above.
+#
+# NOTE: ClusterRole + ClusterRoleBinding grant permissions cluster-wide.
+# Review with your security team before applying in shared clusters.
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: orb
+  labels:
+    app.kubernetes.io/name: orb
+    app.kubernetes.io/component: cluster-scoped-watch
+rules:
+  # Core — required for the Pod handler and for the cluster-scoped watch task.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/status"]
+    verbs: ["get"]
+  # Pod logs — optional; useful for diagnosing handler creation failures.
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  # Events — optional; lets operators use `kubectl describe pod <orb-pod>`
+  # to surface scheduling failures across all namespaces.
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+
+  # apps/v1 — required for the Deployment and StatefulSet handlers.
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/status", "statefulsets/status"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale", "statefulsets/scale"]
+    verbs: ["get", "patch"]
+
+  # batch/v1 — required for the Job handler.
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs/status"]
+    verbs: ["get"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: orb
+  labels:
+    app.kubernetes.io/name: orb
+    app.kubernetes.io/component: cluster-scoped-watch
+subjects:
+  - kind: ServiceAccount
+    name: orb
+    namespace: orb
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
   name: orb
