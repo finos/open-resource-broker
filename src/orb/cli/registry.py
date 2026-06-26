@@ -263,6 +263,7 @@ def build_registry() -> None:
         handle_show_storage_config,
         handle_storage_health,
         handle_storage_metrics,
+        handle_storage_migrate,
         handle_test_storage,
         handle_validate_storage_config,
     )
@@ -271,6 +272,7 @@ def build_registry() -> None:
     register("storage", "show", handle_show_storage_config)
     register("storage", "health", handle_storage_health)
     register("storage", "metrics", handle_storage_metrics)
+    register("storage", "migrate", handle_storage_migrate)
     register("storage", "test", handle_test_storage)
     register("storage", "validate", handle_validate_storage_config)
 

@@ -686,6 +686,17 @@ For more information, visit: {DOCS_URL}
     add_global_arguments(storage_metrics)
     storage_metrics.add_argument("--strategy", help="Show metrics for specific storage strategy")
 
+    storage_migrate = storage_subparsers.add_parser(
+        "migrate",
+        help="Run SQL storage migrations (Alembic). No-op for JSON backend.",
+    )
+    add_global_arguments(storage_migrate)
+    storage_migrate.add_argument(
+        "migrate_subcommand",
+        choices=["up", "down", "current", "history"],
+        help="Alembic action: up (upgrade head), down (downgrade -1), current (show), history (list)",
+    )
+
     # Scheduler
     scheduler_parser = subparsers.add_parser("scheduler", help="Scheduler")
     resource_parsers["scheduler"] = scheduler_parser
