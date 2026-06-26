@@ -33,6 +33,7 @@ from .storage_schema import (
     StorageConfig,
 )
 from .template_schema import TemplateConfig
+from .ui_schema import UIConfig
 
 __all__: list[str] = [
     "AdaptiveBatchSizingConfig",
@@ -71,5 +72,7 @@ __all__: list[str] = [
     "StrategyCircuitBreakerConfig",
     # Template configuration
     "TemplateConfig",
+    # UI configuration
+    "UIConfig",
     "validate_config",
 ]

@@ -68,6 +68,54 @@ def register_core_services(container: DIContainer) -> None:
         bus.register_handler("RequestCreatedEvent", handler)
         bus.register_handler("RequestCompletedEvent", handler)
         bus.register_handler("RequestFailedEvent", handler)
+
+        # Wire SseEventHandler so domain events are pushed to active SSE
+        # connections.  Guarded by a try/except so a missing [api] extra
+        # or an import failure never prevents the application from starting.
+        try:
+            from orb.api.routers.events import sse_event_bus
+            from orb.application.events.base.event_handler import EventHandler
+            from orb.domain.base.events import DomainEvent
+
+            import json as _json
+
+            class _SseEventHandler(EventHandler):
+                """Bridge between ORB's synchronous EventBus and the SSE pubsub.
+
+                EventHandler's template-method ``handle()`` calls
+                ``process_event()`` as its abstract hook; that's where the
+                push to ``sse_event_bus`` lives. Overriding ``handle()``
+                directly would skip the surrounding logging / retry /
+                error-handling that the base class wraps around each
+                handler invocation.
+                """
+
+                async def process_event(self, event: DomainEvent) -> None:  # type: ignore[override]
+                    event_type = getattr(event, "event_type", event.__class__.__name__)
+                    try:
+                        payload = (
+                            _json.loads(event.model_dump_json())
+                            if hasattr(event, "model_dump_json")
+                            else {}
+                        )
+                    except Exception:
+                        payload = {}
+                    await sse_event_bus.publish(event_type, payload)
+
+            _sse_handler = _SseEventHandler()
+            for _et in (
+                "MachineCreatedEvent", "MachineStatusChangedEvent", "MachineTerminatedEvent",
+                "RequestCreatedEvent", "RequestStatusChangedEvent",
+                "RequestCompletedEvent", "RequestFailedEvent",
+                "TemplateCreatedEvent", "TemplateUpdatedEvent", "TemplateDeletedEvent",
+            ):
+                bus.register_handler(_et, _sse_handler)
+        except Exception as _sse_err:  # noqa: BLE001
+            import logging as _logging
+            _logging.getLogger(__name__).debug(
+                "SseEventHandler not registered with EventBus (SSE push disabled): %s", _sse_err
+            )
+
         return bus
 
     container.register_singleton(EventBus, create_event_bus)
