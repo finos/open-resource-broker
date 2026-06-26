@@ -378,10 +378,8 @@ class ProvisioningOrchestrationService:
                 # Surface the capacity-constrained signal on the outcome
                 # metadata so status handlers + telemetry can distinguish
                 # "still pending" (provider just hasn't reported yet) from
-                # "stuck pending" (insufficient capacity in the AZ / fleet
-                # bucket the provider chose). The flag is set by provider
-                # handlers when the SDK returned a partial-fulfilment
-                # error like InsufficientInstanceCapacity.
+                # "stuck pending" (provider returned a capacity error).
+                # Provider handlers set the flag; consumers read it.
                 merged_provider_data["capacity_constrained"] = has_capacity_error
 
                 # fulfillment_final=True means the provider has finished
