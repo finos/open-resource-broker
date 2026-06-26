@@ -225,9 +225,10 @@ async def handle_server_reload(args) -> dict[str, Any]:
     try:
         # URL is composed from operator-controlled config (server host/port
         # or the embedded-UI backend port). Not user-controlled at the HTTP
-        # boundary — safe to pass to urlopen. nosec annotation pins the
-        # semgrep dynamic-urllib finding.
+        # boundary — safe to pass to urlopen.
+        # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
         req = urllib.request.Request(url, method="POST", data=b"")  # nosec B310
+        # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
         with urllib.request.urlopen(req, timeout=5) as resp:  # nosec B310
             body = json.loads(resp.read().decode() or "{}")
             return {"method": "http", "url": url, "status": resp.status, **body}

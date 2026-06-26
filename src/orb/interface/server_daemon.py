@@ -29,6 +29,8 @@ from typing import Any, Callable, Coroutine
 
 from orb.infrastructure.logging.logger import get_logger
 
+logger = get_logger(__name__)
+
 
 def _expand(path: str) -> Path:
     return Path(os.path.expanduser(os.path.expandvars(path))).resolve()
@@ -93,8 +95,10 @@ def _redirect_stdio(log_file: Path) -> None:
     try:
         sys.stdout.flush()
         sys.stderr.flush()
-    except Exception:
-        pass
+    except Exception as exc:
+        # Flush failure during daemonisation is non-fatal — the stdio
+        # handoff continues with whatever buffered output is on the wire.
+        logger.debug("stdio flush failed during daemon handoff: %s", exc)
     log_fd = os.open(str(log_file), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
     try:
         # ``sys.stdout/.stderr`` may be replaced with non-fileno wrappers
@@ -108,8 +112,10 @@ def _redirect_stdio(log_file: Path) -> None:
                 target_fd = default_fd
             try:
                 os.dup2(log_fd, target_fd)
-            except OSError:
-                pass
+            except OSError as exc:
+                # Best-effort: some unusual runtimes refuse dup2 on a
+                # particular fd; keep going so we still daemonise.
+                logger.debug("dup2 failed on fd %d: %s", target_fd, exc)
         try:
             stdin_fd = sys.stdin.fileno()
         except (AttributeError, OSError, ValueError):
@@ -118,8 +124,10 @@ def _redirect_stdio(log_file: Path) -> None:
             devnull = os.open(os.devnull, os.O_RDONLY)
             os.dup2(devnull, stdin_fd)
             os.close(devnull)
-        except OSError:
-            pass
+        except OSError as exc:
+            # Best-effort stdin /dev/null redirect; daemon proceeds even
+            # if the host filesystem hides /dev/null (containers etc.).
+            logger.debug("stdin /dev/null redirect failed: %s", exc)
     finally:
         os.close(log_fd)
 
@@ -178,6 +186,8 @@ def start(
             try:
                 pid_path.unlink()
             except FileNotFoundError:
+                # PID file already removed by a parallel stop/restart;
+                # cleanup is idempotent.
                 pass
             os.close(lock_fd)
         return {"pid": os.getpid(), "status": "exited", "exit_code": rc}
@@ -226,6 +236,8 @@ def start(
             with os.fdopen(write_fd, "wb") as w:
                 w.write(f"err:{exc}".encode("utf-8"))
         except Exception:
+            # Best-effort error reporting in the daemon child; if even the
+            # pipe write fails the parent will treat the EOF as failure.
             pass
         os._exit(1)
 
@@ -233,6 +245,9 @@ def start(
         with os.fdopen(write_fd, "wb") as w:
             w.write(f"ok:{os.getpid()}".encode("utf-8"))
     except Exception:
+        # Readiness notification is best-effort. The parent treats an
+        # empty pipe payload as failure, but the daemon itself keeps
+        # running — operators can still see it via PID file + health.
         pass
 
     try:
@@ -241,10 +256,12 @@ def start(
         try:
             pid_path.unlink()
         except FileNotFoundError:
+            # Cleanup race with a parallel stop/restart; idempotent.
             pass
         try:
             os.close(daemon_fd)
         except OSError:
+            # fd already closed (interpreter teardown can race); ignore.
             pass
 
     os._exit(rc)
@@ -298,6 +315,7 @@ def stop(
     try:
         pid_path.unlink()
     except FileNotFoundError:
+        # PID file already removed by the daemon itself during teardown.
         pass
     return {"pid": pid, "status": "killed" if not _pid_is_alive(pid) else "still_running"}
 
@@ -333,6 +351,7 @@ def status(
             # health_url is composed by the CLI from operator-controlled
             # ServerConfig (host/port) — not user-controlled at the HTTP
             # boundary. Safe to pass to urlopen.
+            # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
             with urllib.request.urlopen(health_url, timeout=1.5) as resp:  # nosec B310
                 out["health_status"] = resp.status
                 out["health_ok"] = 200 <= resp.status < 300

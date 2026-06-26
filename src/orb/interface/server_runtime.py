@@ -185,8 +185,10 @@ async def run_embedded_foreground(
         logger.info("Forwarding signal %s to Reflex process group %s", signum, pgid)
         try:
             os.killpg(pgid, signum)
-        except ProcessLookupError:
-            pass
+        except ProcessLookupError as exc:
+            # Process group exited between getpgid and killpg — expected
+            # race on shutdown, nothing to forward.
+            logger.debug("killpg race for signal %s: %s", signum, exc)
 
     # SIGHUP is NOT wired here: forwarding it to the Reflex CLI child
     # group kills the Bun frontend dev server. The CLI `orb server
@@ -195,8 +197,10 @@ async def run_embedded_foreground(
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
             loop.add_signal_handler(sig, _terminate_group, sig)
-        except (NotImplementedError, RuntimeError):
-            pass
+        except (NotImplementedError, RuntimeError) as exc:
+            # Some loops (Windows / restricted runtimes) don't support
+            # signal handlers; non-fatal — we just lose signal forwarding.
+            logger.debug("add_signal_handler(%s) unsupported: %s", sig, exc)
 
     try:
         rc = await proc.wait()
@@ -205,12 +209,20 @@ async def run_embedded_foreground(
             try:
                 pgid = os.getpgid(proc.pid)
                 os.killpg(pgid, signal.SIGTERM)
-            except (ProcessLookupError, PermissionError):
+            except ProcessLookupError:
+                # Process group already exited; nothing to terminate.
                 pass
+            except PermissionError as exc:
+                # We do not own the group (uncommon — would require a
+                # uid drop between spawn and wait). Log and continue;
+                # the orphan will be reaped by init.
+                logger.debug("killpg permission denied: %s", exc)
         for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
             try:
                 loop.remove_signal_handler(sig)
-            except (NotImplementedError, RuntimeError, ValueError):
-                pass
+            except (NotImplementedError, RuntimeError, ValueError) as exc:
+                # Handler was never installed (see add_signal_handler
+                # above) or the loop is already closed — non-fatal.
+                logger.debug("remove_signal_handler(%s) failed: %s", sig, exc)
 
     return {"message": f"Reflex exited with code {rc}", "exit_code": rc}
