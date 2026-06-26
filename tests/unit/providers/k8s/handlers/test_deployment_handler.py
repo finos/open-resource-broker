@@ -276,6 +276,81 @@ async def test_release_hosts_selective_404_on_victim_is_best_effort() -> None:
     )
 
 
+@pytest.mark.asyncio
+async def test_release_hosts_partial_annotation_failure_minority_proceeds() -> None:
+    """When fewer than 50% of victim annotations fail the release still
+    proceeds — the controller will preferentially terminate the annotated
+    pods and the unannotated ones will be evicted last."""
+    from kubernetes.client.exceptions import ApiException
+
+    core_v1 = MagicMock()
+    _fail_pods = {"pod-x"}
+
+    def _patch(*, name: str, namespace: str, body: Any) -> None:
+        if name in _fail_pods:
+            raise ApiException(status=503, reason="Service Unavailable")
+        return None
+
+    core_v1.patch_namespaced_pod.side_effect = _patch
+    apps_v1 = MagicMock()
+    apps_v1.read_namespaced_deployment.return_value = _make_deployment_status(spec_replicas=4)
+    apps_v1.patch_namespaced_deployment_scale.return_value = SimpleNamespace()
+
+    client = _make_client(core_v1=core_v1, apps_v1=apps_v1)
+    handler = _make_handler(client=client)
+    handler._max_retries = 1
+
+    request = _make_request(
+        requested_count=4,
+        deployment_name="orb-deadbeef",
+        namespace="orb-test",
+    )
+
+    # 1 out of 3 victims fails annotation — below the 50% threshold, so
+    # the release must continue and patch spec.replicas from 4 to 1.
+    await handler.release_hosts(["pod-a", "pod-b", "pod-x"], request)
+    apps_v1.patch_namespaced_deployment_scale.assert_called_once()
+    assert (
+        apps_v1.patch_namespaced_deployment_scale.call_args.kwargs["body"]["spec"]["replicas"] == 1
+    )
+
+
+@pytest.mark.asyncio
+async def test_release_hosts_partial_annotation_failure_majority_aborts() -> None:
+    """When more than 50% of victim annotations fail the release is aborted
+    to prevent the controller from terminating arbitrary pods."""
+    from kubernetes.client.exceptions import ApiException
+
+    core_v1 = MagicMock()
+    _fail_pods = {"pod-a", "pod-b"}
+
+    def _patch(*, name: str, namespace: str, body: Any) -> None:
+        if name in _fail_pods:
+            raise ApiException(status=503, reason="Service Unavailable")
+        return None
+
+    core_v1.patch_namespaced_pod.side_effect = _patch
+    apps_v1 = MagicMock()
+    apps_v1.read_namespaced_deployment.return_value = _make_deployment_status(spec_replicas=4)
+    apps_v1.patch_namespaced_deployment_scale.return_value = SimpleNamespace()
+
+    client = _make_client(core_v1=core_v1, apps_v1=apps_v1)
+    handler = _make_handler(client=client)
+    handler._max_retries = 1
+
+    request = _make_request(
+        requested_count=4,
+        deployment_name="orb-deadbeef",
+        namespace="orb-test",
+    )
+
+    # 2 out of 3 victims fail annotation — above the 50% threshold, so
+    # the release must raise and the replicas patch must NOT be applied.
+    with pytest.raises(RuntimeError, match="Aborted selective release"):
+        await handler.release_hosts(["pod-a", "pod-b", "pod-c"], request)
+    apps_v1.patch_namespaced_deployment_scale.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # release_hosts — full release
 # ---------------------------------------------------------------------------

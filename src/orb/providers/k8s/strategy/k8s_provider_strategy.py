@@ -491,7 +491,23 @@ class K8sProviderStrategy(ProviderStrategy):
             ],
             supported_apis=list(self._SUPPORTED_APIS),
             features={
-                "selective_termination": True,
+                # Selective termination support varies by provider_api:
+                #   Pod         — delete individual pods by name (fully selective)
+                #   Deployment  — pod-deletion-cost annotation + replicas patch
+                #   StatefulSet — pod-deletion-cost annotation (highest-ordinal first)
+                #   Job         — deletes the whole Job regardless of machine_ids
+                #                 (NOT selective)
+                # The dict below is the authoritative per-API declaration.
+                # Callers that need a single boolean should treat the
+                # provider as selective only when their target api is in
+                # the True set.
+                "selective_termination": False,
+                "selective_termination_by_api": {
+                    "Pod": True,
+                    "Deployment": True,
+                    "StatefulSet": True,
+                    "Job": False,
+                },
                 "watch_supported": True,
                 "namespaces_supported": True,
             },

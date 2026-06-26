@@ -25,6 +25,7 @@ deletion without operator consent.
 from __future__ import annotations
 
 import asyncio
+import datetime
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
@@ -281,7 +282,22 @@ class OrphanGarbageCollector:
         )
 
     def _delete_orphan(self, orphan: OrphanPod) -> None:
-        """Best-effort delete; swallow 404 (already gone)."""
+        """Best-effort delete; swallow 404 (already gone).
+
+        The min-age guard prevents deletion of pods whose request record may
+        not yet have been committed to storage (in-flight request commit race).
+        """
+        min_age = self._config.orphan_min_age_seconds
+        if min_age > 0 and orphan.creation_timestamp is not None:
+            pod_age_seconds = _pod_age_seconds(orphan.creation_timestamp)
+            if pod_age_seconds is not None and pod_age_seconds < min_age:
+                self._logger.debug(
+                    "Skipping orphan %s; created %.1fs ago, under min-age threshold (%ds)",
+                    orphan.pod_name,
+                    pod_age_seconds,
+                    min_age,
+                )
+                return
         try:
             self._client.core_v1.delete_namespaced_pod(
                 name=orphan.pod_name,
@@ -308,6 +324,23 @@ class OrphanGarbageCollector:
                 orphan.namespace,
                 exc,
             )
+
+
+def _pod_age_seconds(creation_timestamp: str) -> Optional[float]:
+    """Return how many seconds ago the pod was created, or ``None`` on parse failure.
+
+    The kubernetes client serialises ``V1ObjectMeta.creation_timestamp`` as an
+    ISO 8601 string.  We normalise the ``Z`` suffix to ``+00:00`` so that
+    :meth:`datetime.datetime.fromisoformat` works on Python 3.10 as well as 3.11+.
+    """
+    try:
+        ts_str = creation_timestamp.replace("Z", "+00:00")
+        created = datetime.datetime.fromisoformat(ts_str)
+        now = datetime.datetime.now(tz=datetime.timezone.utc)
+        delta = (now - created).total_seconds()
+        return delta
+    except (ValueError, TypeError):
+        return None
 
 
 def _is_not_found(exc: BaseException) -> bool:

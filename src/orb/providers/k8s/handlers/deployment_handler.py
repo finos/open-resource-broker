@@ -284,15 +284,52 @@ class K8sDeploymentHandler(K8sHandlerBase):
         await self._patch_replicas(namespace, deployment_name, target=new_replicas)
 
     async def _annotate_victims(self, *, namespace: str, pod_names: list[str]) -> None:
-        """Patch each victim pod with the negative pod-deletion-cost annotation."""
+        """Patch each victim pod with the negative pod-deletion-cost annotation.
+
+        Uses ``return_exceptions=True`` so that a single transient annotation
+        failure does not abort the remaining victims.  A warning is logged for
+        each individual failure so operators can identify flaky pods.
+
+        If more than half of the victims could not be annotated the release is
+        aborted — the controller would pick arbitrary pods instead of the
+        intended victims, which could silently violate the caller's selection.
+        When the majority succeed ORB proceeds with the replicas patch: the
+        controller still preferentially terminates the annotated pods, and the
+        unannotated ones will be terminated last (lowest-cost-first ordering
+        remains intact for the annotated subset).
+        """
         sem = asyncio.Semaphore(self._max_concurrent_patches)
-        await asyncio.gather(
+        results = await asyncio.gather(
             *(
                 self._annotate_one(sem=sem, namespace=namespace, pod_name=name)
                 for name in pod_names
             ),
-            return_exceptions=False,
+            return_exceptions=True,
         )
+
+        failed: list[tuple[str, BaseException]] = [
+            (name, exc) for name, exc in zip(pod_names, results) if isinstance(exc, BaseException)
+        ]
+
+        if not failed:
+            return
+
+        for pod_name, exc in failed:
+            self._logger.warning(
+                "Victim annotation failed for pod=%s namespace=%s: %s",
+                pod_name,
+                namespace,
+                exc,
+            )
+
+        failure_rate = len(failed) / len(pod_names)
+        if failure_rate > 0.5:
+            raise RuntimeError(
+                f"Aborted selective release: {len(failed)}/{len(pod_names)} victim annotations "
+                f"failed in namespace={namespace!r} — the controller would not honour "
+                f"deletion-cost ordering. Transient errors: "
+                + ", ".join(f"{name}: {exc}" for name, exc in failed)
+            )
 
     async def _annotate_one(
         self,

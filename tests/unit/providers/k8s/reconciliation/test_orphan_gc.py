@@ -8,12 +8,15 @@ Covers:
   deletes via ``delete_namespaced_pod`` with 404 swallowing;
 * the periodic loop — wakes on the configured interval and stops
   cleanly on :meth:`stop`;
-* error tolerance — list failures and known-id failures do not raise.
+* error tolerance — list failures and known-id failures do not raise;
+* min-age grace period — pods younger than ``orphan_min_age_seconds``
+  are skipped; pods older are deleted.
 """
 
 from __future__ import annotations
 
 import asyncio
+import datetime
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
@@ -31,6 +34,7 @@ def _pod(
     name: str,
     request_id: str | None,
     namespace: str = "orb",
+    creation_timestamp: str = "2026-06-19T11:00:00Z",
 ) -> SimpleNamespace:
     labels: dict[str, str] = {"orb.io/managed": "true"}
     if request_id is not None:
@@ -39,9 +43,18 @@ def _pod(
         name=name,
         namespace=namespace,
         labels=labels,
-        creation_timestamp="2026-06-19T11:00:00Z",
+        creation_timestamp=creation_timestamp,
     )
     return SimpleNamespace(metadata=metadata)
+
+
+def _iso_now_offset(seconds: float) -> str:
+    """Return an ISO 8601 UTC timestamp offset by ``seconds`` from now.
+
+    Positive values are in the future; negative values are in the past.
+    """
+    ts = datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(seconds=seconds)
+    return ts.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _make_gc(
@@ -222,3 +235,44 @@ async def test_list_failure_does_not_raise() -> None:
 
     assert orphans == []
     assert gc.stats.last_error is not None
+
+
+# ---------------------------------------------------------------------------
+# Min-age grace period
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_orphan_younger_than_min_age_is_not_deleted() -> None:
+    """A pod created just now must not be deleted: it may be in-flight."""
+    cfg = K8sProviderConfig(namespace="orb", auto_cleanup_orphans=True, orphan_min_age_seconds=300)
+    # Pod created 10 seconds ago — well under the 300 s threshold.
+    recent_ts = _iso_now_offset(-10)
+    pods = [_pod(name="new-orph", request_id="r-stranger", creation_timestamp=recent_ts)]
+    gc, core_v1 = _make_gc(pods=pods, config=cfg, known=["r1"])
+
+    orphans = await gc.run_once()
+
+    # The orphan is still returned (it is classified as an orphan) …
+    assert len(orphans) == 1
+    assert orphans[0].pod_name == "new-orph"
+    # … but no delete call was issued.
+    assert core_v1.delete_namespaced_pod.called is False
+    assert gc.stats.total_orphans_deleted == 0
+
+
+@pytest.mark.asyncio
+async def test_orphan_older_than_min_age_is_deleted() -> None:
+    """A pod older than the min-age threshold must be deleted."""
+    cfg = K8sProviderConfig(namespace="orb", auto_cleanup_orphans=True, orphan_min_age_seconds=60)
+    # Pod created 10 minutes ago — safely over the 60 s threshold.
+    old_ts = _iso_now_offset(-600)
+    pods = [_pod(name="old-orph", request_id="r-stranger", creation_timestamp=old_ts)]
+    gc, core_v1 = _make_gc(pods=pods, config=cfg, known=["r1"])
+
+    await gc.run_once()
+
+    assert core_v1.delete_namespaced_pod.called is True
+    deleted_names = {c.kwargs.get("name") for c in core_v1.delete_namespaced_pod.mock_calls}
+    assert "old-orph" in deleted_names
+    assert gc.stats.total_orphans_deleted == 1

@@ -79,6 +79,21 @@ def test_get_capabilities_lists_v1_apis() -> None:
     }
 
 
+def test_get_capabilities_selective_termination_per_api() -> None:
+    """selective_termination is False at the top level (lowest-common-denominator
+    because Job does not support it).  The per-API dict carries the accurate
+    per-workload declaration."""
+    caps = _make_strategy().get_capabilities()
+    # Top-level flag is the LCM — Job cannot do selective termination.
+    assert caps.features["selective_termination"] is False
+    # Per-API map carries the accurate declaration for each workload type.
+    per_api = caps.features["selective_termination_by_api"]
+    assert per_api["Pod"] is True
+    assert per_api["Deployment"] is True
+    assert per_api["StatefulSet"] is True
+    assert per_api["Job"] is False
+
+
 def test_check_health_happy_path() -> None:
     status = _make_strategy().check_health()
     assert status.is_healthy is True
