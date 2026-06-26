@@ -67,7 +67,13 @@ def create_fastapi_app(server_config: Any) -> Any:
         server_config = ServerConfig()  # type: ignore[call-arg]
 
     from orb.api.documentation import configure_openapi
-    from orb.api.middleware import AuthMiddleware, LoggingMiddleware
+    from orb.api.middleware import (
+        AuditLogMiddleware,
+        AuthMiddleware,
+        LoggingMiddleware,
+        RateLimitMiddleware,
+        ReadOnlyMiddleware,
+    )
     from orb.infrastructure.error.exception_handler import get_exception_handler
 
     # Create FastAPI app with configuration
@@ -82,9 +88,15 @@ def create_fastapi_app(server_config: Any) -> Any:
 
     logger = get_logger(__name__)
 
-    # Add trusted host middleware if configured
-    if server_config.trusted_hosts and server_config.trusted_hosts != ["*"]:
+    # Add trusted host middleware only when an explicit allowlist is provided.
+    # The default is [] (disabled), so omitting this in config is safe.
+    if server_config.trusted_hosts:
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=server_config.trusted_hosts)  # type: ignore[arg-type]
+
+    # Add read-only mode middleware (runs before CORS so preflight OPTIONS still pass freely)
+    if getattr(server_config, "read_only", False):
+        app.add_middleware(ReadOnlyMiddleware, enabled=True)
+        logger.info("Read-only mode middleware enabled")
 
     # Add CORS middleware
     if server_config.cors.enabled:
@@ -96,6 +108,11 @@ def create_fastapi_app(server_config: Any) -> Any:
             allow_headers=server_config.cors.headers,
         )
         logger.info("CORS middleware enabled")
+        if server_config.cors.origins == ["*"] and server_config.auth.enabled:
+            logger.warning(
+                "CORS allows all origins (origins=['*']) with auth enabled — "
+                "consider restricting to known UI origins in production."
+            )
 
     # Add logging middleware
     app.add_middleware(LoggingMiddleware)
@@ -119,6 +136,20 @@ def create_fastapi_app(server_config: Any) -> Any:
             raise ConfigurationError(
                 f"Authentication enabled but strategy '{server_config.auth.strategy}' could not be created"
             )
+
+    # Add rate-limit middleware (runs inside Auth so user identity is already resolved)
+    rate_limiting_cfg = getattr(server_config, "rate_limiting", None)
+    if rate_limiting_cfg is not None and rate_limiting_cfg.get("enabled", True):
+        app.add_middleware(RateLimitMiddleware, rate_limiting_config=rate_limiting_cfg)
+        logger.info(
+            "Rate-limit middleware enabled (%s req/min)",
+            rate_limiting_cfg.get("requests_per_minute", 100),
+        )
+
+    # Add audit-log middleware (innermost — status_code and latency are most accurate here)
+    if getattr(server_config, "audit_log_enabled", True):
+        app.add_middleware(AuditLogMiddleware)
+        logger.info("Audit-log middleware enabled")
 
     # Add global exception handler
     exception_handler = get_exception_handler()
@@ -264,11 +295,18 @@ def _register_routers(app: Any) -> None:
         app: FastAPI application
     """
     try:
-        from orb.api.routers import machines, requests, templates
+        from orb.api.routers import admin, config, events, machines, me, observability, providers, requests, system, templates
 
         app.include_router(templates.router, prefix="/api/v1")
         app.include_router(machines.router, prefix="/api/v1")
         app.include_router(requests.router, prefix="/api/v1")
+        app.include_router(system.router, prefix="/api/v1")
+        app.include_router(events.router, prefix="/api/v1")
+        app.include_router(me.router, prefix="/api/v1")
+        app.include_router(observability.router, prefix="/api/v1")
+        app.include_router(providers.router, prefix="/api/v1")
+        app.include_router(admin.router, prefix="/api/v1")
+        app.include_router(config.router, prefix="/api/v1")
 
     except ImportError as e:
         logger = get_logger(__name__)

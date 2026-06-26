@@ -5,25 +5,34 @@ import json
 from typing import Optional
 
 try:
-    from fastapi import APIRouter, Depends, Query
+    from fastapi import APIRouter, Depends, Query, Request
     from fastapi.responses import JSONResponse, StreamingResponse
 except ImportError:
     raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
 
 from orb.api.dependencies import (
+    check_destructive_admin_allowed as _check_destructive_admin_allowed,
     get_cancel_request_orchestrator,
+    get_di_container,
     get_list_requests_orchestrator,
     get_list_return_requests_orchestrator,
+    get_request_formatter,
     get_request_status_orchestrator,
-    get_response_formatting_service,
+    require_role,
 )
+from orb.api.models.base import APIRequest
 from orb.api.models.responses import RequestOperationResponse, RequestStatusResponse
+from orb.application.services.admin.cleanup_database import (
+    CleanupDatabaseService,
+    NonTerminalStatusError,
+)
 from orb.application.services.orchestration.dtos import (
     CancelRequestInput,
     GetRequestStatusInput,
     ListRequestsInput,
     ListReturnRequestsInput,
 )
+from orb.domain.base import UnitOfWorkFactory
 from orb.infrastructure.error.decorators import handle_rest_exceptions
 
 router = APIRouter(prefix="/requests", tags=["Requests"])
@@ -33,7 +42,7 @@ STATUS_ORCHESTRATOR = Depends(get_request_status_orchestrator)
 LIST_ORCHESTRATOR = Depends(get_list_requests_orchestrator)
 RETURN_LIST_ORCHESTRATOR = Depends(get_list_return_requests_orchestrator)
 CANCEL_ORCHESTRATOR = Depends(get_cancel_request_orchestrator)
-FORMATTER = Depends(get_response_formatting_service)
+FORMATTER = Depends(get_request_formatter)
 STATUS_QUERY = Query(None, description="Filter by request status")
 LIMIT_QUERY = Query(50, description="Limit number of results")
 OFFSET_QUERY = Query(0, ge=0, description="Number of results to skip")
@@ -53,21 +62,34 @@ async def list_requests(
     limit: Optional[int] = LIMIT_QUERY,
     offset: int = OFFSET_QUERY,
     sync: bool = Query(False, description="Sync with provider before returning results"),
+    cursor: Optional[str] = Query(None, description="Opaque pagination cursor"),
+    q: Optional[str] = Query(None, description="Substring search"),
+    sort: Optional[str] = Query(None, description='Sort: "field" / "-field"'),
     orchestrator=LIST_ORCHESTRATOR,
     formatter=FORMATTER,
 ) -> JSONResponse:
-    """
-    List requests with optional filtering.
-
-    - **status**: Filter by request status (pending, running, complete, failed)
-    - **limit**: Limit number of results
-    - **offset**: Number of results to skip
-    - **sync**: Sync with provider before returning results
-    """
+    """List requests with optional filtering and server-side pagination."""
     result = await orchestrator.execute(
-        ListRequestsInput(status=status, limit=limit or 50, offset=offset, sync=sync)
+        ListRequestsInput(
+            status=status,
+            limit=limit or 50,
+            offset=offset,
+            sync=sync,
+            cursor=cursor,
+            q=q,
+            sort=sort,
+        )
     )
-    return JSONResponse(content=formatter.format_request_status(result.requests).data)
+    payload = formatter.format_request_status(result.requests).data
+    if isinstance(payload, dict):
+        payload = {
+            **payload,
+            "total_count": (
+                result.total_count if result.total_count is not None else len(result.requests)
+            ),
+            "next_cursor": result.next_cursor,
+        }
+    return JSONResponse(content=payload)
 
 
 @router.get(
@@ -79,12 +101,33 @@ async def list_requests(
 @handle_rest_exceptions(endpoint="/api/v1/requests/return", method="GET")
 async def list_return_requests(
     limit: int = LIMIT_QUERY,
+    offset: int = OFFSET_QUERY,
+    cursor: Optional[str] = Query(None, description="Opaque pagination cursor"),
+    q: Optional[str] = Query(None, description="Substring search"),
+    sort: Optional[str] = Query(None, description='Sort: "field" / "-field"'),
     orchestrator=RETURN_LIST_ORCHESTRATOR,
     formatter=FORMATTER,
 ) -> JSONResponse:
     """List requests that are pending return."""
-    result = await orchestrator.execute(ListReturnRequestsInput(limit=limit or 50))
-    return JSONResponse(content=formatter.format_request_status(result.requests).data)
+    result = await orchestrator.execute(
+        ListReturnRequestsInput(
+            limit=limit or 50,
+            offset=offset,
+            cursor=cursor,
+            q=q,
+            sort=sort,
+        )
+    )
+    payload = formatter.format_request_status(result.requests).data
+    if isinstance(payload, dict):
+        payload = {
+            **payload,
+            "total_count": (
+                result.total_count if result.total_count is not None else len(result.requests)
+            ),
+            "next_cursor": result.next_cursor,
+        }
+    return JSONResponse(content=payload)
 
 
 @router.get(
@@ -108,6 +151,44 @@ async def get_request_status(
     """
     result = await orchestrator.execute(
         GetRequestStatusInput(request_ids=[request_id], verbose=verbose)
+    )
+    return JSONResponse(content=formatter.format_request_status(result.requests).data)
+
+
+class BatchRequestStatusBody(APIRequest):
+    """Body for ``POST /api/v1/requests/status``.
+
+    Accepts a list of request IDs and an optional ``verbose`` flag. The
+    server fans out one read-through-sync call per ID using the same
+    code path as ``GET /{id}/status`` and returns the results in the
+    same order as the input.
+    """
+
+    request_ids: list[str]
+    verbose: bool = True
+
+
+@router.post(
+    "/status",
+    summary="Batch Get Request Status",
+    description="Read-through-sync a batch of requests by ID.",
+    response_model=RequestStatusResponse,
+)
+@handle_rest_exceptions(endpoint="/api/v1/requests/status", method="POST")
+async def batch_get_request_status(
+    body: BatchRequestStatusBody,
+    orchestrator=STATUS_ORCHESTRATOR,
+    formatter=FORMATTER,
+) -> JSONResponse:
+    """Sync a batch of requests from the provider.
+
+    The orchestrator already iterates ``input.request_ids`` and persists
+    each result, so this endpoint is a thin POST adapter. Failures per
+    request surface as ``{"request_id": ..., "error": "..."}`` entries
+    in the response list rather than failing the whole call.
+    """
+    result = await orchestrator.execute(
+        GetRequestStatusInput(request_ids=body.request_ids, verbose=body.verbose)
     )
     return JSONResponse(content=formatter.format_request_status(result.requests).data)
 
@@ -157,16 +238,18 @@ async def stream_request_status(
 @router.delete(
     "/{request_id}",
     summary="Cancel Request",
-    description="Cancel a pending request",
+    description="Cancel a pending request.",
     response_model=RequestOperationResponse,
 )
 @handle_rest_exceptions(endpoint="/api/v1/requests/{request_id}", method="DELETE")
 async def cancel_request(
     request_id: str,
+    request: Request,
     reason: Optional[str] = Query(None, description="Cancellation reason"),
+    _operator=Depends(require_role("operator")),
     orchestrator=CANCEL_ORCHESTRATOR,
-    formatter=FORMATTER,
 ) -> JSONResponse:
+    formatter = get_request_formatter(request, get_di_container())
     result = await orchestrator.execute(
         CancelRequestInput(
             request_id=request_id,
@@ -177,4 +260,48 @@ async def cancel_request(
         content=formatter.format_request_operation(
             {"request_id": result.request_id, "status": result.status}, result.status
         ).data
+    )
+
+
+@router.post(
+    "/{request_id}/purge",
+    summary="Purge Request",
+    description=(
+        "Hard-delete a request row from storage. Requires "
+        "allow_destructive_admin=true in config, a non-production environment, "
+        "and the request must already be in a terminal state."
+    ),
+)
+async def purge_request(
+    request_id: str,
+    request: Request,
+    _admin=Depends(require_role("admin")),
+    _destructive=Depends(_check_destructive_admin_allowed),
+) -> JSONResponse:
+    container = get_di_container()
+    service = CleanupDatabaseService(uow_factory=container.get(UnitOfWorkFactory))
+
+    try:
+        cleanup_result = service.delete_request(request_id, cascade_machines=True)
+    except KeyError as exc:
+        return JSONResponse(
+            status_code=404,
+            content={"success": False, "error": {"code": "NOT_FOUND", "message": str(exc)}},
+        )
+    except NonTerminalStatusError as exc:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "error": {"code": "NON_TERMINAL_STATUS", "message": str(exc)},
+            },
+        )
+
+    return JSONResponse(
+        status_code=200,
+        content={
+            "deleted": True,
+            "request_id": request_id,
+            "machines_deleted": cleanup_result.machines_deleted,
+        },
     )

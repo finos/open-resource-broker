@@ -62,7 +62,12 @@ class TestStreamEndpoint:
     """Tests for GET /{request_id}/stream SSE endpoint."""
 
     def _make_client(self, app, orchestrator):
+        from orb.api.dependencies import get_request_formatter
+
         app.dependency_overrides[get_request_status_orchestrator] = lambda: orchestrator
+        # Router uses get_request_formatter (header-aware); also override
+        # the non-header variant for safety.
+        app.dependency_overrides[get_request_formatter] = _make_formatter
         app.dependency_overrides[get_response_formatting_service] = _make_formatter
         return TestClient(app, raise_server_exceptions=False)
 

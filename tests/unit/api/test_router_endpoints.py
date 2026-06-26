@@ -13,6 +13,7 @@ from orb.api.dependencies import (
     get_list_requests_orchestrator,
     get_list_return_requests_orchestrator,
     get_machine_orchestrator,
+    get_request_formatter,
     get_request_status_orchestrator,
     get_response_formatting_service,
     get_return_machines_orchestrator,
@@ -106,6 +107,9 @@ class TestMachinesRouter:
 
     def _set_scheduler(self, app, scheduler=None):
         f = self._make_formatter()
+        # Routers depend on get_request_formatter (header-aware); override
+        # both so scheduler-header and non-header paths use the same mock.
+        app.dependency_overrides[get_request_formatter] = lambda: f
         app.dependency_overrides[get_response_formatting_service] = lambda: f
         return f
 
@@ -289,6 +293,9 @@ class TestRequestsRouter:
 
     def _set_scheduler(self, app, scheduler=None):
         f = self._make_formatter()
+        # Routers depend on get_request_formatter (header-aware); override
+        # both so scheduler-header and non-header paths use the same mock.
+        app.dependency_overrides[get_request_formatter] = lambda: f
         app.dependency_overrides[get_response_formatting_service] = lambda: f
         return f
 
