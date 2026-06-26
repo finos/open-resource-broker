@@ -64,7 +64,7 @@ async def test_fetch_provider_machines_replays_persisted_request_metadata():
 @pytest.mark.unit
 @pytest.mark.application
 @pytest.mark.asyncio
-async def test_fetch_provider_machines_for_return_forwards_azure_resource_mapping():
+async def test_fetch_provider_machines_for_return_forwards_resource_id():
     command_bus = MagicMock()
     uow_factory = MagicMock()
     config_port = MagicMock()
@@ -105,14 +105,14 @@ async def test_fetch_provider_machines_for_return_forwards_azure_resource_mappin
     assert operation.operation_type == OperationType.GET_INSTANCE_STATUS
     assert operation.parameters["provider_api"] == "VMSS"
     assert operation.parameters["resource_id"] == "vmss-demo"
-    assert operation.parameters["resource_mapping"] == {"vmss-demo_000001": ("vmss-demo", 1)}
+    assert "resource_mapping" not in operation.parameters
     assert operation.parameters["request_metadata"]["resource_group"] == "orb-test-rg"
 
 
 @pytest.mark.unit
 @pytest.mark.application
 @pytest.mark.asyncio
-async def test_fetch_provider_machines_for_return_rebuilds_vmss_mapping_from_follow_up_context():
+async def test_fetch_provider_machines_for_return_resolves_resource_id_from_follow_up_context():
     command_bus = MagicMock()
     uow_factory = MagicMock()
     config_port = MagicMock()
@@ -163,8 +163,9 @@ async def test_fetch_provider_machines_for_return_rebuilds_vmss_mapping_from_fol
     assert operation.operation_type == OperationType.GET_INSTANCE_STATUS
     assert operation.parameters["provider_api"] == "VMSS"
     assert operation.parameters["resource_id"] == "vmss-demo"
-    assert operation.parameters["resource_mapping"] == {"vmss-demo_000001": ("vmss-demo", 1)}
+    assert "resource_mapping" not in operation.parameters
     assert operation.parameters["request_metadata"]["resource_group"] == "orb-test-rg"
+
 
 @pytest.mark.unit
 @pytest.mark.application

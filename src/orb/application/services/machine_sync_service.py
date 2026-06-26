@@ -71,12 +71,7 @@ class MachineSyncService:
             # machines being returned — not resource-level discovery which returns all
             # ASG/fleet instances including unrelated ones.
             if request.request_type.value == "return" and request.machine_ids:
-                resource_mapping = self._build_return_resource_mapping(request, db_machines)
-                resource_ids = {
-                    resource_id
-                    for resource_id, _ordinal in resource_mapping.values()
-                    if resource_id not in (None, "")
-                }
+                resource_id = self._resolve_return_resource_id(request, db_machines)
                 operation_type = ProviderOperationType.GET_INSTANCE_STATUS
                 parameters = {
                     "instance_ids": request.machine_ids,
@@ -84,10 +79,8 @@ class MachineSyncService:
                     "template_id": request.template_id,
                     "request_metadata": self._build_request_metadata(request),
                 }
-                if resource_mapping:
-                    parameters["resource_mapping"] = resource_mapping
-                if len(resource_ids) == 1:
-                    parameters["resource_id"] = next(iter(resource_ids))
+                if resource_id:
+                    parameters["resource_id"] = resource_id
             # Use resource-level discovery for acquire requests (handles scaling/replacement)
             elif request.resource_ids:
                 operation_type = ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES
@@ -212,27 +205,28 @@ class MachineSyncService:
                 return str(resource_id)
         return ""
 
-    def _build_return_resource_mapping(
+    def _resolve_return_resource_id(
         self,
         request: Request,
         db_machines: list[Machine],
-    ) -> dict[str, tuple[str, int]]:
-        """Map return-request machine IDs to resource IDs using DB state and follow-up context."""
-        mapping: dict[str, tuple[str, int]] = {}
+    ) -> str:
+        """Resolve the single resource ID for a return status request."""
+        resource_ids: set[str] = set()
+        requested_ids = {str(machine_id) for machine_id in request.machine_ids}
 
         for machine in db_machines:
             resource_id = machine.resource_id
             machine_id = machine.machine_id.value
             if resource_id in (None, "") or machine_id in (None, ""):
                 continue
-            mapping[str(machine_id)] = (str(resource_id), 1)
+            if str(machine_id) in requested_ids:
+                resource_ids.add(str(resource_id))
 
         request_metadata = self._build_request_metadata(request)
         termination_requests = request_metadata.get("termination_requests")
         if not isinstance(termination_requests, list):
-            return mapping
+            return next(iter(resource_ids)) if len(resource_ids) == 1 else ""
 
-        requested_ids = {str(machine_id) for machine_id in request.machine_ids}
         for termination_request in termination_requests:
             if not isinstance(termination_request, dict):
                 continue
@@ -251,9 +245,9 @@ class MachineSyncService:
             for machine_id in pending_machine_ids:
                 machine_id_str = str(machine_id)
                 if machine_id_str and machine_id_str in requested_ids:
-                    mapping.setdefault(machine_id_str, (str(resource_id), 1))
+                    resource_ids.add(str(resource_id))
 
-        return mapping
+        return next(iter(resource_ids)) if len(resource_ids) == 1 else ""
 
     def _create_machine_from_processed_data(
         self, processed_data: dict, request: Request
