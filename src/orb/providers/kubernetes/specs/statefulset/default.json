@@ -1,0 +1,19 @@
+{
+  "_comment": "Example KubernetesStatefulSet template payload.  Consumed by the example-template generator and the docs/--show-example surface.  The StatefulSet is constructed programmatically by orb.providers.kubernetes.utilities.statefulset_spec.build_statefulset_spec; this JSON only captures the per-template ORB-level fields.",
+  "template_id": "kubernetes-statefulset-example",
+  "name": "Kubernetes StatefulSet example",
+  "description": "Submit a StatefulSet-managed pod set via the kubernetes provider.",
+  "provider_type": "kubernetes",
+  "provider_api": "KubernetesStatefulSet",
+  "image_id": "busybox:latest",
+  "max_instances": 3,
+  "provider_data": {
+    "kubernetes": {
+      "namespace": "default",
+      "container_image": "busybox:latest",
+      "resource_requests": {"cpu": "100m", "memory": "128Mi"},
+      "resource_limits": {"cpu": "500m", "memory": "256Mi"},
+      "command": ["sh", "-c", "sleep 3600"]
+    }
+  }
+}

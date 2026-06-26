@@ -40,7 +40,9 @@ from orb.providers.base.strategy import (
 from orb.providers.kubernetes.configuration.config import KubernetesProviderConfig
 from orb.providers.kubernetes.handlers.base_handler import KubernetesHandlerBase
 from orb.providers.kubernetes.handlers.deployment_handler import KubernetesDeploymentHandler
+from orb.providers.kubernetes.handlers.job_handler import KubernetesJobHandler
 from orb.providers.kubernetes.handlers.pod_handler import KubernetesPodHandler
+from orb.providers.kubernetes.handlers.statefulset_handler import KubernetesStatefulSetHandler
 from orb.providers.kubernetes.infrastructure.kubernetes_client import KubernetesClient
 from orb.providers.kubernetes.value_objects import KubernetesProviderApi
 from orb.providers.kubernetes.watch.multi_namespace import MultiNamespaceWatcher
@@ -429,10 +431,29 @@ class KubernetesProviderStrategy(ProviderStrategy):
             )
             self._handlers[provider_api] = handler
             return handler
-        # StatefulSet / Job arrive in later phases.
+        if provider_api == KubernetesProviderApi.STATEFUL_SET.value:
+            handler = KubernetesStatefulSetHandler(
+                kubernetes_client=self.kubernetes_client,
+                config=self._k8s_config,
+                logger=self._logger,
+                pod_state_cache=cache,
+                cache_alive=alive,
+            )
+            self._handlers[provider_api] = handler
+            return handler
+        if provider_api == KubernetesProviderApi.JOB.value:
+            handler = KubernetesJobHandler(
+                kubernetes_client=self.kubernetes_client,
+                config=self._k8s_config,
+                logger=self._logger,
+                pod_state_cache=cache,
+                cache_alive=alive,
+            )
+            self._handlers[provider_api] = handler
+            return handler
         raise NotImplementedError(
             f"Kubernetes handler for provider_api={provider_api!r} is not yet implemented "
-            "(Pod and Deployment are implemented; StatefulSet/Job arrive in later phases)."
+            "(Pod, Deployment, StatefulSet and Job are implemented)."
         )
 
     # ------------------------------------------------------------------

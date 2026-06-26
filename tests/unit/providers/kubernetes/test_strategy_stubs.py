@@ -184,14 +184,18 @@ async def test_typed_provisioning_methods_route_to_pod_handler() -> None:
 
 @pytest.mark.asyncio
 async def test_unsupported_provider_api_returns_failed() -> None:
-    """StatefulSet / Job APIs are not yet implemented."""
+    """A provider_api that does not match any of the registered handlers
+    (Pod / Deployment / StatefulSet / Job) is rejected via the
+    :class:`Failed` outcome."""
     from orb.domain.base.operation_outcome import Failed
 
     strategy = _make_strategy()
 
     fake_request = MagicMock()
     fake_request.request_id = "req-test"
-    fake_request.provider_api = "KubernetesStatefulSet"  # Later phase
+    # Unknown provider-API key — must NOT match any of the four
+    # registered handler keys.
+    fake_request.provider_api = "KubernetesUnknownApi"
     fake_request.template_id = "tpl-1"
     fake_request.requested_count = 1
     fake_request.metadata = {}
