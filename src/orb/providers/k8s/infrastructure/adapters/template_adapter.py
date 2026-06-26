@@ -7,11 +7,14 @@ behind the generic :class:`TemplateAdapterPort` interface.
 
 Kubernetes templates do not require AMI resolution or SSM lookups, so the
 adapter is significantly thinner than the AWS counterpart.  The supported
-fields list and validation rules cover the v1 kubernetes resource shape:
-``container_image``, ``namespace``, resource requests / limits,
-``runtime_class``, ``node_selector``, ``tolerations``, ``service_account``,
-``replicas`` / ``completions`` / ``parallelism``, labels, annotations,
-volume mounts, volumes, and environment variables.
+fields list and validation rules cover the v1 kubernetes resource shape
+exposed via :class:`K8sTemplate`: ``namespace``, resource requests /
+limits, ``runtime_class``, ``node_selector``, ``tolerations``,
+``service_account``, ``completions`` / ``parallelism``, annotations,
+env vars, volume mounts, and volumes.  Generic concepts such as the
+container image (``Template.image_id``) and operator labels
+(``Template.tags``) come from the parent ``Template`` and are not
+duplicated here.
 """
 
 from __future__ import annotations
@@ -53,12 +56,13 @@ _QUANTITY = re.compile(
 class K8sTemplateAdapter(TemplateAdapterPort):
     """Kubernetes implementation of :class:`TemplateAdapterPort`."""
 
-    # Fields the adapter recognises on the generic :class:`Template` or
-    # under ``template.provider_data["k8s"]``.  Used by
-    # :meth:`get_supported_fields` so the CLI / docs can introspect the
-    # surface without reaching into the DTO config class.
+    # Fields the adapter recognises on :class:`K8sTemplate` (typed
+    # kubernetes-specific extensions).  Generic fields like ``image_id``
+    # and ``tags`` come from the parent :class:`Template` and are not
+    # listed here.  Used by :meth:`get_supported_fields` so the CLI /
+    # docs can introspect the surface without reaching into the DTO
+    # config class.
     _SUPPORTED_FIELDS: list[str] = [
-        "container_image",
         "namespace",
         "runtime_class",
         "node_selector",
@@ -66,17 +70,16 @@ class K8sTemplateAdapter(TemplateAdapterPort):
         "service_account",
         "resource_requests",
         "resource_limits",
-        "replicas",
         "completions",
         "parallelism",
-        "labels",
         "annotations",
-        "environment_variables",
+        "env",
         "volume_mounts",
         "volumes",
         "command",
         "args",
         "image_pull_secret",
+        "pod_spec_override",
     ]
 
     def __init__(
@@ -105,23 +108,16 @@ class K8sTemplateAdapter(TemplateAdapterPort):
         return errors
 
     def extend_template_fields(self, template: Template) -> Template:
-        """Attach kubernetes-specific provider data to *template* in place."""
+        """Attach kubernetes-specific provider data to *template* in place.
+
+        With the typed :class:`K8sTemplate` aggregate in place, the
+        kubernetes provider does not need to mirror operator-supplied
+        fields into ``template.provider_data["k8s"]`` — handlers read
+        the typed fields directly.  We still default ``provider_api``
+        to ``"Pod"`` when the template arrives without one.
+        """
         if not template.provider_api:
             template.provider_api = self.get_provider_api()
-
-        if not template.provider_data:
-            template.provider_data = {}
-
-        if "k8s" not in template.provider_data:
-            template.provider_data["k8s"] = {}
-
-        template.provider_data["k8s"].update(
-            {
-                "supported_fields": self._SUPPORTED_FIELDS,
-                "validation_enabled": True,
-            }
-        )
-
         return template
 
     def resolve_template_references(self, template: Template) -> Template:
@@ -139,58 +135,65 @@ class K8sTemplateAdapter(TemplateAdapterPort):
     def validate_field_values(self, template: Template) -> dict[str, str]:
         """Validate kubernetes-specific field values on *template*.
 
-        Returns a mapping of field name -> error message.  Empty values are
-        reported as errors only when the field is required.
+        Reads the typed :class:`K8sTemplate` fields directly.  Returns a
+        mapping of field name -> error message; empty when valid.
         """
+        from orb.providers.k8s.domain.template.k8s_template import (  # noqa: PLC0415
+            upcast_to_k8s_template,
+        )
+
         errors: dict[str, str] = {}
+        k8s_template = upcast_to_k8s_template(template)
 
-        k8s_block = self._kubernetes_block(template)
-
-        # container_image: required either via provider_data or via the
-        # legacy ``image_id`` field at the domain level.
-        container_image = k8s_block.get("container_image") if k8s_block else None
-        if not container_image and not getattr(template, "image_id", None):
-            errors["container_image"] = (
-                "Container image is required — set provider_data.kubernetes.container_image "
-                "or template.image_id."
+        # Container image required via the generic ``Template.image_id`` field.
+        if not getattr(template, "image_id", None):
+            errors["image_id"] = (
+                "Container image is required — set Template.image_id on the kubernetes template."
             )
 
         # namespace: optional but must conform to DNS-1123 when set
-        namespace = (k8s_block or {}).get("namespace")
+        namespace = k8s_template.namespace
         if namespace is not None and not _DNS_1123_LABEL.match(str(namespace)):
             errors["namespace"] = f"Invalid namespace: {namespace!r}.  Must be a DNS-1123 label."
 
         # runtime_class follows the same rules as namespace
-        runtime_class = (k8s_block or {}).get("runtime_class")
+        runtime_class = k8s_template.runtime_class
         if runtime_class is not None and not _DNS_1123_LABEL.match(str(runtime_class)):
             errors["runtime_class"] = (
                 f"Invalid runtime_class: {runtime_class!r}.  Must be a DNS-1123 label."
             )
 
-        # resource_requests / resource_limits: each value must parse as a
-        # kubernetes resource quantity (e.g. "500m", "1Gi", "2").
-        for field in ("resource_requests", "resource_limits"):
-            entries = (k8s_block or {}).get(field) or {}
-            if not isinstance(entries, dict):
-                errors[field] = f"{field} must be a mapping of resource -> quantity"
+        # resource_requests / resource_limits: each emitted entry must
+        # parse as a kubernetes resource quantity (e.g. "500m", "1Gi").
+        for field_name, payload in (
+            ("resource_requests", k8s_template.resolve_resource_requests_map()),
+            ("resource_limits", k8s_template.resolve_resource_limits_map()),
+        ):
+            if not payload:
                 continue
-            for resource, quantity in entries.items():
+            for resource, quantity in payload.items():
                 if not _QUANTITY.match(str(quantity)):
-                    errors[field] = (
-                        f"Invalid {field} entry for {resource!r}: {quantity!r} is not a "
-                        f"valid kubernetes resource quantity."
+                    errors[field_name] = (
+                        f"Invalid {field_name} entry for {resource!r}: "
+                        f"{quantity!r} is not a valid kubernetes resource quantity."
                     )
                     break
 
-        # Workload sizing: replicas / completions / parallelism must be > 0 when set
-        for field in ("replicas", "completions", "parallelism"):
-            value = (k8s_block or {}).get(field)
-            if value is not None:
-                try:
-                    if int(value) <= 0:
-                        errors[field] = f"{field} must be a positive integer"
-                except (TypeError, ValueError):
-                    errors[field] = f"{field} must be an integer"
+        # Workload sizing — only completions / parallelism are operator
+        # surfaces.  ``Template.max_instances`` cap is enforced by the
+        # handler at acquire time; replica count comes from
+        # ``request.requested_count``.
+        for field_name, value in (
+            ("completions", k8s_template.completions),
+            ("parallelism", k8s_template.parallelism),
+        ):
+            if value is None:
+                continue
+            try:
+                if int(value) <= 0:
+                    errors[field_name] = f"{field_name} must be a positive integer"
+            except (TypeError, ValueError):
+                errors[field_name] = f"{field_name} must be an integer"
 
         return errors
 
@@ -241,17 +244,6 @@ class K8sTemplateAdapter(TemplateAdapterPort):
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
-
-    @staticmethod
-    def _kubernetes_block(template: Template) -> Optional[dict[str, Any]]:
-        """Return the ``provider_data["k8s"]`` dict on *template*, or ``None``."""
-        provider_data = getattr(template, "provider_data", None) or {}
-        if not isinstance(provider_data, dict):
-            return None
-        block = provider_data.get("k8s")
-        if not isinstance(block, dict):
-            return None
-        return block
 
     def _validate_required_fields(self, template: Template) -> list[str]:
         """Validate fields that are strictly required for any kubernetes template."""

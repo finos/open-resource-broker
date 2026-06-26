@@ -24,12 +24,14 @@ class K8sFieldMapping:
     """Kubernetes-specific field-mapping adapter for the HostFactory scheduler."""
 
     # Kubernetes-specific HF field -> internal field mappings.
-    # Generic mappings (templateId, maxNumber, etc.) live in the shared
-    # ``HostFactoryFieldMappings.MAPPINGS["generic"]`` table; this dict carries
-    # only the kubernetes-specific additions.
+    # Generic mappings (templateId, maxNumber, imageId, ...) live in the
+    # shared ``HostFactoryFieldMappings.MAPPINGS["generic"]`` table; this
+    # dict carries only the kubernetes-specific additions.  Shadow
+    # fields (``containerImage`` / ``labels`` / ``replicas``) are
+    # intentionally absent — HF callers should use the generic
+    # ``imageId``, ``tags`` and ``maxNumber`` surfaces respectively.
     _PROVIDER_MAPPINGS: dict[str, str] = {
-        # Container image / namespace / scheduling
-        "containerImage": "container_image",
+        # Scheduling / placement
         "namespace": "namespace",
         "runtimeClass": "runtime_class",
         "nodeSelector": "node_selector",
@@ -38,19 +40,21 @@ class K8sFieldMapping:
         # Resource requests / limits
         "resourceRequests": "resource_requests",
         "resourceLimits": "resource_limits",
-        # Workload sizing for controller-backed handlers
+        # Workload sizing overrides for the Job handler
         "completions": "completions",
         "parallelism": "parallelism",
-        "replicas": "replicas",
         # Pod metadata
-        "labels": "labels",
         "annotations": "annotations",
         # Storage / runtime
         "volumeMounts": "volume_mounts",
         "volumes": "volumes",
         # Container environment
-        "env": "environment_variables",
-        "environment": "environment_variables",
+        "env": "env",
+        "environment": "env",
+        # Image pull
+        "imagePullSecret": "image_pull_secret",
+        # Raw partial pod-spec override
+        "podSpecOverride": "pod_spec_override",
     }
 
     def get_mappings(self) -> dict[str, str]:
@@ -62,22 +66,19 @@ class K8sFieldMapping:
 
         Mutates *mapped* in place and returns it for convenience.  Defaults:
 
-        * ``namespace`` -> ``"default"`` (matches the kube-API default; the
-          provider-level config overrides this when set).
-        * ``max_instances`` -> ``1``.
-        * ``replicas`` -> the resolved ``max_instances`` for controller-backed
-          handlers that read this field.  We only set the default when
-          ``replicas`` is absent so an explicit HF value wins.
-        * ``labels`` -> empty dict.
+        * ``namespace`` -> ``"default"`` (matches the kube-API default;
+          the provider-level config overrides this when set).
+        * ``max_instances`` -> ``1`` (generic quota cap).
         * ``annotations`` -> empty dict.
-        * ``environment_variables`` -> empty dict.
+
+        Replica count is taken from ``request.requested_count`` at acquire
+        time, not from the template, so ``replicas`` is intentionally not
+        defaulted here.  Operator labels live on the generic ``tags``
+        field on :class:`Template`.
         """
         mapped.setdefault("namespace", "default")
         mapped.setdefault("max_instances", 1)
-        mapped.setdefault("replicas", mapped["max_instances"])
-        mapped.setdefault("labels", {})
         mapped.setdefault("annotations", {})
-        mapped.setdefault("environment_variables", {})
         return mapped
 
     def derive_attributes(self, machine_type: str | None) -> Optional[dict[str, list[str]]]:

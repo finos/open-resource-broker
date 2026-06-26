@@ -1,12 +1,19 @@
 """Kubernetes-specific template extension configuration.
 
 Mirrors :mod:`orb.providers.aws.configuration.template_extension` for the
-kubernetes provider.  Holds the kubernetes-specific defaults that are merged
-into the hierarchical template defaults pipeline so that handlers receive a
-fully-populated template at runtime.
+kubernetes provider.  Holds the kubernetes-specific defaults that are
+merged into the hierarchical template defaults pipeline so that handlers
+receive a fully-populated template at runtime.
 
 The :class:`K8sTemplateExtensionConfig` is registered with
 :class:`TemplateExtensionRegistry` during provider bootstrap.
+
+Shadow fields removed — generic concepts read from the parent ``Template``:
+
+* The replica count comes from ``request.requested_count`` at acquire
+  time; ``max_instances`` on the generic ``Template`` caps the quota.
+* Container images come from ``Template.image_id``.
+* Pod labels are projected from ``Template.tags`` at spec-build time.
 """
 
 from __future__ import annotations
@@ -19,23 +26,17 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class K8sTemplateExtensionConfig(BaseModel):
     """Kubernetes-specific template extension configuration.
 
-    These fields are applied to kubernetes templates through the hierarchical
-    defaults system in addition to (and after) the provider-level
-    :class:`K8sProviderConfig` defaults.  Operator-level overrides
-    on the template itself win against this baseline.
+    These fields are applied to kubernetes templates through the
+    hierarchical defaults system in addition to (and after) the
+    provider-level :class:`K8sProviderConfig` defaults.  Operator-level
+    overrides on the template itself win against this baseline.
     """
 
     model_config = ConfigDict(extra="ignore")
 
-    # Workload sizing defaults consumed by controller-backed handlers
-    # (Deployment / StatefulSet / Job).  The Pod handler ignores these.
-    replicas: Optional[int] = Field(
-        None,
-        description=(
-            "Default replicas for controller-backed handlers.  Resolved to "
-            "``max_instances`` at request time when unset."
-        ),
-    )
+    # Workload sizing overrides for the Job handler.  The per-request
+    # replica count is taken from ``request.requested_count`` — these
+    # fields exist to allow operator-level overrides when needed.
     completions: Optional[int] = Field(
         None, description="Default ``completions`` for the Job handler."
     )
@@ -74,9 +75,6 @@ class K8sTemplateExtensionConfig(BaseModel):
     )
 
     # Pod metadata
-    labels: Optional[dict[str, str]] = Field(
-        None, description="Default labels applied to managed resources."
-    )
     annotations: Optional[dict[str, str]] = Field(
         None, description="Default annotations applied to managed resources."
     )
@@ -109,7 +107,7 @@ class K8sTemplateExtensionConfig(BaseModel):
             raise ValueError("namespace must be a non-empty string when set")
         return v
 
-    @field_validator("replicas", "completions", "parallelism")
+    @field_validator("completions", "parallelism")
     @classmethod
     def _validate_positive(cls, v: Optional[int]) -> Optional[int]:
         """Workload counts must be positive when set."""

@@ -405,6 +405,8 @@ def test_resolve_namespace_template_override_wins() -> None:
 
 
 def test_resolve_namespace_rejects_namespace_outside_allowlist() -> None:
+    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+
     client = MagicMock()
     config = K8sProviderConfig(namespace="orb", namespaces=["allowed-a", "allowed-b"])
     handler = K8sPodHandler(
@@ -412,19 +414,20 @@ def test_resolve_namespace_rejects_namespace_outside_allowlist() -> None:
         config=config,
         logger=MagicMock(),
     )
-    template = Template(
+    template = K8sTemplate(
         template_id="tpl",
-        provider_type="k8s",
         provider_api="Pod",
         image_id="busybox",
         max_instances=1,
-        provider_data={"k8s": {"namespace": "orb"}},
+        namespace="orb",
     )
     with pytest.raises(ValueError, match="not in the provider's configured namespaces"):
         handler.resolve_namespace(template)
 
 
 def test_resolve_namespace_accepts_wildcard_list() -> None:
+    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+
     client = MagicMock()
     config = K8sProviderConfig(namespace="orb", namespaces=["*"])
     handler = K8sPodHandler(
@@ -432,13 +435,12 @@ def test_resolve_namespace_accepts_wildcard_list() -> None:
         config=config,
         logger=MagicMock(),
     )
-    template = Template(
+    template = K8sTemplate(
         template_id="tpl",
-        provider_type="k8s",
         provider_api="Pod",
         image_id="busybox",
         max_instances=1,
-        provider_data={"k8s": {"namespace": "any-ns"}},
+        namespace="any-ns",
     )
     assert handler.resolve_namespace(template) == "any-ns"
 

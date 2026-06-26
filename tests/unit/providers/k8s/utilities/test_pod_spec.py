@@ -36,14 +36,25 @@ def _build_request(*, requested_count: int = 1) -> Request:
     )
 
 
-def _build_template(**provider_data) -> Template:
-    return Template(
+def _build_template(**k8s_fields) -> Template:
+    """Build a :class:`K8sTemplate` for tests.
+
+    The k8s-specific fields are passed as flat kwargs and forwarded
+    directly to the typed template constructor.  ``container_image`` is
+    accepted as a legacy alias for ``image_id`` to keep existing tests
+    succinct.
+    """
+    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+
+    image_id = k8s_fields.pop("container_image", None) or k8s_fields.pop(
+        "image_id", "busybox:latest"
+    )
+    return K8sTemplate(
         template_id="tpl-1",
-        provider_type="k8s",
         provider_api="Pod",
-        image_id="busybox:latest",
+        image_id=image_id,
         max_instances=2,
-        provider_data={"k8s": dict(provider_data)} if provider_data else {},
+        **k8s_fields,
     )
 
 

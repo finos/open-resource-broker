@@ -24,21 +24,19 @@ class TestK8sTemplateExtensionConfig:
     def test_populated_fields_appear_in_defaults(self) -> None:
         """Only non-None fields appear in the flat defaults dict."""
         config = K8sTemplateExtensionConfig(
-            replicas=3,
             namespace="orb",
             resource_requests={"cpu": "500m"},
-            labels={"team": "ml"},
+            annotations={"orb.io/note": "hi"},
         )
         defaults = config.to_template_defaults()
-        assert defaults["replicas"] == 3
         assert defaults["namespace"] == "orb"
         assert defaults["resource_requests"] == {"cpu": "500m"}
-        assert defaults["labels"] == {"team": "ml"}
+        assert defaults["annotations"] == {"orb.io/note": "hi"}
         # None-valued fields are dropped
         assert "completions" not in defaults
         assert "node_selector" not in defaults
 
-    @pytest.mark.parametrize("field", ["replicas", "completions", "parallelism"])
+    @pytest.mark.parametrize("field", ["completions", "parallelism"])
     def test_workload_counts_must_be_positive(self, field: str) -> None:
         """Zero / negative workload counts are rejected at validation time."""
         with pytest.raises(ValidationError):
@@ -56,6 +54,13 @@ class TestK8sTemplateExtensionConfig:
         config = K8sTemplateExtensionConfig(unknown_field="surprise")  # type: ignore[call-arg]
         assert "unknown_field" not in config.to_template_defaults()
 
+    def test_shadow_fields_are_gone(self) -> None:
+        """``container_image`` / ``labels`` / ``replicas`` no longer live here."""
+        fields = K8sTemplateExtensionConfig.model_fields
+        assert "container_image" not in fields
+        assert "labels" not in fields
+        assert "replicas" not in fields
+
 
 class TestK8sTemplateDTOConfig:
     """Tests for the typed DTO config registered with ``TemplateExtensionRegistry``."""
@@ -67,9 +72,7 @@ class TestK8sTemplateDTOConfig:
 
     def test_populated_dto_round_trips_to_defaults(self) -> None:
         config = K8sTemplateDTOConfig(
-            container_image="ghcr.io/example/worker:1.2.3",
             namespace="prod",
-            replicas=4,
             resource_requests={"cpu": "1", "memory": "2Gi"},
             resource_limits={"cpu": "2", "memory": "4Gi"},
             environment_variables={"DEBUG": "1"},
@@ -77,27 +80,28 @@ class TestK8sTemplateDTOConfig:
             args=["--workers", "4"],
         )
         defaults = config.to_template_defaults()
-        assert defaults["container_image"] == "ghcr.io/example/worker:1.2.3"
         assert defaults["namespace"] == "prod"
-        assert defaults["replicas"] == 4
         assert defaults["resource_requests"] == {"cpu": "1", "memory": "2Gi"}
         assert defaults["resource_limits"] == {"cpu": "2", "memory": "4Gi"}
         assert defaults["environment_variables"] == {"DEBUG": "1"}
         assert defaults["command"] == ["/bin/run"]
         assert defaults["args"] == ["--workers", "4"]
 
-    def test_container_image_rejects_blank(self) -> None:
-        with pytest.raises(ValidationError):
-            K8sTemplateDTOConfig(container_image="")
-
     def test_namespace_rejects_blank(self) -> None:
         with pytest.raises(ValidationError):
             K8sTemplateDTOConfig(namespace="")
 
-    @pytest.mark.parametrize("field", ["replicas", "completions", "parallelism"])
+    @pytest.mark.parametrize("field", ["completions", "parallelism"])
     def test_workload_counts_must_be_positive(self, field: str) -> None:
         with pytest.raises(ValidationError):
             K8sTemplateDTOConfig(**{field: 0})
+
+    def test_shadow_fields_are_gone(self) -> None:
+        """``container_image`` / ``labels`` / ``replicas`` no longer live here."""
+        fields = K8sTemplateDTOConfig.model_fields
+        assert "container_image" not in fields
+        assert "labels" not in fields
+        assert "replicas" not in fields
 
 
 class TestExtensionRegistration:

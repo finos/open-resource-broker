@@ -5,11 +5,11 @@ metadata.  Lives under ``providers/k8s/`` so that the kubernetes
 SDK imports stay confined to the provider tree (enforced by the
 ``test_k8s_leak_detection`` architecture test).
 
-The pod-spec construction is intentionally minimal: one container per
-pod, image + optional resource requests + optional node-selector /
-tolerations / image-pull-secret defaults from the provider config.
-Richer template merging can be layered on later without touching this
-module's call sites.
+The pod-spec construction reads from the strongly-typed
+:class:`K8sTemplate` aggregate.  Generic fields (image, labels, max
+replicas) come from the parent :class:`Template`; kubernetes-specific
+fields (namespace, resource requests, tolerations, ...) come from the
+flat :class:`K8sTemplate` attributes.
 """
 
 from __future__ import annotations
@@ -19,6 +19,10 @@ from typing import TYPE_CHECKING, Any, Optional
 from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
 from orb.providers.k8s.configuration.config import K8sProviderConfig
+from orb.providers.k8s.domain.template.k8s_template import (
+    K8sTemplate,
+    upcast_to_k8s_template,
+)
 
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
     from kubernetes.client import V1Pod
@@ -47,14 +51,6 @@ def make_pod_name(request_id: str, seq: int) -> str:
 
     Pattern: ``orb-{request_id[:8]}-{seq:04d}``.  Stays under the 63-char
     DNS-1123 label limit and is human-readable.
-
-    Args:
-        request_id: ORB request UUID (string).  Only the first 8 chars are
-            used so two pods in the same request share a common prefix.
-        seq: 0-based sequence number for this pod within the request.
-
-    Returns:
-        A DNS-1123 conformant pod name.
     """
     prefix = (request_id or "unknown")[:8]
     name = f"orb-{prefix}-{seq:04d}"
@@ -70,31 +66,27 @@ def build_pod_labels(
     provider_api: str = "Pod",
     label_prefix: str = _DEFAULT_LABEL_PREFIX,
     emit_legacy_labels: bool = True,
+    extra_labels: Optional[dict[str, str]] = None,
 ) -> dict[str, str]:
     """Construct the label map applied to every managed pod.
 
-    Args:
-        request: ORB request the pod belongs to.
-        machine_id: Per-pod unique identifier (typically the pod name).
-        provider_api: Provider-API key stamped onto every pod for
-            reconciler/cleanup matching (defaults to ``"Pod"``).
-        label_prefix: DNS-subdomain prefix for the ORB labels.  Operators
-            override this via ``K8sProviderConfig.label_prefix``.
-        emit_legacy_labels: When ``True`` (default), also emit the legacy
-            ``symphony/open-resource-broker-reqid`` label so legacy
-            watchers continue to function during the transition.
-
-    Returns:
-        A dict of label-key -> value entries suitable for
-        ``metadata.labels``.
+    Operator-supplied ``extra_labels`` (typically derived from
+    ``Template.tags``) are merged in first; ORB-system label keys then
+    overwrite any conflicts so the request-id / machine-id / managed
+    sentinels are always present.
     """
-    labels: dict[str, str] = {
-        f"{label_prefix}/managed": "true",
-        f"{label_prefix}/request-id": str(request.request_id),
-        f"{label_prefix}/machine-id": machine_id,
-        f"{label_prefix}/provider-api": provider_api,
-        f"{label_prefix}/template-id": str(request.template_id),
-    }
+    labels: dict[str, str] = {}
+    if extra_labels:
+        labels.update({str(k): str(v) for k, v in extra_labels.items()})
+    labels.update(
+        {
+            f"{label_prefix}/managed": "true",
+            f"{label_prefix}/request-id": str(request.request_id),
+            f"{label_prefix}/machine-id": machine_id,
+            f"{label_prefix}/provider-api": provider_api,
+            f"{label_prefix}/template-id": str(request.template_id),
+        }
+    )
     if emit_legacy_labels:
         labels[LEGACY_REQUEST_ID_LABEL] = str(request.request_id)
     return labels
@@ -105,98 +97,126 @@ def request_id_label_selector(
     *,
     label_prefix: str = _DEFAULT_LABEL_PREFIX,
 ) -> str:
-    """Build the ``label_selector`` string for listing a request's pods."""
+    """Build the ``label_selector=orb.io/request-id=<id>`` string."""
     return f"{label_prefix}/request-id={request.request_id}"
+
+
+# ---------------------------------------------------------------------------
+# Shared helpers — typed-template field projection
+# ---------------------------------------------------------------------------
+
+
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    """Deep-merge ``override`` onto ``base`` (override wins on leaves).
+
+    Nested dicts merge recursively; lists / scalars replace wholesale.
+    ``base`` is not mutated.
+    """
+    out: dict[str, Any] = dict(base)
+    for key, value in override.items():
+        if key in out and isinstance(out[key], dict) and isinstance(value, dict):
+            out[key] = _deep_merge(out[key], value)
+        else:
+            out[key] = value
+    return out
+
+
+def apply_pod_spec_override(pod: "V1Pod", override: Optional[dict[str, Any]]) -> "V1Pod":
+    """Deep-merge ``override`` onto the pod's ``spec`` payload."""
+    if not override:
+        return pod
+    from kubernetes.client import V1PodSpec  # noqa: PLC0415
+
+    if pod.spec is None:  # pragma: no cover — defensive
+        return pod
+    spec_dict = pod.spec.to_dict() if hasattr(pod.spec, "to_dict") else dict(pod.spec)
+    merged = _deep_merge(spec_dict, override)
+    pod.spec = V1PodSpec(**merged)
+    return pod
+
+
+def build_container_resources(k8s_template: K8sTemplate) -> Optional[Any]:
+    """Build ``V1ResourceRequirements`` from the typed template fields."""
+    requests = k8s_template.resolve_resource_requests_map()
+    limits = k8s_template.resolve_resource_limits_map()
+    if not requests and not limits:
+        return None
+    from kubernetes.client import V1ResourceRequirements  # noqa: PLC0415
+
+    return V1ResourceRequirements(requests=requests, limits=limits)
+
+
+def build_container_env(k8s_template: K8sTemplate) -> Optional[list[Any]]:
+    """Build the ``V1EnvVar`` list from the typed env field."""
+    api_list = k8s_template.resolve_env_api_list()
+    if not api_list:
+        return None
+    from kubernetes.client import V1EnvVar  # noqa: PLC0415
+
+    return [V1EnvVar(**entry) for entry in api_list]
+
+
+def build_pod_tolerations(
+    k8s_template: K8sTemplate,
+    *,
+    config: Optional[K8sProviderConfig],
+) -> Optional[list[Any]]:
+    """Resolve tolerations from template (preferred) or provider-config defaults."""
+    from kubernetes.client import V1Toleration  # noqa: PLC0415
+
+    api_list = k8s_template.resolve_tolerations_api_list()
+    if api_list:
+        return [V1Toleration(**entry) for entry in api_list]
+    if config is not None and config.default_tolerations:
+        return [V1Toleration(**dict(t)) for t in config.default_tolerations]
+    return None
+
+
+def build_pod_volumes(k8s_template: K8sTemplate) -> Optional[list[Any]]:
+    """Build the ``V1Volume`` list from the typed volumes field."""
+    api_list = k8s_template.resolve_volumes_api_list()
+    if not api_list:
+        return None
+    from kubernetes.client import V1Volume  # noqa: PLC0415
+
+    out: list[V1Volume] = []
+    for entry in api_list:
+        try:
+            out.append(V1Volume(**entry))
+        except (TypeError, ValueError):
+            out.append(V1Volume(name=entry.get("name", "unnamed")))
+    return out
+
+
+def resolve_node_selector(
+    k8s_template: K8sTemplate,
+    *,
+    config: Optional[K8sProviderConfig],
+) -> Optional[dict[str, str]]:
+    """Resolve ``nodeSelector`` from template (preferred) or provider config."""
+    if k8s_template.node_selector:
+        return dict(k8s_template.node_selector)
+    if config is not None and config.default_node_selector:
+        return dict(config.default_node_selector)
+    return None
+
+
+def resolve_image_pull_secret_name(
+    k8s_template: K8sTemplate,
+    *,
+    config: Optional[K8sProviderConfig],
+) -> Optional[str]:
+    """Resolve ``imagePullSecrets[0].name`` from template or provider config."""
+    if k8s_template.image_pull_secret:
+        return str(k8s_template.image_pull_secret)
+    if config is not None and config.default_image_pull_secret:
+        return str(config.default_image_pull_secret)
+    return None
 
 
 # ---------------------------------------------------------------------------
 # Pod-spec assembly
 # ---------------------------------------------------------------------------
-
-
-def _resolve_container_image(template: Template) -> str:
-    """Pick the container image string from a generic ``Template``.
-
-    The kubernetes provider does not extend ``Template`` yet (a
-    handler-side ``KubernetesTemplate`` may be introduced later); for now
-    the resolver looks in two well-known places:
-
-    1. ``template.image_id`` — repurposed as the container image string
-       (the field is provider-agnostic at the domain layer).
-    2. ``template.provider_data["k8s"]["container_image"]`` — structured
-       field consumed by the kubernetes provider.
-
-    The second wins when both are set.
-    """
-    provider_data = getattr(template, "provider_data", None) or {}
-    k8s_block = provider_data.get("k8s") if isinstance(provider_data, dict) else None
-    if isinstance(k8s_block, dict):
-        image = k8s_block.get("container_image")
-        if image:
-            return str(image)
-    image_id = getattr(template, "image_id", None)
-    if image_id:
-        return str(image_id)
-    raise ValueError(
-        "Kubernetes template is missing a container image — set ``image_id`` or "
-        "``provider_data.kubernetes.container_image``."
-    )
-
-
-def _resolve_resource_requests(template: Template) -> Optional[dict[str, str]]:
-    """Extract optional resource requests/limits from a template."""
-    provider_data = getattr(template, "provider_data", None) or {}
-    if not isinstance(provider_data, dict):
-        return None
-    k8s_block = provider_data.get("k8s")
-    if not isinstance(k8s_block, dict):
-        return None
-    requests = k8s_block.get("resource_requests")
-    if isinstance(requests, dict):
-        return {str(k): str(v) for k, v in requests.items()}
-    return None
-
-
-def _resolve_resource_limits(template: Template) -> Optional[dict[str, str]]:
-    """Extract optional resource limits from a template."""
-    provider_data = getattr(template, "provider_data", None) or {}
-    if not isinstance(provider_data, dict):
-        return None
-    k8s_block = provider_data.get("k8s")
-    if not isinstance(k8s_block, dict):
-        return None
-    limits = k8s_block.get("resource_limits")
-    if isinstance(limits, dict):
-        return {str(k): str(v) for k, v in limits.items()}
-    return None
-
-
-def _resolve_command(template: Template) -> Optional[list[str]]:
-    """Extract optional container command from a template."""
-    provider_data = getattr(template, "provider_data", None) or {}
-    if not isinstance(provider_data, dict):
-        return None
-    k8s_block = provider_data.get("k8s")
-    if not isinstance(k8s_block, dict):
-        return None
-    command = k8s_block.get("command")
-    if isinstance(command, list):
-        return [str(c) for c in command]
-    return None
-
-
-def _resolve_args(template: Template) -> Optional[list[str]]:
-    """Extract optional container args from a template."""
-    provider_data = getattr(template, "provider_data", None) or {}
-    if not isinstance(provider_data, dict):
-        return None
-    k8s_block = provider_data.get("k8s")
-    if not isinstance(k8s_block, dict):
-        return None
-    args = k8s_block.get("args")
-    if isinstance(args, list):
-        return [str(a) for a in args]
-    return None
 
 
 def build_pod_spec(
@@ -217,75 +237,52 @@ def build_pod_spec(
       and a self-restarting container would defeat per-pod release.
     * Labels include ``orb.io/managed=true`` and ``orb.io/request-id``;
       callers can filter by these to scope list operations.
-
-    Args:
-        template: Source ORB template.
-        request: Request the pod belongs to.
-        pod_name: ``metadata.name`` for the pod.
-        machine_id: ORB machine identifier; included as a label.
-        namespace: Target Kubernetes namespace.
-        provider_api: Provider API key stamped on labels.
-        config: Optional provider config — when supplied, its
-            ``default_node_selector`` / ``default_tolerations`` /
-            ``default_image_pull_secret`` / ``label_prefix`` /
-            ``emit_legacy_labels`` fields are applied as defaults.
-
-    Returns:
-        A fully populated ``V1Pod`` ready for ``create_namespaced_pod``.
     """
-    # The kubernetes SDK is imported lazily so that simply importing
-    # ``pod_spec`` (e.g. from a config validator) does not require the
-    # ``[kubernetes]`` extra to be installed.
+    # Lazy SDK import keeps callers without the ``[kubernetes]`` extra
+    # able to import this module.
     from kubernetes.client import (  # noqa: PLC0415
         V1Container,
         V1LocalObjectReference,
         V1ObjectMeta,
         V1Pod,
         V1PodSpec,
-        V1ResourceRequirements,
-        V1Toleration,
     )
+
+    k8s_template = upcast_to_k8s_template(template)
 
     label_prefix = config.label_prefix if config is not None else _DEFAULT_LABEL_PREFIX
     emit_legacy_labels = config.emit_legacy_labels if config is not None else True
 
+    operator_labels = k8s_template.resolve_pod_labels()
     labels = build_pod_labels(
         request,
         machine_id=machine_id,
         provider_api=provider_api,
         label_prefix=label_prefix,
         emit_legacy_labels=emit_legacy_labels,
+        extra_labels=operator_labels,
     )
 
-    image = _resolve_container_image(template)
-    requests = _resolve_resource_requests(template)
-    limits = _resolve_resource_limits(template)
-    command = _resolve_command(template)
-    args = _resolve_args(template)
-
-    resources: Optional[V1ResourceRequirements] = None
-    if requests or limits:
-        resources = V1ResourceRequirements(requests=requests, limits=limits)
+    image = k8s_template.resolve_container_image()
+    resources = build_container_resources(k8s_template)
+    env = build_container_env(k8s_template)
 
     container = V1Container(
         name="orb",
         image=image,
-        command=command,
-        args=args,
+        command=k8s_template.command,
+        args=k8s_template.args,
         resources=resources,
+        env=env,
     )
 
-    node_selector: Optional[dict[str, str]] = None
-    tolerations: Optional[list[V1Toleration]] = None
-    image_pull_secrets: Optional[list[V1LocalObjectReference]] = None
-
-    if config is not None:
-        if config.default_node_selector:
-            node_selector = dict(config.default_node_selector)
-        if config.default_tolerations:
-            tolerations = [V1Toleration(**dict(t)) for t in config.default_tolerations]
-        if config.default_image_pull_secret:
-            image_pull_secrets = [V1LocalObjectReference(name=config.default_image_pull_secret)]
+    node_selector = resolve_node_selector(k8s_template, config=config)
+    tolerations = build_pod_tolerations(k8s_template, config=config)
+    pull_secret_name = resolve_image_pull_secret_name(k8s_template, config=config)
+    image_pull_secrets = (
+        [V1LocalObjectReference(name=pull_secret_name)] if pull_secret_name else None
+    )
+    volumes = build_pod_volumes(k8s_template)
 
     pod_spec_kwargs: dict[str, Any] = {
         "containers": [container],
@@ -297,24 +294,40 @@ def build_pod_spec(
         pod_spec_kwargs["tolerations"] = tolerations
     if image_pull_secrets is not None:
         pod_spec_kwargs["image_pull_secrets"] = image_pull_secrets
+    if volumes is not None:
+        pod_spec_kwargs["volumes"] = volumes
+    if k8s_template.service_account:
+        pod_spec_kwargs["service_account_name"] = k8s_template.service_account
+    if k8s_template.runtime_class:
+        pod_spec_kwargs["runtime_class_name"] = k8s_template.runtime_class
+
+    pod_metadata = V1ObjectMeta(
+        name=pod_name,
+        namespace=namespace,
+        labels=labels,
+        annotations=(dict(k8s_template.annotations) if k8s_template.annotations else None),
+    )
 
     pod = V1Pod(
         api_version="v1",
         kind="Pod",
-        metadata=V1ObjectMeta(
-            name=pod_name,
-            namespace=namespace,
-            labels=labels,
-        ),
+        metadata=pod_metadata,
         spec=V1PodSpec(**pod_spec_kwargs),
     )
-    return pod
+    return apply_pod_spec_override(pod, k8s_template.pod_spec_override)
 
 
 __all__ = [
     "LEGACY_REQUEST_ID_LABEL",
+    "apply_pod_spec_override",
+    "build_container_env",
+    "build_container_resources",
     "build_pod_labels",
     "build_pod_spec",
+    "build_pod_tolerations",
+    "build_pod_volumes",
     "make_pod_name",
     "request_id_label_selector",
+    "resolve_image_pull_secret_name",
+    "resolve_node_selector",
 ]

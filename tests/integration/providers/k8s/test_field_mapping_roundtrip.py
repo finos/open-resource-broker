@@ -8,8 +8,8 @@ Covers the path a HostFactory template takes through ORB:
   bootstrap) plus the generic mappings the
   :class:`HostFactoryFieldMapper` always applies;
 * internal defaults are applied via the adapter's
-  :meth:`apply_defaults` (``namespace``, ``replicas``,
-  ``labels`` / ``annotations``, ``environment_variables``);
+  :meth:`apply_defaults` (``namespace``, ``max_instances``,
+  ``annotations``);
 * mapping back to HF preserves the kubernetes-specific keys that the
   scheduler hands the operator on a ``getAvailableTemplates``
   round trip.
@@ -17,6 +17,11 @@ Covers the path a HostFactory template takes through ORB:
 The test wires the registry by hand (no DI bootstrap), mirroring the
 production registration in
 :func:`orb.providers.k8s.registration._register_field_mapping`.
+
+Shadow fields (``containerImage`` / ``labels`` / ``replicas``) are not
+exercised here — those concepts are sourced from the generic ``imageId``,
+``tags`` and ``maxNumber`` HF fields and the per-request
+``requested_count`` respectively.
 """
 
 from __future__ import annotations
@@ -79,14 +84,19 @@ def _register_k8s_adapter() -> None:
 
 
 def _hf_payload(*, replicas: int = 3) -> dict[str, object]:
-    """A realistic HF JSON payload for a kubernetes Deployment template."""
+    """A realistic HF JSON payload for a kubernetes Deployment template.
+
+    Uses the generic surfaces (``imageId``, ``tags``, ``maxNumber``) for
+    the concepts that used to live in shadow k8s fields.
+    """
     return {
         "templateId": "my-k8s-template",
         "maxNumber": replicas,
         "providerName": "kubernetes_orb-it",
         "providerApi": "Deployment",
         "providerType": "k8s",
-        "containerImage": "ghcr.io/example/worker:1.2.3",
+        # Container image arrives via the generic ``imageId`` surface.
+        "imageId": "ghcr.io/example/worker:1.2.3",
         "namespace": "orb-it",
         "resourceRequests": {"cpu": "500m", "memory": "256Mi"},
         "resourceLimits": {"cpu": "2", "memory": "1Gi"},
@@ -94,12 +104,14 @@ def _hf_payload(*, replicas: int = 3) -> dict[str, object]:
         "nodeSelector": {"role": "compute"},
         "tolerations": [{"key": "dedicated", "operator": "Equal", "value": "ml"}],
         "serviceAccount": "orb-worker",
-        "replicas": replicas,
-        "labels": {"team": "ml"},
+        # Operator-supplied labels arrive via the generic ``instanceTags``
+        # HF field which maps to ``tags`` on the domain ``Template``.
+        "instanceTags": {"team": "ml"},
         "annotations": {"orb.io/note": "submitted-via-hf"},
         "env": {"WORKER_MODE": "batch"},
         "volumeMounts": [{"name": "data", "mountPath": "/data"}],
         "volumes": [{"name": "data", "emptyDir": {}}],
+        "imagePullSecret": "registry-creds",
     }
 
 
@@ -124,7 +136,10 @@ def test_hf_to_internal_field_mapping_translates_camel_case() -> None:
     assert mapped["provider_type"] == "k8s"
     assert mapped["provider_name"] == "kubernetes_orb-it"
 
-    assert mapped["container_image"] == "ghcr.io/example/worker:1.2.3"
+    # Image and tags come from the generic surfaces.
+    assert mapped["image_id"] == "ghcr.io/example/worker:1.2.3"
+    # ``instanceTags`` is the HF surface for the generic ``tags`` field.
+    assert mapped["tags"] == {"team": "ml"}
     assert mapped["namespace"] == "orb-it"
     assert mapped["resource_requests"] == {"cpu": "500m", "memory": "256Mi"}
     assert mapped["resource_limits"] == {"cpu": "2", "memory": "1Gi"}
@@ -132,12 +147,16 @@ def test_hf_to_internal_field_mapping_translates_camel_case() -> None:
     assert mapped["node_selector"] == {"role": "compute"}
     assert mapped["tolerations"] == [{"key": "dedicated", "operator": "Equal", "value": "ml"}]
     assert mapped["service_account"] == "orb-worker"
-    assert mapped["replicas"] == 4
-    assert mapped["labels"] == {"team": "ml"}
     assert mapped["annotations"] == {"orb.io/note": "submitted-via-hf"}
-    assert mapped["environment_variables"] == {"WORKER_MODE": "batch"}
+    assert mapped["env"] == {"WORKER_MODE": "batch"}
     assert mapped["volume_mounts"] == [{"name": "data", "mountPath": "/data"}]
     assert mapped["volumes"] == [{"name": "data", "emptyDir": {}}]
+    assert mapped["image_pull_secret"] == "registry-creds"
+
+    # Shadow fields are intentionally absent on the internal side.
+    assert "container_image" not in mapped
+    assert "labels" not in mapped
+    assert "replicas" not in mapped
 
 
 def test_internal_to_hf_field_mapping_preserves_kubernetes_keys() -> None:
@@ -147,16 +166,16 @@ def test_internal_to_hf_field_mapping_preserves_kubernetes_keys() -> None:
         "max_instances": 2,
         "provider_api": "Pod",
         "provider_type": "k8s",
-        "container_image": "busybox:latest",
+        "image_id": "busybox:latest",
+        "tags": {"team": "ml"},
         "namespace": "orb-it",
         "resource_requests": {"cpu": "100m"},
         "resource_limits": {"cpu": "200m"},
         "runtime_class": "gvisor",
         "node_selector": {"role": "compute"},
         "service_account": "orb-worker",
-        "labels": {"team": "ml"},
         "annotations": {"orb.io/note": "round-trip"},
-        "environment_variables": {"BACKEND": "queue"},
+        "env": {"BACKEND": "queue"},
     }
     out = _reverse_full_mapping(internal)
 
@@ -164,18 +183,17 @@ def test_internal_to_hf_field_mapping_preserves_kubernetes_keys() -> None:
     assert out["maxNumber"] == 2
     assert out["providerApi"] == "Pod"
     assert out["providerType"] == "k8s"
-    assert out["containerImage"] == "busybox:latest"
+    assert out["imageId"] == "busybox:latest"
+    # ``tags`` reverses to ``instanceTags`` per the generic mapping.
+    assert out["instanceTags"] == {"team": "ml"}
     assert out["namespace"] == "orb-it"
     assert out["resourceRequests"] == {"cpu": "100m"}
     assert out["resourceLimits"] == {"cpu": "200m"}
     assert out["runtimeClass"] == "gvisor"
     assert out["nodeSelector"] == {"role": "compute"}
     assert out["serviceAccount"] == "orb-worker"
-    assert out["labels"] == {"team": "ml"}
     assert out["annotations"] == {"orb.io/note": "round-trip"}
-    # env / environment both map to environment_variables in the
-    # forward direction.  The reverse direction picks one canonical
-    # key; we accept either (long form is preferred in practice).
+    # env / environment both reverse-map to one canonical k8s-specific key.
     assert out.get("environment") == {"BACKEND": "queue"} or out.get("env") == (
         {"BACKEND": "queue"}
     )
@@ -187,18 +205,21 @@ def test_field_mapping_defaults_applied_in_isolation() -> None:
     out = adapter.apply_defaults({})
     assert out["namespace"] == "default"
     assert out["max_instances"] == 1
-    assert out["replicas"] == 1
-    assert out["labels"] == {}
     assert out["annotations"] == {}
-    assert out["environment_variables"] == {}
+    # Replicas / labels / env are intentionally NOT defaulted — those
+    # concepts live on the generic ``requested_count`` / ``tags`` / typed
+    # ``env`` surfaces instead.
+    assert "replicas" not in out
+    assert "labels" not in out
+    assert "environment_variables" not in out
 
     # Operator-supplied values win over defaults.
-    out = adapter.apply_defaults({"namespace": "ns-a", "max_instances": 7, "labels": {"k": "v"}})
+    out = adapter.apply_defaults(
+        {"namespace": "ns-a", "max_instances": 7, "annotations": {"k": "v"}}
+    )
     assert out["namespace"] == "ns-a"
     assert out["max_instances"] == 7
-    # ``replicas`` defaults to ``max_instances`` when not set.
-    assert out["replicas"] == 7
-    assert out["labels"] == {"k": "v"}
+    assert out["annotations"] == {"k": "v"}
 
 
 def test_field_mapping_full_roundtrip_in_to_out() -> None:
@@ -212,14 +233,14 @@ def test_field_mapping_full_roundtrip_in_to_out() -> None:
     assert out["templateId"] == payload["templateId"]
     assert out["maxNumber"] == payload["maxNumber"]
     assert out["providerApi"] == payload["providerApi"]
-    assert out["containerImage"] == payload["containerImage"]
+    assert out["imageId"] == payload["imageId"]
+    assert out["instanceTags"] == payload["instanceTags"]
     assert out["namespace"] == payload["namespace"]
     assert out["resourceRequests"] == payload["resourceRequests"]
     assert out["resourceLimits"] == payload["resourceLimits"]
     assert out["runtimeClass"] == payload["runtimeClass"]
     assert out["nodeSelector"] == payload["nodeSelector"]
     assert out["serviceAccount"] == payload["serviceAccount"]
-    assert out["labels"] == payload["labels"]
     assert out["annotations"] == payload["annotations"]
 
 

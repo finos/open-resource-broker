@@ -4,6 +4,15 @@ Mirrors :mod:`orb.providers.aws.domain.template.aws_template_dto_config` for
 the kubernetes provider.  Registered with :class:`TemplateExtensionRegistry`
 so :meth:`TemplateDTO.from_domain` can delegate construction to the registry
 rather than carrying kubernetes-specific knowledge directly.
+
+Only kubernetes-specific fields belong here.  Generic fields that have a
+home on the parent :class:`Template` are not duplicated:
+
+* Container image lives in ``Template.image_id``.
+* Operator labels live in ``Template.tags`` and are projected onto the
+  pod label set at spec-build time.
+* The per-request replica count comes from ``request.requested_count``;
+  ``Template.max_instances`` caps the quota.
 """
 
 from __future__ import annotations
@@ -14,25 +23,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class K8sTemplateDTOConfig(BaseModel):
-    """Typed container for kubernetes-specific fields on :class:`TemplateDTO`.
-
-    Only kubernetes-specific fields belong here.  Generic fields (template id,
-    name, machine counts, etc.) live on the parent :class:`TemplateDTO`.
-    Values are kept ``Optional`` so the DTO can round-trip partial payloads
-    without forcing operators to populate every field.
-    """
+    """Typed container for kubernetes-specific fields on :class:`TemplateDTO`."""
 
     model_config = ConfigDict(extra="ignore")
 
-    # Container image and runtime
-    container_image: Optional[str] = Field(
-        None,
-        description=(
-            "Container image string (e.g. ``ghcr.io/example/worker:1.2.3``).  "
-            "Overrides the legacy ``image_id`` field at the kubernetes handler "
-            "boundary when set."
-        ),
-    )
+    # Scheduling / placement
     namespace: Optional[str] = Field(
         None, description="Target namespace for this template's resources."
     )
@@ -40,8 +35,6 @@ class K8sTemplateDTOConfig(BaseModel):
     service_account: Optional[str] = Field(
         None, description="``serviceAccountName`` applied to pods."
     )
-
-    # Scheduling
     node_selector: Optional[dict[str, str]] = Field(
         None, description="``nodeSelector`` applied to pods."
     )
@@ -59,11 +52,8 @@ class K8sTemplateDTOConfig(BaseModel):
         description='Container resource limits, e.g. ``{"cpu": "2", "memory": "4Gi"}``.',
     )
 
-    # Workload sizing for controller-backed handlers
-    replicas: Optional[int] = Field(
-        None,
-        description="Replica count for the Deployment / StatefulSet handlers.",
-    )
+    # Workload sizing overrides (Job-specific; replica count comes from
+    # ``request.requested_count``)
     completions: Optional[int] = Field(
         None, description="``completions`` count for the Job handler."
     )
@@ -72,9 +62,6 @@ class K8sTemplateDTOConfig(BaseModel):
     )
 
     # Pod metadata
-    labels: Optional[dict[str, str]] = Field(
-        None, description="Labels applied to managed resources."
-    )
     annotations: Optional[dict[str, str]] = Field(
         None, description="Annotations applied to managed resources."
     )
@@ -99,6 +86,14 @@ class K8sTemplateDTOConfig(BaseModel):
         None, description="``imagePullSecrets`` entry attached to pods."
     )
 
+    # Raw partial override applied AFTER the computed pod spec is built.
+    pod_spec_override: Optional[dict[str, Any]] = Field(
+        None,
+        description=(
+            "Partial pod-spec override deep-merged onto the computed pod spec at acquire time."
+        ),
+    )
+
     @field_validator("namespace")
     @classmethod
     def _validate_namespace(cls, v: Optional[str]) -> Optional[str]:
@@ -107,20 +102,12 @@ class K8sTemplateDTOConfig(BaseModel):
             raise ValueError("namespace must be a non-empty string when set")
         return v
 
-    @field_validator("replicas", "completions", "parallelism")
+    @field_validator("completions", "parallelism")
     @classmethod
     def _validate_positive(cls, v: Optional[int]) -> Optional[int]:
         """Workload counts must be positive when set."""
         if v is not None and v <= 0:
             raise ValueError("workload count fields must be positive integers")
-        return v
-
-    @field_validator("container_image")
-    @classmethod
-    def _validate_container_image(cls, v: Optional[str]) -> Optional[str]:
-        """Reject the empty string; ``None`` is the unset sentinel."""
-        if v is not None and not v.strip():
-            raise ValueError("container_image must be a non-empty string when set")
         return v
 
     def to_template_defaults(self) -> dict[str, Any]:

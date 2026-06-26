@@ -27,9 +27,17 @@ from typing import TYPE_CHECKING, Any, Optional
 from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
 from orb.providers.k8s.configuration.config import K8sProviderConfig
+from orb.providers.k8s.domain.template.k8s_template import upcast_to_k8s_template
 from orb.providers.k8s.utilities.pod_spec import (
     _DEFAULT_LABEL_PREFIX,
+    apply_pod_spec_override,
+    build_container_env,
+    build_container_resources,
     build_pod_labels,
+    build_pod_tolerations,
+    build_pod_volumes,
+    resolve_image_pull_secret_name,
+    resolve_node_selector,
 )
 
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
@@ -37,7 +45,7 @@ if TYPE_CHECKING:  # pragma: no cover — type-checking only
 
 
 # ---------------------------------------------------------------------------
-# Deployment name / selector helpers
+# Deployment name helpers
 # ---------------------------------------------------------------------------
 
 # DNS-1123 label limit for the deployment name.  Pods spawned by a
@@ -47,100 +55,12 @@ _DEPLOYMENT_NAME_MAX_LEN = 47  # 63 - 16-char controller suffix budget
 
 
 def make_deployment_name(request_id: str) -> str:
-    """Build a deterministic Deployment name for an ORB request.
-
-    Pattern: ``orb-{request_id[:8]}``.  The trailing sequence used by the
-    Pod handler is omitted — one Deployment per request supports N replicas.
-
-    Args:
-        request_id: ORB request UUID (string).  Only the first 8 chars
-            are used so the name stays compact and human-readable.
-
-    Returns:
-        A DNS-1123 conformant Deployment name.
-    """
+    """Build a deterministic Deployment name for an ORB request."""
     prefix = (request_id or "unknown")[:8]
     name = f"orb-{prefix}"
     if len(name) > _DEPLOYMENT_NAME_MAX_LEN:  # pragma: no cover — defensive
         name = name[:_DEPLOYMENT_NAME_MAX_LEN]
     return name
-
-
-# ---------------------------------------------------------------------------
-# Pod-template field extraction (shared with the Pod handler at the field
-# level but assembled here so we can apply the additional Deployment
-# pod-template invariants — labels minus ``machine-id``, restart policy
-# ``Always``, etc.).
-# ---------------------------------------------------------------------------
-
-
-def _resolve_container_image(template: Template) -> str:
-    """Pick the container image string from a generic ``Template``."""
-    provider_data = getattr(template, "provider_data", None) or {}
-    k8s_block = provider_data.get("k8s") if isinstance(provider_data, dict) else None
-    if isinstance(k8s_block, dict):
-        image = k8s_block.get("container_image")
-        if image:
-            return str(image)
-    image_id = getattr(template, "image_id", None)
-    if image_id:
-        return str(image_id)
-    raise ValueError(
-        "Kubernetes template is missing a container image — set ``image_id`` or "
-        "``provider_data.kubernetes.container_image``."
-    )
-
-
-def _resolve_resource_requests(template: Template) -> Optional[dict[str, str]]:
-    provider_data = getattr(template, "provider_data", None) or {}
-    if not isinstance(provider_data, dict):
-        return None
-    k8s_block = provider_data.get("k8s")
-    if not isinstance(k8s_block, dict):
-        return None
-    requests = k8s_block.get("resource_requests")
-    if isinstance(requests, dict):
-        return {str(k): str(v) for k, v in requests.items()}
-    return None
-
-
-def _resolve_resource_limits(template: Template) -> Optional[dict[str, str]]:
-    provider_data = getattr(template, "provider_data", None) or {}
-    if not isinstance(provider_data, dict):
-        return None
-    k8s_block = provider_data.get("k8s")
-    if not isinstance(k8s_block, dict):
-        return None
-    limits = k8s_block.get("resource_limits")
-    if isinstance(limits, dict):
-        return {str(k): str(v) for k, v in limits.items()}
-    return None
-
-
-def _resolve_command(template: Template) -> Optional[list[str]]:
-    provider_data = getattr(template, "provider_data", None) or {}
-    if not isinstance(provider_data, dict):
-        return None
-    k8s_block = provider_data.get("k8s")
-    if not isinstance(k8s_block, dict):
-        return None
-    command = k8s_block.get("command")
-    if isinstance(command, list):
-        return [str(c) for c in command]
-    return None
-
-
-def _resolve_args(template: Template) -> Optional[list[str]]:
-    provider_data = getattr(template, "provider_data", None) or {}
-    if not isinstance(provider_data, dict):
-        return None
-    k8s_block = provider_data.get("k8s")
-    if not isinstance(k8s_block, dict):
-        return None
-    args = k8s_block.get("args")
-    if isinstance(args, list):
-        return [str(a) for a in args]
-    return None
 
 
 # ---------------------------------------------------------------------------
@@ -158,45 +78,7 @@ def build_deployment_spec(
     provider_api: str = "Deployment",
     config: Optional[K8sProviderConfig] = None,
 ) -> "V1Deployment":
-    """Build a ``V1Deployment`` for ``request`` with the given replica count.
-
-    Mandatory invariants:
-
-    * ``spec.replicas`` is exactly ``replicas`` (caller decides the value;
-      typically ``request.requested_count``).
-    * ``spec.selector.matchLabels`` includes the ORB ``request-id`` label
-      so the deployment uniquely owns the pods it spawns and the handler
-      can list them with the same selector.
-    * The pod template's ``restartPolicy`` is ``Always`` — Deployment
-      replicas must be restartable by the controller for the scale-down
-      contract (and for the pod-deletion-cost annotation strategy) to
-      work; per-machine retry semantics are owned by ORB at the request
-      level, not the pod level.
-
-    Pod-level labels intentionally **omit** the ``machine-id`` label
-    because the controller assigns pod names, and a single label value
-    cannot fan out across N pods.  The handler discovers per-pod
-    ``machine_id`` (i.e. the controller-assigned pod name) on read-back
-    via :meth:`list_namespaced_pod`.
-
-    Args:
-        template: Source ORB template.
-        request: Request the deployment belongs to.
-        deployment_name: ``metadata.name`` for the deployment.
-        namespace: Target Kubernetes namespace.
-        replicas: ``spec.replicas`` value (must be >= 0).
-        provider_api: Provider API key stamped on labels.
-        config: Optional provider config — when supplied, its
-            ``default_node_selector`` / ``default_tolerations`` /
-            ``default_image_pull_secret`` / ``label_prefix`` /
-            ``emit_legacy_labels`` fields are applied as defaults.
-
-    Returns:
-        A fully populated ``V1Deployment`` ready for
-        ``create_namespaced_deployment``.
-    """
-    # Lazy import keeps ``utilities`` clean of unconditional kubernetes
-    # SDK imports for callers that only need the helpers above.
+    """Build a ``V1Deployment`` for ``request`` with the given replica count."""
     from kubernetes.client import (  # noqa: PLC0415
         V1Container,
         V1Deployment,
@@ -204,83 +86,61 @@ def build_deployment_spec(
         V1LabelSelector,
         V1LocalObjectReference,
         V1ObjectMeta,
+        V1Pod,
         V1PodSpec,
         V1PodTemplateSpec,
-        V1ResourceRequirements,
-        V1Toleration,
     )
 
     if replicas < 0:
         raise ValueError(f"replicas must be >= 0, got {replicas}")
 
+    k8s_template = upcast_to_k8s_template(template)
+
     label_prefix = config.label_prefix if config is not None else _DEFAULT_LABEL_PREFIX
     emit_legacy_labels = config.emit_legacy_labels if config is not None else True
 
-    # Deployment-level labels (applied to the Deployment object itself).
-    # ``machine-id`` is not a label on the Deployment because the
-    # Deployment is shared by all replicas.  We reuse the helper but
-    # then strip ``machine-id`` so it does not point to a non-existent
-    # pod.
+    operator_labels = k8s_template.resolve_pod_labels()
+
     deployment_labels = build_pod_labels(
         request,
         machine_id=deployment_name,
         provider_api=provider_api,
         label_prefix=label_prefix,
         emit_legacy_labels=emit_legacy_labels,
+        extra_labels=operator_labels,
     )
-    # The Deployment itself is not a pod and has no machine_id — drop the
-    # label so it does not get conflated with a real machine.
     deployment_labels.pop(f"{label_prefix}/machine-id", None)
 
-    # Pod-template labels (applied to every replica).  Same as above —
-    # the controller stamps pod names, so a fixed ``machine-id`` label
-    # would be wrong; the handler reads pod names back via the selector.
     pod_template_labels = dict(deployment_labels)
 
-    # Selector matches the request-id label so the Deployment owns
-    # exactly the pods spawned for this request.
     selector_match_labels: dict[str, str] = {
         f"{label_prefix}/request-id": str(request.request_id),
         f"{label_prefix}/provider-api": provider_api,
     }
 
-    image = _resolve_container_image(template)
-    requests = _resolve_resource_requests(template)
-    limits = _resolve_resource_limits(template)
-    command = _resolve_command(template)
-    args = _resolve_args(template)
-
-    resources: Optional[V1ResourceRequirements] = None
-    if requests or limits:
-        resources = V1ResourceRequirements(requests=requests, limits=limits)
+    image = k8s_template.resolve_container_image()
+    resources = build_container_resources(k8s_template)
+    env = build_container_env(k8s_template)
 
     container = V1Container(
         name="orb",
         image=image,
-        command=command,
-        args=args,
+        command=k8s_template.command,
+        args=k8s_template.args,
         resources=resources,
+        env=env,
     )
 
-    node_selector: Optional[dict[str, str]] = None
-    tolerations: Optional[list[V1Toleration]] = None
-    image_pull_secrets: Optional[list[V1LocalObjectReference]] = None
-
-    if config is not None:
-        if config.default_node_selector:
-            node_selector = dict(config.default_node_selector)
-        if config.default_tolerations:
-            tolerations = [V1Toleration(**dict(t)) for t in config.default_tolerations]
-        if config.default_image_pull_secret:
-            image_pull_secrets = [V1LocalObjectReference(name=config.default_image_pull_secret)]
+    node_selector = resolve_node_selector(k8s_template, config=config)
+    tolerations = build_pod_tolerations(k8s_template, config=config)
+    pull_secret_name = resolve_image_pull_secret_name(k8s_template, config=config)
+    image_pull_secrets = (
+        [V1LocalObjectReference(name=pull_secret_name)] if pull_secret_name else None
+    )
+    volumes = build_pod_volumes(k8s_template)
 
     pod_spec_kwargs: dict[str, Any] = {
         "containers": [container],
-        # Deployment-managed pods MUST use restartPolicy Always — the
-        # controller's reconciliation contract requires it.  ORB
-        # controls retry semantics at the *request* level via
-        # release_hosts; the controller restarts crashed containers
-        # within a pod.
         "restart_policy": "Always",
     }
     if node_selector is not None:
@@ -289,11 +149,25 @@ def build_deployment_spec(
         pod_spec_kwargs["tolerations"] = tolerations
     if image_pull_secrets is not None:
         pod_spec_kwargs["image_pull_secrets"] = image_pull_secrets
+    if volumes is not None:
+        pod_spec_kwargs["volumes"] = volumes
+    if k8s_template.service_account:
+        pod_spec_kwargs["service_account_name"] = k8s_template.service_account
+    if k8s_template.runtime_class:
+        pod_spec_kwargs["runtime_class_name"] = k8s_template.runtime_class
 
     pod_template = V1PodTemplateSpec(
-        metadata=V1ObjectMeta(labels=pod_template_labels),
+        metadata=V1ObjectMeta(
+            labels=pod_template_labels,
+            annotations=(dict(k8s_template.annotations) if k8s_template.annotations else None),
+        ),
         spec=V1PodSpec(**pod_spec_kwargs),
     )
+
+    if k8s_template.pod_spec_override:
+        transient = V1Pod(spec=pod_template.spec)
+        merged = apply_pod_spec_override(transient, k8s_template.pod_spec_override)
+        pod_template.spec = merged.spec
 
     deployment_spec = V1DeploymentSpec(
         replicas=replicas,

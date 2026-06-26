@@ -741,23 +741,34 @@ class K8sProviderStrategy(ProviderStrategy):
     def _build_template_for_request(self, request: "Request") -> "Template":
         """Resolve the :class:`Template` carried by ``request``.
 
-        The kubernetes provider currently picks up the template payload
-        from ``request.metadata['template']`` (REST/CLI submission shape)
-        and falls back to a minimal template assembled from the request
-        fields when nothing richer is available.
+        The kubernetes provider picks up the template payload from
+        ``request.metadata['template']`` (REST/CLI submission shape) and
+        falls back to a minimal template assembled from the request fields
+        when nothing richer is available.  In every case the result is
+        upcast to :class:`K8sTemplate` so the spec builders see the typed
+        k8s-specific surface — the fallback path historically built a
+        bare ``Template`` and silently dropped any k8s fields.
         """
-        from orb.domain.template.template_aggregate import Template as _Template  # noqa: PLC0415
+        from orb.domain.template.template_aggregate import (  # noqa: PLC0415
+            Template as _Template,
+        )
+        from orb.providers.k8s.domain.template.k8s_template import (  # noqa: PLC0415
+            K8sTemplate,
+            upcast_to_k8s_template,
+        )
 
         meta = getattr(request, "metadata", None) or {}
         if isinstance(meta, dict):
             template_payload = meta.get("template")
-            if isinstance(template_payload, _Template):
+            if isinstance(template_payload, K8sTemplate):
                 return template_payload
+            if isinstance(template_payload, _Template):
+                return upcast_to_k8s_template(template_payload)
             if isinstance(template_payload, dict):
-                return _Template(**template_payload)
+                return K8sTemplate.model_validate(template_payload)
 
-        # Fall back to a minimal template built from the request fields.
-        return _Template(
+        # Fall back to a minimal K8sTemplate built from the request fields.
+        return K8sTemplate(
             template_id=str(request.template_id),
             provider_type="k8s",
             provider_api=request.provider_api or KubernetesProviderApi.POD.value,
