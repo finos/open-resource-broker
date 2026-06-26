@@ -76,6 +76,7 @@ def _make_return_request(machine_ids=None):
         machine_ids=machine_ids,
         provider_type="aws",
         provider_name="aws-us-east-1",
+        provider_api="ec2fleet",
     )
 
 

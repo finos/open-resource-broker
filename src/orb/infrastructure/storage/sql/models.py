@@ -1,142 +1,208 @@
-"""SQLAlchemy models for storage."""
+"""
+AUTHORITATIVE schema for SQL strategy. Use Alembic for migrations.
 
-import enum
-import json
-from datetime import datetime, timezone
+These ORM models are the single source of truth for the SQL table structure.
+The column-dict helpers in unit_of_work.py have been removed in favour of
+these models.  Run ``alembic upgrade head`` to apply schema changes.
+"""
 
-from sqlalchemy import (
-    JSON,
-    Boolean,
-    Column,
-    DateTime,
-    Enum,
-    ForeignKey,
-    Integer,
-    String,
-    Text,
-)
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
-
-Base = declarative_base()
+from sqlalchemy import BIGINT, Boolean, Integer, String, Text
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
-class JsonSerializableMixin:
-    """Mixin for JSON serializable models."""
-
-    def to_dict(self):
-        """Convert model to dictionary."""
-        result = {}
-        for column in self.__table__.columns:  # type: ignore[attr-defined]
-            value = getattr(self, column.name)
-            if isinstance(value, datetime):
-                value = value.isoformat()
-            elif isinstance(value, enum.Enum):
-                value = value.value
-            result[column.name] = value
-        return result
-
-    @classmethod
-    def from_dict(cls, data):
-        """Create model from dictionary."""
-        # Handle enum fields
-        for column in cls.__table__.columns:  # type: ignore[attr-defined]
-            if isinstance(column.type, Enum) and column.name in data:
-                enum_class = column.type.enum_class
-                data[column.name] = enum_class(data[column.name])  # type: ignore[misc]
-        return cls(**data)
-
-    def to_json(self):
-        """Convert model to JSON string."""
-        return json.dumps(self.to_dict())
+class Base(DeclarativeBase):
+    """Shared declarative base for all ORM models."""
 
 
-class MachineModel(Base, JsonSerializableMixin):
-    """SQLAlchemy model for machines."""
-
-    __tablename__ = "machines"
-
-    machine_id = Column(String(36), primary_key=True)
-    name = Column(String(255), nullable=False)
-    status = Column(String(50), nullable=False)
-    instance_type = Column(String(50), nullable=False)
-    private_ip = Column(String(50), nullable=True)
-    public_ip = Column(String(50), nullable=True)
-    result = Column(String(50), nullable=False)
-    launch_time = Column(Integer, nullable=False)
-    message = Column(Text, nullable=True)
-    provider_api = Column(String(50), nullable=True)
-    resource_id = Column(String(255), nullable=True)
-    price_type = Column(String(50), nullable=True)
-    cloud_host_id = Column(String(255), nullable=True)
-    # Using model_metadata instead of metadata to avoid conflict with SQLAlchemy's reserved keyword
-    # The domain model uses metadata, but SQLAlchemy reserves this name in the
-    # Declarative API
-    model_metadata = Column("model_metadata", JSON, nullable=True)
-    health_checks = Column(JSON, nullable=True)
-    request_id = Column(String(36), ForeignKey("requests.request_id"), nullable=False)
-    template_id = Column(String(36), ForeignKey("templates.template_id"), nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(
-        DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
-    )
-    version = Column(Integer, default=0)
-
-    # Relationships
-    request = relationship("RequestModel", back_populates="machines")
-    template = relationship("TemplateModel", back_populates="machines")
-
-
-class RequestModel(Base, JsonSerializableMixin):
-    """SQLAlchemy model for requests."""
+class RequestModel(Base):
+    """ORM model for the `requests` table."""
 
     __tablename__ = "requests"
 
-    request_id = Column(String(36), primary_key=True)
-    status = Column(String(50), nullable=False)
-    request_type = Column(String(50), nullable=False)
-    template_id = Column(String(36), ForeignKey("templates.template_id"), nullable=True)
-    number_of_machines = Column(Integer, nullable=False)
-    machine_ids = Column(JSON, nullable=True)  # List of machine IDs
-    parameters = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(
-        DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
-    )
-    completed_at = Column(DateTime, nullable=True)
-    version = Column(Integer, default=0)
+    # Identity
+    request_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    template_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    request_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    status: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
-    # Relationships
-    machines = relationship("MachineModel", back_populates="request")
-    template = relationship("TemplateModel", back_populates="requests")
+    # Counts
+    requested_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    desired_capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    successful_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    failed_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Timing (stored as ISO-8601 TEXT for dialect portability)
+    created_at: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[str | None] = mapped_column(Text, nullable=True)
+    first_status_check: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_status_check: Mapped[str | None] = mapped_column(Text, nullable=True)
+    completed_at: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Status / error
+    status_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_details: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON-encoded
+    success_rate: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Provider
+    provider_api: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    provider_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    provider_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    provider_data: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON-encoded TEXT
+
+    # Resources
+    resource_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    resource_ids: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON-encoded list
+    machine_ids: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON-encoded list
+
+    # Launch template
+    launch_template_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    launch_template_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # Misc
+    duration: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    schema_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # NOTE: 'metadata' is reserved by SQLAlchemy DeclarativeBase; the column is
+    # named 'metadata' in the DB but accessed as `extra_metadata` on the model.
+    extra_metadata: Mapped[str | None] = mapped_column("metadata", Text, nullable=True)
+
+    # Legacy / backward-compat aliases written by older serializer versions
+    machine_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    timeout: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tags: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON-encoded
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
-class TemplateModel(Base, JsonSerializableMixin):
-    """SQLAlchemy model for templates."""
+class MachineModel(Base):
+    """ORM model for the `machines` table."""
+
+    __tablename__ = "machines"
+
+    # Identity
+    machine_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    status: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    instance_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # Network
+    private_ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    public_ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    private_dns_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    public_dns_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Timing (BIGINT unix epoch for launch_time; ISO-8601 TEXT for others)
+    launch_time: Mapped[int | None] = mapped_column(BIGINT, nullable=True)
+    termination_time: Mapped[str | None] = mapped_column(Text, nullable=True)
+    uptime_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Provider — provider_api is a domain-level invariant (Machine.provider_api
+    # is required on the aggregate). The SQL constraint mirrors that.
+    provider_api: Mapped[str] = mapped_column(String(255), nullable=False)
+    provider_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    provider_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    resource_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    cloud_host_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    provider_data: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON-encoded
+
+    # Relations (no FK constraints — strategies vary)
+    request_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    template_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    return_request_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # Location
+    availability_zone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    region: Mapped[str | None] = mapped_column(Text, nullable=True)
+    subnet_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # Tags / metadata
+    tags: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON-encoded
+    # NOTE: 'metadata' reserved by DeclarativeBase; column 'metadata' accessed as extra_metadata
+    extra_metadata: Mapped[str | None] = mapped_column("metadata", Text, nullable=True)
+    health_checks: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON-encoded
+
+    # Pricing
+    price_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # Misc
+    result: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    vcpus: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    security_group_ids: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON-encoded
+    image_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    status_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    schema_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # Timestamps (ISO-8601 TEXT)
+    created_at: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class TemplateModel(Base):
+    """ORM model for the `templates` table."""
 
     __tablename__ = "templates"
 
-    template_id = Column(String(36), primary_key=True)
-    name = Column(String(255), nullable=False)
-    description = Column(Text, nullable=True)
-    provider_api = Column(String(50), nullable=False)
-    instance_type = Column(String(50), nullable=False)
-    price_type = Column(String(50), nullable=False)
-    max_number = Column(Integer, nullable=False)
-    is_available = Column(Boolean, default=True)
-    parameters = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(
-        DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
-    )
-    version = Column(Integer, default=0)
+    # Core
+    template_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
-    # Relationships
-    machines = relationship("MachineModel", back_populates="template")
-    requests = relationship("RequestModel", back_populates="template")
+    # Provider
+    provider_api: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    provider_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    provider_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    provider_data: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON-encoded
+
+    # Instance
+    image_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    max_instances: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    instance_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # Machine types (JSON-encoded dicts)
+    machine_types: Mapped[str | None] = mapped_column(Text, nullable=True)
+    machine_types_ondemand: Mapped[str | None] = mapped_column(Text, nullable=True)
+    machine_types_priority: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Network (JSON-encoded lists)
+    subnet_ids: Mapped[str | None] = mapped_column(Text, nullable=True)
+    security_group_ids: Mapped[str | None] = mapped_column(Text, nullable=True)
+    network_zones: Mapped[str | None] = mapped_column(Text, nullable=True)
+    public_ip_assignment: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Pricing / allocation
+    price_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    allocation_strategy: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    max_price: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Storage
+    root_device_volume_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    volume_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    iops: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    throughput: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    storage_encryption: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    encryption_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Access
+    key_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    user_data: Mapped[str | None] = mapped_column(Text, nullable=True)
+    instance_profile: Mapped[str | None] = mapped_column(Text, nullable=True)
+    launch_template_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # Advanced
+    monitoring_enabled: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+
+    # Tags / metadata (JSON-encoded)
+    tags: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # NOTE: 'metadata' reserved by DeclarativeBase; column 'metadata' accessed as extra_metadata
+    extra_metadata: Mapped[str | None] = mapped_column("metadata", Text, nullable=True)
+
+    # Timestamps (ISO-8601 TEXT)
+    created_at: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Misc
+    version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    schema_version: Mapped[str | None] = mapped_column(String(50), nullable=True)

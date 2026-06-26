@@ -42,7 +42,12 @@ class Machine(AggregateRoot):
     return_request_id: Optional[str] = None
     provider_type: str = Field(default="aws")
     provider_name: str
-    provider_api: Optional[str] = None
+    # provider_api is required at the domain level — every machine MUST
+    # know which provider API produced it (EC2Fleet / ASG / SpotFleet /
+    # RunInstances) so the deprovisioning router can dispatch correctly.
+    # Persistence layers loading legacy rows without it are expected to
+    # backfill from the source request before constructing the aggregate.
+    provider_api: str
     resource_id: Optional[str] = None
 
     # Machine configuration
