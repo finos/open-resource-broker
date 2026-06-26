@@ -23,6 +23,10 @@ from __future__ import annotations
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Optional
 
+from orb.providers.kubernetes.configuration.template_extension import (
+    KubernetesTemplateExtensionConfig,
+)
+
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
     from orb.domain.base.ports import LoggingPort
     from orb.domain.template.factory import TemplateFactory
@@ -157,35 +161,41 @@ def register_kubernetes_provider_settings() -> None:
 def register_kubernetes_extensions(logger: "Optional[LoggingPort]" = None) -> None:
     """Register template-DTO extensions with the global template extension registry.
 
-    The kubernetes-specific DTO config class arrives in Phase B alongside the
-    Pod handler.  Until that lands the registration is a documented no-op so
-    this module imports cleanly and the rest of the provider scaffolding is
-    exercised by tests.
+    Registers :class:`KubernetesTemplateDTOConfig` as the typed
+    ``provider_config`` class for :class:`TemplateDTO` serialisation so the
+    kubernetes-specific fields (``container_image``, ``namespace``, resource
+    requests / limits, etc.) round-trip cleanly without leaking into the
+    generic template DTO.
     """
     try:
         from orb.infrastructure.registry.template_extension_registry import (
             TemplateExtensionRegistry,
         )
-        from orb.providers.kubernetes.domain.template.kubernetes_template_dto_config import (  # type: ignore[import-not-found]  # noqa: PLC0415
+        from orb.providers.kubernetes.domain.template.kubernetes_template_dto_config import (
             KubernetesTemplateDTOConfig,
         )
 
         TemplateExtensionRegistry.register_extension("kubernetes", KubernetesTemplateDTOConfig)
         if logger:
             logger.debug("Kubernetes template extensions registered successfully")
-    except ImportError:
-        # Phase A: DTO config not present yet — log only at debug level.
-        if logger:
-            logger.debug(
-                "Kubernetes template DTO config not present yet "
-                "(introduced in Phase B alongside the Pod handler)."
-            )
     except Exception as exc:
         if logger:
             logger.error(
                 "Failed to register Kubernetes template extensions: %s", exc, exc_info=True
             )
         raise
+
+
+def get_kubernetes_extension_defaults() -> dict[str, Any]:
+    """Return default kubernetes extension configuration values.
+
+    Mirrors :func:`orb.providers.aws.registration.get_aws_extension_defaults`.
+    Returns the kubernetes-specific defaults from
+    :class:`KubernetesTemplateExtensionConfig` so callers (template merge,
+    docs generation, CLI introspection) can introspect the baseline without
+    materialising an instance manually.
+    """
+    return KubernetesTemplateExtensionConfig().to_template_defaults()  # type: ignore[call-arg]
 
 
 def register_kubernetes_auth_strategies(logger: "Optional[LoggingPort]" = None) -> None:
@@ -297,9 +307,10 @@ def initialize_kubernetes_provider(
     """Initialize Kubernetes provider components.
 
     Mirrors :func:`orb.providers.aws.registration.initialize_aws_provider`.
-    Each registration is wrapped in :func:`contextlib.suppress(ImportError)`
-    so Phase A imports cleanly even when phase-B+ modules (CLI spec, field
-    mapping, template adapter, example generator) are not yet present.
+    Wires every registry the provider participates in: provider settings,
+    template DTO extensions, auth strategies, the optional template factory,
+    the CLI spec, the HostFactory field-mapping adapter, and the defaults
+    loader.
     """
     try:
         register_kubernetes_provider_settings()
@@ -309,27 +320,23 @@ def initialize_kubernetes_provider(
         if template_factory is not None:
             register_kubernetes_template_factory(template_factory, logger)
 
-        # CLI spec — arrives in Phase G.
-        with suppress(ImportError):
-            from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
-            from orb.providers.kubernetes.cli.kubernetes_cli_spec import (  # type: ignore[import-not-found]  # noqa: PLC0415
-                KubernetesCLISpec,
-            )
+        # CLI spec
+        from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
+        from orb.providers.kubernetes.cli.kubernetes_cli_spec import KubernetesCLISpec
 
-            CLISpecRegistry.register("kubernetes", KubernetesCLISpec())
+        CLISpecRegistry.register("kubernetes", KubernetesCLISpec())
 
-        # HostFactory field mapping — arrives in Phase G.
-        with suppress(ImportError):
-            from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import (
-                FieldMappingRegistry,
-            )
-            from orb.providers.kubernetes.scheduler.hostfactory_field_mapping import (  # type: ignore[import-not-found]  # noqa: PLC0415
-                KubernetesFieldMapping,
-            )
+        # HostFactory field mapping
+        from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import (
+            FieldMappingRegistry,
+        )
+        from orb.providers.kubernetes.scheduler.hostfactory_field_mapping import (
+            KubernetesFieldMapping,
+        )
 
-            FieldMappingRegistry.register("kubernetes", KubernetesFieldMapping())
+        FieldMappingRegistry.register("kubernetes", KubernetesFieldMapping())
 
-        # Defaults loader — Phase A loader always available (returns {} for now).
+        # Defaults loader
         from orb.providers.kubernetes.defaults_loader import KubernetesDefaultsLoader
         from orb.providers.registry.defaults_loader_registry import DefaultsLoaderRegistry
 
@@ -348,25 +355,30 @@ def initialize_kubernetes_provider(
 def register_kubernetes_services_with_di(container) -> None:
     """Register Kubernetes utility services with the DI container.
 
-    Phase A: registers the ``TemplateAdapterPort`` / ``TemplateExampleGeneratorPort``
-    bindings only when their concrete implementations exist (Phase B+).  In
-    Phase A this function is a documented no-op.
+    Registers :class:`KubernetesTemplateAdapter` against both its concrete
+    type and the :class:`TemplateAdapterPort` port so callers can resolve
+    either binding from the container.
+
+    The :class:`TemplateExampleGeneratorPort` registration is wrapped in
+    ``suppress(ImportError)`` so this function remains operational before
+    Phase G ships the example-generator adapter under
+    ``providers/kubernetes/adapters/``.
     """
     from orb.domain.base.ports import LoggingPort
+    from orb.domain.base.ports.template_adapter_port import TemplateAdapterPort
+    from orb.providers.kubernetes.infrastructure.adapters.template_adapter import (
+        KubernetesTemplateAdapter,
+        create_kubernetes_template_adapter,
+    )
 
     logger = container.get(LoggingPort)
 
-    with suppress(ImportError):
-        from orb.domain.base.ports.template_adapter_port import TemplateAdapterPort
-        from orb.providers.kubernetes.infrastructure.adapters.template_adapter import (  # type: ignore[import-not-found]  # noqa: PLC0415
-            KubernetesTemplateAdapter,
-            create_kubernetes_template_adapter,
-        )
+    container.register_singleton(KubernetesTemplateAdapter, create_kubernetes_template_adapter)
+    container.register_singleton(TemplateAdapterPort, create_kubernetes_template_adapter)
+    logger.debug("Kubernetes Template Adapter registered with DI container")
 
-        container.register_singleton(KubernetesTemplateAdapter, create_kubernetes_template_adapter)
-        container.register_singleton(TemplateAdapterPort, create_kubernetes_template_adapter)
-        logger.debug("Kubernetes Template Adapter registered with DI container")
-
+    # Example generator arrives in Phase G; the import is guarded so this
+    # function works regardless of phase ordering.
     with suppress(ImportError):
         from orb.domain.base.ports.template_example_generator_port import (
             TemplateExampleGeneratorPort,
