@@ -186,9 +186,7 @@ def start(
             try:
                 pid_path.unlink()
             except FileNotFoundError:
-                # PID file already removed by a parallel stop/restart;
-                # cleanup is idempotent.
-                pass
+                logger.debug("PID file %s already removed during teardown", pid_path)
             os.close(lock_fd)
         return {"pid": os.getpid(), "status": "exited", "exit_code": rc}
 
@@ -235,20 +233,15 @@ def start(
         try:
             with os.fdopen(write_fd, "wb") as w:
                 w.write(f"err:{exc}".encode())
-        except Exception:
-            # Best-effort error reporting in the daemon child; if even the
-            # pipe write fails the parent will treat the EOF as failure.
-            pass
+        except Exception as report_exc:
+            logger.debug("daemon child failed to report start error: %s", report_exc)
         os._exit(1)
 
     try:
         with os.fdopen(write_fd, "wb") as w:
             w.write(f"ok:{os.getpid()}".encode())
-    except Exception:
-        # Readiness notification is best-effort. The parent treats an
-        # empty pipe payload as failure, but the daemon itself keeps
-        # running — operators can still see it via PID file + health.
-        pass
+    except Exception as exc:
+        logger.debug("daemon child readiness pipe write failed: %s", exc)
 
     try:
         rc = _spawn_runtime(runtime)
@@ -256,13 +249,11 @@ def start(
         try:
             pid_path.unlink()
         except FileNotFoundError:
-            # Cleanup race with a parallel stop/restart; idempotent.
-            pass
+            logger.debug("PID file %s already removed during teardown", pid_path)
         try:
             os.close(daemon_fd)
-        except OSError:
-            # fd already closed (interpreter teardown can race); ignore.
-            pass
+        except OSError as exc:
+            logger.debug("daemon lock fd already closed: %s", exc)
 
     os._exit(rc)
 
@@ -282,7 +273,7 @@ def stop(
         try:
             pid_path.unlink()
         except FileNotFoundError:
-            pass
+            logger.debug("PID file %s already removed", pid_path)
         return {"pid": pid, "status": "not_running"}
 
     # Kill the whole group so the Reflex subtree dies too.
@@ -294,8 +285,8 @@ def stop(
     def _signal_group(sig: int) -> None:
         try:
             os.killpg(pgid, sig)
-        except ProcessLookupError:
-            pass
+        except ProcessLookupError as exc:
+            logger.debug("killpg target %s already gone: %s", pgid, exc)
 
     _signal_group(signal.SIGTERM)
 
@@ -305,7 +296,7 @@ def stop(
             try:
                 pid_path.unlink()
             except FileNotFoundError:
-                pass
+                logger.debug("PID file %s already removed by daemon", pid_path)
             return {"pid": pid, "status": "stopped"}
         time.sleep(0.2)
 
@@ -315,8 +306,7 @@ def stop(
     try:
         pid_path.unlink()
     except FileNotFoundError:
-        # PID file already removed by the daemon itself during teardown.
-        pass
+        logger.debug("PID file %s already removed during teardown", pid_path)
     return {"pid": pid, "status": "killed" if not _pid_is_alive(pid) else "still_running"}
 
 
