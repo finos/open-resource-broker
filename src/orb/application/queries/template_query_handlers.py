@@ -156,8 +156,13 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, Paginated[Templa
 
                 try:
                     template_dtos = sorted(template_dtos, key=_val, reverse=descending)
-                except TypeError:
-                    pass
+                except TypeError as exc:
+                    self.logger.warning(
+                        "ListTemplates sort failed on attr=%s descending=%s: %s",
+                        attr,
+                        descending,
+                        exc,
+                    )
 
             # total AFTER filter+sort, BEFORE slice — this is what the
             # client expects as the pagination denominator.

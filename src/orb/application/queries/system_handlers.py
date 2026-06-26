@@ -490,8 +490,11 @@ class GetSystemConfigHandler(BaseQueryHandler[GetSystemConfigQuery, SystemConfig
                     break
 
             template_search_paths = all_paths
-        except Exception:
-            pass
+        except Exception as exc:
+            # Best-effort template-path resolution; fall back to None so
+            # the response still renders without a scheduler port. Log
+            # the failure so a misconfigured scheduler is observable.
+            self.logger.debug("template path resolution failed: %s", exc)
 
         paths = PathsSectionDTO(
             root_dir=cfg.get_root_dir() if hasattr(cfg, "get_root_dir") else "",

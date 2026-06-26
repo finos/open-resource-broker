@@ -1,9 +1,12 @@
 """Scheduler Registry - Registry pattern for scheduler strategy factories."""
 
+import logging
 from typing import Any, Callable, ClassVar
 
 from orb.domain.base.exceptions import ConfigurationError
 from orb.infrastructure.registry.base_registry import BaseRegistration, BaseRegistry, RegistryMode
+
+logger = logging.getLogger(__name__)
 
 
 class UnsupportedSchedulerError(Exception):
@@ -134,8 +137,15 @@ class SchedulerRegistry(BaseRegistry):
                     defaults = reg.strategy_class.get_defaults_config()
                     if defaults:
                         self._deep_merge(merged, defaults)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    # One strategy's defaults loader is allowed to fail
+                    # without breaking the merge for the others. Log so
+                    # the bad strategy is observable.
+                    logger.warning(
+                        "Skipped defaults from %s: %s",
+                        getattr(reg.strategy_class, "__name__", reg),
+                        exc,
+                    )
         return merged
 
 
