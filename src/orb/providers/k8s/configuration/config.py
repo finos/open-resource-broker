@@ -41,6 +41,8 @@ def _read_in_cluster_namespace() -> Optional[str]:
             ns = _SA_NAMESPACE_FILE.read_text(encoding="utf-8").strip()
             return ns if ns else None
     except OSError:
+        # ServiceAccount file unreadable (permissions, deleted mid-read);
+        # fall back to None so the caller uses the configured default.
         pass
     return None
 

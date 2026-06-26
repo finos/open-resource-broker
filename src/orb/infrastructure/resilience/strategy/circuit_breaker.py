@@ -128,6 +128,8 @@ class CircuitBreakerStrategy(RetryStrategy):
                 status = getattr(exception, "status", None)
                 return status in CircuitBreakerStrategy._NON_RETRYABLE_K8S_STATUSES
         except ImportError:
+            # kubernetes SDK not installed (the [k8s] optional extra is absent);
+            # the exception cannot be a k8s ApiException, so treat as retryable.
             pass
         return False
 

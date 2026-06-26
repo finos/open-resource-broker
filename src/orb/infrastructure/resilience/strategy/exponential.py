@@ -66,6 +66,8 @@ class ExponentialBackoffStrategy:
                 if status in self._NON_RETRYABLE_K8S_STATUSES:
                     return False
         except ImportError:
+            # kubernetes SDK not installed (the [k8s] optional extra is absent);
+            # the exception cannot be a k8s ApiException, so treat as retryable.
             pass
 
         return True
