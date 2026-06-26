@@ -197,7 +197,7 @@ def start(
     working_dir: str | os.PathLike[str],
     runtime: Callable[[], Coroutine[Any, Any, Any]],
     foreground: bool = False,
-) -> dict[str, Any] | NoReturn:
+) -> dict[str, Any]:
     """Start the server, either daemonized or in the foreground.
 
     Args:

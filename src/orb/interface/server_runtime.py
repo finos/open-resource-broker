@@ -192,8 +192,9 @@ async def run_embedded_foreground(
 
     # SIGHUP is NOT wired here: forwarding it to the Reflex CLI child
     # group kills the Bun frontend dev server. The CLI `orb server
-    # reload` command instead calls the admin HTTP endpoint directly —
-    # see ``server_command_handlers.handle_server_reload``.
+    # reload` command instead targets the Reflex backend via a
+    # loopback IPC call — see
+    # ``server_command_handlers.handle_server_reload``.
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
             loop.add_signal_handler(sig, _terminate_group, sig)
