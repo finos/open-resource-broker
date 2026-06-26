@@ -152,6 +152,78 @@ namespace.
 * First-class observability via the standard ORB metrics, logging port,
   and tracing surfaces.
 
+## Deploying the HF script bundle
+
+The modern k8s provider ships five HostFactory shell scripts that mirror
+the legacy `requestMachines.sh` / `getRequestStatus.sh` / etc. layout
+expected by the Symphony `confdir` convention.
+
+**Script location in the package**
+
+```
+src/orb/providers/k8s/hostfactory/providers/k8s-hf/scripts/
+├── requestMachines.sh
+├── getRequestStatus.sh
+├── requestReturnMachines.sh
+├── getReturnRequests.sh
+└── getAvailableTemplates.sh
+```
+
+Each script calls the installed `orb` command with `--provider k8s` and
+the appropriate sub-command verb, forwarding the Symphony JSON payload path
+(`$2`) verbatim.  Errors from `orb` are appended to `/tmp/orb-k8s.log`
+rather than mixed with HF stdout so that Symphony can parse the JSON
+response cleanly.
+
+**Installing into `${HF_CONFDIR}`**
+
+Symphony locates provider scripts under
+`${HF_CONFDIR}/providers/<provider-name>/scripts/`.  To register the
+modern k8s scripts:
+
+```bash
+SCRIPTS_SRC="$(python -c "
+import importlib.resources as r
+import orb.providers.k8s.hostfactory as hf
+print(r.files(hf) / 'providers/k8s-hf/scripts')
+")"
+
+DEST="${HF_CONFDIR}/providers/k8s-hf/scripts"
+mkdir -p "$DEST"
+cp "$SCRIPTS_SRC"/*.sh "$DEST/"
+chmod +x "$DEST"/*.sh
+```
+
+If you are building a custom container image you can `COPY` the scripts
+directly:
+
+```dockerfile
+COPY src/orb/providers/k8s/hostfactory/providers/k8s-hf/scripts/ \
+     /etc/hostfactory/providers/k8s-hf/scripts/
+RUN chmod +x /etc/hostfactory/providers/k8s-hf/scripts/*.sh
+```
+
+**Confirming the correct `orb` binary is on `PATH`**
+
+The scripts call `orb` without an absolute path.  Before deploying, verify
+that `which orb` points to the installation that has the `k8s` extra:
+
+```bash
+orb --version
+python -c "import orb.providers.k8s; print('k8s extra: ok')"
+```
+
+If you are using a virtualenv, activate it before starting the HF daemon
+so the daemon's environment inherits the correct `PATH`.
+
+**Logging**
+
+`orb` stderr is redirected to `/tmp/orb-k8s.log`.  Rotate or tail this
+file to monitor provider activity separate from the HostFactory
+`scripts.log`.  To redirect to a different path, wrap the scripts in a
+site-local shim that sets `ORB_K8S_LOG` or patches the path before
+calling the bundled scripts.
+
 ## Things the legacy plugin does that the modern provider does not (yet)
 
 * The legacy plugin ships its own admin / utils HTTP server; the modern

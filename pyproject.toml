@@ -363,6 +363,7 @@ include-package-data = true
 "orb.k8s_legacy.alembic" = ["alembic.ini", "script.py.mako"]
 "orb.k8s_legacy.alembic.versions" = ["*.py"]
 "orb.k8s_legacy.tests.resources" = ["*.yml", "*.tpl"]
+"orb.providers.k8s.hostfactory" = ["providers/k8s-hf/scripts/*.sh"]
 
 [tool.setuptools.data-files]
 "orb_scripts" = ["src/orb/infrastructure/scheduler/hostfactory/scripts/*.sh", "src/orb/infrastructure/scheduler/hostfactory/scripts/*.bat"]  # keep in sync with .project.yml build.package_root
