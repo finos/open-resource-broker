@@ -10,7 +10,7 @@ try:
 except ImportError:
     raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
 
-from orb.api.dependencies import get_config_manager
+from orb.api.dependencies import get_config_manager, get_di_container
 from orb.infrastructure.error.decorators import handle_rest_exceptions
 
 router = APIRouter(prefix="/providers", tags=["Providers"])
@@ -18,30 +18,68 @@ router = APIRouter(prefix="/providers", tags=["Providers"])
 CONFIG_MANAGER = Depends(get_config_manager)
 
 
+async def _probe_provider_health(provider_name: str) -> tuple[str, dict[str, Any]]:
+    """Run the ``HEALTH_CHECK`` operation through the registry.
+
+    Returns ``(status, details)`` where status is one of
+    ``healthy`` / ``degraded`` / ``unknown``. Failures are caught — a
+    read-only status endpoint must never throw.
+    """
+    try:
+        from orb.application.services.provider_registry_service import (
+            ProviderRegistryService,
+        )
+        from orb.domain.base.operations import (
+            Operation as ProviderOperation,
+            OperationType as ProviderOperationType,
+        )
+
+        container = get_di_container()
+        registry = container.get(ProviderRegistryService)
+        operation = ProviderOperation(
+            operation_type=ProviderOperationType.HEALTH_CHECK,
+            parameters={},
+            context={"source": "providers_health_endpoint"},
+        )
+        result = await registry.execute_operation(provider_name, operation)
+    except Exception as exc:
+        return "unknown", {"probe_error": str(exc)}
+
+    if not result.success or not result.data:
+        return "degraded", {
+            "probe_error": result.error_message or "health check failed",
+        }
+
+    data = result.data
+    is_healthy = bool(data.get("is_healthy", False))
+    details: dict[str, Any] = {}
+    if "response_time_ms" in data:
+        details["response_time_ms"] = data["response_time_ms"]
+    if data.get("status_message"):
+        details["status_message"] = data["status_message"]
+    return ("healthy" if is_healthy else "degraded"), details
+
+
 @router.get(
     "/health",
     summary="Provider Health",
     description=(
-        "Returns per-provider configuration status for the UI Config page. "
-        "Connectivity status is config-driven; real probes are not performed."
+        "Returns per-provider configuration + live connectivity status. "
+        "Each enabled provider is probed via the registry's HEALTH_CHECK "
+        "operation (AWS: sts:GetCallerIdentity or equivalent)."
     ),
 )
 @handle_rest_exceptions(endpoint="/api/v1/providers/health", method="GET")
 async def get_providers_health(
     config_manager=CONFIG_MANAGER,
 ) -> JSONResponse:
-    """Return per-provider health/status derived from configuration.
+    """Return per-provider health/status.
 
     Status values:
-    - ``healthy``   – provider is enabled and has a registered strategy
-    - ``degraded``  – provider is enabled but its strategy could not be resolved
+    - ``healthy``   – provider is enabled and HEALTH_CHECK succeeded
+    - ``degraded``  – provider is enabled but HEALTH_CHECK failed
     - ``unhealthy`` – provider is explicitly disabled
-    - ``unknown``   – provider exists in config but health state cannot be determined
-
-    No outbound connectivity checks are performed (no AWS API calls, etc.).
-    TODO: Once a ProviderHealthPort or similar probe is available, replace the
-    ``status: "unknown"`` path with a real health check so ``healthy`` /
-    ``degraded`` reflect actual connectivity.
+    - ``unknown``   – probe could not run (registry resolution failed)
     """
     providers_info: list[dict[str, Any]] = []
     active_provider_name: str | None = None
@@ -72,15 +110,14 @@ async def get_providers_health(
                     provider_instance, "config", {}
                 ) or {}
 
+                details: dict[str, Any] = {}
                 if enabled:
-                    # No live probe — status is config-driven
-                    # TODO: call provider health port once available
-                    status = "unknown"
+                    status, probe_details = await _probe_provider_health(name)
+                    details.update(probe_details)
                 else:
                     status = "unhealthy"
 
                 # Best-effort details — never crash on missing attributes
-                details: dict[str, Any] = {}
                 region = instance_config.get("region")
                 if region:
                     details["region"] = region
