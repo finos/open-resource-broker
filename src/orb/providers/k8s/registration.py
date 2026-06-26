@@ -99,6 +99,14 @@ def create_k8s_strategy(provider_config: Any) -> Any:
         if not strategy.initialize():
             raise RuntimeError("Failed to initialize Kubernetes provider strategy")
 
+        with suppress(Exception):
+            from orb.domain.base.ports.health_check_port import HealthCheckPort
+            from orb.infrastructure.di.container import get_container
+            from orb.providers.k8s.health import register_k8s_health_checks
+
+            health_check = get_container().get(HealthCheckPort)
+            register_k8s_health_checks(health_check, strategy.kubernetes_client)
+
         if provider_name:
             strategy._provider_name = provider_name  # type: ignore[assignment]
 
@@ -384,9 +392,8 @@ def register_k8s_services_with_di(container) -> None:
     container to own the lifecycle.
 
     The :class:`TemplateExampleGeneratorPort` registration is wrapped in
-    ``suppress(ImportError)`` so this function remains operational even
-    when the example-generator adapter under ``providers/k8s/adapters/``
-    is not yet available.
+    ``suppress(ImportError)`` for defensive resilience; the concrete adapter
+    lives under ``providers/k8s/adapters/template_example_generator_adapter``.
     """
     from orb.domain.base.ports import LoggingPort
     from orb.domain.base.ports.template_adapter_port import TemplateAdapterPort
@@ -417,13 +424,13 @@ def register_k8s_services_with_di(container) -> None:
         container.register_singleton(K8sNativeSpecService, _create_k8s_native_spec_service)
         logger.debug("K8sNativeSpecService registered with DI container")
 
-    # Example generator adapter is optional; the import is guarded so
-    # this function works regardless of whether it is present.
+    # Example generator adapter lives under providers/k8s/adapters/; the
+    # suppress guard is retained for defensive resilience only.
     with suppress(ImportError):
         from orb.domain.base.ports.template_example_generator_port import (
             TemplateExampleGeneratorPort,
         )
-        from orb.providers.k8s.adapters.template_example_generator_adapter import (  # type: ignore[import-not-found]  # noqa: PLC0415
+        from orb.providers.k8s.adapters.template_example_generator_adapter import (  # noqa: PLC0415
             KubernetesTemplateExampleGeneratorAdapter,
             create_k8s_template_example_generator,
         )
