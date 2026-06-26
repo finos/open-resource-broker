@@ -36,8 +36,8 @@ Built for AWS today (EC2, Auto Scaling Groups, SpotFleet, EC2Fleet), with an ext
 
 **Provider support:**
 - **AWS** — EC2 RunInstances, EC2Fleet, SpotFleet, Auto Scaling Groups
-- **Kubernetes** — Pod, Deployment, StatefulSet, Job (`pip install "orb-py[kubernetes]"`; see [Kubernetes provider docs](docs/root/providers/kubernetes/index.md))
-- **Custom** — extensible via [provider registry](docs/root/developer_guide/architecture.md) and the [`orb.providers` entry-point group](docs/root/providers/kubernetes/plugin-authoring.md)
+- **Kubernetes** — Pod, Deployment, StatefulSet, Job (`pip install "orb-py[k8s]"`; see [Kubernetes provider docs](docs/root/providers/k8s/index.md))
+- **Custom** — extensible via [provider registry](docs/root/developer_guide/architecture.md) and the [`orb.providers` entry-point group](docs/root/providers/k8s/plugin-authoring.md)
 
 **Scheduler support:**
 - **HostFactory** — runs as an [IBM Spectrum Symphony provider plugin](#hostfactory-integration)
@@ -97,7 +97,7 @@ will return a clear "no provider configured" error rather than an ImportError.
 
 ```bash
 pip install "orb-py[aws]"          # AWS provider (boto3 + botocore)
-pip install "orb-py[kubernetes]"   # Kubernetes provider (kubernetes SDK)
+pip install "orb-py[k8s]"   # Kubernetes provider (kubernetes SDK)
 pip install "orb-py[aws,cli]"      # AWS provider + colored CLI output
 pip install "orb-py[aws,api]"      # AWS provider + REST API server
 pip install "orb-py[monitoring-aws]"  # AWS provider + full monitoring stack
@@ -110,8 +110,8 @@ pip install "orb-py[all]"          # All providers + all features
 |----------|----------------|
 | Core only (no provider) | `pip install orb-py` |
 | AWS operator | `pip install "orb-py[aws]"` |
-| Kubernetes operator | `pip install "orb-py[kubernetes]"` |
-| AWS + Kubernetes | `pip install "orb-py[aws,kubernetes]"` |
+| Kubernetes operator | `pip install "orb-py[k8s]"` |
+| AWS + Kubernetes | `pip install "orb-py[aws,k8s]"` |
 | AWS + colored CLI | `pip install "orb-py[aws,cli]"` |
 | AWS + REST API | `pip install "orb-py[aws,api]"` |
 | AWS + monitoring | `pip install "orb-py[monitoring-aws]"` |

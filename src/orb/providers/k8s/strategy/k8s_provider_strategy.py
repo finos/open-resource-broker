@@ -1,0 +1,771 @@
+"""Kubernetes Provider Strategy — orchestrator for Kubernetes provider operations.
+
+Mirrors :class:`orb.providers.aws.strategy.aws_provider_strategy.AWSProviderStrategy`
+in shape and responsibility split:
+
+* ``check_health`` — calls ``CoreV1Api.get_api_resources`` and returns a
+  populated :class:`ProviderHealthStatus`.
+* ``get_capabilities`` — advertises support for the three core operation
+  types (``CREATE_INSTANCES``, ``TERMINATE_INSTANCES``, ``GET_INSTANCE_STATUS``)
+  plus the four v1 handler names.
+* ``get_available_regions`` — returns ``[]`` because Kubernetes uses
+  contexts rather than regions.
+* ``acquire`` / ``return_machines`` / ``get_status`` — dispatch to the
+  per-provider-API handler.  Phase B wires the Pod handler; Deployment /
+  StatefulSet / Job handlers arrive in Phases E and F.
+
+The strategy adopts the same constructor signature, lazy-getter style and
+DI-friendly contract as the AWS counterpart so that the registration
+factory can be a near drop-in.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import time
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
+
+from orb.domain.base.dependency_injection import injectable
+from orb.domain.base.operation_outcome import Accepted, Completed, Failed, OperationOutcome
+from orb.domain.base.ports import LoggingPort
+from orb.domain.base.ports.configuration_port import ConfigurationPort
+from orb.providers.base.strategy import (
+    ProviderCapabilities,
+    ProviderHealthStatus,
+    ProviderOperation,
+    ProviderOperationType,
+    ProviderResult,
+    ProviderStrategy,
+)
+from orb.providers.k8s.configuration.config import K8sProviderConfig
+from orb.providers.k8s.handlers.base_handler import K8sHandlerBase
+from orb.providers.k8s.handlers.deployment_handler import K8sDeploymentHandler
+from orb.providers.k8s.handlers.job_handler import K8sJobHandler
+from orb.providers.k8s.handlers.pod_handler import K8sPodHandler
+from orb.providers.k8s.handlers.statefulset_handler import K8sStatefulSetHandler
+from orb.providers.k8s.infrastructure.k8s_client import K8sClient
+from orb.providers.k8s.reconciliation.orphan_gc import OrphanGarbageCollector
+from orb.providers.k8s.reconciliation.startup_reconciler import (
+    ReconciliationReport,
+    StartupReconciler,
+)
+from orb.providers.k8s.value_objects import KubernetesProviderApi
+from orb.providers.k8s.watch.multi_namespace import MultiNamespaceWatcher
+from orb.providers.k8s.watch.pod_state_cache import PodStateCache
+
+if TYPE_CHECKING:  # pragma: no cover — type-checking only
+    from orb.domain.request.aggregate import Request
+    from orb.domain.template.template_aggregate import Template
+    from orb.monitoring.health import HealthCheck
+
+
+@injectable
+class K8sProviderStrategy(ProviderStrategy):
+    """Kubernetes implementation of the :class:`ProviderStrategy` interface.
+
+    Phase A wires the shell: config validation, lazy K8sClient
+    construction, health check, capabilities, and the typed
+    provisioning interface stubs.  Phase B onwards fills in the handler
+    services and the typed ``acquire`` / ``return_machines`` / ``get_status``
+    paths.
+    """
+
+    _SUPPORTED_APIS: tuple[str, ...] = tuple(api.value for api in KubernetesProviderApi)
+
+    # Plugin extension point — class-level registry of handler factories
+    # keyed by ``provider_api`` value.  Third-party plugins call
+    # :meth:`register_handler` from their ``orb.providers`` entry-point
+    # callable to attach a handler to the Kubernetes provider without
+    # forking the strategy.  See
+    # ``docs/root/providers/k8s/plugin-authoring.md``.
+    _HANDLER_FACTORIES: dict[str, Callable[..., K8sHandlerBase]] = {}
+
+    @classmethod
+    def register_handler(
+        cls,
+        provider_api: str,
+        handler_class: Callable[..., K8sHandlerBase],
+    ) -> None:
+        """Register a handler class against a ``provider_api`` key.
+
+        The ``handler_class`` must accept the standard handler kwargs:
+        ``kubernetes_client``, ``config``, ``logger``, ``pod_state_cache``,
+        and ``cache_alive``.  Plugin authors typically subclass
+        :class:`orb.providers.k8s.handlers.base_handler.K8sHandlerBase`
+        which already accepts those kwargs.
+
+        Args:
+            provider_api: The ``provider_api`` template field this handler
+                will service (e.g. ``"KubernetesMPIJob"``).
+            handler_class: A callable that returns a configured handler
+                instance — usually a subclass of ``K8sHandlerBase``.
+
+        Raises:
+            ValueError: If ``provider_api`` is already registered to a
+                different handler class.  Idempotent re-registration of
+                the same class is allowed so that plugin reloads do not
+                fail.
+        """
+        existing = cls._HANDLER_FACTORIES.get(provider_api)
+        if existing is not None and existing is not handler_class:
+            raise ValueError(
+                f"provider_api {provider_api!r} is already registered to a "
+                f"different handler class ({existing!r}); refusing to overwrite."
+            )
+        cls._HANDLER_FACTORIES[provider_api] = handler_class
+
+    @classmethod
+    def unregister_handler(cls, provider_api: str) -> None:
+        """Remove a plugin-registered handler (intended for tests / reload)."""
+        cls._HANDLER_FACTORIES.pop(provider_api, None)
+
+    def __init__(
+        self,
+        config: K8sProviderConfig,
+        logger: LoggingPort,
+        provider_name: Optional[str] = None,
+        provider_instance_config: Optional[Any] = None,
+        config_port: Optional[ConfigurationPort] = None,
+        console: Optional[Any] = None,
+        kubernetes_client: Optional[K8sClient] = None,
+        handler_overrides: Optional[dict[str, K8sHandlerBase]] = None,
+        watch_manager: Optional[MultiNamespaceWatcher] = None,
+        known_request_ids: Optional[Callable[[], Iterable[str]]] = None,
+        startup_reconciler: Optional[StartupReconciler] = None,
+        orphan_gc: Optional[OrphanGarbageCollector] = None,
+    ) -> None:
+        if not isinstance(config, K8sProviderConfig):
+            raise ValueError("K8sProviderStrategy requires K8sProviderConfig")
+
+        super().__init__(config)
+        self._logger = logger
+        self._k8s_config = config
+        self._console = console
+        self._provider_instance_config = provider_instance_config
+        self._provider_name = provider_name
+        self._config_port = config_port
+        self._kubernetes_client: Optional[K8sClient] = kubernetes_client
+        # Handler cache keyed by provider_api value.  Tests can pre-seed
+        # this via ``handler_overrides`` to inject mock handlers.
+        self._handlers: dict[str, K8sHandlerBase] = dict(handler_overrides or {})
+        # Watch fan-out.  Constructed lazily by :meth:`initialize` when
+        # ``config.watch_enabled`` is True and no override has been
+        # provided.  Tests inject a stub via ``watch_manager``.
+        self._watch_manager: Optional[MultiNamespaceWatcher] = watch_manager
+        # Phase G wiring: startup reconciler + orphan GC.  ``known_request_ids``
+        # is the storage closure the strategy hands to both — when the
+        # caller does not supply it the reconciler treats every managed
+        # pod as an orphan (safest signal) and the GC is wired to an
+        # empty set.  Tests can override both subsystems wholesale.
+        self._known_request_ids_fn: Callable[[], Iterable[str]] = known_request_ids or (lambda: ())
+        self._startup_reconciler: Optional[StartupReconciler] = startup_reconciler
+        self._orphan_gc: Optional[OrphanGarbageCollector] = orphan_gc
+        self._last_reconciliation_report: Optional[ReconciliationReport] = None
+
+    # ------------------------------------------------------------------
+    # Provider identity
+    # ------------------------------------------------------------------
+
+    @property
+    def provider_type(self) -> str:
+        return "k8s"
+
+    @property
+    def provider_name(self) -> Optional[str]:
+        return self._provider_name
+
+    @property
+    def kubernetes_client(self) -> K8sClient:
+        """Lazy ``K8sClient`` accessor.
+
+        Constructs the client on first access using the validated provider
+        config and the injected logger.  Unit tests can pre-supply a mock
+        client via the ``kubernetes_client`` constructor argument.
+        """
+        if self._kubernetes_client is None:
+            self._kubernetes_client = K8sClient(
+                config=self._k8s_config,
+                logger=self._logger,
+            )
+        return self._kubernetes_client
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
+
+    def initialize(self) -> bool:
+        try:
+            self._logger.info(
+                "Kubernetes provider strategy ready (namespace=%s, in_cluster=%s)",
+                self._k8s_config.namespace,
+                self._k8s_config.in_cluster,
+            )
+            # Startup reconciliation runs synchronously BEFORE the watch
+            # task is spawned so the cache is warm by the time the first
+            # ``check_hosts_status`` call lands.  Failures inside the
+            # reconciler are logged and tolerated — the watcher will
+            # converge on the correct state in steady-state.
+            self._run_startup_reconciler()
+            self._maybe_start_watch_manager()
+            self._maybe_start_orphan_gc()
+            self._initialized = True
+            return True
+        except Exception as exc:
+            self._logger.error(
+                "Failed to initialize Kubernetes provider strategy: %s", exc, exc_info=True
+            )
+            return False
+
+    def cleanup(self) -> None:
+        try:
+            if self._orphan_gc is not None:
+                self._stop_orphan_gc_sync()
+            if self._watch_manager is not None:
+                # ``stop`` is async; schedule it on the running loop if
+                # there is one, otherwise drive it synchronously via
+                # ``asyncio.run``.  CLI cleanup paths typically have no
+                # loop running while daemon paths do.
+                self._stop_watch_manager_sync()
+            if self._kubernetes_client is not None:
+                self._kubernetes_client.cleanup()
+            self._kubernetes_client = None
+            self._initialized = False
+        except Exception as exc:
+            self._logger.warning(
+                "Failed during Kubernetes provider cleanup: %s", exc, exc_info=True
+            )
+
+    def _ensure_watch_manager(self) -> MultiNamespaceWatcher:
+        """Lazily construct (but do NOT start) the watch fan-out.
+
+        Exposed so the startup reconciler can share the watcher's
+        :class:`PodStateCache`: the reconciler warms the cache before
+        the watcher spawns, then the watcher takes over.  The watcher
+        is only started later by :meth:`_maybe_start_watch_manager`
+        when an event loop is available.
+        """
+        if self._watch_manager is None:
+            self._watch_manager = MultiNamespaceWatcher(
+                kubernetes_client=self.kubernetes_client,
+                config=self._k8s_config,
+                logger=self._logger,
+            )
+        return self._watch_manager
+
+    def _maybe_start_watch_manager(self) -> None:
+        """Start the watch fleet when enabled by config and a loop is available.
+
+        The fleet runs as an asyncio task and therefore needs a running
+        event loop.  When ``initialize`` is called from a synchronous
+        context (e.g. CLI bootstrap) we skip startup and let the
+        cache-less fallback path serve reads.  Daemon / REST callers
+        typically run inside an event loop and pick up the watcher.
+        """
+        if not self._k8s_config.watch_enabled:
+            return
+        manager = self._ensure_watch_manager()
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            self._logger.debug(
+                "Skipping Kubernetes watcher startup: no running event loop "
+                "(cache-less fallback will serve reads)."
+            )
+            return
+        try:
+            manager.start()
+        except Exception as exc:
+            self._logger.warning("Failed to start Kubernetes watcher fleet: %s", exc, exc_info=True)
+
+    def _stop_watch_manager_sync(self) -> None:
+        """Stop the watch manager from a sync-or-async cleanup context."""
+        manager = self._watch_manager
+        if manager is None or not manager.is_started():
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop is None:
+            try:
+                asyncio.run(manager.stop())
+            except Exception as exc:
+                self._logger.debug(
+                    "Watch manager stop raised during cleanup: %s", exc, exc_info=True
+                )
+            return
+        # Inside a running loop — schedule stop and let the loop drain.
+        loop.create_task(manager.stop())
+
+    # ------------------------------------------------------------------
+    # Reconciliation / orphan-GC lifecycle (Phase G)
+    # ------------------------------------------------------------------
+
+    @property
+    def last_reconciliation_report(self) -> Optional[ReconciliationReport]:
+        """Surface the most recent :class:`ReconciliationReport` for diagnostics."""
+        return self._last_reconciliation_report
+
+    def _shared_cache(self) -> PodStateCache:
+        """Return the cache used by both reconciler and watcher.
+
+        Constructed via :meth:`_ensure_watch_manager` so reconciler and
+        watcher always share the same instance — populating one
+        warms the other.
+        """
+        return self._ensure_watch_manager().cache
+
+    def _run_startup_reconciler(self) -> None:
+        """Run the startup reconciler before the watch task spawns.
+
+        The reconciler is constructed lazily here so tests that pass
+        ``startup_reconciler=`` directly into the strategy can skip the
+        default construction path entirely.
+        """
+        reconciler = self._startup_reconciler
+        if reconciler is None:
+            reconciler = StartupReconciler(
+                kubernetes_client=self.kubernetes_client,
+                config=self._k8s_config,
+                cache=self._shared_cache(),
+                logger=self._logger,
+                known_request_ids=self._known_request_ids_fn,
+            )
+            self._startup_reconciler = reconciler
+        try:
+            self._last_reconciliation_report = reconciler.run()
+        except Exception as exc:  # noqa: BLE001 — defensive
+            self._logger.warning(
+                "Kubernetes startup reconciler raised: %s (provider continues)",
+                exc,
+                exc_info=True,
+            )
+
+    def _maybe_start_orphan_gc(self) -> None:
+        """Spawn the orphan GC task when enabled and an event loop is available."""
+        if not self._k8s_config.orphan_gc_enabled:
+            return
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            self._logger.debug(
+                "Skipping orphan GC startup: no running event loop "
+                "(GC will not run in this process)."
+            )
+            return
+        if self._orphan_gc is None:
+            self._orphan_gc = OrphanGarbageCollector(
+                kubernetes_client=self.kubernetes_client,
+                config=self._k8s_config,
+                logger=self._logger,
+                known_request_ids=self._known_request_ids_fn,
+            )
+        try:
+            self._orphan_gc.start()
+            self._logger.info(
+                "Kubernetes orphan GC started (interval=%ss, auto_cleanup=%s)",
+                self._k8s_config.orphan_gc_interval_seconds,
+                self._k8s_config.auto_cleanup_orphans,
+            )
+        except Exception as exc:
+            self._logger.warning("Failed to start Kubernetes orphan GC: %s", exc, exc_info=True)
+
+    def _stop_orphan_gc_sync(self) -> None:
+        """Stop the orphan GC from a sync-or-async cleanup context."""
+        gc = self._orphan_gc
+        if gc is None or not gc.is_running():
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop is None:
+            try:
+                asyncio.run(gc.stop())
+            except Exception as exc:
+                self._logger.debug("Orphan GC stop raised during cleanup: %s", exc, exc_info=True)
+            return
+        loop.create_task(gc.stop())
+
+    # ------------------------------------------------------------------
+    # Operation dispatch — Phase B onwards
+    # ------------------------------------------------------------------
+
+    async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
+        """Execute a provider operation.
+
+        Phase A only services ``HEALTH_CHECK`` end-to-end; the resource
+        lifecycle operations return an ``UNSUPPORTED_OPERATION`` error
+        with a clear message until the handler layer arrives in Phase B.
+        """
+        self._logger.debug("Kubernetes strategy executing operation: %s", operation.operation_type)
+
+        if not self._initialized:
+            return ProviderResult.error_result(
+                "Kubernetes provider strategy not initialized", "NOT_INITIALIZED"
+            )
+
+        start_time = time.time()
+        try:
+            if operation.operation_type == ProviderOperationType.HEALTH_CHECK:
+                health = self.check_health()
+                result = ProviderResult.success_result(
+                    {
+                        "is_healthy": health.is_healthy,
+                        "status_message": health.status_message,
+                        "response_time_ms": health.response_time_ms,
+                    },
+                    {"operation": "health_check"},
+                )
+            else:
+                result = ProviderResult.error_result(
+                    f"Operation {operation.operation_type} not yet supported by the "
+                    "kubernetes provider (lands in Phase B+).",
+                    "UNSUPPORTED_OPERATION",
+                )
+
+            execution_time_ms = int((time.time() - start_time) * 1000)
+            return result.model_copy(
+                update={
+                    "routing_info": {
+                        "execution_time_ms": execution_time_ms,
+                        "provider": "k8s",
+                    },
+                    "metadata": {
+                        **result.metadata,
+                        "execution_time_ms": execution_time_ms,
+                        "provider": "k8s",
+                    },
+                }
+            )
+        except Exception as exc:
+            execution_time_ms = int((time.time() - start_time) * 1000)
+            self._logger.error("Kubernetes operation failed: %s", exc, exc_info=True)
+            return ProviderResult.error_result(
+                f"Kubernetes operation failed: {exc}",
+                "OPERATION_FAILED",
+            ).model_copy(
+                update={
+                    "routing_info": {
+                        "execution_time_ms": execution_time_ms,
+                        "provider": "k8s",
+                    }
+                }
+            )
+
+    # ------------------------------------------------------------------
+    # Capabilities & health
+    # ------------------------------------------------------------------
+
+    def get_capabilities(self) -> ProviderCapabilities:
+        return ProviderCapabilities(
+            provider_type="k8s",
+            supported_operations=[
+                ProviderOperationType.CREATE_INSTANCES,
+                ProviderOperationType.TERMINATE_INSTANCES,
+                ProviderOperationType.GET_INSTANCE_STATUS,
+                ProviderOperationType.HEALTH_CHECK,
+            ],
+            supported_apis=list(self._SUPPORTED_APIS),
+            features={
+                "selective_termination": True,
+                "watch_supported": True,
+                "namespaces_supported": True,
+            },
+        )
+
+    def check_health(self) -> ProviderHealthStatus:
+        """Probe the Kubernetes API server via ``CoreV1Api.get_api_resources``."""
+        start = time.time()
+        try:
+            resources = self.kubernetes_client.core_v1.get_api_resources()
+            response_time_ms = (time.time() - start) * 1000.0
+            resource_count = len(getattr(resources, "resources", []) or [])
+            return ProviderHealthStatus.healthy(
+                message=(f"Kubernetes API server reachable; {resource_count} core/v1 resources"),
+                response_time_ms=response_time_ms,
+            )
+        except Exception as exc:
+            response_time_ms = (time.time() - start) * 1000.0
+            self._logger.warning("Kubernetes health check failed: %s", exc, exc_info=True)
+            return ProviderHealthStatus.unhealthy(
+                message=f"Kubernetes API server unreachable: {exc}",
+                error_details={
+                    "error": str(exc),
+                    "response_time_ms": response_time_ms,
+                },
+            )
+
+    # ------------------------------------------------------------------
+    # Naming
+    # ------------------------------------------------------------------
+
+    def generate_provider_name(self, config: dict[str, Any]) -> str:
+        """Generate a Kubernetes provider instance name.
+
+        Pattern: ``kubernetes_{context_or_namespace}``.  When neither is
+        usable, falls back to ``kubernetes_default``.
+        """
+        context = config.get("context")
+        if context:
+            return f"kubernetes_{context}"
+        namespace = config.get("namespace", "default")
+        return f"kubernetes_{namespace}"
+
+    def parse_provider_name(self, provider_name: str) -> dict[str, str]:
+        """Inverse of :meth:`generate_provider_name`."""
+        if not provider_name.startswith("kubernetes_"):
+            return {}
+        suffix = provider_name[len("kubernetes_") :]
+        return {"context_or_namespace": suffix}
+
+    def get_provider_name_pattern(self) -> str:
+        return "kubernetes_{context_or_namespace}"
+
+    def get_supported_apis(self) -> list[str]:
+        return list(self._SUPPORTED_APIS)
+
+    # ------------------------------------------------------------------
+    # Region / CLI helpers
+    # ------------------------------------------------------------------
+
+    def get_available_regions(self) -> list[tuple[str, str]]:
+        """Kubernetes has contexts, not regions — return an empty list."""
+        return []
+
+    def get_default_region(self) -> str:
+        """Kubernetes has no region concept; return an empty string."""
+        return ""
+
+    def get_cli_extra_config_keys(self) -> set[str]:
+        return set()
+
+    def get_cli_infrastructure_defaults(self, args: Any) -> dict[str, Any]:
+        return {}
+
+    # ------------------------------------------------------------------
+    # Health-check integration
+    # ------------------------------------------------------------------
+
+    def register_health_checks(self, health_check: "HealthCheck") -> None:
+        """Register Kubernetes-specific health checks if the client is reachable."""
+        try:
+            client = self.kubernetes_client
+        except Exception as exc:
+            self._logger.debug(
+                "Skipping Kubernetes health-check registration: %s", exc, exc_info=True
+            )
+            return
+
+        from orb.providers.k8s.health import register_k8s_health_checks
+
+        register_k8s_health_checks(health_check, client)
+
+    # ------------------------------------------------------------------
+    # Handler dispatch
+    # ------------------------------------------------------------------
+
+    def _resolve_provider_api(self, request: "Request") -> str:
+        """Pick the provider-API key for ``request``.
+
+        Defaults to :attr:`KubernetesProviderApi.POD` so legacy callers
+        that omit the provider_api field still route to the Pod handler.
+        """
+        api = getattr(request, "provider_api", None)
+        if api:
+            return str(api)
+        return KubernetesProviderApi.POD.value
+
+    def _get_handler(self, provider_api: str) -> K8sHandlerBase:
+        """Return (and lazily construct) the handler for ``provider_api``."""
+        handler = self._handlers.get(provider_api)
+        if handler is not None:
+            return handler
+        cache = self._watch_manager.cache if self._watch_manager is not None else None
+        alive = (
+            (lambda m=self._watch_manager: m.is_healthy())
+            if self._watch_manager is not None
+            else None
+        )
+        if provider_api == KubernetesProviderApi.POD.value:
+            handler = K8sPodHandler(
+                kubernetes_client=self.kubernetes_client,
+                config=self._k8s_config,
+                logger=self._logger,
+                pod_state_cache=cache,
+                cache_alive=alive,
+            )
+            self._handlers[provider_api] = handler
+            return handler
+        if provider_api == KubernetesProviderApi.DEPLOYMENT.value:
+            handler = K8sDeploymentHandler(
+                kubernetes_client=self.kubernetes_client,
+                config=self._k8s_config,
+                logger=self._logger,
+                pod_state_cache=cache,
+                cache_alive=alive,
+            )
+            self._handlers[provider_api] = handler
+            return handler
+        if provider_api == KubernetesProviderApi.STATEFUL_SET.value:
+            handler = K8sStatefulSetHandler(
+                kubernetes_client=self.kubernetes_client,
+                config=self._k8s_config,
+                logger=self._logger,
+                pod_state_cache=cache,
+                cache_alive=alive,
+            )
+            self._handlers[provider_api] = handler
+            return handler
+        if provider_api == KubernetesProviderApi.JOB.value:
+            handler = K8sJobHandler(
+                kubernetes_client=self.kubernetes_client,
+                config=self._k8s_config,
+                logger=self._logger,
+                pod_state_cache=cache,
+                cache_alive=alive,
+            )
+            self._handlers[provider_api] = handler
+            return handler
+        # Plugin-supplied handlers — see ``register_handler`` and
+        # ``docs/root/providers/k8s/plugin-authoring.md``.
+        factory = self._HANDLER_FACTORIES.get(provider_api)
+        if factory is not None:
+            handler = factory(
+                kubernetes_client=self.kubernetes_client,
+                config=self._k8s_config,
+                logger=self._logger,
+                pod_state_cache=cache,
+                cache_alive=alive,
+            )
+            self._handlers[provider_api] = handler
+            return handler
+        raise NotImplementedError(
+            f"Kubernetes handler for provider_api={provider_api!r} is not yet implemented "
+            "(Pod, Deployment, StatefulSet and Job are implemented; third-party "
+            "plugins may register additional handlers via "
+            "K8sProviderStrategy.register_handler)."
+        )
+
+    # ------------------------------------------------------------------
+    # Typed provisioning interface
+    # ------------------------------------------------------------------
+
+    async def acquire(self, request: "Request") -> OperationOutcome:
+        """Submit an acquisition request to Kubernetes via the per-API handler."""
+        try:
+            provider_api = self._resolve_provider_api(request)
+            handler = self._get_handler(provider_api)
+            template = self._build_template_for_request(request)
+            result = await handler.acquire_hosts(request, template)
+
+            resource_ids = list(result.get("resource_ids", []) or [])
+            machine_ids = list(result.get("machine_ids", []) or [])
+            metadata: dict[str, Any] = {
+                "provider_api": provider_api,
+                "provider_data": result.get("provider_data", {}),
+                "machine_ids": machine_ids,
+            }
+            self._logger.info(
+                "Kubernetes acquire accepted: request_id=%s pods=%s",
+                request.request_id,
+                resource_ids,
+            )
+            return Accepted(
+                request_id=str(request.request_id),
+                pending_resource_ids=resource_ids,
+                metadata=metadata,
+            )
+        except Exception as exc:
+            self._logger.error("Kubernetes acquire failed: %s", exc, exc_info=True)
+            return Failed(error=str(exc), recoverable=False)
+
+    async def return_machines(self, machine_ids: list[str], request: "Request") -> OperationOutcome:
+        """Delete the named pods via the per-API handler."""
+        try:
+            provider_api = self._resolve_provider_api(request)
+            handler = self._get_handler(provider_api)
+            await handler.release_hosts(list(machine_ids), request)
+            self._logger.info(
+                "Kubernetes return accepted: request_id=%s machine_ids=%s",
+                request.request_id,
+                machine_ids,
+            )
+            return Accepted(
+                request_id=str(request.request_id),
+                pending_resource_ids=list(machine_ids),
+                metadata={"provider_api": provider_api},
+            )
+        except Exception as exc:
+            self._logger.error("Kubernetes return_machines failed: %s", exc, exc_info=True)
+            return Failed(error=str(exc), recoverable=False)
+
+    async def get_status(self, resource_ids: list[str], request: "Request") -> OperationOutcome:
+        """Poll the per-API handler's ``check_hosts_status`` for a verdict.
+
+        Returns ``Completed`` when fulfilment is terminal (``fulfilled``,
+        ``partial``, or ``failed``); ``Accepted`` while ``in_progress``.
+        """
+        try:
+            provider_api = self._resolve_provider_api(request)
+            handler = self._get_handler(provider_api)
+            check_result = await asyncio.to_thread(handler.check_hosts_status, request)
+            instances = check_result.instances
+            fulfilment = check_result.fulfilment
+
+            metadata: dict[str, Any] = {
+                "provider_api": provider_api,
+                "fulfilment": fulfilment,
+                "instances": instances,
+            }
+
+            if fulfilment.state == "in_progress":
+                pending = [
+                    i.get("instance_id", "")
+                    for i in instances
+                    if i.get("status") in ("pending", "starting")
+                ]
+                return Accepted(
+                    request_id=str(request.request_id),
+                    pending_resource_ids=pending or list(resource_ids),
+                    metadata=metadata,
+                )
+
+            terminal_ids = [i.get("instance_id", "") for i in instances]
+            return Completed(resource_ids=terminal_ids, metadata=metadata)
+        except Exception as exc:
+            self._logger.error("Kubernetes get_status failed: %s", exc, exc_info=True)
+            return Failed(error=str(exc), recoverable=True)
+
+    def _build_template_for_request(self, request: "Request") -> "Template":
+        """Resolve the :class:`Template` carried by ``request``.
+
+        Phase B does not yet wire the full template-aggregate registration
+        (lands in Phase G).  For now we pick up the template payload from
+        ``request.metadata['template']`` (REST/CLI submission shape) and
+        fall back to a minimal template assembled from request fields.
+        """
+        from orb.domain.template.template_aggregate import Template as _Template  # noqa: PLC0415
+
+        meta = getattr(request, "metadata", None) or {}
+        if isinstance(meta, dict):
+            template_payload = meta.get("template")
+            if isinstance(template_payload, _Template):
+                return template_payload
+            if isinstance(template_payload, dict):
+                return _Template(**template_payload)
+
+        # Fall back to a minimal template built from the request fields.
+        return _Template(
+            template_id=str(request.template_id),
+            provider_type="k8s",
+            provider_api=request.provider_api or KubernetesProviderApi.POD.value,
+            max_instances=max(int(request.requested_count), 1),
+        )
+
+    def __str__(self) -> str:  # pragma: no cover — trivial
+        return (
+            "K8sProviderStrategy("
+            f"namespace={self._k8s_config.namespace}, "
+            f"initialized={self._initialized})"
+        )

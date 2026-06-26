@@ -1,0 +1,19 @@
+{
+  "_comment": "Example Pod template payload.  Consumed by the example-template generator and the docs/--show-example surface.  The pod is constructed programmatically by orb.providers.k8s.utilities.pod_spec.build_pod_spec; this JSON only captures the per-template ORB-level fields.",
+  "template_id": "k8s-pod-example",
+  "name": "Kubernetes Pod example",
+  "description": "Submit a single pod via the kubernetes provider.",
+  "provider_type": "k8s",
+  "provider_api": "Pod",
+  "image_id": "busybox:latest",
+  "max_instances": 1,
+  "provider_data": {
+    "k8s": {
+      "namespace": "default",
+      "container_image": "busybox:latest",
+      "resource_requests": {"cpu": "100m", "memory": "128Mi"},
+      "resource_limits": {"cpu": "500m", "memory": "256Mi"},
+      "command": ["sh", "-c", "sleep 3600"]
+    }
+  }
+}

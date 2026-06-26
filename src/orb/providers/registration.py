@@ -9,7 +9,7 @@ To add a new provider:
 That is the only edit outside the new provider package.
 
 Third-party plugins are discovered via the ``orb.providers`` entry-point
-group (see ``docs/root/providers/kubernetes/plugin-authoring.md``) and
+group (see ``docs/root/providers/k8s/plugin-authoring.md``) and
 are loaded by :func:`discover_provider_plugins` immediately after the
 built-in providers have registered.
 """
@@ -28,11 +28,11 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # Central provider list – the single line to edit when adding a new provider.
 # ---------------------------------------------------------------------------
-_REGISTERED_PROVIDERS: list[str] = ["aws", "kubernetes"]
+_REGISTERED_PROVIDERS: list[str] = ["aws", "k8s"]
 
 # Entry-point group used by third-party plugins to register provider
 # extensions.  See ``discover_provider_plugins`` and
-# ``docs/root/providers/kubernetes/plugin-authoring.md``.
+# ``docs/root/providers/k8s/plugin-authoring.md``.
 _PROVIDER_ENTRY_POINT_GROUP = "orb.providers"
 
 _logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ def discover_provider_plugins(
     Walks ``importlib.metadata.entry_points(group=entry_point_group)`` and
     invokes each entry point's loaded callable.  The contract for the
     callable is documented in
-    ``docs/root/providers/kubernetes/plugin-authoring.md``:
+    ``docs/root/providers/k8s/plugin-authoring.md``:
 
     * Zero-argument callable.
     * Returns ``None``.

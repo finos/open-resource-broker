@@ -1,0 +1,19 @@
+{
+  "_comment": "Example Job template payload.  Consumed by the example-template generator and the docs/--show-example surface.  The Job is constructed programmatically by orb.providers.k8s.utilities.job_spec.build_job_spec; this JSON only captures the per-template ORB-level fields.",
+  "template_id": "k8s-job-example",
+  "name": "Kubernetes Job example",
+  "description": "Submit a run-to-completion Job via the kubernetes provider.",
+  "provider_type": "k8s",
+  "provider_api": "Job",
+  "image_id": "busybox:latest",
+  "max_instances": 3,
+  "provider_data": {
+    "k8s": {
+      "namespace": "default",
+      "container_image": "busybox:latest",
+      "resource_requests": {"cpu": "100m", "memory": "128Mi"},
+      "resource_limits": {"cpu": "500m", "memory": "256Mi"},
+      "command": ["sh", "-c", "echo done"]
+    }
+  }
+}

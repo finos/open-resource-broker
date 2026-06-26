@@ -1,0 +1,94 @@
+# Minimum RBAC for the ORB Kubernetes provider running in-cluster.
+#
+# Apply with:
+#     kubectl apply -f docs/root/providers/k8s/rbac.yaml
+#
+# Scope:
+#   - Single-namespace mode.  For multi-namespace mode duplicate the Role +
+#     RoleBinding per namespace, or upgrade to ClusterRole + ClusterRoleBinding
+#     for cluster-scoped watches (`namespaces: ["*"]`).
+#
+# Adjust:
+#   - `metadata.namespace` to match where ORB runs.
+#   - The verbs list to drop any handler you do not use (e.g. drop
+#     ``apps`` / ``deployments`` if you only use the Pod handler).
+#
+# References:
+#   - docs/root/providers/k8s/auth.md
+#   - docs/root/providers/k8s/configuration.md
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: orb
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: orb
+  namespace: orb
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: orb
+  namespace: orb
+rules:
+  # Core — required for the Pod handler and for the watch task.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/status"]
+    verbs: ["get"]
+  # Pod logs — optional; useful for diagnosing handler creation failures.
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  # Events — optional; ORB does not consume these but operators often want
+  # `kubectl describe pod <orb-pod>` to surface scheduling failures.
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+
+  # apps/v1 — required for the Deployment and StatefulSet handlers.
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/status", "statefulsets/status"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale", "statefulsets/scale"]
+    verbs: ["get", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+
+  # batch/v1 — required for the Job handler.
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs/status"]
+    verbs: ["get"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: orb
+  namespace: orb
+subjects:
+  - kind: ServiceAccount
+    name: orb
+    namespace: orb
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: orb

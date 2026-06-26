@@ -2,7 +2,7 @@
 
 Covers :func:`orb.providers.registration.discover_provider_plugins` -
 the entry-point-driven extension point documented at
-``docs/root/providers/kubernetes/plugin-authoring.md``.
+``docs/root/providers/k8s/plugin-authoring.md``.
 
 Tests use a simulated entry-point group so we can exercise success and
 failure paths without installing a real distribution.
