@@ -19,10 +19,13 @@ from sqlalchemy import engine_from_config, pool
 from alembic import context
 
 # ---------------------------------------------------------------------------
-# Ensure the src/ layout is importable when running alembic from the project
-# root (e.g. ``alembic upgrade head``).
+# Ensure the src/ layout is importable when alembic is invoked with this
+# env.py path. env.py lives at src/orb/infrastructure/storage/sql/migrations/
+# so the repo's src/ dir is five levels up from __file__.
 # ---------------------------------------------------------------------------
-_SRC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "src")
+_SRC_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir, os.pardir, os.pardir)
+)
 if _SRC_DIR not in sys.path:
     sys.path.insert(0, _SRC_DIR)
 

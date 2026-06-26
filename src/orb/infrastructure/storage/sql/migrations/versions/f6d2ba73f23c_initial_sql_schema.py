@@ -33,7 +33,7 @@ def upgrade() -> None:
     sa.Column('launch_time', sa.BIGINT(), nullable=True),
     sa.Column('termination_time', sa.Text(), nullable=True),
     sa.Column('uptime_seconds', sa.Integer(), nullable=True),
-    sa.Column('provider_api', sa.String(length=255), nullable=True),
+    sa.Column('provider_api', sa.String(length=255), nullable=False),
     sa.Column('provider_type', sa.String(length=255), nullable=True),
     sa.Column('provider_name', sa.String(length=255), nullable=True),
     sa.Column('resource_id', sa.String(length=255), nullable=True),

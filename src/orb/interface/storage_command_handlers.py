@@ -202,11 +202,22 @@ async def handle_storage_migrate(
         if db_url:
             env["ORB_SQL_URL"] = db_url
 
-        import orb  # noqa: F401 — find the package root for alembic.ini lookup
+        # alembic.ini ships inside the package at
+        # src/orb/infrastructure/storage/sql/migrations/alembic.ini so it
+        # lands wherever the orb package is installed (no dependency on
+        # the repo layout being intact).
+        import orb
 
-        pkg_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(orb.__file__))))
+        alembic_ini = os.path.join(
+            os.path.dirname(os.path.abspath(orb.__file__)),
+            "infrastructure",
+            "storage",
+            "sql",
+            "migrations",
+            "alembic.ini",
+        )
         result = subprocess.run(
-            [sys.executable, "-m", "alembic", "--config", os.path.join(pkg_root, "alembic.ini")]
+            [sys.executable, "-m", "alembic", "--config", alembic_ini]
             + alembic_args,
             capture_output=True,
             text=True,
