@@ -101,3 +101,55 @@ async def test_augment_vmss_capacity_metadata_async_skips_failed_snapshot_and_pr
     }
     assert "fleet_capacity_fulfilment_by_resource" not in metadata
     logger.warning.assert_called_once()
+
+
+def test_attach_provider_fulfilment_uses_vmss_capacity_metadata():
+    service = AzureResourceMetadataService(
+        default_resource_group="test-rg",
+        logger=MagicMock(),
+    )
+    metadata = {
+        "fleet_capacity_fulfilment": {
+            "target_capacity_units": 3,
+            "fulfilled_capacity_units": 2,
+            "provisioned_instance_count": 2,
+            "state": "Updating",
+        }
+    }
+
+    service.attach_provider_fulfilment(
+        metadata,
+        instances=[],
+        target_units=None,
+    )
+
+    fulfilment = metadata["provider_fulfilment"]
+    assert fulfilment.state == "in_progress"
+    assert fulfilment.target_units == 3
+    assert fulfilment.fulfilled_units == 2
+
+
+def test_attach_provider_fulfilment_reports_failed_single_vm_deployment():
+    service = AzureResourceMetadataService(
+        default_resource_group="test-rg",
+        logger=MagicMock(),
+    )
+    metadata = {
+        "fleet_errors": [
+            {
+                "error_code": "OperationNotAllowed",
+                "error_message": "quota exceeded",
+            }
+        ]
+    }
+
+    service.attach_provider_fulfilment(
+        metadata,
+        instances=[],
+        target_units=1,
+    )
+
+    fulfilment = metadata["provider_fulfilment"]
+    assert fulfilment.state == "failed"
+    assert fulfilment.target_units == 1
+    assert fulfilment.fulfilled_units == 0

@@ -516,16 +516,22 @@ class AzureInventoryService:
             AzureProviderApi.VMSS,
             AzureProviderApi.VMSS_UNIFORM,
         )
+        metadata: dict[str, Any] = {
+            "operation": "get_instance_status",
+            "instance_ids": read_context.instance_ids,
+            "method": "handler",
+        }
+        status_result = self._resource_metadata_service.attach_provider_fulfilment(
+            metadata,
+            instances=handler_machines,
+            target_units=len(read_context.instance_ids),
+        )
         result = ProviderResult.success_result(
             {
-                "instances": handler_machines,
+                "instances": status_result.instances,
                 "queried_count": len(read_context.instance_ids),
             },
-            {
-                "operation": "get_instance_status",
-                "instance_ids": read_context.instance_ids,
-                "method": "handler",
-            },
+            metadata,
         )
         if is_vmss and read_context.resource_group and read_context.resource_ids:
             await self._vmss_cleanup_coordinator.reconcile(
@@ -748,7 +754,19 @@ class AzureInventoryService:
                     resource_group=resource_group,
                     deployment_service=deployment_service,
                 )
-            return ProviderResult.success_result({"instances": []}, metadata)
+            status_result = self._resource_metadata_service.attach_provider_fulfilment(
+                metadata,
+                instances=[],
+                target_units=(
+                    len(resource_ids)
+                    if provider_api == AzureProviderApi.SINGLE_VM
+                    else None
+                ),
+            )
+            return ProviderResult.success_result(
+                {"instances": status_result.instances},
+                metadata,
+            )
 
         fleet_errors = self._collect_instance_fleet_errors(instance_details)
         if fleet_errors:
@@ -762,7 +780,16 @@ class AzureInventoryService:
             )
         if include_shortfall_metadata:
             self._resource_metadata_service.augment_shortfall_metadata(metadata)
+        status_result = self._resource_metadata_service.attach_provider_fulfilment(
+            metadata,
+            instances=instance_details,
+            target_units=(
+                len(resource_ids)
+                if provider_api == AzureProviderApi.SINGLE_VM
+                else None
+            ),
+        )
         return ProviderResult.success_result(
-            data={"instances": instance_details},
+            data={"instances": status_result.instances},
             metadata=metadata,
         )

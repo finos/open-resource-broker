@@ -3,7 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from azure.core.exceptions import ResourceNotFoundError
+from azure.core.exceptions import HttpResponseError, ResourceNotFoundError
 
 from orb.providers.azure.exceptions.azure_exceptions import LaunchError, TerminationError
 from orb.providers.azure.infrastructure.handlers.azure_handler import (
@@ -171,6 +171,52 @@ def test_acquire_hosts_stops_after_non_capacity_error():
         )
 
     assert azure_client.resource_client.resources.begin_create_or_update.call_count == 1
+
+
+def test_acquire_hosts_classifies_quota_runtime_error():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = SingleVMHandler(azure_client=azure_client, logger=logger)
+
+    handler.azure_deployment_service.submit_template_deployment_async = AsyncMock(
+        side_effect=RuntimeError("quota exceeded")
+    )
+
+    with pytest.raises(LaunchError) as exc_info:
+        run_operation(
+            handler.acquire_hosts_async(_make_request(count=1, request_id="req-quota"), _make_template())
+        )
+
+    assert exc_info.value.error_code == "QuotaExceeded"
+
+
+def test_acquire_hosts_does_not_misclassify_resource_name_containing_quota():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = SingleVMHandler(azure_client=azure_client, logger=logger)
+
+    fake_error = MagicMock()
+    fake_error.code = "InvalidParameter"
+    fake_error.message = "subnet 'team-quota-subnet-1' does not exist"
+
+    response = MagicMock()
+    response.status_code = 400
+
+    exc = HttpResponseError(response=response)
+    exc.error = fake_error
+    handler.azure_deployment_service.submit_template_deployment_async = AsyncMock(
+        side_effect=exc
+    )
+
+    with pytest.raises(LaunchError) as exc_info:
+        run_operation(
+            handler.acquire_hosts_async(
+                _make_request(count=1, request_id="req-quota-in-name"),
+                _make_template(),
+            )
+        )
+
+    assert exc_info.value.error_code == "InvalidParameter"
 
 
 def test_acquire_hosts_requires_subnet_id():

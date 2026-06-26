@@ -23,14 +23,13 @@ from orb.application.services.spot_placement_planner import (
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
 from orb.providers.azure.configuration.config import AzureProviderConfig
-from orb.providers.azure.configuration.template_extension import AzureTemplateExtensionConfig
 from orb.providers.azure.configuration.validator import validate_azure_template
 from orb.providers.azure.capabilities import (
     get_supported_api_capabilities,
     get_supported_apis,
 )
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
-from orb.providers.azure.domain.template.value_objects import AzureProviderApi
+from orb.providers.azure.domain.template.value_objects import AzurePriority, AzureProviderApi
 from orb.providers.azure.exceptions import AzureError, AzureValidationError
 from orb.providers.azure.infrastructure.error_utils import (
     canonical_azure_error_code,
@@ -43,6 +42,7 @@ from orb.providers.azure.services.cyclecloud_request_context_service import (
     resolve_cyclecloud_request_metadata,
 )
 from orb.providers.azure.services.inventory_service import (
+    AzureReadOperationContext,
     AzureInventoryService,
     build_read_operation_context,
 )
@@ -78,6 +78,7 @@ if TYPE_CHECKING:
     from orb.providers.azure.infrastructure.services.azure_native_spec_service import (
         AzureNativeSpecService,
     )
+
 
 @injectable
 class AzureProviderStrategy(ProviderStrategy):
@@ -246,16 +247,14 @@ class AzureProviderStrategy(ProviderStrategy):
         elif enhanced_config.get("subnet_ids") == ["default-subnet"]:
             enhanced_config.pop("subnet_ids", None)
 
-        azure_defaults = AzureTemplateExtensionConfig(
-            vm_size="Standard_D4s_v5",
-            priority="Regular",
-            os_disk_type="Premium_LRS",
-            os_disk_size_gb=None,
-            admin_username="azureuser",
-        ).to_template_defaults()
-        for field, value in azure_defaults.items():
-            if enhanced_config.get(field) in (None, ""):
-                enhanced_config[field] = value
+        if enhanced_config.get("vm_size") in (None, ""):
+            enhanced_config["vm_size"] = "Standard_D4s_v5"
+        if enhanced_config.get("priority") in (None, ""):
+            enhanced_config["priority"] = AzurePriority.REGULAR
+        if enhanced_config.get("admin_username") in (None, ""):
+            enhanced_config["admin_username"] = "azureuser"
+        if enhanced_config.get("node_attributes") in (None, ""):
+            enhanced_config["node_attributes"] = {}
 
         if enhanced_config.get("resource_group") in (None, "") and self._azure_config.resource_group:
             enhanced_config["resource_group"] = self._azure_config.resource_group
@@ -795,26 +794,7 @@ class AzureProviderStrategy(ProviderStrategy):
             instance_ids = read_context.instance_ids
 
             if bool(operation.context and operation.context.get("dry_run", False)):
-                return ProviderResult.success_result(
-                    {
-                        "instances": [
-                            {
-                                "instance_id": iid,
-                                "status": "unknown",
-                                "provider_type": "azure",
-                                "provider_data": {"dry_run": True},
-                            }
-                            for iid in instance_ids
-                        ],
-                        "queried_count": len(instance_ids),
-                    },
-                    {
-                        "operation": "get_instance_status",
-                        "instance_ids": instance_ids,
-                        "method": "dry_run",
-                        "provider_data": {"dry_run": True},
-                    },
-                )
+                return self._dry_run_instance_status_result(instance_ids)
 
             return await self._inventory_service.get_instance_status_async(read_context)
 
@@ -884,16 +864,7 @@ class AzureProviderStrategy(ProviderStrategy):
                 default_resource_group=self._azure_config.resource_group,
             )
             if bool(operation.context and operation.context.get("dry_run", False)):
-                return ProviderResult.success_result(
-                    {"instances": []},
-                    {
-                        "operation": "describe_resource_instances",
-                        "resource_ids": read_context.resource_ids,
-                        "provider_api": read_context.provider_api_key,
-                        "method": "dry_run",
-                        "provider_data": {"dry_run": True},
-                    },
-                )
+                return self._dry_run_describe_instances_result(read_context)
             return await self._inventory_service.describe_resource_instances_async(
                 read_context=read_context,
                 resource_manager=self.resource_manager,
@@ -907,6 +878,58 @@ class AzureProviderStrategy(ProviderStrategy):
                 f"Failed to describe resource instances: {exc!s}",
                 "DESCRIBE_RESOURCE_INSTANCES_ERROR", exc,
             )
+
+    def _dry_run_instance_status_result(self, instance_ids: list[str]) -> ProviderResult:
+        """Build a dry-run status result with the same fulfilment contract as real status."""
+        dry_run_instances = [
+            {
+                "instance_id": instance_id,
+                "status": "unknown",
+                "provider_type": "azure",
+                "provider_data": {"dry_run": True},
+            }
+            for instance_id in instance_ids
+        ]
+        metadata: dict[str, Any] = {
+            "operation": "get_instance_status",
+            "instance_ids": instance_ids,
+            "method": "dry_run",
+            "provider_data": {"dry_run": True},
+        }
+        status_result = self._resource_metadata_service.attach_provider_fulfilment(
+            metadata,
+            instances=dry_run_instances,
+            target_units=len(instance_ids),
+        )
+        return ProviderResult.success_result(
+            {
+                "instances": status_result.instances,
+                "queried_count": len(instance_ids),
+            },
+            metadata,
+        )
+
+    def _dry_run_describe_instances_result(
+        self,
+        read_context: AzureReadOperationContext,
+    ) -> ProviderResult:
+        """Build a dry-run resource discovery result with an explicit unknown target."""
+        metadata: dict[str, Any] = {
+            "operation": "describe_resource_instances",
+            "resource_ids": read_context.resource_ids,
+            "provider_api": read_context.provider_api_key,
+            "method": "dry_run",
+            "provider_data": {"dry_run": True},
+        }
+        status_result = self._resource_metadata_service.attach_provider_fulfilment(
+            metadata,
+            instances=[],
+            target_units=None,
+        )
+        return ProviderResult.success_result(
+            {"instances": status_result.instances},
+            metadata,
+        )
 
     # ------------------------------------------------------------------
     # VALIDATE_TEMPLATE
