@@ -195,7 +195,10 @@ class RequestDTO(BaseDTO):
                             pending_count=int(float(pd_top.get("pending_count") or 0)),
                         )
                     except (TypeError, ValueError):
-                        pass
+                        # Best-effort parse: malformed legacy / provider data
+                        # leaves resolved_fulfilment as None and the request
+                        # falls back to the legacy count-based view.
+                        resolved_fulfilment = None
 
         # Build structured error block from error_details when available.
         # Accept both "provider_error" (new) and legacy "aws_error" so that
@@ -246,13 +249,19 @@ class RequestDTO(BaseDTO):
             pending_count=resolved_fulfilment.pending_count if resolved_fulfilment else None,
         )
 
-    def to_dict(self, verbose: bool = False) -> dict[str, Any]:
+    def to_dict(self, verbose: bool = False, include_timing: bool = False) -> dict[str, Any]:
         """
         Convert to dictionary format - returns snake_case for internal use.
         External format conversion should be handled at scheduler strategy level.
 
         Args:
-            verbose: Whether to include detailed information.
+            verbose: Whether to include detailed information (metadata,
+                launch_template_*, status_check timestamps).
+            include_timing: When True, surface ``first_status_check`` /
+                ``last_status_check`` on the non-verbose payload too. The
+                UI list view passes this so it can render the Timing
+                stepper from list-row data; CLI / SDK consumers default to
+                False so the wire payload stays lean.
 
         Returns:
             Dictionary representation with snake_case keys
@@ -281,14 +290,13 @@ class RequestDTO(BaseDTO):
             if result.get(cap_field) is None:
                 result.pop(cap_field, None)
 
-        # Remove fields based on detail level.
-        # Keep first/last_status_check on list responses — they're cheap
-        # timestamps the UI needs to render the Timing section in the
-        # request drawer (which reads list-row data on initial paint).
         if not include_details:
             result.pop("metadata", None)
             result.pop("launch_template_id", None)
             result.pop("launch_template_version", None)
+            if not include_timing:
+                result.pop("first_status_check", None)
+                result.pop("last_status_check", None)
 
         return result
 
