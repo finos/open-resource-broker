@@ -276,5 +276,5 @@ def create_k8s_template_adapter(
     so the DI container registration in :mod:`registration` can use the same
     callable shape.
     """
-    template_config_manager = TemplateConfigurationManager(kubernetes_client, logger)  # type: ignore[arg-type]
+    template_config_manager = TemplateConfigurationManager(kubernetes_client, logger, config)  # type: ignore[arg-type]
     return K8sTemplateAdapter(template_config_manager, kubernetes_client, logger)

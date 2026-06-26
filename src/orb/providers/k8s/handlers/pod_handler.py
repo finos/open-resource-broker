@@ -44,13 +44,6 @@ from orb.providers.k8s.watch.pod_state_cache import PodStateCache
 _MAX_CONCURRENT_CREATES = 50
 
 
-# Phase-to-status mapping used by ``_pod_status_string`` and the
-# fulfilment computation.  ``Pending`` covers both "scheduling" and
-# "ContainerCreating"; readiness is read separately from the pod
-# conditions to disambiguate Running-but-not-Ready.
-_TERMINAL_PHASES = frozenset({"Succeeded", "Failed"})
-
-
 @injectable
 class K8sPodHandler(K8sHandlerBase):
     """Handler for the ``Pod`` provider-API key.
