@@ -301,11 +301,25 @@ class K8sTemplate(Template):
     service_account: Optional[str] = None
 
     # Raw partial override applied AFTER the computed pod spec is built.
-    # NOT the same as the AWS-style ``provider_api_spec`` field handled in
-    # ticket 2401 — this dict is deep-merged onto the computed pod spec
-    # to allow per-template tweaks that would otherwise require a full
-    # native-spec submission.
+    # Distinct from :attr:`native_spec` below — ``pod_spec_override`` is a
+    # partial deep-merge onto the computed pod spec built by the spec
+    # helpers, whereas ``native_spec`` is a full-replacement escape hatch
+    # that bypasses the helpers entirely.
     pod_spec_override: Optional[dict[str, Any]] = None
+
+    # Full native kubernetes API body for the per-handler create call.
+    # When set (and the provider config enables native specs), the handler
+    # passes the rendered dict directly to the kubernetes SDK
+    # (e.g. ``create_namespaced_pod(body=native_spec)``) instead of
+    # building the body via :mod:`orb.providers.k8s.utilities.pod_spec`
+    # and friends.  The dict is Jinja-templated against the standard
+    # template context at acquire time, then deep-merged onto the
+    # provider's per-API default Jinja template so operators can supply a
+    # partial override (e.g. only ``spec.containers[0].resources``) and
+    # have the rest come from the default.  Mirrors the AWS provider's
+    # ``provider_api_spec`` field — see
+    # :class:`orb.providers.k8s.infrastructure.services.k8s_native_spec_service.K8sNativeSpecService`.
+    native_spec: Optional[dict[str, Any]] = None
 
     def __init__(self, **data: Any) -> None:
         """Initialise the K8sTemplate.
@@ -391,6 +405,8 @@ class K8sTemplate(Template):
             self._promote_field(pc, "args")
             self._promote_field(pc, "completions")
             self._promote_field(pc, "parallelism")
+            self._promote_field(pc, "pod_spec_override")
+            self._promote_field(pc, "native_spec")
 
             # Coerced fields go through the per-field validator helpers.
             if self.tolerations is None and pc.get("tolerations") is not None:

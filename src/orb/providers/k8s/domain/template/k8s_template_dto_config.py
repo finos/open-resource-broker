@@ -94,6 +94,15 @@ class K8sTemplateDTOConfig(BaseModel):
         ),
     )
 
+    # Full native kubernetes API body — escape hatch.
+    native_spec: Optional[dict[str, Any]] = Field(
+        None,
+        description=(
+            "Full native kubernetes API body passed straight to the SDK when "
+            "the provider's native-spec escape hatch is enabled."
+        ),
+    )
+
     @field_validator("namespace")
     @classmethod
     def _validate_namespace(cls, v: Optional[str]) -> Optional[str]:

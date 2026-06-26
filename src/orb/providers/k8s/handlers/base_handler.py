@@ -12,6 +12,7 @@ lifting is per-handler.
 
 from __future__ import annotations
 
+import copy
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Optional, TypeVar
 
@@ -63,6 +64,7 @@ class K8sHandlerBase(ABC):
         pod_state_cache: Optional[PodStateCache] = None,
         cache_alive: Optional[Callable[[], bool]] = None,
         stale_cache_timeout_seconds: Optional[float] = None,
+        native_spec_service: Optional[Any] = None,
     ) -> None:
         self._kubernetes_client = kubernetes_client
         self._config = config
@@ -70,6 +72,12 @@ class K8sHandlerBase(ABC):
         self._max_retries = max_retries
         self._base_delay = base_delay
         self._max_delay = max_delay
+        # Native-spec escape hatch.  ``None`` when the provider config
+        # opts out (``native_spec_enabled=False``) or when the DI
+        # resolution failed — handlers fall back to the typed builder
+        # path in :mod:`orb.providers.k8s.utilities` when this is unset
+        # or when the service reports the hatch disabled.
+        self._native_spec_service = native_spec_service
         # Cache wiring: when both the cache and the ``cache_alive``
         # callable are supplied, :meth:`_read_from_cache` returns a
         # per-pod instance list built from the cached snapshots.  When
@@ -134,6 +142,64 @@ class K8sHandlerBase(ABC):
     def build_label_selector(self, request: Request) -> str:
         """Convenience: build the ``label_selector=orb.io/request-id=<id>`` string."""
         return request_id_label_selector(request, label_prefix=self._config.label_prefix)
+
+    def _stamp_native_workload_body(
+        self,
+        native_body: dict[str, Any],
+        *,
+        workload_name: str,
+        namespace: str,
+        replicas: int,
+        request: Request,
+    ) -> dict[str, Any]:
+        """Stamp per-request identity onto a rendered native workload body.
+
+        Used by the Deployment / StatefulSet / Job handlers when the
+        native-spec escape hatch is active.  Overwrites the fields that
+        ORB owns at acquire time (name / namespace / replicas, request-id
+        and managed labels) so the workload remains discoverable by the
+        provider's label-selector reads regardless of what the operator
+        rendered.  Operator-controlled fields (pod-template selector
+        match labels, container spec, ...) are preserved as-is when the
+        operator set them.
+        """
+        body = copy.deepcopy(native_body)
+
+        metadata = body.setdefault("metadata", {})
+        metadata["name"] = workload_name
+        metadata["namespace"] = namespace
+        labels = dict(metadata.get("labels", {}) or {})
+        prefix = self._config.label_prefix
+        labels[f"{prefix}/managed"] = "true"
+        labels[f"{prefix}/request-id"] = str(request.request_id)
+        labels[f"{prefix}/template-id"] = str(request.template_id)
+        metadata["labels"] = labels
+
+        spec = body.setdefault("spec", {})
+        # Stamp the replica count under the field name the workload kind
+        # uses.  Job uses ``parallelism`` / ``completions`` (and Jobs do
+        # not have a ``replicas`` key), Deployment / StatefulSet use
+        # ``replicas``.  We respect whichever key the operator's body
+        # already uses; only the present keys are overwritten so that an
+        # operator who explicitly set a different value gets the new one.
+        if "parallelism" in spec or "completions" in spec:
+            spec["parallelism"] = replicas
+            spec["completions"] = replicas
+        else:
+            spec["replicas"] = replicas
+
+        # Always ensure the request-id label is in the pod-template
+        # labels too — without it the controller's selector cannot match
+        # the pods.  Keep operator-supplied template labels intact.
+        template_section = spec.setdefault("template", {})
+        template_metadata = template_section.setdefault("metadata", {})
+        template_labels = dict(template_metadata.get("labels", {}) or {})
+        template_labels[f"{prefix}/request-id"] = str(request.request_id)
+        template_labels[f"{prefix}/managed"] = "true"
+        template_labels[f"{prefix}/template-id"] = str(request.template_id)
+        template_metadata["labels"] = template_labels
+
+        return body
 
     def apply_pod_timeouts(
         self,

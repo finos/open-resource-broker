@@ -106,6 +106,8 @@ workloads).
 
 * [Configuration reference](configuration.md) - every `K8sProviderConfig` field.
 * [Handlers](handlers.md) - Pod, Deployment, StatefulSet, Job; when to pick each.
+* [Native spec escape hatch](native-spec.md) - submit a full kubernetes
+  API body and bypass the typed builders for fields ORB does not model.
 * [Authentication](auth.md) - in-cluster vs kubeconfig, troubleshooting.
 * [RBAC example](rbac.yaml) - minimum ServiceAccount + Role + RoleBinding.
 * [Migrating from `orb.k8s_legacy`](migrating-from-k8s-legacy.md) - template field

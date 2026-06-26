@@ -184,6 +184,21 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         ),
     )
 
+    # Native spec escape hatch
+    native_spec_enabled: bool = Field(
+        False,
+        description=(
+            "Opt-in flag for the native-spec escape hatch.  When True, the "
+            "per-handler create paths consult :attr:`K8sTemplate.native_spec` "
+            "(or the provider's default Jinja template) and pass the rendered "
+            "kubernetes API body straight to the SDK, bypassing the typed "
+            "spec builders under ``providers.k8s.utilities``.  Default False "
+            "so operators opt in deliberately — the escape hatch surrenders "
+            "the typed-builder invariants (label injection, restart policy, "
+            "selector wiring) to the operator's spec."
+        ),
+    )
+
     @field_validator("namespaces")
     @classmethod
     def _validate_namespaces(cls, v: Optional[list[str]]) -> Optional[list[str]]:

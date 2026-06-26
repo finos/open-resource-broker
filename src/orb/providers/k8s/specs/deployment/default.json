@@ -1,6 +1,6 @@
 {
   "apiVersion": "apps/v1",
-  "kind": "StatefulSet",
+  "kind": "Deployment",
   "metadata": {
     "name": "orb-{{ request_id[:8] }}",
     "namespace": "{{ namespace }}",
@@ -9,7 +9,6 @@
   },
   "spec": {
     "replicas": {{ replicas }},
-    "serviceName": "orb-{{ request_id[:8] }}",
     "selector": {
       "matchLabels": {
         "{{ label_prefix }}/request-id": "{{ request_id }}",

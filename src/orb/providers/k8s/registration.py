@@ -362,6 +362,14 @@ def register_k8s_services_with_di(container) -> None:
     type and the :class:`TemplateAdapterPort` port so callers can resolve
     either binding from the container.
 
+    Also registers :class:`K8sNativeSpecService` so plugin code and tests
+    can resolve it from the container when the kubernetes provider's
+    native-spec escape hatch is in use.  The strategy itself resolves the
+    service lazily (see
+    :meth:`K8sProviderStrategy._resolve_native_spec_service`) so this
+    registration is the explicit binding for callers who want the
+    container to own the lifecycle.
+
     The :class:`TemplateExampleGeneratorPort` registration is wrapped in
     ``suppress(ImportError)`` so this function remains operational even
     when the example-generator adapter under ``providers/k8s/adapters/``
@@ -379,6 +387,22 @@ def register_k8s_services_with_di(container) -> None:
     container.register_singleton(K8sTemplateAdapter, create_k8s_template_adapter)
     container.register_singleton(TemplateAdapterPort, create_k8s_template_adapter)
     logger.debug("Kubernetes Template Adapter registered with DI container")
+
+    with suppress(ImportError):
+        from orb.application.services.native_spec_service import NativeSpecService
+        from orb.domain.base.ports.configuration_port import ConfigurationPort
+        from orb.providers.k8s.infrastructure.services.k8s_native_spec_service import (  # noqa: PLC0415
+            K8sNativeSpecService,
+        )
+
+        def _create_k8s_native_spec_service(_container) -> K8sNativeSpecService:
+            return K8sNativeSpecService(
+                native_spec_service=_container.get(NativeSpecService),
+                config_port=_container.get(ConfigurationPort),
+            )
+
+        container.register_singleton(K8sNativeSpecService, _create_k8s_native_spec_service)
+        logger.debug("K8sNativeSpecService registered with DI container")
 
     # Example generator adapter is optional; the import is guarded so
     # this function works regardless of whether it is present.
