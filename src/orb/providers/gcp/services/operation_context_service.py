@@ -196,6 +196,9 @@ class GCPOperationContextService:
         if resource_ids:
             return resource_ids
 
+        if params.resource_id is not None:
+            return [params.resource_id]
+
         mapped_resource_ids = self._resource_ids_from_mapping(
             instance_ids=params.instance_ids,
             resource_mapping=params.resource_mapping,
@@ -209,7 +212,7 @@ class GCPOperationContextService:
 
         if params.instance_ids:
             raise GCPValidationError(
-                "MIG operations with instance_ids require resource_mapping or resource_ids"
+                "MIG operations with instance_ids require resource_id, resource_ids, or resource_mapping"
             )
         return []
 

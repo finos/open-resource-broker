@@ -1267,6 +1267,40 @@ async def test_strategy_terminate_mig_uses_resource_mapping() -> None:
 
 
 @pytest.mark.asyncio
+async def test_strategy_status_mig_uses_scalar_resource_id() -> None:
+    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    assert strategy.initialize() is True
+
+    handler = MagicMock()
+    handler.check_hosts_status.return_value = [
+        {
+            "instance_id": "vm-a",
+            "status": "running",
+            "provider_data": {"resource_id": "mig-a"},
+        }
+    ]
+    strategy._handler_factory = SimpleNamespace(create_handler=lambda _api: handler)
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
+            parameters={
+                "provider_api": "MIG",
+                "instance_ids": ["vm-a"],
+                "resource_id": "mig-a",
+                "request_metadata": {"region": "us-central1", "scope": "regional"},
+            },
+        )
+    )
+
+    assert result.success is True
+    call = handler.check_hosts_status.call_args.kwargs
+    assert call["resource_ids"] == ["mig-a"]
+    assert call["instance_ids"] == ["vm-a"]
+    assert call["context"]["mig_name"] == "mig-a"
+
+
+@pytest.mark.asyncio
 async def test_strategy_terminate_mig_requires_resource_mapping_for_instance_ids() -> None:
     strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
     assert strategy.initialize() is True
@@ -1284,7 +1318,7 @@ async def test_strategy_terminate_mig_requires_resource_mapping_for_instance_ids
 
     assert result.success is False
     assert result.error_code == "GCPValidationError"
-    assert "resource_mapping or resource_ids" in result.error_message
+    assert "resource_id, resource_ids, or resource_mapping" in result.error_message
 
 
 @pytest.mark.asyncio
