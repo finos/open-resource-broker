@@ -3,10 +3,20 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Optional, Protocol, TypedDict
 
 from orb.domain.base.ports import LoggingPort
+from orb.domain.base.provider_fulfilment import (
+    CheckHostsStatusResult,
+    FulfilmentState,
+    ProviderFulfilment,
+)
+
+_RUNNING_STATES = frozenset({"running"})
+_PENDING_STATES = frozenset({"pending", "creating", "starting", "updating", "unknown"})
+_FAILED_STATES = frozenset({"failed", "terminated", "stopped", "deallocated"})
 
 
 @dataclass
@@ -271,3 +281,123 @@ class AzureResourceMetadataService:
                 + (f"; causes={', '.join(likely_causes)}" if likely_causes else "")
             ),
         }
+
+    def attach_provider_fulfilment(
+        self,
+        metadata: dict[str, Any],
+        *,
+        instances: Sequence[Mapping[str, Any]],
+        target_units: int | None,
+    ) -> CheckHostsStatusResult:
+        """Attach and return the canonical provider status contract."""
+        status_result = CheckHostsStatusResult(
+            instances=list(instances),
+            fulfilment=_build_provider_fulfilment(
+                metadata=metadata,
+                instances=instances,
+                target_units=target_units,
+            ),
+        )
+        metadata["provider_fulfilment"] = status_result.fulfilment
+        return status_result
+
+
+def _build_provider_fulfilment(
+    *,
+    metadata: dict[str, Any],
+    instances: Sequence[Mapping[str, Any]],
+    target_units: int | None,
+) -> ProviderFulfilment:
+    fleet_errors = metadata.get("fleet_errors") or []
+    # ProviderResult.metadata is the core provider result bag typed as dict[str, Any].
+    # Azure owns this key, but reading it back from the core metadata boundary
+    # requires validating the shape before trusting the capacity fields.
+    capacity = metadata.get("fleet_capacity_fulfilment")
+    if isinstance(capacity, dict):
+        target = capacity.get("target_capacity_units")
+        fulfilled = capacity.get("fulfilled_capacity_units")
+        if isinstance(target, int) and isinstance(fulfilled, int):
+            capacity_state = str(capacity.get("state") or "").lower()
+            if fulfilled >= target and target > 0 and not fleet_errors:
+                return ProviderFulfilment(
+                    state="fulfilled",
+                    message=f"Azure capacity fulfilled: {fulfilled}/{target}",
+                    target_units=target,
+                    fulfilled_units=fulfilled,
+                )
+
+            if capacity_state == "failed" or fleet_errors:
+                capacity_fulfilment_state: FulfilmentState = (
+                    "partial" if fulfilled > 0 else "failed"
+                )
+                return ProviderFulfilment(
+                    state=capacity_fulfilment_state,
+                    message=f"Azure capacity shortfall: {fulfilled}/{target}",
+                    target_units=target,
+                    fulfilled_units=fulfilled,
+                )
+
+            return ProviderFulfilment(
+                state="in_progress",
+                message=f"Azure capacity provisioning: {fulfilled}/{target}",
+                target_units=target,
+                fulfilled_units=fulfilled,
+            )
+
+    # Handler-backed status, SingleVM, CycleCloud, and dry-run results do not
+    # have VMSS capacity metadata; derive their verdict from observed statuses.
+    target = target_units
+    running_count = _count_statuses(instances, _RUNNING_STATES)
+    pending_count = _count_statuses(instances, _PENDING_STATES)
+    failed_count = _count_statuses(instances, _FAILED_STATES)
+
+    if fleet_errors and running_count == 0:
+        return ProviderFulfilment(
+            state="failed",
+            message="Azure provisioning failed before capacity became available",
+            target_units=target,
+            fulfilled_units=running_count,
+        )
+
+    if target is not None and target > 0 and running_count >= target and failed_count == 0:
+        return ProviderFulfilment(
+            state="fulfilled",
+            message=f"Azure instances running: {running_count}/{target}",
+            target_units=target,
+            fulfilled_units=running_count,
+        )
+
+    if failed_count > 0 and pending_count == 0:
+        state: FulfilmentState = "partial" if running_count > 0 else "failed"
+        return ProviderFulfilment(
+            state=state,
+            message=(
+                f"Azure instance shortfall: {running_count}/{target}"
+                if target is not None
+                else f"Azure instance failure: {running_count} running"
+            ),
+            target_units=target,
+            fulfilled_units=running_count,
+        )
+
+    return ProviderFulfilment(
+        state="in_progress",
+        message=(
+            f"Azure instances provisioning: {running_count}/{target}"
+            if target is not None
+            else f"Azure instances provisioning: {running_count} running"
+        ),
+        target_units=target,
+        fulfilled_units=running_count,
+    )
+
+
+def _count_statuses(
+    instances: Sequence[Mapping[str, Any]],
+    statuses: frozenset[str],
+) -> int:
+    return sum(
+        1
+        for instance in instances
+        if str(instance.get("status") or "").lower() in statuses
+    )

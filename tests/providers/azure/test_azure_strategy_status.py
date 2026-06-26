@@ -75,6 +75,8 @@ class TestGetInstanceStatus:
 
         assert result.success
         assert result.data["queried_count"] == 1
+        assert result.metadata["provider_fulfilment"].state == "fulfilled"
+        assert result.metadata["provider_fulfilment"].target_units == 1
         handler.check_hosts_status_async.assert_awaited_once()
     def test_dry_run_short_circuits_status_lookup(self, azure_config, logger):
         strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
@@ -92,6 +94,7 @@ class TestGetInstanceStatus:
         assert result.data["queried_count"] == 2
         assert [m["instance_id"] for m in result.data["instances"]] == ["vm-1", "vm-2"]
         assert result.metadata["method"] == "dry_run"
+        assert result.metadata["provider_fulfilment"].state == "in_progress"
 
     def test_single_vm_provider_api_routes_status_via_handler(self, azure_config, logger):
         strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
