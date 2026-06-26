@@ -19,15 +19,13 @@ class RequestModel(Base):
 
     __tablename__ = "requests"
 
-    # Identity — domain invariants. Request pydantic aggregate requires
-    # template_id, request_type, and provider_type; SQL mirrors that.
+    # Identity
     request_id: Mapped[str] = mapped_column(String(255), primary_key=True)
     template_id: Mapped[str] = mapped_column(String(255), nullable=False)
     request_type: Mapped[str] = mapped_column(String(50), nullable=False)
     status: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
-    # Counts — pydantic defaults to non-zero values; SQL mirrors NOT NULL
-    # with matching server_default so direct inserts still succeed.
+    # Counts
     requested_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     desired_capacity: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     successful_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
@@ -45,7 +43,7 @@ class RequestModel(Base):
     error_details: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON-encoded
     success_rate: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # Provider — provider_type is a domain invariant on Request.
+    # Provider
     provider_api: Mapped[str | None] = mapped_column(String(255), nullable=True)
     provider_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     provider_type: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -81,7 +79,7 @@ class MachineModel(Base):
 
     __tablename__ = "machines"
 
-    # Identity — instance_type is a domain invariant on Machine.
+    # Identity
     machine_id: Mapped[str] = mapped_column(String(255), primary_key=True)
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str | None] = mapped_column(String(50), nullable=True)
@@ -96,13 +94,10 @@ class MachineModel(Base):
     # Timing (BIGINT unix epoch for launch_time; ISO-8601 TEXT for others)
     launch_time: Mapped[int | None] = mapped_column(BIGINT, nullable=True)
     termination_time: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # provisioning_started_at: set by Machine.start_launching() and used for
-    # uptime diagnostics. Previously had no SQL column and was silently dropped.
     provisioning_started_at: Mapped[str | None] = mapped_column(Text, nullable=True)
     uptime_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    # Provider — provider_api + provider_name are domain invariants on
-    # Machine.  The SQL constraints mirror that.
+    # Provider
     provider_api: Mapped[str] = mapped_column(String(255), nullable=False)
     provider_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
     provider_name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -110,7 +105,7 @@ class MachineModel(Base):
     cloud_host_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     provider_data: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON-encoded
 
-    # Relations — template_id is a domain invariant on Machine.
+    # Relations
     request_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     template_id: Mapped[str] = mapped_column(String(255), nullable=False)
     return_request_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -119,8 +114,6 @@ class MachineModel(Base):
     availability_zone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     region: Mapped[str | None] = mapped_column(Text, nullable=True)
     subnet_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    # vpc_id is an optional domain field that previously had no SQL column;
-    # the value was silently dropped on save.
     vpc_id: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Tags / metadata
@@ -132,7 +125,7 @@ class MachineModel(Base):
     # Pricing
     price_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
-    # Misc — image_id is a domain invariant on Machine.
+    # Misc
     result: Mapped[str | None] = mapped_column(String(255), nullable=True)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
     vcpus: Mapped[int | None] = mapped_column(Integer, nullable=True)

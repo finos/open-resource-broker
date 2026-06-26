@@ -150,6 +150,46 @@ def _spawn_runtime(coro_factory: Callable[[], Coroutine[Any, Any, Any]]) -> int:
     return 0
 
 
+def _run_daemon_grandchild(
+    write_fd: int,
+    pid_path: Path,
+    log_path: Path,
+    wd_path: Path,
+    runtime: Callable[[], Coroutine[Any, Any, Any]],
+) -> NoReturn:
+    """Grandchild daemon body. Always terminates the process via os._exit."""
+    try:
+        os.umask(0o027)
+        os.chdir(str(wd_path))
+        _redirect_stdio(log_path)
+        daemon_fd = _acquire_pid_lock(pid_path)
+        _write_pid(daemon_fd, os.getpid())
+    except Exception as exc:
+        try:
+            with os.fdopen(write_fd, "wb") as w:
+                w.write(f"err:{exc}".encode())
+        except Exception as report_exc:
+            logger.debug("daemon child failed to report start error: %s", report_exc)
+        os._exit(1)
+
+    try:
+        with os.fdopen(write_fd, "wb") as w:
+            w.write(f"ok:{os.getpid()}".encode())
+    except Exception as exc:
+        logger.debug("daemon child readiness pipe write failed: %s", exc)
+
+    try:
+        rc = _spawn_runtime(runtime)
+    finally:
+        pid_path.unlink(missing_ok=True)
+        try:
+            os.close(daemon_fd)
+        except OSError as exc:
+            logger.debug("daemon lock fd already closed: %s", exc)
+
+    os._exit(rc)
+
+
 def start(
     *,
     pid_file: str | os.PathLike[str],
@@ -183,26 +223,15 @@ def start(
         try:
             rc = _spawn_runtime(runtime)
         finally:
-            # ``missing_ok=True`` makes the PID-file unlink idempotent
-            # across parallel stop/restart races.
             pid_path.unlink(missing_ok=True)
             os.close(lock_fd)
         return {"pid": os.getpid(), "status": "exited", "exit_code": rc}
 
-    # The lock fd is held by the parent. We have to release it before
-    # forking so the child can re-acquire under its own pid (the lock is
-    # released on close of the original fd in the parent's exit path).
     os.close(lock_fd)
-
-    # Pipe: child signals "ready" (or "failed") back to the parent before
-    # the parent exits. Avoids `orb server start` claiming success when
-    # the daemon couldn't even acquire the lock.
     read_fd, write_fd = os.pipe()
 
     intermediate = os.fork()
     if intermediate > 0:
-        # Original caller: wait for the intermediate to die, then read
-        # readiness from the pipe.
         os.close(write_fd)
         os.waitpid(intermediate, 0)
         with os.fdopen(read_fd, "rb") as r:
@@ -213,57 +242,17 @@ def start(
             payload[4:] if payload.startswith("err:") else payload or "daemon failed"
         )
 
-    # Intermediate: complete double-fork; the grandchild becomes the daemon.
     os.close(read_fd)
     os.setsid()
     grandchild = os.fork()
     if grandchild > 0:
-        os._exit(0)
+        _terminate_intermediate()
+    _run_daemon_grandchild(write_fd, pid_path, log_path, wd_path, runtime)
 
-    # Grandchild — the actual daemon. Set up stdio + cwd, re-acquire the
-    # lock under this pid, write the pid, then run the server.
-    try:
-        os.umask(0o027)
-        os.chdir(str(wd_path))
-        _redirect_stdio(log_path)
-        daemon_fd = _acquire_pid_lock(pid_path)
-        _write_pid(daemon_fd, os.getpid())
-    except Exception as exc:
-        try:
-            with os.fdopen(write_fd, "wb") as w:
-                w.write(f"err:{exc}".encode())
-        except Exception as report_exc:
-            # Best-effort error reporting in the daemon child; if even
-            # the pipe write fails the parent will treat the EOF as
-            # failure and surface the right exit status.
-            logger.debug("daemon child failed to report start error: %s", report_exc)
-        os._exit(1)
 
-    try:
-        with os.fdopen(write_fd, "wb") as w:
-            w.write(f"ok:{os.getpid()}".encode())
-    except Exception as exc:
-        # Readiness notification is best-effort. The parent treats an
-        # empty pipe payload as failure, but the daemon itself keeps
-        # running — operators can still see it via the PID file +
-        # /health.
-        logger.debug("daemon child readiness pipe write failed: %s", exc)
-
-    try:
-        rc = _spawn_runtime(runtime)
-    finally:
-        pid_path.unlink(missing_ok=True)
-        try:
-            os.close(daemon_fd)
-        except OSError as exc:
-            # fd already closed (interpreter teardown can race); ignore.
-            logger.debug("daemon lock fd already closed: %s", exc)
-
-    # Grandchild branch terminates the daemon process here. The function's
-    # advertised dict return is satisfied by the foreground path at L193
-    # and the parent-fork path at L214; both grandchild branches exit via
-    # os._exit and never return to the caller.
-    os._exit(rc)
+def _terminate_intermediate() -> NoReturn:
+    """Intermediate fork exits without running atexit / finally clauses."""
+    os._exit(0)
 
 
 def stop(

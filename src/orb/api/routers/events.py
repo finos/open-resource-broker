@@ -224,35 +224,27 @@ async def stream_events(
     async def generator() -> AsyncGenerator[str, None]:
         q = sse_event_bus.subscribe()
         try:
-            # Replay historical events if ?since= provided
             if since_dt is not None:
                 for event_type, payload in sse_event_bus.history_since(since_dt):
                     if _allowed(event_type, type_filter):
                         yield _format_sse(event_type, payload)
 
             while True:
-                # Interleave real events with heartbeat deadline
                 try:
                     item = await asyncio.wait_for(q.get(), timeout=_HEARTBEAT_INTERVAL)
-                    if item is None:
-                        # Poison-pill: subscriber was asked to close
-                        break
-                    event_type, payload = item
-                    if _allowed(event_type, type_filter):
-                        yield _format_sse(event_type, payload)
                 except asyncio.TimeoutError:
-                    # No real event arrived within the heartbeat window
                     if await request.is_disconnected():
                         break
                     yield _format_sse(
                         "heartbeat",
                         {"ts": datetime.now(timezone.utc).isoformat()},
                     )
-        except asyncio.CancelledError:
-            # Task cancelled (client disconnected or server shutdown).
-            # finally below still runs to remove the subscriber; re-raise
-            # so the surrounding ASGI machinery observes the cancellation.
-            raise
+                    continue
+                if item is None:
+                    break
+                event_type, payload = item
+                if _allowed(event_type, type_filter):
+                    yield _format_sse(event_type, payload)
         finally:
             sse_event_bus.unsubscribe(q)
 

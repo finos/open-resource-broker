@@ -26,21 +26,17 @@ def upgrade() -> None:
         sa.Column("machine_id", sa.String(length=255), nullable=False),
         sa.Column("name", sa.String(length=255), nullable=True),
         sa.Column("status", sa.String(length=50), nullable=True),
-        # Domain invariants — Machine pydantic aggregate requires these.
         sa.Column("instance_type", sa.String(length=50), nullable=False),
         sa.Column("image_id", sa.String(length=255), nullable=False),
         sa.Column("template_id", sa.String(length=255), nullable=False),
         sa.Column("provider_api", sa.String(length=255), nullable=False),
         sa.Column("provider_name", sa.String(length=255), nullable=False),
-        # Optional domain fields.
         sa.Column("private_ip", sa.String(length=45), nullable=True),
         sa.Column("public_ip", sa.String(length=45), nullable=True),
         sa.Column("private_dns_name", sa.Text(), nullable=True),
         sa.Column("public_dns_name", sa.Text(), nullable=True),
         sa.Column("launch_time", sa.BIGINT(), nullable=True),
         sa.Column("termination_time", sa.Text(), nullable=True),
-        # provisioning_started_at is set by Machine.start_launching() and used
-        # for uptime diagnostics; was previously silently dropped on save.
         sa.Column("provisioning_started_at", sa.Text(), nullable=True),
         sa.Column("uptime_seconds", sa.Integer(), nullable=True),
         sa.Column("provider_type", sa.String(length=255), nullable=True),
@@ -52,8 +48,6 @@ def upgrade() -> None:
         sa.Column("availability_zone", sa.String(length=50), nullable=True),
         sa.Column("region", sa.Text(), nullable=True),
         sa.Column("subnet_id", sa.String(length=255), nullable=True),
-        # vpc_id is an optional domain field; previously absent from SQL and
-        # silently dropped on save.
         sa.Column("vpc_id", sa.Text(), nullable=True),
         sa.Column("tags", sa.Text(), nullable=True),
         sa.Column("metadata", sa.Text(), nullable=True),
@@ -64,8 +58,6 @@ def upgrade() -> None:
         sa.Column("vcpus", sa.Integer(), nullable=True),
         sa.Column("security_group_ids", sa.Text(), nullable=True),
         sa.Column("status_reason", sa.Text(), nullable=True),
-        # Domain-default fields stamped with NOT NULL + matching defaults so
-        # the SQL invariant mirrors the pydantic field default.
         sa.Column("version", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("schema_version", sa.String(length=50), nullable=True),
         sa.Column("created_at", sa.Text(), nullable=True),
@@ -75,12 +67,10 @@ def upgrade() -> None:
     op.create_table(
         "requests",
         sa.Column("request_id", sa.String(length=255), nullable=False),
-        # Domain invariants — Request pydantic aggregate requires these.
         sa.Column("template_id", sa.String(length=255), nullable=False),
         sa.Column("request_type", sa.String(length=50), nullable=False),
         sa.Column("provider_type", sa.String(length=255), nullable=False),
         sa.Column("status", sa.String(length=50), nullable=True),
-        # Counters: pydantic has int defaults, so SQL mirrors NOT NULL + default.
         sa.Column("requested_count", sa.Integer(), nullable=False, server_default="1"),
         sa.Column("desired_capacity", sa.Integer(), nullable=False, server_default="1"),
         sa.Column("successful_count", sa.Integer(), nullable=False, server_default="0"),

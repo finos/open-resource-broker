@@ -35,6 +35,11 @@ _HF_TEMPLATE_WITH_TAGS: dict[str, Any] = {
 }
 
 
+def _no_op_config(_container: Any) -> None:
+    """Config factory used by the scheduler-registry tests below."""
+    return None
+
+
 # ---------------------------------------------------------------------------
 # load_templates_from_path — both schedulers
 # ---------------------------------------------------------------------------
@@ -144,21 +149,18 @@ def test_default_load_delegates_hf_file_to_hf_strategy(tmp_path):
     from orb.infrastructure.scheduler.registry import get_scheduler_registry
 
     registry = get_scheduler_registry()
-    # register(type_name, strategy_factory, config_factory, **kwargs) — the
-    # strategy class itself goes in via the strategy_class kwarg so
-    # get_strategy_class() can resolve it without instantiation.
     if not registry.is_registered("hostfactory"):
         registry.register(
             "hostfactory",
-            lambda c: HostFactorySchedulerStrategy(c),
-            lambda c: None,
+            HostFactorySchedulerStrategy,
+            _no_op_config,
             strategy_class=HostFactorySchedulerStrategy,
         )
     if not registry.is_registered("default"):
         registry.register(
             "default",
-            lambda c: DefaultSchedulerStrategy(c),
-            lambda c: None,
+            DefaultSchedulerStrategy,
+            _no_op_config,
             strategy_class=DefaultSchedulerStrategy,
         )
 
@@ -175,21 +177,18 @@ def test_hf_load_delegates_default_file_to_default_strategy(tmp_path):
     from orb.infrastructure.scheduler.registry import get_scheduler_registry
 
     registry = get_scheduler_registry()
-    # register(type_name, strategy_factory, config_factory, **kwargs) — the
-    # strategy class itself goes in via the strategy_class kwarg so
-    # get_strategy_class() can resolve it without instantiation.
     if not registry.is_registered("hostfactory"):
         registry.register(
             "hostfactory",
-            lambda c: HostFactorySchedulerStrategy(c),
-            lambda c: None,
+            HostFactorySchedulerStrategy,
+            _no_op_config,
             strategy_class=HostFactorySchedulerStrategy,
         )
     if not registry.is_registered("default"):
         registry.register(
             "default",
-            lambda c: DefaultSchedulerStrategy(c),
-            lambda c: None,
+            DefaultSchedulerStrategy,
+            _no_op_config,
             strategy_class=DefaultSchedulerStrategy,
         )
 

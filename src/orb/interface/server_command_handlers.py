@@ -215,27 +215,24 @@ async def handle_server_reload(args) -> dict[str, Any]:
     # ORB at /orb on the UI backend port; API-only exposes /admin
     # directly on the configured host/port.
     if ui_config and ui_config.enabled and ui_config.mode == "embedded":
-        url = f"http://127.0.0.1:{ui_config.backend_port}/orb/api/v1/admin/reload-config"
+        host, port = "127.0.0.1", ui_config.backend_port
+        path = "/orb/api/v1/admin/reload-config"
     else:
         host = server_config.host
         if host in ("0.0.0.0", "::"):
             host = "127.0.0.1"
-        url = f"http://{host}:{server_config.port}/api/v1/admin/reload-config"
+        port = server_config.port
+        path = "/api/v1/admin/reload-config"
 
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        raise ValueError(f"reload IPC requires a loopback host, refusing to call {host!r}")
+
+    url = f"http://{host}:{port}{path}"
     try:
-        # URL is loopback HTTP by design — ``orb server reload`` is a
-        # localhost-only IPC channel between the CLI and the daemon
-        # running on the same host. TLS would add no value here.
-        # ``requests`` is bound to http(s):// only — urllib would also
-        # accept file:// which is a tail-risk if the URL is misconfigured.
-        # nosemgrep: python.lang.security.audit.insecure-transport.requests.request-with-http.request-with-http
         resp = requests.post(url, data=b"", timeout=5)
         body = resp.json() if resp.content else {}
         return {"method": "http", "url": url, "status": resp.status_code, **body}
     except (requests.RequestException, OSError, json.JSONDecodeError) as exc:
-        # HTTP path unavailable (server not listening, wrong port, etc.)
-        # — fall back to SIGHUP so API-only deployments still get a
-        # working reload signal even if the HTTP probe misfires.
         return {
             "method": "sighup_fallback",
             "http_error": str(exc),
