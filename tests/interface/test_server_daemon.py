@@ -22,7 +22,6 @@ import pytest
 
 from orb.interface import server_daemon as daemon
 
-
 # ── Path helpers ────────────────────────────────────────────────────────────
 
 

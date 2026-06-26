@@ -9,7 +9,6 @@ except ImportError:
     raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
 
 from orb.api.dependencies import (
-    require_role,
     get_create_template_orchestrator,
     get_delete_template_orchestrator,
     get_get_template_orchestrator,
@@ -19,6 +18,7 @@ from orb.api.dependencies import (
     get_template_generation_service,
     get_update_template_orchestrator,
     get_validate_template_orchestrator,
+    require_role,
 )
 from orb.api.models.base import APIRequest
 from orb.api.models.responses import (
@@ -27,7 +27,6 @@ from orb.api.models.responses import (
     TemplateMutationResponse,
 )
 from orb.application.dto.template_generation_dto import TemplateGenerationRequest
-from orb.application.services.template_generation_service import TemplateGenerationService
 from orb.application.services.orchestration.dtos import (
     CreateTemplateInput,
     DeleteTemplateInput,
@@ -37,6 +36,7 @@ from orb.application.services.orchestration.dtos import (
     UpdateTemplateInput,
     ValidateTemplateInput,
 )
+from orb.application.services.template_generation_service import TemplateGenerationService
 from orb.domain.base.exceptions import EntityNotFoundError
 from orb.infrastructure.error.decorators import handle_rest_exceptions
 

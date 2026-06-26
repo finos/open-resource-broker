@@ -12,10 +12,9 @@ except ImportError:
 
 from orb.application.ports.scheduler_port import SchedulerPort
 from orb.application.services.orchestration.acquire_machines import AcquireMachinesOrchestrator
-from orb.application.services.template_generation_service import TemplateGenerationService
-from orb.application.services.orchestration.dashboard_summary import DashboardSummaryOrchestrator
 from orb.application.services.orchestration.cancel_request import CancelRequestOrchestrator
 from orb.application.services.orchestration.create_template import CreateTemplateOrchestrator
+from orb.application.services.orchestration.dashboard_summary import DashboardSummaryOrchestrator
 from orb.application.services.orchestration.delete_template import DeleteTemplateOrchestrator
 from orb.application.services.orchestration.get_machine import GetMachineOrchestrator
 from orb.application.services.orchestration.get_request_status import GetRequestStatusOrchestrator
@@ -30,6 +29,7 @@ from orb.application.services.orchestration.refresh_templates import RefreshTemp
 from orb.application.services.orchestration.return_machines import ReturnMachinesOrchestrator
 from orb.application.services.orchestration.update_template import UpdateTemplateOrchestrator
 from orb.application.services.orchestration.validate_template import ValidateTemplateOrchestrator
+from orb.application.services.template_generation_service import TemplateGenerationService
 from orb.config.schemas.server_schema import ServerConfig
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.infrastructure.di.buses import CommandBus, QueryBus
@@ -174,7 +174,7 @@ def get_response_formatting_service() -> ResponseFormattingService:
 
 
 def get_request_formatter(
-    request: "Request",
+    request: Request,
     container=Depends(get_di_container),
 ) -> ResponseFormattingService:
     """Get ResponseFormattingService, optionally overridden by X-ORB-Scheduler header."""
@@ -193,7 +193,7 @@ def get_request_formatter(
 
 
 def get_request_scheduler(
-    request: "Request",
+    request: Request,
     container=Depends(get_di_container),
 ) -> SchedulerPort:
     """Get SchedulerPort, optionally overridden by X-ORB-Scheduler header."""
@@ -286,7 +286,7 @@ class CurrentUser:
         return _ROLE_PERMISSIONS.get(self.role, _ROLE_PERMISSIONS["viewer"])
 
 
-def get_current_user(request: "Request") -> CurrentUser:
+def get_current_user(request: Request) -> CurrentUser:
     """
     FastAPI dependency that returns the authenticated caller.
 
@@ -322,7 +322,7 @@ def get_current_user(request: "Request") -> CurrentUser:
     return CurrentUser(username=user_id, role=role, claims=claims)
 
 
-def check_destructive_admin_allowed(request: "Request") -> None:
+def check_destructive_admin_allowed(request: Request) -> None:
     """FastAPI Depends that gates destructive admin actions.
 
     Re-exported from ``orb.api.routers.admin._check_destructive_admin_allowed``
@@ -338,7 +338,7 @@ def check_destructive_admin_allowed(request: "Request") -> None:
     _check_destructive_admin_allowed(request)
 
 
-def require_role(min_role: str) -> Callable[["Request"], CurrentUser]:
+def require_role(min_role: str) -> Callable[[Request], CurrentUser]:
     """
     Factory that returns a FastAPI Depends enforcing a minimum RBAC role.
 
@@ -366,7 +366,7 @@ def require_role(min_role: str) -> Callable[["Request"], CurrentUser]:
 
     required_rank = _ROLE_RANK[min_role]
 
-    def _check(request: "Request") -> CurrentUser:
+    def _check(request: Request) -> CurrentUser:
         user = get_current_user(request)
         if _ROLE_RANK.get(user.role, 0) < required_rank:
             raise HTTPException(  # type: ignore[misc]

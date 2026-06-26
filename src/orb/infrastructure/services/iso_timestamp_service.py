@@ -1,7 +1,6 @@
 """Infrastructure implementation of timestamp service."""
 
 from datetime import datetime, timezone
-from typing import Union
 
 from orb.domain.services.timestamp_service import TimestampService
 
@@ -9,7 +8,7 @@ from orb.domain.services.timestamp_service import TimestampService
 class ISOTimestampService(TimestampService):
     """ISO format timestamp service implementation."""
 
-    def format_for_display(self, timestamp: Union[datetime, float, int, None]) -> str | None:
+    def format_for_display(self, timestamp: datetime | float | int | None) -> str | None:
         """Format timestamp to ISO format with Z timezone indicator."""
         if timestamp is None:
             return None
@@ -26,7 +25,7 @@ class ISOTimestampService(TimestampService):
 
         return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    def format_for_dto(self, timestamp: Union[datetime, float, int, None]) -> int | None:
+    def format_for_dto(self, timestamp: datetime | float | int | None) -> int | None:
         """Format timestamp to unix timestamp for DTO backward compatibility."""
         if timestamp is None:
             return None
@@ -43,7 +42,7 @@ class ISOTimestampService(TimestampService):
         return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     def format_with_type(
-        self, timestamp: Union[datetime, float, int, None], format_type: str
+        self, timestamp: datetime | float | int | None, format_type: str
     ) -> int | str | None:
         """Format timestamp based on requested format type."""
         if format_type == "unix":

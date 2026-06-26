@@ -134,7 +134,7 @@ class SchedulerRegistry(BaseRegistry):
                     defaults = reg.strategy_class.get_defaults_config()
                     if defaults:
                         self._deep_merge(merged, defaults)
-                except Exception:  # noqa: BLE001 — skip strategies that fail to load defaults
+                except Exception:
                     pass
         return merged
 

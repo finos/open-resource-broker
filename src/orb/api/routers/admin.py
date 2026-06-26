@@ -294,7 +294,6 @@ async def init_orb(
         config_file = config_dir / "config.json"
         if not config_file.exists() or body.force:
             # Copy default_config.json shipped with the package
-            import importlib.resources as pkg_resources
             from pathlib import Path
 
             default_src = Path(__file__).resolve().parents[3] / "config" / "default_config.json"

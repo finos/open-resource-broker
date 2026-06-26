@@ -7,7 +7,7 @@ using orchestrators for architectural consistency.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 from orb.application.dto.interface_response import InterfaceResponse
 from orb.domain.base.exceptions import DuplicateError, EntityNotFoundError
@@ -21,8 +21,8 @@ if TYPE_CHECKING:
 
 @handle_interface_exceptions(context="list_templates", interface_type="cli")
 async def handle_list_templates(
-    args: "argparse.Namespace",
-) -> "Union[dict[str, Any], InterfaceResponse]":
+    args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
     """Handle list templates operations using the ListTemplatesOrchestrator."""
     from orb.application.services.orchestration.dtos import ListTemplatesInput
     from orb.application.services.orchestration.list_templates import ListTemplatesOrchestrator
@@ -72,8 +72,8 @@ async def handle_list_templates(
 
 @handle_interface_exceptions(context="get_template", interface_type="cli")
 async def handle_get_template(
-    args: "argparse.Namespace",
-) -> "Union[dict[str, Any], InterfaceResponse]":
+    args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
     """Handle get template operations using the GetTemplateOrchestrator."""
     from orb.application.ports.scheduler_port import SchedulerPort
     from orb.application.services.orchestration.dtos import GetTemplateInput
@@ -115,8 +115,8 @@ async def handle_get_template(
 
 @handle_interface_exceptions(context="create_template", interface_type="cli")
 async def handle_create_template(
-    args: "argparse.Namespace",
-) -> "Union[dict[str, Any], InterfaceResponse]":
+    args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
     """Handle create template operations using the CreateTemplateOrchestrator."""
     from orb.application.services.orchestration.create_template import CreateTemplateOrchestrator
     from orb.application.services.orchestration.dtos import CreateTemplateInput
@@ -225,8 +225,8 @@ async def handle_create_template(
 
 @handle_interface_exceptions(context="update_template", interface_type="cli")
 async def handle_update_template(
-    args: "argparse.Namespace",
-) -> "Union[dict[str, Any], InterfaceResponse]":
+    args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
     """Handle update template operations using the UpdateTemplateOrchestrator."""
     from orb.application.services.orchestration.dtos import UpdateTemplateInput
     from orb.application.services.orchestration.update_template import UpdateTemplateOrchestrator
@@ -321,8 +321,8 @@ async def handle_update_template(
 
 @handle_interface_exceptions(context="delete_template", interface_type="cli")
 async def handle_delete_template(
-    args: "argparse.Namespace",
-) -> "Union[dict[str, Any], InterfaceResponse]":
+    args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
     """Handle delete template operations using the DeleteTemplateOrchestrator."""
     from orb.application.services.orchestration.delete_template import DeleteTemplateOrchestrator
     from orb.application.services.orchestration.dtos import DeleteTemplateInput
@@ -386,8 +386,8 @@ async def handle_delete_template(
 
 @handle_interface_exceptions(context="validate_template", interface_type="cli")
 async def handle_validate_template(
-    args: "argparse.Namespace",
-) -> "Union[dict[str, Any], InterfaceResponse]":
+    args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
     """Handle validate template operations using the ValidateTemplateOrchestrator."""
     from orb.application.services.orchestration.dtos import ValidateTemplateInput
     from orb.application.services.orchestration.validate_template import (
@@ -493,8 +493,8 @@ async def handle_validate_template(
 
 @handle_interface_exceptions(context="refresh_templates", interface_type="cli")
 async def handle_refresh_templates(
-    args: "argparse.Namespace",
-) -> "Union[dict[str, Any], InterfaceResponse]":
+    args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
     """Handle refresh templates operations using the RefreshTemplatesOrchestrator."""
     from orb.application.services.orchestration.dtos import RefreshTemplatesInput
     from orb.application.services.orchestration.refresh_templates import (

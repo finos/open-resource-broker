@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from types import TracebackType
-from typing import Any, Generic, Optional, TypeVar, Union
+from typing import Any, Generic, Optional, TypeVar
 
 from orb.domain.base.ports.storage_port import StoragePort
 from orb.infrastructure.logging.logger import get_logger
@@ -84,7 +84,7 @@ class StorageStrategy(StoragePort[T], ABC, Generic[T]):
         """
 
     @abstractmethod
-    def find_all(self) -> Union[list[dict[str, Any]], dict[str, dict[str, Any]]]:  # type: ignore[override]
+    def find_all(self) -> list[dict[str, Any]] | dict[str, dict[str, Any]]:  # type: ignore[override]
         """
         Find all entities.
 

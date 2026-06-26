@@ -234,7 +234,7 @@ def start(
     except Exception as exc:
         try:
             with os.fdopen(write_fd, "wb") as w:
-                w.write(f"err:{exc}".encode("utf-8"))
+                w.write(f"err:{exc}".encode())
         except Exception:
             # Best-effort error reporting in the daemon child; if even the
             # pipe write fails the parent will treat the EOF as failure.
@@ -243,7 +243,7 @@ def start(
 
     try:
         with os.fdopen(write_fd, "wb") as w:
-            w.write(f"ok:{os.getpid()}".encode("utf-8"))
+            w.write(f"ok:{os.getpid()}".encode())
     except Exception:
         # Readiness notification is best-effort. The parent treats an
         # empty pipe payload as failure, but the daemon itself keeps

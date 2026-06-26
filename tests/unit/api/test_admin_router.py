@@ -10,7 +10,6 @@ from fastapi.testclient import TestClient
 
 from orb.api.routers.admin import router as admin_router
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -108,7 +107,7 @@ def _make_container(
 # ---------------------------------------------------------------------------
 
 
-def _wipe_post(client: TestClient, body: dict | None = None) -> "httpx.Response":  # type: ignore[name-defined]
+def _wipe_post(client: TestClient, body: dict | None = None):
     if body is None:
         body = {"confirm": "WIPE"}
     return client.post("/admin/database/wipe", json=body)

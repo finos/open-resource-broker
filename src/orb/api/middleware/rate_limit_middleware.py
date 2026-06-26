@@ -20,7 +20,7 @@ _DEFAULT_MAX_BUCKETS = 10_000
 class _Bucket:
     """Token-bucket state for a single identity."""
 
-    __slots__ = ("tokens", "last_refill")
+    __slots__ = ("last_refill", "tokens")
 
     def __init__(self, capacity: float) -> None:
         self.tokens: float = capacity

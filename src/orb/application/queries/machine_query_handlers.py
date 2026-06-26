@@ -9,7 +9,6 @@ if TYPE_CHECKING:
 
 from orb.application.base.handlers import BaseQueryHandler
 from orb.application.decorators import query_handler
-from orb.application.services.orchestration.dtos import Paginated
 from orb.application.dto.queries import GetMachineQuery, ListMachinesQuery
 from orb.application.dto.responses import MachineDTO
 from orb.application.machine.queries import (
@@ -19,6 +18,7 @@ from orb.application.machine.queries import (
 )
 from orb.application.ports.command_bus_port import CommandBusPort
 from orb.application.services.machine_sync_service import MachineSyncService
+from orb.application.services.orchestration.dtos import Paginated
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.exceptions import EntityNotFoundError
 from orb.domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort

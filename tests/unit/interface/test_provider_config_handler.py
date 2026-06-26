@@ -7,7 +7,7 @@ reflect current behaviour and include TODO markers where the violation exists.
 
 import argparse
 import json
-from typing import Any, Union
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -27,7 +27,7 @@ def register_aws_cli_spec():
     CLISpecRegistry._specs.clear()
 
 
-def exit_code(result: Union[dict[str, Any], InterfaceResponse]) -> int:
+def exit_code(result: dict[str, Any] | InterfaceResponse) -> int:
     """Extract exit_code from either a dict or InterfaceResponse."""
     if isinstance(result, InterfaceResponse):
         return result.exit_code

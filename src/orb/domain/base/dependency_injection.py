@@ -15,7 +15,7 @@ Key Principles:
 
 import inspect
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Generic, Optional, TypeVar, Union
+from typing import Any, Callable, Generic, Optional, TypeVar
 
 T = TypeVar("T")
 
@@ -44,7 +44,7 @@ class DependencyInjectionPort(ABC):
         """
 
     @abstractmethod
-    def register(self, cls: type[T], instance_or_factory: Union[T, Callable[[], T]]) -> None:
+    def register(self, cls: type[T], instance_or_factory: T | Callable[[], T]) -> None:
         """
         Register dependency in container.
 
@@ -54,9 +54,7 @@ class DependencyInjectionPort(ABC):
         """
 
     @abstractmethod
-    def register_singleton(
-        self, cls: type[T], instance_or_factory: Union[T, Callable[[], T]]
-    ) -> None:
+    def register_singleton(self, cls: type[T], instance_or_factory: T | Callable[[], T]) -> None:
         """
         Register dependency as singleton.
 

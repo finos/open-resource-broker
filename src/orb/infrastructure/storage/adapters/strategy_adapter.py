@@ -1,6 +1,6 @@
 """Adapter for existing StorageStrategy to segregated interfaces."""
 
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from ..base.strategy import StorageStrategy
 from ..interfaces.batch_storage import BatchStorage
@@ -25,7 +25,7 @@ class StorageStrategyAdapter(StorageReader, StorageWriter, BatchStorage, Transac
         """Find entity by ID."""
         return self._storage.find_by_id(entity_id)
 
-    def find_all(self) -> Union[list[dict[str, Any]], dict[str, dict[str, Any]]]:
+    def find_all(self) -> list[dict[str, Any]] | dict[str, dict[str, Any]]:
         """Find all entities."""
         return self._storage.find_all()
 

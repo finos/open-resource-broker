@@ -490,7 +490,7 @@ class GetSystemConfigHandler(BaseQueryHandler[GetSystemConfigQuery, SystemConfig
                     break
 
             template_search_paths = all_paths
-        except Exception:  # noqa: BLE001 — template path resolution is best-effort; fall back to None
+        except Exception:
             pass
 
         paths = PathsSectionDTO(
@@ -583,7 +583,7 @@ class GetSystemConfigHandler(BaseQueryHandler[GetSystemConfigQuery, SystemConfig
                     failure_threshold=cb.failure_threshold,
                     recovery_timeout=cb.recovery_timeout,
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 cb_cfg = cfg.get("circuit_breaker", {})
                 if isinstance(cb_cfg, dict):
                     circuit_breaker = CircuitBreakerSectionDTO(

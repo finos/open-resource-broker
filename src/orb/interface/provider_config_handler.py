@@ -1,7 +1,7 @@
 """Provider configuration command handlers."""
 
 import json
-from typing import Any, Dict, Union
+from typing import Any, Dict
 
 from orb.application.dto.interface_response import InterfaceResponse
 from orb.config.platform_dirs import get_config_location
@@ -278,7 +278,7 @@ async def handle_provider_get(args) -> dict[str, Any]:
         return {"error": True, "message": f"Failed to get provider: {e}", "exit_code": 1}
 
 
-async def handle_provider_show(args) -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_provider_show(args) -> dict[str, Any] | InterfaceResponse:
     """Handle orb providers show command."""
     try:
         container = get_container()

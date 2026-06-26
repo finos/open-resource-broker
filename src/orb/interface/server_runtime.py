@@ -102,11 +102,11 @@ async def run_api_foreground(
 
     server = uvicorn.Server(config)
 
-    def signal_handler(signum, frame) -> None:  # noqa: ARG001
+    def signal_handler(signum, frame) -> None:
         logger.info("Received signal %s, shutting down gracefully...", signum)
         server.should_exit = True
 
-    def sighup_handler(signum, frame) -> None:  # noqa: ARG001
+    def sighup_handler(signum, frame) -> None:
         logger.info("Received SIGHUP — reloading configuration from disk")
         _reload_config_from_signal(logger)
 

@@ -73,11 +73,11 @@ def register_core_services(container: DIContainer) -> None:
         # connections.  Guarded by a try/except so a missing [api] extra
         # or an import failure never prevents the application from starting.
         try:
+            import json as _json
+
             from orb.api.routers.events import sse_event_bus
             from orb.application.events.base.event_handler import EventHandler
             from orb.domain.base.events import DomainEvent
-
-            import json as _json
 
             class _SseEventHandler(EventHandler):
                 """Bridge between ORB's synchronous EventBus and the SSE pubsub.
@@ -116,7 +116,7 @@ def register_core_services(container: DIContainer) -> None:
                 "TemplateDeletedEvent",
             ):
                 bus.register_handler(_et, _sse_handler)
-        except Exception as _sse_err:  # noqa: BLE001
+        except Exception as _sse_err:
             import logging as _logging
 
             _logging.getLogger(__name__).debug(

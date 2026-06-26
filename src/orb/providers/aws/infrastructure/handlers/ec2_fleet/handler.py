@@ -649,38 +649,37 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     pending_count=pending_count,
                     failed_count=failed_count,
                 )
+            # fulfillment_final=True for instant — no more instances coming
+            elif running_count > 0:
+                return ProviderFulfilment(
+                    state="partial",
+                    message=f"Instant fleet: {running_count}/{requested_count} instance(s) running",
+                    target_units=target_units,
+                    fulfilled_units=running_count,
+                    running_count=running_count,
+                    pending_count=pending_count,
+                    failed_count=failed_count,
+                )
+            elif not instances:
+                return ProviderFulfilment(
+                    state="in_progress",
+                    message="Instant fleet: waiting for instances",
+                    target_units=target_units,
+                    fulfilled_units=0,
+                    running_count=0,
+                    pending_count=0,
+                    failed_count=0,
+                )
             else:
-                # fulfillment_final=True for instant — no more instances coming
-                if running_count > 0:
-                    return ProviderFulfilment(
-                        state="partial",
-                        message=f"Instant fleet: {running_count}/{requested_count} instance(s) running",
-                        target_units=target_units,
-                        fulfilled_units=running_count,
-                        running_count=running_count,
-                        pending_count=pending_count,
-                        failed_count=failed_count,
-                    )
-                elif not instances:
-                    return ProviderFulfilment(
-                        state="in_progress",
-                        message="Instant fleet: waiting for instances",
-                        target_units=target_units,
-                        fulfilled_units=0,
-                        running_count=0,
-                        pending_count=0,
-                        failed_count=0,
-                    )
-                else:
-                    return ProviderFulfilment(
-                        state="failed",
-                        message="Instant fleet: all instances failed",
-                        target_units=target_units,
-                        fulfilled_units=0,
-                        running_count=running_count,
-                        pending_count=pending_count,
-                        failed_count=failed_count,
-                    )
+                return ProviderFulfilment(
+                    state="failed",
+                    message="Instant fleet: all instances failed",
+                    target_units=target_units,
+                    fulfilled_units=0,
+                    running_count=running_count,
+                    pending_count=pending_count,
+                    failed_count=failed_count,
+                )
         else:
             # Maintain / Request fleet: capacity-unit based fulfilment
             return compute_capacity_based_fulfilment(

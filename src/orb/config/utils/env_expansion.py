@@ -1,10 +1,10 @@
 """Environment variable expansion utilities."""
 
 import os
-from typing import Any, Union
+from typing import Any
 
 
-def expand_env_vars(value: Union[str, dict, Any]) -> Union[str, dict, Any]:
+def expand_env_vars(value: str | dict | Any) -> str | dict | Any:
     """
     Automatically expand environment variables in configuration values.
 

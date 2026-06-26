@@ -265,7 +265,7 @@ class ORBServerManager:
                 if size > 2048:
                     f.seek(size - 2048)
                 return f.read()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return f"(failed to read log: {exc})"
 
     def stop(self):

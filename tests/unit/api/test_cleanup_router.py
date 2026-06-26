@@ -19,7 +19,6 @@ from orb.api.routers.admin import router as admin_router
 from orb.api.routers.machines import router as machines_router
 from orb.api.routers.requests import router as requests_router
 
-
 # ---------------------------------------------------------------------------
 # Fixtures & helpers
 # ---------------------------------------------------------------------------
@@ -70,7 +69,6 @@ def _make_request(
     machine_ids: list[str] | None = None,
 ):
     """Build a mock Request aggregate."""
-    from orb.domain.request.request_types import RequestStatus
 
     req = MagicMock()
     req.request_id = request_id
@@ -463,7 +461,6 @@ class TestRequestPurgeEndpoint:
             mock_orchestrator.execute = MagicMock(
                 return_value=MagicMock(request_id="req-1", status="cancelled", __await__=None)
             )
-            import asyncio
 
             async def fake_execute(inp):
                 return MagicMock(request_id="req-1", status="cancelled")

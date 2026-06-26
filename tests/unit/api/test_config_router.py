@@ -11,7 +11,6 @@ from fastapi.testclient import TestClient
 from orb.api.dependencies import get_config_manager
 from orb.api.routers.config import router as config_router
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -219,9 +218,8 @@ class TestGetConfigSources:
         """GET /config/sources returns the sources dict from the port."""
         port = _make_config_port()
 
-        with patch("orb.api.routers.config.get_config_manager", return_value=port):
-            client = TestClient(config_app)
-            r = client.get("/config/sources")
+        client = _client_with_port(config_app, port)
+        r = client.get("/config/sources")
 
         assert r.status_code == 200
         body = r.json()

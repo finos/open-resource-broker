@@ -183,7 +183,7 @@ _TYPE_QUERY = Query(None, description="Comma-separated event type filter")
 async def stream_events(
     request: Request,
     since: Optional[str] = _SINCE_QUERY,
-    type: Optional[str] = _TYPE_QUERY,  # noqa: A002  — FastAPI maps query param name
+    type: Optional[str] = _TYPE_QUERY,
 ) -> StreamingResponse:
     """Open an SSE stream for the caller."""
     since_dt = _parse_since(since)

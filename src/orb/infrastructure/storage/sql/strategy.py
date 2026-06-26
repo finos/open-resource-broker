@@ -107,14 +107,11 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 self.logger.debug(
                     "Applied Base.metadata.create_all for ORM table %s", self.table_name
                 )
-            else:
-                # Fallback: build CREATE TABLE from the column dict (legacy path).
-                if not self.connection_manager.table_exists(self.table_name):
-                    create_table_sql = self.query_builder.build_create_table()
-                    self.connection_manager.execute_query(create_table_sql)
-                    self.logger.info(
-                        "Created non-ORM table via column-dict DDL: %s", self.table_name
-                    )
+            # Fallback: build CREATE TABLE from the column dict (legacy path).
+            elif not self.connection_manager.table_exists(self.table_name):
+                create_table_sql = self.query_builder.build_create_table()
+                self.connection_manager.execute_query(create_table_sql)
+                self.logger.info("Created non-ORM table via column-dict DDL: %s", self.table_name)
         except Exception as e:
             self.logger.error("Failed to initialize table %s: %s", self.table_name, e)
             raise

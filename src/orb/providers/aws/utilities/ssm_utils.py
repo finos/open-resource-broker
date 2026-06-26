@@ -5,7 +5,7 @@ This module contains utility functions for working with AWS SSM Parameter Store.
 """
 
 import re
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from botocore.exceptions import ClientError
 
@@ -186,9 +186,9 @@ def resolve_ssm_parameters_in_list(
 
 
 def resolve_ssm_parameters(
-    data: Union[dict[str, Any], list[Any]],
+    data: dict[str, Any] | list[Any],
     aws_client: Any = None,
-) -> Union[dict[str, Any], list[Any]]:
+) -> dict[str, Any] | list[Any]:
     """
     Resolve all SSM parameters in a dictionary or list.
 

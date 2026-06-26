@@ -1,7 +1,7 @@
 """Machine-related command handlers for the interface layer."""
 
 import asyncio
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 from orb.application.dto.interface_response import InterfaceResponse
 from orb.infrastructure.di.container import get_container
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 @handle_interface_exceptions(context="get_machine_status", interface_type="cli")
 async def handle_get_machine_status(
     args: "argparse.Namespace",
-) -> Union[dict[str, Any], InterfaceResponse]:
+) -> dict[str, Any] | InterfaceResponse:
     """
     Handle get machine status operations for multiple machine IDs.
 
@@ -77,7 +77,7 @@ async def handle_get_machine_status(
 @handle_interface_exceptions(context="list_machines", interface_type="cli")
 async def handle_list_machines(
     args: "argparse.Namespace",
-) -> Union[dict[str, Any], InterfaceResponse]:
+) -> dict[str, Any] | InterfaceResponse:
     """
     Handle list machines operations with scheduler-aware formatting.
 
@@ -114,7 +114,7 @@ async def handle_list_machines(
 @handle_interface_exceptions(context="stop_machines", interface_type="cli")
 async def handle_stop_machines(
     args: "argparse.Namespace",
-) -> Union[dict[str, Any], InterfaceResponse]:
+) -> dict[str, Any] | InterfaceResponse:
     """
     Handle stop machines operations.
 
@@ -185,7 +185,7 @@ async def handle_stop_machines(
 @handle_interface_exceptions(context="start_machines", interface_type="cli")
 async def handle_start_machines(
     args: "argparse.Namespace",
-) -> Union[dict[str, Any], InterfaceResponse]:
+) -> dict[str, Any] | InterfaceResponse:
     """
     Handle start machines operations.
 
@@ -244,7 +244,7 @@ async def handle_start_machines(
 @handle_interface_exceptions(context="get_machine", interface_type="cli")
 async def handle_get_machine(
     args: "argparse.Namespace",
-) -> Union[dict[str, Any], InterfaceResponse]:
+) -> dict[str, Any] | InterfaceResponse:
     """Handle machines show — fetch a single machine and wrap in InterfaceResponse."""
     from orb.application.services.orchestration.dtos import GetMachineInput
     from orb.application.services.orchestration.get_machine import GetMachineOrchestrator

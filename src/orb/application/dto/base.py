@@ -2,7 +2,7 @@
 
 from abc import ABC
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
@@ -65,7 +65,7 @@ class BaseDTO(BaseModel):
         return cls.model_validate(data)
 
     @staticmethod
-    def serialize_enum(value: Union[Enum, str, None]) -> Optional[str]:
+    def serialize_enum(value: Enum | str | None) -> Optional[str]:
         """
         Serialize enum to string value.
 

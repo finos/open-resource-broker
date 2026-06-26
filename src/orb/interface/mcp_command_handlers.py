@@ -7,7 +7,7 @@ interface layer patterns and error handling conventions.
 
 import json
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 from orb.application.dto.interface_response import InterfaceResponse
 from orb.infrastructure.constants import MAX_DESCRIPTION_LENGTH
@@ -16,7 +16,7 @@ from orb.mcp.tools import OpenResourceBrokerMCPTools
 
 
 @handle_interface_exceptions(context="mcp_tools_list", interface_type="cli")
-async def handle_mcp_tools_list(args) -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_mcp_tools_list(args) -> dict[str, Any] | InterfaceResponse:
     """
     Handle 'orb mcp tools list' command.
 
@@ -49,7 +49,7 @@ async def handle_mcp_tools_list(args) -> Union[dict[str, Any], InterfaceResponse
 
 
 @handle_interface_exceptions(context="mcp_tools_call", interface_type="cli")
-async def handle_mcp_tools_call(args) -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_mcp_tools_call(args) -> dict[str, Any] | InterfaceResponse:
     """
     Handle 'orb mcp tools call' command.
 
@@ -101,7 +101,7 @@ async def handle_mcp_tools_call(args) -> Union[dict[str, Any], InterfaceResponse
 
 
 @handle_interface_exceptions(context="mcp_tools_info", interface_type="cli")
-async def handle_mcp_tools_info(args) -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_mcp_tools_info(args) -> dict[str, Any] | InterfaceResponse:
     """
     Handle 'orb mcp tools info' command.
 
@@ -142,7 +142,7 @@ async def handle_mcp_tools_info(args) -> Union[dict[str, Any], InterfaceResponse
 
 
 @handle_interface_exceptions(context="mcp_validate", interface_type="cli")
-async def handle_mcp_validate(args) -> Union[dict[str, Any], InterfaceResponse]:
+async def handle_mcp_validate(args) -> dict[str, Any] | InterfaceResponse:
     """
     Handle 'orb mcp validate' command.
 

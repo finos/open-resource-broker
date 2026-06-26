@@ -61,7 +61,7 @@ def decode_cursor(cursor: Optional[str]) -> int:
         payload = base64.urlsafe_b64decode(cursor.encode()).decode()
         data = json.loads(payload)
         return int(data.get("offset", 0))
-    except Exception:  # noqa: BLE001
+    except Exception:
         return 0
 
 

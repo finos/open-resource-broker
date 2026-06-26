@@ -14,9 +14,8 @@ import os
 import sys
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
-
 from alembic import context
+from sqlalchemy import engine_from_config, pool
 
 # ---------------------------------------------------------------------------
 # Ensure the src/ layout is importable when alembic is invoked with this
@@ -29,7 +28,7 @@ _SRC_DIR = os.path.abspath(
 if _SRC_DIR not in sys.path:
     sys.path.insert(0, _SRC_DIR)
 
-from orb.infrastructure.storage.sql.models import Base  # noqa: E402
+from orb.infrastructure.storage.sql.models import Base
 
 # Alembic Config object
 config = context.config

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -222,8 +222,8 @@ class MachineItem(BaseModel):
 
     # --- Outcome / lifecycle ---
     result: Optional[str] = None
-    launch_time: Optional[Union[int, str]] = None
-    termination_time: Optional[Union[int, str]] = None
+    launch_time: Optional[int | str] = None
+    termination_time: Optional[int | str] = None
     status_reason: Optional[str] = None
     message: Optional[str] = None
 

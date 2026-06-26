@@ -67,10 +67,10 @@ class TestConfigurationAdapterPackageInfo:
         import types
 
         fake_pkg = types.ModuleType("_package")
-        setattr(fake_pkg, "PACKAGE_NAME", "test-package")
-        setattr(fake_pkg, "__version__", "2.0.0")
-        setattr(fake_pkg, "DESCRIPTION", "A description")
-        setattr(fake_pkg, "AUTHOR", "An author")
+        fake_pkg.PACKAGE_NAME = "test-package"
+        fake_pkg.__version__ = "2.0.0"
+        fake_pkg.DESCRIPTION = "A description"
+        fake_pkg.AUTHOR = "An author"
 
         with patch.dict("sys.modules", {"orb._package": fake_pkg}):
             result = self.adapter.get_package_info()

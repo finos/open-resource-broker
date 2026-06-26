@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
-
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 from orb.application.dto.interface_response import InterfaceResponse
 from orb.infrastructure.di.container import get_container
@@ -18,8 +17,8 @@ if TYPE_CHECKING:
 
 @handle_interface_exceptions(context="list_storage_strategies", interface_type="cli")
 async def handle_list_storage_strategies(
-    args: "argparse.Namespace",
-) -> Union[dict[str, Any], InterfaceResponse]:
+    args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
     """Handle list storage strategies operations."""
     from orb.application.services.orchestration.dtos import ListStorageStrategiesInput
     from orb.application.services.orchestration.list_storage_strategies import (
@@ -38,8 +37,8 @@ async def handle_list_storage_strategies(
 
 @handle_interface_exceptions(context="show_storage_config", interface_type="cli")
 async def handle_show_storage_config(
-    args: "argparse.Namespace",
-) -> Union[dict[str, Any], InterfaceResponse]:
+    args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
     """Handle show storage configuration operations."""
     from orb.application.services.orchestration.dtos import GetStorageConfigInput
     from orb.application.services.orchestration.get_storage_config import (
@@ -58,8 +57,8 @@ async def handle_show_storage_config(
 
 @handle_interface_exceptions(context="validate_storage_config", interface_type="cli")
 async def handle_validate_storage_config(  # type: ignore[return]
-    _args: "argparse.Namespace",
-) -> "Union[dict[str, Any], InterfaceResponse]":
+    _args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
     """Handle validate storage configuration operations."""
     container = get_container()
     formatter = container.get(ResponseFormattingService)
@@ -82,8 +81,8 @@ async def handle_validate_storage_config(  # type: ignore[return]
 
 @handle_interface_exceptions(context="test_storage", interface_type="cli")
 async def handle_test_storage(
-    args: "argparse.Namespace",
-) -> "Union[dict[str, Any], InterfaceResponse]":
+    args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
     """Handle test storage operations."""
     from orb.infrastructure.di.buses import QueryBus
 
@@ -105,8 +104,8 @@ async def handle_test_storage(
 
 @handle_interface_exceptions(context="storage_health", interface_type="cli")
 async def handle_storage_health(
-    args: "argparse.Namespace",
-) -> "Union[dict[str, Any], InterfaceResponse]":
+    args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
     """Handle storage health operations."""
     container = get_container()
     formatter = container.get(ResponseFormattingService)
@@ -137,8 +136,8 @@ async def handle_storage_health(
 
 @handle_interface_exceptions(context="storage_migrate", interface_type="cli")
 async def handle_storage_migrate(
-    args: "argparse.Namespace",
-) -> "Union[dict[str, Any], InterfaceResponse]":
+    args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
     """Run Alembic migrations for the SQL storage strategy.
 
     Subcommands: up (upgrade head), down (downgrade -1), current, history.
@@ -233,8 +232,8 @@ async def handle_storage_migrate(
 
 @handle_interface_exceptions(context="storage_metrics", interface_type="cli")
 async def handle_storage_metrics(
-    _args: "argparse.Namespace",
-) -> "Union[dict[str, Any], InterfaceResponse]":
+    _args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
     """Handle storage metrics operations."""
     container = get_container()
     formatter = container.get(ResponseFormattingService)
