@@ -25,7 +25,7 @@ import signal
 import sys
 import time
 from pathlib import Path
-from typing import Any, Callable, Coroutine
+from typing import Any, Callable, Coroutine, NoReturn
 
 from orb.infrastructure.logging.logger import get_logger
 
@@ -157,7 +157,7 @@ def start(
     working_dir: str | os.PathLike[str],
     runtime: Callable[[], Coroutine[Any, Any, Any]],
     foreground: bool = False,
-) -> dict[str, Any]:
+) -> dict[str, Any] | NoReturn:
     """Start the server, either daemonized or in the foreground.
 
     Args:
@@ -183,10 +183,9 @@ def start(
         try:
             rc = _spawn_runtime(runtime)
         finally:
-            try:
-                pid_path.unlink()
-            except FileNotFoundError:
-                logger.debug("PID file %s already removed during teardown", pid_path)
+            # ``missing_ok=True`` makes the PID-file unlink idempotent
+            # across parallel stop/restart races.
+            pid_path.unlink(missing_ok=True)
             os.close(lock_fd)
         return {"pid": os.getpid(), "status": "exited", "exit_code": rc}
 
@@ -234,6 +233,9 @@ def start(
             with os.fdopen(write_fd, "wb") as w:
                 w.write(f"err:{exc}".encode())
         except Exception as report_exc:
+            # Best-effort error reporting in the daemon child; if even
+            # the pipe write fails the parent will treat the EOF as
+            # failure and surface the right exit status.
             logger.debug("daemon child failed to report start error: %s", report_exc)
         os._exit(1)
 
@@ -241,20 +243,26 @@ def start(
         with os.fdopen(write_fd, "wb") as w:
             w.write(f"ok:{os.getpid()}".encode())
     except Exception as exc:
+        # Readiness notification is best-effort. The parent treats an
+        # empty pipe payload as failure, but the daemon itself keeps
+        # running — operators can still see it via the PID file +
+        # /health.
         logger.debug("daemon child readiness pipe write failed: %s", exc)
 
     try:
         rc = _spawn_runtime(runtime)
     finally:
-        try:
-            pid_path.unlink()
-        except FileNotFoundError:
-            logger.debug("PID file %s already removed during teardown", pid_path)
+        pid_path.unlink(missing_ok=True)
         try:
             os.close(daemon_fd)
         except OSError as exc:
+            # fd already closed (interpreter teardown can race); ignore.
             logger.debug("daemon lock fd already closed: %s", exc)
 
+    # Grandchild branch terminates the daemon process here. The function's
+    # advertised dict return is satisfied by the foreground path at L193
+    # and the parent-fork path at L214; both grandchild branches exit via
+    # os._exit and never return to the caller.
     os._exit(rc)
 
 
@@ -270,10 +278,7 @@ def stop(
     pid_path = _expand(str(pid_file))
     pid = _read_pid(pid_path)
     if pid is None or not _pid_is_alive(pid):
-        try:
-            pid_path.unlink()
-        except FileNotFoundError:
-            logger.debug("PID file %s already removed", pid_path)
+        pid_path.unlink(missing_ok=True)
         return {"pid": pid, "status": "not_running"}
 
     # Kill the whole group so the Reflex subtree dies too.
@@ -283,30 +288,30 @@ def stop(
         pgid = pid
 
     def _signal_group(sig: int) -> None:
-        try:
-            os.killpg(pgid, sig)
-        except ProcessLookupError as exc:
-            logger.debug("killpg target %s already gone: %s", pgid, exc)
+        # killpg races with the process group exiting on its own; gate
+        # on a liveness check so the call only fires when there is
+        # something to signal. Exceptions still possible if the group
+        # dies between the check and the call, but the window is
+        # narrow and the daemon stop path doesn't depend on the result.
+        if _pid_is_alive(pid):
+            try:
+                os.killpg(pgid, sig)
+            except ProcessLookupError as exc:
+                logger.debug("killpg target %s exited mid-call: %s", pgid, exc)
 
     _signal_group(signal.SIGTERM)
 
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if not _pid_is_alive(pid):
-            try:
-                pid_path.unlink()
-            except FileNotFoundError:
-                logger.debug("PID file %s already removed by daemon", pid_path)
+            pid_path.unlink(missing_ok=True)
             return {"pid": pid, "status": "stopped"}
         time.sleep(0.2)
 
     _signal_group(signal.SIGKILL)
     # Final check
     time.sleep(0.2)
-    try:
-        pid_path.unlink()
-    except FileNotFoundError:
-        logger.debug("PID file %s already removed during teardown", pid_path)
+    pid_path.unlink(missing_ok=True)
     return {"pid": pid, "status": "killed" if not _pid_is_alive(pid) else "still_running"}
 
 
@@ -336,15 +341,14 @@ def status(
     # Health probe.
     if health_url:
         try:
-            import urllib.request
+            import requests
 
             # health_url is composed by the CLI from operator-controlled
-            # ServerConfig (host/port) — not user-controlled at the HTTP
-            # boundary. Safe to pass to urlopen.
-            # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
-            with urllib.request.urlopen(health_url, timeout=1.5) as resp:  # nosec B310
-                out["health_status"] = resp.status
-                out["health_ok"] = 200 <= resp.status < 300
+            # ServerConfig (host/port). ``requests`` is bound to http(s)://
+            # only — no file:// fallback if the URL is misconfigured.
+            resp = requests.get(health_url, timeout=1.5)
+            out["health_status"] = resp.status_code
+            out["health_ok"] = 200 <= resp.status_code < 300
         except Exception as exc:
             out["health_status"] = None
             out["health_ok"] = False

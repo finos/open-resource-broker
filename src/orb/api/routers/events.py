@@ -60,6 +60,19 @@ _HEARTBEAT_INTERVAL: float = 15.0  # seconds
 _QUEUE_MAXSIZE: int = 256  # drop oldest on overflow rather than blocking
 
 
+def _drain_one(q: asyncio.Queue) -> bool:
+    """Pop one entry from ``q``. Return True on success, False if empty.
+
+    Wraps ``get_nowait`` to absorb the documented QueueEmpty race when
+    another task drains between ``full()`` and ``get_nowait()``.
+    """
+    try:
+        q.get_nowait()
+    except asyncio.QueueEmpty:
+        return False
+    return True
+
+
 class _SseEventBus:
     """Minimal fan-out pubsub for SSE subscribers.
 
@@ -80,27 +93,52 @@ class _SseEventBus:
         return q
 
     def unsubscribe(self, q: asyncio.Queue[Optional[tuple[str, dict]]]) -> None:
-        """Remove subscriber. Safe to call even if already removed."""
-        try:
+        """Remove subscriber. Safe to call even if already removed.
+
+        ``list.remove`` raises ValueError on missing elements; we want
+        idempotent set-style ``discard`` semantics so the SSE
+        generator's finally clause and an explicit disconnect can both
+        run without coordinating.
+        """
+        if q in self._subscribers:
             self._subscribers.remove(q)
-        except ValueError:
-            logger.debug("SSE unsubscribe: subscriber already removed (race)")
 
     async def publish(self, event_type: str, payload: dict) -> None:
-        """Publish an event from async context."""
+        """Publish an event from async context.
+
+        For each subscriber: if the queue is full, drop the event
+        rather than blocking the publisher. The freshness-preferring
+        drain (``get_nowait`` before ``put_nowait``) only happens when
+        the queue has slack, avoiding the QueueEmpty / QueueFull race
+        windows entirely.
+        """
         ts = datetime.now(timezone.utc)
         self._record(ts, event_type, payload)
         for q in list(self._subscribers):
-            if q.full():
-                # Drain one stale entry to make room — prefer freshness.
-                try:
-                    q.get_nowait()
-                except asyncio.QueueEmpty:
-                    logger.debug("SSE drain: queue raced empty; nothing to evict")
-            try:
-                q.put_nowait((event_type, payload))
-            except asyncio.QueueFull:
-                logger.debug("SSE publish: subscriber queue full; dropping event %s", event_type)
+            self._enqueue_for(q, event_type, payload)
+
+    @staticmethod
+    def _enqueue_for(
+        q: asyncio.Queue[Optional[tuple[str, dict]]],
+        event_type: str,
+        payload: dict,
+    ) -> None:
+        """Push (event_type, payload) onto a subscriber's queue.
+
+        Strategy: check ``full()`` first (LBYL). If full, evict the
+        oldest entry then enqueue. Both ``get_nowait``+``put_nowait``
+        can still race against another task touching the queue; we
+        treat any race as "subscriber is too slow" and drop the event.
+        """
+        if not q.full():
+            q.put_nowait((event_type, payload))
+            return
+        # Queue full — try to make room by evicting the oldest entry.
+        evicted = _drain_one(q)
+        if evicted and not q.full():
+            q.put_nowait((event_type, payload))
+            return
+        logger.debug("SSE publish: subscriber queue full; dropping %s", event_type)
 
     def history_since(self, since: datetime) -> list[tuple[str, dict]]:
         """Return (event_type, payload) pairs recorded after *since*."""

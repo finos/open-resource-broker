@@ -203,8 +203,8 @@ async def handle_server_reload(args) -> dict[str, Any]:
     frontend dev server as a side effect.
     """
     import json
-    import urllib.error
-    import urllib.request
+
+    import requests
 
     from orb.interface import server_daemon as daemon_mod
 
@@ -223,16 +223,16 @@ async def handle_server_reload(args) -> dict[str, Any]:
         url = f"http://{host}:{server_config.port}/api/v1/admin/reload-config"
 
     try:
-        # URL is composed from operator-controlled config (server host/port
-        # or the embedded-UI backend port). Not user-controlled at the HTTP
-        # boundary — safe to pass to urlopen.
-        # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
-        req = urllib.request.Request(url, method="POST", data=b"")  # nosec B310
-        # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
-        with urllib.request.urlopen(req, timeout=5) as resp:  # nosec B310
-            body = json.loads(resp.read().decode() or "{}")
-            return {"method": "http", "url": url, "status": resp.status, **body}
-    except (urllib.error.URLError, OSError, json.JSONDecodeError) as exc:
+        # URL is loopback HTTP by design — ``orb server reload`` is a
+        # localhost-only IPC channel between the CLI and the daemon
+        # running on the same host. TLS would add no value here.
+        # ``requests`` is bound to http(s):// only — urllib would also
+        # accept file:// which is a tail-risk if the URL is misconfigured.
+        # nosemgrep: python.lang.security.audit.insecure-transport.requests.request-with-http.request-with-http
+        resp = requests.post(url, data=b"", timeout=5)
+        body = resp.json() if resp.content else {}
+        return {"method": "http", "url": url, "status": resp.status_code, **body}
+    except (requests.RequestException, OSError, json.JSONDecodeError) as exc:
         # HTTP path unavailable (server not listening, wrong port, etc.)
         # — fall back to SIGHUP so API-only deployments still get a
         # working reload signal even if the HTTP probe misfires.
