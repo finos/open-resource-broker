@@ -64,6 +64,8 @@ class K8sHandlerBase(ABC):
         base_delay: float = 1.0,
         max_delay: float = 30.0,
         *,
+        circuit_breaker_failure_threshold: int = 5,
+        circuit_breaker_reset_timeout: int = 60,
         pod_state_cache: Optional[PodStateCache] = None,
         cache_alive: Optional[Callable[[], bool]] = None,
         stale_cache_timeout_seconds: Optional[float] = None,
@@ -75,6 +77,8 @@ class K8sHandlerBase(ABC):
         self._max_retries = max_retries
         self._base_delay = base_delay
         self._max_delay = max_delay
+        self._cb_failure_threshold = circuit_breaker_failure_threshold
+        self._cb_reset_timeout = circuit_breaker_reset_timeout
         # Native-spec escape hatch.  ``None`` when the provider config
         # opts out (``native_spec_enabled=False``) or when the DI
         # resolution failed — handlers fall back to the typed builder
@@ -332,21 +336,30 @@ class K8sHandlerBase(ABC):
         operation_name: str = "kubernetes_operation",
         **kwargs: Any,
     ) -> T:
-        """Run ``operation`` with exponential-backoff retry.
+        """Run ``operation`` with circuit-breaker-wrapped exponential-backoff retry.
 
         Used by handlers for individual SDK calls that should retry on
-        transient errors (429 / 5xx).  404 / 400 / 403 / 422 are raised
-        immediately — the retry decorator does not catch those because
-        the underlying ``ApiException`` carries the HTTP status and the
-        retry strategy filters non-recoverable codes by re-raising.
+        transient errors (429 / 5xx).  400 / 403 / 404 / 409 / 410 / 422 are
+        raised immediately — ``ExponentialBackoffStrategy.should_retry`` filters
+        those non-recoverable Kubernetes API status codes without consuming
+        retry budget.
+
+        A per-handler-class circuit breaker is layered on top: once the
+        apiserver failure count reaches ``circuit_breaker_failure_threshold``
+        the circuit opens and subsequent calls fast-fail with
+        ``CircuitBreakerOpenError`` until the reset window expires.  This
+        prevents cascading retry storms during apiserver degradation.
         """
+        service_key = f"kubernetes.{self.PROVIDER_API.lower()}"
 
         @retry(
-            strategy="exponential",
-            service=f"kubernetes.{self.PROVIDER_API.lower()}",
+            strategy="circuit_breaker",
+            service=service_key,
             max_attempts=self._max_retries,
             base_delay=self._base_delay,
             max_delay=self._max_delay,
+            failure_threshold=self._cb_failure_threshold,
+            reset_timeout=self._cb_reset_timeout,
         )
         def wrapped() -> T:
             self._logger.debug(

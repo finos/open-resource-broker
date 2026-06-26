@@ -32,8 +32,11 @@ from orb.providers.k8s.utilities.pod_spec import (
     _DEFAULT_LABEL_PREFIX,
     apply_pod_spec_override,
     build_container_env,
+    build_container_probe,
     build_container_resources,
+    build_container_volume_mounts,
     build_pod_labels,
+    build_pod_security_context,
     build_pod_tolerations,
     build_pod_volumes,
     resolve_image_pull_secret_name,
@@ -121,6 +124,9 @@ def build_deployment_spec(
     image = k8s_template.resolve_container_image()
     resources = build_container_resources(k8s_template)
     env = build_container_env(k8s_template)
+    volume_mounts = build_container_volume_mounts(k8s_template)
+    readiness_probe = build_container_probe(k8s_template.readiness_probe)
+    liveness_probe = build_container_probe(k8s_template.liveness_probe)
 
     container = V1Container(
         name="orb",
@@ -129,6 +135,9 @@ def build_deployment_spec(
         args=k8s_template.args,
         resources=resources,
         env=env,
+        volume_mounts=volume_mounts,
+        readiness_probe=readiness_probe,
+        liveness_probe=liveness_probe,
     )
 
     node_selector = resolve_node_selector(k8s_template, config=config)
@@ -138,6 +147,7 @@ def build_deployment_spec(
         [V1LocalObjectReference(name=pull_secret_name)] if pull_secret_name else None
     )
     volumes = build_pod_volumes(k8s_template)
+    security_context = build_pod_security_context(k8s_template.security_context)
 
     pod_spec_kwargs: dict[str, Any] = {
         "containers": [container],
@@ -155,6 +165,14 @@ def build_deployment_spec(
         pod_spec_kwargs["service_account_name"] = k8s_template.service_account
     if k8s_template.runtime_class:
         pod_spec_kwargs["runtime_class_name"] = k8s_template.runtime_class
+    if k8s_template.priority_class_name:
+        pod_spec_kwargs["priority_class_name"] = k8s_template.priority_class_name
+    if k8s_template.termination_grace_period_seconds is not None:
+        pod_spec_kwargs["termination_grace_period_seconds"] = (
+            k8s_template.termination_grace_period_seconds
+        )
+    if security_context is not None:
+        pod_spec_kwargs["security_context"] = security_context
 
     pod_template = V1PodTemplateSpec(
         metadata=V1ObjectMeta(

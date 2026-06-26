@@ -25,6 +25,7 @@ The watcher is single-namespace; the multi-namespace fan-out lives in
 from __future__ import annotations
 
 import asyncio
+import threading
 import time
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
@@ -124,6 +125,14 @@ class K8sWatcher:
 
         self._task: Optional[asyncio.Task[None]] = None
         self._stop_event = asyncio.Event()
+        # threading.Event mirrors _stop_event and is safe to read from the
+        # worker thread spawned by asyncio.to_thread.  asyncio.Event is bound
+        # to the event loop and must only be accessed from the event loop
+        # thread; using it from a worker thread is an asyncio contract
+        # violation (works under CPython via GIL accident but is not safe in
+        # the general case).  _stop_thread_event is set whenever _stop_event
+        # is set so both surfaces stay in sync.
+        self._stop_thread_event = threading.Event()
         self._active_watch: "Optional[Watch]" = None
         # Tracked for diagnostics / liveness checks.  Updated each time
         # a watch session ends (cleanly or with error) so external
@@ -164,6 +173,7 @@ class K8sWatcher:
         if self.is_running():
             return
         self._stop_event = asyncio.Event()
+        self._stop_thread_event = threading.Event()
         self._consecutive_failures = 0
         self._task = asyncio.create_task(
             self._run(),
@@ -181,6 +191,7 @@ class K8sWatcher:
         blocking stream returns promptly, then awaits the task.
         """
         self._stop_event.set()
+        self._stop_thread_event.set()
         watch = self._active_watch
         if watch is not None:
             try:
@@ -295,7 +306,7 @@ class K8sWatcher:
             kwargs.setdefault("timeout_seconds", self._watch_timeout_seconds)
             stream = watch.stream(api_func, **kwargs)
             for event in stream:
-                if self._stop_event.is_set():
+                if self._stop_thread_event.is_set():
                     break
                 # ``stream`` is typed to potentially yield log strings
                 # for non-pod APIs; for pod watches it always yields

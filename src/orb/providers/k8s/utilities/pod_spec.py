@@ -20,6 +20,8 @@ from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.domain.template.k8s_template import (
+    K8sProbe,
+    K8sSecurityContext,
     K8sTemplate,
     upcast_to_k8s_template,
 )
@@ -188,6 +190,104 @@ def build_pod_volumes(k8s_template: K8sTemplate) -> Optional[list[Any]]:
     return out
 
 
+def _camel_to_snake(name: str) -> str:
+    """Convert a camelCase key to snake_case for the kubernetes SDK constructors.
+
+    The kubernetes Python SDK exposes snake_case constructor arguments
+    (e.g. ``mount_path``, ``run_as_user``) even though the wire format uses
+    camelCase.  This helper normalises operator-supplied camelCase dict keys
+    into the shape the SDK expects.
+    """
+    import re  # noqa: PLC0415
+
+    # Insert underscores before uppercase letters, then lower-case the result.
+    s = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", name)
+    s = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s)
+    return s.lower()
+
+
+def _normalise_sdk_kwargs(d: dict[str, Any]) -> dict[str, Any]:
+    """Return a copy of *d* with camelCase keys converted to snake_case.
+
+    Nested dicts (but not lists) are also normalised recursively.
+    """
+    out: dict[str, Any] = {}
+    for key, value in d.items():
+        snake_key = _camel_to_snake(key)
+        if isinstance(value, dict):
+            out[snake_key] = _normalise_sdk_kwargs(value)
+        else:
+            out[snake_key] = value
+    return out
+
+
+def build_container_volume_mounts(k8s_template: K8sTemplate) -> Optional[list[Any]]:
+    """Build the ``V1VolumeMount`` list from the typed volume_mounts field.
+
+    Operator-supplied entries may use camelCase keys (e.g. ``mountPath``)
+    matching the kubernetes JSON API surface.  They are normalised to
+    the snake_case names that the Python SDK's constructor expects.
+    """
+    if not k8s_template.volume_mounts:
+        return None
+    from kubernetes.client import V1VolumeMount  # noqa: PLC0415
+
+    out: list[V1VolumeMount] = []
+    for entry in k8s_template.volume_mounts:
+        if isinstance(entry, dict):
+            kwargs = _normalise_sdk_kwargs(entry)
+            try:
+                out.append(V1VolumeMount(**kwargs))
+            except (TypeError, ValueError):
+                # Fall back to mount_path-less stub — callers still get
+                # a mount entry rather than silently dropping it.
+                out.append(
+                    V1VolumeMount(
+                        name=kwargs.get("name", "unnamed"),
+                        mount_path=kwargs.get("mount_path", "/"),
+                    )
+                )
+        else:
+            out.append(entry)  # type: ignore[arg-type]
+    return out or None
+
+
+def build_container_probe(probe: Optional["K8sProbe"]) -> Optional[Any]:
+    """Build a ``V1Probe`` from a :class:`K8sProbe` domain object.
+
+    The domain model uses camelCase aliases for the JSON surface; the SDK
+    constructor expects snake_case names.  ``model_dump(exclude_none=True)``
+    (no alias) produces the correct snake_case keys, with one exception:
+    the ``exec`` field is mapped to ``_exec`` because ``exec`` is a Python
+    keyword and the SDK uses the leading-underscore convention.
+    """
+    if probe is None:
+        return None
+    from kubernetes.client import V1Probe  # noqa: PLC0415
+
+    # model_dump without by_alias gives snake_case field names.
+    kwargs = probe.model_dump(exclude_none=True)
+    # ``exec`` is a Python reserved word; the SDK constructor uses ``_exec``.
+    if "exec" in kwargs:
+        kwargs["_exec"] = kwargs.pop("exec")
+    return V1Probe(**kwargs)
+
+
+def build_pod_security_context(
+    security_context: Optional["K8sSecurityContext"],
+) -> Optional[Any]:
+    """Build a ``V1PodSecurityContext`` from a :class:`K8sSecurityContext` domain object.
+
+    Uses snake_case ``model_dump`` to match the SDK constructor signature.
+    """
+    if security_context is None:
+        return None
+    from kubernetes.client import V1PodSecurityContext  # noqa: PLC0415
+
+    kwargs = security_context.model_dump(exclude_none=True)
+    return V1PodSecurityContext(**kwargs)
+
+
 def resolve_node_selector(
     k8s_template: K8sTemplate,
     *,
@@ -266,6 +366,9 @@ def build_pod_spec(
     image = k8s_template.resolve_container_image()
     resources = build_container_resources(k8s_template)
     env = build_container_env(k8s_template)
+    volume_mounts = build_container_volume_mounts(k8s_template)
+    readiness_probe = build_container_probe(k8s_template.readiness_probe)
+    liveness_probe = build_container_probe(k8s_template.liveness_probe)
 
     container = V1Container(
         name="orb",
@@ -274,6 +377,9 @@ def build_pod_spec(
         args=k8s_template.args,
         resources=resources,
         env=env,
+        volume_mounts=volume_mounts,
+        readiness_probe=readiness_probe,
+        liveness_probe=liveness_probe,
     )
 
     node_selector = resolve_node_selector(k8s_template, config=config)
@@ -283,6 +389,7 @@ def build_pod_spec(
         [V1LocalObjectReference(name=pull_secret_name)] if pull_secret_name else None
     )
     volumes = build_pod_volumes(k8s_template)
+    security_context = build_pod_security_context(k8s_template.security_context)
 
     pod_spec_kwargs: dict[str, Any] = {
         "containers": [container],
@@ -300,6 +407,14 @@ def build_pod_spec(
         pod_spec_kwargs["service_account_name"] = k8s_template.service_account
     if k8s_template.runtime_class:
         pod_spec_kwargs["runtime_class_name"] = k8s_template.runtime_class
+    if k8s_template.priority_class_name:
+        pod_spec_kwargs["priority_class_name"] = k8s_template.priority_class_name
+    if k8s_template.termination_grace_period_seconds is not None:
+        pod_spec_kwargs["termination_grace_period_seconds"] = (
+            k8s_template.termination_grace_period_seconds
+        )
+    if security_context is not None:
+        pod_spec_kwargs["security_context"] = security_context
 
     pod_metadata = V1ObjectMeta(
         name=pod_name,
@@ -321,8 +436,11 @@ __all__ = [
     "LEGACY_REQUEST_ID_LABEL",
     "apply_pod_spec_override",
     "build_container_env",
+    "build_container_probe",
     "build_container_resources",
+    "build_container_volume_mounts",
     "build_pod_labels",
+    "build_pod_security_context",
     "build_pod_spec",
     "build_pod_tolerations",
     "build_pod_volumes",

@@ -58,6 +58,12 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
         # guarded by try/except ImportError so the generic resilience layer
         # has no hard SDK dependency when the [k8s] extra is not installed.
         ("infrastructure/resilience/strategy/exponential.py", "kubernetes.client.exceptions"),
+        # infrastructure/resilience/strategy/circuit_breaker.py performs the
+        # same lazy, ImportError-guarded check so that non-retryable Kubernetes
+        # ApiException status codes do not count as circuit failures and are
+        # not retried.  The import is inside a @staticmethod and guarded by
+        # try/except ImportError — no hard SDK dependency is introduced.
+        ("infrastructure/resilience/strategy/circuit_breaker.py", "kubernetes.client.exceptions"),
     }
 )
 

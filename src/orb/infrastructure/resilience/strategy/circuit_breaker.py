@@ -111,6 +111,26 @@ class CircuitBreakerStrategy(RetryStrategy):
             extra={"service_name": service_name, "state": CircuitState.OPEN.value},
         )
 
+    # HTTP status codes that indicate a permanent client error.  These must not
+    # consume retry budget or count as circuit-breaker failures — they represent
+    # operator / caller errors, not apiserver degradation.  The set mirrors
+    # ExponentialBackoffStrategy._NON_RETRYABLE_K8S_STATUSES.
+    _NON_RETRYABLE_K8S_STATUSES: frozenset[int] = frozenset({400, 403, 404, 409, 410, 422})
+
+    @staticmethod
+    def _is_non_retryable_k8s_exception(exception: Exception) -> bool:
+        """Return True when ``exception`` is a Kubernetes ApiException with a
+        status code that must not be retried or counted as a circuit failure."""
+        try:
+            from kubernetes.client.exceptions import ApiException  # noqa: PLC0415
+
+            if isinstance(exception, ApiException):
+                status = getattr(exception, "status", None)
+                return status in CircuitBreakerStrategy._NON_RETRYABLE_K8S_STATUSES
+        except ImportError:
+            pass
+        return False
+
     def should_retry(self, attempt: int, exception: Exception) -> bool:
         """
         Determine if operation should be retried based on circuit state.
@@ -125,6 +145,13 @@ class CircuitBreakerStrategy(RetryStrategy):
         # Quota errors are never retryable — force circuit open immediately
         if isinstance(exception, QuotaError):
             self._force_open(self.service_name)
+            return False
+
+        # Non-retryable Kubernetes API status codes (client errors such as
+        # 409 Conflict and 403 RBAC denied) must not be retried and must not
+        # be counted as circuit failures — they are permanent caller errors,
+        # not apiserver degradation signals.
+        if self._is_non_retryable_k8s_exception(exception):
             return False
 
         current_time = time.time()

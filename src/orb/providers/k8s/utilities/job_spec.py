@@ -40,8 +40,11 @@ from orb.providers.k8s.utilities.pod_spec import (
     _DEFAULT_LABEL_PREFIX,
     apply_pod_spec_override,
     build_container_env,
+    build_container_probe,
     build_container_resources,
+    build_container_volume_mounts,
     build_pod_labels,
+    build_pod_security_context,
     build_pod_tolerations,
     build_pod_volumes,
     resolve_image_pull_secret_name,
@@ -122,6 +125,9 @@ def build_job_spec(
     image = k8s_template.resolve_container_image()
     resources = build_container_resources(k8s_template)
     env = build_container_env(k8s_template)
+    volume_mounts = build_container_volume_mounts(k8s_template)
+    readiness_probe = build_container_probe(k8s_template.readiness_probe)
+    liveness_probe = build_container_probe(k8s_template.liveness_probe)
 
     container = V1Container(
         name="orb",
@@ -130,6 +136,9 @@ def build_job_spec(
         args=k8s_template.args,
         resources=resources,
         env=env,
+        volume_mounts=volume_mounts,
+        readiness_probe=readiness_probe,
+        liveness_probe=liveness_probe,
     )
 
     node_selector = resolve_node_selector(k8s_template, config=config)
@@ -139,6 +148,7 @@ def build_job_spec(
         [V1LocalObjectReference(name=pull_secret_name)] if pull_secret_name else None
     )
     volumes = build_pod_volumes(k8s_template)
+    security_context = build_pod_security_context(k8s_template.security_context)
 
     pod_spec_kwargs: dict[str, Any] = {
         "containers": [container],
@@ -156,6 +166,14 @@ def build_job_spec(
         pod_spec_kwargs["service_account_name"] = k8s_template.service_account
     if k8s_template.runtime_class:
         pod_spec_kwargs["runtime_class_name"] = k8s_template.runtime_class
+    if k8s_template.priority_class_name:
+        pod_spec_kwargs["priority_class_name"] = k8s_template.priority_class_name
+    if k8s_template.termination_grace_period_seconds is not None:
+        pod_spec_kwargs["termination_grace_period_seconds"] = (
+            k8s_template.termination_grace_period_seconds
+        )
+    if security_context is not None:
+        pod_spec_kwargs["security_context"] = security_context
 
     pod_template = V1PodTemplateSpec(
         metadata=V1ObjectMeta(
@@ -177,14 +195,20 @@ def build_job_spec(
         int(k8s_template.completions) if k8s_template.completions is not None else parallelism
     )
 
-    job_spec = V1JobSpec(
-        parallelism=effective_parallelism,
-        completions=effective_completions,
-        backoff_limit=0,
-        manual_selector=True,
-        selector=V1LabelSelector(match_labels=selector_match_labels),
-        template=pod_template,
-    )
+    job_spec_kwargs: dict[str, Any] = {
+        "parallelism": effective_parallelism,
+        "completions": effective_completions,
+        "backoff_limit": 0,
+        "manual_selector": True,
+        "selector": V1LabelSelector(match_labels=selector_match_labels),
+        "template": pod_template,
+    }
+    if k8s_template.ttl_seconds_after_finished is not None:
+        job_spec_kwargs["ttl_seconds_after_finished"] = k8s_template.ttl_seconds_after_finished
+    if k8s_template.active_deadline_seconds is not None:
+        job_spec_kwargs["active_deadline_seconds"] = k8s_template.active_deadline_seconds
+
+    job_spec = V1JobSpec(**job_spec_kwargs)
 
     return V1Job(
         api_version="batch/v1",

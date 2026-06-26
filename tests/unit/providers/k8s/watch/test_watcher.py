@@ -14,6 +14,7 @@ so no apiserver is required.  Covers:
 from __future__ import annotations
 
 import asyncio
+import threading
 from types import SimpleNamespace
 from typing import Any, Iterator
 from unittest.mock import MagicMock
@@ -385,3 +386,74 @@ def test_is_resource_version_too_old_detects_410() -> None:
     assert K8sWatcher._is_resource_version_too_old(ApiException(status=410))
     assert not K8sWatcher._is_resource_version_too_old(ApiException(status=500))
     assert not K8sWatcher._is_resource_version_too_old(RuntimeError("oops"))
+
+
+# ---------------------------------------------------------------------------
+# threading.Event stop signal — correctness in worker thread
+# ---------------------------------------------------------------------------
+
+
+def test_stop_thread_event_is_threading_event() -> None:
+    """_stop_thread_event must be a threading.Event, not an asyncio.Event.
+
+    asyncio.Event is bound to the event loop and must not be called from
+    worker threads spawned by asyncio.to_thread.  threading.Event is the
+    correct primitive for cross-thread signalling.
+    """
+    client = _make_kubernetes_client_mock()
+    watcher = K8sWatcher(
+        kubernetes_client=client,
+        cache=PodStateCache(),
+        logger=MagicMock(),
+        namespace="ns",
+    )
+    assert isinstance(watcher._stop_thread_event, threading.Event), (
+        "_stop_thread_event must be threading.Event for thread-safe cross-thread stop signalling"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(10)
+async def test_stop_sets_threading_event() -> None:
+    """Calling stop() must set _stop_thread_event so the worker thread can observe it."""
+    client = _make_kubernetes_client_mock()
+
+    # A stub that pauses until _stop_thread_event is observed set.
+    signal_received: list[bool] = []
+
+    class _BlockingWatch:
+        resource_version: str | None = None
+
+        def stream(self, func: Any, **kwargs: Any) -> Any:
+            # Spin until the threading event fires — this simulates the worker
+            # thread polling the stop event while consuming a long-lived stream.
+            for _ in range(2000):
+                import time
+
+                time.sleep(0.001)
+                # We cannot reference watcher here yet, so we read via closure.
+                if stop_event_ref[0].is_set():
+                    signal_received.append(True)
+                    return
+            return
+
+        def stop(self) -> None:
+            pass
+
+    watcher = K8sWatcher(
+        kubernetes_client=client,
+        cache=PodStateCache(),
+        logger=MagicMock(),
+        namespace="ns",
+        watch_factory=lambda: _BlockingWatch(),
+        watch_timeout_seconds=1,
+    )
+    stop_event_ref: list[Any] = [watcher._stop_thread_event]
+
+    watcher.start()
+    await asyncio.sleep(0.05)
+    await watcher.stop()
+
+    assert watcher._stop_thread_event.is_set(), (
+        "stop() must set the threading.Event so the worker thread exits"
+    )
