@@ -136,8 +136,9 @@ class DashboardSummaryOrchestrator(OrchestratorBase[DashboardSummaryInput, Dashb
 
         # ---- recent activity (top 10 by created_at desc) --------------------
         def _created_at_key(r: dict[str, Any]) -> str:
-            val = r.get("created_at")
-            return _to_iso(val)
+            # Sort key must be totally ordered — coerce missing values to ""
+            # so requests without a created_at land at the end (sort reversed).
+            return _to_iso(r.get("created_at")) or ""
 
         recent_sorted = sorted(recent_raw, key=_created_at_key, reverse=True)[:10]
         recent_activity = [

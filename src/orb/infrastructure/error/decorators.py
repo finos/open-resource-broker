@@ -10,9 +10,9 @@ from functools import wraps
 from typing import Any, Callable, Optional
 
 try:
-    from fastapi import HTTPException as _FastAPIHTTPException
+    from fastapi import HTTPException as _FastAPIHTTPException  # type: ignore[assignment]
 
-    _HTTP_EXCEPTION_TYPE: type[BaseException] = _FastAPIHTTPException
+    _HTTP_EXCEPTION_TYPE: type[BaseException] = _FastAPIHTTPException  # type: ignore[assignment]
 except ImportError:  # FastAPI is optional — define a private sentinel never raised at runtime
 
     class _FastAPIHTTPException(Exception):  # type: ignore[no-redef]

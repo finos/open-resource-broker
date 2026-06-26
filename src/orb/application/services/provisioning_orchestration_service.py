@@ -370,13 +370,19 @@ class ProvisioningOrchestrationService:
                         metadata_dict.setdefault(k, v)
 
                 fulfillment_final = bool(metadata_dict.get("fulfillment_final", False))
-                has_capacity_error = bool(  # noqa: F841 — retained for telemetry consumers
-                    metadata_dict.get("capacity_constrained", False)
-                )
+                has_capacity_error = bool(metadata_dict.get("capacity_constrained", False))
 
                 merged_provider_data: dict[str, Any] = dict(metadata_dict)
                 if result.routing_info:
                     merged_provider_data.update(result.routing_info)
+                # Surface the capacity-constrained signal on the outcome
+                # metadata so status handlers + telemetry can distinguish
+                # "still pending" (provider just hasn't reported yet) from
+                # "stuck pending" (insufficient capacity in the AZ / fleet
+                # bucket the provider chose). The flag is set by provider
+                # handlers when the SDK returned a partial-fulfilment
+                # error like InsufficientInstanceCapacity.
+                merged_provider_data["capacity_constrained"] = has_capacity_error
 
                 # fulfillment_final=True means the provider has finished
                 # provisioning and the result is the final word — emit

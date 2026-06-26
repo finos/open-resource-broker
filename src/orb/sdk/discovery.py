@@ -199,7 +199,12 @@ class SDKMethodDiscovery:
             if items and hasattr(items[0], "to_dict"):
                 serialised = [self._make_json_serializable(item.to_dict()) for item in items]
                 return self._apply_scheduler_format_list(items, serialised)
-            return self._make_json_serializable(items)
+            # Plain-list payload (already dicts / primitives) — serialise
+            # element-wise; _make_json_serializable expects a dict, not a list.
+            return [
+                self._make_json_serializable(item) if isinstance(item, dict) else item
+                for item in items
+            ]
 
         # Single DTO with to_dict method
         if hasattr(result, "to_dict"):
