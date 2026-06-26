@@ -78,13 +78,21 @@ ci-build-sbom:  ## Generate SBOM files (matches publish.yml workflow)
 	@echo "This matches the GitHub Actions publish.yml workflow exactly"
 	$(MAKE) sbom-generate
 
+# pytest-xdist parallelisation. ``-n auto`` spawns one worker per CPU core.
+# ``--dist=loadscope`` keeps tests in the same class/module on one worker so
+# class-scoped setUp / fixtures don't re-run per worker. Tests that share
+# global state (live AWS, docker daemon, e2e tempdirs) are tagged ``serial``
+# and run sequentially in a second pytest pass via ``-m serial``.
+PYTEST_PARALLEL := -n auto --dist=loadscope -m "not serial"
+PYTEST_SERIAL := -m serial
+
 ci-tests-unit:  ## Run unit tests only (matches ci.yml unit-tests job)
-	@echo "Running unit tests..."
-	$(call run-tool,pytest,$(TESTS_UNIT) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-unit.xml --junitxml=junit-unit.xml)
+	@echo "Running unit tests (parallel)..."
+	$(call run-tool,pytest,$(TESTS_UNIT) $(PYTEST_PARALLEL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-unit.xml --junitxml=junit-unit.xml)
 
 ci-tests-integration:  ## Run integration tests only (matches ci.yml integration-tests job)
-	@echo "Running integration tests..."
-	$(call run-tool,pytest,$(TESTS_INTEGRATION) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-integration.xml --junitxml=junit-integration.xml)
+	@echo "Running integration tests (parallel)..."
+	$(call run-tool,pytest,$(TESTS_INTEGRATION) $(PYTEST_PARALLEL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-integration.xml --junitxml=junit-integration.xml)
 
 ci-tests-e2e:  ## Run end-to-end tests only (matches ci.yml e2e-tests job)
 	@echo "Running end-to-end tests..."
@@ -106,12 +114,16 @@ PROVIDER ?=
 PROVIDER_SUFFIX := $(if $(PROVIDER),-$(PROVIDER),)
 PROVIDER_PATH := $(if $(PROVIDER),$(TESTS_PROVIDERS)/$(PROVIDER),$(TESTS_PROVIDERS))
 ci-tests-providers:  ## Run providers tests (PROVIDER=<name> scopes to one provider)
-	@echo "Running provider tests: $(if $(PROVIDER),$(PROVIDER),all)..."
-	$(call run-tool,pytest,$(PROVIDER_PATH) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-providers$(PROVIDER_SUFFIX).xml --junitxml=junit-providers$(PROVIDER_SUFFIX).xml)
+	@echo "Running provider tests (parallel): $(if $(PROVIDER),$(PROVIDER),all)..."
+	$(call run-tool,pytest,$(PROVIDER_PATH) $(PYTEST_PARALLEL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-providers$(PROVIDER_SUFFIX).xml --junitxml=junit-providers$(PROVIDER_SUFFIX).xml)
+
+ci-tests-providers-serial:  ## Run the serial-marked subset of provider tests (live, etc.)
+	@echo "Running serial provider tests: $(if $(PROVIDER),$(PROVIDER),all)..."
+	$(call run-tool,pytest,$(PROVIDER_PATH) $(PYTEST_SERIAL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-providers$(PROVIDER_SUFFIX)-serial.xml --junitxml=junit-providers$(PROVIDER_SUFFIX)-serial.xml)
 
 ci-tests-infrastructure:  ## Run infrastructure tests only (matches ci.yml infrastructure-tests job)
-	@echo "Running infrastructure tests..."
-	$(call run-tool,pytest,$(TESTS_INFRASTRUCTURE) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-infrastructure.xml --junitxml=junit-infrastructure.xml)
+	@echo "Running infrastructure tests (parallel)..."
+	$(call run-tool,pytest,$(TESTS_INFRASTRUCTURE) $(PYTEST_PARALLEL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-infrastructure.xml --junitxml=junit-infrastructure.xml)
 
 ci-check:  ## Run comprehensive CI checks (matches GitHub Actions exactly)
 	@echo "Running comprehensive CI checks that match GitHub Actions pipeline..."

@@ -415,6 +415,7 @@ markers = [
     "benchmark: marks benchmark/performance tests",
     "api: marks API tests",
     "security: marks security tests",
+    "serial: forces serial execution (use ``-n0`` or filter with ``-m 'not serial'`` under xdist)",
 ]
 env = [
     "AWS_DEFAULT_REGION=us-east-1",
