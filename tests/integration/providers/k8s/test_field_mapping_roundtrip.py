@@ -203,9 +203,14 @@ def test_field_mapping_defaults_applied_in_isolation() -> None:
     """``apply_defaults`` populates kubernetes-sensible defaults for absent fields."""
     adapter = K8sFieldMapping()
     out = adapter.apply_defaults({})
-    assert out["namespace"] == "default"
     assert out["max_instances"] == 1
     assert out["annotations"] == {}
+    # ``namespace`` is NOT defaulted here — the precedence chain at
+    # ``K8sBaseHandler.resolve_namespace`` resolves
+    # HF/template namespace -> provider-config namespace -> kube-API
+    # default ``"default"``.  Hard-coding it here would short-circuit
+    # the provider-config fallback.
+    assert "namespace" not in out
     # Replicas / labels / env are intentionally NOT defaulted — those
     # concepts live on the generic ``requested_count`` / ``tags`` / typed
     # ``env`` surfaces instead.

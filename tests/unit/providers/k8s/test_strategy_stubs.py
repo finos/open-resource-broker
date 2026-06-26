@@ -210,3 +210,85 @@ def test_cleanup_idempotent() -> None:
     strategy.cleanup()
     strategy.cleanup()
     assert strategy._kubernetes_client is None  # type: ignore[attr-defined]
+
+
+def test_build_template_for_request_fallback_returns_k8s_template() -> None:
+    """Fallback path (no template payload in metadata) yields a K8sTemplate.
+
+    Historically the fallback assembled a bare :class:`Template` so the
+    kubernetes-specific spec builders saw a plain ``Template`` instead
+    of a :class:`K8sTemplate` and silently dropped every k8s-typed
+    field.  The fallback now constructs a :class:`K8sTemplate` directly
+    so the spec builders always see the typed surface, even when the
+    request carries no metadata.
+    """
+    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+
+    strategy = _make_strategy()
+
+    # No metadata -> fallback path.
+    fake_request = MagicMock()
+    fake_request.request_id = "req-fallback-1"
+    fake_request.provider_api = "Pod"
+    fake_request.template_id = "tpl-fallback"
+    fake_request.requested_count = 3
+    fake_request.metadata = None
+
+    template = strategy._build_template_for_request(fake_request)  # type: ignore[attr-defined]
+    assert isinstance(template, K8sTemplate)
+    assert template.template_id == "tpl-fallback"
+    assert template.provider_type == "k8s"
+    assert template.provider_api == "Pod"
+    assert template.max_instances == 3
+
+    # Empty-metadata dict + no ``template`` key -> still fallback path.
+    fake_request.metadata = {}
+    template2 = strategy._build_template_for_request(fake_request)  # type: ignore[attr-defined]
+    assert isinstance(template2, K8sTemplate)
+    assert template2.template_id == "tpl-fallback"
+
+    # k8s-specific fields aren't silently dropped on the fallback path —
+    # they are absent (None) on the constructed template so the spec
+    # builders can apply the provider-config defaults later, rather
+    # than being lost behind an opaque ``Template`` shell.
+    assert template2.namespace is None
+    assert template2.image_pull_secret is None
+    assert template2.resource_requests is None
+    assert template2.node_selector is None
+
+
+def test_build_template_for_request_dict_payload_yields_k8s_template() -> None:
+    """A dict ``template`` payload in metadata is parsed into a K8sTemplate.
+
+    Asserts that operator-supplied k8s-specific fields (``namespace``,
+    ``image_pull_secret``, ``node_selector``) carried in the metadata
+    dict survive the build step.  Together with the fallback test
+    above this protects the strategy's template-build path from the
+    historical regression where k8s fields were silently dropped.
+    """
+    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+
+    strategy = _make_strategy()
+
+    payload = {
+        "template_id": "tpl-dict",
+        "provider_type": "k8s",
+        "provider_api": "Pod",
+        "max_instances": 2,
+        "namespace": "submitted-ns",
+        "image_pull_secret": "registry-creds",
+        "node_selector": {"role": "compute"},
+    }
+    fake_request = MagicMock()
+    fake_request.request_id = "req-dict-1"
+    fake_request.provider_api = "Pod"
+    fake_request.template_id = "tpl-dict"
+    fake_request.requested_count = 2
+    fake_request.metadata = {"template": payload}
+
+    template = strategy._build_template_for_request(fake_request)  # type: ignore[attr-defined]
+    assert isinstance(template, K8sTemplate)
+    assert template.template_id == "tpl-dict"
+    assert template.namespace == "submitted-ns"
+    assert template.image_pull_secret == "registry-creds"
+    assert template.node_selector == {"role": "compute"}

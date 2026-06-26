@@ -33,6 +33,7 @@ class K8sFieldMapping:
     _PROVIDER_MAPPINGS: dict[str, str] = {
         # Scheduling / placement
         "namespace": "namespace",
+        "namespaces": "namespaces",
         "runtimeClass": "runtime_class",
         "nodeSelector": "node_selector",
         "tolerations": "tolerations",
@@ -51,6 +52,9 @@ class K8sFieldMapping:
         # Container environment
         "env": "env",
         "environment": "env",
+        # Container entrypoint override
+        "command": "command",
+        "args": "args",
         # Image pull
         "imagePullSecret": "image_pull_secret",
         # Raw partial pod-spec override
@@ -66,17 +70,22 @@ class K8sFieldMapping:
 
         Mutates *mapped* in place and returns it for convenience.  Defaults:
 
-        * ``namespace`` -> ``"default"`` (matches the kube-API default;
-          the provider-level config overrides this when set).
         * ``max_instances`` -> ``1`` (generic quota cap).
         * ``annotations`` -> empty dict.
+
+        ``namespace`` is intentionally NOT defaulted here.  Doing so would
+        force a hardcoded value onto the template, which then takes
+        precedence over the provider-config namespace at
+        :meth:`K8sBaseHandler.resolve_namespace` time and silently
+        overrides the operator's configured default.  The precedence
+        order resolved at handler time is: HF/template ``namespace`` ->
+        ``K8sProviderConfig.namespace`` -> kube-API default ``"default"``.
 
         Replica count is taken from ``request.requested_count`` at acquire
         time, not from the template, so ``replicas`` is intentionally not
         defaulted here.  Operator labels live on the generic ``tags``
         field on :class:`Template`.
         """
-        mapped.setdefault("namespace", "default")
         mapped.setdefault("max_instances", 1)
         mapped.setdefault("annotations", {})
         return mapped

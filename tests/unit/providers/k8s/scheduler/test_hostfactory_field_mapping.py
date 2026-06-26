@@ -27,6 +27,7 @@ def test_get_mappings_contains_core_entries(mapping: K8sFieldMapping) -> None:
     """Every kubernetes-specific HF field is mapped to a snake_case name."""
     mappings = mapping.get_mappings()
     assert mappings["namespace"] == "namespace"
+    assert mappings["namespaces"] == "namespaces"
     assert mappings["resourceRequests"] == "resource_requests"
     assert mappings["resourceLimits"] == "resource_limits"
     assert mappings["runtimeClass"] == "runtime_class"
@@ -41,6 +42,8 @@ def test_get_mappings_contains_core_entries(mapping: K8sFieldMapping) -> None:
     # env / environment both collapse to the typed ``env`` field.
     assert mappings["env"] == "env"
     assert mappings["environment"] == "env"
+    assert mappings["command"] == "command"
+    assert mappings["args"] == "args"
     assert mappings["imagePullSecret"] == "image_pull_secret"
     assert mappings["podSpecOverride"] == "pod_spec_override"
 
@@ -67,15 +70,33 @@ def test_get_mappings_returns_copy(mapping: K8sFieldMapping) -> None:
 def test_apply_defaults_fills_unset_keys(mapping: K8sFieldMapping) -> None:
     """Unset fields are filled with kubernetes-sensible defaults."""
     out = mapping.apply_defaults({})
-    assert out["namespace"] == "default"
     assert out["max_instances"] == 1
     assert out["annotations"] == {}
+    # ``namespace`` is intentionally NOT defaulted here — see the
+    # ``test_apply_defaults_does_not_force_namespace`` test below for
+    # the precedence rationale.
+    assert "namespace" not in out
     # Replicas / labels / env are intentionally NOT defaulted — they are
     # derived from generic surfaces (``requested_count`` / ``tags``)
     # or absent until the operator sets them.
     assert "replicas" not in out
     assert "labels" not in out
     assert "environment_variables" not in out
+
+
+def test_apply_defaults_does_not_force_namespace(mapping: K8sFieldMapping) -> None:
+    """apply_defaults must NOT setdefault a hardcoded namespace.
+
+    Forcing ``namespace="default"`` here would propagate onto
+    :attr:`K8sTemplate.namespace` and then take precedence over
+    :attr:`K8sProviderConfig.namespace` at
+    :meth:`K8sBaseHandler.resolve_namespace` time, silently overriding
+    the operator's configured default namespace.  The precedence order
+    must remain: HF/template namespace -> provider-config namespace ->
+    kube-API default ``"default"``.
+    """
+    out = mapping.apply_defaults({})
+    assert "namespace" not in out
 
 
 def test_apply_defaults_preserves_explicit_values(mapping: K8sFieldMapping) -> None:
@@ -90,6 +111,58 @@ def test_apply_defaults_preserves_explicit_values(mapping: K8sFieldMapping) -> N
     assert out["namespace"] == "orb-prod"
     assert out["max_instances"] == 5
     assert out["annotations"] == {"orb.io/note": "hello"}
+
+
+def test_namespace_precedence_hf_template_over_provider_config() -> None:
+    """HF JSON ``namespace`` field overrides the provider-config namespace default.
+
+    Exercises :meth:`K8sHandlerBase.resolve_namespace` directly so the
+    precedence guarantee is locked down: an explicit template namespace
+    wins over the provider-config namespace, while an unset template
+    namespace falls back to the provider-config value.  Together with
+    :func:`test_apply_defaults_does_not_force_namespace` this proves
+    that an HF JSON missing ``namespace`` does NOT silently bypass the
+    provider-config default.
+    """
+    from unittest.mock import MagicMock
+
+    from orb.providers.k8s.configuration.config import K8sProviderConfig
+    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+    from orb.providers.k8s.handlers.base_handler import K8sHandlerBase
+
+    config = K8sProviderConfig(namespace="config-default-ns")
+
+    # Subclass to satisfy the abstract surface — only resolve_namespace
+    # is under test so the other methods can stay as no-op stubs.
+    class _DummyHandler(K8sHandlerBase):  # type: ignore[misc]
+        async def acquire_hosts(self, request, template):  # pragma: no cover - stub
+            raise NotImplementedError
+
+        async def release_hosts(self, machine_ids, request):  # pragma: no cover - stub
+            raise NotImplementedError
+
+        def check_hosts_status(self, request):  # pragma: no cover - stub
+            raise NotImplementedError
+
+        @classmethod
+        def get_example_templates(cls):  # pragma: no cover - stub
+            return []
+
+    handler = _DummyHandler(
+        kubernetes_client=MagicMock(),
+        config=config,
+        logger=MagicMock(),
+        pod_state_cache=MagicMock(),
+        cache_alive=MagicMock(return_value=False),
+    )
+
+    # HF/template namespace wins over the provider-config default.
+    explicit = K8sTemplate(template_id="t1", provider_api="Pod", namespace="hf-template-ns")
+    assert handler.resolve_namespace(explicit) == "hf-template-ns"
+
+    # No HF/template namespace -> fall back to the provider-config default.
+    no_namespace = K8sTemplate(template_id="t2", provider_api="Pod")
+    assert handler.resolve_namespace(no_namespace) == "config-default-ns"
 
 
 def test_derive_attributes_returns_none(mapping: K8sFieldMapping) -> None:
