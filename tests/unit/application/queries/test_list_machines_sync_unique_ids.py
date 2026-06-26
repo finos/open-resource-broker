@@ -71,6 +71,9 @@ async def test_list_machines_sync_preserves_unique_ids():
     query = ListMachinesQuery(all_resources=True)
     result = await handler.execute_query(query)
 
-    ids = [dto.machine_id for dto in result]
+    # ListMachinesHandler now returns Paginated[MachineDTO].
+    ids = [dto.machine_id for dto in result.items]
     assert ids == ["i-aaa", "i-bbb", "i-ccc"], f"Expected 3 unique IDs, got {ids}"
     assert len(set(ids)) == 3, "All machine IDs should be unique"
+    assert result.total_count == 3
+    assert result.total_unfiltered == 3

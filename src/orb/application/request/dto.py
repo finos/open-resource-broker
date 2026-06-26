@@ -160,7 +160,9 @@ class RequestDTO(BaseDTO):
                 ]
 
         # Resolve the ProviderFulfilment to use for capacity fields.
-        # Priority: explicit arg > cached snapshot in metadata["last_fulfilment"].
+        # Priority: explicit arg > metadata["last_fulfilment"] > provider_data top-level
+        # (initial CreateFleet response captures target_units/fulfilled_units there
+        # so the UI shows units immediately without waiting for check_hosts_status).
         resolved_fulfilment: Optional[ProviderFulfilment] = fulfilment
         if resolved_fulfilment is None and request.metadata:
             cached = request.metadata.get("last_fulfilment")
@@ -169,6 +171,31 @@ class RequestDTO(BaseDTO):
                     resolved_fulfilment = ProviderFulfilment(**cached)
                 except (TypeError, KeyError):
                     resolved_fulfilment = None
+        if resolved_fulfilment is None and request.provider_data:
+            # ``provider_data`` is a canonical flat dict: the orchestration layer
+            # merges handler-level keys (target_units, fulfilled_units, etc.) into
+            # the top level before persistence.  Read capacity fields directly from
+            # the flat dict.
+            # TODO: if a legacy record still carries the old wrapper shape
+            # ({method, provider_data: {...}}) target_units/fulfilled_units will be
+            # absent at the top level and resolved_fulfilment stays None — the UI
+            # will fall back to instance-count fields, which is safe.
+            pd_top = request.provider_data
+            if isinstance(pd_top, dict):
+                tu = pd_top.get("target_units")
+                fu = pd_top.get("fulfilled_units")
+                if tu is not None or fu is not None:
+                    try:
+                        resolved_fulfilment = ProviderFulfilment(
+                            state="fulfilled" if (fu or 0) >= (tu or 0) else "in_progress",
+                            message="",
+                            target_units=int(float(tu or 0)),
+                            fulfilled_units=int(float(fu or 0)),
+                            running_count=int(float(pd_top.get("running_count") or 0)),
+                            pending_count=int(float(pd_top.get("pending_count") or 0)),
+                        )
+                    except (TypeError, ValueError):
+                        pass
 
         # Build structured error block from error_details when available.
         # Accept both "provider_error" (new) and legacy "aws_error" so that
@@ -254,11 +281,12 @@ class RequestDTO(BaseDTO):
             if result.get(cap_field) is None:
                 result.pop(cap_field, None)
 
-        # Remove fields based on detail level
+        # Remove fields based on detail level.
+        # Keep first/last_status_check on list responses — they're cheap
+        # timestamps the UI needs to render the Timing section in the
+        # request drawer (which reads list-row data on initial paint).
         if not include_details:
             result.pop("metadata", None)
-            result.pop("first_status_check", None)
-            result.pop("last_status_check", None)
             result.pop("launch_template_id", None)
             result.pop("launch_template_version", None)
 

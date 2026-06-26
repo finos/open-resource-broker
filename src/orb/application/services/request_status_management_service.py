@@ -75,9 +75,25 @@ class RequestStatusManagementService:
                 with self._uow_factory.create_unit_of_work() as uow:
                     uow.machines.save_batch(machines_to_save)
 
-        # Update request status based on fulfillment
+        # Derive fulfillment finality from ProvisioningResult.is_final, which
+        # is itself derived from the typed OperationOutcome by
+        # ProvisioningResult.__post_init__:
+        #   Completed         → is_final=True   (instances reached final state)
+        #   Accepted          → is_final=False  (provider accepted; pending)
+        #   RequiresFollowUp  → is_final=False  (async follow-up needed)
+        #   Failed            → is_final=True   (failure path handled separately)
+        #
+        # This is the single source of truth across all providers (AWS, future
+        # Azure/GCP/K8s). Per-handler fulfillment_final flags inside
+        # provider_data are no longer consulted here — providers express
+        # finality via OperationOutcome.
         return self._update_request_status(
-            request, len(instances), request.requested_count, has_api_errors, provider_errors
+            request,
+            len(instances),
+            request.requested_count,
+            has_api_errors,
+            provider_errors,
+            fulfillment_final=provisioning_result.is_final,
         )
 
     def _handle_provisioning_failure(self, request: Any, provisioning_result: Any) -> Any:
@@ -139,8 +155,25 @@ class RequestStatusManagementService:
         requested_count: int,
         has_api_errors: bool,
         provider_errors: List[Dict],
+        fulfillment_final: bool = True,
     ) -> Any:
-        """Update request status based on fulfillment and errors."""
+        """Update request status based on fulfillment and errors.
+
+        ``instance_count`` is the authoritative count of instances the
+        provider just confirmed as fulfilled (derived from
+        ``len(ProvisioningResult.instances)`` by the caller). It is
+        written to ``request.successful_count`` whenever the count is
+        non-zero so the persisted counter matches reality.
+
+        The aggregate's ``update_status`` only touches status / message
+        / completed_at — it does not bump ``successful_count``. The
+        legacy counter-update path
+        (``Request.update_with_provisioning_result``) only fires when
+        the provider emits a top-level ``instance_ids`` key, which the
+        EC2Fleet instant path does not. Doing the bump here keeps the
+        wire payload consistent across both batched-instance and
+        instant-fulfilment providers.
+        """
         from orb.domain.request.value_objects import RequestStatus
 
         error_summary = None
@@ -153,11 +186,55 @@ class RequestStatusManagementService:
                 or "Unknown API errors"
             )
 
+        # Reconcile the persisted ``successful_count`` against the
+        # authoritative count from the provider before transitioning
+        # status. Only write a non-zero count here; the FAILED branch
+        # below leaves the existing counter alone. Pydantic aggregates
+        # are frozen, so we use ``model_copy`` for them; for non-pydantic
+        # callers (plain objects, test mocks) the attribute is set
+        # directly without rebinding ``request``.
+        if instance_count > 0:
+            from pydantic import BaseModel as _PydanticBaseModel
+
+            if isinstance(request, _PydanticBaseModel):
+                request = request.model_copy(
+                    update={"successful_count": instance_count}
+                )
+            else:
+                try:
+                    request.successful_count = instance_count  # type: ignore[attr-defined]
+                except Exception as e:
+                    # Best-effort: this branch runs on legacy non-pydantic
+                    # request stand-ins in tests. Log so a real assignment
+                    # failure on a live request doesn't disappear.
+                    self._logger.warning(
+                        "Failed to set successful_count on request %s: %s",
+                        getattr(request, "request_id", "<unknown>"),
+                        e,
+                    )
+
         if instance_count == requested_count:
-            if has_api_errors:
+            # All requested instances fulfilled. Fleet API errors (e.g. AZ-
+            # specific spot capacity warnings that were already routed around
+            # by the fleet's instance-type ladder) are advisory in this
+            # case — they did not prevent any capacity unit being met.
+            # Marking the request PARTIAL would be misleading and locks it
+            # in a terminal non-success state. The errors are still
+            # persisted under request.metadata["fleet_errors"] and visible
+            # in the drawer.
+            if not fulfillment_final:
+                # Provider returned all instance IDs synchronously but instances
+                # are still 'pending' (booting). Keep request IN_PROGRESS so
+                # check_hosts_status / ProviderFulfilment can promote it to
+                # COMPLETED once running_count >= target.
                 request = request.update_status(
-                    RequestStatus.PARTIAL,
-                    f"Partial success: {instance_count}/{requested_count} instances created with API errors: {error_summary}",
+                    RequestStatus.IN_PROGRESS,
+                    f"{instance_count}/{requested_count} instances created — awaiting running state",
+                )
+            elif has_api_errors:
+                request = request.update_status(
+                    RequestStatus.COMPLETED,
+                    f"All {instance_count} instances provisioned (with non-blocking provider warnings)",
                 )
             else:
                 request = request.update_status(
@@ -165,7 +242,19 @@ class RequestStatusManagementService:
                     "All instances provisioned successfully",
                 )
         elif instance_count > 0:
-            if has_api_errors:
+            # When the provider has NOT signalled this is the final answer
+            # (fulfillment_final=False — true for every async cloud provider
+            # in the present codebase) we MUST NOT stamp PARTIAL here. PARTIAL
+            # is terminal; once stamped, future sync cycles cannot reconcile
+            # against the actual provider state. Stay IN_PROGRESS instead and
+            # let the polling loop / ProviderFulfilment promote the request to
+            # COMPLETED once running_count >= target.
+            if not fulfillment_final:
+                request = request.update_status(
+                    RequestStatus.IN_PROGRESS,
+                    f"{instance_count}/{requested_count} instances created — awaiting provider confirmation",
+                )
+            elif has_api_errors:
                 request = request.update_status(
                     RequestStatus.PARTIAL,
                     f"Partial success: {instance_count}/{requested_count} instances created with API errors: {error_summary}",

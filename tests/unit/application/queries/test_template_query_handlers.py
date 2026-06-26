@@ -302,7 +302,9 @@ async def test_list_templates_provider_name_filter() -> None:
     result = await handler.execute_query(query)
 
     template_manager.load_templates.assert_awaited_once_with(provider_override="aws")
-    assert len(result) == 3
+    # ListTemplatesHandler now returns Paginated[TemplateDTOPort].
+    assert result.total_count == 3
+    assert len(result.items) == 3
 
 
 @pytest.mark.asyncio
@@ -321,4 +323,5 @@ async def test_list_templates_provider_api_filter() -> None:
     result = await handler.execute_query(query)
 
     template_manager.get_templates_by_provider.assert_awaited_once_with("EC2Fleet")
-    assert len(result) == 2
+    assert result.total_count == 2
+    assert len(result.items) == 2

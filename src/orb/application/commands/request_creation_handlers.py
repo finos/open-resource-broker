@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from orb.application.base.handlers import BaseCommandHandler
@@ -154,8 +155,6 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
         error is logged at ERROR level but NOT re-raised because the request was
         already successfully persisted.
         """
-        import asyncio
-
         with self.uow_factory.create_unit_of_work() as uow:
             events = uow.requests.save(request)
 
@@ -216,6 +215,10 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         self._deprovisioning_orchestrator = DeprovisioningOrchestrator(
             uow_factory, logger, container, query_bus, provider_selection_port
         )
+        # Hold strong references to background deprovisioning tasks so the
+        # event loop's weak-reference set doesn't GC them mid-flight. Each
+        # task removes itself via done_callback once complete.
+        self._background_tasks: set[Any] = set()
 
     async def validate_command(self, command: CreateReturnRequestCommand):
         """Validate create return request command."""
@@ -282,12 +285,13 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             created_requests: list[str] = []
             pending_deprovision: list[tuple[list[str], Any, str]] = []
 
-            for (provider_type, provider_name), machine_ids in provider_groups.items():
+            for (provider_type, provider_name, provider_api), machine_ids in provider_groups.items():
                 return_request_id = str(RequestId.generate(RequestType.RETURN, prefix=prefix))
                 request = Request.create_return_request(
                     machine_ids=machine_ids,
                     provider_type=provider_type,
                     provider_name=provider_name,
+                    provider_api=provider_api,
                     metadata=command.metadata or {},
                     request_id=return_request_id,
                 )
@@ -315,9 +319,39 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             command.processed_machines = valid_machines
             command.skipped_machines = skipped_machines
 
-            # Await deprovisioning sequentially — one per provider group.
-            for machine_ids, request, provider_name in pending_deprovision:
-                await self._execute_deprovisioning_for_request(machine_ids, request, provider_name)
+            # Fire deprovisioning in the background and return immediately.
+            # The HTTP caller (UI / CLI) only needs the request IDs to land —
+            # actual provider termination (TerminateInstances / DeleteFleet)
+            # can take 15-60s on AWS which exceeds typical UI timeouts and
+            # leaves the operator looking at a "failed" toast even though
+            # the return request was created successfully and is processing.
+            #
+            # Errors raised inside the background coroutine are logged but
+            # never surface to the original HTTP caller; the request's
+            # status_message + error_details fields capture them for the UI's
+            # next sync. ``asyncio.create_task`` requires a running event
+            # loop, which is always present here because execute_command is
+            # awaited from FastAPI.
+            async def _deprovision_all() -> None:
+                for machine_ids, request, provider_name in pending_deprovision:
+                    try:
+                        await self._execute_deprovisioning_for_request(
+                            machine_ids, request, provider_name
+                        )
+                    except Exception as deprov_err:
+                        self.logger.error(
+                            "Background deprovisioning failed for request %s: %s",
+                            request.request_id,
+                            deprov_err,
+                            exc_info=True,
+                        )
+
+            # Detach — caller does not await. Strong-reference the task on
+            # the handler so the event loop's weak-set doesn't GC it
+            # mid-flight; discard once the coroutine settles.
+            _task = asyncio.create_task(_deprovision_all())
+            self._background_tasks.add(_task)
+            _task.add_done_callback(self._background_tasks.discard)
 
         except Exception as e:
             self.logger.error(

@@ -180,16 +180,54 @@ class RequestStatusService:
         (target_units, fulfilled_units, running_count, pending_count) appear in every
         response without requiring the caller to re-pass the fulfilment explicitly.
 
-        No-op if the request is already in a terminal state. Terminal requests
-        (COMPLETED/FAILED/CANCELLED/TIMEOUT/PARTIAL) are immutable; re-evaluation
-        of a terminal request during a query-time sync must not attempt to
-        downgrade it.
+        Terminal requests are mostly immutable, but PARTIAL is allowed to
+        upgrade to COMPLETED. Multi-fleet requests can be stamped PARTIAL on
+        a first sync when one fleet is still reporting transient state; once
+        every fleet's instances are running, the next sync correctly produces
+        a 'fulfilled' verdict and the request should reflect that — not stay
+        stuck PARTIAL forever.
+
+        Downgrades (COMPLETED -> PARTIAL/FAILED, CANCELLED -> anything, etc.)
+        remain blocked.
         """
         if request.status.is_terminal():
-            return request
+            # Allow PARTIAL -> COMPLETED upgrade; everything else stays put.
+            new_status_enum: Optional[RequestStatus] = None
+            try:
+                new_status_enum = RequestStatus(status)
+            except ValueError:
+                pass
+            is_upgrade_to_complete = (
+                request.status == RequestStatus.PARTIAL
+                and new_status_enum == RequestStatus.COMPLETED
+            )
+            if not is_upgrade_to_complete:
+                return request
         try:
             status_enum = RequestStatus(status)
             updated_request = request.update_status(status_enum, message)
+
+            # Reconcile the persisted counters with reality. The acquire
+            # fulfilment path transitions directly via ``update_status``,
+            # which does not touch ``successful_count`` — it is only
+            # bumped by ``update_with_provisioning_result``. That works
+            # for batched-instance providers but not for instant fulfilment
+            # (e.g. EC2Fleet instant) where the provider reports
+            # "fulfilled" without emitting instance_ids. Use the request's
+            # own machine_ids list — which is the authoritative count of
+            # machines associated with this request — as the source of
+            # truth for ``successful_count`` whenever it disagrees with
+            # the persisted value.
+            if status_enum in (
+                RequestStatus.COMPLETED,
+                RequestStatus.PARTIAL,
+                RequestStatus.IN_PROGRESS,
+            ):
+                actual_count = len(updated_request.machine_ids)
+                if actual_count and actual_count != updated_request.successful_count:
+                    updated_request = updated_request.model_copy(
+                        update={"successful_count": actual_count}
+                    )
 
             # Cache the latest ProviderFulfilment snapshot so DTO callers can surface it.
             if provider_metadata:

@@ -48,7 +48,15 @@ class TestUpdateRequestStatus:
         call_args = req.update_status.call_args[0]
         assert call_args[0] == RequestStatus.COMPLETED
 
-    def test_full_count_with_errors_sets_partial(self):
+    def test_full_count_with_errors_sets_completed(self):
+        """Fleet errors are advisory when all requested capacity is met.
+
+        EC2Fleet returns success-with-errors when one AZ was skipped but
+        another absorbed the capacity. Marking the request PARTIAL in that
+        case is misleading and locks the request in a non-success
+        terminal state. Errors are still persisted under
+        request.metadata['fleet_errors'].
+        """
         req = _make_request(requested_count=2)
         errors = [{"error_code": "InsufficientCapacity", "error_message": "No capacity"}]
         self.svc._update_request_status(
@@ -59,7 +67,7 @@ class TestUpdateRequestStatus:
             provider_errors=errors,
         )
         call_args = req.update_status.call_args[0]
-        assert call_args[0] == RequestStatus.PARTIAL
+        assert call_args[0] == RequestStatus.COMPLETED
 
     def test_partial_count_no_errors_sets_partial(self):
         req = _make_request(requested_count=5)
@@ -111,7 +119,10 @@ class TestUpdateRequestStatus:
         call_args = req.update_status.call_args[0]
         assert call_args[0] == RequestStatus.FAILED
 
-    def test_error_summary_included_in_message(self):
+    def test_full_count_with_errors_message_signals_non_blocking_warnings(self):
+        """Full fulfillment + errors → status_message says provisioning OK
+        but flags warnings; the error codes themselves live on
+        request.metadata['fleet_errors'], not the status_message."""
         req = _make_request(requested_count=2)
         errors = [{"error_code": "InsufficientCapacity", "error_message": "No capacity"}]
         self.svc._update_request_status(
@@ -122,7 +133,8 @@ class TestUpdateRequestStatus:
             provider_errors=errors,
         )
         call_args = req.update_status.call_args[0]
-        assert "InsufficientCapacity" in call_args[1]
+        assert "provisioned" in call_args[1].lower()
+        assert "warning" in call_args[1].lower()
 
 
 class TestHandleProvisioningFailure:

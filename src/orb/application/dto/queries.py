@@ -32,6 +32,10 @@ class ListActiveRequestsQuery(Query, BaseModel):
     all_resources: bool = False
     limit: Optional[int] = 50  # Default: 50, Max: 1000
     offset: Optional[int] = 0
+    # Server-side filter/sort — applied BEFORE the limit/offset slice so
+    # pagination is honest (a q-match on row 9000 is still reachable).
+    q: Optional[str] = None
+    sort: Optional[str] = None  # "+field" / "-field"; prefix optional, "-" = desc
 
 
 class ListReturnRequestsQuery(Query, BaseModel):
@@ -46,6 +50,8 @@ class ListReturnRequestsQuery(Query, BaseModel):
     filter_expressions: list[str] = []
     limit: Optional[int] = 50  # Default: 50, Max: 1000
     offset: Optional[int] = 0
+    q: Optional[str] = None
+    sort: Optional[str] = None
 
 
 class GetTemplateQuery(Query, BaseModel):
@@ -68,6 +74,8 @@ class ListTemplatesQuery(Query, BaseModel):
     filter_expressions: list[str] = []
     limit: Optional[int] = 50  # Default: 50, Max: 1000
     offset: Optional[int] = 0
+    q: Optional[str] = None
+    sort: Optional[str] = None
 
 
 class ValidateTemplateQuery(Query, BaseModel):
@@ -102,6 +110,13 @@ class ListMachinesQuery(Query, BaseModel):
     timestamp_format: Optional[str] = None
     limit: Optional[int] = 50  # Default: 50, Max: 1000
     offset: Optional[int] = 0
+    q: Optional[str] = None
+    sort: Optional[str] = None
+    # When True, refresh each machine on the returned page from the
+    # provider (one DescribeInstances per row). Off by default so list
+    # endpoints stay cheap; callers that need authoritative state should
+    # use the per-machine /status endpoint instead.
+    sync: bool = False
 
 
 class GetActiveMachineCountQuery(Query, BaseModel):

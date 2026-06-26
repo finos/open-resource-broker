@@ -260,7 +260,12 @@ class CleanupMachineResourcesHandler(BaseCommandHandler[CleanupMachineResourcesC
                 if self.logger:
                     self.logger.warning("Machine not found for cleanup: %s", machine_id)
                 continue
-            machine = machine.model_copy(update={"status": MachineStatus.TERMINATED})  # type: ignore[attr-defined]
+            machine = machine.model_copy(  # type: ignore[attr-defined]
+                update={
+                    "status": MachineStatus.TERMINATED,
+                    "status_reason": "Terminated",
+                }
+            )
             self._machine_repository.save(machine)
 
 
@@ -324,6 +329,11 @@ class DeregisterMachineHandler(BaseCommandHandler[DeregisterMachineCommand, None
             if self.logger:
                 self.logger.warning("Machine not found for deregistration: %s", command.machine_id)
             return None
-        machine = machine.model_copy(update={"status": MachineStatus.TERMINATED})  # type: ignore[attr-defined]
+        machine = machine.model_copy(  # type: ignore[attr-defined]
+            update={
+                "status": MachineStatus.TERMINATED,
+                "status_reason": "Terminated",
+            }
+        )
         self._machine_repository.save(machine)
         return None

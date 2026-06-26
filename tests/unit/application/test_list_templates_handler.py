@@ -45,16 +45,19 @@ async def test_active_only_true_filters_inactive() -> None:
     handler, active_dto = _make_handler()
     query = ListTemplatesQuery(active_only=True)
     result = await handler.execute_query(query)
-    assert result == [active_dto]
+    # Handler now returns Paginated[TemplateDTOPort].
+    assert result.items == [active_dto]
+    assert result.total_count == 1
+    assert result.total_unfiltered == 2
 
 
 @pytest.mark.asyncio
 async def test_active_only_false_returns_all() -> None:
     handler, _ = _make_handler()
-    # Re-fetch inactive from the same mock setup
     query = ListTemplatesQuery(active_only=False)
     result = await handler.execute_query(query)
-    assert len(result) == 2
+    assert len(result.items) == 2
+    assert result.total_count == 2
 
 
 def test_active_only_default_is_true() -> None:
@@ -89,5 +92,7 @@ async def test_pagination_limit_and_offset() -> None:
     query = ListTemplatesQuery(active_only=False, limit=2, offset=1)
     result = await handler.execute_query(query)
 
-    assert len(result) == 2
-    assert result == dtos[1:3]
+    assert len(result.items) == 2
+    assert result.items == dtos[1:3]
+    assert result.total_count == 5
+    assert result.total_unfiltered == 5

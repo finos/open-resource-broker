@@ -14,6 +14,7 @@ from orb.application.dto.queries import (
 )
 from orb.application.dto.system import ValidationDTO
 from orb.application.ports.template_dto_port import TemplateDTOPort
+from orb.application.services.orchestration.dtos import Paginated
 from orb.domain.base.exceptions import EntityNotFoundError
 from orb.domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
 from orb.domain.services.generic_filter_service import GenericFilterService
@@ -80,7 +81,7 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, TemplateDTOPort]):
 
 
 @query_handler(ListTemplatesQuery)
-class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[TemplateDTOPort]]):
+class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, Paginated[TemplateDTOPort]]):
     """Handler for listing templates."""
 
     def __init__(
@@ -94,8 +95,15 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[TemplateDTO
         self._container = container
         self._generic_filter_service = generic_filter_service
 
-    async def execute_query(self, query: ListTemplatesQuery) -> list[TemplateDTOPort]:
-        """Execute list templates query - returns raw templates for scheduler formatting."""
+    async def execute_query(
+        self, query: ListTemplatesQuery
+    ) -> Paginated[TemplateDTOPort]:
+        """Execute list templates query.
+
+        Pipeline: load → filters → active_only → q → sort → total → slice.
+        Filter/sort/q all run on the FULL dataset so the slice is honest:
+        if there are 200 q-matches in 10k rows, page 2 still shows them.
+        """
         from orb.domain.base.ports import TemplateConfigurationPort
 
         self.logger.info("Listing templates")
@@ -112,6 +120,8 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[TemplateDTO
             else:
                 template_dtos = await template_manager.load_templates()
 
+            total_unfiltered = len(template_dtos)
+
             if query.filter_expressions:
                 template_dicts = [dto.model_dump() for dto in template_dtos]
                 filtered_dicts = self._generic_filter_service.apply_filters(
@@ -122,21 +132,70 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[TemplateDTO
             if query.active_only:
                 template_dtos = [t for t in template_dtos if getattr(t, "is_active", True)]
 
-            total_count = len(template_dtos)
-            limit = min(query.limit or 50, 1000)  # type: ignore[union-attr]
-            offset = query.offset or 0  # type: ignore[union-attr]
+            # q: case-insensitive substring search across user-visible fields
+            if query.q:
+                needle = query.q.lower()
+                searchable = ("template_id", "name", "description", "image_id")
+                template_dtos = [
+                    t
+                    for t in template_dtos
+                    if any(
+                        needle
+                        in str(
+                            t.get(f, "") if isinstance(t, dict) else getattr(t, f, "")
+                        ).lower()
+                        for f in searchable
+                    )
+                ]
 
-            if limit > 0:
-                template_dtos = template_dtos[offset : offset + limit]
+            # sort: "+field" / "-field"; missing prefix == asc
+            if query.sort:
+                sort_key = query.sort
+                descending = sort_key.startswith("-")
+                attr = sort_key.lstrip("-+")
+
+                def _val(t: Any) -> str:
+                    raw = t.get(attr, "") if isinstance(t, dict) else getattr(t, attr, "")
+                    return "" if raw is None else str(raw)
+
+                try:
+                    template_dtos = sorted(template_dtos, key=_val, reverse=descending)
+                except TypeError:
+                    pass
+
+            # total AFTER filter+sort, BEFORE slice — this is what the
+            # client expects as the pagination denominator.
+            total_count = len(template_dtos)
+
+            # Slice. None limit → no cap.
+            offset = query.offset or 0
+            if query.limit is None:
+                page = template_dtos[offset:]
+            else:
+                limit = min(query.limit, 1000)
+                if query.limit > 1000:
+                    self.logger.warning(
+                        "ListTemplatesQuery.limit=%d clamped to 1000; "
+                        "total_count=%d. Consumers needing full counts "
+                        "should rely on total_count, not len(templates).",
+                        query.limit,
+                        total_count,
+                    )
+                page = template_dtos[offset : offset + limit] if limit > 0 else []
 
             self.logger.info(
-                "Found %s templates (total: %s, limit: %s, offset: %s)",
-                len(template_dtos),
+                "Found %s templates (total: %s, unfiltered: %s, limit: %s, offset: %s)",
+                len(page),
                 total_count,
-                limit,
+                total_unfiltered,
+                query.limit,
                 offset,
             )
-            return template_dtos  # type: ignore[return-value]
+            return Paginated(
+                items=list(page),  # type: ignore[arg-type]
+                total_count=total_count,
+                total_unfiltered=total_unfiltered,
+            )
 
         except Exception as e:
             self.logger.error("Failed to list templates: %s", e)

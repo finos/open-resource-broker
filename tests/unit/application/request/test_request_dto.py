@@ -65,8 +65,12 @@ class TestRequestDTOVerboseField:
         )
         dto = RequestDTO.from_domain(request)
         result = dto.to_dict()
-        assert "first_status_check" not in result
-        assert "last_status_check" not in result
+        # first_status_check / last_status_check are now exposed in the
+        # non-verbose payload too — the UI's request-detail Timing section
+        # renders the stepper from these even in the list view.
+        assert "first_status_check" in result
+        assert "last_status_check" in result
+        # metadata stays verbose-only.
         assert "metadata" not in result
 
     def test_to_dict_verbose_true_includes_detail_fields(self):

@@ -55,6 +55,9 @@ class UpdateRequestStatusHandler(BaseCommandHandler[UpdateRequestStatusCommand, 
                 if not request:
                     raise EntityNotFoundError("Request", command.request_id)
 
+                # Note: ``started_at`` is stamped inside
+                # ``Request.update_status`` on first non-PENDING
+                # transition — no per-handler logic needed.
                 request = request.update_status(
                     status=command.status,
                     message=command.message or "",

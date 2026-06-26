@@ -244,7 +244,7 @@ class TestDispatchSingleAttemptOutcome:
                 "instances": [{"id": "i-1"}, {"id": "i-2"}],  # 2 of 2
                 "instance_ids": ["i-1", "i-2"],
             },
-            metadata={},
+            metadata={"fulfillment_final": True},
         )
         svc._provider_selection_port.execute_operation = AsyncMock(return_value=provider_result)
 
