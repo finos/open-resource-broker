@@ -52,6 +52,12 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
         # entry point.  The import is guarded by try/except ImportError and the
         # imported module is not actually used (it is the availability sentinel).
         ("interface/cli/k8s_legacy.py", "kubernetes"),
+        # infrastructure/resilience/strategy/exponential.py fast-fails on
+        # non-retryable Kubernetes ApiException status codes (400, 403, 404,
+        # 409, 410, 422).  The import is lazy (inside should_retry()) and
+        # guarded by try/except ImportError so the generic resilience layer
+        # has no hard SDK dependency when the [k8s] extra is not installed.
+        ("infrastructure/resilience/strategy/exponential.py", "kubernetes.client.exceptions"),
     }
 )
 

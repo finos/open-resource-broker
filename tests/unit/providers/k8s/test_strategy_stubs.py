@@ -12,6 +12,8 @@ Covers:
 
 from __future__ import annotations
 
+import asyncio
+import threading
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -307,3 +309,151 @@ def test_build_template_for_request_dict_payload_yields_k8s_template() -> None:
     assert template.namespace == "submitted-ns"
     assert template.image_pull_secret == "registry-creds"
     assert template.node_selector == {"role": "compute"}
+
+
+# ---------------------------------------------------------------------------
+# _stop_watch_manager_sync — shutdown blocking behaviour
+# ---------------------------------------------------------------------------
+
+
+def _make_strategy_no_init() -> K8sProviderStrategy:
+    """Return a strategy without calling initialize() (avoids reconciler I/O)."""
+    fake_client = MagicMock()
+    fake_client.core_v1.get_api_resources.return_value = SimpleNamespace(
+        group_version="v1", resources=[]
+    )
+    return K8sProviderStrategy(
+        config=K8sProviderConfig(),
+        logger=MagicMock(),
+        kubernetes_client=fake_client,
+    )
+
+
+def test_stop_watch_manager_blocks_until_stop_completes_from_foreign_thread() -> None:
+    """stop_watch_manager blocks (via run_coroutine_threadsafe) when called
+    from a thread that is not the event-loop thread.
+
+    The test spins a real asyncio event loop in a background thread, injects
+    a fake watch manager whose ``stop()`` coroutine sets a threading.Event,
+    then calls ``_stop_watch_manager_sync`` from the *main* (foreign) thread
+    and asserts that the Event is set before the call returns.
+    """
+    stop_completed = threading.Event()
+
+    async def _fake_stop() -> None:
+        # Simulate a brief async teardown to confirm we actually await.
+        await asyncio.sleep(0)
+        stop_completed.set()
+
+    fake_manager = MagicMock()
+    fake_manager.is_started.return_value = True
+    fake_manager.stop = AsyncMock(side_effect=_fake_stop)
+
+    strategy = _make_strategy_no_init()
+    strategy._watch_manager = fake_manager  # type: ignore[attr-defined]
+
+    # Run the event loop in a background thread to simulate a daemon.
+    loop_ready = threading.Event()
+    loop_ref: list[asyncio.AbstractEventLoop] = []
+
+    async def _loop_main() -> None:
+        loop_ref.append(asyncio.get_running_loop())
+        loop_ready.set()
+        # Keep the loop alive long enough for the foreign-thread call to
+        # schedule and complete the stop coroutine.
+        await asyncio.sleep(5)
+
+    bg_thread = threading.Thread(target=lambda: asyncio.run(_loop_main()), daemon=True)
+    bg_thread.start()
+    loop_ready.wait(timeout=5)
+
+    loop = loop_ref[0]
+    # Patch the loop onto the strategy so _stop_watch_manager_sync sees it.
+    import unittest.mock as mock
+
+    with mock.patch(
+        "orb.providers.k8s.strategy.k8s_provider_strategy.asyncio.get_running_loop",
+        return_value=loop,
+    ):
+        strategy._stop_watch_manager_sync(shutdown_timeout=5.0)  # type: ignore[attr-defined]
+
+    assert stop_completed.is_set(), (
+        "stop() coroutine was not awaited before _stop_watch_manager_sync returned"
+    )
+
+    # Tidy up the background loop.
+    loop.call_soon_threadsafe(loop.stop)
+    bg_thread.join(timeout=5)
+
+
+def test_stop_watch_manager_respects_timeout_from_foreign_thread() -> None:
+    """When stop() takes longer than shutdown_timeout, the call returns
+    without raising and logs a warning."""
+    import asyncio
+
+    async def _slow_stop() -> None:
+        await asyncio.sleep(60)  # Never completes within the test timeout.
+
+    fake_manager = MagicMock()
+    fake_manager.is_started.return_value = True
+    fake_manager.stop = AsyncMock(side_effect=_slow_stop)
+
+    mock_logger = MagicMock()
+    strategy = _make_strategy_no_init()
+    strategy._watch_manager = fake_manager  # type: ignore[attr-defined]
+    strategy._logger = mock_logger  # type: ignore[attr-defined]
+
+    loop_ready = threading.Event()
+    loop_ref: list[asyncio.AbstractEventLoop] = []
+
+    async def _loop_main() -> None:
+        loop_ref.append(asyncio.get_running_loop())
+        loop_ready.set()
+        await asyncio.sleep(10)
+
+    bg_thread = threading.Thread(target=lambda: asyncio.run(_loop_main()), daemon=True)
+    bg_thread.start()
+    loop_ready.wait(timeout=5)
+
+    loop = loop_ref[0]
+    import unittest.mock as mock
+
+    with mock.patch(
+        "orb.providers.k8s.strategy.k8s_provider_strategy.asyncio.get_running_loop",
+        return_value=loop,
+    ):
+        # Use a very short timeout so the test finishes quickly.
+        strategy._stop_watch_manager_sync(shutdown_timeout=0.1)  # type: ignore[attr-defined]
+
+    warning_calls = [str(c) for c in mock_logger.warning.call_args_list]
+    assert any("did not stop" in msg for msg in warning_calls), (
+        "Expected a timeout warning; got: %s" % warning_calls
+    )
+
+    loop.call_soon_threadsafe(loop.stop)
+    bg_thread.join(timeout=5)
+
+
+def test_stop_watch_manager_no_loop_runs_synchronously() -> None:
+    """When there is no running event loop the call drives stop() via asyncio.run."""
+    completed = threading.Event()
+
+    async def _fake_stop() -> None:
+        completed.set()
+
+    fake_manager = MagicMock()
+    fake_manager.is_started.return_value = True
+    fake_manager.stop = AsyncMock(side_effect=_fake_stop)
+
+    strategy = _make_strategy_no_init()
+    strategy._watch_manager = fake_manager  # type: ignore[attr-defined]
+
+    import unittest.mock as mock
+
+    with mock.patch(
+        "orb.providers.k8s.strategy.k8s_provider_strategy.asyncio.get_running_loop",
+        side_effect=RuntimeError("no running event loop"),
+    ):
+        strategy._stop_watch_manager_sync()  # type: ignore[attr-defined]
+
+    assert completed.is_set(), "stop() was not called synchronously via asyncio.run"

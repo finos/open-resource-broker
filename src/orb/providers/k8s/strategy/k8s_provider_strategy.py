@@ -22,6 +22,7 @@ factory can be a near drop-in.
 from __future__ import annotations
 
 import asyncio
+import threading
 import time
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
 
@@ -298,8 +299,29 @@ class K8sProviderStrategy(ProviderStrategy):
         except Exception as exc:
             self._logger.warning("Failed to start Kubernetes watcher fleet: %s", exc, exc_info=True)
 
-    def _stop_watch_manager_sync(self) -> None:
-        """Stop the watch manager from a sync-or-async cleanup context."""
+    def _stop_watch_manager_sync(self, *, shutdown_timeout: float = 10.0) -> None:
+        """Stop the watch manager, blocking until all watchers exit or the timeout elapses.
+
+        Three paths depending on the calling context:
+
+        * **No running loop** — drives ``manager.stop()`` synchronously
+          via :func:`asyncio.run`.
+        * **Running loop, different thread** (e.g. signal handler) —
+          schedules the coroutine via
+          :func:`asyncio.run_coroutine_threadsafe` and calls
+          ``.result(timeout)`` to block until the watchers exit.  If the
+          timeout elapses a warning is logged but the caller is not raised.
+        * **Running loop, same thread** (event-loop-thread cleanup path) —
+          blocking via ``.result()`` would deadlock, so this path falls
+          back to fire-and-forget scheduling while logging a warning.
+          Callers that need guaranteed completion should use
+          ``await manager.stop()`` directly instead.
+
+        Args:
+            shutdown_timeout: Maximum seconds to wait for the watcher loop
+                to exit when called from a different thread.  Defaults to
+                ``10.0 s``.
+        """
         manager = self._watch_manager
         if manager is None or not manager.is_started():
             return
@@ -307,7 +329,9 @@ class K8sProviderStrategy(ProviderStrategy):
             loop = asyncio.get_running_loop()
         except RuntimeError:
             loop = None
+
         if loop is None:
+            # No running event loop — drive the coroutine synchronously.
             try:
                 asyncio.run(manager.stop())
             except Exception as exc:
@@ -315,8 +339,40 @@ class K8sProviderStrategy(ProviderStrategy):
                     "Watch manager stop raised during cleanup: %s", exc, exc_info=True
                 )
             return
-        # Inside a running loop — schedule stop and let the loop drain.
-        loop.create_task(manager.stop())
+
+        # There is a running event loop.  Determine whether this call is
+        # arriving from the event-loop thread itself or from a foreign
+        # thread (e.g. a signal handler or a cleanup thread).
+        loop_thread_id: int | None = getattr(loop, "_thread_id", None)
+        on_loop_thread = (
+            loop_thread_id is not None and threading.current_thread().ident == loop_thread_id
+        )
+
+        if on_loop_thread:
+            # Blocking here would deadlock — the event loop cannot make
+            # progress while the current frame is suspended.  Schedule
+            # fire-and-forget and warn so operators know the watcher may
+            # not finish before the process exits.
+            self._logger.warning(
+                "Kubernetes watcher stop scheduled without awaiting completion "
+                "(cleanup called from the event-loop thread; "
+                "watchers may outlive this cleanup call)."
+            )
+            loop.create_task(manager.stop())
+            return
+
+        # Foreign thread with a running loop — block with timeout.
+        future = asyncio.run_coroutine_threadsafe(manager.stop(), loop)
+        try:
+            future.result(timeout=shutdown_timeout)
+        except TimeoutError:
+            self._logger.warning(
+                "Kubernetes watcher fleet did not stop within %.1fs; "
+                "proceeding with shutdown anyway.",
+                shutdown_timeout,
+            )
+        except Exception as exc:
+            self._logger.debug("Watch manager stop raised during cleanup: %s", exc, exc_info=True)
 
     # ------------------------------------------------------------------
     # Reconciliation / orphan-GC lifecycle
