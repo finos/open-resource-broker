@@ -14,38 +14,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from orb.domain.base import UnitOfWorkFactory
-from orb.domain.machine.machine_status import MachineStatus
-from orb.domain.request.request_types import RequestStatus
 
 logger = logging.getLogger(__name__)
 
-# Non-terminal request statuses (purge must be rejected for these)
-_NON_TERMINAL_REQUEST_STATUSES = {
-    RequestStatus.PENDING,
-    RequestStatus.IN_PROGRESS,
-    RequestStatus.ACQUIRING,
-}
-
-# Non-terminal machine statuses (purge must be rejected for these)
-_NON_TERMINAL_MACHINE_STATUSES = {
-    MachineStatus.PENDING,
-    MachineStatus.LAUNCHING,
-    MachineStatus.RUNNING,
-    MachineStatus.STOPPING,
-    MachineStatus.SHUTTING_DOWN,
-}
-
-# String representations accepted in bulk cleanup body
-_ALLOWED_TERMINAL_REQUEST_STATUS_STRINGS = {
-    "cancelled",
-    "canceled",
-    "complete",
-    "completed",
-    "failed",
-    "timeout",
-    "partial",
-}
-
+# Non-terminal request status strings — the bulk cleanup body rejects
+# these. Enum-form constants were removed: the cleanup paths normalise
+# status to strings before checking, so the enum sets were never read.
 _NON_TERMINAL_REQUEST_STATUS_STRINGS = {
     "pending",
     "in_progress",
