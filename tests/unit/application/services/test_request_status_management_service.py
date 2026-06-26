@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from orb.application.services.provisioning_orchestration_service import ProvisioningResult
 from orb.application.services.request_status_management_service import (
     RequestStatusManagementService,
@@ -122,7 +124,13 @@ class TestUpdateRequestStatus:
     def test_full_count_with_errors_message_signals_non_blocking_warnings(self):
         """Full fulfillment + errors → status_message says provisioning OK
         but flags warnings; the error codes themselves live on
-        request.metadata['fleet_errors'], not the status_message."""
+        request.metadata['fleet_errors'], not the status_message.
+
+        Verifies the status_message contract here; the metadata persistence
+        contract is tested below at the higher entry point
+        (``_update_request_status_from_result``) where the actual
+        ``update_metadata`` call happens.
+        """
         req = _make_request(requested_count=2)
         errors = [{"error_code": "InsufficientCapacity", "error_message": "No capacity"}]
         self.svc._update_request_status(
@@ -135,6 +143,52 @@ class TestUpdateRequestStatus:
         call_args = req.update_status.call_args[0]
         assert "provisioned" in call_args[1].lower()
         assert "warning" in call_args[1].lower()
+
+    @pytest.mark.asyncio
+    async def test_provisioning_result_with_fleet_errors_persists_them_in_metadata(self):
+        """fleet_errors from provider_data must be persisted on request.metadata.
+
+        Without this the error codes are user-invisible — only the
+        status_message would reflect them, and that's deliberately a
+        non-blocking summary not the error list. Tests the public entry
+        point that does the metadata write.
+        """
+        from unittest.mock import MagicMock
+
+        req = _make_request(requested_count=2)
+        req.metadata = {}
+        req.provider_data = {}
+        captured: dict = {}
+
+        def _capture_metadata(patch):
+            captured.update(patch)
+            req.metadata = {**req.metadata, **patch}
+            return req
+
+        req.update_metadata = MagicMock(side_effect=_capture_metadata)
+        req.set_provider_data = MagicMock(return_value=req)
+        req.add_resource_id = MagicMock(return_value=req)
+        req.add_machine_ids = MagicMock(return_value=req)
+
+        provisioning_result = MagicMock(
+            resource_ids=["fleet-1"],
+            # Empty instances list — exercises the metadata-persistence path
+            # without dragging in the create-machine-aggregate side-effect.
+            instances=[],
+            machine_ids=[],
+            provider_data={
+                "fleet_errors": [
+                    {"error_code": "InsufficientCapacity", "error_message": "No capacity"}
+                ]
+            },
+            success=True,
+            is_final=True,
+        )
+
+        await self.svc.update_request_from_provisioning(req, provisioning_result)
+
+        assert "fleet_errors" in captured
+        assert captured["fleet_errors"][0]["error_code"] == "InsufficientCapacity"
 
 
 class TestHandleProvisioningFailure:
