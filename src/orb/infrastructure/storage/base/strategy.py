@@ -191,6 +191,18 @@ class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
         self.logger = get_logger(__name__)
         self._is_closed = False
 
+    def is_healthy(self) -> tuple[bool, dict[str, Any]]:
+        """Probe the backend with a cheap read-only call.
+
+        Returns ``(healthy, details)`` where ``details`` is a small dict the
+        ``/health`` endpoint embeds verbatim. Subclasses should override to
+        delegate to their connection/client manager (see
+        ``ResourceManager.is_healthy``). The default keeps the historical
+        ``unknown`` behaviour so a strategy without an override doesn't
+        get silently misclassified.
+        """
+        return False, {"reason": "is_healthy not implemented for this strategy"}
+
     def cleanup(self) -> None:
         """
         Clean up resources used by the storage strategy.

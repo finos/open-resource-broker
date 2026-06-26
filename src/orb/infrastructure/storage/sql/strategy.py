@@ -52,6 +52,33 @@ class SQLStorageStrategy(BaseStorageStrategy):
 
         self.logger.debug("Initialized SQL storage strategy for table %s", table_name)
 
+    def is_healthy(self) -> tuple[bool, dict[str, Any]]:
+        """Probe SQL: confirm connection works AND the configured table exists.
+
+        Two cheap calls:
+          - ``SELECT 1`` via the connection manager
+          - ``table_exists(self.table_name)`` to catch schema-not-deployed
+        """
+        info = self.connection_manager.get_connection_info()
+        details: dict[str, Any] = {
+            "type": "sql",
+            "database_type": info.get("database_type", "unknown"),
+            "table": self.table_name,
+        }
+        if not info.get("healthy", False):
+            details["reason"] = "connection manager reports unhealthy"
+            return False, details
+        try:
+            table_present = self.connection_manager.table_exists(self.table_name)
+        except Exception as exc:
+            details["error"] = f"table_exists check failed: {exc}"
+            return False, details
+        details["table_exists"] = table_present
+        if not table_present:
+            details["reason"] = "configured table does not exist"
+            return False, details
+        return True, details
+
     def _get_id_column(self) -> str:
         """Get the primary key column name."""
         for column_name, column_type in self.columns.items():
@@ -60,12 +87,34 @@ class SQLStorageStrategy(BaseStorageStrategy):
         return "id"  # Default fallback
 
     def _initialize_table(self) -> None:
-        """Initialize database table if it doesn't exist."""
+        """Initialize database tables.
+
+        For tables that are defined in the ORM (requests, machines, templates)
+        ``Base.metadata.create_all`` is used — this is the authoritative DDL path.
+
+        For any other table name (e.g. ad-hoc tables used in tests or generic
+        storage) the legacy column-dict driven ``build_create_table`` path is
+        used as a fallback so existing behaviour is preserved.
+        """
         try:
-            if not self.connection_manager.table_exists(self.table_name):
-                create_table_sql = self.query_builder.build_create_table()
-                self.connection_manager.execute_query(create_table_sql)
-                self.logger.info("Created table: %s", self.table_name)
+            from orb.infrastructure.storage.sql.models import Base
+
+            engine = self.connection_manager.get_engine()
+            orm_tables = set(Base.metadata.tables.keys())
+
+            if self.table_name in orm_tables:
+                Base.metadata.create_all(engine)
+                self.logger.debug(
+                    "Applied Base.metadata.create_all for ORM table %s", self.table_name
+                )
+            else:
+                # Fallback: build CREATE TABLE from the column dict (legacy path).
+                if not self.connection_manager.table_exists(self.table_name):
+                    create_table_sql = self.query_builder.build_create_table()
+                    self.connection_manager.execute_query(create_table_sql)
+                    self.logger.info(
+                        "Created non-ORM table via column-dict DDL: %s", self.table_name
+                    )
         except Exception as e:
             self.logger.error("Failed to initialize table %s: %s", self.table_name, e)
             raise

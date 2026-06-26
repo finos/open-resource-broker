@@ -36,19 +36,34 @@ class MachineSerializer(BaseEntitySerializer):
             raise
 
     def from_dict(self, data: dict[str, Any]) -> Machine:
-        """Deserialize a storage dict back to a Machine aggregate."""
+        """Deserialize a storage dict back to a Machine aggregate.
+
+        Raises ValueError on invariant violations (e.g. missing
+        provider_api) so callers can decide whether to skip-and-log a
+        bad row or surface the failure. List endpoints catch and skip;
+        single-id lookups propagate so a request for a known-bad id
+        returns 404 instead of pretending the row exists.
+        """
         try:
             data = self._normalize_on_read(data)
             return Machine.model_validate(data)
         except Exception as e:
-            self.logger.error("Failed to deserialize machine data: %s", e)
+            machine_id = data.get("machine_id", "<unknown>")
+            self.logger.error(
+                "Failed to deserialize machine %s: %s", machine_id, e
+            )
             raise
+
+    _CURRENT_SCHEMA_VERSION = "2.0.0"
 
     def _normalize_on_read(self, data: dict[str, Any]) -> dict[str, Any]:
         """Normalize storage data before model_validate.
 
-        Runs on every read to handle legacy data quirks and future
-        schema evolution. Each fixup is idempotent.
+        Runs only on records written by an older serializer (missing
+        schema_version, or schema_version < _CURRENT_SCHEMA_VERSION).
+        Records stamped at the current version go straight to
+        model_validate — the shim cost (dict copies, key migrations) is
+        avoided on every hot read.
 
         Categories:
           - FIELD MIGRATION: field was renamed or moved between schema versions
@@ -58,6 +73,9 @@ class MachineSerializer(BaseEntitySerializer):
                              the aggregate default, or where the key must be
                              present for model_validate to accept the record.
         """
+        # Fast path: current-version records skip all legacy fixups.
+        if data.get("schema_version") == self._CURRENT_SCHEMA_VERSION:
+            return data
         data = dict(data)  # shallow copy — don't mutate the caller's dict
 
         # FIELD MIGRATION: legacy records may not have a name field; use
@@ -88,6 +106,18 @@ class MachineSerializer(BaseEntitySerializer):
         if _migrated:
             data["metadata"] = _metadata
             data["provider_data"] = _provider_data
+
+        # FIELD MIGRATION: legacy records may carry a nested provider_data
+        # envelope written by the old adapter:
+        #   {"method": "...", "provider_data": {"target_units": 3, ...}}
+        # Promote nested keys to the top level and drop the redundant wrapper.
+        # Idempotent: flat records pass through unchanged.
+        _pd = data.get("provider_data")
+        if isinstance(_pd, dict) and isinstance(_pd.get("provider_data"), dict):
+            _nested = _pd.pop("provider_data")
+            # Outer keys win over inner keys on collision.
+            _pd = {**_nested, **_pd}
+            data["provider_data"] = _pd
 
         # provider_type: Machine.provider_type now has Field(default="aws"), so
         # model_validate will supply the default when the key is absent.
@@ -233,23 +263,34 @@ class MachineRepositoryImpl(StorageRepositoryMixin, MachineRepositoryInterface):
 
     @handle_infrastructure_exceptions(context="machine_repository_find_by_request_id")
     def find_by_request_id(self, request_id: str) -> list[Machine]:
-        """Find machines by request ID."""
+        """Find machines by request ID.
+
+        Uses _safe_deserialize_iter so a single malformed row never aborts
+        the whole result set — critical on the deprovisioning path, where
+        a return batch of N machines must not be killed by one bad row.
+        """
         try:
-            # Filter to only machine records (must have machine_id field)
-            data_list = self._get_storage().find_by_criteria({"request_id": request_id})
-            return [self.serializer.from_dict(d) for d in data_list if "machine_id" in d]  # type: ignore[return-value]
+            # Filter to only machine records (must have machine_id field).
+            data_list = [
+                d for d in self._get_storage().find_by_criteria({"request_id": request_id})
+                if "machine_id" in d
+            ]
+            return list(self._safe_deserialize_iter(data_list))  # type: ignore[return-value]
         except Exception as e:
             self.logger.error("Failed to find machines by request_id %s: %s", request_id, e)
             raise
 
     @handle_infrastructure_exceptions(context="machine_repository_find_by_return_request_id")
     def find_by_return_request_id(self, return_request_id: str) -> list[Machine]:
-        """Find machines by return request ID."""
+        """Find machines by return request ID. See find_by_request_id."""
         try:
-            data_list = self._get_storage().find_by_criteria(
-                {"return_request_id": return_request_id}
-            )
-            return [self.serializer.from_dict(d) for d in data_list if "machine_id" in d]  # type: ignore[return-value]
+            data_list = [
+                d for d in self._get_storage().find_by_criteria(
+                    {"return_request_id": return_request_id}
+                )
+                if "machine_id" in d
+            ]
+            return list(self._safe_deserialize_iter(data_list))  # type: ignore[return-value]
         except Exception as e:
             self.logger.error(
                 "Failed to find machines by return_request_id %s: %s", return_request_id, e

@@ -29,6 +29,37 @@ def _id_str(value_obj: Any) -> str:
     return str(value_obj.value) if hasattr(value_obj, "value") else str(value_obj)
 
 
+def _unwrap_provider_data(raw: Any) -> dict[str, Any]:
+    """Normalise the stored ``provider_data`` dict to a flat envelope.
+
+    Old records were persisted with a nested wrapper shape written by the AWS
+    provisioning adapter before the envelope was flattened:
+
+        {"method": "provisioning_adapter", "provider_data": {"target_units": 3, ...}}
+
+    The new shape places all keys at the top level:
+
+        {"method": "provisioning_adapter", "target_units": 3, ...}
+
+    This shim detects the legacy shape on read (presence of a "provider_data"
+    dict value nested inside the top-level provider_data dict) and promotes its
+    contents to the top level, removing the redundant nested key.  It is
+    idempotent: records already written in the flat format pass through
+    unchanged.
+    """
+    if not isinstance(raw, dict):
+        return raw or {}
+
+    nested = raw.get("provider_data")
+    if not isinstance(nested, dict):
+        return raw  # already flat or no nesting — nothing to do
+
+    # Promote nested keys; caller's top-level keys take priority.
+    merged: dict[str, Any] = {**nested, **raw}
+    del merged["provider_data"]
+    return merged
+
+
 class RequestSerializer(BaseEntitySerializer):
     """Handles Request aggregate serialization/deserialization."""
 
@@ -151,7 +182,7 @@ class RequestSerializer(BaseEntitySerializer):
                 # Metadata and error details
                 "metadata": data.get("metadata", {}),
                 "error_details": data.get("error_details", {}),
-                "provider_data": data.get("provider_data", {}),
+                "provider_data": _unwrap_provider_data(data.get("provider_data", {})),
                 # Timestamps
                 "created_at": created_at,
                 "started_at": started_at,

@@ -31,12 +31,6 @@ class TemplateSerializer(BaseEntitySerializer):
         self._dt = GenericEntitySerializer(Template, "Template", "template_id")
         self.defaults_service = defaults_service
 
-        if not self.defaults_service:
-            try:
-                pass
-            except Exception as e:
-                self.logger.debug("Could not get defaults service from container: %s", e)
-
     def _normalize_machine_types(self, data: dict) -> dict[str, int]:
         """Normalize machine types from various input formats."""
         if "vmType" in data:
