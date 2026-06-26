@@ -47,8 +47,15 @@ def test_create_k8s_resolver_returns_none() -> None:
     assert create_k8s_resolver() is None
 
 
-def test_create_k8s_validator_returns_none_when_no_config() -> None:
-    assert create_k8s_validator(None) is None
+def test_create_k8s_validator_returns_instance() -> None:
+    """create_k8s_validator must return a K8sTemplateValidator regardless of config."""
+    from orb.providers.k8s.validation.template_validator import K8sTemplateValidator
+
+    validator = create_k8s_validator(None)
+    assert isinstance(validator, K8sTemplateValidator)
+
+    validator_no_arg = create_k8s_validator()
+    assert isinstance(validator_no_arg, K8sTemplateValidator)
 
 
 def test_create_k8s_strategy_initialises_with_dict() -> None:

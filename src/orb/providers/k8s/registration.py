@@ -128,13 +128,26 @@ def create_k8s_resolver() -> Any:
 
 
 def create_k8s_validator(provider_config: Any = None) -> Any:
-    """No provider-side template validator is shipped yet.
+    """Create a :class:`K8sTemplateValidator` for registration-time template checks.
 
-    Returns ``None`` so the provider registry falls back to the generic
-    validation surface.  Handler-level validation is performed inside
-    each per-API handler at submit time.
+    The validator is called by the provider registry at template-registration
+    time so that malformed templates are rejected before the first acquire
+    attempt reaches the Kubernetes API server.
+
+    Args:
+        provider_config: Unused; accepted for API parity with the AWS
+            equivalent so the registry can call all validator factories
+            with the same signature.
+
+    Returns:
+        A :class:`~orb.providers.k8s.validation.template_validator.K8sTemplateValidator`
+        instance.
     """
-    return None
+    from orb.providers.k8s.validation.template_validator import (
+        K8sTemplateValidator,  # noqa: PLC0415
+    )
+
+    return K8sTemplateValidator()
 
 
 # ---------------------------------------------------------------------------
