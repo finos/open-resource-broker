@@ -438,6 +438,23 @@ class K8sWatcher:
         status_str = pod_status_string(phase, ready)
         reason = extract_status_reason(container_statuses, conditions)
 
+        # DisruptionTarget condition — Karpenter preemption signal.
+        disrupted_reason: Optional[str] = None
+        disrupted_message: Optional[str] = None
+        for cond in conditions:
+            if (
+                getattr(cond, "type", None) == "DisruptionTarget"
+                and getattr(cond, "status", None) == "True"
+            ):
+                disrupted_reason = str(getattr(cond, "reason", None) or "")
+                disrupted_message = str(getattr(cond, "message", None) or "")
+                break
+
+        # Sum restart_count across all containers.
+        restart_count: int = sum(
+            int(getattr(cs, "restart_count", 0) or 0) for cs in container_statuses
+        )
+
         return PodState(
             request_id=request_id,
             pod_name=name,
@@ -452,6 +469,9 @@ class K8sWatcher:
             start_time=str(start_time) if start_time is not None else None,
             labels=labels,
             deleted=deleted,
+            disrupted_reason=disrupted_reason,
+            disrupted_message=disrupted_message,
+            restart_count=restart_count,
         )
 
 

@@ -423,6 +423,23 @@ class K8sHandlerBase(ABC):
         status_str = pod_status_string(phase, ready)
         status_reason = extract_status_reason(container_statuses, conditions)
 
+        # DisruptionTarget condition — Karpenter preemption signal.
+        disrupted_reason: Optional[str] = None
+        disrupted_message: Optional[str] = None
+        for cond in conditions:
+            if (
+                getattr(cond, "type", None) == "DisruptionTarget"
+                and getattr(cond, "status", None) == "True"
+            ):
+                disrupted_reason = str(getattr(cond, "reason", None) or "")
+                disrupted_message = str(getattr(cond, "message", None) or "")
+                break
+
+        # Sum restart_count across all containers.
+        restart_count: int = sum(
+            int(getattr(cs, "restart_count", 0) or 0) for cs in container_statuses
+        )
+
         return {
             "instance_id": name,
             "resource_id": name,
@@ -445,6 +462,9 @@ class K8sHandlerBase(ABC):
                 "node_name": node_name,
                 "phase": phase,
                 "ready": ready,
+                "restart_count": restart_count,
+                "disrupted_reason": disrupted_reason,
+                "disrupted_message": disrupted_message,
             },
             "metadata": {},
         }
@@ -477,6 +497,9 @@ class K8sHandlerBase(ABC):
                 "node_name": state.node_name,
                 "phase": state.phase,
                 "ready": state.ready,
+                "restart_count": state.restart_count,
+                "disrupted_reason": state.disrupted_reason,
+                "disrupted_message": state.disrupted_message,
             },
             "metadata": {},
         }

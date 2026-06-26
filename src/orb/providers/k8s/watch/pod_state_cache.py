@@ -28,6 +28,13 @@ fulfilment without re-deriving fields from a ``V1Pod`` on every read:
   :meth:`PodStateCache.delete`.
 * ``last_updated``     — monotonic timestamp (seconds) of the last
   upsert; consumed by :meth:`PodStateCache.mark_stale`.
+* ``disrupted_reason`` / ``disrupted_message`` — set when the pod
+  carries a ``DisruptionTarget=True`` condition (Karpenter preemption).
+  ``None`` when the pod is not being preempted.
+* ``restart_count``    — sum of ``restartCount`` across all containers;
+  non-zero values indicate a container restart loop and are surfaced in
+  the per-instance ``provider_data`` so operators can detect
+  ``CrashLoopBackOff`` before the pending timeout fires.
 
 The cache uses a coarse :class:`threading.RLock` because the watcher
 runs on a worker thread (via :func:`asyncio.to_thread`) while readers
@@ -67,6 +74,13 @@ class PodState:
     labels: dict[str, str] = field(default_factory=dict)
     deleted: bool = False
     last_updated: float = 0.0
+    # Karpenter / cluster-autoscaler preemption signal.  Set when the pod
+    # carries a ``DisruptionTarget=True`` condition; ``None`` otherwise.
+    disrupted_reason: Optional[str] = None
+    disrupted_message: Optional[str] = None
+    # Sum of restartCount across all containers.  Non-zero indicates the
+    # pod is in a restart loop (e.g. CrashLoopBackOff).
+    restart_count: int = 0
 
 
 class PodStateCache:
@@ -116,6 +130,9 @@ class PodStateCache:
             labels=dict(state.labels),
             deleted=state.deleted,
             last_updated=time.monotonic(),
+            disrupted_reason=state.disrupted_reason,
+            disrupted_message=state.disrupted_message,
+            restart_count=state.restart_count,
         )
         key = (stamped.request_id, stamped.pod_name)
         with self._lock:
