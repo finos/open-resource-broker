@@ -1,11 +1,9 @@
 """HostFactory response formatting — converts domain objects to HF wire format.
 
-NOTE (dead code): HostFactoryResponseFormatter is not referenced anywhere in the
-production code path.  All equivalent formatting logic lives inline on
-HostFactorySchedulerStrategy (hostfactory_strategy.py).  This class was
-extracted as a refactoring step but the strategy was never updated to delegate
-to it.  Do not delete — it may be wired up in a future cleanup — but do not
-rely on it being called at runtime.
+This module is the contract-test target for HF response shapes
+(tests/unit/test_hf_response_contracts.py). HostFactorySchedulerStrategy
+keeps inline formatting; this class exists as the reference shape the
+tests assert against.
 """
 
 import json
