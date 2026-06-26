@@ -56,9 +56,9 @@ Type=simple
 User=orb
 Group=orb
 WorkingDirectory=/opt/orb
-Environment=HF_SERVER_ENABLED=true
-Environment=HF_AUTH_ENABLED=true
-Environment=HF_CONFIG_FILE=/etc/orb/config.json
+Environment=ORB_SERVER_ENABLED=true
+Environment=ORB_AUTH_ENABLED=true
+Environment=ORB_CONFIG_FILE=/etc/orb/config.json
 ExecStart=/opt/orb/venv/bin/orb server start --foreground
 Restart=always
 RestartSec=10
