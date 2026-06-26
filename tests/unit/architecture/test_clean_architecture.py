@@ -151,7 +151,16 @@ class TestCleanArchitecture:
         return violations
 
     def _check_forbidden_imports(self, file_path: str, forbidden: list[str]) -> list[str]:
-        """Check for forbidden imports in a file."""
+        """Check for forbidden imports in a file.
+
+        Matches each forbidden entry as a dotted module prefix, NOT as a
+        substring. The old ``in`` match incorrectly flagged e.g.
+        ``orb.application.services.orchestration.list_requests`` as
+        importing the ``requests`` HTTP client because ``"requests"`` is
+        a substring of ``"list_requests"``. Dotted forbidden entries
+        (e.g. ``orb.infrastructure``) match any import whose path starts
+        with that prefix.
+        """
         violations = []
 
         try:
@@ -162,8 +171,14 @@ class TestCleanArchitecture:
                 for node in ast.walk(tree):
                     if isinstance(node, (ast.Import, ast.ImportFrom)):
                         import_name = self._get_import_name(node)
-                        if any(forbidden_lib in import_name for forbidden_lib in forbidden):
-                            violations.append(f"{file_path}: {import_name}")
+                        if not import_name:
+                            continue
+                        parts = import_name.split(".")
+                        for fl in forbidden:
+                            fl_parts = fl.split(".")
+                            if parts[: len(fl_parts)] == fl_parts:
+                                violations.append(f"{file_path}: {import_name}")
+                                break
         except (SyntaxError, UnicodeDecodeError):
             pass
 

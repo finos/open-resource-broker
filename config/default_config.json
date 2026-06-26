@@ -231,9 +231,7 @@
     },
     "cors": {
       "enabled": true,
-      "origins": [
-        "*"
-      ],
+      "origins": [],
       "methods": [
         "GET",
         "POST",
@@ -269,5 +267,12 @@
       "asg": "",
       "tag": ""
     }
+  },
+  "ui": {
+    "enabled": true,
+    "mode": "embedded",
+    "backend_port": 8000,
+    "frontend_port": 3000,
+    "base_url": "http://localhost:8000"
   }
 }

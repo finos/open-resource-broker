@@ -122,7 +122,7 @@ export ORB_AWS_REGION=us-east-1
 export ORB_AWS_PROFILE=development
 
 # Start with defaults
-orb system serve
+orb server start --foreground
 ```
 
 #### Staging Environment
@@ -150,7 +150,7 @@ export ORB_REQUEST_TIMEOUT=300
 export ORB_AWS_MAX_RETRIES=3
 
 # Use configuration file for complex settings
-orb system serve --config config/staging.json
+orb server start --foreground --config config/staging.json
 ```
 
 #### Production Environment
@@ -168,7 +168,7 @@ export ORB_ENVIRONMENT=production
 export ORB_AWS_ROLE_ARN=arn:aws:iam::123456789012:role/OrbitProductionRole
 
 # All other configuration in secure configuration file
-orb system serve --config /etc/orb/production.json
+orb server start --foreground --config /etc/orb/production.json
 ```
 
 ### Configuration File Structure
@@ -258,7 +258,7 @@ orb system serve --config /etc/orb/production.json
 ls -la config/config.json ~/.orb/config.json
 
 # Specify explicit path
-orb system serve --config /path/to/config.json
+orb server start --foreground --config /path/to/config.json
 ```
 
 **Environment variable not taking effect:**
@@ -285,7 +285,7 @@ Enable debug logging to see configuration loading process:
 
 ```bash
 export ORB_LOG_LEVEL=DEBUG
-orb system serve --config config.json
+orb server start --foreground --config config.json
 ```
 
 This will show:
@@ -1012,7 +1012,7 @@ Enable debug logging to see configuration loading:
 
 ```bash
 export ORB_LOG_LEVEL=DEBUG
-orb system serve --config config.json
+orb server start --foreground --config config.json
 ```
 
 This will show:

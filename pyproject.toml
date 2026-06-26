@@ -60,9 +60,17 @@ dependencies = [
     # breaking change for operators who installed without extras.
     "boto3>=1.42.21",
     "botocore>=1.42.21",
+    "psutil>=5.9.0", # Required by the system health check (CPU/memory)
 ]
 
 [project.optional-dependencies]
+# ── Storage extras ─────────────────────────────────────────────────────────
+# SQL storage strategy — includes Alembic for schema migration support.
+# Install with: pip install orb-py[sql]
+sql = [
+    "alembic>=1.13",
+]
+
 # ── Provider extras ────────────────────────────────────────────────────────
 # AWS provider — explicit opt-in alias for the AWS deps currently in core.
 # Pinning the same versions keeps `pip install orb-py[aws]` resolving identically
@@ -140,9 +148,16 @@ monitoring-aws = [
     "opentelemetry-instrumentation-boto>=0.41b0",
 ]
 
+# Web UI (Reflex)
+ui = [
+    "orb-py[api]",
+    "reflex>=0.9.5",
+    "httpx>=0.27.0",
+]
+
 # All optional features (providers + features)
 all = [
-    "orb-py[cli,api,monitoring,all-providers]",
+    "orb-py[cli,api,sql,monitoring,ui,all-providers]",
 ]
 
 # ── Test extras ────────────────────────────────────────────────────────────

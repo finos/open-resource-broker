@@ -424,7 +424,7 @@ export ORB_CIRCUIT_BREAKER__ENABLED=true
 export ORB_CIRCUIT_BREAKER__FAILURE_THRESHOLD=5
 
 # Start the application
-orb system serve --port 8000
+orb server start --foreground --port 8000
 ```
 
 ### Configuration Validation

@@ -127,8 +127,11 @@ pip install -e .
 cp config/default_config.json config/production.json
 # Edit config/production.json
 
-# Start server
-orb system serve --host 0.0.0.0 --port 8000 --config config/production.json
+# Start server (foreground)
+orb --config config/production.json server start --foreground --host 0.0.0.0 --port 8000
+
+# Or daemonise (writes a PID file under <work_dir>/server/orb-server.pid)
+orb --config config/production.json server start --host 0.0.0.0 --port 8000
 ```
 
 #### Systemd Service
@@ -145,7 +148,7 @@ Group=orb
 WorkingDirectory=/opt/orb
 Environment=HF_SERVER_ENABLED=true
 Environment=HF_AUTH_ENABLED=true
-ExecStart=/opt/orb/.venv/bin/python src/run.py system serve --config config/production.json
+ExecStart=/opt/orb/.venv/bin/orb --config config/production.json server start --foreground
 Restart=always
 RestartSec=10
 

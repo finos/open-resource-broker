@@ -177,8 +177,8 @@ start_application() {
         cmd_args+=("--log-level" "${HF_LOGGING_LEVEL}")
     fi
 
-    # Add system serve command
-    cmd_args+=("system" "serve")
+    # Add server start command (PID 1 in the container — run foreground).
+    cmd_args+=("server" "start" "--foreground")
 
     # Add server-specific arguments
     if [[ -n "${HF_SERVER_HOST}" ]]; then

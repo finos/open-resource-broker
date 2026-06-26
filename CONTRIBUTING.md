@@ -330,7 +330,7 @@ The container supports multiple entry points:
 docker run --rm image --version
 
 # API server
-docker run -p 8000:8000 image system serve
+docker run -p 8000:8000 image server start --foreground
 
 # Health check
 docker run --rm image --health

@@ -59,7 +59,7 @@ WorkingDirectory=/opt/orb
 Environment=HF_SERVER_ENABLED=true
 Environment=HF_AUTH_ENABLED=true
 Environment=HF_CONFIG_FILE=/etc/orb/config.json
-ExecStart=/opt/orb/venv/bin/python -m src.run system serve
+ExecStart=/opt/orb/venv/bin/orb server start --foreground
 Restart=always
 RestartSec=10
 StandardOutput=journal
