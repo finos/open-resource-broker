@@ -1,7 +1,7 @@
 """Kubernetes Provider Strategy — orchestrator for Kubernetes provider operations.
 
 Mirrors :class:`orb.providers.aws.strategy.aws_provider_strategy.AWSProviderStrategy`
-in shape and responsibility split.  Phase A implements the wired-up shell:
+in shape and responsibility split:
 
 * ``check_health`` — calls ``CoreV1Api.get_api_resources`` and returns a
   populated :class:`ProviderHealthStatus`.
@@ -10,8 +10,9 @@ in shape and responsibility split.  Phase A implements the wired-up shell:
   plus the four v1 handler names.
 * ``get_available_regions`` — returns ``[]`` because Kubernetes uses
   contexts rather than regions.
-* ``acquire`` / ``return_machines`` / ``get_status`` — raise
-  ``NotImplementedError`` (filled in Phase B with the Pod handler).
+* ``acquire`` / ``return_machines`` / ``get_status`` — dispatch to the
+  per-provider-API handler.  Phase B wires the Pod handler; Deployment /
+  StatefulSet / Job handlers arrive in Phases E and F.
 
 The strategy adopts the same constructor signature, lazy-getter style and
 DI-friendly contract as the AWS counterpart so that the registration
@@ -20,11 +21,12 @@ factory can be a near drop-in.
 
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import TYPE_CHECKING, Any, Optional
 
 from orb.domain.base.dependency_injection import injectable
-from orb.domain.base.operation_outcome import OperationOutcome
+from orb.domain.base.operation_outcome import Accepted, Completed, Failed, OperationOutcome
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.providers.base.strategy import (
@@ -36,11 +38,14 @@ from orb.providers.base.strategy import (
     ProviderStrategy,
 )
 from orb.providers.kubernetes.configuration.config import KubernetesProviderConfig
+from orb.providers.kubernetes.handlers.base_handler import KubernetesHandlerBase
+from orb.providers.kubernetes.handlers.pod_handler import KubernetesPodHandler
 from orb.providers.kubernetes.infrastructure.kubernetes_client import KubernetesClient
 from orb.providers.kubernetes.value_objects import KubernetesProviderApi
 
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
     from orb.domain.request.aggregate import Request
+    from orb.domain.template.template_aggregate import Template
     from orb.monitoring.health import HealthCheck
 
 
@@ -66,6 +71,7 @@ class KubernetesProviderStrategy(ProviderStrategy):
         config_port: Optional[ConfigurationPort] = None,
         console: Optional[Any] = None,
         kubernetes_client: Optional[KubernetesClient] = None,
+        handler_overrides: Optional[dict[str, KubernetesHandlerBase]] = None,
     ) -> None:
         if not isinstance(config, KubernetesProviderConfig):
             raise ValueError("KubernetesProviderStrategy requires KubernetesProviderConfig")
@@ -78,6 +84,9 @@ class KubernetesProviderStrategy(ProviderStrategy):
         self._provider_name = provider_name
         self._config_port = config_port
         self._kubernetes_client: Optional[KubernetesClient] = kubernetes_client
+        # Handler cache keyed by provider_api value.  Tests can pre-seed
+        # this via ``handler_overrides`` to inject mock handlers.
+        self._handlers: dict[str, KubernetesHandlerBase] = dict(handler_overrides or {})
 
     # ------------------------------------------------------------------
     # Provider identity
@@ -311,25 +320,153 @@ class KubernetesProviderStrategy(ProviderStrategy):
         register_kubernetes_health_checks(health_check, client)
 
     # ------------------------------------------------------------------
-    # Typed provisioning interface — Phase B+
+    # Handler dispatch
+    # ------------------------------------------------------------------
+
+    def _resolve_provider_api(self, request: "Request") -> str:
+        """Pick the provider-API key for ``request``.
+
+        Defaults to :attr:`KubernetesProviderApi.POD` so legacy callers
+        that omit the provider_api field still route to the Pod handler.
+        """
+        api = getattr(request, "provider_api", None)
+        if api:
+            return str(api)
+        return KubernetesProviderApi.POD.value
+
+    def _get_handler(self, provider_api: str) -> KubernetesHandlerBase:
+        """Return (and lazily construct) the handler for ``provider_api``."""
+        handler = self._handlers.get(provider_api)
+        if handler is not None:
+            return handler
+        if provider_api == KubernetesProviderApi.POD.value:
+            handler = KubernetesPodHandler(
+                kubernetes_client=self.kubernetes_client,
+                config=self._k8s_config,
+                logger=self._logger,
+            )
+            self._handlers[provider_api] = handler
+            return handler
+        # Deployment / StatefulSet / Job arrive in Phases E / F.
+        raise NotImplementedError(
+            f"Kubernetes handler for provider_api={provider_api!r} is not yet implemented "
+            "(Pod is implemented in Phase B; Deployment/StatefulSet/Job arrive in later phases)."
+        )
+
+    # ------------------------------------------------------------------
+    # Typed provisioning interface
     # ------------------------------------------------------------------
 
     async def acquire(self, request: "Request") -> OperationOutcome:
-        """Submit an acquisition request to Kubernetes — filled in Phase B."""
-        raise NotImplementedError(
-            "KubernetesProviderStrategy.acquire is implemented in Phase B (Pod handler)."
-        )
+        """Submit an acquisition request to Kubernetes via the per-API handler."""
+        try:
+            provider_api = self._resolve_provider_api(request)
+            handler = self._get_handler(provider_api)
+            template = self._build_template_for_request(request)
+            result = await handler.acquire_hosts(request, template)
+
+            resource_ids = list(result.get("resource_ids", []) or [])
+            machine_ids = list(result.get("machine_ids", []) or [])
+            metadata: dict[str, Any] = {
+                "provider_api": provider_api,
+                "provider_data": result.get("provider_data", {}),
+                "machine_ids": machine_ids,
+            }
+            self._logger.info(
+                "Kubernetes acquire accepted: request_id=%s pods=%s",
+                request.request_id,
+                resource_ids,
+            )
+            return Accepted(
+                request_id=str(request.request_id),
+                pending_resource_ids=resource_ids,
+                metadata=metadata,
+            )
+        except Exception as exc:
+            self._logger.error("Kubernetes acquire failed: %s", exc, exc_info=True)
+            return Failed(error=str(exc), recoverable=False)
 
     async def return_machines(self, machine_ids: list[str], request: "Request") -> OperationOutcome:
-        """Submit a return (termination) request to Kubernetes — filled in Phase B."""
-        raise NotImplementedError(
-            "KubernetesProviderStrategy.return_machines is implemented in Phase B (Pod handler)."
-        )
+        """Delete the named pods via the per-API handler."""
+        try:
+            provider_api = self._resolve_provider_api(request)
+            handler = self._get_handler(provider_api)
+            await handler.release_hosts(list(machine_ids), request)
+            self._logger.info(
+                "Kubernetes return accepted: request_id=%s machine_ids=%s",
+                request.request_id,
+                machine_ids,
+            )
+            return Accepted(
+                request_id=str(request.request_id),
+                pending_resource_ids=list(machine_ids),
+                metadata={"provider_api": provider_api},
+            )
+        except Exception as exc:
+            self._logger.error("Kubernetes return_machines failed: %s", exc, exc_info=True)
+            return Failed(error=str(exc), recoverable=False)
 
     async def get_status(self, resource_ids: list[str], request: "Request") -> OperationOutcome:
-        """Query Kubernetes resource status — filled in Phase B."""
-        raise NotImplementedError(
-            "KubernetesProviderStrategy.get_status is implemented in Phase B (Pod handler)."
+        """Poll the per-API handler's ``check_hosts_status`` for a verdict.
+
+        Returns ``Completed`` when fulfilment is terminal (``fulfilled``,
+        ``partial``, or ``failed``); ``Accepted`` while ``in_progress``.
+        """
+        try:
+            provider_api = self._resolve_provider_api(request)
+            handler = self._get_handler(provider_api)
+            check_result = await asyncio.to_thread(handler.check_hosts_status, request)
+            instances = check_result.instances
+            fulfilment = check_result.fulfilment
+
+            metadata: dict[str, Any] = {
+                "provider_api": provider_api,
+                "fulfilment": fulfilment,
+                "instances": instances,
+            }
+
+            if fulfilment.state == "in_progress":
+                pending = [
+                    i.get("instance_id", "")
+                    for i in instances
+                    if i.get("status") in ("pending", "starting")
+                ]
+                return Accepted(
+                    request_id=str(request.request_id),
+                    pending_resource_ids=pending or list(resource_ids),
+                    metadata=metadata,
+                )
+
+            terminal_ids = [i.get("instance_id", "") for i in instances]
+            return Completed(resource_ids=terminal_ids, metadata=metadata)
+        except Exception as exc:
+            self._logger.error("Kubernetes get_status failed: %s", exc, exc_info=True)
+            return Failed(error=str(exc), recoverable=True)
+
+    def _build_template_for_request(self, request: "Request") -> "Template":
+        """Resolve the :class:`Template` carried by ``request``.
+
+        Phase B does not yet wire the full template-aggregate registration
+        (lands in Phase G).  For now we pick up the template payload from
+        ``request.metadata['template']`` (REST/CLI submission shape) and
+        fall back to a minimal template assembled from request fields.
+        """
+        from orb.domain.template.template_aggregate import Template as _Template  # noqa: PLC0415
+
+        meta = getattr(request, "metadata", None) or {}
+        if isinstance(meta, dict):
+            template_payload = meta.get("template")
+            if isinstance(template_payload, _Template):
+                return template_payload
+            if isinstance(template_payload, dict):
+                return _Template(**template_payload)
+
+        # Fall back to a minimal template built from the request fields.
+        return _Template(
+            template_id=str(request.template_id),
+            provider_type="kubernetes",
+            provider_api=request.provider_api or KubernetesProviderApi.POD.value,
+            max_instances=max(int(request.requested_count), 1),
         )
 
     def __str__(self) -> str:  # pragma: no cover — trivial

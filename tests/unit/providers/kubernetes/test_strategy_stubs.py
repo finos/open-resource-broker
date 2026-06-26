@@ -13,7 +13,7 @@ Covers:
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -149,17 +149,56 @@ async def test_execute_operation_unsupported_returns_error() -> None:
 
 
 @pytest.mark.asyncio
-async def test_typed_provisioning_methods_raise_not_implemented() -> None:
-    """Phase A stubs every typed entry point with ``NotImplementedError``."""
-    strategy = _make_strategy()
-    fake_request = MagicMock()
+async def test_typed_provisioning_methods_route_to_pod_handler() -> None:
+    """Phase B routes typed entry points to the Pod handler when ``provider_api='KubernetesPod'``."""
+    from orb.domain.base.operation_outcome import Accepted
 
-    with pytest.raises(NotImplementedError):
-        await strategy.acquire(fake_request)
-    with pytest.raises(NotImplementedError):
-        await strategy.return_machines(["m-1"], fake_request)
-    with pytest.raises(NotImplementedError):
-        await strategy.get_status(["m-1"], fake_request)
+    strategy = _make_strategy()
+
+    fake_handler = MagicMock()
+    fake_handler.acquire_hosts = AsyncMock(
+        return_value={
+            "resource_ids": ["orb-aaa-0000"],
+            "machine_ids": ["orb-aaa-0000"],
+            "provider_data": {"namespace": "default", "pod_names": ["orb-aaa-0000"]},
+        }
+    )
+    fake_handler.release_hosts = AsyncMock(return_value=None)
+    strategy._handlers["KubernetesPod"] = fake_handler  # type: ignore[attr-defined]
+
+    fake_request = MagicMock()
+    fake_request.request_id = "req-test"
+    fake_request.provider_api = "KubernetesPod"
+    fake_request.template_id = "tpl-1"
+    fake_request.requested_count = 1
+    fake_request.metadata = {}
+
+    outcome = await strategy.acquire(fake_request)
+    assert isinstance(outcome, Accepted)
+    assert outcome.pending_resource_ids == ["orb-aaa-0000"]
+
+    return_outcome = await strategy.return_machines(["orb-aaa-0000"], fake_request)
+    assert isinstance(return_outcome, Accepted)
+    assert return_outcome.pending_resource_ids == ["orb-aaa-0000"]
+
+
+@pytest.mark.asyncio
+async def test_unsupported_provider_api_returns_failed() -> None:
+    """Non-Pod APIs (Deployment / StatefulSet / Job) are not yet implemented."""
+    from orb.domain.base.operation_outcome import Failed
+
+    strategy = _make_strategy()
+
+    fake_request = MagicMock()
+    fake_request.request_id = "req-test"
+    fake_request.provider_api = "KubernetesDeployment"  # Phase E
+    fake_request.template_id = "tpl-1"
+    fake_request.requested_count = 1
+    fake_request.metadata = {}
+
+    outcome = await strategy.acquire(fake_request)
+    assert isinstance(outcome, Failed)
+    assert "not yet implemented" in outcome.error
 
 
 def test_cleanup_idempotent() -> None:
