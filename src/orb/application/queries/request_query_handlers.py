@@ -259,8 +259,13 @@ class ListRequestsHandler(BaseQueryHandler[ListRequestsQuery, Paginated[RequestD
 
                     try:
                         requests = sorted(requests, key=_val, reverse=descending)
-                    except TypeError:
-                        pass
+                    except TypeError as exc:
+                        self.logger.warning(
+                            "ListRequests sort failed on attr=%s descending=%s: %s",
+                            attr,
+                            descending,
+                            exc,
+                        )
 
                 total_count = len(requests)
 
@@ -448,8 +453,13 @@ class ListReturnRequestsHandler(BaseQueryHandler[ListReturnRequestsQuery, Pagina
 
                     try:
                         request_dtos = sorted(request_dtos, key=_val, reverse=descending)
-                    except TypeError:
-                        pass
+                    except TypeError as exc:
+                        self.logger.warning(
+                            "ListReturnRequests sort failed on attr=%s descending=%s: %s",
+                            attr,
+                            descending,
+                            exc,
+                        )
 
                 total_count = len(request_dtos)
                 offset = query.offset or 0  # type: ignore[union-attr]

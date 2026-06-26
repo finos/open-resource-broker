@@ -139,8 +139,16 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, Paginated[MachineD
 
                     try:
                         machines = sorted(machines, key=_val, reverse=descending)
-                    except TypeError:
-                        pass
+                    except TypeError as exc:
+                        # Mixed-type column under sort. Fall back to
+                        # unsorted results rather than failing the
+                        # request; log so the bad column is observable.
+                        self.logger.warning(
+                            "ListMachines sort failed on attr=%s descending=%s: %s",
+                            attr,
+                            descending,
+                            exc,
+                        )
 
                 total_count = len(machines)
 

@@ -196,7 +196,11 @@ class RequestStatusService:
             try:
                 new_status_enum = RequestStatus(status)
             except ValueError:
-                pass
+                # Unknown status string — leave new_status_enum=None so
+                # the upgrade check below rejects it. Terminal-state
+                # requests stay locked rather than transitioning to an
+                # invalid state.
+                new_status_enum = None
             is_upgrade_to_complete = (
                 request.status == RequestStatus.PARTIAL
                 and new_status_enum == RequestStatus.COMPLETED

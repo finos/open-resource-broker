@@ -58,13 +58,17 @@ def test_acquire_pid_lock_rejects_other_process(tmp_path: Path) -> None:
         pid = os.fork()
         if pid == 0:  # child
             os.close(r)
+            child_fd = -1
             try:
-                daemon._acquire_pid_lock(pf)
+                child_fd = daemon._acquire_pid_lock(pf)
                 os.write(w, b"ok")
             except RuntimeError as exc:
                 os.write(w, f"err:{exc}".encode())
             except Exception as exc:  # pragma: no cover
                 os.write(w, f"unexpected:{exc!r}".encode())
+            finally:
+                if child_fd >= 0:
+                    os.close(child_fd)
             os._exit(0)
         # parent
         os.close(w)

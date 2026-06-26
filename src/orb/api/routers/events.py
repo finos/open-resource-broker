@@ -84,7 +84,10 @@ class _SseEventBus:
         try:
             self._subscribers.remove(q)
         except ValueError:
-            pass
+            # Subscriber already removed (concurrent unsubscribe race
+            # between the SSE generator's finally clause and an explicit
+            # disconnect). Idempotent by design.
+            return
 
     async def publish(self, event_type: str, payload: dict) -> None:
         """Publish an event from async context."""
@@ -96,11 +99,16 @@ class _SseEventBus:
                 try:
                     q.get_nowait()
                 except asyncio.QueueEmpty:
-                    pass
+                    # Queue was drained between full() and get_nowait()
+                    # by another task; nothing to evict.
+                    continue
             try:
                 q.put_nowait((event_type, payload))
             except asyncio.QueueFull:
-                pass  # subscriber is too slow; skip rather than block
+                # Subscriber is too slow; drop the event rather than
+                # block the publisher. The freshness-preferring drain
+                # above is best-effort.
+                continue
 
     def history_since(self, since: datetime) -> list[tuple[str, dict]]:
         """Return (event_type, payload) pairs recorded after *since*."""
@@ -210,7 +218,10 @@ async def stream_events(
                         {"ts": datetime.now(timezone.utc).isoformat()},
                     )
         except asyncio.CancelledError:
-            pass
+            # Task cancelled (client disconnected or server shutdown).
+            # finally below still runs to remove the subscriber; re-raise
+            # so the surrounding ASGI machinery observes the cancellation.
+            raise
         finally:
             sse_event_bus.unsubscribe(q)
 
