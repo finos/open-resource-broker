@@ -21,7 +21,11 @@ from orb.api.dependencies import (
     get_validate_template_orchestrator,
 )
 from orb.api.models.base import APIRequest
-from orb.api.models.responses import GenerateTemplatesBody, TemplateListResponse, TemplateMutationResponse
+from orb.api.models.responses import (
+    GenerateTemplatesBody,
+    TemplateListResponse,
+    TemplateMutationResponse,
+)
 from orb.application.dto.template_generation_dto import TemplateGenerationRequest
 from orb.application.services.template_generation_service import TemplateGenerationService
 from orb.application.services.orchestration.dtos import (
@@ -102,7 +106,9 @@ async def list_templates(
     provider_api: Optional[str] = PROVIDER_API_QUERY,
     limit: int = Query(50, description="Limit number of results"),
     offset: int = Query(0, description="Number of results to skip"),
-    cursor: Optional[str] = Query(None, description="Opaque pagination cursor (preferred over offset)"),
+    cursor: Optional[str] = Query(
+        None, description="Opaque pagination cursor (preferred over offset)"
+    ),
     q: Optional[str] = Query(None, description="Case-insensitive substring search"),
     sort: Optional[str] = Query(None, description='Sort: "field" or "-field" (desc)'),
     orchestrator=LIST_ORCHESTRATOR,

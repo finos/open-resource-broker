@@ -91,9 +91,7 @@ async def get_providers_health(
         if provider_config:
             # Determine active / default provider name from selection policy config
             try:
-                default_provider_instance = getattr(
-                    provider_config, "default_provider", None
-                )
+                default_provider_instance = getattr(provider_config, "default_provider", None)
             except Exception:
                 default_provider_instance = None
 
@@ -106,9 +104,7 @@ async def get_providers_health(
                 name: str = getattr(provider_instance, "name", "")
                 ptype: str = getattr(provider_instance, "type", "unknown")
                 enabled: bool = bool(getattr(provider_instance, "enabled", True))
-                instance_config: dict[str, Any] = getattr(
-                    provider_instance, "config", {}
-                ) or {}
+                instance_config: dict[str, Any] = getattr(provider_instance, "config", {}) or {}
 
                 details: dict[str, Any] = {}
                 if enabled:
@@ -121,9 +117,7 @@ async def get_providers_health(
                 region = instance_config.get("region")
                 if region:
                     details["region"] = region
-                profile = instance_config.get("profile") or instance_config.get(
-                    "aws_profile"
-                )
+                profile = instance_config.get("profile") or instance_config.get("aws_profile")
                 if profile:
                     details["profile"] = profile
 

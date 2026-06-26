@@ -564,7 +564,8 @@ For more information, visit: {DOCS_URL}
             help="Unix domain socket path for IPC (alternative to --host/--port)",
         )
         p.add_argument(
-            "--foreground", "-F",
+            "--foreground",
+            "-F",
             action="store_true",
             help="Run in the foreground instead of daemonising",
         )
@@ -575,13 +576,17 @@ For more information, visit: {DOCS_URL}
             help="Skip embedded UI even if ui.enabled=true",
         )
 
-    server_start = server_subparsers.add_parser("start", help="Start the ORB server (daemonised by default)")
+    server_start = server_subparsers.add_parser(
+        "start", help="Start the ORB server (daemonised by default)"
+    )
     _add_server_start_args(server_start)
 
     server_stop = server_subparsers.add_parser("stop", help="Stop the running ORB server")
     add_global_arguments(server_stop)
     server_stop.add_argument(
-        "--timeout", type=int, default=None,
+        "--timeout",
+        type=int,
+        default=None,
         help="Seconds to wait for graceful shutdown before SIGKILL (defaults to config)",
     )
 
@@ -591,7 +596,9 @@ For more information, visit: {DOCS_URL}
     server_restart = server_subparsers.add_parser("restart", help="Restart the ORB server")
     _add_server_start_args(server_restart)
     server_restart.add_argument(
-        "--restart-timeout", type=int, default=None,
+        "--restart-timeout",
+        type=int,
+        default=None,
         dest="timeout",
         help="Seconds to wait for graceful shutdown before SIGKILL during stop phase",
     )

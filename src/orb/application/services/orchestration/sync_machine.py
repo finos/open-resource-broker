@@ -63,9 +63,7 @@ class SyncMachineOrchestrator(OrchestratorBase[SyncMachineInput, SyncMachineOutp
                 request, [machine]
             )
         except Exception as exc:
-            self._logger.warning(
-                "Provider fetch failed for machine %s: %s", input.machine_id, exc
-            )
+            self._logger.warning("Provider fetch failed for machine %s: %s", input.machine_id, exc)
             dto = MachineDTO.from_domain(machine)
             return SyncMachineOutput(machine=dto, synced=False, error=str(exc))
 

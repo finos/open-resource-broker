@@ -3079,6 +3079,7 @@ dependencies = [
     { name = "cryptography" },
     { name = "filelock" },
     { name = "jsonschema" },
+    { name = "psutil" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pyjwt" },
@@ -3090,6 +3091,7 @@ dependencies = [
 
 [package.optional-dependencies]
 all = [
+    { name = "alembic" },
     { name = "boto3" },
     { name = "botocore" },
     { name = "fastapi" },
@@ -3265,6 +3267,9 @@ monitoring-aws = [
     { name = "prometheus-client" },
     { name = "psutil" },
 ]
+sql = [
+    { name = "alembic" },
+]
 test-aws = [
     { name = "boto3" },
     { name = "botocore" },
@@ -3384,6 +3389,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "alembic", marker = "extra == 'k8s-legacy'" },
+    { name = "alembic", marker = "extra == 'sql'", specifier = ">=1.13" },
     { name = "bandit", marker = "extra == 'ci'", specifier = ">=1.7.5,<2.0.0" },
     { name = "bandit-sarif-formatter", marker = "extra == 'ci'", specifier = ">=1.1.1,<2.0.0" },
     { name = "boto3", specifier = ">=1.42.21" },
@@ -3433,7 +3439,7 @@ requires-dist = [
     { name = "orb-py", extras = ["aws"], marker = "extra == 'test-aws'" },
     { name = "orb-py", extras = ["aws", "monitoring"], marker = "extra == 'monitoring-aws'" },
     { name = "orb-py", extras = ["ci", "all-providers"], marker = "extra == 'dev'" },
-    { name = "orb-py", extras = ["cli", "api", "monitoring", "all-providers"], marker = "extra == 'all'" },
+    { name = "orb-py", extras = ["cli", "api", "sql", "monitoring", "all-providers"], marker = "extra == 'all'" },
     { name = "pathspec", marker = "extra == 'ci'", specifier = ">=0.11.0" },
     { name = "peewee", marker = "extra == 'ci'", specifier = ">=3.18.3" },
     { name = "pg8000", marker = "extra == 'k8s-legacy'" },
@@ -3442,6 +3448,7 @@ requires-dist = [
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.5.0,<5.0.0" },
     { name = "prometheus-client", marker = "extra == 'k8s-legacy'", specifier = ">=0.17.0" },
     { name = "prometheus-client", marker = "extra == 'monitoring'", specifier = ">=0.17.0" },
+    { name = "psutil", specifier = ">=5.9.0" },
     { name = "psutil", marker = "extra == 'monitoring'", specifier = ">=5.9.0" },
     { name = "py-cpuinfo", marker = "extra == 'dev'", specifier = ">=9.0.0,<10.0.0" },
     { name = "py-spy", marker = "extra == 'dev'", specifier = ">=0.3.14,<1.0.0" },
@@ -3491,7 +3498,7 @@ requires-dist = [
     { name = "werkzeug", marker = "extra == 'ci'", specifier = ">=3.1.6" },
     { name = "wheel", marker = "extra == 'ci'", specifier = ">=0.41.3,<1.0.0" },
 ]
-provides-extras = ["aws", "all-providers", "k8s-legacy", "cli", "api", "monitoring", "monitoring-aws", "all", "test-aws", "ci", "dev"]
+provides-extras = ["sql", "aws", "all-providers", "k8s-legacy", "cli", "api", "monitoring", "monitoring-aws", "all", "test-aws", "ci", "dev"]
 
 [package.metadata.requires-dev]
 ci = [

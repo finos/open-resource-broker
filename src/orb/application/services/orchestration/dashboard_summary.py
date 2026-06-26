@@ -58,9 +58,7 @@ def _to_iso(value: Any) -> Optional[str]:
     return str(value)
 
 
-class DashboardSummaryOrchestrator(
-    OrchestratorBase[DashboardSummaryInput, DashboardSummaryOutput]
-):
+class DashboardSummaryOrchestrator(OrchestratorBase[DashboardSummaryInput, DashboardSummaryOutput]):
     """Aggregate orchestrator that builds the dashboard summary in Python.
 
     Pulls all machines, requests and templates from the existing list
@@ -84,14 +82,10 @@ class DashboardSummaryOrchestrator(
         self._logger.info("DashboardSummaryOrchestrator: building dashboard aggregate")
 
         # ---- machines -------------------------------------------------------
-        machines_output = await self._list_machines.execute(
-            ListMachinesInput(limit=100_000)
-        )
+        machines_output = await self._list_machines.execute(ListMachinesInput(limit=100_000))
         machine_by_status: dict[str, int] = {k: 0 for k in _MACHINE_STATUS_KEYS}
         for m in machines_output.machines:
-            raw = getattr(m, "status", None) or (
-                m.get("status") if isinstance(m, dict) else None
-            )
+            raw = getattr(m, "status", None) or (m.get("status") if isinstance(m, dict) else None)
             status_key = str(raw).lower() if raw else "unknown"
             if status_key in machine_by_status:
                 machine_by_status[status_key] += 1
@@ -115,9 +109,7 @@ class DashboardSummaryOrchestrator(
         }
 
         # ---- requests -------------------------------------------------------
-        requests_output = await self._list_requests.execute(
-            ListRequestsInput(limit=100_000)
-        )
+        requests_output = await self._list_requests.execute(ListRequestsInput(limit=100_000))
         request_by_status: dict[str, int] = {k: 0 for k in _REQUEST_STATUS_KEYS}
         in_flight = 0
         recent_raw: list[dict[str, Any]] = []

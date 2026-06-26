@@ -160,8 +160,7 @@ async def handle_storage_migrate(
     alembic_args = alembic_cmd_map.get(subcommand)
     if alembic_args is None:
         return formatter.format_error(
-            f"Unknown migrate subcommand '{subcommand}'. "
-            "Valid values: up, down, current, history"
+            f"Unknown migrate subcommand '{subcommand}'. Valid values: up, down, current, history"
         )
 
     try:
@@ -217,8 +216,7 @@ async def handle_storage_migrate(
             "alembic.ini",
         )
         result = subprocess.run(
-            [sys.executable, "-m", "alembic", "--config", alembic_ini]
-            + alembic_args,
+            [sys.executable, "-m", "alembic", "--config", alembic_ini] + alembic_args,
             capture_output=True,
             text=True,
             env=env,
@@ -226,7 +224,9 @@ async def handle_storage_migrate(
         output = (result.stdout + result.stderr).strip()
         if result.returncode != 0:
             return formatter.format_error(f"Alembic migration failed:\n{output}")
-        return formatter.format_success({"message": f"Migration '{subcommand}' completed", "output": output})
+        return formatter.format_success(
+            {"message": f"Migration '{subcommand}' completed", "output": output}
+        )
     except Exception as exc:
         return formatter.format_error(f"Migration error: {exc}")
 

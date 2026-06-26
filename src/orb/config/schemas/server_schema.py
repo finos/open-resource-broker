@@ -181,7 +181,9 @@ class ServerConfig(BaseModel):
     rate_limiting: Optional[dict[str, Any]] = Field(None, description="Rate limiting configuration")
 
     # Read-only mode
-    read_only: bool = Field(False, description="Reject all mutating requests (POST, PUT, PATCH, DELETE) with HTTP 403")
+    read_only: bool = Field(
+        False, description="Reject all mutating requests (POST, PUT, PATCH, DELETE) with HTTP 403"
+    )
 
     # ── Process lifecycle (orb server start/stop/status) ─────────────────────
     # Paths are optional — when None the daemon module resolves them from
@@ -228,11 +230,7 @@ class ServerConfig(BaseModel):
         callers are trusted), set ``cors.origins=['*']`` explicitly — that documents
         the intentional choice.
         """
-        if (
-            self.auth.enabled
-            and self.cors.enabled
-            and not self.cors.origins
-        ):
+        if self.auth.enabled and self.cors.enabled and not self.cors.origins:
             raise ValueError(
                 "auth.enabled=true requires cors.origins to be set explicitly. "
                 "An empty origins list means the browser will block all cross-origin "

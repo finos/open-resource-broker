@@ -295,7 +295,18 @@ def _register_routers(app: Any) -> None:
         app: FastAPI application
     """
     try:
-        from orb.api.routers import admin, config, events, machines, me, observability, providers, requests, system, templates
+        from orb.api.routers import (
+            admin,
+            config,
+            events,
+            machines,
+            me,
+            observability,
+            providers,
+            requests,
+            system,
+            templates,
+        )
 
         app.include_router(templates.router, prefix="/api/v1")
         app.include_router(machines.router, prefix="/api/v1")

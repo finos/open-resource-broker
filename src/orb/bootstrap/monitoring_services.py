@@ -31,9 +31,7 @@ def register_monitoring_services(container) -> None:
         try:
             storage = c.get(StoragePort)
         except Exception as exc:
-            get_logger(__name__).debug(
-                "StoragePort not available for health wiring: %s", exc
-            )
+            get_logger(__name__).debug("StoragePort not available for health wiring: %s", exc)
             return hc
         register_storage_health_checks(hc, storage)
         return hc

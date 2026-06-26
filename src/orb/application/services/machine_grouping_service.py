@@ -27,9 +27,7 @@ class MachineGroupingService:
         self.uow_factory = uow_factory
         self.logger = logger
 
-    def group_by_provider(
-        self, machine_ids: list[str]
-    ) -> dict[tuple[str, str, str], list[str]]:
+    def group_by_provider(self, machine_ids: list[str]) -> dict[tuple[str, str, str], list[str]]:
         """Group machines by (provider_type, provider_name, provider_api).
 
         provider_api MUST be part of the key — machines from different APIs

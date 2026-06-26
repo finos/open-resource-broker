@@ -285,7 +285,11 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             created_requests: list[str] = []
             pending_deprovision: list[tuple[list[str], Any, str]] = []
 
-            for (provider_type, provider_name, provider_api), machine_ids in provider_groups.items():
+            for (
+                provider_type,
+                provider_name,
+                provider_api,
+            ), machine_ids in provider_groups.items():
                 return_request_id = str(RequestId.generate(RequestType.RETURN, prefix=prefix))
                 request = Request.create_return_request(
                     machine_ids=machine_ids,

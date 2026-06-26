@@ -187,8 +187,15 @@ class ORBServerManager:
     def start(self, timeout: int | None = None):
         """Start ORB server: orb server start --foreground --api-only --host <h> --port <p>"""
         cmd = [
-            "orb", "server", "start", "--foreground", "--api-only",
-            "--host", self.host, "--port", str(self.port),
+            "orb",
+            "server",
+            "start",
+            "--foreground",
+            "--api-only",
+            "--host",
+            self.host,
+            "--port",
+            str(self.port),
         ]
         log.info("Starting ORB server: %s", " ".join(cmd))
 

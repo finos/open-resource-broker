@@ -132,9 +132,7 @@ class TestAdminWipeEndpoint:
         machine_repo, request_repo, template_repo = _make_repositories()
         container = _make_container(config_port, machine_repo, request_repo, template_repo)
 
-        with patch(
-            "orb.api.routers.admin.get_di_container", return_value=container
-        ):
+        with patch("orb.api.routers.admin.get_di_container", return_value=container):
             client = TestClient(admin_app, raise_server_exceptions=False)
             r = _wipe_post(client)
 
@@ -150,9 +148,7 @@ class TestAdminWipeEndpoint:
         machine_repo, request_repo, template_repo = _make_repositories()
         container = _make_container(config_port, machine_repo, request_repo, template_repo)
 
-        with patch(
-            "orb.api.routers.admin.get_di_container", return_value=container
-        ):
+        with patch("orb.api.routers.admin.get_di_container", return_value=container):
             client = TestClient(admin_app, raise_server_exceptions=False)
             r = _wipe_post(client)
 
@@ -167,9 +163,7 @@ class TestAdminWipeEndpoint:
             machine_repo, request_repo, template_repo = _make_repositories()
             container = _make_container(config_port, machine_repo, request_repo, template_repo)
 
-            with patch(
-                "orb.api.routers.admin.get_di_container", return_value=container
-            ):
+            with patch("orb.api.routers.admin.get_di_container", return_value=container):
                 client = TestClient(admin_app, raise_server_exceptions=False)
                 r = _wipe_post(client)
 
@@ -184,9 +178,7 @@ class TestAdminWipeEndpoint:
         machine_repo, request_repo, template_repo = _make_repositories()
         container = _make_container(config_port, machine_repo, request_repo, template_repo)
 
-        with patch(
-            "orb.api.routers.admin.get_di_container", return_value=container
-        ):
+        with patch("orb.api.routers.admin.get_di_container", return_value=container):
             client = TestClient(admin_app, raise_server_exceptions=False)
             r = _wipe_post(client, body={"confirm": "wipe"})  # lowercase — must not match
 
@@ -200,9 +192,7 @@ class TestAdminWipeEndpoint:
         machine_repo, request_repo, template_repo = _make_repositories()
         container = _make_container(config_port, machine_repo, request_repo, template_repo)
 
-        with patch(
-            "orb.api.routers.admin.get_di_container", return_value=container
-        ):
+        with patch("orb.api.routers.admin.get_di_container", return_value=container):
             client = TestClient(admin_app, raise_server_exceptions=False)
             r = _wipe_post(client, body={})
 
@@ -216,9 +206,7 @@ class TestAdminWipeEndpoint:
         machine_repo, request_repo, template_repo = _make_repositories()
         container = _make_container(config_port, machine_repo, request_repo, template_repo)
 
-        with patch(
-            "orb.api.routers.admin.get_di_container", return_value=container
-        ):
+        with patch("orb.api.routers.admin.get_di_container", return_value=container):
             client = TestClient(admin_app, raise_server_exceptions=False)
             r = _wipe_post(client, body={"confirm": ""})
 
@@ -242,9 +230,7 @@ class TestAdminWipeEndpoint:
         )
         container = _make_container(config_port, machine_repo, request_repo, template_repo)
 
-        with patch(
-            "orb.api.routers.admin.get_di_container", return_value=container
-        ):
+        with patch("orb.api.routers.admin.get_di_container", return_value=container):
             client = TestClient(admin_app, raise_server_exceptions=False)
             r = _wipe_post(client)
 
@@ -273,9 +259,7 @@ class TestAdminWipeEndpoint:
             del repo.storage_strategy
         container = _make_container(config_port, machine_repo, request_repo, template_repo)
 
-        with patch(
-            "orb.api.routers.admin.get_di_container", return_value=container
-        ):
+        with patch("orb.api.routers.admin.get_di_container", return_value=container):
             client = TestClient(admin_app, raise_server_exceptions=False)
             r = _wipe_post(client)
 
@@ -291,9 +275,7 @@ class TestAdminWipeEndpoint:
         machine_repo, request_repo, template_repo = _make_repositories()
         container = _make_container(config_port, machine_repo, request_repo, template_repo)
 
-        with patch(
-            "orb.api.routers.admin.get_di_container", return_value=container
-        ):
+        with patch("orb.api.routers.admin.get_di_container", return_value=container):
             client = TestClient(admin_app, raise_server_exceptions=False)
             r = _wipe_post(client)
 
@@ -309,9 +291,7 @@ class TestAdminWipeEndpoint:
             machine_repo, request_repo, template_repo = _make_repositories()
             container = _make_container(config_port, machine_repo, request_repo, template_repo)
 
-            with patch(
-                "orb.api.routers.admin.get_di_container", return_value=container
-            ):
+            with patch("orb.api.routers.admin.get_di_container", return_value=container):
                 client = TestClient(admin_app, raise_server_exceptions=False)
                 r = _wipe_post(client)
 
@@ -326,9 +306,7 @@ class TestAdminWipeEndpoint:
         container = MagicMock()
         container.get.side_effect = RuntimeError("DI container exploded")
 
-        with patch(
-            "orb.api.routers.admin.get_di_container", return_value=container
-        ):
+        with patch("orb.api.routers.admin.get_di_container", return_value=container):
             client = TestClient(admin_app, raise_server_exceptions=False)
             r = _wipe_post(client)
 

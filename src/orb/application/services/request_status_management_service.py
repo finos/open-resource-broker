@@ -197,9 +197,7 @@ class RequestStatusManagementService:
             from pydantic import BaseModel as _PydanticBaseModel
 
             if isinstance(request, _PydanticBaseModel):
-                request = request.model_copy(
-                    update={"successful_count": instance_count}
-                )
+                request = request.model_copy(update={"successful_count": instance_count})
             else:
                 try:
                     request.successful_count = instance_count  # type: ignore[attr-defined]

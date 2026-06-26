@@ -104,14 +104,21 @@ def register_core_services(container: DIContainer) -> None:
 
             _sse_handler = _SseEventHandler()
             for _et in (
-                "MachineCreatedEvent", "MachineStatusChangedEvent", "MachineTerminatedEvent",
-                "RequestCreatedEvent", "RequestStatusChangedEvent",
-                "RequestCompletedEvent", "RequestFailedEvent",
-                "TemplateCreatedEvent", "TemplateUpdatedEvent", "TemplateDeletedEvent",
+                "MachineCreatedEvent",
+                "MachineStatusChangedEvent",
+                "MachineTerminatedEvent",
+                "RequestCreatedEvent",
+                "RequestStatusChangedEvent",
+                "RequestCompletedEvent",
+                "RequestFailedEvent",
+                "TemplateCreatedEvent",
+                "TemplateUpdatedEvent",
+                "TemplateDeletedEvent",
             ):
                 bus.register_handler(_et, _sse_handler)
         except Exception as _sse_err:  # noqa: BLE001
             import logging as _logging
+
             _logging.getLogger(__name__).debug(
                 "SseEventHandler not registered with EventBus (SSE push disabled): %s", _sse_err
             )

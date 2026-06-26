@@ -568,9 +568,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             # Fallback to request.requested_count is for the rare case where
             # AWS returns the fleet without TargetCapacitySpecification.
             per_fleet_requested = (
-                int(target_capacity)
-                if target_capacity is not None
-                else request.requested_count
+                int(target_capacity) if target_capacity is not None else request.requested_count
             )
 
             if not instance_ids:

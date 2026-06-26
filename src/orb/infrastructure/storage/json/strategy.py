@@ -100,8 +100,7 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 sample = payload[sample_key]
                 if not isinstance(sample, dict):
                     details["reason"] = (
-                        f"sampled record {sample_key!r} is "
-                        f"{type(sample).__name__}, expected dict"
+                        f"sampled record {sample_key!r} is {type(sample).__name__}, expected dict"
                     )
                     return False, details
                 details["sample_keys"] = sorted(sample.keys())[:8]

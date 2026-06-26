@@ -49,9 +49,7 @@ class MachineSerializer(BaseEntitySerializer):
             return Machine.model_validate(data)
         except Exception as e:
             machine_id = data.get("machine_id", "<unknown>")
-            self.logger.error(
-                "Failed to deserialize machine %s: %s", machine_id, e
-            )
+            self.logger.error("Failed to deserialize machine %s: %s", machine_id, e)
             raise
 
     _CURRENT_SCHEMA_VERSION = "2.0.0"
@@ -272,7 +270,8 @@ class MachineRepositoryImpl(StorageRepositoryMixin, MachineRepositoryInterface):
         try:
             # Filter to only machine records (must have machine_id field).
             data_list = [
-                d for d in self._get_storage().find_by_criteria({"request_id": request_id})
+                d
+                for d in self._get_storage().find_by_criteria({"request_id": request_id})
                 if "machine_id" in d
             ]
             return list(self._safe_deserialize_iter(data_list))  # type: ignore[return-value]
@@ -285,7 +284,8 @@ class MachineRepositoryImpl(StorageRepositoryMixin, MachineRepositoryInterface):
         """Find machines by return request ID. See find_by_request_id."""
         try:
             data_list = [
-                d for d in self._get_storage().find_by_criteria(
+                d
+                for d in self._get_storage().find_by_criteria(
                     {"return_request_id": return_request_id}
                 )
                 if "machine_id" in d

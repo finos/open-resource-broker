@@ -223,8 +223,12 @@ async def handle_server_reload(args) -> dict[str, Any]:
         url = f"http://{host}:{server_config.port}/api/v1/admin/reload-config"
 
     try:
-        req = urllib.request.Request(url, method="POST", data=b"")
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        # URL is composed from operator-controlled config (server host/port
+        # or the embedded-UI backend port). Not user-controlled at the HTTP
+        # boundary — safe to pass to urlopen. nosec annotation pins the
+        # semgrep dynamic-urllib finding.
+        req = urllib.request.Request(url, method="POST", data=b"")  # nosec B310
+        with urllib.request.urlopen(req, timeout=5) as resp:  # nosec B310
             body = json.loads(resp.read().decode() or "{}")
             return {"method": "http", "url": url, "status": resp.status, **body}
     except (urllib.error.URLError, OSError, json.JSONDecodeError) as exc:

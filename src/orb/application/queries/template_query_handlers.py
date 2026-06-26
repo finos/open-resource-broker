@@ -95,9 +95,7 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, Paginated[Templa
         self._container = container
         self._generic_filter_service = generic_filter_service
 
-    async def execute_query(
-        self, query: ListTemplatesQuery
-    ) -> Paginated[TemplateDTOPort]:
+    async def execute_query(self, query: ListTemplatesQuery) -> Paginated[TemplateDTOPort]:
         """Execute list templates query.
 
         Pipeline: load → filters → active_only → q → sort → total → slice.
@@ -141,9 +139,7 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, Paginated[Templa
                     for t in template_dtos
                     if any(
                         needle
-                        in str(
-                            t.get(f, "") if isinstance(t, dict) else getattr(t, f, "")
-                        ).lower()
+                        in str(t.get(f, "") if isinstance(t, dict) else getattr(t, f, "")).lower()
                         for f in searchable
                     )
                 ]

@@ -202,9 +202,7 @@ def test_stop_stale_pid_cleans_up_pid_file(tmp_path: Path) -> None:
     assert not pf.exists()
 
 
-def test_stop_sigterm_fallback_to_sigkill(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_stop_sigterm_fallback_to_sigkill(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """If SIGTERM doesn't make the pid disappear before the deadline we escalate.
 
     The child here is the test process itself — we mock killpg so nothing
@@ -223,9 +221,7 @@ def test_stop_sigterm_fallback_to_sigkill(
     monkeypatch.setattr(daemon.os, "getpgid", lambda pid: pid)
     # Alive until SIGKILL observed, so SIGTERM doesn't kill it and we
     # exhaust the timeout, escalating to SIGKILL.
-    monkeypatch.setattr(
-        daemon, "_pid_is_alive", lambda pid: signal.SIGKILL not in signals_sent
-    )
+    monkeypatch.setattr(daemon, "_pid_is_alive", lambda pid: signal.SIGKILL not in signals_sent)
 
     out = daemon.stop(pid_file=pf, timeout=0.4)
     assert out["status"] == "killed"
@@ -245,9 +241,7 @@ def test_stop_succeeds_on_sigterm(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(daemon.os, "killpg", fake_killpg)
     monkeypatch.setattr(daemon.os, "getpgid", lambda pid: pid)
     # Alive until SIGTERM observed, then drop.
-    monkeypatch.setattr(
-        daemon, "_pid_is_alive", lambda pid: signal.SIGTERM not in sent
-    )
+    monkeypatch.setattr(daemon, "_pid_is_alive", lambda pid: signal.SIGTERM not in sent)
 
     out = daemon.stop(pid_file=pf, timeout=0.4)
     assert out["status"] == "stopped"

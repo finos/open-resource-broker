@@ -475,9 +475,7 @@ class ListReturnRequestsHandler(BaseQueryHandler[ListReturnRequestsQuery, Pagina
                             query.limit,
                             total_count,
                         )
-                    request_dtos = (
-                        request_dtos[offset : offset + limit] if limit > 0 else []
-                    )
+                    request_dtos = request_dtos[offset : offset + limit] if limit > 0 else []
 
                 self.logger.info(
                     "Found %s return requests (total: %s, offset: %s)",
@@ -591,9 +589,7 @@ class ListActiveRequestsHandler(BaseQueryHandler[ListActiveRequestsQuery, Pagina
                             sync_err,
                         )
 
-            await asyncio.gather(
-                *(_sync_one(r) for r in requests), return_exceptions=False
-            )
+            await asyncio.gather(*(_sync_one(r) for r in requests), return_exceptions=False)
 
             request_dtos = []
             for request in requests:

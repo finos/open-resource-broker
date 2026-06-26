@@ -43,7 +43,7 @@ class RequestItem(BaseModel):
     requested_count: Optional[int] = None
     successful_count: Optional[int] = None
     failed_count: Optional[int] = None
-    returned_count: Optional[int] = None          # computed by router from machine list
+    returned_count: Optional[int] = None  # computed by router from machine list
     desired_capacity: Optional[int] = None
 
     # --- Timestamps (ISO 8601 strings after scheduler serialisation) ---

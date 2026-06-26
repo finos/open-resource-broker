@@ -202,7 +202,9 @@ def start(
             payload = r.read().decode("utf-8", errors="replace").strip()
         if payload.startswith("ok:"):
             return {"pid": int(payload[3:]), "status": "started"}
-        raise RuntimeError(payload[4:] if payload.startswith("err:") else payload or "daemon failed")
+        raise RuntimeError(
+            payload[4:] if payload.startswith("err:") else payload or "daemon failed"
+        )
 
     # Intermediate: complete double-fork; the grandchild becomes the daemon.
     os.close(read_fd)
@@ -328,6 +330,9 @@ def status(
         try:
             import urllib.request
 
+            # health_url is composed by the CLI from operator-controlled
+            # ServerConfig (host/port) — not user-controlled at the HTTP
+            # boundary. Safe to pass to urlopen.
             with urllib.request.urlopen(health_url, timeout=1.5) as resp:  # nosec B310
                 out["health_status"] = resp.status
                 out["health_ok"] = 200 <= resp.status < 300

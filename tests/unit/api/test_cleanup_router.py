@@ -263,12 +263,8 @@ class TestCleanupEndpoint:
         """2 cancelled requests × 3 machines each → requests_deleted=2 machines_deleted=6."""
         config_port = _make_config_port(allow_destructive=True)
 
-        machines_r1 = [
-            _make_machine(f"m-r1-{i}", "terminated", "req-1") for i in range(3)
-        ]
-        machines_r2 = [
-            _make_machine(f"m-r2-{i}", "terminated", "req-2") for i in range(3)
-        ]
+        machines_r1 = [_make_machine(f"m-r1-{i}", "terminated", "req-1") for i in range(3)]
+        machines_r2 = [_make_machine(f"m-r2-{i}", "terminated", "req-2") for i in range(3)]
         request1 = _make_request("req-1", "cancelled")
         request2 = _make_request("req-2", "cancelled")
 
@@ -465,9 +461,7 @@ class TestRequestPurgeEndpoint:
         ):
             mock_orchestrator = MagicMock()
             mock_orchestrator.execute = MagicMock(
-                return_value=MagicMock(
-                    request_id="req-1", status="cancelled", __await__=None
-                )
+                return_value=MagicMock(request_id="req-1", status="cancelled", __await__=None)
             )
             import asyncio
 

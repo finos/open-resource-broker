@@ -127,6 +127,7 @@ sse_event_bus = _SseEventBus()
 # SSE formatting helpers
 # ---------------------------------------------------------------------------
 
+
 def _format_sse(event_type: str, data: dict) -> str:
     """Format a single SSE message block (terminated by double newline)."""
     return f"event: {event_type}\ndata: {json.dumps(data)}\n\n"

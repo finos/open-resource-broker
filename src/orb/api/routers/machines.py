@@ -221,9 +221,7 @@ async def sync_machine_status(
     """
     result = await orchestrator.execute(SyncMachineInput(machine_id=machine_id))
     if result.machine is None:
-        return JSONResponse(
-            content={"detail": f"Machine {machine_id} not found"}, status_code=404
-        )
+        return JSONResponse(content={"detail": f"Machine {machine_id} not found"}, status_code=404)
     data = result.machine.to_dict()
     payload = formatter.format_machine_detail(data).data
     if isinstance(payload, dict):
@@ -281,8 +279,7 @@ async def purge_machine(
                 "error": {
                     "code": "PURGE_REQUIRED",
                     "message": (
-                        "Machines have no soft-delete. "
-                        "Add ?purge=true to confirm hard-deletion."
+                        "Machines have no soft-delete. Add ?purge=true to confirm hard-deletion."
                     ),
                 },
             },

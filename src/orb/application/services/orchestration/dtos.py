@@ -39,6 +39,7 @@ class Paginated(Generic[T]):
 # Cursor helpers
 # ---------------------------------------------------------------------------
 
+
 def encode_cursor(offset: int) -> str:
     """Encode an offset into an opaque, URL-safe base64 cursor string.
 
@@ -481,6 +482,7 @@ class WatchRequestStatusOutput:
 # ---------------------------------------------------------------------------
 # Dashboard summary
 # ---------------------------------------------------------------------------
+
 
 @dataclasses.dataclass(frozen=True)
 class DashboardSummaryInput:

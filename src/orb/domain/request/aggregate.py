@@ -625,10 +625,7 @@ class Request(AggregateRoot):
         # — provider sync, status management service, lifecycle handler —
         # without each caller needing to remember.
         now = datetime.now(timezone.utc)
-        if (
-            status != RequestStatus.PENDING
-            and self.started_at is None
-        ):
+        if status != RequestStatus.PENDING and self.started_at is None:
             fields["started_at"] = now
 
         if status in [

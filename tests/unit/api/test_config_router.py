@@ -39,11 +39,15 @@ def _make_config_port(
         "server": {"host": "0.0.0.0", "port": 8000},
         "storage": {"backend": "sqlite"},
     }
-    _sources = sources if sources is not None else {
-        "config_file": loaded_file,
-        "config_dir": "/etc/orb",
-        "primary_source": "config_file",
-    }
+    _sources = (
+        sources
+        if sources is not None
+        else {
+            "config_file": loaded_file,
+            "config_dir": "/etc/orb",
+            "primary_source": "config_file",
+        }
+    )
 
     port.get_app_config.return_value = _config
     port.get_configuration_sources.return_value = _sources

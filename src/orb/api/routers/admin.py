@@ -34,9 +34,7 @@ try:
     from fastapi.responses import JSONResponse
     from pydantic import BaseModel
 except ImportError:
-    raise ImportError(
-        "FastAPI routing requires: pip install orb-py[api]"
-    ) from None
+    raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
 
 from orb.api.dependencies import get_di_container, require_role
 from orb.application.services.admin.cleanup_database import (
@@ -83,9 +81,7 @@ def _check_destructive_admin_allowed(request: Request) -> None:
         environment = _PRODUCTION_ENVIRONMENT
 
     if environment == _PRODUCTION_ENVIRONMENT:
-        logger.warning(
-            "ADMIN_WIPE blocked: environment is '%s'", environment
-        )
+        logger.warning("ADMIN_WIPE blocked: environment is '%s'", environment)
         raise _forbidden(
             "PRODUCTION_ENVIRONMENT",
             "Destructive admin actions are never permitted in production environments.",
@@ -158,8 +154,7 @@ async def wipe_database(
                 "error": {
                     "code": "MISSING_CONFIRMATION",
                     "message": (
-                        "Confirmation token required. "
-                        "Send {\"confirm\": \"WIPE\"} in the request body."
+                        'Confirmation token required. Send {"confirm": "WIPE"} in the request body.'
                     ),
                 },
             },
@@ -180,9 +175,7 @@ async def wipe_database(
     # event is unambiguous in the application log, separate from HTTP access).
     caller_ip = request.client.host if request.client else "unknown"
     caller_id = getattr(request.state, "user_id", "anonymous") or "anonymous"
-    logger.warning(
-        "DATABASE_WIPED by user=%s ip=%s", caller_id, caller_ip
-    )
+    logger.warning("DATABASE_WIPED by user=%s ip=%s", caller_id, caller_ip)
 
     result = service.execute()
 
@@ -264,8 +257,7 @@ async def init_orb(
                 "error": {
                     "code": "MISSING_CONFIRMATION",
                     "message": (
-                        'Confirmation token required. '
-                        'Send {"confirm": "INIT"} in the request body.'
+                        'Confirmation token required. Send {"confirm": "INIT"} in the request body.'
                     ),
                 },
             },
@@ -311,6 +303,7 @@ async def init_orb(
             else:
                 # Fallback: write a minimal valid config
                 import json
+
                 minimal: dict[str, Any] = {
                     "scheduler": {"type": "default"},
                     "provider": {"providers": []},
@@ -323,6 +316,7 @@ async def init_orb(
         # ── Copy platform scripts (best-effort) ──────────────────────────────
         try:
             from orb.interface.init_command_handler import _copy_scripts
+
             _copy_scripts(scripts_dir)
         except Exception as e:
             logger.debug("Script copy skipped: %s", e)
@@ -416,7 +410,7 @@ async def cleanup_database(
                 "error": {
                     "code": "MISSING_CONFIRMATION",
                     "message": (
-                        'Confirmation token required. '
+                        "Confirmation token required. "
                         'Send {"confirm": "CLEANUP"} in the request body.'
                     ),
                 },

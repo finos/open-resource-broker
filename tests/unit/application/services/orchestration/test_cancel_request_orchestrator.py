@@ -64,9 +64,7 @@ def orchestrator(mock_command_bus, mock_query_bus, mock_return_orchestrator, moc
 @pytest.mark.application
 class TestCancelRequestOrchestrator:
     @pytest.mark.asyncio
-    async def test_execute_dispatches_cancel_request_command(
-        self, orchestrator, mock_command_bus
-    ):
+    async def test_execute_dispatches_cancel_request_command(self, orchestrator, mock_command_bus):
         input = CancelRequestInput(request_id="req-001", reason="no longer needed")
         await orchestrator.execute(input)
         mock_command_bus.execute.assert_called_once()
@@ -126,9 +124,7 @@ class TestCancelRequestOrchestrator:
     ):
         """Machines allocated → return orchestrator is invoked with their IDs first."""
         query_bus = MagicMock()
-        query_bus.execute = AsyncMock(
-            return_value=MagicMock(machine_ids=["i-aaa", "i-bbb"])
-        )
+        query_bus.execute = AsyncMock(return_value=MagicMock(machine_ids=["i-aaa", "i-bbb"]))
         orchestrator = CancelRequestOrchestrator(
             command_bus=mock_command_bus,
             query_bus=query_bus,

@@ -72,7 +72,9 @@ class ValidateResponse(BaseModel):
     ),
 )
 async def get_full_config(
-    source: str | None = Query(default=None, description="Use 'file' to return raw on-disk config."),
+    source: str | None = Query(
+        default=None, description="Use 'file' to return raw on-disk config."
+    ),
     config_manager=CONFIG_MANAGER,
 ) -> JSONResponse:
     """Return the full effective configuration (default) or the raw file config (?source=file)."""
@@ -95,9 +97,11 @@ async def get_full_config(
             if not config_file:
                 # Final fallback: use the bundled default config.
                 import os as _os
+
                 config_file = _os.path.join(
                     _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
-                    "config", "default_config.json",
+                    "config",
+                    "default_config.json",
                 )
             try:
                 with open(config_file) as fh:
@@ -197,7 +201,10 @@ async def get_config_value(
     if value is _NOT_FOUND_SENTINEL:
         raise HTTPException(
             status_code=404,
-            detail={"code": "CONFIG_KEY_NOT_FOUND", "message": f"Configuration key '{key}' not found."},
+            detail={
+                "code": "CONFIG_KEY_NOT_FOUND",
+                "message": f"Configuration key '{key}' not found.",
+            },
         )
     return JSONResponse(content={"key": key, "value": value}, status_code=200)
 
