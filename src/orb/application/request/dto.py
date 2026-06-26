@@ -194,10 +194,13 @@ class RequestDTO(BaseDTO):
                             running_count=int(float(pd_top.get("running_count") or 0)),
                             pending_count=int(float(pd_top.get("pending_count") or 0)),
                         )
-                    except (TypeError, ValueError):
-                        # Best-effort parse: malformed legacy / provider data
-                        # leaves resolved_fulfilment as None and the request
-                        # falls back to the legacy count-based view.
+                    except (TypeError, ValueError) as exc:
+                        import logging as _logging
+
+                        _logging.getLogger(__name__).debug(
+                            "ProviderFulfilment parse failed (%s); falling back to legacy view",
+                            exc,
+                        )
                         resolved_fulfilment = None
 
         # Build structured error block from error_details when available.

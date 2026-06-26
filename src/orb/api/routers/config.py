@@ -89,10 +89,14 @@ async def get_full_config(
             config_file: str | None = None
             try:
                 config_file = config_manager.get_loaded_config_file()  # type: ignore[attr-defined]
-            except AttributeError:
-                # Manager does not expose get_loaded_config_file();
-                # the bundled-default fallback below picks up the path.
-                config_file = None
+            except AttributeError as exc:
+                import logging as _logging
+
+                _logging.getLogger(__name__).debug(
+                    "config_manager lacks get_loaded_config_file (%s); "
+                    "falling back to bundled default config",
+                    exc,
+                )
             if not config_file:
                 # Final fallback: use the bundled default config.
                 import os as _os

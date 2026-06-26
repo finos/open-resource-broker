@@ -84,10 +84,7 @@ class _SseEventBus:
         try:
             self._subscribers.remove(q)
         except ValueError:
-            # Subscriber already removed (concurrent unsubscribe race
-            # between the SSE generator's finally clause and an explicit
-            # disconnect). Idempotent by design.
-            return
+            logger.debug("SSE unsubscribe: subscriber already removed (race)")
 
     async def publish(self, event_type: str, payload: dict) -> None:
         """Publish an event from async context."""
@@ -95,20 +92,15 @@ class _SseEventBus:
         self._record(ts, event_type, payload)
         for q in list(self._subscribers):
             if q.full():
-                # Drain one stale entry to make room — prefer freshness
+                # Drain one stale entry to make room — prefer freshness.
                 try:
                     q.get_nowait()
                 except asyncio.QueueEmpty:
-                    # Queue was drained between full() and get_nowait()
-                    # by another task; nothing to evict.
-                    continue
+                    logger.debug("SSE drain: queue raced empty; nothing to evict")
             try:
                 q.put_nowait((event_type, payload))
             except asyncio.QueueFull:
-                # Subscriber is too slow; drop the event rather than
-                # block the publisher. The freshness-preferring drain
-                # above is best-effort.
-                continue
+                logger.debug("SSE publish: subscriber queue full; dropping event %s", event_type)
 
     def history_since(self, since: datetime) -> list[tuple[str, dict]]:
         """Return (event_type, payload) pairs recorded after *since*."""
