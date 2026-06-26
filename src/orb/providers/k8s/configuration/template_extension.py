@@ -99,6 +99,37 @@ class K8sTemplateExtensionConfig(BaseModel):
         ),
     )
 
+    # Pod scheduling priority
+    priority_class_name: Optional[str] = Field(
+        None, description="Default ``priorityClassName`` applied to managed pods."
+    )
+
+    # Pod termination
+    termination_grace_period_seconds: Optional[int] = Field(
+        None, description="Default ``terminationGracePeriodSeconds`` applied to managed pods."
+    )
+
+    # Container health probes
+    readiness_probe: Optional[dict[str, Any]] = Field(
+        None, description="Default readiness probe applied to managed containers."
+    )
+    liveness_probe: Optional[dict[str, Any]] = Field(
+        None, description="Default liveness probe applied to managed containers."
+    )
+
+    # Pod-level security context
+    security_context: Optional[dict[str, Any]] = Field(
+        None, description="Default pod-level ``securityContext`` applied to managed pods."
+    )
+
+    # Job lifecycle defaults
+    ttl_seconds_after_finished: Optional[int] = Field(
+        None, description="Default ``ttlSecondsAfterFinished`` for the Job handler."
+    )
+    active_deadline_seconds: Optional[int] = Field(
+        None, description="Default ``activeDeadlineSeconds`` for the Job handler."
+    )
+
     @field_validator("namespace")
     @classmethod
     def _validate_namespace(cls, v: Optional[str]) -> Optional[str]:

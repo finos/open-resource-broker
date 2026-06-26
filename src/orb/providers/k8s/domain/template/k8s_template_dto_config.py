@@ -86,6 +86,45 @@ class K8sTemplateDTOConfig(BaseModel):
         None, description="``imagePullSecrets`` entry attached to pods."
     )
 
+    # Pod scheduling priority
+    priority_class_name: Optional[str] = Field(
+        None, description="``priorityClassName`` applied to pods."
+    )
+
+    # Pod termination
+    termination_grace_period_seconds: Optional[int] = Field(
+        None, description="``terminationGracePeriodSeconds`` applied to pods."
+    )
+
+    # Container health probes
+    readiness_probe: Optional[dict[str, Any]] = Field(
+        None, description="Readiness probe applied to the container."
+    )
+    liveness_probe: Optional[dict[str, Any]] = Field(
+        None, description="Liveness probe applied to the container."
+    )
+
+    # Pod-level security context
+    security_context: Optional[dict[str, Any]] = Field(
+        None, description="Pod-level ``securityContext`` (``V1PodSecurityContext``)."
+    )
+
+    # Job lifecycle
+    ttl_seconds_after_finished: Optional[int] = Field(
+        None,
+        description=(
+            "``ttlSecondsAfterFinished`` for the Job handler — the Job is cleaned "
+            "up automatically after this many seconds once it completes."
+        ),
+    )
+    active_deadline_seconds: Optional[int] = Field(
+        None,
+        description=(
+            "``activeDeadlineSeconds`` for the Job handler — the Job is terminated "
+            "if it runs longer than this many seconds."
+        ),
+    )
+
     # Raw partial override applied AFTER the computed pod spec is built.
     pod_spec_override: Optional[dict[str, Any]] = Field(
         None,

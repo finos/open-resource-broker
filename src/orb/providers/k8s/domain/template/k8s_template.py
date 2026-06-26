@@ -153,6 +153,54 @@ class K8sVolume(BaseModel):
         return out
 
 
+class K8sProbe(BaseModel):
+    """Kubernetes container probe (readiness / liveness).
+
+    Covers the most common probe mechanisms.  Opaque fields not modelled
+    here can be reached via ``pod_spec_override``.
+    """
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    # HTTP GET probe
+    http_get: Optional[dict[str, Any]] = Field(default=None, alias="httpGet")
+    # Exec probe
+    exec: Optional[dict[str, Any]] = None
+    # TCP socket probe
+    tcp_socket: Optional[dict[str, Any]] = Field(default=None, alias="tcpSocket")
+    # Timing knobs
+    initial_delay_seconds: Optional[int] = Field(default=None, alias="initialDelaySeconds")
+    period_seconds: Optional[int] = Field(default=None, alias="periodSeconds")
+    timeout_seconds: Optional[int] = Field(default=None, alias="timeoutSeconds")
+    success_threshold: Optional[int] = Field(default=None, alias="successThreshold")
+    failure_threshold: Optional[int] = Field(default=None, alias="failureThreshold")
+
+    def to_api_dict(self) -> dict[str, Any]:
+        """Serialise to the dict shape accepted by the kubernetes SDK."""
+        return self.model_dump(by_alias=True, exclude_none=True)
+
+
+class K8sSecurityContext(BaseModel):
+    """Pod-level ``securityContext`` (``V1PodSecurityContext``).
+
+    Covers the fields required for non-root UID/GID, seccomp, and
+    filesystem group assignments.  Less common fields can be reached via
+    ``pod_spec_override``.
+    """
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    run_as_user: Optional[int] = Field(default=None, alias="runAsUser")
+    run_as_group: Optional[int] = Field(default=None, alias="runAsGroup")
+    fs_group: Optional[int] = Field(default=None, alias="fsGroup")
+    run_as_non_root: Optional[bool] = Field(default=None, alias="runAsNonRoot")
+    seccomp_profile: Optional[dict[str, Any]] = Field(default=None, alias="seccompProfile")
+
+    def to_api_dict(self) -> dict[str, Any]:
+        """Serialise to the dict shape accepted by the kubernetes SDK."""
+        return self.model_dump(by_alias=True, exclude_none=True)
+
+
 # ---------------------------------------------------------------------------
 # K8sTemplate aggregate
 # ---------------------------------------------------------------------------
@@ -216,6 +264,28 @@ def _coerce_env(value: Any) -> Optional[list[K8sEnvVar]]:
                 raise TypeError(f"Unsupported env entry type: {type(entry).__name__}")
         return out
     raise TypeError(f"Unsupported env payload type: {type(value).__name__}")
+
+
+def _coerce_probe(value: Any) -> Optional[K8sProbe]:
+    """Accept dict / model inputs for probe fields."""
+    if value is None:
+        return None
+    if isinstance(value, K8sProbe):
+        return value
+    if isinstance(value, dict):
+        return K8sProbe.model_validate(value)
+    raise TypeError(f"Unsupported probe payload type: {type(value).__name__}")
+
+
+def _coerce_security_context(value: Any) -> Optional[K8sSecurityContext]:
+    """Accept dict / model inputs for the security_context field."""
+    if value is None:
+        return None
+    if isinstance(value, K8sSecurityContext):
+        return value
+    if isinstance(value, dict):
+        return K8sSecurityContext.model_validate(value)
+    raise TypeError(f"Unsupported security_context payload type: {type(value).__name__}")
 
 
 def _coerce_volumes(value: Any) -> Optional[list[K8sVolume]]:
@@ -300,6 +370,23 @@ class K8sTemplate(Template):
     # Identity overrides
     service_account: Optional[str] = None
 
+    # Pod scheduling priority
+    priority_class_name: Optional[str] = None
+
+    # Pod termination
+    termination_grace_period_seconds: Optional[int] = None
+
+    # Container health probes
+    readiness_probe: Optional[K8sProbe] = None
+    liveness_probe: Optional[K8sProbe] = None
+
+    # Pod-level security context (V1PodSecurityContext)
+    security_context: Optional[K8sSecurityContext] = None
+
+    # Job lifecycle knobs
+    ttl_seconds_after_finished: Optional[int] = None
+    active_deadline_seconds: Optional[int] = None
+
     # Raw partial override applied AFTER the computed pod spec is built.
     # Distinct from :attr:`native_spec` below — ``pod_spec_override`` is a
     # partial deep-merge onto the computed pod spec built by the spec
@@ -355,6 +442,30 @@ class K8sTemplate(Template):
     def _coerce_volumes_input(cls, value: Any) -> Optional[list[K8sVolume]]:
         return _coerce_volumes(value)
 
+    @field_validator("readiness_probe", "liveness_probe", mode="before")
+    @classmethod
+    def _coerce_probe_input(cls, value: Any) -> Optional[K8sProbe]:
+        return _coerce_probe(value)
+
+    @field_validator("security_context", mode="before")
+    @classmethod
+    def _coerce_security_context_input(cls, value: Any) -> Optional[K8sSecurityContext]:
+        return _coerce_security_context(value)
+
+    @field_validator("termination_grace_period_seconds", "ttl_seconds_after_finished")
+    @classmethod
+    def _validate_non_negative_seconds(cls, value: Optional[int]) -> Optional[int]:
+        if value is not None and value < 0:
+            raise ValueError("seconds fields must be non-negative integers when set")
+        return value
+
+    @field_validator("active_deadline_seconds")
+    @classmethod
+    def _validate_positive_deadline(cls, value: Optional[int]) -> Optional[int]:
+        if value is not None and value <= 0:
+            raise ValueError("active_deadline_seconds must be a positive integer when set")
+        return value
+
     @field_validator("namespace")
     @classmethod
     def _validate_namespace(cls, value: Optional[str]) -> Optional[str]:
@@ -405,8 +516,26 @@ class K8sTemplate(Template):
             self._promote_field(pc, "args")
             self._promote_field(pc, "completions")
             self._promote_field(pc, "parallelism")
+            self._promote_field(pc, "priority_class_name")
+            self._promote_field(pc, "termination_grace_period_seconds")
+            self._promote_field(pc, "ttl_seconds_after_finished")
+            self._promote_field(pc, "active_deadline_seconds")
             self._promote_field(pc, "pod_spec_override")
             self._promote_field(pc, "native_spec")
+
+            # Coerced probe / security-context fields go through per-field validators.
+            if self.readiness_probe is None and pc.get("readiness_probe") is not None:
+                object.__setattr__(
+                    self, "readiness_probe", _coerce_probe(pc.get("readiness_probe"))
+                )
+            if self.liveness_probe is None and pc.get("liveness_probe") is not None:
+                object.__setattr__(self, "liveness_probe", _coerce_probe(pc.get("liveness_probe")))
+            if self.security_context is None and pc.get("security_context") is not None:
+                object.__setattr__(
+                    self,
+                    "security_context",
+                    _coerce_security_context(pc.get("security_context")),
+                )
 
             # Coerced fields go through the per-field validator helpers.
             if self.tolerations is None and pc.get("tolerations") is not None:
@@ -535,7 +664,9 @@ def upcast_to_k8s_template(template: Union[Template, "K8sTemplate"]) -> K8sTempl
 __all__ = [
     "K8sEnvVar",
     "K8sEnvVarSource",
+    "K8sProbe",
     "K8sResourceQuantities",
+    "K8sSecurityContext",
     "K8sTemplate",
     "K8sToleration",
     "K8sVolume",

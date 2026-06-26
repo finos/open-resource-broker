@@ -80,6 +80,13 @@ class K8sTemplateAdapter(TemplateAdapterPort):
         "args",
         "image_pull_secret",
         "pod_spec_override",
+        "priority_class_name",
+        "termination_grace_period_seconds",
+        "readiness_probe",
+        "liveness_probe",
+        "security_context",
+        "ttl_seconds_after_finished",
+        "active_deadline_seconds",
     ]
 
     def __init__(

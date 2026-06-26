@@ -59,6 +59,18 @@ class K8sFieldMapping:
         "imagePullSecret": "image_pull_secret",
         # Raw partial pod-spec override
         "podSpecOverride": "pod_spec_override",
+        # Pod scheduling priority
+        "priorityClassName": "priority_class_name",
+        # Pod termination
+        "terminationGracePeriodSeconds": "termination_grace_period_seconds",
+        # Container health probes
+        "readinessProbe": "readiness_probe",
+        "livenessProbe": "liveness_probe",
+        # Pod-level security context
+        "securityContext": "security_context",
+        # Job lifecycle
+        "ttlSecondsAfterFinished": "ttl_seconds_after_finished",
+        "activeDeadlineSeconds": "active_deadline_seconds",
     }
 
     def get_mappings(self) -> dict[str, str]:
