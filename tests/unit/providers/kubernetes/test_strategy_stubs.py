@@ -184,14 +184,14 @@ async def test_typed_provisioning_methods_route_to_pod_handler() -> None:
 
 @pytest.mark.asyncio
 async def test_unsupported_provider_api_returns_failed() -> None:
-    """Non-Pod APIs (Deployment / StatefulSet / Job) are not yet implemented."""
+    """StatefulSet / Job APIs are not yet implemented."""
     from orb.domain.base.operation_outcome import Failed
 
     strategy = _make_strategy()
 
     fake_request = MagicMock()
     fake_request.request_id = "req-test"
-    fake_request.provider_api = "KubernetesDeployment"  # Phase E
+    fake_request.provider_api = "KubernetesStatefulSet"  # Later phase
     fake_request.template_id = "tpl-1"
     fake_request.requested_count = 1
     fake_request.metadata = {}

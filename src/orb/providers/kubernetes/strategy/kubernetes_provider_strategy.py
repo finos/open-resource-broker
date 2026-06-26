@@ -39,6 +39,7 @@ from orb.providers.base.strategy import (
 )
 from orb.providers.kubernetes.configuration.config import KubernetesProviderConfig
 from orb.providers.kubernetes.handlers.base_handler import KubernetesHandlerBase
+from orb.providers.kubernetes.handlers.deployment_handler import KubernetesDeploymentHandler
 from orb.providers.kubernetes.handlers.pod_handler import KubernetesPodHandler
 from orb.providers.kubernetes.infrastructure.kubernetes_client import KubernetesClient
 from orb.providers.kubernetes.value_objects import KubernetesProviderApi
@@ -402,13 +403,13 @@ class KubernetesProviderStrategy(ProviderStrategy):
         handler = self._handlers.get(provider_api)
         if handler is not None:
             return handler
+        cache = self._watch_manager.cache if self._watch_manager is not None else None
+        alive = (
+            (lambda m=self._watch_manager: m.is_healthy())
+            if self._watch_manager is not None
+            else None
+        )
         if provider_api == KubernetesProviderApi.POD.value:
-            cache = self._watch_manager.cache if self._watch_manager is not None else None
-            alive = (
-                (lambda m=self._watch_manager: m.is_healthy())
-                if self._watch_manager is not None
-                else None
-            )
             handler = KubernetesPodHandler(
                 kubernetes_client=self.kubernetes_client,
                 config=self._k8s_config,
@@ -418,10 +419,20 @@ class KubernetesProviderStrategy(ProviderStrategy):
             )
             self._handlers[provider_api] = handler
             return handler
-        # Deployment / StatefulSet / Job arrive in Phases E / F.
+        if provider_api == KubernetesProviderApi.DEPLOYMENT.value:
+            handler = KubernetesDeploymentHandler(
+                kubernetes_client=self.kubernetes_client,
+                config=self._k8s_config,
+                logger=self._logger,
+                pod_state_cache=cache,
+                cache_alive=alive,
+            )
+            self._handlers[provider_api] = handler
+            return handler
+        # StatefulSet / Job arrive in later phases.
         raise NotImplementedError(
             f"Kubernetes handler for provider_api={provider_api!r} is not yet implemented "
-            "(Pod is implemented in Phase B; Deployment/StatefulSet/Job arrive in later phases)."
+            "(Pod and Deployment are implemented; StatefulSet/Job arrive in later phases)."
         )
 
     # ------------------------------------------------------------------
