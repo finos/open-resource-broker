@@ -86,16 +86,21 @@ func New(cfg Config) *Manager {
 // Start launches the ORB subprocess and waits for it to become healthy.
 func (m *Manager) Start(ctx context.Context) error {
 	binary := m.cfg.Binary
-	args := append([]string{"system", "serve"}, m.cfg.Args...)
+	// `orb server start` is the lifecycle command. --foreground keeps the
+	// process in the current process tree (we manage the lifecycle from Go,
+	// not via the ORB daemon). --api-only skips the embedded UI so the
+	// subprocess is purely the REST + IPC surface this SDK talks to.
+	baseArgs := []string{"server", "start", "--foreground", "--api-only"}
+	args := append(append([]string{}, baseArgs...), m.cfg.Args...)
 
 	// Resolve binary; fall back to python -m orb if not found in PATH
 	if _, err := exec.LookPath(binary); err != nil {
 		if _, pyErr := exec.LookPath("python"); pyErr == nil {
 			binary = "python"
-			args = append([]string{"-m", "orb", "system", "serve"}, m.cfg.Args...)
+			args = append(append([]string{"-m", "orb"}, baseArgs...), m.cfg.Args...)
 		} else if _, pyErr := exec.LookPath("python3"); pyErr == nil {
 			binary = "python3"
-			args = append([]string{"-m", "orb", "system", "serve"}, m.cfg.Args...)
+			args = append(append([]string{"-m", "orb"}, baseArgs...), m.cfg.Args...)
 		} else {
 			return fmt.Errorf("process: %q not found in PATH and python/python3 not available", m.cfg.Binary)
 		}
