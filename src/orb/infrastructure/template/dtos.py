@@ -46,6 +46,10 @@ class TemplateDTO(BaseDTO):
     price_type: str = "ondemand"
     allocation_strategy: Optional[str] = None
     max_price: Optional[float] = None
+    placement_split_strategy: str = "hybrid"
+    placement_primary_share_percent: int = 80
+    placement_regions: list[str] = Field(default_factory=list)
+    placement_zones: list[str] = Field(default_factory=list)
 
     # Network configuration
     network_zones: list[str] = Field(default_factory=list)
@@ -95,7 +99,7 @@ class TemplateDTO(BaseDTO):
     def _serialize_provider_config(self, value: Optional[BaseModel]) -> Optional[dict[str, Any]]:
         if value is None:
             return None
-        return value.model_dump(exclude_none=True)
+        return value.model_dump(exclude_none=True, exclude_unset=True)
 
     @model_validator(mode="before")
     @classmethod
@@ -175,6 +179,12 @@ class TemplateDTO(BaseDTO):
             price_type=getattr(template, "price_type", "ondemand"),
             allocation_strategy=getattr(template, "allocation_strategy", None),
             max_price=getattr(template, "max_price", None),
+            placement_split_strategy=getattr(template, "placement_split_strategy", "hybrid"),
+            placement_primary_share_percent=getattr(
+                template, "placement_primary_share_percent", 80
+            ),
+            placement_regions=getattr(template, "placement_regions", []),
+            placement_zones=getattr(template, "placement_zones", []),
             # Network configuration
             network_zones=getattr(template, "network_zones", []),
             public_ip_assignment=getattr(template, "public_ip_assignment", None),
@@ -213,7 +223,12 @@ class TemplateDTO(BaseDTO):
     def to_template_config(self) -> dict[str, Any]:
         """Return template config with provider-specific config promoted."""
         template_config = self.model_dump(mode="json", exclude_none=True)
-        provider_config = dict(template_config.pop("provider_config", {}) or {})
+        template_config.pop("provider_config", None)
+        provider_config = (
+            self.provider_config.model_dump(mode="json", exclude_none=True, exclude_unset=True)
+            if self.provider_config is not None
+            else {}
+        )
         for key, value in provider_config.items():
             template_config.setdefault(key, value)
         return template_config
