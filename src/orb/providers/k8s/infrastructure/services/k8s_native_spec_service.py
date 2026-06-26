@@ -39,10 +39,35 @@ from orb.providers.k8s.domain.template.k8s_template import (
     K8sTemplate,
     upcast_to_k8s_template,
 )
+from orb.providers.k8s.exceptions.k8s_errors import K8sError
 
 # Supported per-API spec keys; each corresponds to a directory under
 # ``providers/k8s/specs/`` containing a ``default.json`` Jinja template.
 _SUPPORTED_API_TYPES: frozenset[str] = frozenset({"pod", "deployment", "statefulset", "job"})
+
+
+def _validate_api_version_and_kind(spec: dict[str, Any], template_id: Any) -> None:
+    """Raise :class:`K8sError` when ``spec`` is missing ``apiVersion`` or ``kind``.
+
+    Both fields are mandatory on every Kubernetes object body.  Their absence
+    means the native spec is misconfigured and would produce a confusing error
+    from the API server rather than a clear operator-facing message.
+
+    Args:
+        spec: The fully rendered native-spec dict about to be sent to the SDK.
+        template_id: Used in the error message so the operator can locate the
+            offending template.
+
+    Raises:
+        K8sError: when ``apiVersion`` or ``kind`` is missing or empty.
+    """
+    missing = [field for field in ("apiVersion", "kind") if not spec.get(field)]
+    if missing:
+        raise K8sError(
+            f"native_spec rendered dict for template {template_id!r} is missing "
+            f"required field(s): {missing!r}.  Ensure the native_spec (or the "
+            f"default template it merges onto) sets apiVersion and kind."
+        )
 
 
 @injectable
@@ -190,17 +215,39 @@ class K8sNativeSpecService:
         """Resolve the rendered native-spec body for ``api_type``.
 
         When the escape hatch is disabled, returns ``None`` so the caller
-        falls back to the typed builder path.  Otherwise:
+        falls back to the typed builder path.  A warning is logged when
+        ``native_spec`` is set on the template but the flag is disabled, so
+        operators are not silently surprised by the bypass.
 
-        * If ``K8sTemplate.native_spec`` is set, render it and deep-merge
-          it onto the per-API default Jinja template (default first, then
-          operator override wins on leaf collisions).
-        * Else, render the default Jinja template and return it directly.
+        When enabled:
+
+        * If ``K8sTemplate.native_spec`` is set, render it and deep-merge it
+          onto the per-API default Jinja template (default first, then
+          operator override wins on leaf collisions).  When ``pod_spec_override``
+          is also set, it is ignored with a warning — ``native_spec`` is a
+          full-replacement intent and layering a partial override on top of it
+          would produce undefined behaviour.
+        * Otherwise, render the default Jinja template and return it directly.
+
+        The rendered dict is validated to carry ``apiVersion`` and ``kind``
+        before it is returned — both fields are required by the Kubernetes API
+        server and their absence always indicates a misconfigured native spec.
+
+        Raises:
+            K8sError: when the final rendered dict is missing ``apiVersion``
+                or ``kind``.
         """
+        k8s_template = upcast_to_k8s_template(template)
+
         if not self.is_native_spec_enabled():
+            if k8s_template.native_spec:
+                self.native_spec_service.logger.warning(
+                    "native_spec is set on template %r but native_spec_enabled=False; "
+                    "falling back to the typed K8sTemplate path",
+                    k8s_template.template_id,
+                )
             return None
 
-        k8s_template = upcast_to_k8s_template(template)
         context = self._build_k8s_context(k8s_template, request, namespace=namespace)
 
         # Always render the default first so operators can submit a
@@ -208,8 +255,16 @@ class K8sNativeSpecService:
         default_spec = self.render_default_spec(api_type, context)
 
         if k8s_template.native_spec:
+            if k8s_template.pod_spec_override:
+                self.native_spec_service.logger.warning(
+                    "Both native_spec and pod_spec_override are set on template %r; "
+                    "native_spec takes precedence and pod_spec_override will be ignored",
+                    k8s_template.template_id,
+                )
             rendered_override = self.render_spec(k8s_template.native_spec, context)
-            return deep_merge(default_spec, rendered_override)
+            result = deep_merge(default_spec, rendered_override)
+            _validate_api_version_and_kind(result, k8s_template.template_id)
+            return result
 
         return default_spec
 
@@ -287,4 +342,4 @@ class K8sNativeSpecService:
         }
 
 
-__all__ = ["K8sNativeSpecService"]
+__all__ = ["K8sNativeSpecService", "_validate_api_version_and_kind"]

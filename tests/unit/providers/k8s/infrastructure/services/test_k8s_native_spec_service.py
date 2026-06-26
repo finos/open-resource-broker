@@ -28,6 +28,7 @@ from orb.domain.request.value_objects import RequestId, RequestType
 from orb.infrastructure.template.jinja_spec_renderer import JinjaSpecRenderer
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+from orb.providers.k8s.exceptions.k8s_errors import K8sError
 from orb.providers.k8s.infrastructure.services.k8s_native_spec_service import (
     _SUPPORTED_API_TYPES,
     K8sNativeSpecService,
@@ -358,3 +359,166 @@ class TestContextBuilding:
         ctx = service._build_k8s_context(template, request, namespace="orb-test")
         assert ctx["has_command"] is True
         assert ctx["command"] == ["echo", "hi"]
+
+
+# ---------------------------------------------------------------------------
+# native_spec safety holes
+# ---------------------------------------------------------------------------
+
+
+class TestNativeSpecSafetyHoles:
+    """Covers the three safety holes identified in the adversarial review.
+
+    1. native_spec set but native_spec_enabled=False → warning + typed path.
+    2. Both native_spec and pod_spec_override set with native_spec_enabled=True
+       → native_spec wins, pod_spec_override ignored with a warning.
+    3. Rendered dict missing apiVersion or kind → K8sError raised.
+    """
+
+    # ------------------------------------------------------------------
+    # Case 1: native_spec set but flag disabled
+    # ------------------------------------------------------------------
+
+    def test_warning_logged_when_native_spec_set_but_flag_disabled(self) -> None:
+        """When native_spec_enabled=False, native_spec is bypassed with a warning.
+
+        The caller must receive None (typed-builder fallback) and the logger must
+        record a warning so the operator is not silently surprised.
+        """
+        service = _make_service(provider_flag_enabled=False)
+        # Replace logger with a mock so we can inspect calls.
+        logger_mock = Mock()
+        service.native_spec_service.logger = logger_mock
+
+        template = _make_template(native_spec={"apiVersion": "v1", "kind": "Pod"})
+        request = _make_request("Pod")
+
+        result = service.process_pod_spec(template, request, namespace="orb-test")
+
+        assert result is None, "Disabled flag must yield None (typed-builder path)"
+        logger_mock.warning.assert_called_once()
+        warning_message: str = logger_mock.warning.call_args[0][0]
+        assert "native_spec_enabled=False" in warning_message
+        assert "falling back" in warning_message
+
+    def test_no_warning_when_native_spec_not_set_and_flag_disabled(self) -> None:
+        """No warning should be logged when native_spec is not set on the template."""
+        service = _make_service(provider_flag_enabled=False)
+        logger_mock = Mock()
+        service.native_spec_service.logger = logger_mock
+
+        template = _make_template()  # no native_spec
+        request = _make_request("Pod")
+
+        result = service.process_pod_spec(template, request, namespace="orb-test")
+
+        assert result is None
+        logger_mock.warning.assert_not_called()
+
+    # ------------------------------------------------------------------
+    # Case 2: both native_spec and pod_spec_override set
+    # ------------------------------------------------------------------
+
+    def test_warning_logged_when_both_native_spec_and_pod_spec_override_set(self) -> None:
+        """pod_spec_override is ignored when native_spec takes precedence."""
+        service = _make_service()
+        logger_mock = Mock()
+        service.native_spec_service.logger = logger_mock
+
+        native = {"spec": {"restartPolicy": "Never"}}
+        template = K8sTemplate(
+            template_id="tpl-conflict",
+            image_id="busybox:latest",
+            namespace="orb-test",
+            native_spec=native,
+            pod_spec_override={"metadata": {"labels": {"extra": "label"}}},
+        )
+        request = _make_request("Pod")
+
+        result = service.process_pod_spec(template, request, namespace="orb-test")
+
+        # The call should succeed; native_spec path is taken.
+        assert result is not None
+        assert result["kind"] == "Pod"
+        # pod_spec_override labels must NOT appear — native_spec won.
+        labels = result.get("metadata", {}).get("labels", {})
+        assert "extra" not in labels
+
+        # Exactly one warning about pod_spec_override being ignored.
+        logger_mock.warning.assert_called_once()
+        warning_message: str = logger_mock.warning.call_args[0][0]
+        assert "pod_spec_override" in warning_message
+        assert "native_spec takes precedence" in warning_message
+
+    def test_no_warning_when_only_pod_spec_override_set_without_native_spec(self) -> None:
+        """pod_spec_override alone (no native_spec) must not trigger the conflict warning."""
+        service = _make_service()
+        logger_mock = Mock()
+        service.native_spec_service.logger = logger_mock
+
+        template = K8sTemplate(
+            template_id="tpl-override-only",
+            image_id="busybox:latest",
+            namespace="orb-test",
+            pod_spec_override={"metadata": {"labels": {"extra": "label"}}},
+        )
+        request = _make_request("Pod")
+
+        result = service.process_pod_spec(template, request, namespace="orb-test")
+
+        # Default path taken; no native_spec → no conflict warning.
+        assert result is not None
+        logger_mock.warning.assert_not_called()
+
+    # ------------------------------------------------------------------
+    # Case 3: rendered dict missing apiVersion / kind
+    # ------------------------------------------------------------------
+
+    def test_raises_k8s_error_when_api_version_stripped_from_result(self) -> None:
+        """A native_spec that overrides apiVersion with an empty string must raise K8sError."""
+        service = _make_service()
+        # Supply a native_spec that explicitly clears apiVersion so the merged
+        # result has an empty string — simulating a misconfigured operator spec.
+        native = {"apiVersion": ""}
+        template = _make_template(native_spec=native)
+        request = _make_request("Pod")
+
+        with pytest.raises(K8sError, match="missing required field"):
+            service.process_pod_spec(template, request, namespace="orb-test")
+
+    def test_raises_k8s_error_when_kind_absent_in_native_spec(self) -> None:
+        """When the native_spec omits kind and the default template is also missing it,
+        a K8sError must be raised so the operator gets a clear message."""
+        service = _make_service()
+
+        # Build a native spec that deliberately supplies apiVersion but no kind,
+        # and monkeypatch render_default_spec to return a skeleton without kind
+        # so the merge result is also missing it.
+        original_render = service.render_default_spec
+
+        def _render_no_kind(api_type: str, context: dict[str, Any]) -> dict[str, Any]:
+            rendered = original_render(api_type, context)
+            rendered.pop("kind", None)
+            return rendered
+
+        service.render_default_spec = _render_no_kind  # type: ignore[method-assign]
+
+        native = {"apiVersion": "v1"}  # kind missing from both sides
+        template = _make_template(native_spec=native)
+        request = _make_request("Pod")
+
+        with pytest.raises(K8sError, match="missing required field"):
+            service.process_pod_spec(template, request, namespace="orb-test")
+
+    def test_no_error_when_api_version_and_kind_present(self) -> None:
+        """Happy path: a well-formed native_spec must not raise."""
+        service = _make_service()
+        native = {"spec": {"containers": [{"name": "orb", "image": "busybox:latest"}]}}
+        template = _make_template(native_spec=native)
+        request = _make_request("Pod")
+
+        result = service.process_pod_spec(template, request, namespace="orb-test")
+
+        assert result is not None
+        assert result.get("apiVersion") == "v1"
+        assert result.get("kind") == "Pod"
