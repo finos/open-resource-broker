@@ -73,6 +73,14 @@ aws = [
     "botocore>=1.42.21",
 ]
 
+# Modern Kubernetes provider — explicit opt-in extra.  Install with:
+#   pip install orb-py[kubernetes]
+# Only the SDK client is required here; everything else (jinja2, watchdog,
+# alembic etc.) is legacy-plugin baggage and stays in the [k8s-legacy] extra.
+kubernetes = [
+    "kubernetes",
+]
+
 # Placeholder entries for future providers (add when provider is implemented)
 # azure = [
 #     "azure-mgmt-compute>=30.0.0",
@@ -87,6 +95,7 @@ aws = [
 # Meta-extra: all currently implemented providers
 all-providers = [
     "orb-py[aws]",
+    "orb-py[kubernetes]",
 ]
 
 # Legacy k8s HostFactory plugin — heavy deps gated behind optional extra.

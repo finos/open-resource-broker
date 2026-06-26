@@ -1,7 +1,7 @@
 {
   "pythonVersion": "3.12",
   "pythonPlatform": "Linux",
-  "include": ["src/orb"],
+  "include": ["src/orb", "src/orb/providers/kubernetes"],
   "exclude": [".venv", "build", "dist", "src/orb/k8s_legacy"],
   "extraPaths": ["src"],
   "typeCheckingMode": "basic",

@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # Central provider list – the single line to edit when adding a new provider.
 # ---------------------------------------------------------------------------
-_REGISTERED_PROVIDERS: list[str] = ["aws"]
+_REGISTERED_PROVIDERS: list[str] = ["aws", "kubernetes"]
 
 
 def register_all_providers(container: "DIContainer | None" = None) -> None:
