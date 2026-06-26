@@ -9,7 +9,7 @@ from starlette.datastructures import URL
 
 import orb.api.dependencies as deps
 from orb.api.server import create_fastapi_app
-from orb.config.schemas.server_schema import AuthConfig, ServerConfig
+from orb.config.schemas.server_schema import AuthConfig, CORSConfig, ServerConfig
 from orb.infrastructure.auth.strategy.bearer_token_strategy import BearerTokenStrategy
 from orb.infrastructure.auth.strategy.no_auth_strategy import NoAuthStrategy
 
@@ -62,6 +62,7 @@ class TestAuthenticationFlows:
                     "token_expiry": 3600,
                 },
             ),
+            cors=CORSConfig(origins=["*"]),  # type: ignore[call-arg]
         )
 
         # Create FastAPI app
@@ -110,6 +111,7 @@ class TestAuthenticationFlows:
                     "algorithm": "HS256",
                 },
             ),
+            cors=CORSConfig(origins=["*"]),  # type: ignore[call-arg]
         )
 
         app = create_fastapi_app(server_config)
@@ -194,6 +196,7 @@ class TestAuthenticationFlows:
                 strategy="bearer_token",
                 bearer_token={"secret_key": "test-secret-key-minimum-32-bytes!"},
             ),
+            cors=CORSConfig(origins=["*"]),  # type: ignore[call-arg]
         )
 
         app = create_fastapi_app(server_config)
@@ -209,7 +212,11 @@ class TestAuthenticationFlows:
 
     def test_cors_headers(self):
         """Test CORS headers are properly set."""
-        server_config = ServerConfig(enabled=True, auth=AuthConfig(enabled=False))  # type: ignore[call-arg]
+        server_config = ServerConfig(  # type: ignore[call-arg]
+            enabled=True,
+            auth=AuthConfig(enabled=False),  # type: ignore[call-arg]
+            cors=CORSConfig(origins=["http://localhost:3000"]),  # type: ignore[call-arg]
+        )
 
         app = create_fastapi_app(server_config)
         client = TestClient(app)
