@@ -1,0 +1,296 @@
+"""Handler registry for :class:`K8sProviderStrategy`.
+
+Encapsulates the per-API handler factory wiring, the template-resolution
+path used at acquire time, and the typed dispatch helpers
+(``acquire`` / ``return_machines`` / ``get_status``).
+
+The strategy keeps the lifecycle surface (initialize / cleanup, watch
+manager, startup reconciler, orphan GC, health, capabilities, plugin
+registration, native-spec resolution) and delegates the per-request
+execution to this registry, which mirrors the AWS provider's separation
+between its strategy shell and its handler factory.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from typing import TYPE_CHECKING, Any, Callable, Optional
+
+from orb.domain.base.operation_outcome import Accepted, Completed, Failed, OperationOutcome
+from orb.domain.base.ports import LoggingPort
+from orb.providers.k8s.configuration.config import K8sProviderConfig
+from orb.providers.k8s.handlers.base_handler import K8sHandlerBase
+from orb.providers.k8s.handlers.deployment_handler import K8sDeploymentHandler
+from orb.providers.k8s.handlers.job_handler import K8sJobHandler
+from orb.providers.k8s.handlers.pod_handler import K8sPodHandler
+from orb.providers.k8s.handlers.statefulset_handler import K8sStatefulSetHandler
+from orb.providers.k8s.infrastructure.k8s_client import K8sClient
+from orb.providers.k8s.value_objects import KubernetesProviderApi
+from orb.providers.k8s.watch.multi_namespace import MultiNamespaceWatcher
+
+if TYPE_CHECKING:  # pragma: no cover — type-checking only
+    from orb.domain.request.aggregate import Request
+    from orb.domain.template.template_aggregate import Template
+
+
+class K8sHandlerRegistry:
+    """Resolve per-API handlers and dispatch acquire/return/status calls.
+
+    Construction is light: the registry holds references to the strategy's
+    config, logger, lazy client accessor, the lazy watcher accessor, the
+    native-spec resolver, and the plugin-factory accessor.  Handler
+    instances are cached on first resolution so each provider-API only
+    ever holds one live handler.
+
+    Plugin-registered handler factories are looked up on the
+    :class:`K8sProviderStrategy` class — the registry consults
+    ``plugin_factories`` (a callable returning the dict) so the strategy
+    remains the single source of truth for plugin state.
+    """
+
+    def __init__(
+        self,
+        *,
+        config: K8sProviderConfig,
+        logger: LoggingPort,
+        client_provider: Callable[[], K8sClient],
+        watch_manager_provider: Callable[[], Optional[MultiNamespaceWatcher]],
+        plugin_factories: Callable[[], dict[str, Callable[..., K8sHandlerBase]]],
+        native_spec_service_provider: Callable[[], Optional[Any]],
+        handler_overrides: Optional[dict[str, K8sHandlerBase]] = None,
+    ) -> None:
+        self._config = config
+        self._logger = logger
+        self._client_provider = client_provider
+        self._watch_manager_provider = watch_manager_provider
+        self._plugin_factories = plugin_factories
+        self._native_spec_service_provider = native_spec_service_provider
+        # Handler cache keyed by provider_api value.  Tests can pre-seed
+        # this via ``handler_overrides`` to inject mock handlers.
+        self._handlers: dict[str, K8sHandlerBase] = dict(handler_overrides or {})
+
+    # ------------------------------------------------------------------
+    # Public surface used by the strategy
+    # ------------------------------------------------------------------
+
+    @property
+    def handlers(self) -> dict[str, K8sHandlerBase]:
+        """Mutable handler cache — exposed for test fixtures."""
+        return self._handlers
+
+    def resolve_provider_api(self, request: "Request") -> str:
+        """Pick the provider-API key for ``request``.
+
+        Defaults to :attr:`KubernetesProviderApi.POD` so legacy callers
+        that omit the provider_api field still route to the Pod handler.
+        """
+        api = getattr(request, "provider_api", None)
+        if api:
+            return str(api)
+        return KubernetesProviderApi.POD.value
+
+    def get_handler(self, provider_api: str) -> K8sHandlerBase:
+        """Return (and lazily construct) the handler for ``provider_api``."""
+        handler = self._handlers.get(provider_api)
+        if handler is not None:
+            return handler
+
+        watch_manager = self._watch_manager_provider()
+        cache = watch_manager.cache if watch_manager is not None else None
+        alive = (lambda m=watch_manager: m.is_healthy()) if watch_manager is not None else None
+        native_spec_service = self._native_spec_service_provider()
+
+        if provider_api == KubernetesProviderApi.POD.value:
+            handler = K8sPodHandler(
+                kubernetes_client=self._client_provider(),
+                config=self._config,
+                logger=self._logger,
+                pod_state_cache=cache,
+                cache_alive=alive,
+                native_spec_service=native_spec_service,
+            )
+            self._handlers[provider_api] = handler
+            return handler
+        if provider_api == KubernetesProviderApi.DEPLOYMENT.value:
+            handler = K8sDeploymentHandler(
+                kubernetes_client=self._client_provider(),
+                config=self._config,
+                logger=self._logger,
+                pod_state_cache=cache,
+                cache_alive=alive,
+                native_spec_service=native_spec_service,
+            )
+            self._handlers[provider_api] = handler
+            return handler
+        if provider_api == KubernetesProviderApi.STATEFUL_SET.value:
+            handler = K8sStatefulSetHandler(
+                kubernetes_client=self._client_provider(),
+                config=self._config,
+                logger=self._logger,
+                pod_state_cache=cache,
+                cache_alive=alive,
+                native_spec_service=native_spec_service,
+            )
+            self._handlers[provider_api] = handler
+            return handler
+        if provider_api == KubernetesProviderApi.JOB.value:
+            handler = K8sJobHandler(
+                kubernetes_client=self._client_provider(),
+                config=self._config,
+                logger=self._logger,
+                pod_state_cache=cache,
+                cache_alive=alive,
+                native_spec_service=native_spec_service,
+            )
+            self._handlers[provider_api] = handler
+            return handler
+
+        # Plugin-supplied handlers — see ``K8sProviderStrategy.register_handler``
+        # and ``docs/root/providers/k8s/plugin-authoring.md``.
+        factory = self._plugin_factories().get(provider_api)
+        if factory is not None:
+            handler = factory(
+                kubernetes_client=self._client_provider(),
+                config=self._config,
+                logger=self._logger,
+                pod_state_cache=cache,
+                cache_alive=alive,
+            )
+            self._handlers[provider_api] = handler
+            return handler
+        raise NotImplementedError(
+            f"Kubernetes handler for provider_api={provider_api!r} is not yet implemented "
+            "(Pod, Deployment, StatefulSet and Job are implemented; third-party "
+            "plugins may register additional handlers via "
+            "K8sProviderStrategy.register_handler)."
+        )
+
+    # ------------------------------------------------------------------
+    # Typed provisioning interface
+    # ------------------------------------------------------------------
+
+    async def acquire(self, request: "Request") -> OperationOutcome:
+        """Submit an acquisition request to Kubernetes via the per-API handler."""
+        try:
+            provider_api = self.resolve_provider_api(request)
+            handler = self.get_handler(provider_api)
+            template = self.build_template_for_request(request)
+            result = await handler.acquire_hosts(request, template)
+
+            resource_ids = list(result.get("resource_ids", []) or [])
+            machine_ids = list(result.get("machine_ids", []) or [])
+            metadata: dict[str, Any] = {
+                "provider_api": provider_api,
+                "provider_data": result.get("provider_data", {}),
+                "machine_ids": machine_ids,
+            }
+            self._logger.info(
+                "Kubernetes acquire accepted: request_id=%s pods=%s",
+                request.request_id,
+                resource_ids,
+            )
+            return Accepted(
+                request_id=str(request.request_id),
+                pending_resource_ids=resource_ids,
+                metadata=metadata,
+            )
+        except Exception as exc:
+            self._logger.error("Kubernetes acquire failed: %s", exc, exc_info=True)
+            return Failed(error=str(exc), recoverable=False)
+
+    async def return_machines(self, machine_ids: list[str], request: "Request") -> OperationOutcome:
+        """Delete the named pods via the per-API handler."""
+        try:
+            provider_api = self.resolve_provider_api(request)
+            handler = self.get_handler(provider_api)
+            await handler.release_hosts(list(machine_ids), request)
+            self._logger.info(
+                "Kubernetes return accepted: request_id=%s machine_ids=%s",
+                request.request_id,
+                machine_ids,
+            )
+            return Accepted(
+                request_id=str(request.request_id),
+                pending_resource_ids=list(machine_ids),
+                metadata={"provider_api": provider_api},
+            )
+        except Exception as exc:
+            self._logger.error("Kubernetes return_machines failed: %s", exc, exc_info=True)
+            return Failed(error=str(exc), recoverable=False)
+
+    async def get_status(self, resource_ids: list[str], request: "Request") -> OperationOutcome:
+        """Poll the per-API handler's ``check_hosts_status`` for a verdict.
+
+        Returns ``Completed`` when fulfilment is terminal (``fulfilled``,
+        ``partial``, or ``failed``); ``Accepted`` while ``in_progress``.
+        """
+        try:
+            provider_api = self.resolve_provider_api(request)
+            handler = self.get_handler(provider_api)
+            check_result = await asyncio.to_thread(handler.check_hosts_status, request)
+            instances = check_result.instances
+            fulfilment = check_result.fulfilment
+
+            metadata: dict[str, Any] = {
+                "provider_api": provider_api,
+                "fulfilment": fulfilment,
+                "instances": instances,
+            }
+
+            if fulfilment.state == "in_progress":
+                pending = [
+                    i.get("instance_id", "")
+                    for i in instances
+                    if i.get("status") in ("pending", "starting")
+                ]
+                return Accepted(
+                    request_id=str(request.request_id),
+                    pending_resource_ids=pending or list(resource_ids),
+                    metadata=metadata,
+                )
+
+            terminal_ids = [i.get("instance_id", "") for i in instances]
+            return Completed(resource_ids=terminal_ids, metadata=metadata)
+        except Exception as exc:
+            self._logger.error("Kubernetes get_status failed: %s", exc, exc_info=True)
+            return Failed(error=str(exc), recoverable=True)
+
+    def build_template_for_request(self, request: "Request") -> "Template":
+        """Resolve the :class:`Template` carried by ``request``.
+
+        The kubernetes provider picks up the template payload from
+        ``request.metadata['template']`` (REST/CLI submission shape) and
+        falls back to a minimal template assembled from the request fields
+        when nothing richer is available.  In every case the result is
+        upcast to :class:`K8sTemplate` so the spec builders see the typed
+        k8s-specific surface — the fallback path historically built a
+        bare ``Template`` and silently dropped any k8s fields.
+        """
+        from orb.domain.template.template_aggregate import (  # noqa: PLC0415
+            Template as _Template,
+        )
+        from orb.providers.k8s.domain.template.k8s_template import (  # noqa: PLC0415
+            K8sTemplate,
+            upcast_to_k8s_template,
+        )
+
+        meta = getattr(request, "metadata", None) or {}
+        if isinstance(meta, dict):
+            template_payload = meta.get("template")
+            if isinstance(template_payload, K8sTemplate):
+                return template_payload
+            if isinstance(template_payload, _Template):
+                return upcast_to_k8s_template(template_payload)
+            if isinstance(template_payload, dict):
+                return K8sTemplate.model_validate(template_payload)
+
+        # Fall back to a minimal K8sTemplate built from the request fields.
+        return K8sTemplate(
+            template_id=str(request.template_id),
+            provider_type="k8s",
+            provider_api=request.provider_api or KubernetesProviderApi.POD.value,
+            max_instances=max(int(request.requested_count), 1),
+        )
+
+
+__all__ = ["K8sHandlerRegistry"]

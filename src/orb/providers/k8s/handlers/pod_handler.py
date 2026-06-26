@@ -4,8 +4,10 @@ Contract:
 
 * ``acquire_hosts``   — creates N pods concurrently via
   :meth:`CoreV1Api.create_namespaced_pod` wrapped in :func:`asyncio.to_thread`.
-* ``check_hosts_status`` — lists pods by ``orb.io/request-id`` label and
-  maps ``status.phase`` to an ORB :class:`ProviderFulfilment` verdict.
+* ``check_hosts_status`` — delegated to
+  :class:`orb.providers.k8s.handlers.pod_status.PodStatusResolver`, which
+  lists pods by ``orb.io/request-id`` label and maps ``status.phase`` to
+  an ORB :class:`ProviderFulfilment` verdict.
 * ``release_hosts``   — deletes pods by name; 404s are treated as
   best-effort (already gone) and logged at debug.
 
@@ -18,25 +20,23 @@ issuing a ``list_namespaced_pod`` per call.
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any, Callable, Optional
+import copy
+from typing import Any, Callable, Optional
 
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
-from orb.domain.base.provider_fulfilment import CheckHostsStatusResult, ProviderFulfilment
+from orb.domain.base.provider_fulfilment import CheckHostsStatusResult
 from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.handlers.base_handler import K8sHandlerBase
+from orb.providers.k8s.handlers.pod_status import PodStatusResolver
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 from orb.providers.k8s.utilities.pod_spec import (
     build_pod_spec,
     make_pod_name,
 )
 from orb.providers.k8s.watch.pod_state_cache import PodStateCache
-
-if TYPE_CHECKING:  # pragma: no cover — type-checking only
-    from kubernetes.client import V1Pod
-
 
 # Cap on concurrent ``create_namespaced_pod`` calls.  The kubernetes
 # apiserver can throttle requests aggressively; 50 leaves headroom for
@@ -45,8 +45,8 @@ _MAX_CONCURRENT_CREATES = 50
 
 
 # Phase-to-status mapping used by ``_pod_status_string`` and the
-# fulfilment computation below.  ``Pending`` covers both "scheduling"
-# and "ContainerCreating"; readiness is read separately from the pod
+# fulfilment computation.  ``Pending`` covers both "scheduling" and
+# "ContainerCreating"; readiness is read separately from the pod
 # conditions to disambiguate Running-but-not-Ready.
 _TERMINAL_PHASES = frozenset({"Succeeded", "Failed"})
 
@@ -70,6 +70,7 @@ class K8sPodHandler(K8sHandlerBase):
         pod_state_cache: Optional[PodStateCache] = None,
         cache_alive: Optional[Callable[[], bool]] = None,
         stale_cache_timeout_seconds: Optional[float] = None,
+        native_spec_service: Optional[Any] = None,
     ) -> None:
         super().__init__(
             kubernetes_client=kubernetes_client,
@@ -78,8 +79,10 @@ class K8sPodHandler(K8sHandlerBase):
             pod_state_cache=pod_state_cache,
             cache_alive=cache_alive,
             stale_cache_timeout_seconds=stale_cache_timeout_seconds,
+            native_spec_service=native_spec_service,
         )
         self._max_concurrent_creates = max_concurrent_creates
+        self._status_resolver = PodStatusResolver(self)
 
     # ------------------------------------------------------------------
     # acquire_hosts
@@ -109,19 +112,40 @@ class K8sPodHandler(K8sHandlerBase):
             count,
         )
 
+        # Native-spec escape hatch (opt-in via K8sProviderConfig.native_spec_enabled):
+        # when the operator-supplied template carries a native_spec and
+        # the feature is enabled, the rendered dict replaces the body
+        # built by build_pod_spec.  Each pod gets a per-pod copy with
+        # its unique name / machine-id stamped over the rendered body so
+        # the request-scoped label selector still works.
+        native_pod_body = (
+            self._native_spec_service.process_pod_spec(template, request, namespace=namespace)
+            if self._native_spec_service is not None
+            else None
+        )
+
         sem = asyncio.Semaphore(self._max_concurrent_creates)
-        pods_to_create: list[tuple[str, V1Pod]] = []
+        pods_to_create: list[tuple[str, Any]] = []
         for seq in range(count):
             pod_name = make_pod_name(str(request.request_id), seq)
-            pod_body = build_pod_spec(
-                template,
-                request,
-                pod_name=pod_name,
-                machine_id=pod_name,  # 1 pod = 1 machine for Pod
-                namespace=namespace,
-                provider_api=self.PROVIDER_API,
-                config=self._config,
-            )
+            if native_pod_body is not None:
+                pod_body: Any = self._stamp_native_pod_body(
+                    native_pod_body,
+                    pod_name=pod_name,
+                    machine_id=pod_name,
+                    namespace=namespace,
+                    request=request,
+                )
+            else:
+                pod_body = build_pod_spec(
+                    template,
+                    request,
+                    pod_name=pod_name,
+                    machine_id=pod_name,  # 1 pod = 1 machine for Pod
+                    namespace=namespace,
+                    provider_api=self.PROVIDER_API,
+                    config=self._config,
+                )
             pods_to_create.append((pod_name, pod_body))
 
         results = await asyncio.gather(
@@ -164,13 +188,44 @@ class K8sPodHandler(K8sHandlerBase):
             },
         }
 
+    def _stamp_native_pod_body(
+        self,
+        native_body: dict[str, Any],
+        *,
+        pod_name: str,
+        machine_id: str,
+        namespace: str,
+        request: Request,
+    ) -> dict[str, Any]:
+        """Stamp per-pod identity onto a rendered native pod body.
+
+        The native_spec is rendered once for the whole acquire call, so
+        the same dict would be submitted N times without re-stamping —
+        the kubernetes API server would reject the second create as a
+        duplicate.  This helper deep-copies the rendered dict and
+        overwrites the per-pod fields (name, machine-id label, namespace).
+
+        Operator-controlled non-identity fields (labels, annotations,
+        spec.*) are preserved.
+        """
+        body = copy.deepcopy(native_body)
+        metadata = body.setdefault("metadata", {})
+        metadata["name"] = pod_name
+        metadata["namespace"] = namespace
+        labels = dict(metadata.get("labels", {}) or {})
+        labels[f"{self._config.label_prefix}/machine-id"] = machine_id
+        labels[f"{self._config.label_prefix}/request-id"] = str(request.request_id)
+        labels[f"{self._config.label_prefix}/managed"] = "true"
+        metadata["labels"] = labels
+        return body
+
     async def _create_one_pod(
         self,
         *,
         sem: asyncio.Semaphore,
         namespace: str,
         pod_name: str,
-        body: "V1Pod",
+        body: Any,
     ) -> str:
         """Submit a single ``create_namespaced_pod`` call under the semaphore."""
         async with sem:
@@ -184,127 +239,12 @@ class K8sPodHandler(K8sHandlerBase):
         return pod_name
 
     # ------------------------------------------------------------------
-    # check_hosts_status
+    # check_hosts_status — delegated to PodStatusResolver
     # ------------------------------------------------------------------
 
     def check_hosts_status(self, request: Request) -> CheckHostsStatusResult:
-        """Return per-pod details + the fulfilment verdict for ``request``.
-
-        Cache-first read path: when a :class:`PodStateCache` has been
-        injected and the watcher reports alive, the handler
-        reads the cached :class:`PodState` snapshots for ``request_id``.
-        A cache miss (no entry) or a stale cache (any entry older than
-        :attr:`K8sProviderConfig.stale_cache_timeout_seconds`)
-        falls back to a single ``list_namespaced_pod`` call.
-        """
-        cached = self._read_from_cache(request)
-        if cached is not None:
-            cached_instances = self.apply_pod_timeouts(list(cached.instances))
-            fulfilment = self._compute_fulfilment(cached_instances, request.requested_count)
-            return CheckHostsStatusResult(instances=cached_instances, fulfilment=fulfilment)
-
-        namespace = self._resolve_request_namespace(request)
-        selector = self.build_label_selector(request)
-
-        try:
-            response = self.with_retry(
-                self.client.core_v1.list_namespaced_pod,
-                namespace=namespace,
-                label_selector=selector,
-                operation_name="list_namespaced_pod",
-            )
-        except Exception as exc:
-            self._logger.error(
-                "list_namespaced_pod failed for request %s: %s",
-                request.request_id,
-                exc,
-                exc_info=True,
-            )
-            # In-flight read failure — treat as in_progress so callers
-            # retry rather than failing the request outright.
-            return CheckHostsStatusResult(
-                instances=[],
-                fulfilment=ProviderFulfilment(
-                    state="in_progress",
-                    message=f"Kubernetes list failed (will retry): {exc}",
-                    target_units=request.requested_count,
-                    running_count=0,
-                    pending_count=0,
-                    failed_count=0,
-                ),
-            )
-
-        pods: list[Any] = list(getattr(response, "items", []) or [])
-        instances: list[dict[str, Any]] = [
-            self._instance_dict_for_pod(pod, namespace=namespace) for pod in pods
-        ]
-        instances = self.apply_pod_timeouts(instances)
-        fulfilment = self._compute_fulfilment(instances, request.requested_count)
-        return CheckHostsStatusResult(instances=instances, fulfilment=fulfilment)
-
-    def _compute_fulfilment(
-        self,
-        instances: list[dict[str, Any]],
-        requested_count: int,
-    ) -> ProviderFulfilment:
-        """Roll up per-pod statuses into a :class:`ProviderFulfilment`.
-
-        Mirrors the RunInstances handler's compute helper so the
-        downstream presentation is identical.
-        """
-        running_count = sum(1 for i in instances if i.get("status") == "running")
-        pending_count = sum(1 for i in instances if i.get("status") in ("pending", "starting"))
-        failed_count = sum(1 for i in instances if i.get("status") == "failed")
-
-        if running_count >= requested_count and failed_count == 0 and requested_count > 0:
-            return ProviderFulfilment(
-                state="fulfilled",
-                message=f"All {running_count} pod(s) running",
-                target_units=requested_count,
-                fulfilled_units=running_count,
-                running_count=running_count,
-                pending_count=pending_count,
-                failed_count=failed_count,
-            )
-        if pending_count > 0:
-            return ProviderFulfilment(
-                state="in_progress",
-                message=f"{running_count}/{requested_count} running, {pending_count} pending",
-                target_units=requested_count,
-                fulfilled_units=running_count,
-                running_count=running_count,
-                pending_count=pending_count,
-                failed_count=failed_count,
-            )
-        if failed_count > 0 and failed_count == len(instances) and len(instances) > 0:
-            return ProviderFulfilment(
-                state="failed",
-                message=f"All {failed_count} pod(s) failed",
-                target_units=requested_count,
-                fulfilled_units=0,
-                running_count=running_count,
-                pending_count=pending_count,
-                failed_count=failed_count,
-            )
-        if running_count > 0:
-            return ProviderFulfilment(
-                state="partial",
-                message=f"{running_count}/{requested_count} pod(s) running",
-                target_units=requested_count,
-                fulfilled_units=running_count,
-                running_count=running_count,
-                pending_count=pending_count,
-                failed_count=failed_count,
-            )
-        return ProviderFulfilment(
-            state="in_progress",
-            message="Pods starting",
-            target_units=requested_count,
-            fulfilled_units=0,
-            running_count=running_count,
-            pending_count=pending_count,
-            failed_count=failed_count,
-        )
+        """Delegate the status read path to :class:`PodStatusResolver`."""
+        return self._status_resolver.check_hosts_status(request)
 
     # ------------------------------------------------------------------
     # release_hosts
