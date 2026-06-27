@@ -52,3 +52,16 @@ class MachineRepository(AggregateRepository[Machine]):
     @abstractmethod
     def find_by_return_request_id(self, return_request_id: str) -> list[Machine]:
         """Find machines by return request ID."""
+
+    def count_by_status(self) -> dict[str, int]:
+        """Return ``{status_value: count}`` for all machines.
+
+        Default implementation lists all machines and groups by status.
+        Concrete implementations backed by SQL should override this with a
+        single ``SELECT status, COUNT(*) GROUP BY status`` query.
+        """
+        counts: dict[str, int] = {}
+        for machine in self.find_all():
+            key = str(getattr(machine.status, "value", machine.status))
+            counts[key] = counts.get(key, 0) + 1
+        return counts

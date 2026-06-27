@@ -187,3 +187,25 @@ class GetTemplateValidationResultQuery(Query, BaseModel):
     model_config = ConfigDict(frozen=True)
 
     template_id: str
+
+
+# Dashboard aggregate count queries — return {value: count} dicts via a single
+# storage-layer GROUP BY instead of listing all rows into Python.
+
+
+class CountMachinesByStatusQuery(Query, BaseModel):
+    """Query to count machines grouped by status."""
+
+    model_config = ConfigDict(frozen=True)
+
+
+class CountRequestsByStatusQuery(Query, BaseModel):
+    """Query to count requests grouped by status."""
+
+    model_config = ConfigDict(frozen=True)
+
+
+class CountTemplatesByProviderApiQuery(Query, BaseModel):
+    """Query to count templates grouped by provider_api."""
+
+    model_config = ConfigDict(frozen=True)

@@ -10,6 +10,8 @@ try:
 except ImportError:
     raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
 
+import logging as _logging
+
 from orb.api.dependencies import (
     check_destructive_admin_allowed as _check_destructive_admin_allowed,
     get_cancel_request_orchestrator,
@@ -33,9 +35,12 @@ from orb.application.services.orchestration.dtos import (
     ListReturnRequestsInput,
 )
 from orb.domain.base import UnitOfWorkFactory
+from orb.domain.request.request_types import RequestStatus
 from orb.infrastructure.error.decorators import handle_rest_exceptions
 
 router = APIRouter(prefix="/requests", tags=["Requests"])
+
+_logger = _logging.getLogger(__name__)
 
 # Module-level dependency variables to avoid B008 warnings
 STATUS_ORCHESTRATOR = Depends(get_request_status_orchestrator)
@@ -47,7 +52,18 @@ STATUS_QUERY = Query(None, description="Filter by request status")
 LIMIT_QUERY = Query(50, description="Limit number of results")
 OFFSET_QUERY = Query(0, ge=0, description="Number of results to skip")
 
-_TERMINAL_STATUSES = {"complete", "completed", "failed", "error", "cancelled", "canceled"}
+
+def _is_terminal_status(status: str) -> bool:
+    """Return True when *status* is a terminal RequestStatus value.
+
+    Unknown strings (not in the enum) are treated as non-terminal so the SSE
+    stream does not close prematurely on unexpected provider-side values.
+    """
+    try:
+        return RequestStatus(status.lower()).is_terminal()
+    except ValueError:
+        _logger.debug("Unrecognised request status %r — treating as non-terminal", status)
+        return False
 
 
 @router.get(
@@ -219,7 +235,7 @@ async def stream_request_status(
                 requests_list = formatted.get("requests", [])
                 if requests_list:
                     status = requests_list[0].get("status", "")
-                    if status.lower() in _TERMINAL_STATUSES:
+                    if _is_terminal_status(status):
                         yield "data: {}\n\n"
                         return
             except Exception:

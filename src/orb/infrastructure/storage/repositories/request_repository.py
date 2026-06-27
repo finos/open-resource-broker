@@ -476,6 +476,21 @@ class RequestRepositoryImpl(StorageRepositoryMixin, RequestRepositoryInterface):
             self.logger.error("Failed to check if request %s exists: %s", request_id, e)
             raise
 
+    def count_by_status(self) -> dict[str, int]:
+        """Return ``{status: count}`` for all requests.
+
+        Delegates to ``storage_strategy.count_by_column("status")`` when the
+        underlying strategy supports it (SQL fast path).  Falls back to the
+        domain-interface default (list all + group) for file-based backends.
+        """
+        strategy = getattr(self, "storage_strategy", None)
+        if strategy is not None and hasattr(strategy, "count_by_column"):
+            result = strategy.count_by_column("status")
+            if result:
+                return result
+        # Slow path: list all rows and group in Python.
+        return super().count_by_status()
+
     def count_by_date_range(self, start_date: datetime, end_date: datetime) -> int:
         """Count requests within date range."""
         return len(self.find_by_date_range(start_date, end_date))

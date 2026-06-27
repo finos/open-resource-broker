@@ -327,6 +327,21 @@ class TemplateRepositoryImpl(StorageRepositoryMixin, TemplateRepositoryInterface
         """Get all templates - alias for find_all for backward compatibility."""
         return self.find_all()
 
+    def count_by_provider_api(self) -> dict[str, int]:
+        """Return ``{provider_api: count}`` for all templates.
+
+        Delegates to ``storage_strategy.count_by_column("provider_api")`` when
+        the underlying strategy supports it (SQL fast path).  Falls back to the
+        domain-interface default (list all + group) for file-based backends.
+        """
+        strategy = getattr(self, "storage_strategy", None)
+        if strategy is not None and hasattr(strategy, "count_by_column"):
+            result = strategy.count_by_column("provider_api")
+            if result:
+                return result
+        # Slow path: list all rows and group in Python.
+        return super().count_by_provider_api()
+
     @handle_infrastructure_exceptions(context="template_search")
     def search_templates(self, criteria: dict[str, Any]) -> list[Template]:
         """Search templates by criteria."""

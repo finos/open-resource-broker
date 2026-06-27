@@ -52,10 +52,16 @@ def _bulk_delete(repo: object, id_field: str, entities: list) -> int:
         return len(ids)
 
     # Slow path: per-entity delete via the repository interface.
+    # Mirror the fast-path guard: skip entities whose PK is None rather
+    # than raising AttributeError / passing None to delete().
+    deleted = 0
     for entity in entities:
-        pk = getattr(entity, id_field)
+        pk = getattr(entity, id_field, None)
+        if pk is None:
+            continue
         repo.delete(pk)  # type: ignore[attr-defined]
-    return len(entities)
+        deleted += 1
+    return deleted
 
 
 class WipeDatabaseService:

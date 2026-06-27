@@ -102,8 +102,6 @@ class GetProviderConfigHandler(BaseQueryHandler[GetProviderConfigQuery, Provider
         super().__init__(logger, error_handler)
         self.container = container
         self.timestamp_service = timestamp_service
-        super().__init__(logger, error_handler)
-        self.container = container
 
     async def execute_query(self, query: GetProviderConfigQuery) -> ProviderConfigDTO:
         """Execute provider configuration query."""

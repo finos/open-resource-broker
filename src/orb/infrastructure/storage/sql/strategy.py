@@ -401,6 +401,36 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 self.logger.error("Failed to delete batch: %s", e)
                 raise StorageError(f"Failed to delete batch: {e}")
 
+    def count_by_column(self, column: str) -> dict[str, int]:
+        """Return ``{column_value: count}`` via a single SQL GROUP BY query.
+
+        Used by the dashboard to get per-status (or per-provider-api) counts
+        without loading every row into Python first.
+
+        Falls back to an empty dict on any error so callers can degrade
+        gracefully to the list-and-count slow path if needed.
+        """
+        with self.lock_manager.read_lock():
+            try:
+                sql = f"SELECT {column}, COUNT(*) AS cnt FROM {self.table_name} GROUP BY {column}"  # noqa: S608 — table/column names come from trusted internal code, not user input
+                with self.connection_manager.get_session() as session:
+                    result = session.execute(text(sql))
+                    rows = result.fetchall()
+                counts: dict[str, int] = {}
+                for row in rows:
+                    row_dict = dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
+                    key = str(row_dict.get(column) or "unknown")
+                    counts[key] = int(row_dict.get("cnt", 0))
+                return counts
+            except Exception as exc:
+                self.logger.error(
+                    "count_by_column failed for table=%s column=%s: %s",
+                    self.table_name,
+                    column,
+                    exc,
+                )
+                return {}
+
     def begin_transaction(self) -> None:
         """Begin transaction (handled by session)."""
         self.logger.debug("Transaction begin (handled by session)")

@@ -120,15 +120,19 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, Paginated[Templa
 
             total_unfiltered = len(template_dtos)
 
+            # active_only filter runs first, while items are still DTOs and the
+            # is_active attribute is reliably present.  filter_expressions may
+            # convert items to plain dicts (via model_dump), after which
+            # getattr(t, "is_active", True) would always return True.
+            if query.active_only:
+                template_dtos = [t for t in template_dtos if getattr(t, "is_active", True)]
+
             if query.filter_expressions:
                 template_dicts = [dto.model_dump() for dto in template_dtos]
                 filtered_dicts = self._generic_filter_service.apply_filters(
                     template_dicts, query.filter_expressions
                 )
                 template_dtos = filtered_dicts  # type: ignore[assignment]
-
-            if query.active_only:
-                template_dtos = [t for t in template_dtos if getattr(t, "is_active", True)]
 
             # q: case-insensitive substring search across user-visible fields
             if query.q:

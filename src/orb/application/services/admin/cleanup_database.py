@@ -212,15 +212,19 @@ class CleanupDatabaseService:
                 if request.status.value not in normalised:
                     continue
 
-                # Age filter (skip recent records if cutoff is set)
+                # Age filter (skip recent records if cutoff is set).
+                # Rows with NULL created_at are treated as "too recent to
+                # purge" — unknown age must never accidentally slip past the
+                # cutoff and result in unintended deletion.
                 if cutoff is not None:
                     created = request.created_at
-                    if created is not None:
-                        # Normalise to UTC-aware for comparison
-                        if created.tzinfo is None:
-                            created = created.replace(tzinfo=timezone.utc)
-                        if created >= cutoff:
-                            continue
+                    if created is None:
+                        continue
+                    # Normalise to UTC-aware for comparison
+                    if created.tzinfo is None:
+                        created = created.replace(tzinfo=timezone.utc)
+                    if created >= cutoff:
+                        continue
 
                 machines_deleted = 0
                 if include_machines:

@@ -437,6 +437,21 @@ class MachineRepositoryImpl(StorageRepositoryMixin, MachineRepositoryInterface):
         """Return all machines from the repository."""
         return self.find_all()
 
+    def count_by_status(self) -> dict[str, int]:
+        """Return ``{status: count}`` for all machines.
+
+        Delegates to ``storage_strategy.count_by_column("status")`` when the
+        underlying strategy supports it (SQL fast path).  Falls back to the
+        domain-interface default (list all + group) for file-based backends.
+        """
+        strategy = getattr(self, "storage_strategy", None)
+        if strategy is not None and hasattr(strategy, "count_by_column"):
+            result = strategy.count_by_column("status")
+            if result:
+                return result
+        # Slow path: list all rows and group in Python.
+        return super().count_by_status()
+
     @handle_infrastructure_exceptions(context="machine_repository_delete")
     def delete(self, machine_id: MachineId) -> None:
         """Delete machine by ID."""

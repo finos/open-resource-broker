@@ -299,3 +299,18 @@ def register_orchestrators(container: DIContainer) -> None:
                 logger=c.get(LoggingPort),
             ),
         )
+
+    from orb.application.services.orchestration.dashboard_summary import (
+        DashboardSummaryOrchestrator,
+    )
+    from orb.domain.base import UnitOfWorkFactory
+
+    if not container.is_registered(DashboardSummaryOrchestrator):
+        container.register_singleton(
+            DashboardSummaryOrchestrator,
+            lambda c: DashboardSummaryOrchestrator(
+                list_requests=c.get(ListRequestsOrchestrator),
+                uow_factory=c.get(UnitOfWorkFactory),
+                logger=c.get(LoggingPort),
+            ),
+        )

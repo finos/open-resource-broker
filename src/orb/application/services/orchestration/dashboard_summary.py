@@ -9,21 +9,17 @@ from orb.application.services.orchestration.base import OrchestratorBase
 from orb.application.services.orchestration.dtos import (
     DashboardSummaryInput,
     DashboardSummaryOutput,
-    ListMachinesInput,
     ListRequestsInput,
-    ListTemplatesInput,
 )
-from orb.application.services.orchestration.list_machines import ListMachinesOrchestrator
 from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
-from orb.application.services.orchestration.list_templates import ListTemplatesOrchestrator
+from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.ports.logging_port import LoggingPort
+from orb.domain.request.request_types import RequestStatus
 
 # RequestStatus enum values are: pending / in_progress / acquiring /
 # complete / failed / cancelled / timeout / partial. Note "complete"
-# (singular) — NOT "completed". The dashboard previously used the wrong
-# key "completed" which never matched, leaving every fulfilled request
-# counted as in_flight and the Completed stat card stuck at 0.
-_TERMINAL_STATUSES = frozenset({"complete", "failed", "cancelled", "timeout", "partial"})
+# (singular) — NOT "completed".
+_TERMINAL_STATUSES = frozenset(s.value for s in RequestStatus if s.is_terminal())
 
 _MACHINE_STATUS_KEYS = ["running", "pending", "stopped", "terminated", "shutting-down"]
 _REQUEST_STATUS_KEYS = [
@@ -60,81 +56,73 @@ def _to_iso(value: Any) -> Optional[str]:
 class DashboardSummaryOrchestrator(OrchestratorBase[DashboardSummaryInput, DashboardSummaryOutput]):
     """Aggregate orchestrator that builds the dashboard summary in Python.
 
-    Pulls all machines, requests and templates from the existing list
-    orchestrators and rolls up counts server-side so the UI does not have
-    to reduce thousands of records client-side.
+    Per-status and per-provider-api counts are sourced from dedicated
+    repository GROUP BY queries (``count_by_status`` / ``count_by_provider_api``)
+    instead of listing all rows with limit=100_000 against handlers that
+    clamp at 1000.  This makes the stat cards accurate at any data scale.
+
+    Recent activity (top-10 table) continues to use the list endpoint with
+    limit=10; that is intentional.
     """
 
     def __init__(
         self,
-        list_machines: ListMachinesOrchestrator,
         list_requests: ListRequestsOrchestrator,
-        list_templates: ListTemplatesOrchestrator,
+        uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
     ) -> None:
-        self._list_machines = list_machines
         self._list_requests = list_requests
-        self._list_templates = list_templates
+        self._uow_factory = uow_factory
         self._logger = logger
 
     async def execute(self, input: DashboardSummaryInput) -> DashboardSummaryOutput:
         self._logger.info("DashboardSummaryOrchestrator: building dashboard aggregate")
 
-        # ---- machines -------------------------------------------------------
-        machines_output = await self._list_machines.execute(ListMachinesInput(limit=100_000))
-        machine_by_status: dict[str, int] = {k: 0 for k in _MACHINE_STATUS_KEYS}
-        for m in machines_output.machines:
-            raw = getattr(m, "status", None) or (m.get("status") if isinstance(m, dict) else None)
-            status_key = str(raw).lower() if raw else "unknown"
-            if status_key in machine_by_status:
-                machine_by_status[status_key] += 1
-            else:
-                machine_by_status[status_key] = machine_by_status.get(status_key, 0) + 1
+        with self._uow_factory.create_unit_of_work() as uow:
+            # ---- machines ---------------------------------------------------
+            machine_by_status = uow.machines.count_by_status()
+            machines_total = sum(machine_by_status.values())
+            # Ensure well-known keys are present even when count is 0.
+            for key in _MACHINE_STATUS_KEYS:
+                machine_by_status.setdefault(key, 0)
+            machines_section: dict[str, Any] = {
+                "total": machines_total,
+                "by_status": machine_by_status,
+            }
 
-        # total_count is the post-filter row count from the handler before
-        # pagination/clamp; count is len(items) which the handler clamps to
-        # 1000. Use total_count so the dashboard headline number is honest
-        # at any scale. by_status remains computed over the slice the
-        # handler returned (capped); a proper count_by_status aggregate
-        # is tracked for a follow-up.
-        machines_total = (
-            machines_output.total_count
-            if machines_output.total_count is not None
-            else machines_output.count
-        )
-        machines_section: dict[str, Any] = {
-            "total": machines_total,
-            "by_status": machine_by_status,
-        }
+            # ---- requests (counts) ------------------------------------------
+            request_by_status = uow.requests.count_by_status()
+            requests_total = sum(request_by_status.values())
+            in_flight = sum(
+                count
+                for status_val, count in request_by_status.items()
+                if status_val not in _TERMINAL_STATUSES
+            )
+            for key in _REQUEST_STATUS_KEYS:
+                request_by_status.setdefault(key, 0)
+            requests_section: dict[str, Any] = {
+                "total": requests_total,
+                "in_flight": in_flight,
+                "by_status": request_by_status,
+            }
 
-        # ---- requests -------------------------------------------------------
-        requests_output = await self._list_requests.execute(ListRequestsInput(limit=100_000))
-        request_by_status: dict[str, int] = {k: 0 for k in _REQUEST_STATUS_KEYS}
-        in_flight = 0
-        recent_raw: list[dict[str, Any]] = []
-
-        for r in requests_output.requests:
-            raw_status = str(r.get("status", "")).lower()
-            if raw_status in request_by_status:
-                request_by_status[raw_status] += 1
-            else:
-                request_by_status[raw_status] = request_by_status.get(raw_status, 0) + 1
-            if raw_status not in _TERMINAL_STATUSES:
-                in_flight += 1
-            recent_raw.append(r)
-
-        requests_total = (
-            requests_output.total_count
-            if requests_output.total_count is not None
-            else requests_output.count
-        )
-        requests_section: dict[str, Any] = {
-            "total": requests_total,
-            "in_flight": in_flight,
-            "by_status": request_by_status,
-        }
+            # ---- templates (counts) -----------------------------------------
+            provider_api_counts = uow.templates.count_by_provider_api()
+            templates_total = sum(provider_api_counts.values())
+            for key in _TEMPLATE_PROVIDER_API_KEYS:
+                provider_api_counts.setdefault(key, 0)
+            templates_section: dict[str, Any] = {
+                "total": templates_total,
+                "by_provider_api": provider_api_counts,
+            }
 
         # ---- recent activity (top 10 by created_at desc) --------------------
+        # Uses the list endpoint with a small limit; this is intentional.
+        requests_output = await self._list_requests.execute(
+            ListRequestsInput(limit=10, sort="-created_at")
+        )
+        recent_raw: list[dict[str, Any]] = list(requests_output.requests)
+
         def _created_at_key(r: dict[str, Any]) -> str:
             # Sort key must be totally ordered — coerce missing values to ""
             # so requests without a created_at land at the end (sort reversed).
@@ -163,31 +151,6 @@ class DashboardSummaryOrchestrator(OrchestratorBase[DashboardSummaryInput, Dashb
             }
             for r in recent_sorted
         ]
-
-        # ---- templates ------------------------------------------------------
-        templates_output = await self._list_templates.execute(
-            ListTemplatesInput(active_only=False, limit=100_000)
-        )
-        provider_api_counts: dict[str, int] = {k: 0 for k in _TEMPLATE_PROVIDER_API_KEYS}
-        for t in templates_output.templates:
-            if isinstance(t, dict):
-                api = str(t.get("provider_api", "")).strip()
-            else:
-                api = str(getattr(t, "provider_api", "")).strip()
-            if api in provider_api_counts:
-                provider_api_counts[api] += 1
-            else:
-                provider_api_counts[api] = provider_api_counts.get(api, 0) + 1
-
-        templates_total = (
-            templates_output.total_count
-            if templates_output.total_count is not None
-            else templates_output.count
-        )
-        templates_section: dict[str, Any] = {
-            "total": templates_total,
-            "by_provider_api": provider_api_counts,
-        }
 
         return DashboardSummaryOutput(
             machines=machines_section,
