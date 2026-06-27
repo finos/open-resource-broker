@@ -316,6 +316,49 @@ class HealthCheck(HealthCheckPort):
             )
 
 
+def register_deserialize_skip_counter_check(
+    health_check: HealthCheckPort,
+    repository: Any,
+) -> None:
+    """Register a ``storage.deserialize`` health check backed by a repository mixin.
+
+    The check is ``healthy`` when no rows have been skipped.  Any non-zero
+    skip counter flips the check to ``degraded`` so operators can see that
+    list operations are returning incomplete results without surfacing a hard
+    failure.
+
+    Args:
+        health_check: The application HealthCheck instance.
+        repository: A ``StorageRepositoryMixin`` subclass exposing
+            ``_get_skip_counters()``.  If the method is absent the check is
+            not registered.
+    """
+    get_counters = getattr(repository, "_get_skip_counters", None)
+    if not callable(get_counters):
+        return
+
+    def _check_deserialize_skip_counters() -> HealthStatus:
+        try:
+            raw = get_counters()  # type: ignore[call-arg]  # callable validated above
+            counters: dict[str, int] = raw if isinstance(raw, dict) else {}
+        except Exception as exc:
+            return HealthStatus(
+                name="storage.deserialize",
+                status="unhealthy",
+                details={"error": str(exc)},
+                dependencies=["database"],
+            )
+        total_skipped = sum(counters.values())
+        return HealthStatus(
+            name="storage.deserialize",
+            status="degraded" if total_skipped > 0 else "healthy",
+            details={"skipped_rows": counters, "total_skipped": total_skipped},
+            dependencies=["database"],
+        )
+
+    health_check.register_check("storage.deserialize", _check_deserialize_skip_counters, force=True)
+
+
 def register_storage_health_checks(
     health_check: HealthCheckPort,
     storage_port: Any,

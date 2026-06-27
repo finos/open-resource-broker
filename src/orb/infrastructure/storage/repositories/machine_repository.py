@@ -20,10 +20,19 @@ class MachineSerializer(BaseEntitySerializer):
     Value objects (MachineId, InstanceType, Tags, …) carry @model_serializer /
     @model_validator so they self-flatten to/from plain scalars — no hand-rolling
     needed here.
+
+    An optional ``storage_backend`` may be passed at construction time so the
+    serializer can attempt to backfill ``provider_api`` from the source request
+    when the column is NULL in a legacy row.
     """
 
     # Fields produced by model_dump that must not be written to storage.
     _DUMP_EXCLUDED: set[str] = set(Machine._SERIALIZATION_EXCLUDED_FIELDS)
+
+    def __init__(self, storage_backend: Any = None) -> None:
+        """Initialise serializer with an optional storage backend for backfill."""
+        super().__init__()
+        self._storage_backend = storage_backend
 
     def to_dict(self, machine: Machine) -> dict[str, Any]:  # type: ignore[override]
         """Serialize Machine to a storage-compatible dict."""
@@ -54,14 +63,48 @@ class MachineSerializer(BaseEntitySerializer):
 
     _CURRENT_SCHEMA_VERSION = "2.0.0"
 
+    @staticmethod
+    def _apply_nullable_defaults(data: dict[str, Any]) -> dict[str, Any]:
+        """Coerce nullable JSON columns to safe empty containers.
+
+        Applied unconditionally — including on the schema_version fast path —
+        so legacy NULL values stored before the NOT NULL migration are never
+        handed to model_validate as Python None for fields that expect a dict
+        or list.
+
+        Fields coerced:
+          - tags             → {} if None  (serialised as JSON in SQL)
+          - metadata         → {} if None
+          - provider_data    → {} if None
+          - security_group_ids → [] if None
+          - health_checks    → [] if None  (SQL column exists even though the
+                               field is not on the Machine aggregate; coerce to
+                               drop it harmlessly rather than propagate None)
+
+        provider_api is handled separately: if None, the caller attempts a
+        fallback from the source request before falling through to "" + WARNING.
+        """
+        if data.get("tags") is None:
+            data["tags"] = {}
+        if data.get("metadata") is None:
+            data["metadata"] = {}
+        if data.get("provider_data") is None:
+            data["provider_data"] = {}
+        if data.get("security_group_ids") is None:
+            data["security_group_ids"] = []
+        if data.get("health_checks") is None:
+            data["health_checks"] = []
+        return data
+
     def _normalize_on_read(self, data: dict[str, Any]) -> dict[str, Any]:
         """Normalize storage data before model_validate.
 
-        Runs only on records written by an older serializer (missing
-        schema_version, or schema_version < _CURRENT_SCHEMA_VERSION).
-        Records stamped at the current version go straight to
-        model_validate — the shim cost (dict copies, key migrations) is
-        avoided on every hot read.
+        _apply_nullable_defaults runs first on every record (including the
+        fast path) so NULL values in optional JSON columns never reach
+        model_validate as None.
+
+        The legacy fixup block runs only on records whose schema_version is
+        absent or older than the current version.
 
         Categories:
           - FIELD MIGRATION: field was renamed or moved between schema versions
@@ -71,10 +114,30 @@ class MachineSerializer(BaseEntitySerializer):
                              the aggregate default, or where the key must be
                              present for model_validate to accept the record.
         """
-        # Fast path: current-version records skip all legacy fixups.
+        data = dict(data)  # shallow copy — never mutate the caller's dict
+        data = self._apply_nullable_defaults(data)
+
+        # provider_api backfill: the domain requires this field (no default).
+        # If it is absent or empty string, try to recover from the source
+        # request stored in the same row.  An empty string is the sentinel for
+        # "backfill was not possible" — visible in logs, queryable by operators.
+        if not data.get("provider_api"):
+            recovered = self._backfill_provider_api(data)
+            if recovered:
+                data["provider_api"] = recovered
+            else:
+                machine_id = data.get("machine_id", "<unknown>")
+                self.logger.warning(
+                    "Machine %s has no provider_api and no source request to backfill from; "
+                    "setting sentinel empty string. "
+                    "Run the backfill migration or update the record manually.",
+                    machine_id,
+                )
+                data["provider_api"] = ""
+
+        # Fast path: current-version records skip all legacy field-migration fixups.
         if data.get("schema_version") == self._CURRENT_SCHEMA_VERSION:
             return data
-        data = dict(data)  # shallow copy — don't mutate the caller's dict
 
         # FIELD MIGRATION: legacy records may not have a name field; use
         # machine_id as a stand-in so the aggregate's Optional[str] name stays
@@ -123,6 +186,35 @@ class MachineSerializer(BaseEntitySerializer):
 
         return data
 
+    def _backfill_provider_api(self, data: dict[str, Any]) -> str | None:
+        """Attempt to recover provider_api from the machine's source request.
+
+        Looks up the request_id stored on the machine row and reads
+        provider_api from the corresponding request record.  Returns the
+        recovered value or None when no source is available.
+
+        Requires a ``storage_backend`` reference injected at construction
+        time (set by ``MachineRepositoryImpl``).  When no backend is
+        available the method returns None and the caller logs a WARNING.
+
+        This is a read-time best-effort heuristic; the canonical fix is to
+        run the backfill data migration.
+        """
+        if self._storage_backend is None:
+            return None
+        request_id = data.get("request_id")
+        if not request_id:
+            return None
+        try:
+            request_data = self._storage_backend.find_by_id(request_id)
+            if isinstance(request_data, dict):
+                value = request_data.get("provider_api")
+                if value:
+                    return str(value)
+        except Exception:
+            pass
+        return None
+
 
 class MachineRepositoryImpl(StorageRepositoryMixin, MachineRepositoryInterface):
     """Single machine repository implementation using storage strategy composition."""
@@ -133,7 +225,9 @@ class MachineRepositoryImpl(StorageRepositoryMixin, MachineRepositoryInterface):
             storage_strategy.entity_type = "machines"  # type: ignore[attr-defined]
 
         self.storage_strategy = storage_strategy
-        self.serializer = MachineSerializer()
+        # Pass the storage backend so the serializer can backfill
+        # provider_api from the source request on legacy rows.
+        self.serializer = MachineSerializer(storage_backend=storage_strategy)
         self.logger = get_logger(__name__)
 
     @handle_infrastructure_exceptions(context="machine_repository_save")

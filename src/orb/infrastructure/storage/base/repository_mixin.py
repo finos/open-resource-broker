@@ -23,6 +23,25 @@ class StorageRepositoryMixin:
       - self._deserialize(data): converts a dict to the entity type
     """
 
+    # Per-entity-type count of rows skipped due to deserialization failures.
+    # Exposed via get_skip_counters() so health checks can surface degradation.
+    _skipped_row_count: dict[str, int]
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Ensure each subclass gets its own skip-counter dict."""
+        super().__init_subclass__(**kwargs)
+
+    def _get_skip_counters(self) -> dict[str, int]:
+        """Return per-entity-type counts of rows skipped during deserialization.
+
+        A non-zero value means list operations are returning incomplete results.
+        The health endpoint uses this to surface a ``storage.deserialize``
+        degraded signal so operators can act before data inconsistency escalates.
+        """
+        if not hasattr(self, "_skipped_row_count"):
+            self._skipped_row_count = {}
+        return dict(self._skipped_row_count)
+
     def _get_storage(self) -> Any:
         """Return the storage backend, supporting both attribute names used in the codebase."""
         if hasattr(self, "storage_port"):
@@ -60,8 +79,14 @@ class StorageRepositoryMixin:
         endpoint. We log the offending entity id and continue with the
         rest so a single bad record doesn't black-hole the dashboard /
         machines list / requests list.
+
+        Each failure increments the per-entity-type skip counter so the
+        health endpoint can surface degradation without losing any data.
         """
         from orb.infrastructure.logging.logger import get_logger as _get_logger
+
+        if not hasattr(self, "_skipped_row_count"):
+            self._skipped_row_count = {}
 
         log = getattr(self, "logger", None) or _get_logger(__name__)
         for data in items:
@@ -74,9 +99,24 @@ class StorageRepositoryMixin:
                     or data.get("template_id")
                     or "<unknown>"
                 )
-                log.warning(
-                    "Skipping malformed row %s: %s — fix storage or wipe entity_type",
+                entity_type = (
+                    "machines"
+                    if "machine_id" in data
+                    else "requests"
+                    if "request_id" in data
+                    else "templates"
+                    if "template_id" in data
+                    else "unknown"
+                )
+                self._skipped_row_count[entity_type] = (
+                    self._skipped_row_count.get(entity_type, 0) + 1
+                )
+                log.error(
+                    "Skipping malformed row id=%s entity=%s: %s. "
+                    "This row will be invisible to list operations. "
+                    "Inspect storage and consider a data migration before purging.",
                     entity_id,
+                    entity_type,
                     exc,
                 )
 

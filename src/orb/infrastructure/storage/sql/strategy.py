@@ -92,6 +92,12 @@ class SQLStorageStrategy(BaseStorageStrategy):
         For tables that are defined in the ORM (requests, machines, templates)
         ``Base.metadata.create_all`` is used — this is the authoritative DDL path.
 
+        Pre-existing SQL installs (tables present but no ``alembic_version``
+        row) are auto-stamped at head so Alembic knows the current schema
+        position without re-running migrations.  This only fires once on first
+        boot after the upgrade; subsequent starts find the version row and skip
+        the stamp.
+
         For any other table name (e.g. ad-hoc tables used in tests or generic
         storage) the legacy column-dict driven ``build_create_table`` path is
         used as a fallback so existing behaviour is preserved.
@@ -103,10 +109,23 @@ class SQLStorageStrategy(BaseStorageStrategy):
             orm_tables = set(Base.metadata.tables.keys())
 
             if self.table_name in orm_tables:
+                # Check before create_all whether this is a pre-existing install
+                # without Alembic version tracking so we can stamp it afterwards.
+                alembic_version_exists = self.connection_manager.table_exists("alembic_version")
+                tables_already_exist = self.connection_manager.table_exists(self.table_name)
+
                 Base.metadata.create_all(engine)
                 self.logger.debug(
                     "Applied Base.metadata.create_all for ORM table %s", self.table_name
                 )
+
+                # Auto-stamp head for pre-existing installs that have real data
+                # tables but have never been managed by Alembic.  Do NOT stamp
+                # when alembic_version already exists — that would overwrite a
+                # legitimate mid-migration state.
+                if tables_already_exist and not alembic_version_exists:
+                    self._auto_stamp_head(engine)
+
             # Fallback: build CREATE TABLE from the column dict (legacy path).
             elif not self.connection_manager.table_exists(self.table_name):
                 create_table_sql = self.query_builder.build_create_table()
@@ -115,6 +134,45 @@ class SQLStorageStrategy(BaseStorageStrategy):
         except Exception as e:
             self.logger.error("Failed to initialize table %s: %s", self.table_name, e)
             raise
+
+    def _auto_stamp_head(self, engine: Any) -> None:
+        """Stamp the Alembic revision table at head for pre-existing installs.
+
+        Called only when the application tables already exist but no
+        ``alembic_version`` row is present — i.e. the database was created by
+        a previous ``Base.metadata.create_all`` call that predates Alembic
+        management.  Stamping records the current head revision without
+        re-running any DDL, so subsequent ``alembic upgrade head`` runs are
+        no-ops rather than failures.
+        """
+        try:
+            import os
+
+            import alembic.config
+            import alembic.command
+
+            alembic_ini = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "migrations",
+                "alembic.ini",
+            )
+            cfg = alembic.config.Config(alembic_ini)
+            # Pass the live engine URL so env.py uses the same connection.
+            cfg.set_main_option("sqlalchemy.url", str(engine.url))
+            alembic.command.stamp(cfg, "head")
+            self.logger.info(
+                "Auto-stamped Alembic revision at head for pre-existing install "
+                "(tables existed without alembic_version row). "
+                "Run 'orb storage migrate current' to verify."
+            )
+        except Exception as exc:
+            # Stamping is best-effort: log the failure but do not abort startup.
+            self.logger.warning(
+                "Could not auto-stamp Alembic head for table %s: %s. "
+                "Run 'orb storage migrate stamp head' manually.",
+                self.table_name,
+                exc,
+            )
 
     def save(self, entity_id: str, data: dict[str, Any]) -> None:
         """

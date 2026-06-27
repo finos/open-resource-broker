@@ -149,18 +149,25 @@ async def handle_storage_migrate(
 
     subcommand = getattr(args, "migrate_subcommand", "up")
 
-    alembic_cmd_map = {
-        "up": ["upgrade", "head"],
-        "down": ["downgrade", "-1"],
-        "current": ["current"],
-        "history": ["history"],
-    }
+    # "stamp" needs the target revision as an additional argument, so it
+    # is handled separately from the static cmd map.
+    if subcommand == "stamp":
+        stamp_target = getattr(args, "revision", None) or "head"
+        alembic_args: list[str] = ["stamp", stamp_target]
+    else:
+        alembic_cmd_map = {
+            "up": ["upgrade", "head"],
+            "down": ["downgrade", "-1"],
+            "current": ["current"],
+            "history": ["history"],
+        }
 
-    alembic_args = alembic_cmd_map.get(subcommand)
-    if alembic_args is None:
-        return formatter.format_error(
-            f"Unknown migrate subcommand '{subcommand}'. Valid values: up, down, current, history"
-        )
+        alembic_args = alembic_cmd_map.get(subcommand)  # type: ignore[assignment]
+        if alembic_args is None:
+            return formatter.format_error(
+                f"Unknown migrate subcommand '{subcommand}'. "
+                "Valid values: up, down, current, history, stamp"
+            )
 
     try:
         # Guard: alembic is an optional dependency shipped in the [sql] extra.

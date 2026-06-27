@@ -68,6 +68,26 @@ class RequestSerializer(BaseEntitySerializer):
         super().__init__()
         self._dt = GenericEntitySerializer(Request, "Request", "request_id")
 
+    @staticmethod
+    def _apply_nullable_defaults(data: dict[str, Any]) -> dict[str, Any]:
+        """Coerce nullable JSON columns to safe empty containers.
+
+        Applied unconditionally so NULL values stored in legacy rows before
+        the NOT NULL migration are never passed as Python None to from_dict
+        for fields that expect a list or dict.
+        """
+        if data.get("metadata") is None:
+            data["metadata"] = {}
+        if data.get("error_details") is None:
+            data["error_details"] = {}
+        if data.get("provider_data") is None:
+            data["provider_data"] = {}
+        if data.get("resource_ids") is None:
+            data["resource_ids"] = []
+        if data.get("machine_ids") is None:
+            data["machine_ids"] = []
+        return data
+
     def _parse_request_id(self, request_id_data: Any) -> RequestId:
         """Parse RequestId from various formats."""
         if isinstance(request_id_data, str):
@@ -143,6 +163,9 @@ class RequestSerializer(BaseEntitySerializer):
     def from_dict(self, data: dict[str, Any]) -> Request:
         """Convert dictionary to Request aggregate with additional field support."""
         try:
+            data = dict(data)  # shallow copy — never mutate the caller's dict
+            data = self._apply_nullable_defaults(data)
+
             # Parse datetime fields using shared helper
             created_at = datetime.fromisoformat(data["created_at"])
             started_at = self._dt.deserialize_datetime(data.get("started_at"))
