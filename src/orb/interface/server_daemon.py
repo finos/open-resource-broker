@@ -69,7 +69,7 @@ def _acquire_pid_lock(pid_file: Path) -> int:
     Caller owns closing the fd (which releases the lock).
     """
     _ensure_parent(pid_file)
-    fd = os.open(str(pid_file), os.O_RDWR | os.O_CREAT, 0o644)
+    fd = os.open(str(pid_file), os.O_RDWR | os.O_CREAT, 0o600)
     try:
         fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError as exc:
@@ -135,7 +135,7 @@ def _redirect_stdio(log_file: Path) -> None:
         # Flush failure during daemonisation is non-fatal — the stdio
         # handoff continues with whatever buffered output is on the wire.
         logger.debug("stdio flush failed during daemon handoff: %s", exc)
-    log_fd = os.open(str(log_file), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+    log_fd = os.open(str(log_file), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
     try:
         # ``sys.stdout/.stderr`` may be replaced with non-fileno wrappers
         # by some runners (pytest's capsys). Fall back to the canonical

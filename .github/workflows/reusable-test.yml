@@ -86,8 +86,26 @@ jobs:
           fail-on-cache-miss: false
 
       - name: Run tests
+        id: run-tests
         run: make ci-tests-${{ inputs.test-type }} PROVIDER=${{ inputs.provider }}
         continue-on-error: ${{ inputs.continue-on-error }}
+
+      # When continue-on-error is true the overall job status stays green even
+      # if tests fail, which can hide regressions in the PR summary view.
+      # This step fires only on failure and writes a visible warning to the
+      # GitHub job summary so operators notice the failure without digging into
+      # the raw log.
+      - name: Annotate soft failure in job summary
+        if: steps.run-tests.outcome == 'failure'
+        run: |
+          echo "::warning::${{ inputs.test-type }} tests failed (continue-on-error=true). Review the test log for details."
+          {
+            echo "## :warning: ${{ inputs.test-type }} test failures"
+            echo ""
+            echo "The **${{ inputs.test-type }}** test suite reported failures."
+            echo "Overall job status is still green because \`continue-on-error: true\` is set,"
+            echo "but these failures should be investigated before merging."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload test results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7

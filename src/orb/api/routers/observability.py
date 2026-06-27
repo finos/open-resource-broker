@@ -61,12 +61,11 @@ async def get_machine_metrics(
     Valid values: ``1h``, ``6h``, ``24h``, ``7d``.
 
     **Current implementation:** stub only — all ``points`` arrays are empty and
-    ``source`` is ``"stub"``.
+    ``source`` is ``"stub"``.  Consumers should check ``source`` before charting.
 
-    TODO: Wire up CloudWatch GetMetricStatistics / GetMetricData to populate
-    cpu_percent, memory_percent, network_in_bytes, and network_out_bytes with
-    real data points. Suggested namespace: AWS/EC2 for cpu; custom namespace for
-    the rest.  See: https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/
+    Note:
+        The stub shape is intentional and stable; the ``source`` field will change
+        from ``"stub"`` to ``"cloudwatch"`` once real metrics are wired up.
     """
     # Normalise range; default to 1h for unrecognised values.
     if range not in _VALID_RANGES:
@@ -79,11 +78,10 @@ async def get_machine_metrics(
             status_code=404,
         )
 
-    # TODO: Replace the empty-points stub below with real CloudWatch calls.
-    # Suggested approach:
-    #   1. Determine the time window from `range` (e.g. now-1h … now).
-    #   2. Call cloudwatch.get_metric_statistics() for each metric series.
-    #   3. Map CW datapoints → {"ts": <ISO>, "value": <float>} and sort by ts.
+    # Future: replace empty-points stub with CloudWatch GetMetricStatistics calls.
+    # Approach: derive the time window from `range`, query each metric series
+    # (AWS/EC2 for cpu; custom namespace for memory/network), and map
+    # CW datapoints → {"ts": <ISO>, "value": <float>} sorted ascending by ts.
     response: dict[str, Any] = {
         "machine_id": machine_id,
         "range": range,

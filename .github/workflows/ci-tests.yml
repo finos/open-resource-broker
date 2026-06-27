@@ -22,6 +22,13 @@ on:
   schedule:
     - cron: '0 2 * * *'
 
+# Cancel in-progress runs when a new push arrives on the same branch/ref.
+# Scheduled nightly runs use a stable group key so they never cancel each
+# other (there is only ever one running at a time by schedule).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

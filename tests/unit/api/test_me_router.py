@@ -9,7 +9,6 @@ from fastapi.testclient import TestClient
 from orb.api.dependencies import CurrentUser, get_current_user
 from orb.api.routers.me import router as me_router
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

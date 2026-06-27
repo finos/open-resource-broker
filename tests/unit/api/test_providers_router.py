@@ -11,7 +11,6 @@ from fastapi.testclient import TestClient
 from orb.api.dependencies import get_config_manager, get_current_user
 from orb.api.routers.providers import router as providers_router
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

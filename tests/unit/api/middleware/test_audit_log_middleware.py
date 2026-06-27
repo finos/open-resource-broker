@@ -7,11 +7,10 @@ import time
 from unittest.mock import patch
 
 import pytest
-from starlette.testclient import TestClient
 from fastapi import FastAPI
+from starlette.testclient import TestClient
 
 from orb.api.middleware.audit_log_middleware import AuditLogMiddleware
-
 
 # ---------------------------------------------------------------------------
 # helpers

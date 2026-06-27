@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
@@ -12,15 +13,14 @@ from fastapi.testclient import TestClient
 
 from orb.api.dependencies import get_current_user
 from orb.api.routers.events import (
-    _SseEventBus,
     _allowed,
     _drain_one,
     _format_sse,
     _parse_since,
+    _SseEventBus,
     router as events_router,
     sse_event_bus,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -139,7 +139,10 @@ class TestSseEventBusHistoryRingBuffer:
 
     def test_history_capped_at_history_max(self):
         bus = _SseEventBus()
+        # Reset both _history_max and the backing deque to the new capacity so
+        # the deque's maxlen constraint is in sync with the test's expectation.
         bus._history_max = 5
+        bus._history = deque(maxlen=5)
         for i in range(10):
             ts = datetime(2026, 1, 1, 0, 0, i, tzinfo=timezone.utc)
             bus._record(ts, "machine.created", {"i": i})
@@ -263,7 +266,6 @@ class TestStreamEventsAuthGuard:
         # rejects a user whose role rank is below viewer by not injecting any user
         # and letting require_role raise 403 for a fabricated low-rank role.
         # The simplest approach: override with a user that has no role.
-        from orb.api.dependencies import CurrentUser
 
         # Actually, viewer is the minimum required role; anonymous gets role="viewer"
         # from get_current_user fallback.  The /me endpoint raises 401 for username=="anonymous".

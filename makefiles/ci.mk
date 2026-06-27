@@ -78,12 +78,30 @@ ci-build-sbom:  ## Generate SBOM files (matches publish.yml workflow)
 	@echo "This matches the GitHub Actions publish.yml workflow exactly"
 	$(MAKE) sbom-generate
 
-# pytest-xdist parallelisation. ``-n auto`` spawns one worker per CPU core.
-# ``--dist=loadscope`` keeps tests in the same class/module on one worker so
-# class-scoped setUp / fixtures don't re-run per worker. Tests that share
-# global state (live AWS, docker daemon, e2e tempdirs) are tagged ``serial``
-# and run sequentially in a second pytest pass via ``-m serial``.
-PYTEST_PARALLEL := -n auto --dist=loadscope -m "not serial"
+# pytest-xdist parallelisation.
+#
+# Two variants are provided:
+#
+#   PYTEST_PARALLEL_LOCAL  — used by the local ``make test`` targets.
+#     ``-n auto`` spawns one worker per CPU core, which is ideal on developer
+#     machines that typically have 8-16 cores.
+#
+#   PYTEST_PARALLEL_CI  — used by CI targets (ci-tests-*).
+#     GitHub-hosted runners expose exactly 2 vCPUs.  ``-n auto`` therefore
+#     spawns 2 workers, but the xdist scheduler introduces coordination
+#     overhead that can make single-worker runs *slower* on 2-core hosts.
+#     Using ``-n 2`` is explicit and avoids surprises if the runner class
+#     changes.  ``--dist=loadscope`` keeps tests in the same class/module on
+#     one worker so class-scoped setUp / fixtures don't re-run per worker.
+#
+#   PYTEST_PARALLEL (kept for backward compat) — points at the CI variant so
+#     any external callers that reference the old variable name still work.
+#
+# Tests that share global state (live AWS, docker daemon, e2e tempdirs) are
+# tagged ``serial`` and run sequentially via a second pytest pass (PYTEST_SERIAL).
+PYTEST_PARALLEL_LOCAL := -n auto --dist=loadscope -m "not serial"
+PYTEST_PARALLEL_CI := -n 2 --dist=loadscope -m "not serial"
+PYTEST_PARALLEL := $(PYTEST_PARALLEL_CI)
 PYTEST_SERIAL := -m serial
 
 ci-tests-unit:  ## Run unit tests only (matches ci.yml unit-tests job)

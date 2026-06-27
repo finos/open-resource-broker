@@ -15,7 +15,6 @@ from orb.api.dependencies import get_current_user, get_dashboard_summary_orchest
 from orb.api.routers.system import _serialisable, router as system_router
 from orb.application.services.orchestration.dtos import DashboardSummaryInput
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

@@ -41,6 +41,7 @@ Architecture note:
 import asyncio
 import json
 import logging
+from collections import deque
 from datetime import datetime, timezone
 from typing import AsyncGenerator, Optional
 
@@ -84,9 +85,10 @@ class _SseEventBus:
 
     def __init__(self) -> None:
         self._subscribers: list[asyncio.Queue[Optional[tuple[str, dict]]]] = []
-        # Store recent events for ?since= replay (capped ring-buffer)
-        self._history: list[tuple[datetime, str, dict]] = []
+        # Store recent events for ?since= replay (capped ring-buffer backed by deque
+        # so append is O(1) and maxlen enforces the cap without manual slicing).
         self._history_max: int = 512
+        self._history: deque[tuple[datetime, str, dict]] = deque(maxlen=self._history_max)
 
     def subscribe(self) -> asyncio.Queue[Optional[tuple[str, dict]]]:
         """Register a new subscriber; returns its dedicated queue."""
@@ -147,9 +149,8 @@ class _SseEventBus:
         return [(et, p) for (ts, et, p) in self._history if ts > since]
 
     def _record(self, ts: datetime, event_type: str, payload: dict) -> None:
+        # deque(maxlen=...) discards the oldest entry automatically on overflow.
         self._history.append((ts, event_type, payload))
-        if len(self._history) > self._history_max:
-            self._history = self._history[-self._history_max :]
 
 
 sse_event_bus = _SseEventBus()

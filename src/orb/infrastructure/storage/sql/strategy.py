@@ -148,8 +148,8 @@ class SQLStorageStrategy(BaseStorageStrategy):
         try:
             import os
 
-            import alembic.config
             import alembic.command
+            import alembic.config
 
             alembic_ini = os.path.join(
                 os.path.dirname(os.path.abspath(__file__)),
@@ -412,7 +412,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
         """
         with self.lock_manager.read_lock():
             try:
-                sql = f"SELECT {column}, COUNT(*) AS cnt FROM {self.table_name} GROUP BY {column}"  # noqa: S608 — table/column names come from trusted internal code, not user input
+                sql = f"SELECT {column}, COUNT(*) AS cnt FROM {self.table_name} GROUP BY {column}"
                 with self.connection_manager.get_session() as session:
                     result = session.execute(text(sql))
                     rows = result.fetchall()

@@ -5,11 +5,14 @@ import logging
 import math
 import time
 from collections import OrderedDict
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+
+if TYPE_CHECKING:
+    from orb.config.schemas.server_schema import RateLimitConfig
 
 logger = logging.getLogger("orb.rate_limit")
 
@@ -30,32 +33,52 @@ class _Bucket:
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """In-memory token-bucket rate limiter keyed on user_id (or client IP for anonymous).
 
-    Configured via a ``rate_limiting`` dict (from ServerConfig.rate_limiting):
+    Configured via a ``RateLimitConfig`` instance or a legacy dict (from
+    ServerConfig.rate_limiting):
       - enabled (bool, default True)
       - requests_per_minute (int, default 100)
+      - max_buckets (int, default 10 000)
 
     When the bucket is empty the middleware returns HTTP 429 with a
     ``Retry-After`` header indicating seconds until the bucket refills enough
     for one request.
 
-    Disabled entirely when the config dict is None or ``enabled`` is False.
+    Disabled entirely when ``enabled`` is False.
     """
 
-    def __init__(self, app, rate_limiting_config: Optional[dict[str, Any]] = None) -> None:
+    def __init__(
+        self,
+        app,
+        rate_limiting_config: Optional[Union["RateLimitConfig", dict[str, Any]]] = None,
+    ) -> None:
         super().__init__(app)
-        cfg = rate_limiting_config or {}
-        self._enabled: bool = bool(cfg.get("enabled", True)) if cfg else False
-        rpm: int = int(cfg.get("requests_per_minute", _DEFAULT_REQUESTS_PER_MINUTE))
-        # Capacity == burst == full minute's allowance; refill rate == tokens/second
-        self._capacity: float = float(rpm)
-        self._refill_rate: float = rpm / 60.0  # tokens per second
+        # Accept either a typed RateLimitConfig or the legacy dict form so the
+        # middleware is not hard-coupled to the schema import at middleware load time.
+        if rate_limiting_config is None:
+            self._enabled = False
+            self._capacity = float(_DEFAULT_REQUESTS_PER_MINUTE)
+            self._refill_rate = _DEFAULT_REQUESTS_PER_MINUTE / 60.0
+            self._max_buckets = _DEFAULT_MAX_BUCKETS
+        elif isinstance(rate_limiting_config, dict):
+            cfg = rate_limiting_config
+            self._enabled = bool(cfg.get("enabled", True))
+            rpm = int(cfg.get("requests_per_minute", _DEFAULT_REQUESTS_PER_MINUTE))
+            self._capacity = float(rpm)
+            self._refill_rate = rpm / 60.0
+            self._max_buckets = int(cfg.get("max_buckets", _DEFAULT_MAX_BUCKETS))
+        else:
+            # Typed RateLimitConfig object — access via attribute.
+            self._enabled = bool(rate_limiting_config.enabled)
+            rpm = int(rate_limiting_config.requests_per_minute)
+            self._capacity = float(rpm)
+            self._refill_rate = rpm / 60.0
+            self._max_buckets = int(rate_limiting_config.max_buckets)
         # OrderedDict drives an LRU policy: most-recently-touched keys move
         # to the end on access; we evict from the front when over capacity.
         # Without this cap, a long-running server gets an unbounded dict as
         # client IPs / user_ids rotate (NAT churn, scanners, throwaway
         # tokens) — a slow memory leak.
         self._buckets: OrderedDict[str, _Bucket] = OrderedDict()
-        self._max_buckets: int = int(cfg.get("max_buckets", _DEFAULT_MAX_BUCKETS))
         self._lock = asyncio.Lock()
 
     async def dispatch(self, request: Request, call_next):

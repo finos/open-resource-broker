@@ -4,6 +4,27 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
+
+class RateLimitConfig(BaseModel):
+    """Typed configuration for the in-process token-bucket rate limiter."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = Field(
+        True, description="Enable the rate limiter (disable for benchmarks or trusted networks)"
+    )
+    requests_per_minute: int = Field(
+        100,
+        description="Maximum requests per minute per user identity (or IP for anonymous callers)",
+        ge=1,
+    )
+    max_buckets: int = Field(
+        10_000,
+        description="Maximum number of tracked identities; oldest entry is evicted on overflow (LRU)",
+        ge=1,
+    )
+
+
 _ALLOWED_JWT_ALGORITHMS = frozenset({"HS256", "HS384", "HS512"})
 
 
@@ -176,9 +197,22 @@ class ServerConfig(BaseModel):
 
     # Audit logging
     audit_log_enabled: bool = Field(True, description="Emit audit logs for mutating requests")
+    audit_log_file: Optional[str] = Field(
+        None,
+        description=(
+            "Path to a dedicated audit log file.  When set, a rotating JSON-line "
+            "handler is attached to the 'orb.audit' logger so audit records are "
+            "written to a separate file in addition to (or instead of) the root "
+            "handlers.  When None, audit records flow through the root logging "
+            "configuration (stdout/stderr in container deployments)."
+        ),
+    )
 
     # Rate limiting
-    rate_limiting: Optional[dict[str, Any]] = Field(None, description="Rate limiting configuration")
+    rate_limiting: RateLimitConfig = Field(
+        default_factory=RateLimitConfig,  # type: ignore[arg-type]
+        description="Token-bucket rate limiter configuration",
+    )
 
     # Read-only mode
     read_only: bool = Field(

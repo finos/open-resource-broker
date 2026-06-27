@@ -812,6 +812,72 @@ ORB_LOG_LEVEL=DEBUG orb system health
 ORB_AWS_REGION=us-west-2 orb providers test aws
 ```
 
+## `allow_destructive_admin`
+
+The `allow_destructive_admin` flag controls access to administrative endpoints
+that perform irreversible, bulk-state operations.
+
+### Default and location
+
+```json
+{
+  "allow_destructive_admin": false
+}
+```
+
+Default: **`false`**.  The field lives at the top level of the application
+config (same level as `environment`, `provider`, etc.).
+
+### What it gates
+
+When `allow_destructive_admin` is `false` (or absent), the following endpoints
+return **HTTP 403** unconditionally:
+
+| Endpoint | Description |
+|---|---|
+| `POST /api/v1/admin/database/wipe` | Truncates all ORB data tables (machines, requests, templates) |
+| `POST /api/v1/admin/database/cleanup` | Removes stale or orphaned records that no longer match known templates |
+| `POST /api/v1/admin/init` | Re-initialises default config and data directories from a wiped state |
+
+> **Note:** `POST /api/v1/admin/reload-config` is **not** gated by this flag —
+> reloading config is non-destructive and requires only the `admin` role.
+
+### Second guard: environment check
+
+Even when `allow_destructive_admin` is `true`, the endpoints add a second
+runtime check: the active `environment` value must **not** be `production`.
+If the environment is `production`, the endpoints return HTTP 403 regardless
+of the flag.  This prevents accidental data loss if the flag is mistakenly
+left enabled after a maintenance window.
+
+### Production posture
+
+```json
+{
+  "environment": "production",
+  "allow_destructive_admin": false
+}
+```
+
+`allow_destructive_admin` **must be `false` in production**.  Set it to `true`
+only during a controlled maintenance window (e.g. a post-migration data wipe),
+and revert it immediately afterwards.  Never commit `allow_destructive_admin:
+true` to a production config file.
+
+### Enabling for maintenance
+
+```json
+{
+  "environment": "staging",
+  "allow_destructive_admin": true
+}
+```
+
+The wipe endpoint additionally requires the caller to include `"confirm":
+"WIPE"` in the request body, and the init endpoint requires `"confirm":
+"INIT"`.  These confirmation tokens prevent accidents from HTTP replays or
+misconfigured automation.
+
 ## Configuration Validation
 
 ### Automatic Validation

@@ -6,8 +6,7 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from orb.api.middleware.read_only_middleware import ReadOnlyMiddleware, _ALLOWED_PATHS
-
+from orb.api.middleware.read_only_middleware import _ALLOWED_PATHS, ReadOnlyMiddleware
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -107,11 +106,11 @@ class TestReadOnlyMiddlewareAllowedPaths:
         resp = client.post("/_event/some-event")
         assert resp.status_code == 200
 
-    def test_post_reflex_upload_prefix_passes(self):
-        """/_upload/... is an allowed path prefix."""
+    def test_post_reflex_upload_prefix_blocked(self):
+        """/_upload/... is no longer in the allowlist — no upload endpoint exists."""
         client = TestClient(_make_app(enabled=True))
         resp = client.post("/_upload/file")
-        assert resp.status_code == 200
+        assert resp.status_code == 403
 
 
 # ---------------------------------------------------------------------------
@@ -142,8 +141,9 @@ class TestAllowedPathConstants:
     def test_event_path_in_allowed_paths(self):
         assert "/_event" in _ALLOWED_PATHS
 
-    def test_upload_path_in_allowed_paths(self):
-        assert "/_upload" in _ALLOWED_PATHS
+    def test_upload_path_not_in_allowed_paths(self):
+        """/_upload was removed — no upload endpoint exists."""
+        assert "/_upload" not in _ALLOWED_PATHS
 
     def test_health_in_allowed_paths(self):
         assert "/health" in _ALLOWED_PATHS

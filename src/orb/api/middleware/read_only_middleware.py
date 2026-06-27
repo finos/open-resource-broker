@@ -18,7 +18,8 @@ _ALLOWED_PATHS = frozenset(
         "/orb/info",
         "/orb/metrics",
         "/_event",
-        "/_upload",
+        # /_upload removed: no upload endpoint exists; callers should not be
+        # able to bypass read-only mode for a route that is not implemented.
     }
 )
 

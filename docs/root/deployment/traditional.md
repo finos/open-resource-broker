@@ -177,4 +177,56 @@ server {
 }
 ```
 
+## SSE behind nginx
+
+The `/api/v1/events/` endpoint streams Server-Sent Events (SSE). By default
+nginx buffers proxy responses, which prevents the browser from receiving events
+in real time. Add a dedicated `location` block that disables buffering and
+caching for that path:
+
+```nginx
+upstream orb_backend {
+    server 127.0.0.1:8000;
+    keepalive 16;
+}
+
+server {
+    listen 80;
+    server_name api.your-domain.com;
+
+    # --- Regular API traffic --------------------------------------------------
+    location / {
+        proxy_pass http://orb_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # --- Server-Sent Events ---------------------------------------------------
+    # proxy_buffering off is required; otherwise nginx holds the response until
+    # the buffer fills or the connection closes and the client sees no events.
+    # chunked_transfer_encoding off avoids double-chunking with HTTP/1.1.
+    location /api/v1/events/ {
+        proxy_pass http://orb_backend;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_set_header Connection '';
+        proxy_http_version 1.1;
+        chunked_transfer_encoding off;
+        # Keep the upstream connection alive between events.
+        proxy_read_timeout 3600s;
+    }
+
+    location /health {
+        proxy_pass http://orb_backend;
+        access_log off;
+    }
+}
+```
+
+> **Note:** If you use `proxy_buffering off` globally you can remove the
+> per-location override, but a targeted block is preferable so you can
+> tune caching behaviour for other API paths independently.
+
 For complete deployment options, see the [main deployment guide](readme.md).

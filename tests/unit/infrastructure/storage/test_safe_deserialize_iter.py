@@ -8,7 +8,6 @@ import pytest
 
 from orb.infrastructure.storage.base.repository_mixin import StorageRepositoryMixin
 
-
 # ---------------------------------------------------------------------------
 # Concrete subclass for testing
 # ---------------------------------------------------------------------------

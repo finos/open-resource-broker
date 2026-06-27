@@ -2,6 +2,7 @@
 
 import logging
 import time
+from datetime import datetime, timezone
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -45,9 +46,13 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
         if not always_audit and (request.method in self.SAFE_VERBS or path in self.SAFE_PATHS):
             return await call_next(request)
 
-        start = time.monotonic()
+        # Capture wall clock once for the ts field; use a separate monotonic
+        # pair for the latency measurement so clock drift between the two
+        # clocks cannot produce a negative or misleading duration.
+        wall_start = datetime.now(timezone.utc)
+        mono_start = time.monotonic()
         response = await call_next(request)
-        latency_ms = round((time.monotonic() - start) * 1000, 2)
+        latency_ms = round((time.monotonic() - mono_start) * 1000, 2)
 
         # Pull fields that upstream middleware (LoggingMiddleware / AuthMiddleware) set
         request_id: str = getattr(request.state, "request_id", "")
@@ -60,7 +65,7 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
         logger.info(
             "audit",
             extra={
-                "ts": time.time(),
+                "ts": wall_start.isoformat(),
                 "method": request.method,
                 "path": request.url.path,
                 "status_code": response.status_code,

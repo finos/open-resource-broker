@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, TypeVar
+
+_deps_logger = logging.getLogger(__name__)
 
 try:
     from fastapi import Depends, HTTPException, Request, status
@@ -173,22 +176,45 @@ def get_response_formatting_service() -> ResponseFormattingService:
     return get_di_container().get(ResponseFormattingService)
 
 
+def _caller_has_operator_or_higher(request: Request) -> bool:
+    """Return True when the authenticated caller holds at least the operator role.
+
+    Reads the identity that AuthMiddleware already resolved onto request.state so
+    this check is a pure dict lookup with no I/O.
+    """
+    raw_roles: list[str] = getattr(request.state, "user_roles", []) or []
+    # Filter out the anonymous sentinel (mirrors the logic in get_current_user).
+    meaningful = [r for r in raw_roles if r.lower() != "anonymous"]
+    role = _resolve_role(meaningful) if meaningful else "viewer"
+    return _ROLE_RANK.get(role, 0) >= _ROLE_RANK["operator"]
+
+
 def get_request_formatter(
     request: Request,
     container=Depends(get_di_container),
 ) -> ResponseFormattingService:
-    """Get ResponseFormattingService, optionally overridden by X-ORB-Scheduler header."""
+    """Get ResponseFormattingService, optionally overridden by X-ORB-Scheduler header.
+
+    The header is only honoured when the caller holds operator-or-higher privileges.
+    Below-operator callers receive the default scheduler silently.
+    """
     scheduler_override = request.headers.get("X-ORB-Scheduler")
     if scheduler_override:
-        from orb.infrastructure.scheduler.registry import get_scheduler_registry
+        if not _caller_has_operator_or_higher(request):
+            _deps_logger.debug(
+                "X-ORB-Scheduler header ignored for sub-operator caller on %s",
+                request.url.path,
+            )
+        else:
+            from orb.infrastructure.scheduler.registry import get_scheduler_registry
 
-        registry = get_scheduler_registry()
-        if registry.is_registered(scheduler_override):
-            try:
-                scheduler = registry.create_strategy(scheduler_override, container)
-                return ResponseFormattingService(scheduler)
-            except Exception:
-                pass  # Fall through to default
+            registry = get_scheduler_registry()
+            if registry.is_registered(scheduler_override):
+                try:
+                    scheduler = registry.create_strategy(scheduler_override, container)
+                    return ResponseFormattingService(scheduler)
+                except Exception:
+                    pass  # Fall through to default
     return container.get(ResponseFormattingService)
 
 
@@ -196,17 +222,27 @@ def get_request_scheduler(
     request: Request,
     container=Depends(get_di_container),
 ) -> SchedulerPort:
-    """Get SchedulerPort, optionally overridden by X-ORB-Scheduler header."""
+    """Get SchedulerPort, optionally overridden by X-ORB-Scheduler header.
+
+    The header is only honoured when the caller holds operator-or-higher privileges.
+    Below-operator callers receive the default scheduler silently.
+    """
     scheduler_override = request.headers.get("X-ORB-Scheduler")
     if scheduler_override:
-        from orb.infrastructure.scheduler.registry import get_scheduler_registry
+        if not _caller_has_operator_or_higher(request):
+            _deps_logger.debug(
+                "X-ORB-Scheduler header ignored for sub-operator caller on %s",
+                request.url.path,
+            )
+        else:
+            from orb.infrastructure.scheduler.registry import get_scheduler_registry
 
-        registry = get_scheduler_registry()
-        if registry.is_registered(scheduler_override):
-            try:
-                return registry.create_strategy(scheduler_override, container)
-            except Exception:
-                pass  # Fall through to default
+            registry = get_scheduler_registry()
+            if registry.is_registered(scheduler_override):
+                try:
+                    return registry.create_strategy(scheduler_override, container)
+                except Exception:
+                    pass  # Fall through to default
     return container.get(SchedulerPort)
 
 
@@ -262,6 +298,7 @@ def _resolve_role(user_roles: list[str]) -> str:
     Returns:
         One of "viewer", "operator", "admin".
     """
+    _KNOWN_ROLES = frozenset({"admin", "orb-admin", "operator", "orb-operator"})
     best = "viewer"
     for raw in user_roles:
         lower = raw.lower()
@@ -269,6 +306,14 @@ def _resolve_role(user_roles: list[str]) -> str:
             return "admin"  # Can't do better; short-circuit.
         if lower in ("operator", "orb-operator"):
             best = "operator"
+        elif lower not in _KNOWN_ROLES:
+            # Warn about any claim value that does not match a known role token.
+            # This fires when an IdP sends an unexpected group name, helping operators
+            # catch misconfigured role mappings before they silently grant viewer access.
+            _deps_logger.warning(
+                "unknown role claim %r, defaulting to viewer; check IDP mappings",
+                raw,
+            )
     return best
 
 

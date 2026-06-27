@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 from orb._package import __version__
 from orb.domain.base.exceptions import ConfigurationError
 from orb.infrastructure.auth.registry import get_auth_registry
-from orb.infrastructure.logging.logger import get_logger
+from orb.infrastructure.logging.logger import get_logger, setup_audit_logger
 
 _server_logger = get_logger(__name__)
 
@@ -162,6 +162,14 @@ def create_fastapi_app(server_config: Any) -> Any:
     )
     from orb.infrastructure.error.exception_handler import get_exception_handler
 
+    # Install the dedicated audit-log handler early so that audit records
+    # written during middleware setup (e.g. by AuditLogMiddleware) land in the
+    # right place from the first request onward.
+    _audit_log_file: str | None = getattr(server_config, "audit_log_file", None)
+    setup_audit_logger(_audit_log_file)
+    if _audit_log_file:
+        logger.info("orb.audit logger writing to dedicated file: %s", _audit_log_file)
+
     # Create FastAPI app with configuration
     app = FastAPI(  # type: ignore[operator]
         title="Open Resource Broker API",
@@ -231,6 +239,7 @@ def create_fastapi_app(server_config: Any) -> Any:
                 auth_port=auth_port,
                 require_auth=True,
                 trusted_proxies=server_config.trusted_proxies,
+                require_https=getattr(server_config, "require_https", False),
             )
             logger.info(
                 "Authentication middleware enabled with strategy: %s",
@@ -243,11 +252,11 @@ def create_fastapi_app(server_config: Any) -> Any:
 
     # Add rate-limit middleware (runs inside Auth so user identity is already resolved)
     rate_limiting_cfg = getattr(server_config, "rate_limiting", None)
-    if rate_limiting_cfg is not None and rate_limiting_cfg.get("enabled", True):
+    if rate_limiting_cfg is not None and getattr(rate_limiting_cfg, "enabled", True):
         app.add_middleware(RateLimitMiddleware, rate_limiting_config=rate_limiting_cfg)
         logger.info(
             "Rate-limit middleware enabled (%s req/min)",
-            rate_limiting_cfg.get("requests_per_minute", 100),
+            getattr(rate_limiting_cfg, "requests_per_minute", 100),
         )
 
     # Add audit-log middleware (innermost — status_code and latency are most accurate here)
@@ -338,7 +347,6 @@ def create_fastapi_app(server_config: Any) -> Any:
             "version": __version__,
             "description": "REST API for Open Resource Broker",
             "auth_enabled": server_config.auth.enabled,
-            "auth_strategy": (server_config.auth.strategy if server_config.auth.enabled else None),
         }
 
     # Serve favicon from project logo assets

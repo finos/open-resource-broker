@@ -24,7 +24,6 @@ from orb.api.routers.machines import router as machines_router
 from orb.api.routers.requests import router as requests_router
 from orb.api.routers.templates import router as templates_router
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

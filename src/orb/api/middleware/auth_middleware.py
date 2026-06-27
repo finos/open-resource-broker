@@ -26,6 +26,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         excluded_paths: Optional[list[str]] = None,
         require_auth: bool = True,
         trusted_proxies: Optional[list[str]] = None,
+        require_https: bool = False,
     ) -> None:
         """
         Initialize authentication middleware.
@@ -38,6 +39,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
             trusted_proxies: IP addresses of trusted reverse proxies. X-Forwarded-For is
                 only read when the direct client IP is in this list. Empty list (default)
                 means always use the direct connection IP.
+            require_https: When True, emit the Strict-Transport-Security header. Must
+                only be set when the server is actually serving TLS so browsers don't
+                cache an HSTS policy for an HTTP-only origin.
         """
         super().__init__(app)
         self.auth_port = auth_port
@@ -57,6 +61,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         ]
         self.require_auth = require_auth
         self.trusted_proxies: frozenset[str] = frozenset(trusted_proxies or [])
+        self.require_https = require_https
         self.logger = get_logger(__name__)
 
     async def dispatch(self, request: Request, call_next):
@@ -267,16 +272,21 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Prevent MIME type sniffing
         response.headers["X-Content-Type-Options"] = "nosniff"
 
-        # Enable XSS protection
-        response.headers["X-XSS-Protection"] = "1; mode=block"
+        # X-XSS-Protection is deprecated and removed from modern browsers; omitted
+        # intentionally to avoid confusing legacy UAs into enabling a broken parser.
 
-        # Strict Transport Security (HTTPS only)
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        # Strict-Transport-Security must only be emitted over HTTPS connections.
+        # Sending HSTS on a plain-HTTP origin causes browsers to cache an upgrade
+        # policy for a site that cannot serve TLS, breaking all future connections.
+        if self.require_https:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
-        # Content Security Policy
+        # Content Security Policy — 'unsafe-inline' removed from script-src.
+        # If inline scripts are genuinely needed, use nonce-based CSP instead.
+        # 'unsafe-inline' is kept for style-src because Reflex injects inline styles.
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
+            "script-src 'self'; "
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data:; "
             "font-src 'self'; "

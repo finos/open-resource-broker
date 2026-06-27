@@ -22,7 +22,7 @@ from boto3 import Session
 from botocore.exceptions import ClientError, NoCredentialsError
 
 
-def pytest_collection_modifyitems(config, items):  # noqa: D401
+def pytest_collection_modifyitems(config, items):
     """Apply the serial marker to every test collected in this subtree.
 
     ``pytestmark`` only works at module-level — conftest-level constants
