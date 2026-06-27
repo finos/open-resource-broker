@@ -94,18 +94,14 @@ class TestDashboardEndpoint:
 
     def test_returns_200_on_happy_path(self):
         app = _make_app()
-        app.dependency_overrides[get_dashboard_summary_orchestrator] = lambda: (
-            self._make_orchestrator()
-        )
+        app.dependency_overrides[get_dashboard_summary_orchestrator] = self._make_orchestrator
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.get("/system/dashboard")
         assert resp.status_code == 200
 
     def test_response_contains_expected_keys(self):
         app = _make_app()
-        app.dependency_overrides[get_dashboard_summary_orchestrator] = lambda: (
-            self._make_orchestrator()
-        )
+        app.dependency_overrides[get_dashboard_summary_orchestrator] = self._make_orchestrator
         client = TestClient(app, raise_server_exceptions=False)
         body = client.get("/system/dashboard").json()
         for key in ("machines", "requests", "templates"):
@@ -122,8 +118,12 @@ class TestDashboardEndpoint:
 
         orc = AsyncMock()
         orc.execute = _execute
+
+        def _make_orc():
+            return orc
+
         app = _make_app()
-        app.dependency_overrides[get_dashboard_summary_orchestrator] = lambda: orc
+        app.dependency_overrides[get_dashboard_summary_orchestrator] = _make_orc
         client = TestClient(app, raise_server_exceptions=False)
         client.get("/system/dashboard")
         assert len(captured) == 1
@@ -131,9 +131,7 @@ class TestDashboardEndpoint:
 
     def test_machines_total_correct(self):
         app = _make_app()
-        app.dependency_overrides[get_dashboard_summary_orchestrator] = lambda: (
-            self._make_orchestrator()
-        )
+        app.dependency_overrides[get_dashboard_summary_orchestrator] = self._make_orchestrator
         client = TestClient(app, raise_server_exceptions=False)
         body = client.get("/system/dashboard").json()
         assert body["machines"]["total"] == 5
@@ -141,9 +139,7 @@ class TestDashboardEndpoint:
     def test_viewer_can_access_dashboard(self):
         """Viewer role is sufficient to access dashboard."""
         app = _make_app(role="viewer")
-        app.dependency_overrides[get_dashboard_summary_orchestrator] = lambda: (
-            self._make_orchestrator()
-        )
+        app.dependency_overrides[get_dashboard_summary_orchestrator] = self._make_orchestrator
         client = TestClient(app, raise_server_exceptions=False)
         assert client.get("/system/dashboard").status_code == 200
 

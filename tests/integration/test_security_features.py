@@ -686,13 +686,51 @@ class TestAuthMiddlewareSecurityHeaders:
         response = client.get("/ping")
         assert response.headers.get("x-content-type-options") == "nosniff"
 
-    def test_x_xss_protection(self):
+    def test_x_xss_protection_absent(self):
+        """X-XSS-Protection is intentionally omitted.
+
+        The header is deprecated and can activate a broken XSS parser in
+        legacy browsers; modern browsers ignore it.  We deliberately do not
+        emit it.
+        """
         client = self._make_app_with_enhanced_middleware()
         response = client.get("/ping")
-        assert response.headers.get("x-xss-protection") == "1; mode=block"
+        assert "x-xss-protection" not in response.headers
 
-    def test_strict_transport_security(self):
-        client = self._make_app_with_enhanced_middleware()
+    def test_strict_transport_security_absent_without_https(self):
+        """HSTS must NOT be emitted when require_https is False (the default).
+
+        Sending HSTS on a plain-HTTP origin causes browsers to cache an
+        upgrade policy for a site that cannot serve TLS, permanently breaking
+        all future connections.
+        """
+        client = self._make_app_with_enhanced_middleware(require_auth=False)
+        response = client.get("/ping")
+        assert "strict-transport-security" not in response.headers
+
+    def test_strict_transport_security_present_with_https(self):
+        """HSTS is emitted when require_https=True (TLS deployment)."""
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        from orb.api.middleware.auth_middleware import AuthMiddleware
+        from orb.infrastructure.auth.strategy.no_auth_strategy import NoAuthStrategy
+
+        app = FastAPI()
+
+        @app.get("/ping")
+        def ping():
+            return {"ok": True}
+
+        auth_port = NoAuthStrategy(enabled=False)
+        app.add_middleware(
+            AuthMiddleware,
+            auth_port=auth_port,
+            excluded_paths=["/ping"],
+            require_auth=False,
+            require_https=True,
+        )
+        client = TestClient(app)
         response = client.get("/ping")
         hsts = response.headers.get("strict-transport-security", "")
         assert "max-age=31536000" in hsts
@@ -717,15 +755,19 @@ class TestAuthMiddlewareSecurityHeaders:
         assert "geolocation=()" in pp
         assert "camera=()" in pp
 
-    def test_all_eight_security_headers_present(self):
-        """All 8 expected security headers must be present on every response."""
+    def test_required_security_headers_present(self):
+        """All required security headers must be present on every response.
+
+        X-XSS-Protection is intentionally absent (deprecated).
+        Strict-Transport-Security is conditional on require_https=True and
+        is tested separately.  The headers listed here are emitted
+        unconditionally.
+        """
         client = self._make_app_with_enhanced_middleware()
         response = client.get("/ping")
         expected = [
             "x-frame-options",
             "x-content-type-options",
-            "x-xss-protection",
-            "strict-transport-security",
             "content-security-policy",
             "referrer-policy",
             "permissions-policy",

@@ -104,18 +104,14 @@ class TestProvidersAuthGuard:
 class TestProvidersHealthHappyPath:
     def test_returns_200(self):
         app = _make_app()
-        app.dependency_overrides[get_config_manager] = lambda: (
-            _make_config_manager_with_no_providers()
-        )
+        app.dependency_overrides[get_config_manager] = _make_config_manager_with_no_providers
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.get("/providers/health")
         assert resp.status_code == 200
 
     def test_empty_provider_list_returns_empty_providers(self):
         app = _make_app()
-        app.dependency_overrides[get_config_manager] = lambda: (
-            _make_config_manager_with_no_providers()
-        )
+        app.dependency_overrides[get_config_manager] = _make_config_manager_with_no_providers
         client = TestClient(app, raise_server_exceptions=False)
         body = client.get("/providers/health").json()
         assert body["providers"] == []

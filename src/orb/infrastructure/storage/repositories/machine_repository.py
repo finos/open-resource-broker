@@ -212,6 +212,9 @@ class MachineSerializer(BaseEntitySerializer):
                 if value:
                     return str(value)
         except Exception:
+            # Best-effort backfill heuristic — the source request row may not
+            # exist (e.g. purged) or the storage call may transiently fail.
+            # Callers treat None as "unknown" and degrade gracefully.
             pass
         return None
 

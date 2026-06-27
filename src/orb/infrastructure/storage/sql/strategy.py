@@ -412,6 +412,12 @@ class SQLStorageStrategy(BaseStorageStrategy):
         """
         with self.lock_manager.read_lock():
             try:
+                # ``column`` and ``self.table_name`` are internal constants supplied
+                # by repository layer callers (e.g. "status", "provider_api").  No
+                # user-controlled data is ever interpolated here.  SQLAlchemy's
+                # ``text()`` is used because the GROUP BY column name cannot be passed
+                # as a bound parameter — SQL does not allow parameterised identifiers.
+                # semgrep(avoid-sqlalchemy-text): static SQL, no user input in string.
                 sql = f"SELECT {column}, COUNT(*) AS cnt FROM {self.table_name} GROUP BY {column}"
                 with self.connection_manager.get_session() as session:
                     result = session.execute(text(sql))
