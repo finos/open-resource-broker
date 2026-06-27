@@ -8,6 +8,50 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 <!-- insertion marker -->
 ## Unreleased
 
+### BREAKING CHANGES
+
+- **`cors.origins` default changed from `["*"]` to `[]`.**
+  The previous default allowed requests from any origin.  The new default
+  denies all cross-origin requests until origins are explicitly listed.
+  Operators who rely on browser clients (dashboard, Swagger UI from a
+  different host) must add their origins to the config:
+
+  ```json
+  "server": {
+    "cors": {
+      "origins": ["https://your-dashboard.example.com"]
+    }
+  }
+  ```
+
+  Set `origins: ["*"]` to restore the previous permissive behaviour (not
+  recommended for production deployments).
+
+- **`trusted_hosts` default is now restrictive.**
+  The `TrustedHostMiddleware` no longer accepts arbitrary `Host` headers by
+  default.  Set `trusted_hosts` explicitly in your server config if the API
+  is accessed via a hostname other than `localhost` / `127.0.0.1`.
+
+- **Daemon token file at `<work_dir>/server/orb-server.token`.**
+  When `orb server start` is invoked (daemon or `--foreground` mode), a
+  random bearer token is written to `<work_dir>/server/orb-server.token`
+  with mode `0600`.  The CLI reads this file to authenticate loopback admin
+  requests such as `orb server reload`.  The file is removed when the daemon
+  exits.  Operators who snapshot the work directory should exclude
+  `*.token` from backups.
+
+- **`allow_destructive_admin` config field (default `false`).**
+  Administrative endpoints that can wipe state (purge, bulk-delete, etc.)
+  now require `allow_destructive_admin: true` in the server config.  The
+  field defaults to `false` and must be opted in explicitly.
+
+- **SQL storage strategy applies Alembic migrations on startup.**
+  When `storage.strategy` is `sql`, the server now runs `alembic upgrade
+  head` automatically on startup.  Operators using a managed database
+  (RDS, Aurora) should ensure the database user has DDL privileges, or run
+  migrations out-of-band with `orb db upgrade` before starting the server
+  with `allow_auto_migrate: false`.
+
 ### Added
 
 - New `[aws]` extra (alias for AWS deps currently in core). The canonical install

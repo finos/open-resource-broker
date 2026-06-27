@@ -108,6 +108,30 @@ jobs:
       environment: ${{ needs.config.outputs.environment }}
       testing-flag: ${{ needs.config.outputs.testing-flag }}
 
+  # Serial-marked provider tests (tests tagged @pytest.mark.serial).
+  # These run sequentially (no xdist) after the parallel providers job so
+  # that tests sharing global state (live AWS, docker daemon, e2e tempdirs)
+  # do not race each other.
+  providers-tests-serial:
+    name: Providers Tests (Serial)
+    needs: [config, setup-cache, providers-tests]
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [aws]
+    uses: ./.github/workflows/reusable-test.yml
+    with:
+      test-type: providers-serial
+      provider: ${{ matrix.provider }}
+      python-version: ${{ needs.config.outputs.default-python-version }}
+      default-python-version: ${{ needs.config.outputs.default-python-version }}
+      continue-on-error: false
+      aws-region: ${{ needs.config.outputs.aws-region }}
+      aws-access-key: ${{ needs.config.outputs.aws-access-key }}
+      aws-secret-key: ${{ needs.config.outputs.aws-secret-key }}
+      environment: ${{ needs.config.outputs.environment }}
+      testing-flag: ${{ needs.config.outputs.testing-flag }}
+
   infrastructure-tests:
     name: Infrastructure Tests (Default Python)
     needs: [config, setup-cache]
@@ -155,7 +179,7 @@ jobs:
   test-report:
     name: Generate Test Report
     runs-on: ubuntu-latest
-    needs: [config, setup-cache, tests, integration-tests, e2e-tests, providers-tests, infrastructure-tests]
+    needs: [config, setup-cache, tests, integration-tests, e2e-tests, providers-tests, providers-tests-serial, infrastructure-tests]
     if: always()
     permissions:
       contents: read

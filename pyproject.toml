@@ -359,6 +359,7 @@ include-package-data = true
 "*" = ["py.typed"]
 "orb.config" = ["default_config.json"]
 "orb.providers.aws.config" = ["*.json"]
+"orb.ui" = ["rxconfig.py"]
 "orb.k8s_legacy.alembic" = ["alembic.ini", "script.py.mako"]
 "orb.k8s_legacy.alembic.versions" = ["*.py"]
 "orb.k8s_legacy.tests.resources" = ["*.yml", "*.tpl"]

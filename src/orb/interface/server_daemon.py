@@ -448,11 +448,30 @@ def reload(*, pid_file: str | os.PathLike[str]) -> dict[str, Any]:
 
 
 def tail_log(*, log_file: str | os.PathLike[str], lines: int = 50) -> str:
-    """Return the last *lines* of the log file (best-effort, no follow)."""
+    """Return the last *lines* of the log file (best-effort, no follow).
+
+    The daemon log file is **not** rotated automatically.  Stdio is
+    redirected to the file via ``os.dup2`` and the file descriptor is held
+    open for the daemon lifetime; standard logrotate ``create`` semantics
+    (rename + reopen) will silently keep writing to the old inode.  Use
+    ``copytruncate`` in your logrotate configuration instead::
+
+        /var/log/orb/orb-api.log {
+            daily
+            rotate 14
+            compress
+            delaycompress
+            missingok
+            notifempty
+            copytruncate
+        }
+
+    See ``docs/root/deployment/traditional.md`` for a full example.
+    """
     log_path = _expand(str(log_file))
     if not log_path.exists():
         return ""
-    # Cheap implementation: read whole file. The daemon log file is
-    # rotated by RotatingFileHandler so this stays bounded.
+    # Cheap implementation: read whole file.  File size is bounded by
+    # the system logrotate policy (see docstring above).
     with log_path.open("r", encoding="utf-8", errors="replace") as fh:
         return "".join(fh.readlines()[-lines:])

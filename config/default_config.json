@@ -4,15 +4,7 @@
     "type": "default"
   },
   "provider": {
-    "providers": [
-      {
-        "name": "aws-default",
-        "type": "aws",
-        "enabled": true,
-        "weight": 100,
-        "config": {}
-      }
-    ],
+    "providers": [],
     "selection_policy": "FIRST_AVAILABLE",
     "default_provider_type": "aws",
     "health_check_interval": 60,
@@ -101,7 +93,7 @@
   },
   "logging": {
     "level": "INFO",
-    "file_path": "logs/app.log",
+    "file_path": "logs/orb.log",
     "console_enabled": false,
     "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s [%(pathname)s:%(lineno)d (%(funcName)s)]"
   },
@@ -126,6 +118,7 @@
   },
   "environment": "development",
   "debug": false,
+  "allow_destructive_admin": false,
   "performance": {
     "lazy_loading": {
       "enabled": true,

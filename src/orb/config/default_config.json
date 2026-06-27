@@ -224,9 +224,7 @@
     },
     "cors": {
       "enabled": true,
-      "origins": [
-        "*"
-      ],
+      "origins": [],
       "methods": [
         "GET",
         "POST",

@@ -149,10 +149,12 @@ async def run_embedded_foreground(
             "Install with: pip install orb-py[ui]"
         )
 
-    # rxconfig.py lives at the repo root, two levels above this file
-    # (src/orb/interface/server_runtime.py).
+    # rxconfig.py ships inside the wheel at orb/ui/rxconfig.py.  Point
+    # reflex at that directory so it works whether orb-py is installed from
+    # PyPI or run from a local checkout.  The repo-root rxconfig.py is a
+    # thin re-export that delegates here for local ``reflex run`` workflows.
     here = os.path.dirname(os.path.abspath(__file__))
-    repo_root = os.path.abspath(os.path.join(here, "..", "..", ".."))
+    orb_ui_dir = os.path.abspath(os.path.join(here, "..", "ui"))
 
     env = os.environ.copy()
     env["ORB_MODE"] = "embedded"
@@ -170,7 +172,7 @@ async def run_embedded_foreground(
     proc = await asyncio.create_subprocess_exec(
         reflex_bin,
         "run",
-        cwd=repo_root,
+        cwd=orb_ui_dir,
         env=env,
         start_new_session=True,
     )
