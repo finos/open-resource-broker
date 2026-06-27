@@ -136,14 +136,7 @@ class CORSConfig(BaseModel):
     """CORS configuration."""
 
     enabled: bool = Field(True, description="Enable CORS")
-    origins: list[str] = Field(
-        default_factory=list,
-        description=(
-            "Allowed CORS origins. Defaults to [] (no origins permitted). "
-            "Operators MUST explicitly list permitted origins in production — "
-            "use ['*'] only for fully public, unauthenticated APIs."
-        ),
-    )
+    origins: list[str] = Field(["*"], description="Allowed origins")
     methods: list[str] = Field(
         ["GET", "POST", "PUT", "DELETE", "OPTIONS"], description="Allowed methods"
     )
@@ -177,14 +170,7 @@ class ServerConfig(BaseModel):
 
     # Security
     require_https: bool = Field(False, description="Require HTTPS for all requests")
-    trusted_hosts: list[str] = Field(
-        default_factory=list,
-        description=(
-            "Trusted Host header values enforced by TrustedHostMiddleware. "
-            "Defaults to [] (middleware disabled — all Host values accepted). "
-            "Set to ['yourdomain.com', 'www.yourdomain.com'] in production."
-        ),
-    )
+    trusted_hosts: list[str] = Field(["*"], description="Trusted host headers")
     trusted_proxies: list[str] = Field(
         default_factory=list,
         description="IP addresses of trusted reverse proxies. When set, X-Forwarded-For is only "

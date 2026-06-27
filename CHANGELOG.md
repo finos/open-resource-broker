@@ -10,28 +10,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### BREAKING CHANGES
 
-- **`cors.origins` default changed from `["*"]` to `[]`.**
-  The previous default allowed requests from any origin.  The new default
-  denies all cross-origin requests until origins are explicitly listed.
-  Operators who rely on browser clients (dashboard, Swagger UI from a
-  different host) must add their origins to the config:
-
-  ```json
-  "server": {
-    "cors": {
-      "origins": ["https://your-dashboard.example.com"]
-    }
-  }
-  ```
-
-  Set `origins: ["*"]` to restore the previous permissive behaviour (not
-  recommended for production deployments).
-
-- **`trusted_hosts` default is now restrictive.**
-  The `TrustedHostMiddleware` no longer accepts arbitrary `Host` headers by
-  default.  Set `trusted_hosts` explicitly in your server config if the API
-  is accessed via a hostname other than `localhost` / `127.0.0.1`.
-
 - **Daemon token file at `<work_dir>/server/orb-server.token`.**
   When `orb server start` is invoked (daemon or `--foreground` mode), a
   random bearer token is written to `<work_dir>/server/orb-server.token`
