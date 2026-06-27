@@ -32,7 +32,7 @@ _ORB_UI_BACKEND_PORT = int(os.getenv("ORB_UI_BACKEND_PORT", "8001"))
 _ORB_UI_FRONTEND_PORT = int(os.getenv("ORB_UI_FRONTEND_PORT", "3000"))
 
 try:
-    import reflex as rx
+    import reflex as rx  # pyright: ignore[reportMissingImports]
 
     config = rx.Config(
         # Reflex resolves the app via this dotted module path; it imports
