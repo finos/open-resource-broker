@@ -410,22 +410,30 @@ class SQLStorageStrategy(BaseStorageStrategy):
         Falls back to an empty dict on any error so callers can degrade
         gracefully to the list-and-count slow path if needed.
         """
+        # Validate the column against the strategy's registered columns dict
+        # before interpolation.  SQL identifiers cannot be bound parameters, so
+        # the only safe path is allowlist-then-interpolate.  Anything else is
+        # rejected.
+        if column not in self.columns:
+            raise StorageError(
+                f"count_by_column: column {column!r} is not in the registered "
+                f"schema for table {self.table_name!r}"
+            )
+        # table_name and columns keys are constructor-time constants set by the
+        # repository layer; both have just been validated against the in-memory
+        # schema map above.  No request-time string crosses this boundary.
+        sql_statement = text(
+            f"SELECT {column} AS bucket, COUNT(*) AS cnt FROM {self.table_name} GROUP BY {column}"
+        )
         with self.lock_manager.read_lock():
             try:
-                # ``column`` and ``self.table_name`` are internal constants supplied
-                # by repository layer callers (e.g. "status", "provider_api").  No
-                # user-controlled data is ever interpolated here.  SQLAlchemy's
-                # ``text()`` is used because the GROUP BY column name cannot be passed
-                # as a bound parameter — SQL does not allow parameterised identifiers.
-                # semgrep(avoid-sqlalchemy-text): static SQL, no user input in string.
-                sql = f"SELECT {column}, COUNT(*) AS cnt FROM {self.table_name} GROUP BY {column}"
                 with self.connection_manager.get_session() as session:
-                    result = session.execute(text(sql))
+                    result = session.execute(sql_statement)
                     rows = result.fetchall()
                 counts: dict[str, int] = {}
                 for row in rows:
                     row_dict = dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
-                    key = str(row_dict.get(column) or "unknown")
+                    key = str(row_dict.get("bucket") or "unknown")
                     counts[key] = int(row_dict.get("cnt", 0))
                 return counts
             except Exception as exc:

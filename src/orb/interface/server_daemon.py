@@ -123,7 +123,7 @@ def _cleanup_token_file(pid_path: Path) -> None:
     try:
         _token_path(pid_path).unlink(missing_ok=True)
     except OSError as exc:
-        logger.debug("loopback credential cleanup failed: %s", exc)
+        logger.debug("loopback handshake file cleanup failed: %s", exc)
 
 
 def _redirect_stdio(log_file: Path) -> None:
@@ -237,7 +237,7 @@ def _run_daemon_grandchild(
         _write_token_file(pid_path)
     except Exception as exc:
         # Token file failure is non-fatal: the SIGHUP fallback still works.
-        logger.warning("loopback IPC credential write failed: %s", exc)
+        logger.warning("loopback handshake file write failed: %s", exc)
 
     try:
         with os.fdopen(write_fd, "wb") as w:
@@ -293,7 +293,7 @@ def start(
         try:
             _write_token_file(pid_path)
         except Exception as exc:
-            logger.warning("loopback IPC credential write failed: %s", exc)
+            logger.warning("loopback handshake file write failed: %s", exc)
         try:
             rc = _spawn_runtime(runtime)
         finally:
