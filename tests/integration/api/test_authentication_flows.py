@@ -46,7 +46,9 @@ class TestAuthenticationFlows:
         assert response.status_code == 200
         data = response.json()
         assert data["auth_enabled"] is False
-        assert data["auth_strategy"] is None
+        # auth_strategy is no longer surfaced in the /info response; verify only
+        # that the key is absent rather than asserting a specific value.
+        assert "auth_strategy" not in data
 
     def test_bearer_token_auth_flow(self):
         """Test API access with Bearer token authentication."""
