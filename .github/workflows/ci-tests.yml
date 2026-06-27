@@ -115,10 +115,14 @@ jobs:
       environment: ${{ needs.config.outputs.environment }}
       testing-flag: ${{ needs.config.outputs.testing-flag }}
 
-  # Serial-marked provider tests (tests tagged @pytest.mark.serial).
-  # These run sequentially (no xdist) after the parallel providers job so
-  # that tests sharing global state (live AWS, docker daemon, e2e tempdirs)
-  # do not race each other.
+  # Serial-marked provider tests (currently the live-AWS subtree).
+  # The make target points pytest directly at ``tests/providers/<provider>/live``
+  # because ``norecursedirs`` excludes that path from auto-recursion.  Without
+  # ``--live`` the root conftest stamps every live test with ``skip_live``, so
+  # the job collects the suite, reports SKIPPED, and exits 0 — that proves the
+  # collection wiring + skip mechanism still work end-to-end on every PR.
+  # When CI is wired up with real AWS credentials, set ``PYTEST_LIVE=--live``
+  # in the workflow env to flip the suite into actual execution.
   providers-tests-serial:
     name: Providers Tests (Serial)
     needs: [config, setup-cache, providers-tests]

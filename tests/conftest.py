@@ -49,14 +49,17 @@ def _is_moto_test(item) -> bool:
 
 
 def pytest_collection_modifyitems(config, items):
+    # Live tests require real AWS credentials and a real account: they must be
+    # opted into explicitly with --live (or --run-aws).  We deliberately do NOT
+    # treat the presence of "live" / "onaws" in the CLI arg path as an implicit
+    # opt-in: pointing pytest at tests/providers/aws/live to collect the suite
+    # (e.g. the providers-serial CI job) would otherwise auto-enable live mode
+    # without credentials and every test would error on the missing config
+    # file.  The path-based shortcut also makes it dangerously easy for an
+    # operator to launch real AWS provisioning by accident.
     live_enabled = config.getoption("--live") or config.getoption("--run-aws")
     no_mocked = config.getoption("--no-mocked")
     provider_filter = config.getoption("--provider")
-
-    # Also honour legacy path-based live detection (e.g. pytest tests/providers/aws/live)
-    explicit_live = any("live" in str(a) or "onaws" in str(a) for a in config.args)
-    if explicit_live:
-        live_enabled = True
 
     skip_live = pytest.mark.skip(
         reason="requires real credentials — pass --live (or --run-aws) to run"

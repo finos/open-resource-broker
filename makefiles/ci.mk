@@ -131,13 +131,22 @@ ci-tests-performance:  ## Run performance tests only (matches ci.yml performance
 PROVIDER ?=
 PROVIDER_SUFFIX := $(if $(PROVIDER),-$(PROVIDER),)
 PROVIDER_PATH := $(if $(PROVIDER),$(TESTS_PROVIDERS)/$(PROVIDER),$(TESTS_PROVIDERS))
+# Serial-marked provider tests live under each provider's ``live/`` subtree.
+# That directory is listed in pyproject's ``norecursedirs`` so the parallel
+# ``ci-tests-providers`` target never descends into it; the serial target
+# below has to point pytest at the path explicitly so collection succeeds.
+# Without --live the root conftest adds ``skip_live`` to every collected
+# test, so the job exits 0 with a clear "163 skipped" line.  CI with live
+# AWS credentials can opt in by setting PYTEST_LIVE=--live.
+PROVIDER_SERIAL_PATH := $(if $(PROVIDER),$(TESTS_PROVIDERS)/$(PROVIDER)/live,$(TESTS_PROVIDERS))
+PYTEST_LIVE ?=
 ci-tests-providers:  ## Run providers tests (PROVIDER=<name> scopes to one provider)
 	@echo "Running provider tests (parallel): $(if $(PROVIDER),$(PROVIDER),all)..."
 	$(call run-tool,pytest,$(PROVIDER_PATH) $(PYTEST_PARALLEL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-providers$(PROVIDER_SUFFIX).xml --junitxml=junit-providers$(PROVIDER_SUFFIX).xml)
 
-ci-tests-providers-serial:  ## Run the serial-marked subset of provider tests (live, etc.)
+ci-tests-providers-serial:  ## Run the serial-marked subset of provider tests (live AWS, etc.)
 	@echo "Running serial provider tests: $(if $(PROVIDER),$(PROVIDER),all)..."
-	$(call run-tool,pytest,$(PROVIDER_PATH) $(PYTEST_SERIAL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-providers$(PROVIDER_SUFFIX)-serial.xml --junitxml=junit-providers$(PROVIDER_SUFFIX)-serial.xml)
+	$(call run-tool,pytest,$(PROVIDER_SERIAL_PATH) $(PYTEST_SERIAL) $(PYTEST_LIVE) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-providers$(PROVIDER_SUFFIX)-serial.xml --junitxml=junit-providers$(PROVIDER_SUFFIX)-serial.xml)
 
 ci-tests-infrastructure:  ## Run infrastructure tests only (matches ci.yml infrastructure-tests job)
 	@echo "Running infrastructure tests (parallel)..."
