@@ -3,6 +3,19 @@
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+# ---------------------------------------------------------------------------
+# Loopback-admin token store
+#
+# The daemon writes a per-instance secret to <work_dir>/server/orb-server.token
+# (mode 0o600) at startup.  The API server loads it here and stores it in this
+# module-level frozenset so the LoopbackAdminAuthWrapper can grant admin access
+# to the CLI's reload request without requiring a full JWT.
+#
+# The set is populated once during create_fastapi_app; it is intentionally
+# module-level (not instance-level) so it survives any re-import of this module.
+# ---------------------------------------------------------------------------
+_LOOPBACK_ADMIN_TOKENS: set[str] = set()
+
 try:
     from fastapi import Depends, FastAPI
     from fastapi.middleware.cors import CORSMiddleware
@@ -29,6 +42,79 @@ from orb._package import __version__
 from orb.domain.base.exceptions import ConfigurationError
 from orb.infrastructure.auth.registry import get_auth_registry
 from orb.infrastructure.logging.logger import get_logger
+
+_server_logger = get_logger(__name__)
+
+
+class _LoopbackAdminAuthWrapper:
+    """Thin auth-port wrapper that accepts the loopback-admin token.
+
+    When the daemon's loopback reload IPC sends ``Authorization: Bearer <token>``
+    and that token matches the value written to ``orb-server.token``, this
+    wrapper short-circuits normal JWT validation and grants an admin identity.
+    For every other token it delegates to the real inner strategy unchanged.
+
+    This keeps the loopback capability fully isolated: it never modifies the
+    existing JWT strategy, and the token is only ever read from a file that is
+    mode 0o600 (daemon-UID-only readable).
+    """
+
+    def __init__(self, inner: Any) -> None:
+        self._inner = inner
+        self._logger = get_logger(__name__)
+
+    async def authenticate(self, context: Any) -> Any:
+        from orb.infrastructure.adapters.ports.auth import AuthResult, AuthStatus
+
+        auth_header: str = context.headers.get("authorization", "")
+        if auth_header.startswith("Bearer "):
+            candidate = auth_header[7:].strip()
+            if candidate and candidate in _LOOPBACK_ADMIN_TOKENS:
+                self._logger.debug("loopback-admin token accepted for %s", context.path)
+                return AuthResult(
+                    status=AuthStatus.SUCCESS,
+                    user_id="loopback-admin",
+                    user_roles=["admin"],
+                    permissions=["*"],
+                    metadata={"strategy": "loopback_admin_token"},
+                )
+        return await self._inner.authenticate(context)
+
+    def get_strategy_name(self) -> str:
+        return self._inner.get_strategy_name()
+
+    def is_enabled(self) -> bool:
+        return self._inner.is_enabled()
+
+    # Delegate all other attribute access to the inner strategy.
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+
+def _load_loopback_token(server_config: Any) -> None:
+    """Read the daemon-written loopback-admin token file and register it.
+
+    The token file path mirrors the PID file path: if the PID file is
+    ``<work_dir>/server/orb-server.pid``, the token file is
+    ``<work_dir>/server/orb-server.token``.
+
+    Silently skips if the file does not exist (auth disabled, fresh install,
+    or daemon not yet started).
+    """
+    try:
+        from orb.config.platform_dirs import get_work_location
+
+        pid_file = getattr(server_config, "pid_file", None) or str(
+            get_work_location() / "server" / "orb-server.pid"
+        )
+        token_file = Path(pid_file).with_name(Path(pid_file).stem + ".token")
+        if token_file.exists():
+            token = token_file.read_text(encoding="ascii").strip()
+            if token:
+                _LOOPBACK_ADMIN_TOKENS.add(token)
+                _server_logger.debug("loopback-admin token loaded from %s", token_file)
+    except Exception as exc:
+        _server_logger.debug("loopback-admin token load skipped: %s", exc)
 
 
 def create_fastapi_app(server_config: Any) -> Any:
@@ -135,9 +221,14 @@ def create_fastapi_app(server_config: Any) -> Any:
     if server_config.auth.enabled:
         auth_strategy = _create_auth_strategy(server_config.auth)
         if auth_strategy:
+            # Load the daemon-issued loopback-admin token (if present) so the
+            # CLI reload command can authenticate without a user-facing JWT.
+            _load_loopback_token(server_config)
+            # Wrap the real strategy so loopback tokens are checked first.
+            auth_port: Any = _LoopbackAdminAuthWrapper(auth_strategy)
             app.add_middleware(
                 AuthMiddleware,
-                auth_port=auth_strategy,
+                auth_port=auth_port,
                 require_auth=True,
                 trusted_proxies=server_config.trusted_proxies,
             )
@@ -262,6 +353,25 @@ def create_fastapi_app(server_config: Any) -> Any:
 
     # Register API routers
     _register_routers(app)
+
+    # Warn when multiple uvicorn workers are configured alongside the SSE
+    # events router.  The in-process pubsub (SseEventBus) is not shared across
+    # worker processes, so events published in one worker are invisible to
+    # subscribers connected to a different worker.  This is a data-loss risk,
+    # not an error — operators may have valid reasons (e.g. a shared queue
+    # upstream), so we warn but do not refuse to start.
+    _workers = getattr(server_config, "workers", 1) or 1
+    if _workers > 1:
+        _registered_routes = {getattr(r, "path", "") for r in app.routes}
+        _has_events_route = any("/events" in p for p in _registered_routes)
+        if _has_events_route:
+            logger.warning(
+                "MULTI_WORKER_SSE: server.workers=%d but the SSE events router is registered. "
+                "The in-process event queue is NOT shared across worker processes — SSE "
+                "subscribers may silently miss events published by other workers. "
+                "Set server.workers=1 or route SSE through a shared pub/sub backend.",
+                _workers,
+            )
 
     # Configure OpenAPI documentation
     configure_openapi(app, server_config)

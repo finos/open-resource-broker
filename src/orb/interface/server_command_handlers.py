@@ -191,7 +191,30 @@ async def handle_server_restart(args) -> dict[str, Any]:
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 
-def _loopback_reload_request(host: str, port: int, path: str) -> dict[str, Any]:
+def _read_loopback_token(pid_file: str) -> str | None:
+    """Read the loopback-admin token written by the daemon at start time.
+
+    Returns the token string, or None if the file does not exist (e.g. the
+    daemon was started before this feature was added, or auth is disabled).
+    The token file is a sibling of the PID file:
+    ``<work_dir>/server/orb-server.token``.
+    """
+    from pathlib import Path as _Path
+
+    try:
+        pid_path = _Path(pid_file)
+        token_file = pid_path.with_name(pid_path.stem + ".token")
+        if token_file.exists():
+            token = token_file.read_text(encoding="ascii").strip()
+            return token if token else None
+    except OSError:
+        pass
+    return None
+
+
+def _loopback_reload_request(
+    host: str, port: int, path: str, token: str | None = None
+) -> dict[str, Any]:
     """POST to the admin reload endpoint over a raw loopback TCP socket.
 
     Bypasses ``requests`` so static analysis doesn't flag this as a
@@ -199,15 +222,26 @@ def _loopback_reload_request(host: str, port: int, path: str) -> dict[str, Any]:
     that has already been validated by the caller. The transport is
     plaintext HTTP/1.1 because the peer lives in the same trust
     boundary as the CLI invoking it (same machine, same uid).
+
+    When ``token`` is provided it is sent as ``Authorization: Bearer <token>``
+    so the request succeeds even when bearer-token auth is active on the server.
+    If ``token`` is None (legacy daemon or auth disabled), the header is omitted.
+
+    This function is synchronous and must be called via ``asyncio.to_thread``
+    when invoked from an async context to avoid blocking the event loop.
     """
     import http.client
 
     if host not in _LOOPBACK_HOSTS:
         raise ValueError(f"reload IPC requires a loopback host, refusing to call {host!r}")
 
+    headers: dict[str, str] = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
     conn = http.client.HTTPConnection(host, port, timeout=5)
     try:
-        conn.request("POST", path, body=b"")
+        conn.request("POST", path, body=b"", headers=headers)
         resp = conn.getresponse()
         raw = resp.read()
         status = resp.status
@@ -230,7 +264,15 @@ async def handle_server_reload(args) -> dict[str, Any]:
     process via the same loopback channel. SIGHUP is used as a
     fallback when the loopback peer is unreachable; the daemon's
     signal handler invokes ``ConfigurationManager.reload()``.
+
+    The loopback IPC call is dispatched via ``asyncio.to_thread`` so the
+    synchronous ``http.client`` socket I/O does not block the event loop.
+    When a loopback-admin token file exists it is read and forwarded as the
+    ``Authorization: Bearer`` header so the reload succeeds even when
+    bearer-token auth is active on the server.
     """
+    import asyncio as _asyncio
+
     from orb.interface import server_daemon as daemon_mod
 
     server_config, ui_config = _resolve_configs(args)
@@ -246,8 +288,12 @@ async def handle_server_reload(args) -> dict[str, Any]:
         port = server_config.port
         path = "/api/v1/admin/reload-config"
 
+    # Read the loopback-admin token (if available) so the HTTP request carries
+    # a valid Authorization header when bearer-token auth is enabled.
+    token = _read_loopback_token(pid_file)
+
     try:
-        return _loopback_reload_request(host, port, path)
+        return await _asyncio.to_thread(_loopback_reload_request, host, port, path, token)
     except (OSError, ValueError) as exc:
         return {
             "method": "sighup_fallback",

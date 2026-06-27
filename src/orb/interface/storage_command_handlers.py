@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-import subprocess
+import asyncio
+import re
 import sys
 from typing import TYPE_CHECKING, Any
 
@@ -221,14 +222,37 @@ async def handle_storage_migrate(
             "migrations",
             "alembic.ini",
         )
-        result = subprocess.run(
-            [sys.executable, "-m", "alembic", "--config", alembic_ini] + alembic_args,
-            capture_output=True,
-            text=True,
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable,
+            "-m",
+            "alembic",
+            "--config",
+            alembic_ini,
+            *alembic_args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
             env=env,
         )
-        output = (result.stdout + result.stderr).strip()
-        if result.returncode != 0:
+        raw_stdout_bytes, raw_stderr_bytes = await proc.communicate()
+        raw_stdout = raw_stdout_bytes.decode("utf-8", errors="replace")
+        raw_stderr = raw_stderr_bytes.decode("utf-8", errors="replace")
+
+        # Log full output server-side (operators with shell access can debug).
+        from orb.infrastructure.logging.logger import get_logger as _get_logger
+
+        _migrate_logger = _get_logger(__name__)
+        _migrate_logger.debug("alembic stdout: %s", raw_stdout)
+        _migrate_logger.debug("alembic stderr: %s", raw_stderr)
+
+        # Scrub DB credentials before returning to caller.  Matches both
+        # postgresql:// and the future postgres+driver:// variants.
+        _DB_URL_RE = re.compile(r"((?:postgresql|postgres)[^:]*://[^:]+:)[^@]+(@)", re.IGNORECASE)
+
+        def _scrub(text: str) -> str:
+            return _DB_URL_RE.sub(r"\1***\2", text)
+
+        output = _scrub((raw_stdout + raw_stderr).strip())
+        if proc.returncode != 0:
             return formatter.format_error(f"Alembic migration failed:\n{output}")
         return formatter.format_success(
             {"message": f"Migration '{subcommand}' completed", "output": output}

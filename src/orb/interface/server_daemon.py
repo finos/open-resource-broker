@@ -21,6 +21,7 @@ import asyncio
 import errno
 import fcntl
 import os
+import secrets
 import signal
 import sys
 import time
@@ -90,6 +91,41 @@ def _write_pid(fd: int, pid: int) -> None:
     os.fsync(fd)
 
 
+def _token_path(pid_path: Path) -> Path:
+    """Derive the loopback-admin token file path from the PID file path."""
+    return pid_path.with_name(pid_path.stem + ".token")
+
+
+def _write_token_file(pid_path: Path) -> str:
+    """Generate a cryptographically random token, write it to ``<pid_stem>.token``
+    with mode 0o600, and return the token string.
+
+    The token is used as a loopback-admin credential: the daemon writes it on
+    start; the CLI reads it on reload and sends it as ``Authorization: Bearer
+    <token>``; the API server loads it at startup and accepts it as a valid
+    admin token.  File mode 0o600 confines the secret to the daemon's UID.
+    """
+    token = secrets.token_urlsafe(32)
+    token_file = _token_path(pid_path)
+    _ensure_parent(token_file)
+    # Write with O_CREAT|O_WRONLY|O_TRUNC so the mode is set atomically on
+    # creation; avoid a race between open() and chmod().
+    fd = os.open(str(token_file), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        os.write(fd, token.encode("ascii"))
+    finally:
+        os.close(fd)
+    return token
+
+
+def _cleanup_token_file(pid_path: Path) -> None:
+    """Remove the loopback-admin token file on daemon exit (best-effort)."""
+    try:
+        _token_path(pid_path).unlink(missing_ok=True)
+    except OSError as exc:
+        logger.debug("token file cleanup failed: %s", exc)
+
+
 def _redirect_stdio(log_file: Path) -> None:
     _ensure_parent(log_file)
     try:
@@ -150,20 +186,43 @@ def _spawn_runtime(coro_factory: Callable[[], Coroutine[Any, Any, Any]]) -> int:
     return 0
 
 
+def _takeover_pid_lock(lock_fd: int, pid_path: Path) -> None:
+    """Write the grandchild's PID into the already-held pid-lock fd.
+
+    The fd was opened and locked by the parent process before the double-fork.
+    Keeping it open across the fork handover means there is no window where a
+    second ``orb server start`` could sneak in and acquire the lock between the
+    parent releasing it and the grandchild re-acquiring it (the race fixed by M22).
+    """
+    _write_pid(lock_fd, os.getpid())
+
+
 def _run_daemon_grandchild(
     write_fd: int,
     pid_path: Path,
     log_path: Path,
     wd_path: Path,
     runtime: Callable[[], Coroutine[Any, Any, Any]],
+    lock_fd: int,
 ) -> NoReturn:
-    """Grandchild daemon body. Always terminates the process via os._exit."""
+    """Grandchild daemon body. Always terminates the process via os._exit.
+
+    ``lock_fd`` is the pid-lock file descriptor kept open (and locked) by the
+    parent across the double-fork.  The grandchild takes ownership by writing
+    its own PID into it via ``_takeover_pid_lock``, then holds the fd open for
+    the entire daemon lifetime.  This eliminates the window between the parent
+    closing the fd and the grandchild re-acquiring the lock that previously
+    allowed a second ``orb server start`` to race in and win.
+
+    The intermediate fork closes ``lock_fd`` before its ``os._exit(0)`` so it
+    does not hold an extra reference that would prevent the lock from being
+    released when the grandchild eventually closes it.
+    """
     try:
         os.umask(0o027)
         os.chdir(str(wd_path))
         _redirect_stdio(log_path)
-        daemon_fd = _acquire_pid_lock(pid_path)
-        _write_pid(daemon_fd, os.getpid())
+        _takeover_pid_lock(lock_fd, pid_path)
     except Exception as exc:
         try:
             with os.fdopen(write_fd, "wb") as w:
@@ -171,6 +230,14 @@ def _run_daemon_grandchild(
         except Exception as report_exc:
             logger.debug("daemon child failed to report start error: %s", report_exc)
         os._exit(1)
+
+    # Generate and persist the loopback-admin token so the CLI can authenticate
+    # its reload requests when bearer-token auth is active.
+    try:
+        _write_token_file(pid_path)
+    except Exception as exc:
+        # Token file failure is non-fatal: the SIGHUP fallback still works.
+        logger.warning("loopback token file write failed: %s", exc)
 
     try:
         with os.fdopen(write_fd, "wb") as w:
@@ -182,8 +249,9 @@ def _run_daemon_grandchild(
         rc = _spawn_runtime(runtime)
     finally:
         pid_path.unlink(missing_ok=True)
+        _cleanup_token_file(pid_path)
         try:
-            os.close(daemon_fd)
+            os.close(lock_fd)
         except OSError as exc:
             logger.debug("daemon lock fd already closed: %s", exc)
 
@@ -220,18 +288,34 @@ def start(
 
     if foreground:
         _write_pid(lock_fd, os.getpid())
+        # Generate loopback-admin token for foreground mode so the CLI reload
+        # command works when bearer-token auth is active.
+        try:
+            _write_token_file(pid_path)
+        except Exception as exc:
+            logger.warning("loopback token file write failed: %s", exc)
         try:
             rc = _spawn_runtime(runtime)
         finally:
             pid_path.unlink(missing_ok=True)
+            _cleanup_token_file(pid_path)
             os.close(lock_fd)
         return {"pid": os.getpid(), "status": "exited", "exit_code": rc}
 
-    os.close(lock_fd)
+    # Daemon (double-fork) path.
+    #
+    # M22 fix: do NOT close lock_fd here.  Keeping it open across both forks
+    # ensures continuous lock ownership — there is no window between the parent
+    # releasing and the grandchild re-acquiring where a rival ``orb server start``
+    # could sneak in.  The intermediate process closes lock_fd before os._exit(0)
+    # so it holds no extra reference.  The grandchild calls _takeover_pid_lock to
+    # write its PID and then keeps the fd open for the entire daemon lifetime.
     read_fd, write_fd = os.pipe()
 
     intermediate = os.fork()
     if intermediate > 0:
+        # Parent: close lock_fd now — the grandchild (via the intermediate) owns it.
+        os.close(lock_fd)
         os.close(write_fd)
         os.waitpid(intermediate, 0)
         with os.fdopen(read_fd, "rb") as r:
@@ -246,10 +330,15 @@ def start(
     os.setsid()
     grandchild = os.fork()
     if grandchild > 0:
-        # Intermediate fork exits without running atexit / finally clauses;
-        # the grandchild owns the daemon lifecycle from here on.
+        # Intermediate fork: close lock_fd so we hold no extra reference, then
+        # exit without running atexit / finally clauses.  The grandchild owns
+        # the daemon lifecycle from here on.
+        try:
+            os.close(lock_fd)
+        except OSError:
+            pass
         os._exit(0)
-    _run_daemon_grandchild(write_fd, pid_path, log_path, wd_path, runtime)
+    _run_daemon_grandchild(write_fd, pid_path, log_path, wd_path, runtime, lock_fd)
     raise AssertionError("unreachable: _run_daemon_grandchild is NoReturn")
 
 
@@ -292,6 +381,7 @@ def stop(
     while time.monotonic() < deadline:
         if not _pid_is_alive(pid):
             pid_path.unlink(missing_ok=True)
+            _cleanup_token_file(pid_path)
             return {"pid": pid, "status": "stopped"}
         time.sleep(0.2)
 
@@ -299,6 +389,7 @@ def stop(
     # Final check
     time.sleep(0.2)
     pid_path.unlink(missing_ok=True)
+    _cleanup_token_file(pid_path)
     return {"pid": pid, "status": "killed" if not _pid_is_alive(pid) else "still_running"}
 
 

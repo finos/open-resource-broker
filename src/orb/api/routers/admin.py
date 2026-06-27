@@ -429,7 +429,12 @@ async def cleanup_database(
 
 
 # ---------------------------------------------------------------------------
-# Reload — non-destructive, no auth guard
+# Reload — non-destructive, admin role required, no destructive-admin guard
+#
+# Config reload reads config.json from disk and replaces the in-memory cache.
+# No data is modified or deleted, so the allow_destructive_admin flag is NOT
+# consulted.  The admin role requirement ensures only authorised callers can
+# trigger a reload.
 # ---------------------------------------------------------------------------
 
 
@@ -450,8 +455,12 @@ async def cleanup_database(
     },
 )
 async def reload_config(request: Request, _user=Depends(require_role("admin"))) -> JSONResponse:
-    """Force ConfigurationManager.reload() on the live DI container."""
-    check_destructive_admin_allowed(request)
+    """Force ConfigurationManager.reload() on the live DI container.
+
+    This endpoint is non-destructive: it reads from disk and updates the
+    in-memory config cache only.  No data is deleted or modified, so the
+    ``allow_destructive_admin`` guard is intentionally absent.
+    """
     caller_ip = request.client.host if request.client else "unknown"
     try:
         from orb.config.managers.configuration_manager import ConfigurationManager
