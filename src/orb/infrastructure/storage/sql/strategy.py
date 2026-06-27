@@ -3,7 +3,7 @@
 from contextlib import contextmanager
 from typing import Any, Optional
 
-from sqlalchemy import text
+from sqlalchemy import MetaData, Table, column as sa_column, func, select, text
 
 from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.storage.base.strategy import BaseStorageStrategy
@@ -411,24 +411,30 @@ class SQLStorageStrategy(BaseStorageStrategy):
         gracefully to the list-and-count slow path if needed.
         """
         # Validate the column against the strategy's registered columns dict
-        # before interpolation.  SQL identifiers cannot be bound parameters, so
-        # the only safe path is allowlist-then-interpolate.  Anything else is
-        # rejected.
+        # before building the query.  This is the only place untrusted strings
+        # could ever enter the SQL build; rejecting unknown columns keeps the
+        # query construction below restricted to identifiers we registered at
+        # construction time.
         if column not in self.columns:
             raise StorageError(
                 f"count_by_column: column {column!r} is not in the registered "
                 f"schema for table {self.table_name!r}"
             )
-        # table_name and columns keys are constructor-time constants set by the
-        # repository layer; both have just been validated against the in-memory
-        # schema map above.  No request-time string crosses this boundary.
-        sql_statement = text(
-            f"SELECT {column} AS bucket, COUNT(*) AS cnt FROM {self.table_name} GROUP BY {column}"
+        # Build the SELECT via SQLAlchemy Core constructs — no raw SQL string
+        # interpolation.  The column object is created by name (validated
+        # above) and the Table is reflected from MetaData by name (also
+        # validated since self.table_name is a constructor-time constant).
+        bucket = sa_column(column)
+        table = Table(self.table_name, MetaData())
+        stmt = (
+            select(bucket.label("bucket"), func.count().label("cnt"))
+            .select_from(table)
+            .group_by(bucket)
         )
         with self.lock_manager.read_lock():
             try:
                 with self.connection_manager.get_session() as session:
-                    result = session.execute(sql_statement)
+                    result = session.execute(stmt)
                     rows = result.fetchall()
                 counts: dict[str, int] = {}
                 for row in rows:
