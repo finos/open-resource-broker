@@ -36,7 +36,7 @@ try:
 except ImportError:
     raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
 
-from orb.api.dependencies import get_di_container, require_role
+from orb.api.dependencies import check_destructive_admin_allowed, get_di_container, require_role
 from orb.application.services.admin.cleanup_database import (
     CleanupDatabaseService,
     InvalidCleanupStatusError,
@@ -52,48 +52,6 @@ logger = get_logger(__name__)
 # ---------------------------------------------------------------------------
 # Guards
 # ---------------------------------------------------------------------------
-
-_PRODUCTION_ENVIRONMENT = "production"
-
-
-def _check_destructive_admin_allowed(request: Request) -> None:
-    """Raise 403 if the destructive admin feature is disabled or env is production.
-
-    Reads config at call time so a restart is not required to disable the
-    feature after it has been enabled.
-    """
-    container = get_di_container()
-
-    # Resolve AppConfig via the ConfigurationPort.
-    try:
-        from orb.domain.base.ports.configuration_port import ConfigurationPort
-
-        config_port = container.get(ConfigurationPort)
-        allow_destructive: bool = bool(
-            config_port.get_configuration_value("allow_destructive_admin", False)
-        )
-        environment: str = str(
-            config_port.get_configuration_value("environment", "production")
-        ).lower()
-    except Exception:
-        # If we cannot read config, fail closed.
-        allow_destructive = False
-        environment = _PRODUCTION_ENVIRONMENT
-
-    if environment == _PRODUCTION_ENVIRONMENT:
-        logger.warning("ADMIN_WIPE blocked: environment is '%s'", environment)
-        raise _forbidden(
-            "PRODUCTION_ENVIRONMENT",
-            "Destructive admin actions are never permitted in production environments.",
-        )
-
-    if not allow_destructive:
-        logger.warning("ADMIN_WIPE blocked: allow_destructive_admin=False")
-        raise _forbidden(
-            "DESTRUCTIVE_ADMIN_DISABLED",
-            "Destructive admin actions are disabled. "
-            "Set allow_destructive_admin=true in the application config to enable.",
-        )
 
 
 def _forbidden(code: str, message: str):
@@ -140,7 +98,7 @@ async def wipe_database(
     - ``confirm`` (str, required): must equal the exact string ``"WIPE"``.
     """
     # ── Guard 1 & 2: config flag + environment ──────────────────────────────
-    _check_destructive_admin_allowed(request)
+    check_destructive_admin_allowed(request)
 
     # ── Guard 3: explicit confirmation token ────────────────────────────────
     if body is None:
@@ -246,7 +204,7 @@ async def init_orb(
       after directory/config setup.
     """
     # ── Guard 1 & 2: config flag + environment ──────────────────────────────
-    _check_destructive_admin_allowed(request)
+    check_destructive_admin_allowed(request)
 
     # ── Guard 3: explicit confirmation token ────────────────────────────────
     if body.confirm != "INIT":
@@ -398,7 +356,7 @@ async def cleanup_database(
     - ``include_machines`` (bool, default True): cascade-delete machine rows.
     """
     # ── Guard 1 & 2: config flag + environment ──────────────────────────────
-    _check_destructive_admin_allowed(request)
+    check_destructive_admin_allowed(request)
 
     # ── Guard 3: explicit confirmation token ────────────────────────────────
     if body.confirm != "CLEANUP":
@@ -493,7 +451,7 @@ async def cleanup_database(
 )
 async def reload_config(request: Request, _user=Depends(require_role("admin"))) -> JSONResponse:
     """Force ConfigurationManager.reload() on the live DI container."""
-    _check_destructive_admin_allowed(request)
+    check_destructive_admin_allowed(request)
     caller_ip = request.client.host if request.client else "unknown"
     try:
         from orb.config.managers.configuration_manager import ConfigurationManager

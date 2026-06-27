@@ -11,6 +11,7 @@ except ImportError:
 from orb.api.dependencies import (
     get_machine_orchestrator,
     get_request_status_orchestrator,
+    require_role,
 )
 from orb.application.services.orchestration.dtos import (
     GetMachineInput,
@@ -51,6 +52,7 @@ async def get_machine_metrics(
     machine_id: str,
     range: str = Query("1h", description="Time range — one of: 1h, 6h, 24h, 7d"),
     orchestrator=GET_MACHINE_ORCHESTRATOR,
+    _user=Depends(require_role("viewer")),
 ) -> JSONResponse:
     """
     Return time-series metrics for a specific machine.
@@ -108,6 +110,7 @@ async def get_machine_metrics(
 async def get_request_timeline(
     request_id: str,
     orchestrator=GET_REQUEST_STATUS_ORCHESTRATOR,
+    _user=Depends(require_role("viewer")),
 ) -> JSONResponse:
     """
     Return a chronological list of lifecycle events for a request.

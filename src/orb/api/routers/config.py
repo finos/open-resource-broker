@@ -75,6 +75,7 @@ async def get_full_config(
         default=None, description="Use 'file' to return raw on-disk config."
     ),
     config_manager=CONFIG_MANAGER,
+    _user=Depends(require_role("admin")),
 ) -> JSONResponse:
     """Return the full effective configuration (default) or the raw file config (?source=file)."""
     if source == "file":
@@ -129,6 +130,7 @@ async def get_full_config(
 )
 async def get_config_sources(
     config_manager=CONFIG_MANAGER,
+    _user=Depends(require_role("admin")),
 ) -> JSONResponse:
     """Return configuration source information."""
     sources: dict[str, Any] = config_manager.get_configuration_sources()
@@ -178,6 +180,7 @@ async def save_config(
 )
 async def validate_config(
     config_manager=CONFIG_MANAGER,
+    _user=Depends(require_role("admin")),
 ) -> JSONResponse:
     """Validate the current configuration and return errors."""
     errors: list[Any] = config_manager.validate_configuration()
@@ -198,6 +201,7 @@ async def validate_config(
 async def get_config_value(
     key: str,
     config_manager=CONFIG_MANAGER,
+    _user=Depends(require_role("admin")),
 ) -> JSONResponse:
     """Return a single config value by dot-notation key."""
     value = config_manager.get_configuration_value(key, _NOT_FOUND_SENTINEL)

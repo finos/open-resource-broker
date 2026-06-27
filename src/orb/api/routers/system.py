@@ -11,7 +11,7 @@ try:
 except ImportError:
     raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
 
-from orb.api.dependencies import get_dashboard_summary_orchestrator
+from orb.api.dependencies import get_dashboard_summary_orchestrator, require_role
 from orb.application.services.orchestration.dtos import DashboardSummaryInput
 from orb.infrastructure.error.decorators import handle_rest_exceptions
 
@@ -39,6 +39,7 @@ def _serialisable(obj: Any) -> Any:
 @handle_rest_exceptions(endpoint="/api/v1/system/dashboard", method="GET")
 async def get_dashboard_summary(
     orchestrator=DASHBOARD_ORCHESTRATOR,
+    _user=Depends(require_role("viewer")),
 ) -> JSONResponse:
     """Return aggregated dashboard data without client-side reduction."""
     output = await orchestrator.execute(DashboardSummaryInput())

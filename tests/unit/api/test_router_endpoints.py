@@ -7,8 +7,10 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from orb.api.dependencies import (
+    CurrentUser,
     get_acquire_machines_orchestrator,
     get_cancel_request_orchestrator,
+    get_current_user,
     get_list_machines_orchestrator,
     get_list_requests_orchestrator,
     get_list_return_requests_orchestrator,
@@ -48,6 +50,10 @@ from orb.application.services.orchestration.dtos import (
 def machines_app():
     app = FastAPI()
     app.include_router(machines_router)
+    # Supply an operator identity so role guards on mutation endpoints are satisfied.
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        username="test-operator", role="operator"
+    )
     return app
 
 
@@ -55,6 +61,10 @@ def machines_app():
 def requests_app():
     app = FastAPI()
     app.include_router(requests_router)
+    # Supply an operator identity so role guards on mutation endpoints are satisfied.
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        username="test-operator", role="operator"
+    )
     return app
 
 

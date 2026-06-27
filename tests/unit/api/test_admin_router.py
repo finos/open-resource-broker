@@ -8,6 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from orb.api.dependencies import get_current_user
 from orb.api.routers.admin import router as admin_router
 
 # ---------------------------------------------------------------------------
@@ -17,13 +18,25 @@ from orb.api.routers.admin import router as admin_router
 
 @pytest.fixture()
 def admin_app():
-    """Minimal FastAPI app with only the admin router mounted."""
+    """Minimal FastAPI app with only the admin router mounted.
+
+    Overrides ``get_current_user`` to return an admin identity so the
+    ``require_role("admin")`` dependency guard is always satisfied.  Individual
+    tests focus on the *config/environment* guards inside
+    ``check_destructive_admin_allowed`` — not the role check.
+    """
     from fastapi.responses import JSONResponse
 
+    from orb.api.dependencies import CurrentUser
     from orb.infrastructure.error.exception_handler import get_exception_handler
 
     app = FastAPI()
     app.include_router(admin_router)
+
+    # Supply a synthetic admin identity so role-guard never interferes.
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        username="test-admin", role="admin"
+    )
 
     exception_handler = get_exception_handler()
 
@@ -51,6 +64,13 @@ def _make_config_port(allow_destructive: bool = True, environment: str = "develo
         "environment": environment,
     }.get(key, default)
     return config_port
+
+
+def _make_server_config(auth_enabled: bool = True):
+    """Return a MagicMock ServerConfig with auth.enabled set."""
+    server_config = MagicMock()
+    server_config.auth.enabled = auth_enabled
+    return server_config
 
 
 def _make_repositories(machines=None, requests=None, templates=None):
@@ -113,6 +133,42 @@ def _wipe_post(client: TestClient, body: dict | None = None):
     return client.post("/admin/database/wipe", json=body)
 
 
+def _patch_container(container, server_config=None):
+    """Return a context manager that patches get_di_container in both the admin
+    router module and the dependencies module (where check_destructive_admin_allowed lives).
+
+    Also patches get_server_config in dependencies so Guard 0 (auth check) passes.
+    """
+    if server_config is None:
+        server_config = _make_server_config(auth_enabled=True)
+
+    return [
+        patch("orb.api.routers.admin.get_di_container", return_value=container),
+        patch("orb.api.dependencies.get_di_container", return_value=container),
+        patch("orb.api.dependencies.get_server_config", return_value=server_config),
+    ]
+
+
+class _MultiPatch:
+    """Context manager that applies a list of patch objects."""
+
+    def __init__(self, patches):
+        self._patches = patches
+
+    def __enter__(self):
+        for p in self._patches:
+            p.__enter__()
+        return self
+
+    def __exit__(self, *args):
+        for p in reversed(self._patches):
+            p.__exit__(*args)
+
+
+def _patch_ctx(container, server_config=None):
+    return _MultiPatch(_patch_container(container, server_config))
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -131,7 +187,7 @@ class TestAdminWipeEndpoint:
         machine_repo, request_repo, template_repo = _make_repositories()
         container = _make_container(config_port, machine_repo, request_repo, template_repo)
 
-        with patch("orb.api.routers.admin.get_di_container", return_value=container):
+        with _patch_ctx(container):
             client = TestClient(admin_app, raise_server_exceptions=False)
             r = _wipe_post(client)
 
@@ -147,7 +203,7 @@ class TestAdminWipeEndpoint:
         machine_repo, request_repo, template_repo = _make_repositories()
         container = _make_container(config_port, machine_repo, request_repo, template_repo)
 
-        with patch("orb.api.routers.admin.get_di_container", return_value=container):
+        with _patch_ctx(container):
             client = TestClient(admin_app, raise_server_exceptions=False)
             r = _wipe_post(client)
 
@@ -162,7 +218,7 @@ class TestAdminWipeEndpoint:
             machine_repo, request_repo, template_repo = _make_repositories()
             container = _make_container(config_port, machine_repo, request_repo, template_repo)
 
-            with patch("orb.api.routers.admin.get_di_container", return_value=container):
+            with _patch_ctx(container):
                 client = TestClient(admin_app, raise_server_exceptions=False)
                 r = _wipe_post(client)
 
@@ -177,7 +233,7 @@ class TestAdminWipeEndpoint:
         machine_repo, request_repo, template_repo = _make_repositories()
         container = _make_container(config_port, machine_repo, request_repo, template_repo)
 
-        with patch("orb.api.routers.admin.get_di_container", return_value=container):
+        with _patch_ctx(container):
             client = TestClient(admin_app, raise_server_exceptions=False)
             r = _wipe_post(client, body={"confirm": "wipe"})  # lowercase — must not match
 
@@ -191,7 +247,7 @@ class TestAdminWipeEndpoint:
         machine_repo, request_repo, template_repo = _make_repositories()
         container = _make_container(config_port, machine_repo, request_repo, template_repo)
 
-        with patch("orb.api.routers.admin.get_di_container", return_value=container):
+        with _patch_ctx(container):
             client = TestClient(admin_app, raise_server_exceptions=False)
             r = _wipe_post(client, body={})
 
@@ -205,7 +261,7 @@ class TestAdminWipeEndpoint:
         machine_repo, request_repo, template_repo = _make_repositories()
         container = _make_container(config_port, machine_repo, request_repo, template_repo)
 
-        with patch("orb.api.routers.admin.get_di_container", return_value=container):
+        with _patch_ctx(container):
             client = TestClient(admin_app, raise_server_exceptions=False)
             r = _wipe_post(client, body={"confirm": ""})
 
@@ -229,7 +285,7 @@ class TestAdminWipeEndpoint:
         )
         container = _make_container(config_port, machine_repo, request_repo, template_repo)
 
-        with patch("orb.api.routers.admin.get_di_container", return_value=container):
+        with _patch_ctx(container):
             client = TestClient(admin_app, raise_server_exceptions=False)
             r = _wipe_post(client)
 
@@ -258,7 +314,7 @@ class TestAdminWipeEndpoint:
             del repo.storage_strategy
         container = _make_container(config_port, machine_repo, request_repo, template_repo)
 
-        with patch("orb.api.routers.admin.get_di_container", return_value=container):
+        with _patch_ctx(container):
             client = TestClient(admin_app, raise_server_exceptions=False)
             r = _wipe_post(client)
 
@@ -274,7 +330,7 @@ class TestAdminWipeEndpoint:
         machine_repo, request_repo, template_repo = _make_repositories()
         container = _make_container(config_port, machine_repo, request_repo, template_repo)
 
-        with patch("orb.api.routers.admin.get_di_container", return_value=container):
+        with _patch_ctx(container):
             client = TestClient(admin_app, raise_server_exceptions=False)
             r = _wipe_post(client)
 
@@ -290,7 +346,7 @@ class TestAdminWipeEndpoint:
             machine_repo, request_repo, template_repo = _make_repositories()
             container = _make_container(config_port, machine_repo, request_repo, template_repo)
 
-            with patch("orb.api.routers.admin.get_di_container", return_value=container):
+            with _patch_ctx(container):
                 client = TestClient(admin_app, raise_server_exceptions=False)
                 r = _wipe_post(client)
 
@@ -305,9 +361,26 @@ class TestAdminWipeEndpoint:
         container = MagicMock()
         container.get.side_effect = RuntimeError("DI container exploded")
 
-        with patch("orb.api.routers.admin.get_di_container", return_value=container):
+        with _patch_ctx(container):
             client = TestClient(admin_app, raise_server_exceptions=False)
             r = _wipe_post(client)
 
         # Fails closed — production environment assumed when config unreadable.
         assert r.status_code == 403
+
+    # ── Guard: auth disabled ────────────────────────────────────────────────
+
+    def test_returns_403_when_auth_is_disabled(self, admin_app):
+        """Destructive admin is blocked when authentication is disabled."""
+        config_port = _make_config_port(allow_destructive=True, environment="development")
+        machine_repo, request_repo, template_repo = _make_repositories()
+        container = _make_container(config_port, machine_repo, request_repo, template_repo)
+        server_config = _make_server_config(auth_enabled=False)
+
+        with _patch_ctx(container, server_config=server_config):
+            client = TestClient(admin_app, raise_server_exceptions=False)
+            r = _wipe_post(client)
+
+        assert r.status_code == 403
+        detail = r.json()["detail"]
+        assert detail["code"] == "AUTH_DISABLED"

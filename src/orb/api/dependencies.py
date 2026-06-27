@@ -8,7 +8,7 @@ from typing import Any, Callable, TypeVar
 try:
     from fastapi import Depends, HTTPException, Request, status
 except ImportError:
-    pass  # FastAPI optional — only needed when API is active
+    raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
 
 from orb.application.ports.scheduler_port import SchedulerPort
 from orb.application.services.orchestration.acquire_machines import AcquireMachinesOrchestrator
@@ -296,7 +296,7 @@ def get_current_user(request: Request) -> CurrentUser:
       - ``request.state.auth_result`` → full AuthResult (claims stored in metadata)
 
     When auth is disabled (no ``user_id`` on state), falls back to an
-    anonymous admin so dev mode is not locked out.
+    anonymous viewer — least privilege, never admin.
 
     Returns:
         CurrentUser with username, role, and raw claims.
@@ -304,8 +304,9 @@ def get_current_user(request: Request) -> CurrentUser:
     user_id: str | None = getattr(request.state, "user_id", None)
 
     if not user_id:
-        # Auth disabled / excluded path — grant admin in dev mode.
-        return CurrentUser(username="anonymous", role="admin", claims={})
+        # Auth disabled / excluded path — grant least privilege (viewer).
+        # Never elevate an unauthenticated caller to admin.
+        return CurrentUser(username="anonymous", role="viewer", claims={})
 
     raw_roles: list[str] = getattr(request.state, "user_roles", []) or []
     auth_result = getattr(request.state, "auth_result", None)
@@ -313,11 +314,12 @@ def get_current_user(request: Request) -> CurrentUser:
     if auth_result is not None:
         claims = getattr(auth_result, "metadata", {}) or {}
 
+    # Filter out the sentinel "anonymous" value set by NoAuthStrategy; it does
+    # not represent an authenticated claim so it must not be resolved to admin.
+    meaningful_roles = [r for r in raw_roles if r.lower() != "anonymous"]
+
     # If no meaningful role claims arrive, default to least privilege.
-    role = _resolve_role(raw_roles) if raw_roles and raw_roles != ["anonymous"] else "viewer"
-    if raw_roles == ["anonymous"]:
-        # NoAuthStrategy sets this; treat as admin (auth disabled == dev mode).
-        role = "admin"
+    role = _resolve_role(meaningful_roles) if meaningful_roles else "viewer"
 
     return CurrentUser(username=user_id, role=role, claims=claims)
 
@@ -325,20 +327,95 @@ def get_current_user(request: Request) -> CurrentUser:
 def check_destructive_admin_allowed(request: Request) -> None:
     """FastAPI Depends that gates destructive admin actions.
 
-    Re-exported from ``orb.api.routers.admin._check_destructive_admin_allowed``
-    so callers in other routers can depend on a public, well-located name
-    instead of reaching into a sibling router's private helper.
+    Enforces three independent conditions (all must pass):
+
+    1. Authentication must be enabled — an anonymous caller must never reach a
+       destructive endpoint even if the flag below is set.
+    2. ``allow_destructive_admin`` must be True in the application config.
+    3. The active environment must not be ``production``.
+
+    Reads config at call time so a restart is not required to disable the
+    feature after it has been enabled.
 
     Raises:
-        HTTPException(403): when ``allow_destructive_admin`` is false, or when
-            the active environment is ``production``.
+        HTTPException(403): when auth is disabled, ``allow_destructive_admin``
+            is false, or the active environment is ``production``.
     """
-    from orb.api.routers.admin import _check_destructive_admin_allowed
+    from orb.infrastructure.logging.logger import get_logger as _get_logger
 
-    _check_destructive_admin_allowed(request)
+    _logger = _get_logger(__name__)
+    _PRODUCTION_ENVIRONMENT = "production"
+
+    container = get_di_container()
+
+    # Guard 0: authentication must be enabled — fail closed if auth is off.
+    try:
+        server_config = get_server_config()
+        if not server_config.auth.enabled:
+            _logger.warning(
+                "DESTRUCTIVE_ADMIN blocked: authentication is disabled; "
+                "destructive operations require an authenticated identity"
+            )
+            raise HTTPException(  # type: ignore[misc]
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "AUTH_DISABLED",
+                    "message": "Destructive admin requires authentication enabled.",
+                },
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        # If we cannot determine auth config, fail closed.
+        raise HTTPException(  # type: ignore[misc]
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "CONFIG_UNAVAILABLE",
+                "message": "Could not verify server configuration; destructive action blocked.",
+            },
+        )
+
+    # Guards 1 & 2: config flag + environment.
+    try:
+        from orb.domain.base.ports.configuration_port import ConfigurationPort
+
+        config_port = container.get(ConfigurationPort)
+        allow_destructive: bool = bool(
+            config_port.get_configuration_value("allow_destructive_admin", False)
+        )
+        environment: str = str(
+            config_port.get_configuration_value("environment", "production")
+        ).lower()
+    except Exception:
+        # If we cannot read config, fail closed.
+        allow_destructive = False
+        environment = _PRODUCTION_ENVIRONMENT
+
+    if environment == _PRODUCTION_ENVIRONMENT:
+        _logger.warning("ADMIN_WIPE blocked: environment is '%s'", environment)
+        raise HTTPException(  # type: ignore[misc]
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "PRODUCTION_ENVIRONMENT",
+                "message": "Destructive admin actions are never permitted in production environments.",
+            },
+        )
+
+    if not allow_destructive:
+        _logger.warning("ADMIN_WIPE blocked: allow_destructive_admin=False")
+        raise HTTPException(  # type: ignore[misc]
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "DESTRUCTIVE_ADMIN_DISABLED",
+                "message": (
+                    "Destructive admin actions are disabled. "
+                    "Set allow_destructive_admin=true in the application config to enable."
+                ),
+            },
+        )
 
 
-def require_role(min_role: str) -> Callable[[Request], CurrentUser]:
+def require_role(min_role: str) -> Callable[..., CurrentUser]:
     """
     Factory that returns a FastAPI Depends enforcing a minimum RBAC role.
 
@@ -366,8 +443,7 @@ def require_role(min_role: str) -> Callable[[Request], CurrentUser]:
 
     required_rank = _ROLE_RANK[min_role]
 
-    def _check(request: Request) -> CurrentUser:
-        user = get_current_user(request)
+    def _check(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
         if _ROLE_RANK.get(user.role, 0) < required_rank:
             raise HTTPException(  # type: ignore[misc]
                 status_code=status.HTTP_403_FORBIDDEN,

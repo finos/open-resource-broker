@@ -8,7 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from orb.api.dependencies import get_config_manager
+from orb.api.dependencies import CurrentUser, get_config_manager, get_current_user
 from orb.api.routers.config import router as config_router
 
 # ---------------------------------------------------------------------------
@@ -18,9 +18,17 @@ from orb.api.routers.config import router as config_router
 
 @pytest.fixture()
 def config_app():
-    """Minimal FastAPI app with only the config router mounted."""
+    """Minimal FastAPI app with only the config router mounted.
+
+    Overrides ``get_current_user`` to return an admin identity so the
+    ``require_role("admin")`` guards on all config GET endpoints are satisfied.
+    """
     app = FastAPI()
     app.include_router(config_router)
+    # Supply a synthetic admin identity so role guards never interfere.
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        username="test-admin", role="admin"
+    )
     return app
 
 

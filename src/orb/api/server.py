@@ -88,6 +88,19 @@ def create_fastapi_app(server_config: Any) -> Any:
 
     logger = get_logger(__name__)
 
+    # Warn loudly when auth is disabled but the server is bound to a non-loopback
+    # address — this combination exposes every endpoint without authentication.
+    _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
+    bind_host: str = getattr(server_config, "host", "127.0.0.1") or "127.0.0.1"
+    if not server_config.auth.enabled and bind_host not in _LOOPBACK_HOSTS:
+        logger.warning(
+            "SECURITY WARNING: authentication is DISABLED and the server is bound to '%s' "
+            "(non-loopback). All API endpoints are accessible without credentials. "
+            "Enable authentication (server.auth.enabled=true) before exposing this service "
+            "on a network interface.",
+            bind_host,
+        )
+
     # Add trusted host middleware only when an explicit allowlist is provided.
     # The default is [] (disabled), so omitting this in config is safe.
     if server_config.trusted_hosts:

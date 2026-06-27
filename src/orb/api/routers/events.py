@@ -45,10 +45,12 @@ from datetime import datetime, timezone
 from typing import AsyncGenerator, Optional
 
 try:
-    from fastapi import APIRouter, Query, Request
+    from fastapi import APIRouter, Depends, Query, Request
     from fastapi.responses import StreamingResponse
 except ImportError:
     raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
+
+from orb.api.dependencies import require_role
 
 logger = logging.getLogger(__name__)
 
@@ -214,6 +216,7 @@ async def stream_events(
     request: Request,
     since: Optional[str] = _SINCE_QUERY,
     type: Optional[str] = _TYPE_QUERY,
+    _user=Depends(require_role("viewer")),
 ) -> StreamingResponse:
     """Open an SSE stream for the caller."""
     since_dt = _parse_since(since)

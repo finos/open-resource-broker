@@ -15,6 +15,10 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
     Logs at INFO level. Fields: ts, method, path, status_code, latency_ms,
     request_id, user_id, user_roles, client_ip, correlation_id. Skips safe
     verbs and health/metrics paths so logs aren't drowned.
+
+    Exception: GETs (and other safe verbs) that match ``AUDIT_ALWAYS_PREFIXES``
+    are always audited regardless of verb — these paths access sensitive data
+    such as configuration secrets, admin actions, and user identity.
     """
 
     SAFE_PATHS: frozenset[str] = frozenset(
@@ -22,10 +26,23 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
     )
     SAFE_VERBS: frozenset[str] = frozenset({"GET", "HEAD", "OPTIONS"})
 
+    # Paths where even read-only requests must be audited (may contain secrets
+    # or expose identity/admin information).
+    AUDIT_ALWAYS_PREFIXES: tuple[str, ...] = (
+        "/api/v1/config",
+        "/api/v1/admin",
+        "/api/v1/me",
+    )
+
     async def dispatch(self, request: Request, call_next):
         """Process request; emit an audit log entry for mutating requests."""
-        # Skip safe verbs and known health/metrics paths immediately
-        if request.method in self.SAFE_VERBS or request.url.path in self.SAFE_PATHS:
+        path = request.url.path
+
+        # Always audit requests to sensitive prefixes regardless of HTTP verb.
+        always_audit = any(path.startswith(prefix) for prefix in self.AUDIT_ALWAYS_PREFIXES)
+
+        # Skip safe verbs and known health/metrics paths, UNLESS always_audit.
+        if not always_audit and (request.method in self.SAFE_VERBS or path in self.SAFE_PATHS):
             return await call_next(request)
 
         start = time.monotonic()

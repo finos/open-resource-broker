@@ -3,7 +3,7 @@
 from typing import Any
 
 try:
-    from fastapi import APIRouter, Depends
+    from fastapi import APIRouter, Depends, HTTPException, status
 except ImportError:
     raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
 
@@ -21,8 +21,8 @@ async def get_me(current_user: CurrentUser = Depends(get_current_user)) -> dict[
     """
     Return the identity and capabilities of the authenticated caller.
 
-    When authentication is disabled (dev mode), returns the anonymous admin
-    identity so the UI never needs to special-case an absent token.
+    Returns 401 when the caller is unauthenticated (anonymous identity), so the
+    UI can distinguish "not logged in" from "logged in as a viewer".
 
     Response shape::
 
@@ -40,6 +40,11 @@ async def get_me(current_user: CurrentUser = Depends(get_current_user)) -> dict[
     - **admin** — full access including template CRUD: all operator permissions
       plus ``["create_template", "update_template", "delete_template"]``
     """
+    if current_user.username == "anonymous":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required.",
+        )
     return {
         "username": current_user.username,
         "role": current_user.role,

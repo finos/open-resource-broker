@@ -7,7 +7,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from orb.api.dependencies import (
+    CurrentUser,
     get_create_template_orchestrator,
+    get_current_user,
     get_delete_template_orchestrator,
     get_get_template_orchestrator,
     get_list_templates_orchestrator,
@@ -38,6 +40,11 @@ def templates_app():
 
     app = FastAPI()
     app.include_router(templates_router)
+
+    # Supply an admin identity so all template CRUD role guards are satisfied.
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        username="test-admin", role="admin"
+    )
 
     exception_handler = get_exception_handler()
 

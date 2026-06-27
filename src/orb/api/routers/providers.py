@@ -10,8 +10,11 @@ try:
 except ImportError:
     raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
 
-from orb.api.dependencies import get_config_manager, get_di_container
+from orb.api.dependencies import get_config_manager, get_di_container, require_role
 from orb.infrastructure.error.decorators import handle_rest_exceptions
+from orb.infrastructure.logging.logger import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/providers", tags=["Providers"])
 
@@ -24,6 +27,9 @@ async def _probe_provider_health(provider_name: str) -> tuple[str, dict[str, Any
     Returns ``(status, details)`` where status is one of
     ``healthy`` / ``degraded`` / ``unknown``. Failures are caught — a
     read-only status endpoint must never throw.
+
+    Error details are logged server-side; only a generic status is returned to
+    the client to prevent leaking provider credentials, account IDs, or ARNs.
     """
     try:
         from orb.application.services.provider_registry_service import (
@@ -43,12 +49,18 @@ async def _probe_provider_health(provider_name: str) -> tuple[str, dict[str, Any
         )
         result = await registry.execute_operation(provider_name, operation)
     except Exception as exc:
-        return "unknown", {"probe_error": str(exc)}
+        # Log full error server-side; never forward provider internals to client.
+        logger.warning("Provider health probe failed for '%s': %s", provider_name, exc)
+        return "unknown", {}
 
     if not result.success or not result.data:
-        return "degraded", {
-            "probe_error": result.error_message or "health check failed",
-        }
+        # Log the internal error; return only a generic status to the caller.
+        logger.warning(
+            "Provider health check unhealthy for '%s': %s",
+            provider_name,
+            result.error_message or "health check failed",
+        )
+        return "degraded", {}
 
     data = result.data
     is_healthy = bool(data.get("is_healthy", False))
@@ -72,6 +84,7 @@ async def _probe_provider_health(provider_name: str) -> tuple[str, dict[str, Any
 @handle_rest_exceptions(endpoint="/api/v1/providers/health", method="GET")
 async def get_providers_health(
     config_manager=CONFIG_MANAGER,
+    _user=Depends(require_role("viewer")),
 ) -> JSONResponse:
     """Return per-provider health/status.
 

@@ -15,6 +15,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from orb.api.dependencies import CurrentUser, get_current_user
 from orb.api.routers.admin import router as admin_router
 from orb.api.routers.machines import router as machines_router
 from orb.api.routers.requests import router as requests_router
@@ -24,9 +25,21 @@ from orb.api.routers.requests import router as requests_router
 # ---------------------------------------------------------------------------
 
 
+def _make_server_config(auth_enabled: bool = True):
+    """Return a MagicMock ServerConfig with auth.enabled set."""
+    server_config = MagicMock()
+    server_config.auth.enabled = auth_enabled
+    return server_config
+
+
 @pytest.fixture()
 def cleanup_app():
-    """Minimal FastAPI app with admin + requests + machines routers mounted."""
+    """Minimal FastAPI app with admin + requests + machines routers mounted.
+
+    Overrides ``get_current_user`` so ``require_role`` guards are satisfied by
+    a synthetic admin identity.  Individual tests focus on config/environment
+    guards inside ``check_destructive_admin_allowed``.
+    """
     from fastapi.responses import JSONResponse
 
     from orb.infrastructure.error.exception_handler import get_exception_handler
@@ -35,6 +48,11 @@ def cleanup_app():
     app.include_router(admin_router)
     app.include_router(requests_router)
     app.include_router(machines_router)
+
+    # Supply a synthetic admin identity so role guards never interfere.
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        username="test-admin", role="admin"
+    )
 
     exception_handler = get_exception_handler()
 
@@ -51,6 +69,33 @@ def cleanup_app():
         )
 
     return app
+
+
+class _MultiPatch:
+    """Context manager that applies a list of patch objects in order."""
+
+    def __init__(self, patches):
+        self._patches = patches
+
+    def __enter__(self):
+        for p in self._patches:
+            p.__enter__()
+        return self
+
+    def __exit__(self, *args):
+        for p in reversed(self._patches):
+            p.__exit__(*args)
+
+
+def _patch_containers(*targets, container, server_config=None):
+    """Patch get_di_container in multiple module namespaces plus
+    orb.api.dependencies.get_server_config so Guard 0 passes."""
+    if server_config is None:
+        server_config = _make_server_config(auth_enabled=True)
+    patches = [patch(t, return_value=container) for t in targets]
+    patches.append(patch("orb.api.dependencies.get_di_container", return_value=container))
+    patches.append(patch("orb.api.dependencies.get_server_config", return_value=server_config))
+    return _MultiPatch(patches)
 
 
 def _make_config_port(allow_destructive: bool = True, environment: str = "development"):
@@ -158,7 +203,7 @@ class TestCleanupEndpoint:
         uow = _make_uow()
         container = _make_container(config_port, _make_uow_factory(uow))
 
-        with patch("orb.api.routers.admin.get_di_container", return_value=container):
+        with _patch_containers("orb.api.routers.admin.get_di_container", container=container):
             client = TestClient(cleanup_app, raise_server_exceptions=False)
             r = client.post(
                 "/admin/database/cleanup",
@@ -173,7 +218,7 @@ class TestCleanupEndpoint:
         uow = _make_uow()
         container = _make_container(config_port, _make_uow_factory(uow))
 
-        with patch("orb.api.routers.admin.get_di_container", return_value=container):
+        with _patch_containers("orb.api.routers.admin.get_di_container", container=container):
             client = TestClient(cleanup_app, raise_server_exceptions=False)
             r = client.post(
                 "/admin/database/cleanup",
@@ -188,7 +233,7 @@ class TestCleanupEndpoint:
         uow = _make_uow()
         container = _make_container(config_port, _make_uow_factory(uow))
 
-        with patch("orb.api.routers.admin.get_di_container", return_value=container):
+        with _patch_containers("orb.api.routers.admin.get_di_container", container=container):
             client = TestClient(cleanup_app, raise_server_exceptions=False)
             r = client.post(
                 "/admin/database/cleanup",
@@ -203,7 +248,7 @@ class TestCleanupEndpoint:
         uow = _make_uow()
         container = _make_container(config_port, _make_uow_factory(uow))
 
-        with patch("orb.api.routers.admin.get_di_container", return_value=container):
+        with _patch_containers("orb.api.routers.admin.get_di_container", container=container):
             client = TestClient(cleanup_app, raise_server_exceptions=False)
             r = client.post(
                 "/admin/database/cleanup",
@@ -218,7 +263,7 @@ class TestCleanupEndpoint:
         uow = _make_uow()
         container = _make_container(config_port, _make_uow_factory(uow))
 
-        with patch("orb.api.routers.admin.get_di_container", return_value=container):
+        with _patch_containers("orb.api.routers.admin.get_di_container", container=container):
             client = TestClient(cleanup_app, raise_server_exceptions=False)
             r = client.post(
                 "/admin/database/cleanup",
@@ -232,7 +277,7 @@ class TestCleanupEndpoint:
         uow = _make_uow()
         container = _make_container(config_port, _make_uow_factory(uow))
 
-        with patch("orb.api.routers.admin.get_di_container", return_value=container):
+        with _patch_containers("orb.api.routers.admin.get_di_container", container=container):
             client = TestClient(cleanup_app, raise_server_exceptions=False)
             r = client.post(
                 "/admin/database/cleanup",
@@ -247,7 +292,7 @@ class TestCleanupEndpoint:
         uow = _make_uow()
         container = _make_container(config_port, _make_uow_factory(uow))
 
-        with patch("orb.api.routers.admin.get_di_container", return_value=container):
+        with _patch_containers("orb.api.routers.admin.get_di_container", container=container):
             client = TestClient(cleanup_app, raise_server_exceptions=False)
             r = client.post(
                 "/admin/database/cleanup",
@@ -272,7 +317,7 @@ class TestCleanupEndpoint:
         )
         container = _make_container(config_port, _make_uow_factory(uow))
 
-        with patch("orb.api.routers.admin.get_di_container", return_value=container):
+        with _patch_containers("orb.api.routers.admin.get_di_container", container=container):
             client = TestClient(cleanup_app, raise_server_exceptions=False)
             r = client.post(
                 "/admin/database/cleanup",
@@ -307,7 +352,7 @@ class TestCleanupEndpoint:
         uow = _make_uow(request_map={"req-old": old_request, "req-recent": recent_request})
         container = _make_container(config_port, _make_uow_factory(uow))
 
-        with patch("orb.api.routers.admin.get_di_container", return_value=container):
+        with _patch_containers("orb.api.routers.admin.get_di_container", container=container):
             client = TestClient(cleanup_app, raise_server_exceptions=False)
             r = client.post(
                 "/admin/database/cleanup",
@@ -340,7 +385,7 @@ class TestCleanupEndpoint:
         )
         container = _make_container(config_port, _make_uow_factory(uow))
 
-        with patch("orb.api.routers.admin.get_di_container", return_value=container):
+        with _patch_containers("orb.api.routers.admin.get_di_container", container=container):
             client = TestClient(cleanup_app, raise_server_exceptions=False)
             r = client.post(
                 "/admin/database/cleanup",
@@ -376,9 +421,10 @@ class TestRequestPurgeEndpoint:
         uow = _make_uow(request_map={"req-1": pending_req})
         container = _make_container(config_port, _make_uow_factory(uow))
 
-        with (
-            patch("orb.api.routers.admin.get_di_container", return_value=container),
-            patch("orb.api.routers.requests.get_di_container", return_value=container),
+        with _patch_containers(
+            "orb.api.routers.admin.get_di_container",
+            "orb.api.routers.requests.get_di_container",
+            container=container,
         ):
             client = TestClient(cleanup_app, raise_server_exceptions=False)
             r = client.post("/requests/req-1/purge")
@@ -391,9 +437,10 @@ class TestRequestPurgeEndpoint:
         uow = _make_uow(request_map={})
         container = _make_container(config_port, _make_uow_factory(uow))
 
-        with (
-            patch("orb.api.routers.admin.get_di_container", return_value=container),
-            patch("orb.api.routers.requests.get_di_container", return_value=container),
+        with _patch_containers(
+            "orb.api.routers.admin.get_di_container",
+            "orb.api.routers.requests.get_di_container",
+            container=container,
         ):
             client = TestClient(cleanup_app, raise_server_exceptions=False)
             r = client.post("/requests/req-missing/purge")
@@ -405,9 +452,10 @@ class TestRequestPurgeEndpoint:
         uow = _make_uow()
         container = _make_container(config_port, _make_uow_factory(uow))
 
-        with (
-            patch("orb.api.routers.admin.get_di_container", return_value=container),
-            patch("orb.api.routers.requests.get_di_container", return_value=container),
+        with _patch_containers(
+            "orb.api.routers.admin.get_di_container",
+            "orb.api.routers.requests.get_di_container",
+            container=container,
         ):
             client = TestClient(cleanup_app, raise_server_exceptions=False)
             r = client.post("/requests/req-1/purge")
@@ -427,9 +475,10 @@ class TestRequestPurgeEndpoint:
         )
         container = _make_container(config_port, _make_uow_factory(uow))
 
-        with (
-            patch("orb.api.routers.admin.get_di_container", return_value=container),
-            patch("orb.api.routers.requests.get_di_container", return_value=container),
+        with _patch_containers(
+            "orb.api.routers.admin.get_di_container",
+            "orb.api.routers.requests.get_di_container",
+            container=container,
         ):
             client = TestClient(cleanup_app, raise_server_exceptions=False)
             r = client.post("/requests/req-1/purge")
@@ -449,28 +498,29 @@ class TestRequestPurgeEndpoint:
         uow = _make_uow()
         container = _make_container(config_port, _make_uow_factory(uow))
 
-        with (
-            patch("orb.api.routers.admin.get_di_container", return_value=container),
-            patch("orb.api.routers.requests.get_di_container", return_value=container),
-            patch(
+        with _patch_containers(
+            "orb.api.routers.admin.get_di_container",
+            "orb.api.routers.requests.get_di_container",
+            container=container,
+        ):
+            with patch(
                 "orb.api.routers.requests.get_cancel_request_orchestrator",
                 return_value=MagicMock(),
-            ) as mock_orch_dep,
-        ):
-            mock_orchestrator = MagicMock()
-            mock_orchestrator.execute = MagicMock(
-                return_value=MagicMock(request_id="req-1", status="cancelled", __await__=None)
-            )
+            ) as mock_orch_dep:
+                mock_orchestrator = MagicMock()
+                mock_orchestrator.execute = MagicMock(
+                    return_value=MagicMock(request_id="req-1", status="cancelled", __await__=None)
+                )
 
-            async def fake_execute(inp):
-                return MagicMock(request_id="req-1", status="cancelled")
+                async def fake_execute(inp):
+                    return MagicMock(request_id="req-1", status="cancelled")
 
-            mock_orchestrator.execute = fake_execute
-            mock_orch_dep.return_value = mock_orchestrator
+                mock_orchestrator.execute = fake_execute
+                mock_orch_dep.return_value = mock_orchestrator
 
-            client = TestClient(cleanup_app, raise_server_exceptions=False)
-            # No purge flag → hits cancel path
-            r = client.delete("/requests/req-1")
+                client = TestClient(cleanup_app, raise_server_exceptions=False)
+                # No purge flag → hits cancel path
+                r = client.delete("/requests/req-1")
 
         # Should NOT be 404 from the cleanup service
         assert r.status_code != 404
@@ -492,9 +542,10 @@ class TestMachinePurgeEndpoint:
         uow = _make_uow()
         container = _make_container(config_port, _make_uow_factory(uow))
 
-        with (
-            patch("orb.api.routers.admin.get_di_container", return_value=container),
-            patch("orb.api.routers.machines.get_di_container", return_value=container),
+        with _patch_containers(
+            "orb.api.routers.admin.get_di_container",
+            "orb.api.routers.machines.get_di_container",
+            container=container,
         ):
             client = TestClient(cleanup_app, raise_server_exceptions=False)
             r = client.delete("/machines/m-1")
@@ -507,9 +558,10 @@ class TestMachinePurgeEndpoint:
         uow = _make_uow()
         container = _make_container(config_port, _make_uow_factory(uow))
 
-        with (
-            patch("orb.api.routers.admin.get_di_container", return_value=container),
-            patch("orb.api.routers.machines.get_di_container", return_value=container),
+        with _patch_containers(
+            "orb.api.routers.admin.get_di_container",
+            "orb.api.routers.machines.get_di_container",
+            container=container,
         ):
             client = TestClient(cleanup_app, raise_server_exceptions=False)
             r = client.delete("/machines/m-1?purge=true")
@@ -524,9 +576,10 @@ class TestMachinePurgeEndpoint:
         uow = _make_uow(machine_map={"m-1": running_machine})
         container = _make_container(config_port, _make_uow_factory(uow))
 
-        with (
-            patch("orb.api.routers.admin.get_di_container", return_value=container),
-            patch("orb.api.routers.machines.get_di_container", return_value=container),
+        with _patch_containers(
+            "orb.api.routers.admin.get_di_container",
+            "orb.api.routers.machines.get_di_container",
+            container=container,
         ):
             client = TestClient(cleanup_app, raise_server_exceptions=False)
             r = client.delete("/machines/m-1?purge=true")
@@ -539,9 +592,10 @@ class TestMachinePurgeEndpoint:
         uow = _make_uow(machine_map={})
         container = _make_container(config_port, _make_uow_factory(uow))
 
-        with (
-            patch("orb.api.routers.admin.get_di_container", return_value=container),
-            patch("orb.api.routers.machines.get_di_container", return_value=container),
+        with _patch_containers(
+            "orb.api.routers.admin.get_di_container",
+            "orb.api.routers.machines.get_di_container",
+            container=container,
         ):
             client = TestClient(cleanup_app, raise_server_exceptions=False)
             r = client.delete("/machines/m-missing?purge=true")
@@ -556,9 +610,10 @@ class TestMachinePurgeEndpoint:
         uow = _make_uow(machine_map={"m-1": terminated_machine})
         container = _make_container(config_port, _make_uow_factory(uow))
 
-        with (
-            patch("orb.api.routers.admin.get_di_container", return_value=container),
-            patch("orb.api.routers.machines.get_di_container", return_value=container),
+        with _patch_containers(
+            "orb.api.routers.admin.get_di_container",
+            "orb.api.routers.machines.get_di_container",
+            container=container,
         ):
             client = TestClient(cleanup_app, raise_server_exceptions=False)
             r = client.delete("/machines/m-1?purge=true")
