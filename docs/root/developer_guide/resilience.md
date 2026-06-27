@@ -793,7 +793,7 @@ class ResilienceMonitor:
 grep -A 10 "circuit_breaker" config/config.json
 
 # Monitor failure counts
-tail -f logs/app.log | grep "circuit.*failure"
+tail -f logs/orb.log | grep "circuit.*failure"
 ```
 
 #### Excessive Retries
@@ -802,7 +802,7 @@ tail -f logs/app.log | grep "circuit.*failure"
 grep -A 10 "retry" config/config.json
 
 # Monitor retry attempts
-tail -f logs/app.log | grep "retry.*attempt"
+tail -f logs/orb.log | grep "retry.*attempt"
 ```
 
 #### Timeout Issues
@@ -811,7 +811,7 @@ tail -f logs/app.log | grep "retry.*attempt"
 grep -A 10 "timeout" config/config.json
 
 # Monitor timeout errors
-tail -f logs/app.log | grep "timeout"
+tail -f logs/orb.log | grep "timeout"
 ```
 
 ## Next Steps

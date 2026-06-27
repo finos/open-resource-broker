@@ -191,7 +191,7 @@ ORB_STORAGE_BASE_PATH=/app/data
 ORB_LOGGING_LEVEL=INFO
 ORB_LOGGING_CONSOLE_ENABLED=true
 ORB_LOGGING_FILE_ENABLED=true
-ORB_LOGGING_FILE_PATH=/app/logs/app.log
+ORB_LOGGING_FILE_PATH=/app/logs/orb.log
 
 # Security Configuration
 ORB_SERVER_REQUIRE_HTTPS=true
@@ -326,7 +326,7 @@ livenessProbe:
 {
   "logging": {
     "level": "INFO",
-    "file_path": "/app/logs/app.log",
+    "file_path": "/app/logs/orb.log",
     "console_enabled": true,
     "file_enabled": true,
     "max_file_size": "50MB",

@@ -78,7 +78,7 @@ Comprehensive validation system for all configuration sections.
 {
   "logging": {
     "level": "INFO",
-    "file_path": "logs/app.log",
+    "file_path": "logs/orb.log",
     "console_enabled": true,
     "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     "max_size": 10485760,

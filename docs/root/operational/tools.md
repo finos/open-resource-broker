@@ -278,7 +278,7 @@ data = safe_read('config/config.json', default={})
 backup_path = backup_file('data/database.json')
 
 # File compression
-compressed_path = compress_file('logs/app.log')
+compressed_path = compress_file('logs/orb.log')
 
 # JSON validation
 is_valid, errors = validate_json_file('config/templates.json')
@@ -466,7 +466,7 @@ python -c "
 from src.infrastructure.utilities.performance import analyze_performance_logs
 
 # Analyze recent performance
-analysis = analyze_performance_logs('logs/app.log', hours=24)
+analysis = analyze_performance_logs('logs/orb.log', hours=24)
 
 print('Performance Analysis (Last 24 Hours):')
 print(f'Total operations: {analysis[\"total_operations\"]}')
@@ -515,7 +515,7 @@ from src.infrastructure.utilities.log_management import LogManager
 log_manager = LogManager()
 
 # Rotate logs
-log_manager.rotate_logs('logs/app.log', max_size_mb=100)
+log_manager.rotate_logs('logs/orb.log', max_size_mb=100)
 
 # Cleanup old logs
 cleaned_files = log_manager.cleanup_old_logs('logs/', days=30)
@@ -637,7 +637,7 @@ echo "Operational maintenance completed successfully!"
 #### Migration Failures
 ```bash
 # Check migration logs
-tail -f logs/app.log | grep migration
+tail -f logs/orb.log | grep migration
 ```
 
 #### Performance Issues

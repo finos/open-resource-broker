@@ -125,7 +125,7 @@ The consolidated configuration format provides comprehensive provider management
   },
   "logging": {
     "level": "INFO",
-    "file_path": "logs/app.log",
+    "file_path": "logs/orb.log",
     "console_enabled": true
   },
   "storage": {

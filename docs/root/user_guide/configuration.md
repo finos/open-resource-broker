@@ -313,7 +313,7 @@ This will show:
   },
   "logging": {
     "level": "INFO",
-    "file_path": "logs/app.log",
+    "file_path": "logs/orb.log",
     "console_enabled": true,
     "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     "max_size": 10485760,
@@ -475,7 +475,7 @@ Comprehensive logging system with multiple outputs.
 {
   "logging": {
     "level": "INFO",
-    "file_path": "logs/app.log",
+    "file_path": "logs/orb.log",
     "console_enabled": true,
     "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     "max_size": 10485760,

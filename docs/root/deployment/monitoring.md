@@ -73,7 +73,7 @@ The application exposes metrics for:
     "level": "INFO",
     "format": "json",
     "file_enabled": true,
-    "file_path": "/app/logs/app.log",
+    "file_path": "/app/logs/orb.log",
     "console_enabled": true
   }
 }
@@ -102,7 +102,7 @@ output.elasticsearch:
 ```conf
 <source>
   @type tail
-  path /app/logs/app.log
+  path /app/logs/orb.log
   pos_file /var/log/fluentd/orb.log.pos
   tag orb.api
   format json
