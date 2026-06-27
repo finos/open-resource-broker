@@ -335,10 +335,10 @@ def start(
         # the daemon lifecycle from here on.
         try:
             os.close(lock_fd)
-        except OSError:
+        except OSError as exc:
             # fd may already be closed in an unusual forking environment;
             # safe to ignore — os._exit(0) below discards the process anyway.
-            pass
+            logger.debug("intermediate fork close failed: %s", exc)
         os._exit(0)
     _run_daemon_grandchild(write_fd, pid_path, log_path, wd_path, runtime, lock_fd)
     raise AssertionError("unreachable: _run_daemon_grandchild is NoReturn")

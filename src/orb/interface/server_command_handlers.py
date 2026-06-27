@@ -208,10 +208,10 @@ def _read_loopback_token(pid_file: str) -> str | None:
             token = token_file.read_text(encoding="ascii").strip()
             return token if token else None
     except OSError:
-        # The credential file is optional — absent when the daemon was started
+        # The handshake file is optional — absent when the daemon was started
         # before this feature was introduced or when auth is disabled.
         # Silently return None so the caller falls back to SIGHUP reload.
-        pass
+        return None
     return None
 
 

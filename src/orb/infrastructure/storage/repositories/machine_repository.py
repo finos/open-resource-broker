@@ -12,6 +12,8 @@ from orb.infrastructure.storage.base.repository_mixin import StorageRepositoryMi
 from orb.infrastructure.storage.base.strategy import BaseStorageStrategy
 from orb.infrastructure.storage.components.entity_serializer import BaseEntitySerializer
 
+logger = get_logger(__name__)
+
 
 class MachineSerializer(BaseEntitySerializer):
     """Handles Machine aggregate serialization/deserialization.
@@ -211,11 +213,12 @@ class MachineSerializer(BaseEntitySerializer):
                 value = request_data.get("provider_api")
                 if value:
                     return str(value)
-        except Exception:
+        except Exception as exc:
             # Best-effort backfill heuristic — the source request row may not
             # exist (e.g. purged) or the storage call may transiently fail.
             # Callers treat None as "unknown" and degrade gracefully.
-            pass
+            logger.debug("provider_api backfill heuristic skipped: %s", exc)
+            return None
         return None
 
 
