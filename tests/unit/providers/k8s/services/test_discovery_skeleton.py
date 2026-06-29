@@ -331,17 +331,11 @@ class TestStrategyDiscoveryDelegation:
     def test_discover_infrastructure_interactive_returns_dict(self) -> None:
         strategy = _make_strategy()
         fake_service = MagicMock()
+        # Interactive path now returns only operator-chosen leaves
         fake_service.discover_infrastructure_interactive.return_value = {
             "in_cluster": False,
-            "contexts": [],
-            "current_context": None,
-            "cluster_endpoint": "unknown",
-            "namespaces": [],
-            "default_namespace": "default",
-            "service_accounts": [],
-            "image_pull_secrets": [],
-            "rbac_probe": {"create_pods": False, "watch_pods": False, "delete_pods": False},
-            "provider": "test",
+            "namespace": "default",
+            "context": "prod",
         }
         strategy._discovery_service = fake_service  # type: ignore[attr-defined]
         result = strategy.discover_infrastructure_interactive({"type": "k8s", "name": "test"})
@@ -367,7 +361,11 @@ class TestStrategyDiscoveryDelegation:
         strategy = _make_strategy()
         fake_service = MagicMock()
         fake_service.discover_infrastructure.return_value = {"provider": "mocked"}
-        fake_service.discover_infrastructure_interactive.return_value = {"provider": "mocked-i"}
+        # Interactive path returns only chosen leaves
+        fake_service.discover_infrastructure_interactive.return_value = {
+            "in_cluster": False,
+            "namespace": "default",
+        }
         fake_service.validate_infrastructure.return_value = {
             "provider": "mocked-v",
             "valid": True,
@@ -376,7 +374,10 @@ class TestStrategyDiscoveryDelegation:
         strategy._discovery_service = fake_service  # type: ignore[attr-defined]
 
         assert strategy.discover_infrastructure({}) == {"provider": "mocked"}
-        assert strategy.discover_infrastructure_interactive({}) == {"provider": "mocked-i"}
+        assert strategy.discover_infrastructure_interactive({}) == {
+            "in_cluster": False,
+            "namespace": "default",
+        }
         assert strategy.validate_infrastructure({}) == {
             "provider": "mocked-v",
             "valid": True,

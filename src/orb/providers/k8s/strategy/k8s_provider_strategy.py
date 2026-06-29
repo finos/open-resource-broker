@@ -984,19 +984,21 @@ class K8sProviderStrategy(ProviderStrategy):
     def get_cli_extra_config_keys(self) -> set[str]:
         """Return k8s keys that belong in provider config, not template_defaults.
 
-        ``init_command_handler`` calls this after ``discover_infrastructure``
+        ``init_command_handler`` calls this after ``discover_infrastructure_interactive``
         to route each discovered field to the correct section.  Keys returned
         here land in ``provider_instance.config``; all other keys land in
         ``provider_instance.template_defaults``.
 
-        Routing table:
-        - ``context``                  → ``K8sProviderConfig.context``
-        - ``in_cluster``               → ``K8sProviderConfig.in_cluster``
-        - ``namespace``                → ``K8sProviderConfig.namespace``
-        - ``default_image_pull_secret``→ ``K8sProviderConfig.default_image_pull_secret``
-        - ``service_account``          → ``K8sTemplate.service_account`` (template default)
+        Routing table (connection-level → config):
+        - ``context``    → ``K8sProviderConfig.context``   (out-of-cluster only)
+        - ``in_cluster`` → ``K8sProviderConfig.in_cluster``
+        - ``namespace``  → ``K8sProviderConfig.namespace``
+
+        Template-default-level keys NOT in this set (→ template_defaults):
+        - ``service_account``    → ``K8sTemplate.service_account``
+        - ``image_pull_secret``  → ``K8sTemplate.image_pull_secret``
         """
-        return {"context", "in_cluster", "namespace", "default_image_pull_secret"}
+        return {"context", "in_cluster", "namespace"}
 
     def get_cli_infrastructure_defaults(self, args: Any) -> dict[str, Any]:
         return {}

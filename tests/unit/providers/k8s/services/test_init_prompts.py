@@ -514,24 +514,27 @@ class TestDisplayRbacProbe:
 
 
 class TestDiscoverInfrastructureInteractive:
-    _REQUIRED_KEYS = {
-        "in_cluster",
+    # Lean return: only operator-chosen leaves are present
+    _REQUIRED_KEYS = {"in_cluster", "namespace"}
+    _BANNED_SCAFFOLD_KEYS = {
         "contexts",
         "current_context",
         "cluster_endpoint",
         "namespaces",
-        "default_namespace",
         "service_accounts",
         "image_pull_secrets",
         "rbac_probe",
         "provider",
+        "default_namespace",
+        "chosen_service_account",
+        "chosen_image_pull_secret",
     }
 
     def _inputs(self, *values: str):
         """Return side_effect list for input() from positional string args."""
         return list(values)
 
-    def test_happy_path_out_of_cluster_returns_all_keys(self) -> None:
+    def test_happy_path_out_of_cluster_returns_lean_keys(self) -> None:
         con = FakeConsoleAdapter()
         ctxs = [_ctx("prod", is_current=True)]
         nss = [_ns("default")]
@@ -545,12 +548,14 @@ class TestDiscoverInfrastructureInteractive:
             service_accounts=sas,
             pull_secrets=["ecr-pull"],
         )
-        # Inputs: confirm=<enter>, context=<enter>, namespace=<enter>, sa=<enter>, secret=<enter>, rbac=<skip>
+        # Inputs: confirm=<enter>, context=<enter>, namespace=<enter>, sa=<enter>, secret=<enter>
         with patch("builtins.input", side_effect=self._inputs("", "", "", "", "")):
             result = svc.discover_infrastructure_interactive({"name": "test"})
 
         assert self._REQUIRED_KEYS.issubset(result.keys())
-        assert result["provider"] == "test"
+        # No scaffold keys must leak into the return
+        leaked = set(result.keys()) & self._BANNED_SCAFFOLD_KEYS
+        assert not leaked, f"Scaffold keys leaked: {leaked}"
 
     def test_in_cluster_skips_context_prompt(self) -> None:
         con = FakeConsoleAdapter()
@@ -566,6 +571,7 @@ class TestDiscoverInfrastructureInteractive:
             result = svc.discover_infrastructure_interactive({})
 
         assert result["in_cluster"] is True
+        assert "context" not in result
         # discover_contexts must NOT have been called.
         svc.discover_contexts.assert_not_called()  # type: ignore[attr-defined]
 
@@ -585,7 +591,9 @@ class TestDiscoverInfrastructureInteractive:
             result = svc.discover_infrastructure_interactive({})
 
         svc.discover_contexts.assert_called_once()  # type: ignore[attr-defined]
-        assert result["contexts"] == ["prod", "dev"]
+        # context is a single chosen string — not the full list
+        assert result.get("context") == "prod"
+        assert "contexts" not in result
 
     def test_sa_403_auto_skips_and_shows_notice(self) -> None:
         con = FakeConsoleAdapter()
@@ -601,7 +609,8 @@ class TestDiscoverInfrastructureInteractive:
         with patch("builtins.input", side_effect=self._inputs("", "", "")):
             result = svc.discover_infrastructure_interactive({})
 
-        assert result["service_accounts"] == []
+        # No service_account key when nothing was picked
+        assert "service_account" not in result
         assert con.has_any("service_account") or con.has_any("ServiceAccounts")
 
     def test_rbac_all_granted_no_abort_prompt(self) -> None:
@@ -621,7 +630,9 @@ class TestDiscoverInfrastructureInteractive:
         with patch("builtins.input", side_effect=self._inputs("", "", "", "")):
             result = svc.discover_infrastructure_interactive({})
 
-        assert result["rbac_probe"]["create_pods"] is True
+        # rbac_probe must not be in the lean return
+        assert "rbac_probe" not in result
+        assert "in_cluster" in result
 
     def test_rbac_failure_abort_raises(self) -> None:
         con = FakeConsoleAdapter()
@@ -658,9 +669,11 @@ class TestDiscoverInfrastructureInteractive:
         with patch("builtins.input", side_effect=self._inputs("", "", "", "", "y")):
             result = svc.discover_infrastructure_interactive({})
 
-        assert result["rbac_probe"]["create_pods"] is False
+        # rbac_probe is diagnostic only — not in the lean return
+        assert "rbac_probe" not in result
+        assert "in_cluster" in result
 
-    def test_pull_secret_selected_stored_in_chosen_field(self) -> None:
+    def test_pull_secret_selected_stored_in_image_pull_secret_field(self) -> None:
         con = FakeConsoleAdapter()
         svc = _make_fully_mocked_service(
             console=con,
@@ -677,9 +690,11 @@ class TestDiscoverInfrastructureInteractive:
         with patch("builtins.input", side_effect=self._inputs("", "", "", "", "2")):
             result = svc.discover_infrastructure_interactive({})
 
-        assert result.get("chosen_image_pull_secret") == "ghcr-token"
+        assert result.get("image_pull_secret") == "ghcr-token"
+        # Old key must be gone
+        assert "chosen_image_pull_secret" not in result
 
-    def test_chosen_sa_stored_in_result(self) -> None:
+    def test_chosen_sa_stored_in_service_account_field(self) -> None:
         con = FakeConsoleAdapter()
         svc = _make_fully_mocked_service(
             console=con,
@@ -695,7 +710,9 @@ class TestDiscoverInfrastructureInteractive:
         with patch("builtins.input", side_effect=self._inputs("", "", "", "2")):
             result = svc.discover_infrastructure_interactive({})
 
-        assert result.get("chosen_service_account") == "orb-runner"
+        assert result.get("service_account") == "orb-runner"
+        # Old key must be gone
+        assert "chosen_service_account" not in result
 
     def test_namespace_auto_selected_on_single_item_sa_bound(self) -> None:
         """When discover_namespaces returns only the SA-bound ns, no prompt shown."""
@@ -720,9 +737,12 @@ class TestDiscoverInfrastructureInteractive:
             with patch("builtins.input", side_effect=self._inputs("y")):
                 result = svc.discover_infrastructure_interactive({"name": "mycluster"})
 
-        assert result["default_namespace"] == "orb-system"
+        assert result["namespace"] == "orb-system"
+        # Old key must be gone
+        assert "default_namespace" not in result
 
-    def test_rbac_probe_exception_produces_all_false(self) -> None:
+    def test_rbac_probe_exception_returns_lean_result(self) -> None:
+        """RBAC probe failure: operator continues; probe dict never appears in return."""
         con = FakeConsoleAdapter()
         svc = _make_fully_mocked_service(
             console=con,
@@ -740,13 +760,11 @@ class TestDiscoverInfrastructureInteractive:
         with patch("builtins.input", side_effect=self._inputs("", "", "", "", "y")):
             result = svc.discover_infrastructure_interactive({})
 
-        assert result["rbac_probe"] == {
-            "create_pods": False,
-            "watch_pods": False,
-            "delete_pods": False,
-        }
+        assert "rbac_probe" not in result
+        assert "in_cluster" in result
 
-    def test_full_flow_provider_name_in_result(self) -> None:
+    def test_full_flow_no_provider_key_in_lean_return(self) -> None:
+        """provider_name is passed in but never written to the lean return dict."""
         con = FakeConsoleAdapter()
         ctxs = [_ctx("prod", is_current=True)]
         svc = _make_fully_mocked_service(
@@ -760,4 +778,5 @@ class TestDiscoverInfrastructureInteractive:
         with patch("builtins.input", side_effect=self._inputs("", "", "", "")):
             result = svc.discover_infrastructure_interactive({"name": "my-cluster"})
 
-        assert result["provider"] == "my-cluster"
+        # "provider" is a scaffold key — must not appear in the lean return
+        assert "provider" not in result

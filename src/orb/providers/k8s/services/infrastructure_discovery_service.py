@@ -620,21 +620,52 @@ class K8sInfrastructureDiscoveryService:
 
         1. Detect whether ORB is running in-cluster; ask the operator to confirm.
         2. When out-of-cluster: discover kubeconfig contexts; prompt for selection.
-        3. Discover the cluster endpoint (display only).
+        3. Discover the cluster endpoint (display only — not persisted).
         4. Discover namespaces; prompt for selection (or auto-select on 403).
         5. Discover ServiceAccounts in chosen namespace; prompt for template default.
         6. Discover image pull secrets in chosen namespace; prompt for default.
-        7. Probe RBAC; display results and offer to continue on failure.
+        7. Probe RBAC; display results to the operator and offer to continue on failure.
+
+        Return shape — only operator-chosen leaves, matching the AWS provider
+        pattern where lists and diagnostic scaffolds are shown during prompts
+        but never written into config.json:
+
+        Connection-level keys (routed to ``providers[i].config`` by the
+        classifier)::
+
+            {
+                "in_cluster": bool,              # always present
+                "namespace": str,                # always present; chosen namespace
+                "context": str,                  # only when out-of-cluster
+            }
+
+        Template-default-level keys (routed to ``providers[i].template_defaults``
+        by the classifier)::
+
+            {
+                "service_account": str,          # only when operator picked one
+                "image_pull_secret": str,        # only when operator picked one
+            }
+
+        Discovery scaffold (contexts list, cluster endpoint, namespace list,
+        service-account list, pull-secret list, RBAC probe dict) are displayed
+        to the operator during the wizard but are not included in the returned
+        dict.
 
         Args:
-            provider_config: Raw provider config dict (``"name"`` key used for
-                the ``"provider"`` field in the return dict).
+            provider_config: Raw provider config dict (passed through from the
+                strategy; only ``"name"`` is currently used, for logging).
 
         Returns:
-            Discovery dict with the same shape as :meth:`discover_infrastructure`:
-            ``in_cluster``, ``contexts``, ``current_context``, ``cluster_endpoint``,
-            ``namespaces``, ``default_namespace``, ``service_accounts``,
-            ``image_pull_secrets``, ``rbac_probe``, ``provider``.
+            Dict containing only the operator's chosen values as described
+            above.  Every key is conditional: the dict may contain as few as
+            two keys (``in_cluster`` + ``namespace``) for a minimal in-cluster
+            setup.
+
+        Raises:
+            K8sDiscoveryError: When the operator aborts due to missing RBAC
+                permissions, or when no kubeconfig contexts are available in
+                out-of-cluster mode.
         """
         from orb.providers.k8s.services.init_prompts import (  # noqa: PLC0415
             confirm_in_cluster,
@@ -644,8 +675,6 @@ class K8sInfrastructureDiscoveryService:
             pick_namespace,
             pick_service_account,
         )
-
-        provider_name: str = provider_config.get("name", "")
 
         # ------------------------------------------------------------------
         # Step 1 — In-cluster detection + confirm
@@ -660,8 +689,6 @@ class K8sInfrastructureDiscoveryService:
         if self._config.kubeconfig_path:
             kubeconfig_path = Path(self._config.kubeconfig_path)
 
-        all_contexts: list[KubeContextInfo] = []
-        current_context: Optional[KubeContextInfo] = None
         chosen_context_name: Optional[str] = None
 
         if not in_cluster:
@@ -673,17 +700,17 @@ class K8sInfrastructureDiscoveryService:
                 else (chosen_context.name if chosen_context else None)
             )
 
-        context_names: list[str] = [c.name for c in all_contexts]
-        current_context_name: Optional[str] = (
-            current_context.name if current_context is not None else None
-        )
-
         # ------------------------------------------------------------------
-        # Step 3 — Cluster endpoint (display only)
+        # Step 3 — Cluster endpoint (display only — never written to config)
         # ------------------------------------------------------------------
-        effective_context = chosen_context_name or self._config.context or current_context_name
-        cluster_endpoint = self.discover_cluster_endpoint(context=effective_context)
-        self._console.info(f"  Cluster endpoint: {cluster_endpoint}")
+        if not in_cluster:
+            effective_context = (
+                chosen_context_name
+                or self._config.context
+                or (current_context.name if current_context is not None else None)  # type: ignore[possibly-undefined]
+            )
+            cluster_endpoint = self.discover_cluster_endpoint(context=effective_context)
+            self._console.info(f"  Cluster endpoint: {cluster_endpoint}")
 
         # ------------------------------------------------------------------
         # Step 4 — Namespace selection
@@ -724,8 +751,6 @@ class K8sInfrastructureDiscoveryService:
 
             chosen_namespace = pick_namespace(self._console, namespace_infos, fallback)
 
-        namespace_names: list[str] = [n.name for n in namespace_infos]
-
         # ------------------------------------------------------------------
         # Step 5 — ServiceAccount selection
         # ------------------------------------------------------------------
@@ -735,11 +760,10 @@ class K8sInfrastructureDiscoveryService:
                 "  Note: could not list ServiceAccounts — you can set"
                 " `service_account` in your template later."
             )
-            chosen_sa = ""
+            chosen_sa: Optional[str] = None
         else:
-            chosen_sa = pick_service_account(self._console, sa_infos, default="default")
-
-        sa_names: list[str] = [sa.name for sa in sa_infos]
+            raw_sa = pick_service_account(self._console, sa_infos, default="default")
+            chosen_sa = raw_sa or None
 
         # ------------------------------------------------------------------
         # Step 6 — Image pull secret selection
@@ -750,7 +774,7 @@ class K8sInfrastructureDiscoveryService:
         chosen_pull_secret: Optional[str] = pick_image_pull_secret(self._console, pull_secret_names)
 
         # ------------------------------------------------------------------
-        # Step 7 — RBAC probe + confirm on failure
+        # Step 7 — RBAC probe + display verdict; confirm on failure
         # ------------------------------------------------------------------
         try:
             rbac = self.probe_rbac(namespace=chosen_namespace)
@@ -763,6 +787,8 @@ class K8sInfrastructureDiscoveryService:
                 can_delete_pods=False,
             )
 
+        # Display the RBAC verdict to the operator.  The probe result itself is
+        # never written to config — it is diagnostic information only.
         should_continue = display_rbac_probe(
             self._console,
             rbac,
@@ -772,26 +798,22 @@ class K8sInfrastructureDiscoveryService:
         if not should_continue:
             raise K8sDiscoveryError("Operator aborted orb init due to missing RBAC permissions.")
 
-        rbac_probe: dict[str, bool] = {
-            "create_pods": rbac.can_create_pods,
-            "watch_pods": rbac.can_watch_pods,
-            "delete_pods": rbac.can_delete_pods,
-        }
-
-        return {
+        # ------------------------------------------------------------------
+        # Build the return dict — only operator-chosen leaves, no scaffold
+        # ------------------------------------------------------------------
+        result: dict[str, Any] = {
             "in_cluster": in_cluster,
-            "contexts": context_names,
-            "current_context": current_context_name,
-            "cluster_endpoint": cluster_endpoint,
-            "namespaces": namespace_names,
-            "default_namespace": chosen_namespace,
-            "service_accounts": sa_names,
-            "chosen_service_account": chosen_sa or None,
-            "image_pull_secrets": pull_secret_names,
-            "chosen_image_pull_secret": chosen_pull_secret,
-            "rbac_probe": rbac_probe,
-            "provider": provider_name,
+            "namespace": chosen_namespace,
         }
+        # context is only meaningful (and only discovered) when out-of-cluster
+        if not in_cluster and chosen_context_name is not None:
+            result["context"] = chosen_context_name
+        # template-default-level keys — only present when the operator picked a value
+        if chosen_sa is not None:
+            result["service_account"] = chosen_sa
+        if chosen_pull_secret is not None:
+            result["image_pull_secret"] = chosen_pull_secret
+        return result
 
     def validate_infrastructure(self, provider_config: dict[str, Any]) -> dict[str, Any]:
         """Validate that a configured K8s provider can reach its cluster.
