@@ -324,6 +324,64 @@ def register_k8s_provider(
         raise
 
 
+def register_k8s_provider_instance(provider_instance, logger=None) -> bool:
+    """Register a configured Kubernetes provider instance with the registry.
+
+    Called by
+    :meth:`orb.providers.registry.provider_registry.ProviderRegistryImpl.ensure_provider_instance_registered_from_config`
+    when the application starts up and finds a configured ``k8s`` provider
+    entry under ``config.json``.  Mirrors
+    :func:`orb.providers.aws.registration.register_aws_provider_instance`.
+    """
+    try:
+        if logger:
+            logger.debug(
+                "Registering Kubernetes provider instance: %s", provider_instance.name
+            )
+
+        from orb.providers.registry import get_provider_registry
+
+        registry = get_provider_registry()
+
+        if not registry.is_provider_registered("k8s"):
+            from orb.providers.k8s.strategy.k8s_provider_strategy import K8sProviderStrategy
+
+            registry.register_provider(
+                provider_type="k8s",
+                strategy_factory=create_k8s_strategy,
+                config_factory=create_k8s_config,
+                resolver_factory=create_k8s_resolver,
+                validator_factory=create_k8s_validator,
+                strategy_class=K8sProviderStrategy,
+                default_api="Pod",
+            )
+
+        registry.register_provider_instance(
+            provider_type="k8s",
+            instance_name=provider_instance.name,
+            strategy_factory=create_k8s_strategy,
+            config_factory=create_k8s_config,
+            resolver_factory=create_k8s_resolver,
+            validator_factory=create_k8s_validator,
+        )
+
+        if logger:
+            logger.debug(
+                "Successfully registered Kubernetes provider instance: %s",
+                provider_instance.name,
+            )
+        return True
+
+    except Exception as exc:
+        if logger:
+            logger.error(
+                "Failed to register Kubernetes provider instance '%s': %s",
+                provider_instance.name,
+                exc,
+            )
+        return False
+
+
 def initialize_k8s_provider(
     template_factory: "Optional[TemplateFactory]" = None,
     logger: "Optional[LoggingPort]" = None,

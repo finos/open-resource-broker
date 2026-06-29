@@ -240,15 +240,6 @@ class K8sProviderStrategy(ProviderStrategy):
                 self._k8s_config.namespace,
                 self._k8s_config.in_cluster,
             )
-            # Startup reconciliation runs synchronously BEFORE the watch
-            # task is spawned so the cache is warm by the time the first
-            # ``check_hosts_status`` call lands.  Failures inside the
-            # reconciler are logged and tolerated — the watcher will
-            # converge on the correct state in steady-state.
-            self._run_startup_reconciler()
-            self._maybe_start_watch_manager()
-            self._maybe_start_orphan_gc()
-            self._maybe_start_node_watcher()
             self._initialized = True
             return True
         except Exception as exc:
@@ -256,6 +247,26 @@ class K8sProviderStrategy(ProviderStrategy):
                 "Failed to initialize Kubernetes provider strategy: %s", exc, exc_info=True
             )
             return False
+
+    async def start_daemon_services(self) -> None:
+        """Start the watch fleet, startup reconciler, orphan GC and node watcher.
+
+        Called by the REST/daemon entrypoint after ``Application.initialize``
+        completes and the asyncio event loop is running.  Not called by the
+        CLI: CLI commands are one-shot and have no use for a warmed cache or
+        background watchers, and the synchronous ``list_pods`` issued by the
+        reconciler would otherwise block every command on apiserver latency.
+
+        Each sub-step is idempotent and tolerates being skipped — the watch
+        manager and orphan GC short-circuit when their respective config
+        flags are False, and the startup reconciler safely no-ops if invoked
+        again.  Failures inside any sub-step are logged and tolerated; the
+        provider continues to serve reads via the cache-less fallback path.
+        """
+        self._run_startup_reconciler()
+        self._maybe_start_watch_manager()
+        self._maybe_start_orphan_gc()
+        self._maybe_start_node_watcher()
 
     def cleanup(self) -> None:
         try:
@@ -419,7 +430,9 @@ class K8sProviderStrategy(ProviderStrategy):
 
         The reconciler is constructed lazily here so tests that pass
         ``startup_reconciler=`` directly into the strategy can skip the
-        default construction path entirely.
+        default construction path entirely.  Only called from
+        :meth:`start_daemon_services` — the CLI path never reaches this
+        method.
         """
         reconciler = self._startup_reconciler
         if reconciler is None:
