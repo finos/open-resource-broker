@@ -174,6 +174,9 @@ class DeprovisioningOrchestrator:
                     "resource_id": resource_id,
                     "resource_mapping": {iid: (resource_id, 1) for iid in instance_ids},
                     "request_id": origin_request_id,
+                    # Typed Request aggregate for providers that implement
+                    # the typed return interface (k8s).  AWS ignores it.
+                    "request": request,
                 },
                 context={
                     "correlation_id": str(request.request_id),
