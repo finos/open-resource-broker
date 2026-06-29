@@ -336,6 +336,11 @@ class ProvisioningOrchestrationService:
                     "count": count,
                     "request_id": str(request.request_id),
                     "request_metadata": dict(request.metadata),
+                    # Typed objects passed through verbatim for providers that
+                    # implement the typed provisioning interface (k8s).  AWS
+                    # ignores these and consumes the flat scalars above.
+                    "request": request,
+                    "template": template,
                 },
                 context={
                     "correlation_id": str(request.request_id),

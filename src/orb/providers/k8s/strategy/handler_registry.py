@@ -298,6 +298,18 @@ class K8sHandlerRegistry:
                 return upcast_to_k8s_template(template_payload)
             if isinstance(template_payload, dict):
                 return K8sTemplate.model_validate(template_payload)
+            # ``TemplateDTO`` from the application layer carries the generic
+            # fields on the top level and the typed K8s-specific fields under
+            # ``provider_config``.  Flatten both into the K8sTemplate.  Done
+            # generically (no isinstance against TemplateDTO so the domain
+            # layer stays free of infrastructure imports).
+            if template_payload is not None and hasattr(template_payload, "model_dump"):
+                flat = template_payload.model_dump()
+                provider_config = flat.pop("provider_config", None) or {}
+                if isinstance(provider_config, dict):
+                    for key, value in provider_config.items():
+                        flat.setdefault(key, value)
+                return K8sTemplate.model_validate(flat)
 
         # Fall back to a minimal K8sTemplate built from the request fields.
         return K8sTemplate(

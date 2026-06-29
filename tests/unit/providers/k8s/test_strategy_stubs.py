@@ -151,13 +151,28 @@ async def test_execute_operation_health_check_dispatches() -> None:
 
 
 @pytest.mark.asyncio
-async def test_execute_operation_unsupported_returns_error() -> None:
-    """Resource-lifecycle operations are not supported via the untyped dispatch path."""
+async def test_execute_operation_create_instances_without_request_errors() -> None:
+    """CREATE_INSTANCES requires the typed Request object in parameters."""
     from orb.providers.base.strategy import ProviderOperation
 
     strategy = _make_strategy()
     op = ProviderOperation(
         operation_type=ProviderOperationType.CREATE_INSTANCES,
+        parameters={},
+    )
+    result = await strategy.execute_operation(op)
+    assert result.success is False
+    assert result.error_code == "MISSING_REQUEST"
+
+
+@pytest.mark.asyncio
+async def test_execute_operation_truly_unsupported_returns_error() -> None:
+    """Operation types not supported by the k8s provider return UNSUPPORTED_OPERATION."""
+    from orb.providers.base.strategy import ProviderOperation
+
+    strategy = _make_strategy()
+    op = ProviderOperation(
+        operation_type=ProviderOperationType.VALIDATE_TEMPLATE,
         parameters={},
     )
     result = await strategy.execute_operation(op)

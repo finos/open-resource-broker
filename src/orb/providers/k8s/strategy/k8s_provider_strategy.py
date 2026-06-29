@@ -542,10 +542,18 @@ class K8sProviderStrategy(ProviderStrategy):
     async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
         """Execute a provider operation.
 
-        Only ``HEALTH_CHECK`` is serviced through this entry point.
-        Resource-lifecycle operations are dispatched via the typed
-        ``acquire`` / ``return_machines`` / ``get_status`` entry points
-        and return an ``UNSUPPORTED_OPERATION`` error here.
+        Dispatches the shared :class:`ProviderOperation` envelope to the
+        kubernetes provider's typed entry points.  ``CREATE_INSTANCES``,
+        ``TERMINATE_INSTANCES`` and ``GET_INSTANCE_STATUS`` map to
+        :meth:`acquire`, :meth:`return_machines` and :meth:`get_status`
+        respectively; ``HEALTH_CHECK`` is serviced inline.  Other
+        operation types return ``UNSUPPORTED_OPERATION``.
+
+        The shared call site (``ProvisioningOrchestrationService``) puts
+        the live :class:`Request` and :class:`Template` aggregates into
+        ``operation.parameters``; AWS ignores them.  When they are
+        absent (older callers) the strategy raises an explicit error
+        rather than fabricate a request silently.
         """
         self._logger.debug("Kubernetes strategy executing operation: %s", operation.operation_type)
 
@@ -566,11 +574,16 @@ class K8sProviderStrategy(ProviderStrategy):
                     },
                     {"operation": "health_check"},
                 )
+            elif operation.operation_type == ProviderOperationType.CREATE_INSTANCES:
+                result = await self._handle_create_instances(operation)
+            elif operation.operation_type == ProviderOperationType.TERMINATE_INSTANCES:
+                result = await self._handle_terminate_instances(operation)
+            elif operation.operation_type == ProviderOperationType.GET_INSTANCE_STATUS:
+                result = await self._handle_get_instance_status(operation)
             else:
                 result = ProviderResult.error_result(
-                    f"Operation {operation.operation_type} is not supported on the "
-                    "kubernetes provider's untyped dispatch path; use the typed "
-                    "acquire/return_machines/get_status entry points instead.",
+                    f"Operation {operation.operation_type} is not supported by the "
+                    "kubernetes provider.",
                     "UNSUPPORTED_OPERATION",
                 )
 
@@ -602,6 +615,70 @@ class K8sProviderStrategy(ProviderStrategy):
                     }
                 }
             )
+
+    # ------------------------------------------------------------------
+    # Shared-envelope -> typed-interface bridges
+    # ------------------------------------------------------------------
+
+    async def _handle_create_instances(self, operation: ProviderOperation) -> ProviderResult:
+        """Dispatch a ``CREATE_INSTANCES`` operation to the typed :meth:`acquire`.
+
+        Threads the live :class:`Template` from ``operation.parameters`` into
+        ``request.metadata['template']`` where ``K8sHandlerRegistry.build_
+        template_for_request`` looks for it.  The provisioning service does
+        not put the template on the request itself today; doing so here keeps
+        the change local to the kubernetes bridge instead of mutating shared
+        request-creation code.
+        """
+        request = operation.parameters.get("request")
+        if request is None:
+            return ProviderResult.error_result(
+                "CREATE_INSTANCES requires the typed 'request' object in "
+                "operation.parameters for the kubernetes provider.",
+                "MISSING_REQUEST",
+            )
+        template = operation.parameters.get("template")
+        if template is not None:
+            existing_meta = dict(getattr(request, "metadata", None) or {})
+            if "template" not in existing_meta:
+                existing_meta["template"] = template
+                request = request.update_metadata(existing_meta)
+        outcome = await self.acquire(request)
+        return _outcome_to_provider_result(outcome, fallback_operation="create_instances")
+
+    async def _handle_terminate_instances(self, operation: ProviderOperation) -> ProviderResult:
+        """Dispatch a ``TERMINATE_INSTANCES`` operation to :meth:`return_machines`."""
+        request = operation.parameters.get("request")
+        if request is None:
+            return ProviderResult.error_result(
+                "TERMINATE_INSTANCES requires the typed 'request' object in "
+                "operation.parameters for the kubernetes provider.",
+                "MISSING_REQUEST",
+            )
+        machine_ids = list(
+            operation.parameters.get("instance_ids")
+            or operation.parameters.get("machine_ids")
+            or []
+        )
+        outcome = await self.return_machines(machine_ids, request)
+        return _outcome_to_provider_result(outcome, fallback_operation="terminate_instances")
+
+    async def _handle_get_instance_status(self, operation: ProviderOperation) -> ProviderResult:
+        """Dispatch a ``GET_INSTANCE_STATUS`` operation to :meth:`get_status`."""
+        request = operation.parameters.get("request")
+        if request is None:
+            return ProviderResult.error_result(
+                "GET_INSTANCE_STATUS requires the typed 'request' object in "
+                "operation.parameters for the kubernetes provider.",
+                "MISSING_REQUEST",
+            )
+        resource_ids = list(
+            operation.parameters.get("resource_ids")
+            or operation.parameters.get("instance_ids")
+            or []
+        )
+        outcome = await self.get_status(resource_ids, request)
+        return _outcome_to_provider_result(outcome, fallback_operation="get_instance_status")
 
     # ------------------------------------------------------------------
     # Capabilities & health
@@ -1037,3 +1114,105 @@ class K8sProviderStrategy(ProviderStrategy):
             f"namespace={self._k8s_config.namespace}, "
             f"initialized={self._initialized})"
         )
+
+
+def _outcome_to_provider_result(
+    outcome: OperationOutcome, *, fallback_operation: str
+) -> ProviderResult:
+    """Translate an :class:`OperationOutcome` into a :class:`ProviderResult`.
+
+    Used by ``execute_operation`` to bridge the kubernetes provider's typed
+    provisioning interface back to the shared ``ProviderOperation`` envelope
+    that the provisioning orchestration service consumes.
+    """
+    from orb.domain.base.operation_outcome import (  # noqa: PLC0415
+        Accepted,
+        Completed,
+        Failed,
+        RequiresFollowUp,
+    )
+
+    if isinstance(outcome, Failed):
+        return ProviderResult.error_result(outcome.error, "OPERATION_FAILED").model_copy(
+            update={
+                "metadata": {
+                    **(outcome.metadata or {}),
+                    "operation": fallback_operation,
+                    "provider": "k8s",
+                    "recoverable": outcome.recoverable,
+                }
+            }
+        )
+
+    if isinstance(outcome, Accepted):
+        meta_dict = dict(outcome.metadata or {})
+        machine_ids = list(meta_dict.get("machine_ids") or [])
+        resource_ids = list(outcome.pending_resource_ids)
+        # ``RequestStatusManagementService._create_machine_aggregate`` expects
+        # each ``instances`` entry to be a dict with ``instance_id`` /
+        # ``resource_id`` / ``launch_time`` keys.  Pod names are the canonical
+        # k8s machine IDs; expose them in the shape the shared service expects.
+        instance_dicts = [
+            {
+                "instance_id": machine_id,
+                "resource_id": machine_id,
+                "instance_type": "k8s-pod",
+                "image_id": "unknown",
+                "launch_time": None,
+            }
+            for machine_id in (machine_ids or resource_ids)
+        ]
+        data = {
+            "resource_ids": resource_ids,
+            "instances": instance_dicts,
+            "instance_ids": list(machine_ids or resource_ids),
+            "provider_data": meta_dict,
+            "tracking_request_id": outcome.request_id,
+        }
+        return ProviderResult.success_result(
+            data,
+            {"operation": fallback_operation, "provider": "k8s"},
+        )
+
+    if isinstance(outcome, Completed):
+        meta_dict = dict(outcome.metadata or {})
+        machine_ids = list(meta_dict.get("machine_ids") or [])
+        resource_ids = list(outcome.resource_ids)
+        instance_dicts = [
+            {
+                "instance_id": machine_id,
+                "resource_id": machine_id,
+                "instance_type": "k8s-pod",
+                "image_id": "unknown",
+                "launch_time": None,
+            }
+            for machine_id in (machine_ids or resource_ids)
+        ]
+        data = {
+            "resource_ids": resource_ids,
+            "instances": instance_dicts,
+            "instance_ids": list(machine_ids or resource_ids),
+            "provider_data": {**meta_dict, "fulfillment_final": True},
+        }
+        return ProviderResult.success_result(
+            data,
+            {"operation": fallback_operation, "provider": "k8s"},
+        )
+
+    if isinstance(outcome, RequiresFollowUp):
+        return ProviderResult.success_result(
+            {
+                "resource_ids": [],
+                "instances": [],
+                "provider_data": {
+                    **dict(outcome.metadata or {}),
+                    "follow_up_kind": outcome.context.follow_up_kind,
+                },
+            },
+            {"operation": fallback_operation, "provider": "k8s"},
+        )
+
+    return ProviderResult.error_result(
+        f"Unknown OperationOutcome variant: {type(outcome).__name__}",
+        "UNSUPPORTED_OUTCOME",
+    )
