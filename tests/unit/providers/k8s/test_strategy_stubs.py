@@ -344,6 +344,7 @@ def _make_strategy_no_init() -> K8sProviderStrategy:
     )
 
 
+@pytest.mark.timeout(15)
 def test_stop_watch_manager_blocks_until_stop_completes_from_foreign_thread() -> None:
     """stop_watch_manager blocks (via run_coroutine_threadsafe) when called
     from a thread that is not the event-loop thread.
@@ -380,7 +381,7 @@ def test_stop_watch_manager_blocks_until_stop_completes_from_foreign_thread() ->
 
     bg_thread = threading.Thread(target=lambda: asyncio.run(_loop_main()), daemon=True)
     bg_thread.start()
-    loop_ready.wait(timeout=5)
+    assert loop_ready.wait(timeout=5), "background loop did not start in time"
 
     loop = loop_ref[0]
     # Patch the loop onto the strategy so _stop_watch_manager_sync sees it.
@@ -401,6 +402,7 @@ def test_stop_watch_manager_blocks_until_stop_completes_from_foreign_thread() ->
     bg_thread.join(timeout=5)
 
 
+@pytest.mark.timeout(15)
 def test_stop_watch_manager_respects_timeout_from_foreign_thread() -> None:
     """When stop() takes longer than shutdown_timeout, the call returns
     without raising and logs a warning."""
@@ -428,7 +430,7 @@ def test_stop_watch_manager_respects_timeout_from_foreign_thread() -> None:
 
     bg_thread = threading.Thread(target=lambda: asyncio.run(_loop_main()), daemon=True)
     bg_thread.start()
-    loop_ready.wait(timeout=5)
+    assert loop_ready.wait(timeout=5), "background loop did not start in time"
 
     loop = loop_ref[0]
     import unittest.mock as mock
@@ -449,6 +451,7 @@ def test_stop_watch_manager_respects_timeout_from_foreign_thread() -> None:
     bg_thread.join(timeout=5)
 
 
+@pytest.mark.timeout(15)
 def test_stop_watch_manager_no_loop_runs_synchronously() -> None:
     """When there is no running event loop the call drives stop() via asyncio.run."""
     completed = threading.Event()
