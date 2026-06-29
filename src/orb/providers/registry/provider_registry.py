@@ -114,9 +114,28 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
                         )
 
             strategy = self.create_strategy_by_instance(provider_identifier, config)
-        # Fall back to type creation
+        # Fall back to type creation when the identifier itself is the type.
         elif self.is_provider_registered(provider_identifier):
             strategy = self.create_strategy_by_type(provider_identifier, config)
+        # Fall back to type creation when the identifier is an instance name
+        # whose configured instance has been removed from config (e.g. terminating
+        # leftover AWS machines after the operator switched the active provider
+        # to k8s).  The provider type is still known, so the strategy can boot
+        # with provider-side defaults (boto3 reads ~/.aws/credentials, etc.).
+        else:
+            provider_type = extract_provider_type(provider_identifier)
+            if provider_type != provider_identifier and self.is_provider_registered(
+                provider_type
+            ):
+                if self._logger:
+                    self._logger.info(
+                        "Provider instance %r not registered; falling back to "
+                        "%r type strategy with provider-side defaults so historical "
+                        "machines for this instance can still be queried/terminated.",
+                        provider_identifier,
+                        provider_type,
+                    )
+                strategy = self.create_strategy_by_type(provider_type, config)
 
         if strategy:
             # Initialize strategy
