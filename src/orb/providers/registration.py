@@ -179,15 +179,39 @@ def register_all_provider_cli_specs() -> None:
     as part of ``initialize_<name>_provider``.  This alias is retained so that
     ``cli/args.py`` and other early-bootstrap callers continue to work.
     """
+    from orb.domain.base.ports.provider_cli_spec_port import ProviderCLISpecPort
     from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
 
-    try:
-        from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec
-
-        if CLISpecRegistry.get("aws") is None:
-            CLISpecRegistry.register("aws", AWSCLISpec())
-    except ImportError:
-        pass  # [aws] extra not installed; AWS CLI spec unavailable
+    # Provider-agnostic discovery: import ``orb.providers.<name>.cli.<name>_cli_spec``
+    # and pick the first class defined in that module whose runtime instance
+    # satisfies ``ProviderCLISpecPort``.  Each provider owns its own class
+    # name; this loop stays generic.
+    for name in _REGISTERED_PROVIDERS:
+        if CLISpecRegistry.get(name) is not None:
+            continue
+        module_path = f"orb.providers.{name}.cli.{name}_cli_spec"
+        if importlib.util.find_spec(module_path) is None:
+            continue
+        try:
+            mod = importlib.import_module(module_path)
+        except ImportError:
+            continue  # provider extra not installed
+        spec_instance = None
+        for attr_name in dir(mod):
+            attr = getattr(mod, attr_name)
+            if not isinstance(attr, type):
+                continue
+            if attr.__module__ != mod.__name__:
+                continue
+            try:
+                instance = attr()
+            except Exception:
+                continue
+            if isinstance(instance, ProviderCLISpecPort):
+                spec_instance = instance
+                break
+        if spec_instance is not None:
+            CLISpecRegistry.register(name, spec_instance)
 
 
 def register_all_defaults_loaders() -> None:
@@ -202,15 +226,43 @@ def register_all_defaults_loaders() -> None:
     retained so that ``config/loader.py`` and other early-bootstrap callers
     continue to work.
     """
+    # Provider-agnostic discovery: each provider's ``defaults_loader`` module
+    # is expected to export exactly one class whose runtime instance satisfies
+    # ``ProviderDefaultsLoaderPort``.  We import the module from the well-known
+    # path ``orb.providers.<name>.defaults_loader`` and pick the first such
+    # class.  Provider-specific class names live inside the provider's own
+    # folder; the loop here stays generic.
+    from orb.domain.base.ports.provider_defaults_loader_port import (
+        ProviderDefaultsLoaderPort,
+    )
     from orb.providers.registry.defaults_loader_registry import DefaultsLoaderRegistry
 
-    if DefaultsLoaderRegistry.get("aws") is None:
+    for name in _REGISTERED_PROVIDERS:
+        if DefaultsLoaderRegistry.get(name) is not None:
+            continue
+        module_path = f"orb.providers.{name}.defaults_loader"
+        if importlib.util.find_spec(module_path) is None:
+            continue
         try:
-            from orb.providers.aws.defaults_loader import AWSDefaultsLoader
-
-            DefaultsLoaderRegistry.register("aws", AWSDefaultsLoader())
+            mod = importlib.import_module(module_path)
         except ImportError:
-            pass  # [aws] extra not installed; AWS defaults loader unavailable
+            continue  # provider extra not installed
+        loader_instance = None
+        for attr_name in dir(mod):
+            attr = getattr(mod, attr_name)
+            if not isinstance(attr, type):
+                continue
+            if attr.__module__ != mod.__name__:
+                continue
+            try:
+                instance = attr()
+            except Exception:
+                continue
+            if isinstance(instance, ProviderDefaultsLoaderPort):
+                loader_instance = instance
+                break
+        if loader_instance is not None:
+            DefaultsLoaderRegistry.register(name, loader_instance)
 
 
 def register_fallback_provider(

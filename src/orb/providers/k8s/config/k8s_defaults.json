@@ -1,0 +1,35 @@
+{
+  "provider": {
+    "provider_defaults": {
+      "k8s": {
+        "handlers": {
+          "Pod": {
+            "handler_class": "K8sPodHandler",
+            "supports_spot": false,
+            "supports_ondemand": true
+          },
+          "Deployment": {
+            "handler_class": "K8sDeploymentHandler",
+            "supports_spot": false,
+            "supports_ondemand": true
+          },
+          "StatefulSet": {
+            "handler_class": "K8sStatefulSetHandler",
+            "supports_spot": false,
+            "supports_ondemand": true
+          },
+          "Job": {
+            "handler_class": "K8sJobHandler",
+            "supports_spot": false,
+            "supports_ondemand": true
+          }
+        },
+        "template_defaults": {
+          "image_id": "busybox:latest",
+          "provider_api": "Pod",
+          "price_type": "ondemand"
+        }
+      }
+    }
+  }
+}

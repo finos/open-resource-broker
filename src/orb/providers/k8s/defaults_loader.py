@@ -1,32 +1,36 @@
-"""Kubernetes provider defaults loader.
-
-The Kubernetes provider currently ships an empty defaults bundle — it has
-no provider-level defaults yet.  When template-defaults JSON is later
-added under ``orb/providers/k8s/config/`` this loader can read it from
-``importlib.resources`` exactly like the AWS counterpart in
-:mod:`orb.providers.aws.defaults_loader`.
-"""
+"""Kubernetes provider defaults loader."""
 
 from __future__ import annotations
+
+import json
 
 from orb.domain.base.ports.provider_defaults_loader_port import ProviderDefaultsLoaderPort
 
 
 class KubernetesDefaultsLoader:
-    """Return the Kubernetes provider's defaults bundle.
+    """Loads defaults from the bundled ``k8s_defaults.json`` config file.
 
     Satisfies :class:`~orb.domain.base.ports.provider_defaults_loader_port.ProviderDefaultsLoaderPort`.
     """
 
     def load_defaults(self) -> dict:
-        """Return Kubernetes provider defaults.
+        """Return Kubernetes provider defaults from the bundled ``k8s_defaults.json``.
 
         Returns:
-            Empty dict.  Populated once a bundled
-            ``kubernetes_defaults.json`` is shipped alongside the package.
+            Raw configuration dictionary contributed by the Kubernetes provider.
+            Returns an empty dict if the file cannot be read.
         """
-        return {}
+        try:
+            from importlib.resources import files
+
+            text = (
+                files("orb.providers.k8s.config")
+                .joinpath("k8s_defaults.json")
+                .read_text(encoding="utf-8")
+            )
+            return json.loads(text)
+        except Exception:
+            return {}
 
 
-# Runtime check that KubernetesDefaultsLoader satisfies the protocol
 assert isinstance(KubernetesDefaultsLoader(), ProviderDefaultsLoaderPort)

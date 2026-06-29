@@ -106,7 +106,12 @@ def test_initialize_registers_defaults_loader() -> None:
         initialize_k8s_provider()
         loader = DefaultsLoaderRegistry.get("k8s")
         assert isinstance(loader, KubernetesDefaultsLoader)
-        assert loader.load_defaults() == {}
+        defaults = loader.load_defaults()
+        # Sanity-check that the bundled k8s_defaults.json shape is loaded.
+        # Exact contents are validated separately in the defaults JSON tests.
+        k8s_defaults = defaults["provider"]["provider_defaults"]["k8s"]
+        assert "Pod" in k8s_defaults["handlers"]
+        assert k8s_defaults["template_defaults"]["provider_api"] == "Pod"
     finally:
         DefaultsLoaderRegistry.clear()
         for provider_type, original_loader in snapshot.items():
