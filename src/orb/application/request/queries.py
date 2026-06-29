@@ -15,6 +15,9 @@ class ListRequestsQuery(BaseQuery):
     limit: int = 50
     offset: int = 0
     filter_expressions: list[str] = []
+    # Server-side filter/sort — applied BEFORE the limit/offset slice.
+    q: Optional[str] = None
+    sort: Optional[str] = None
 
 
 class GetRequestHistoryQuery(BaseQuery):

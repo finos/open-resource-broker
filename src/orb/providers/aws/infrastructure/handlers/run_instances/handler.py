@@ -143,6 +143,13 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                     "resource_type": "run_instances",
                     "reservation_id": resource_id,
                     "instance_ids": instance_ids,
+                    # RunInstances returns instance IDs synchronously but the
+                    # instances themselves are still ``pending`` at this
+                    # point.  Omitting ``fulfillment_final`` defaults it to
+                    # False at the dispatch layer, which routes the request
+                    # through the polling loop so check_hosts_status can drive
+                    # IN_PROGRESS → COMPLETED once instances reach ``running``.
+                    # Matches the pre-redesign main semantics.
                 },
             }
         except Exception as e:

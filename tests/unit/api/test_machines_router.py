@@ -39,7 +39,7 @@ def machines_app():
     exception_handler = get_exception_handler()
 
     @app.exception_handler(Exception)
-    async def global_exception_handler(__request, exc):  # noqa: N807
+    async def global_exception_handler(__request, exc):
         error_response = exception_handler.handle_error_for_http(exc)
         return JSONResponse(
             status_code=error_response.http_status or 500,
@@ -60,7 +60,7 @@ def templates_app():
     exception_handler = get_exception_handler()
 
     @app.exception_handler(Exception)
-    async def global_exception_handler(__request, exc):  # noqa: N807
+    async def global_exception_handler(__request, exc):
         error_response = exception_handler.handle_error_for_http(exc)
         return JSONResponse(
             status_code=error_response.http_status or 500,

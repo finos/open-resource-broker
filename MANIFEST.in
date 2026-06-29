@@ -1,2 +1,3 @@
 recursive-include config *.json
 recursive-include scripts *.sh *.bat
+include src/orb/ui/rxconfig.py

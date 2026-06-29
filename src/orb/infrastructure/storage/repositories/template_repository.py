@@ -31,11 +31,33 @@ class TemplateSerializer(BaseEntitySerializer):
         self._dt = GenericEntitySerializer(Template, "Template", "template_id")
         self.defaults_service = defaults_service
 
-        if not self.defaults_service:
-            try:
-                pass
-            except Exception as e:
-                self.logger.debug("Could not get defaults service from container: %s", e)
+    @staticmethod
+    def _apply_nullable_defaults(data: dict[str, Any]) -> dict[str, Any]:
+        """Coerce nullable JSON columns to safe empty containers.
+
+        Applied unconditionally so NULL values stored in legacy rows before
+        the NOT NULL migration are never passed as Python None to from_dict
+        for fields that expect a list or dict.
+        """
+        if data.get("tags") is None:
+            data["tags"] = {}
+        if data.get("metadata") is None:
+            data["metadata"] = {}
+        if data.get("security_group_ids") is None:
+            data["security_group_ids"] = []
+        if data.get("subnet_ids") is None:
+            data["subnet_ids"] = []
+        if data.get("network_zones") is None:
+            data["network_zones"] = []
+        if data.get("machine_types") is None:
+            data["machine_types"] = {}
+        if data.get("machine_types_ondemand") is None:
+            data["machine_types_ondemand"] = {}
+        if data.get("machine_types_priority") is None:
+            data["machine_types_priority"] = {}
+        if data.get("provider_data") is None:
+            data["provider_data"] = {}
+        return data
 
     def _normalize_machine_types(self, data: dict) -> dict[str, int]:
         """Normalize machine types from various input formats."""
@@ -98,6 +120,9 @@ class TemplateSerializer(BaseEntitySerializer):
         """Convert dictionary to Template aggregate with complete field support."""
         try:
             self.logger.debug("Converting template data: %s", data)
+
+            data = dict(data)  # shallow copy — never mutate the caller's dict
+            data = self._apply_nullable_defaults(data)
 
             processed_data = data
             if self.defaults_service:
@@ -301,6 +326,21 @@ class TemplateRepositoryImpl(StorageRepositoryMixin, TemplateRepositoryInterface
     def get_all(self) -> list[Template]:
         """Get all templates - alias for find_all for backward compatibility."""
         return self.find_all()
+
+    def count_by_provider_api(self) -> dict[str, int]:
+        """Return ``{provider_api: count}`` for all templates.
+
+        Delegates to ``storage_strategy.count_by_column("provider_api")`` when
+        the underlying strategy supports it (SQL fast path).  Falls back to the
+        domain-interface default (list all + group) for file-based backends.
+        """
+        strategy = getattr(self, "storage_strategy", None)
+        if strategy is not None and hasattr(strategy, "count_by_column"):
+            result = strategy.count_by_column("provider_api")
+            if result:
+                return result
+        # Slow path: list all rows and group in Python.
+        return super().count_by_provider_api()
 
     @handle_infrastructure_exceptions(context="template_search")
     def search_templates(self, criteria: dict[str, Any]) -> list[Template]:

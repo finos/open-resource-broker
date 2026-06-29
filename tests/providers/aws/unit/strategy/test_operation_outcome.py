@@ -170,7 +170,6 @@ class TestAWSProviderStrategyOutcomeInterface:
     """AWSProviderStrategy must declare acquire / return_machines / get_status."""
 
     def test_acquire_method_exists(self):
-
         from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
         assert hasattr(AWSProviderStrategy, "acquire")
@@ -189,7 +188,6 @@ class TestAWSProviderStrategyOutcomeInterface:
         assert asyncio_or_coroutine(AWSProviderStrategy.get_status)
 
     def test_base_strategy_declares_acquire_abstract(self):
-
         from orb.providers.base.strategy.base_provider_strategy import BaseProviderStrategy
 
         assert "acquire" in {m for m in dir(BaseProviderStrategy)}

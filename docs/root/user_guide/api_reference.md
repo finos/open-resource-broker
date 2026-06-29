@@ -3,7 +3,7 @@
 The Open Resource Broker exposes a REST API when running in server mode. Start the server with:
 
 ```bash
-orb system serve --host 0.0.0.0 --port 8000
+orb server start --foreground --host 0.0.0.0 --port 8000
 ```
 
 Requires the `api` extra: `pip install "orb-py[api]"`.
@@ -492,17 +492,17 @@ All endpoints return a consistent error format on failure:
 
 ```bash
 # Development (with auto-reload)
-orb system serve --reload --port 8000
+orb server start --foreground --reload --port 8000
 
 # Production
-orb system serve --host 0.0.0.0 --port 8000 --workers 4
+orb server start --foreground --host 0.0.0.0 --port 8000 --workers 4
 
 # Custom log level
-orb system serve --server-log-level warning
+orb server start --foreground --server-log-level warning
 ```
 
 ## Related
 
-- [CLI Reference](../cli/cli-reference.md) — CLI commands including `orb system serve`
+- [CLI Reference](../cli/cli-reference.md) — CLI commands including `orb server start --foreground`
 - [Templates](templates.md) — template configuration
 - [Requests](requests.md) — request management via CLI

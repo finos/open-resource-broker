@@ -65,13 +65,13 @@ spec:
         ports:
         - containerPort: 8000
         env:
-        - name: HF_SERVER_ENABLED
+        - name: ORB_SERVER_ENABLED
           value: "true"
-        - name: HF_AUTH_ENABLED
+        - name: ORB_AUTH_ENABLED
           value: "true"
-        - name: HF_AUTH_STRATEGY
+        - name: ORB_AUTH_STRATEGY
           value: "bearer_token"
-        - name: HF_AUTH_BEARER_SECRET_KEY
+        - name: ORB_AUTH_BEARER_SECRET_KEY
           valueFrom:
             secretKeyRef:
               name: orb-secrets
@@ -108,7 +108,7 @@ gcloud run deploy orb-api \
   --image gcr.io/your-project/orb-api:latest \
   --platform managed \
   --region us-central1 \
-  --set-env-vars HF_SERVER_ENABLED=true,HF_AUTH_ENABLED=true
+  --set-env-vars ORB_SERVER_ENABLED=true,ORB_AUTH_ENABLED=true
 ```
 
 ### [Server] Traditional Server Deployment
@@ -127,8 +127,11 @@ pip install -e .
 cp config/default_config.json config/production.json
 # Edit config/production.json
 
-# Start server
-orb system serve --host 0.0.0.0 --port 8000 --config config/production.json
+# Start server (foreground)
+orb --config config/production.json server start --foreground --host 0.0.0.0 --port 8000
+
+# Or daemonise (writes a PID file under <work_dir>/server/orb-server.pid)
+orb --config config/production.json server start --host 0.0.0.0 --port 8000
 ```
 
 #### Systemd Service
@@ -143,9 +146,9 @@ Type=simple
 User=orb
 Group=orb
 WorkingDirectory=/opt/orb
-Environment=HF_SERVER_ENABLED=true
-Environment=HF_AUTH_ENABLED=true
-ExecStart=/opt/orb/.venv/bin/python src/run.py system serve --config config/production.json
+Environment=ORB_SERVER_ENABLED=true
+Environment=ORB_AUTH_ENABLED=true
+ExecStart=/opt/orb/.venv/bin/orb --config config/production.json server start --foreground
 Restart=always
 RestartSec=10
 
@@ -161,38 +164,38 @@ WantedBy=multi-user.target
 
 ```bash
 # Server Configuration
-HF_SERVER_ENABLED=true
-HF_SERVER_HOST=0.0.0.0
-HF_SERVER_PORT=8000
-HF_SERVER_WORKERS=4
-HF_SERVER_LOG_LEVEL=info
-HF_SERVER_DOCS_ENABLED=false  # Disable in production
+ORB_SERVER_ENABLED=true
+ORB_SERVER_HOST=0.0.0.0
+ORB_SERVER_PORT=8000
+ORB_SERVER_WORKERS=4
+ORB_SERVER_LOG_LEVEL=info
+ORB_SERVER_DOCS_ENABLED=false  # Disable in production
 
 # Authentication Configuration
-HF_AUTH_ENABLED=true
-HF_AUTH_STRATEGY=bearer_token
-HF_AUTH_BEARER_SECRET_KEY=your-very-secure-secret-key
-HF_AUTH_BEARER_TOKEN_EXPIRY=3600
+ORB_AUTH_ENABLED=true
+ORB_AUTH_STRATEGY=bearer_token
+ORB_AUTH_BEARER_SECRET_KEY=your-very-secure-secret-key
+ORB_AUTH_BEARER_TOKEN_EXPIRY=3600
 
 # AWS Provider Configuration
-HF_PROVIDER_TYPE=aws
-HF_PROVIDER_AWS_REGION=us-east-1
+ORB_PROVIDER_TYPE=aws
+ORB_PROVIDER_AWS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=your-access-key
 AWS_SECRET_ACCESS_KEY=your-secret-key
 
 # Storage Configuration
-HF_STORAGE_STRATEGY=json
-HF_STORAGE_BASE_PATH=/app/data
+ORB_STORAGE_STRATEGY=json
+ORB_STORAGE_BASE_PATH=/app/data
 
 # Logging Configuration
-HF_LOGGING_LEVEL=INFO
-HF_LOGGING_CONSOLE_ENABLED=true
-HF_LOGGING_FILE_ENABLED=true
-HF_LOGGING_FILE_PATH=/app/logs/app.log
+ORB_LOGGING_LEVEL=INFO
+ORB_LOGGING_CONSOLE_ENABLED=true
+ORB_LOGGING_FILE_ENABLED=true
+ORB_LOGGING_FILE_PATH=/app/logs/orb.log
 
 # Security Configuration
-HF_SERVER_REQUIRE_HTTPS=true
-HF_SERVER_TRUSTED_HOSTS=your-domain.com,api.your-domain.com
+ORB_SERVER_REQUIRE_HTTPS=true
+ORB_SERVER_TRUSTED_HOSTS=your-domain.com,api.your-domain.com
 ```
 
 ### Configuration Files
@@ -217,7 +220,7 @@ services:
     secrets:
       - orb-jwt-secret
     environment:
-      HF_AUTH_BEARER_SECRET_KEY_FILE: /run/secrets/orb-jwt-secret
+      ORB_AUTH_BEARER_SECRET_KEY_FILE: /run/secrets/orb-jwt-secret
 ```
 
 #### Kubernetes Secrets
@@ -244,7 +247,7 @@ aws secretsmanager create-secret \
 {
   "secrets": [
     {
-      "name": "HF_AUTH_BEARER_SECRET_KEY",
+      "name": "ORB_AUTH_BEARER_SECRET_KEY",
       "valueFrom": "arn:aws:secretsmanager:region:account:secret:orb/jwt-secret"
     }
   ]
@@ -255,11 +258,11 @@ aws secretsmanager create-secret \
 
 ### Production Security Checklist
 
-- [ ] **Authentication enabled**: `HF_AUTH_ENABLED=true`
+- [ ] **Authentication enabled**: `ORB_AUTH_ENABLED=true`
 - [ ] **Strong JWT secret**: Use cryptographically secure random key
-- [ ] **HTTPS required**: `HF_SERVER_REQUIRE_HTTPS=true`
+- [ ] **HTTPS required**: `ORB_SERVER_REQUIRE_HTTPS=true`
 - [ ] **Trusted hosts configured**: Limit to your domains
-- [ ] **API docs disabled**: `HF_SERVER_DOCS_ENABLED=false`
+- [ ] **API docs disabled**: `ORB_SERVER_DOCS_ENABLED=false`
 - [ ] **Non-root execution**: Container runs as `orb` user
 - [ ] **Resource limits**: Set CPU and memory limits
 - [ ] **Network isolation**: Use private networks where possible
@@ -323,7 +326,7 @@ livenessProbe:
 {
   "logging": {
     "level": "INFO",
-    "file_path": "/app/logs/app.log",
+    "file_path": "/app/logs/orb.log",
     "console_enabled": true,
     "file_enabled": true,
     "max_file_size": "50MB",
@@ -441,7 +444,7 @@ docker exec -i orb-postgres psql -U orb orb < backup-20250107.sql
 docker logs container-name
 
 # Check configuration
-docker exec container-name env | grep HF_
+docker exec container-name env | grep ORB_
 
 # Test configuration
 docker run --rm -it orb-api:latest bash
@@ -456,7 +459,7 @@ docker stats
 curl http://localhost:8000/metrics
 
 # Increase workers
-docker run -e HF_SERVER_WORKERS=4 orb-api:latest
+docker run -e ORB_SERVER_WORKERS=4 orb-api:latest
 ```
 
 **Authentication problems:**
@@ -476,7 +479,7 @@ print(config.get_typed(ServerConfig).auth.enabled)
 
 ```bash
 # Enable debug mode
-docker run -e HF_DEBUG=true -e HF_LOGGING_LEVEL=DEBUG orb-api:latest
+docker run -e ORB_DEBUG=true -e ORB_LOGGING_LEVEL=DEBUG orb-api:latest
 
 # Interactive debugging
 docker run -it --rm orb-api:latest bash
@@ -501,11 +504,11 @@ resources:
 
 ```bash
 # Increase worker processes
-HF_SERVER_WORKERS=4
+ORB_SERVER_WORKERS=4
 
 # Optimize for high concurrency
-HF_SERVER_WORKER_CLASS=uvicorn.workers.UvicornWorker
-HF_SERVER_WORKER_CONNECTIONS=1000
+ORB_SERVER_WORKER_CLASS=uvicorn.workers.UvicornWorker
+ORB_SERVER_WORKER_CONNECTIONS=1000
 ```
 
 ## Migration Guide

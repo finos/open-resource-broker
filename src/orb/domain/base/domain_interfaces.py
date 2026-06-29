@@ -71,12 +71,16 @@ class AggregateRepository(Generic[A], ABC):
         """Save an aggregate root."""
 
     @abstractmethod
-    def find_by_id(self, aggregate_id: str) -> Optional[A]:
+    def find_by_id(self, aggregate_id: Any) -> Optional[A]:
         """Find aggregate by ID."""
 
     @abstractmethod
-    def delete(self, aggregate_id: str) -> None:
+    def delete(self, aggregate_id: Any) -> None:
         """Delete aggregate by ID."""
+
+    @abstractmethod
+    def find_all(self) -> list[A]:
+        """Find all aggregates."""
 
 
 class UnitOfWork(Protocol):

@@ -612,23 +612,68 @@ orb system metrics [OPTIONS]
 |------|-------------|---------|
 | `--format` | Output format | `--format table` |
 
-#### `system serve`
+### Server
 
-Start REST API server.
+Process lifecycle for the local ORB daemon (REST API + optional embedded UI).
+`orb system *` is for **remote API observability** (status/health/metrics/reload of a
+running ORB). `orb server *` manages **the local process** itself.
+
+#### `server start`
+
+Start the ORB server. Daemonised by default; pass `--foreground` to keep it in
+the current shell (useful for containers, systemd `Type=simple`, and dev).
 
 **Usage:**
 ```bash
-orb system serve [OPTIONS]
+orb server start [OPTIONS]
 ```
 
 **Options:**
 | Flag | Description | Default | Example |
 |------|-------------|---------|---------|
-| `--host` | Server host | `0.0.0.0` | `--host localhost` |
-| `--port` | Server port | `8000` | `--port 9000` |
-| `--workers` | Number of workers | `1` | `--workers 4` |
-| `--reload` | Enable auto-reload | `false` | `--reload` |
-| `--server-log-level` | Server log level | `info` | `--server-log-level debug` |
+| `--foreground`, `-F` | Run in the foreground instead of daemonising | `false` | `--foreground` |
+| `--api-only` | Skip the embedded UI even if `ui.enabled=true` | `false` | `--api-only` |
+| `--host` | Server host (overrides config) | from config | `--host localhost` |
+| `--port` | Server port (overrides config) | from config | `--port 9000` |
+| `--workers` | Number of workers | from config | `--workers 4` |
+| `--reload` | Enable uvicorn auto-reload (dev only) | `false` | `--reload` |
+| `--server-log-level` | Server log level | from config | `--server-log-level debug` |
+| `--socket-path` | Unix domain socket path (alternative to host/port) | none | `--socket-path /tmp/orb.sock` |
+
+#### `server stop`
+
+Stop the running ORB server. Sends `SIGTERM`, waits up to the configured
+`stop_timeout_seconds`, then escalates to `SIGKILL`. The whole process group
+is signalled so the embedded Reflex tree (Node/Next included) terminates with
+the parent.
+
+```bash
+orb server stop [--timeout N]
+```
+
+#### `server status`
+
+Report PID, liveness, and a best-effort `/health` probe.
+
+```bash
+orb server status
+```
+
+#### `server restart`
+
+`stop` followed by `start`. Accepts the same flags as `start`.
+
+#### `server reload`
+
+Send `SIGHUP` to the running daemon.
+
+#### `server logs`
+
+Tail the daemon log file (`<log_dir>/orb-server.log` by default).
+
+```bash
+orb server logs [-n LINES]
+```
 
 ### Config
 
@@ -1447,5 +1492,5 @@ orb config validate
 orb storage test --timeout 60
 
 # Start API server for development
-orb system serve --reload --port 9000
+orb server start --foreground --reload --port 9000
 ```

@@ -118,6 +118,7 @@
   },
   "environment": "development",
   "debug": false,
+  "allow_destructive_admin": false,
   "performance": {
     "lazy_loading": {
       "enabled": true,
@@ -241,7 +242,12 @@
     "request_timeout": 30,
     "max_request_size": 16777216,
     "access_log": true,
-    "log_level": "info"
+    "log_level": "info",
+    "rate_limiting": {
+      "enabled": true,
+      "requests_per_minute": 100,
+      "max_buckets": 10000
+    }
   },
   "circuit_breaker": {
     "enabled": true,

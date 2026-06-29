@@ -102,6 +102,7 @@ class TestDomainEventGeneration:
             machine_ids=machine_ids,
             provider_type="aws",
             provider_name="test-provider",
+            provider_api="ec2fleet",
         )
 
         events = request.get_domain_events()

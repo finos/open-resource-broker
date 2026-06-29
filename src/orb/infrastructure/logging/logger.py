@@ -293,11 +293,67 @@ class RequestLogger:
         self.logger.debug(msg, extra=kwargs)
 
 
+def setup_audit_logger(audit_log_file: Optional[str] = None) -> None:
+    """Attach a dedicated handler to the ``orb.audit`` logger.
+
+    In container deployments with stdout-only logging the audit logger
+    inherits the root handlers and that is sufficient.  When operators want
+    audit records in a separate, structured file (for SIEM ingestion, long-term
+    retention, or audit trail requirements) they set ``server.audit_log_file``
+    in config and this function attaches a ``RotatingFileHandler`` that writes
+    one JSON object per line.
+
+    If ``audit_log_file`` is ``None`` a structured ``StreamHandler`` (stderr)
+    is attached instead so audit records always have at least one dedicated
+    channel with JSON formatting, distinct from the coloured console output.
+
+    This function is idempotent — calling it more than once with the same path
+    does not add duplicate handlers.
+
+    Args:
+        audit_log_file: Absolute path to the audit log file.  ``None`` means
+            write structured JSON to stderr.
+    """
+    audit_log = logging.getLogger("orb.audit")
+    # Prevent audit records from propagating to the root logger when a
+    # dedicated handler is configured — keeps the two streams independent.
+    audit_log.propagate = False
+
+    json_fmt = JsonFormatter(log_type="audit")
+
+    if audit_log_file:
+        log_path = Path(audit_log_file)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        # Check for an existing handler pointing at the same file to stay
+        # idempotent across multiple create_fastapi_app calls in tests.
+        existing_paths = {
+            getattr(h, "baseFilename", None)
+            for h in audit_log.handlers
+            if isinstance(h, logging.handlers.RotatingFileHandler)
+        }
+        if str(log_path.resolve()) not in existing_paths:
+            fh = logging.handlers.RotatingFileHandler(
+                filename=str(log_path),
+                maxBytes=50 * 1024 * 1024,  # 50 MiB per shard
+                backupCount=10,
+                encoding="utf-8",
+            )
+            fh.setFormatter(json_fmt)
+            audit_log.addHandler(fh)
+    # Structured stderr handler — only add if no handlers exist yet.
+    elif not audit_log.handlers:
+        import sys
+
+        sh = logging.StreamHandler(sys.stderr)
+        sh.setFormatter(json_fmt)
+        audit_log.addHandler(sh)
+
+
 class AuditLogger:
     """Logger for audit events."""
 
     def __init__(self) -> None:
-        self.logger = get_logger("audit")
+        self.logger = get_logger("orb.audit")
 
     def log_event(
         self,

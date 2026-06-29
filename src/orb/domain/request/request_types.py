@@ -165,7 +165,13 @@ class RequestStatus(str, Enum):
             RequestStatus.FAILED: [],  # Terminal state
             RequestStatus.CANCELLED: [],  # Terminal state
             RequestStatus.TIMEOUT: [],  # Terminal state
-            RequestStatus.PARTIAL: [],  # Terminal state
+            # PARTIAL is terminal in the failure direction but can be
+            # UPGRADED to COMPLETED when a later sync proves the original
+            # partial verdict was a misclassification (e.g. multi-fleet
+            # request stamped partial before all fleets reported in, then
+            # later confirmed fully fulfilled). Downgrade in the other
+            # direction stays blocked.
+            RequestStatus.PARTIAL: [RequestStatus.COMPLETED],
         }
 
         return new_status in valid_transitions.get(self, [])

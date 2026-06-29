@@ -611,7 +611,7 @@ The scheduler configuration determines how the system interfaces with job schedu
   },
   "logging": {
     "level": "INFO",
-    "file_path": "logs/app.log",
+    "file_path": "logs/orb.log",
     "console_enabled": true
   }
 }

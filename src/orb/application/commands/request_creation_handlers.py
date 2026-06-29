@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from orb.application.base.handlers import BaseCommandHandler
@@ -154,8 +155,6 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
         error is logged at ERROR level but NOT re-raised because the request was
         already successfully persisted.
         """
-        import asyncio
-
         with self.uow_factory.create_unit_of_work() as uow:
             events = uow.requests.save(request)
 
@@ -282,12 +281,17 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             created_requests: list[str] = []
             pending_deprovision: list[tuple[list[str], Any, str]] = []
 
-            for (provider_type, provider_name), machine_ids in provider_groups.items():
+            for (
+                provider_type,
+                provider_name,
+                provider_api,
+            ), machine_ids in provider_groups.items():
                 return_request_id = str(RequestId.generate(RequestType.RETURN, prefix=prefix))
                 request = Request.create_return_request(
                     machine_ids=machine_ids,
                     provider_type=provider_type,
                     provider_name=provider_name,
+                    provider_api=provider_api,
                     metadata=command.metadata or {},
                     request_id=return_request_id,
                 )
@@ -315,9 +319,24 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             command.processed_machines = valid_machines
             command.skipped_machines = skipped_machines
 
-            # Await deprovisioning sequentially — one per provider group.
+            # Synchronous deprovisioning: await provider termination before
+            # returning. Integration tests + the CLI rely on the handler
+            # reaching a terminal status by the time it returns; UI-side
+            # responsiveness is addressed at the API layer (the HTTP
+            # caller can return early via a 202 + background task at the
+            # router level, not here in the command handler).
             for machine_ids, request, provider_name in pending_deprovision:
-                await self._execute_deprovisioning_for_request(machine_ids, request, provider_name)
+                try:
+                    await self._execute_deprovisioning_for_request(
+                        machine_ids, request, provider_name
+                    )
+                except Exception as deprov_err:
+                    self.logger.error(
+                        "Deprovisioning failed for request %s: %s",
+                        request.request_id,
+                        deprov_err,
+                        exc_info=True,
+                    )
 
         except Exception as e:
             self.logger.error(

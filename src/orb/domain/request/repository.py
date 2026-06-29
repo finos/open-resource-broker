@@ -53,3 +53,16 @@ class RequestRepository(AggregateRepository[Request]):
     @abstractmethod
     def get_metrics_by_date_range(self, start_date: datetime, end_date: datetime) -> dict[str, int]:
         """Get aggregated metrics within date range."""
+
+    def count_by_status(self) -> dict[str, int]:
+        """Return ``{status_value: count}`` for all requests.
+
+        Default implementation lists all requests and groups by status.
+        Concrete implementations backed by SQL should override this with a
+        single ``SELECT status, COUNT(*) GROUP BY status`` query.
+        """
+        counts: dict[str, int] = {}
+        for req in self.find_all():
+            key = str(getattr(req.status, "value", req.status))
+            counts[key] = counts.get(key, 0) + 1
+        return counts

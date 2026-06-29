@@ -172,6 +172,10 @@ class ConfigurationPort(ProviderConfigPort):
         """Get the path of the loaded configuration file, or None if not loaded from a file."""
         return None
 
+    def save_config(self, path: str | None = None) -> str:
+        """Persist in-memory raw config to disk. Returns the written path."""
+        raise NotImplementedError
+
     def get_root_dir(self) -> str:
         """Get the root directory path."""
         return ""
@@ -179,6 +183,15 @@ class ConfigurationPort(ProviderConfigPort):
     def get_scripts_dir(self) -> str:
         """Get the scripts directory path."""
         return ""
+
+    def get_raw_config(self) -> dict[str, Any]:
+        """Return the raw on-disk configuration dict before Pydantic hydration.
+
+        Concrete adapters should override this to expose the underlying
+        config manager's raw dict.  The default returns an empty dict so
+        callers that only need the public interface don't break.
+        """
+        return {}
 
     @property
     def app_config(self) -> Any:

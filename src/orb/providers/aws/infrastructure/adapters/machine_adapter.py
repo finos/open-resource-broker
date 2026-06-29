@@ -214,8 +214,11 @@ class AWSMachineAdapter:
                         "request_id": request_id,
                         "name": aws_instance_data["InstanceId"],
                         "status": MachineStatus.from_str(instance_state).value,
-                        "instance_type": aws_instance_data.get("InstanceType", "unknown"),
-                        "image_id": aws_instance_data.get("ImageId", "unknown"),
+                        # EC2 omits InstanceType/ImageId for terminated instances.
+                        # Use None instead of the string "unknown" so the UI
+                        # renders an empty field rather than misleading text.
+                        "instance_type": aws_instance_data.get("InstanceType") or None,
+                        "image_id": aws_instance_data.get("ImageId") or None,
                         "private_ip": aws_instance_data.get("PrivateIpAddress"),
                         "public_ip": aws_instance_data.get("PublicIpAddress"),
                         "private_dns_name": aws_instance_data.get("PrivateDnsName"),

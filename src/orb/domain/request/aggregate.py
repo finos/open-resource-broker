@@ -394,6 +394,7 @@ class Request(AggregateRoot):
         machine_count: int,
         provider_type: str,  # Provider type must be explicitly specified
         provider_name: Optional[str] = None,  # Specific provider instance
+        provider_api: Optional[str] = None,  # Provider API/service used
         metadata: Optional[dict[str, Any]] = None,
         request_id: Optional[str] = None,  # Allow external ID to be provided
     ) -> "Request":
@@ -447,6 +448,7 @@ class Request(AggregateRoot):
             desired_capacity=machine_count,  # Initially set to same as requested_count
             provider_type=provider_type,
             provider_name=provider_name,
+            provider_api=provider_api,
             status=RequestStatus.PENDING,
             metadata=metadata or {},
             created_at=datetime.now(timezone.utc),
@@ -477,10 +479,20 @@ class Request(AggregateRoot):
         machine_ids: list[str],
         provider_type: str,
         provider_name: str,
+        provider_api: str,
         metadata: Optional[dict[str, Any]] = None,
         request_id: Optional[str] = None,
     ) -> "Request":
-        """Create a return/terminate request with machine IDs."""
+        """Create a return/terminate request with machine IDs.
+
+        ``provider_api`` is REQUIRED — return requests must carry the same
+        per-API discriminator the original acquire used (EC2Fleet, ASG,
+        SpotFleet, RunInstances). Without it the deprovisioning orchestrator
+        cannot route the terminate call to the correct handler.
+
+        Callers grouping a return across multiple APIs must split into one
+        return request per API; see MachineGroupingService.group_by_provider.
+        """
         if request_id:
             request_id_obj = RequestId(value=request_id)
         else:
@@ -494,6 +506,7 @@ class Request(AggregateRoot):
             desired_capacity=len(machine_ids),
             provider_type=provider_type,
             provider_name=provider_name,
+            provider_api=provider_api,
             machine_ids=machine_ids,
             status=RequestStatus.PENDING,
             metadata=metadata or {},
@@ -606,6 +619,15 @@ class Request(AggregateRoot):
         fields["status_message"] = message
         fields["version"] = self.version + 1
 
+        # Stamp ``started_at`` on first non-PENDING transition so the
+        # request always has a "provisioning started" timestamp once it
+        # leaves the queue. Covers every path that calls ``update_status``
+        # — provider sync, status management service, lifecycle handler —
+        # without each caller needing to remember.
+        now = datetime.now(timezone.utc)
+        if status != RequestStatus.PENDING and self.started_at is None:
+            fields["started_at"] = now
+
         if status in [
             RequestStatus.COMPLETED,
             RequestStatus.FAILED,
@@ -613,6 +635,6 @@ class Request(AggregateRoot):
             RequestStatus.PARTIAL,
             RequestStatus.TIMEOUT,
         ]:
-            fields["completed_at"] = datetime.now(timezone.utc)
+            fields["completed_at"] = now
 
         return Request.model_validate(fields)

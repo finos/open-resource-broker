@@ -45,6 +45,7 @@ def _machines(*statuses: MachineStatus) -> list[Machine]:
             status=s,
             provider_type="aws",
             provider_name="aws-primary",
+            provider_api="ec2fleet",
             template_id="tpl-test",
             instance_type=InstanceType(value="t3.micro"),
             image_id="ami-00000000",

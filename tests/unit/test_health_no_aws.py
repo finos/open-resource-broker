@@ -61,8 +61,12 @@ def test_register_aws_health_checks_always_registers_aws_and_ec2():
     assert health_check.register_check.call_count == 2
 
 
-def test_register_aws_health_checks_registers_dynamodb_when_dynamodb_storage():
-    """register_aws_health_checks must add dynamodb check only when storage_strategy='dynamodb'."""
+def test_register_aws_health_checks_does_not_register_dynamodb_anymore():
+    """The dynamodb branch was removed: storage health now flows through
+    register_storage_health_checks against the active StoragePort, so
+    register_aws_health_checks no longer registers a 'database' or
+    'dynamodb' check even when storage_strategy='dynamodb'.
+    """
     from unittest.mock import MagicMock
 
     from orb.providers.aws.health import register_aws_health_checks
@@ -75,8 +79,9 @@ def test_register_aws_health_checks_registers_dynamodb_when_dynamodb_storage():
     registered_names = {call.args[0] for call in health_check.register_check.call_args_list}
     assert "aws" in registered_names
     assert "ec2" in registered_names
-    assert "dynamodb" in registered_names
-    assert health_check.register_check.call_count == 3
+    assert "dynamodb" not in registered_names
+    assert "database" not in registered_names
+    assert health_check.register_check.call_count == 2
 
 
 def test_register_aws_health_checks_skips_dynamodb_for_sql_storage():

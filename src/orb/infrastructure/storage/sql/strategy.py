@@ -3,7 +3,7 @@
 from contextlib import contextmanager
 from typing import Any, Optional
 
-from sqlalchemy import text
+from sqlalchemy import MetaData, Table, column as sa_column, func, select, text
 
 from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.storage.base.strategy import BaseStorageStrategy
@@ -52,6 +52,33 @@ class SQLStorageStrategy(BaseStorageStrategy):
 
         self.logger.debug("Initialized SQL storage strategy for table %s", table_name)
 
+    def is_healthy(self) -> tuple[bool, dict[str, Any]]:
+        """Probe SQL: confirm connection works AND the configured table exists.
+
+        Two cheap calls:
+          - ``SELECT 1`` via the connection manager
+          - ``table_exists(self.table_name)`` to catch schema-not-deployed
+        """
+        info = self.connection_manager.get_connection_info()
+        details: dict[str, Any] = {
+            "type": "sql",
+            "database_type": info.get("database_type", "unknown"),
+            "table": self.table_name,
+        }
+        if not info.get("healthy", False):
+            details["reason"] = "connection manager reports unhealthy"
+            return False, details
+        try:
+            table_present = self.connection_manager.table_exists(self.table_name)
+        except Exception as exc:
+            details["error"] = f"table_exists check failed: {exc}"
+            return False, details
+        details["table_exists"] = table_present
+        if not table_present:
+            details["reason"] = "configured table does not exist"
+            return False, details
+        return True, details
+
     def _get_id_column(self) -> str:
         """Get the primary key column name."""
         for column_name, column_type in self.columns.items():
@@ -60,15 +87,92 @@ class SQLStorageStrategy(BaseStorageStrategy):
         return "id"  # Default fallback
 
     def _initialize_table(self) -> None:
-        """Initialize database table if it doesn't exist."""
+        """Initialize database tables.
+
+        For tables that are defined in the ORM (requests, machines, templates)
+        ``Base.metadata.create_all`` is used — this is the authoritative DDL path.
+
+        Pre-existing SQL installs (tables present but no ``alembic_version``
+        row) are auto-stamped at head so Alembic knows the current schema
+        position without re-running migrations.  This only fires once on first
+        boot after the upgrade; subsequent starts find the version row and skip
+        the stamp.
+
+        For any other table name (e.g. ad-hoc tables used in tests or generic
+        storage) the legacy column-dict driven ``build_create_table`` path is
+        used as a fallback so existing behaviour is preserved.
+        """
         try:
-            if not self.connection_manager.table_exists(self.table_name):
+            from orb.infrastructure.storage.sql.models import Base
+
+            engine = self.connection_manager.get_engine()
+            orm_tables = set(Base.metadata.tables.keys())
+
+            if self.table_name in orm_tables:
+                # Check before create_all whether this is a pre-existing install
+                # without Alembic version tracking so we can stamp it afterwards.
+                alembic_version_exists = self.connection_manager.table_exists("alembic_version")
+                tables_already_exist = self.connection_manager.table_exists(self.table_name)
+
+                Base.metadata.create_all(engine)
+                self.logger.debug(
+                    "Applied Base.metadata.create_all for ORM table %s", self.table_name
+                )
+
+                # Auto-stamp head for pre-existing installs that have real data
+                # tables but have never been managed by Alembic.  Do NOT stamp
+                # when alembic_version already exists — that would overwrite a
+                # legitimate mid-migration state.
+                if tables_already_exist and not alembic_version_exists:
+                    self._auto_stamp_head(engine)
+
+            # Fallback: build CREATE TABLE from the column dict (legacy path).
+            elif not self.connection_manager.table_exists(self.table_name):
                 create_table_sql = self.query_builder.build_create_table()
                 self.connection_manager.execute_query(create_table_sql)
-                self.logger.info("Created table: %s", self.table_name)
+                self.logger.info("Created non-ORM table via column-dict DDL: %s", self.table_name)
         except Exception as e:
             self.logger.error("Failed to initialize table %s: %s", self.table_name, e)
             raise
+
+    def _auto_stamp_head(self, engine: Any) -> None:
+        """Stamp the Alembic revision table at head for pre-existing installs.
+
+        Called only when the application tables already exist but no
+        ``alembic_version`` row is present — i.e. the database was created by
+        a previous ``Base.metadata.create_all`` call that predates Alembic
+        management.  Stamping records the current head revision without
+        re-running any DDL, so subsequent ``alembic upgrade head`` runs are
+        no-ops rather than failures.
+        """
+        try:
+            import os
+
+            import alembic.command
+            import alembic.config
+
+            alembic_ini = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "migrations",
+                "alembic.ini",
+            )
+            cfg = alembic.config.Config(alembic_ini)
+            # Pass the live engine URL so env.py uses the same connection.
+            cfg.set_main_option("sqlalchemy.url", str(engine.url))
+            alembic.command.stamp(cfg, "head")
+            self.logger.info(
+                "Auto-stamped Alembic revision at head for pre-existing install "
+                "(tables existed without alembic_version row). "
+                "Run 'orb storage migrate current' to verify."
+            )
+        except Exception as exc:
+            # Stamping is best-effort: log the failure but do not abort startup.
+            self.logger.warning(
+                "Could not auto-stamp Alembic head for table %s: %s. "
+                "Run 'orb storage migrate stamp head' manually.",
+                self.table_name,
+                exc,
+            )
 
     def save(self, entity_id: str, data: dict[str, Any]) -> None:
         """
@@ -296,6 +400,56 @@ class SQLStorageStrategy(BaseStorageStrategy):
             except Exception as e:
                 self.logger.error("Failed to delete batch: %s", e)
                 raise StorageError(f"Failed to delete batch: {e}")
+
+    def count_by_column(self, column: str) -> dict[str, int]:
+        """Return ``{column_value: count}`` via a single SQL GROUP BY query.
+
+        Used by the dashboard to get per-status (or per-provider-api) counts
+        without loading every row into Python first.
+
+        Falls back to an empty dict on any error so callers can degrade
+        gracefully to the list-and-count slow path if needed.
+        """
+        # Validate the column against the strategy's registered columns dict
+        # before building the query.  This is the only place untrusted strings
+        # could ever enter the SQL build; rejecting unknown columns keeps the
+        # query construction below restricted to identifiers we registered at
+        # construction time.
+        if column not in self.columns:
+            raise StorageError(
+                f"count_by_column: column {column!r} is not in the registered "
+                f"schema for table {self.table_name!r}"
+            )
+        # Build the SELECT via SQLAlchemy Core constructs — no raw SQL string
+        # interpolation.  The column object is created by name (validated
+        # above) and the Table is reflected from MetaData by name (also
+        # validated since self.table_name is a constructor-time constant).
+        bucket = sa_column(column)
+        table = Table(self.table_name, MetaData())
+        stmt = (
+            select(bucket.label("bucket"), func.count().label("cnt"))
+            .select_from(table)
+            .group_by(bucket)
+        )
+        with self.lock_manager.read_lock():
+            try:
+                with self.connection_manager.get_session() as session:
+                    result = session.execute(stmt)
+                    rows = result.fetchall()
+                counts: dict[str, int] = {}
+                for row in rows:
+                    row_dict = dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
+                    key = str(row_dict.get("bucket") or "unknown")
+                    counts[key] = int(row_dict.get("cnt", 0))
+                return counts
+            except Exception as exc:
+                self.logger.error(
+                    "count_by_column failed for table=%s column=%s: %s",
+                    self.table_name,
+                    column,
+                    exc,
+                )
+                return {}
 
     def begin_transaction(self) -> None:
         """Begin transaction (handled by session)."""

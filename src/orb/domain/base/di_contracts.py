@@ -8,7 +8,7 @@ while maintaining the power and flexibility of dependency injection.
 
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, Callable, Optional, TypeVar, Union
+from typing import Any, Callable, Optional, TypeVar
 
 T = TypeVar("T")
 
@@ -137,7 +137,7 @@ class DIContainerPort(ABC):
     def register_singleton(
         self,
         dependency_type: type[T],
-        implementation_or_factory: Union[type[T], Callable[[], T]],
+        implementation_or_factory: type[T] | Callable[[], T],
     ) -> None:
         """
         Register a singleton dependency.

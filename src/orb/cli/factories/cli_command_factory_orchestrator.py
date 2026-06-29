@@ -240,7 +240,3 @@ class CLICommandFactoryOrchestrator:
     def create_storage_test_command_data(self, **kwargs: Any):
         """Create storage test command data structure."""
         return self._utility_factory.create_storage_test_command_data(**kwargs)
-
-    def create_system_serve_command_data(self, **kwargs: Any):
-        """Create system serve command data structure."""
-        return self._utility_factory.create_system_serve_command_data(**kwargs)

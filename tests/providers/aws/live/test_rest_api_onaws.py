@@ -183,10 +183,24 @@ class ORBServerManager:
         self.log_path = log_path
         self._log_file_handle = None
         self._captured_log_path: Optional[str] = None
+        # Loopback-admin token written by the daemon on start; the REST client
+        # reads it and sends `Authorization: Bearer <token>` so the role-guarded
+        # routes (POST /machines/request etc.) accept the request.
+        self.loopback_admin_token: Optional[str] = None
 
     def start(self, timeout: int | None = None):
-        """Start ORB server: orb system serve --host <host> --port <port>"""
-        cmd = ["orb", "system", "serve", "--host", self.host, "--port", str(self.port)]
+        """Start ORB server: orb server start --foreground --api-only --host <h> --port <p>"""
+        cmd = [
+            "orb",
+            "server",
+            "start",
+            "--foreground",
+            "--api-only",
+            "--host",
+            self.host,
+            "--port",
+            str(self.port),
+        ]
         log.info("Starting ORB server: %s", " ".join(cmd))
 
         # Always capture server output to a file so a failed start has actionable detail.
@@ -227,6 +241,7 @@ class ORBServerManager:
                 )
                 if response.status_code == 200:
                     log.info("ORB server started successfully on %s", self.base_url)
+                    self.loopback_admin_token = self._read_loopback_token()
                     return
             except requests.exceptions.RequestException:
                 time.sleep(scenarios_rest_api.REST_API_SERVER["start_probe_interval"])
@@ -243,6 +258,34 @@ class ORBServerManager:
         )
         raise RuntimeError(error_msg)
 
+    def _read_loopback_token(self) -> Optional[str]:
+        """Read the loopback-admin bearer token written by ``orb server start``.
+
+        The daemon writes the token next to the pid file at
+        ``<work_dir>/server/orb-server.token`` (mode 0o600).  The REST client
+        sends it as ``Authorization: Bearer <token>`` so role-guarded routes
+        (POST /machines/request, /machines/return, /requests, ...) authenticate
+        as admin.  Without the token the routes return 403 because the
+        anonymous fallback resolves to the ``viewer`` role.
+
+        Returns ``None`` when the token file is missing — falls through to the
+        unauthenticated client (older daemons or daemons started without
+        ``_write_token_file`` permissions).
+        """
+        try:
+            from orb.config.platform_dirs import get_work_location
+            from orb.interface.server_daemon import _token_path
+
+            pid_path = get_work_location() / "server" / "orb-server.pid"
+            token_file = _token_path(pid_path)
+            if not token_file.exists():
+                log.warning("Loopback admin token file not found at %s", token_file)
+                return None
+            return token_file.read_text(encoding="ascii").strip() or None
+        except Exception as exc:
+            log.warning("Failed to read loopback admin token: %s", exc)
+            return None
+
     def _read_captured_output(self) -> str:
         """Read the last 2KB of the server log for error context."""
         try:
@@ -255,7 +298,7 @@ class ORBServerManager:
                 if size > 2048:
                     f.seek(size - 2048)
                 return f.read()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return f"(failed to read log: {exc})"
 
     def stop(self):
@@ -289,12 +332,18 @@ class RestApiClient:
         timeout: int | None = None,
         api_prefix: str = scenarios_rest_api.REST_API_PREFIX,
         retry_attempts: int | None = None,
+        auth_token: str | None = None,
     ):
         self.base_url = base_url.rstrip("/")
         self.api_prefix = api_prefix
         self.timeout = timeout or REST_TIMEOUTS["rest_api_timeout"]
         self.retry_attempts = retry_attempts or REST_TIMEOUTS["rest_api_retry_attempts"]
         self.session = requests.Session()
+        if auth_token:
+            # The token is the loopback-admin bearer secret written by the
+            # daemon at start; required for role-guarded routes when auth
+            # is enabled OR when auth is disabled (anonymous → viewer).
+            self.session.headers["Authorization"] = f"Bearer {auth_token}"
 
     def _url(self, path: str) -> str:
         """Construct full URL with API prefix."""
@@ -473,6 +522,7 @@ def rest_api_client(orb_server):
         api_prefix="/api/v1",
         timeout=REST_TIMEOUTS["rest_api_timeout"],
         retry_attempts=REST_TIMEOUTS["rest_api_retry_attempts"],
+        auth_token=orb_server.loopback_admin_token,
     )
 
 
@@ -2229,6 +2279,7 @@ def test_rest_api_unknown_template_returns_error(setup_rest_api_environment):
             base_url=server.base_url,
             api_prefix="/api/v1",
             timeout=REST_TIMEOUTS["rest_api_timeout"],
+            auth_token=server.loopback_admin_token,
         )
         try:
             client.request_machines("NonExistent-Template-XYZ", 1)

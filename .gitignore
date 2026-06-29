@@ -1,3 +1,7 @@
+.states
+.web
+reflex.lock/
+assets/external/
 # Generated files
 # pyproject.toml is now tracked - only metadata is templated, dependencies managed by Dependabot
 

@@ -50,6 +50,7 @@ def register_orchestrators(container: DIContainer) -> None:
     from orb.application.services.orchestration.return_machines import ReturnMachinesOrchestrator
     from orb.application.services.orchestration.start_machines import StartMachinesOrchestrator
     from orb.application.services.orchestration.stop_machines import StopMachinesOrchestrator
+    from orb.application.services.orchestration.sync_machine import SyncMachineOrchestrator
     from orb.application.services.orchestration.update_template import UpdateTemplateOrchestrator
     from orb.application.services.orchestration.validate_template import (
         ValidateTemplateOrchestrator,
@@ -100,6 +101,7 @@ def register_orchestrators(container: DIContainer) -> None:
             lambda c: CancelRequestOrchestrator(
                 command_bus=c.get(CommandBus),
                 query_bus=c.get(QueryBus),
+                return_orchestrator=c.get(ReturnMachinesOrchestrator),
                 logger=c.get(LoggingPort),
             ),
         )
@@ -118,6 +120,20 @@ def register_orchestrators(container: DIContainer) -> None:
             lambda c: GetMachineOrchestrator(
                 command_bus=c.get(CommandBus),
                 query_bus=c.get(QueryBus),
+                logger=c.get(LoggingPort),
+            ),
+        )
+    if not container.is_registered(SyncMachineOrchestrator):
+        from orb.application.services.machine_sync_service import MachineSyncService
+        from orb.domain.base import UnitOfWorkFactory
+
+        container.register_singleton(
+            SyncMachineOrchestrator,
+            lambda c: SyncMachineOrchestrator(
+                command_bus=c.get(CommandBus),
+                query_bus=c.get(QueryBus),
+                uow_factory=c.get(UnitOfWorkFactory),
+                machine_sync_service=c.get(MachineSyncService),
                 logger=c.get(LoggingPort),
             ),
         )
@@ -280,6 +296,21 @@ def register_orchestrators(container: DIContainer) -> None:
             WatchRequestStatusOrchestrator,
             lambda c: WatchRequestStatusOrchestrator(
                 query_bus=c.get(QueryBus),
+                logger=c.get(LoggingPort),
+            ),
+        )
+
+    from orb.application.services.orchestration.dashboard_summary import (
+        DashboardSummaryOrchestrator,
+    )
+    from orb.domain.base import UnitOfWorkFactory
+
+    if not container.is_registered(DashboardSummaryOrchestrator):
+        container.register_singleton(
+            DashboardSummaryOrchestrator,
+            lambda c: DashboardSummaryOrchestrator(
+                list_requests=c.get(ListRequestsOrchestrator),
+                uow_factory=c.get(UnitOfWorkFactory),
                 logger=c.get(LoggingPort),
             ),
         )

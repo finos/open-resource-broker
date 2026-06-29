@@ -13,6 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import orb.api.dependencies as deps
+from orb.api.dependencies import CurrentUser, get_current_user
 from orb.api.server import create_fastapi_app
 from orb.config.schemas.server_schema import AuthConfig, ServerConfig
 
@@ -46,7 +47,13 @@ def _make_status_result(request_id: str, status: str):
 def app():
     """FastAPI app with real routers. Tests install dependency_overrides per-test."""
     server_config = ServerConfig(enabled=True, auth=AuthConfig(enabled=False, strategy="none"))  # type: ignore[call-arg]
-    return create_fastapi_app(server_config)
+    _app = create_fastapi_app(server_config)
+    # Route guards require at least operator; inject a suitable identity so that
+    # tests exercise business logic rather than the RBAC layer.
+    _app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        username="test-admin", role="admin", claims={}
+    )
+    return _app
 
 
 @pytest.fixture

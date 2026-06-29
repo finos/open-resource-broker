@@ -229,7 +229,7 @@ See the [CLI Reference](docs/root/cli/cli-reference.md) for the full flag refere
 <details>
 <summary>REST API</summary>
 
-Example API calls. Requires `pip install "orb-py[api]"` and `orb system serve`.
+Example API calls. Requires `pip install "orb-py[api]"` and `orb server start` (add `--foreground` for an in-shell variant).
 
 ```bash
 # Get available templates

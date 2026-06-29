@@ -78,21 +78,43 @@ ci-build-sbom:  ## Generate SBOM files (matches publish.yml workflow)
 	@echo "This matches the GitHub Actions publish.yml workflow exactly"
 	$(MAKE) sbom-generate
 
+# pytest-xdist parallelisation.
+#
+# Two variants are provided:
+#
+#   PYTEST_PARALLEL_LOCAL  — used by the local ``make test`` targets.
+#     ``-n auto`` spawns one worker per CPU core, which is ideal on developer
+#     machines that typically have 8-16 cores.
+#
+#   PYTEST_PARALLEL_CI  — used by CI targets (ci-tests-*).
+#     GitHub-hosted runners expose exactly 2 vCPUs.  ``-n auto`` therefore
+#     spawns 2 workers, but the xdist scheduler introduces coordination
+#     overhead that can make single-worker runs *slower* on 2-core hosts.
+#     Using ``-n 2`` is explicit and avoids surprises if the runner class
+#     changes.  ``--dist=loadscope`` keeps tests in the same class/module on
+#     one worker so class-scoped setUp / fixtures don't re-run per worker.
+#
+#   PYTEST_PARALLEL (kept for backward compat) — points at the CI variant so
+#     any external callers that reference the old variable name still work.
+#
+# Tests that share global state (live AWS, docker daemon, e2e tempdirs) are
+# tagged ``serial`` and run sequentially via a second pytest pass (PYTEST_SERIAL).
+PYTEST_PARALLEL_LOCAL := -n auto --dist=loadscope -m "not serial"
+PYTEST_PARALLEL_CI := -n 2 --dist=loadscope -m "not serial"
+PYTEST_PARALLEL := $(PYTEST_PARALLEL_CI)
+PYTEST_SERIAL := -m serial
+
 ci-tests-unit:  ## Run unit tests only (matches ci.yml unit-tests job)
-	@echo "Running unit tests..."
-	$(call run-tool,pytest,$(TESTS_UNIT) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-unit.xml --junitxml=junit-unit.xml)
+	@echo "Running unit tests (parallel)..."
+	$(call run-tool,pytest,$(TESTS_UNIT) $(PYTEST_PARALLEL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-unit.xml --junitxml=junit-unit.xml)
 
 ci-tests-integration:  ## Run integration tests only (matches ci.yml integration-tests job)
-	@echo "Running integration tests..."
-	$(call run-tool,pytest,$(TESTS_INTEGRATION) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-integration.xml --junitxml=junit-integration.xml)
+	@echo "Running integration tests (parallel)..."
+	$(call run-tool,pytest,$(TESTS_INTEGRATION) $(PYTEST_PARALLEL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-integration.xml --junitxml=junit-integration.xml)
 
 ci-tests-e2e:  ## Run end-to-end tests only (matches ci.yml e2e-tests job)
 	@echo "Running end-to-end tests..."
 	$(call run-tool,pytest,$(TESTS_E2E) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-e2e.xml --junitxml=junit-e2e.xml)
-
-ci-tests-onmoto:  ## Run onmoto (mocked AWS) tests only (matches ci.yml onmoto-tests job)
-	@echo "Running onmoto tests..."
-	$(call run-tool,pytest,$(TESTS_ONMOTO) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-onmoto.xml --junitxml=junit-onmoto.xml)
 
 ci-tests-matrix:  ## Run comprehensive test matrix (matches test-matrix.yml workflow)
 	@echo "Running comprehensive test matrix..."
@@ -102,13 +124,33 @@ ci-tests-performance:  ## Run performance tests only (matches ci.yml performance
 	@echo "Running performance tests..."
 	$(call run-tool,pytest,$(TESTS_PERFORMANCE) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-performance.xml --junitxml=junit-performance.xml)
 
-ci-tests-providers:  ## Run providers tests only (matches ci.yml providers-tests job)
-	@echo "Running providers tests..."
-	$(call run-tool,pytest,$(TESTS_PROVIDERS) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-providers.xml --junitxml=junit-providers.xml)
+# Per-provider matrix target. Pass PROVIDER=<name> to scope the run to a
+# single provider's test subtree (e.g. PROVIDER=aws → tests/providers/aws).
+# CI's per-provider matrix invokes this with PROVIDER set for each entry;
+# local dev can omit it to run the full tests/providers tree.
+PROVIDER ?=
+PROVIDER_SUFFIX := $(if $(PROVIDER),-$(PROVIDER),)
+PROVIDER_PATH := $(if $(PROVIDER),$(TESTS_PROVIDERS)/$(PROVIDER),$(TESTS_PROVIDERS))
+# Serial-marked provider tests live under each provider's ``live/`` subtree.
+# That directory is listed in pyproject's ``norecursedirs`` so the parallel
+# ``ci-tests-providers`` target never descends into it; the serial target
+# below has to point pytest at the path explicitly so collection succeeds.
+# Without --live the root conftest adds ``skip_live`` to every collected
+# test, so the job exits 0 with a clear "163 skipped" line.  CI with live
+# AWS credentials can opt in by setting PYTEST_LIVE=--live.
+PROVIDER_SERIAL_PATH := $(if $(PROVIDER),$(TESTS_PROVIDERS)/$(PROVIDER)/live,$(TESTS_PROVIDERS))
+PYTEST_LIVE ?=
+ci-tests-providers:  ## Run providers tests (PROVIDER=<name> scopes to one provider)
+	@echo "Running provider tests (parallel): $(if $(PROVIDER),$(PROVIDER),all)..."
+	$(call run-tool,pytest,$(PROVIDER_PATH) $(PYTEST_PARALLEL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-providers$(PROVIDER_SUFFIX).xml --junitxml=junit-providers$(PROVIDER_SUFFIX).xml)
+
+ci-tests-providers-serial:  ## Run the serial-marked subset of provider tests (live AWS, etc.)
+	@echo "Running serial provider tests: $(if $(PROVIDER),$(PROVIDER),all)..."
+	$(call run-tool,pytest,$(PROVIDER_SERIAL_PATH) $(PYTEST_SERIAL) $(PYTEST_LIVE) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-providers$(PROVIDER_SUFFIX)-serial.xml --junitxml=junit-providers$(PROVIDER_SUFFIX)-serial.xml)
 
 ci-tests-infrastructure:  ## Run infrastructure tests only (matches ci.yml infrastructure-tests job)
-	@echo "Running infrastructure tests..."
-	$(call run-tool,pytest,$(TESTS_INFRASTRUCTURE) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-infrastructure.xml --junitxml=junit-infrastructure.xml)
+	@echo "Running infrastructure tests (parallel)..."
+	$(call run-tool,pytest,$(TESTS_INFRASTRUCTURE) $(PYTEST_PARALLEL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-infrastructure.xml --junitxml=junit-infrastructure.xml)
 
 ci-check:  ## Run comprehensive CI checks (matches GitHub Actions exactly)
 	@echo "Running comprehensive CI checks that match GitHub Actions pipeline..."

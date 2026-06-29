@@ -62,13 +62,18 @@ class TestStreamEndpoint:
     """Tests for GET /{request_id}/stream SSE endpoint."""
 
     def _make_client(self, app, orchestrator):
+        from orb.api.dependencies import get_request_formatter
+
         app.dependency_overrides[get_request_status_orchestrator] = lambda: orchestrator
+        # Router uses get_request_formatter (header-aware); also override
+        # the non-header variant for safety.
+        app.dependency_overrides[get_request_formatter] = _make_formatter
         app.dependency_overrides[get_response_formatting_service] = _make_formatter
         return TestClient(app, raise_server_exceptions=False)
 
     def test_happy_path_sse_data_lines_format(self, requests_app):
         """SSE lines are prefixed with 'data: ' and contain valid JSON."""
-        orchestrator = _make_orchestrator_returning("running", "completed")
+        orchestrator = _make_orchestrator_returning("running", "complete")
         client = self._make_client(requests_app, orchestrator)
 
         with client.stream("GET", "/requests/req-stream-1/stream?interval=0.5&timeout=30") as resp:
@@ -88,15 +93,20 @@ class TestStreamEndpoint:
             json.loads(payload)
 
     def test_stream_ends_on_completed_status(self, requests_app):
-        """Stream closes after receiving COMPLETED terminal status."""
-        orchestrator = _make_orchestrator_returning("running", "completed")
+        """Stream closes after receiving COMPLETE terminal status.
+
+        The domain enum uses "complete" (not "completed") as the wire value;
+        the router now delegates to RequestStatus.is_terminal() so only valid
+        enum values close the stream.
+        """
+        orchestrator = _make_orchestrator_returning("running", "complete")
         client = self._make_client(requests_app, orchestrator)
 
         with client.stream("GET", "/requests/req-stream-1/stream?interval=0.5&timeout=30") as resp:
             events = _collect_sse_lines(resp)
 
         statuses = [e["requests"][0]["status"] for e in events if e.get("requests")]
-        assert "completed" in statuses
+        assert "complete" in statuses
         # Orchestrator should not be called more times than needed
         assert orchestrator.execute.await_count <= 3
 

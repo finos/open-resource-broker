@@ -21,7 +21,7 @@ Configure logging in your `config.json`:
 {
   "logging": {
     "level": "INFO",
-    "file_path": "logs/app.log",
+    "file_path": "logs/orb.log",
     "console_enabled": true
   }
 }
@@ -51,25 +51,25 @@ The application uses structured logging:
 **Request Lifecycle:**
 ```bash
 # Track request from creation to completion
-grep "req-123" logs/app.log | grep -E "(created|status|completed)"
+grep "req-123" logs/orb.log | grep -E "(created|status|completed)"
 ```
 
 **Error Analysis:**
 ```bash
 # Count error types
-grep "ERROR" logs/app.log | cut -d']' -f2 | cut -d':' -f1 | sort | uniq -c
+grep "ERROR" logs/orb.log | cut -d']' -f2 | cut -d':' -f1 | sort | uniq -c
 
 # Find recent errors
-tail -100 logs/app.log | grep "ERROR"
+tail -100 logs/orb.log | grep "ERROR"
 ```
 
 **Performance Analysis:**
 ```bash
 # Find slow operations
-grep "slow" logs/app.log
+grep "slow" logs/orb.log
 
 # Track request duration
-grep "Request.*completed" logs/app.log | grep -o "duration=[0-9]*"
+grep "Request.*completed" logs/orb.log | grep -o "duration=[0-9]*"
 ```
 
 ### Log Rotation
@@ -80,7 +80,7 @@ For production environments, set up log rotation:
 Create `/etc/logrotate.d/hostfactory`:
 
 ```
-/path/to/logs/app.log {
+/path/to/logs/orb.log {
     daily
     rotate 30
     compress
@@ -94,11 +94,11 @@ Create `/etc/logrotate.d/hostfactory`:
 #### Manual Log Management
 ```bash
 # Archive old logs
-mv logs/app.log logs/app.log.$(date +%Y%m%d)
-touch logs/app.log
+mv logs/orb.log logs/orb.log.$(date +%Y%m%d)
+touch logs/orb.log
 
 # Compress old logs
-gzip logs/app.log.*
+gzip logs/orb.log.*
 
 # Clean up old logs (keep last 30 days)
 find logs/ -name "app.log.*" -mtime +30 -delete
@@ -194,7 +194,7 @@ Create a simple error monitoring script:
 #!/bin/bash
 # error_monitor.sh
 
-LOG_FILE="logs/app.log"
+LOG_FILE="logs/orb.log"
 ERROR_COUNT=$(grep "ERROR" "$LOG_FILE" | wc -l)
 RECENT_ERRORS=$(tail -100 "$LOG_FILE" | grep "ERROR" | wc -l)
 
@@ -219,10 +219,10 @@ Monitor request lifecycle:
 python run.py getReturnRequests --active-only | jq '. | length'
 
 # List recent requests
-grep "Request.*created" logs/app.log | tail -10
+grep "Request.*created" logs/orb.log | tail -10
 
 # Track request completion
-grep "Request.*completed" logs/app.log | tail -10
+grep "Request.*completed" logs/orb.log | tail -10
 ```
 
 ### Machine Monitoring
@@ -234,7 +234,7 @@ Track machine provisioning:
 python run.py getReturnRequests | jq '.[] | .machines[] | .status' | sort | uniq -c
 
 # Monitor provisioning time
-grep "Machine.*provisioned" logs/app.log | tail -10
+grep "Machine.*provisioned" logs/orb.log | tail -10
 ```
 
 ### AWS API Monitoring
@@ -243,13 +243,13 @@ Monitor AWS API usage:
 
 ```bash
 # Count API calls
-grep "AWS API" logs/app.log | wc -l
+grep "AWS API" logs/orb.log | wc -l
 
 # Check for rate limiting
-grep "rate limit" logs/app.log
+grep "rate limit" logs/orb.log
 
 # Monitor API errors
-grep "AWS API.*error" logs/app.log | tail -10
+grep "AWS API.*error" logs/orb.log | tail -10
 ```
 
 ## Performance Monitoring
@@ -263,7 +263,7 @@ Monitor command execution time:
 time python run.py getAvailableTemplates
 
 # Monitor slow operations
-grep "slow" logs/app.log
+grep "slow" logs/orb.log
 ```
 
 ### Resource Usage
@@ -290,7 +290,7 @@ For JSON storage:
 ls -lh data/request_database.json
 
 # Monitor database operations
-grep "database" logs/app.log | tail -10
+grep "database" logs/orb.log | tail -10
 ```
 
 ## Alerting
@@ -303,7 +303,7 @@ Create a basic alerting script:
 #!/bin/bash
 # alert_check.sh
 
-LOG_FILE="logs/app.log"
+LOG_FILE="logs/orb.log"
 ALERT_EMAIL="admin@example.com"
 
 # Check for critical errors
@@ -344,7 +344,7 @@ crontab -e
 #!/bin/bash
 # daily_summary.sh
 
-LOG_FILE="logs/app.log"
+LOG_FILE="logs/orb.log"
 DATE=$(date +%Y-%m-%d)
 
 echo "Host Factory Daily Summary - $DATE"
@@ -404,8 +404,8 @@ fi
 
 # Check log file size
 echo -n "Log file size: "
-if [ -f "logs/app.log" ]; then
-    LOG_SIZE=$(du -m logs/app.log | cut -f1)
+if [ -f "logs/orb.log" ]; then
+    LOG_SIZE=$(du -m logs/orb.log | cut -f1)
     if [ "$LOG_SIZE" -lt 100 ]; then
         echo "OK (${LOG_SIZE}MB)"
     else
@@ -422,26 +422,26 @@ fi
 
 ```bash
 # Top error messages
-grep "ERROR" logs/app.log | cut -d']' -f3 | sort | uniq -c | sort -nr | head -10
+grep "ERROR" logs/orb.log | cut -d']' -f3 | sort | uniq -c | sort -nr | head -10
 
 # Error timeline
-grep "ERROR" logs/app.log | cut -d' ' -f1-2 | uniq -c
+grep "ERROR" logs/orb.log | cut -d' ' -f1-2 | uniq -c
 
 # AWS-specific errors
-grep "ERROR.*AWS" logs/app.log | tail -20
+grep "ERROR.*AWS" logs/orb.log | tail -20
 ```
 
 ### Performance Analysis
 
 ```bash
 # Slow operations
-grep -E "(slow|timeout|delay)" logs/app.log
+grep -E "(slow|timeout|delay)" logs/orb.log
 
 # Request duration analysis
-grep "duration=" logs/app.log | grep -o "duration=[0-9]*" | sort -n
+grep "duration=" logs/orb.log | grep -o "duration=[0-9]*" | sort -n
 
 # API call frequency
-grep "AWS API" logs/app.log | cut -d' ' -f1-2 | uniq -c
+grep "AWS API" logs/orb.log | cut -d' ' -f1-2 | uniq -c
 ```
 
 ## Troubleshooting Monitoring
@@ -461,11 +461,11 @@ chmod 755 logs
 #### High Log File Size
 ```bash
 # Check log file size
-ls -lh logs/app.log
+ls -lh logs/orb.log
 
 # Rotate logs manually
-mv logs/app.log logs/app.log.old
-touch logs/app.log
+mv logs/orb.log logs/orb.log.old
+touch logs/orb.log
 ```
 
 #### Missing Health Check Data
@@ -490,7 +490,7 @@ Configure syslog forwarding:
 {
   "logging": {
     "level": "INFO",
-    "file_path": "logs/app.log",
+    "file_path": "logs/orb.log",
     "console_enabled": true,
     "syslog_enabled": true,
     "syslog_facility": "local0"
@@ -508,7 +508,7 @@ echo "local0.*    @@logserver:514" >> /etc/rsyslog.conf
 systemctl restart rsyslog
 
 # Using filebeat (ELK stack)
-# Configure filebeat.yml to monitor logs/app.log
+# Configure filebeat.yml to monitor logs/orb.log
 ```
 
 ## Next Steps

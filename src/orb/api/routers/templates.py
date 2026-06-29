@@ -14,12 +14,19 @@ from orb.api.dependencies import (
     get_get_template_orchestrator,
     get_list_templates_orchestrator,
     get_refresh_templates_orchestrator,
-    get_scheduler_strategy,
+    get_request_scheduler,
+    get_template_generation_service,
     get_update_template_orchestrator,
     get_validate_template_orchestrator,
+    require_role,
 )
 from orb.api.models.base import APIRequest
-from orb.api.models.responses import TemplateListResponse, TemplateMutationResponse
+from orb.api.models.responses import (
+    GenerateTemplatesBody,
+    TemplateListResponse,
+    TemplateMutationResponse,
+)
+from orb.application.dto.template_generation_dto import TemplateGenerationRequest
 from orb.application.services.orchestration.dtos import (
     CreateTemplateInput,
     DeleteTemplateInput,
@@ -29,6 +36,7 @@ from orb.application.services.orchestration.dtos import (
     UpdateTemplateInput,
     ValidateTemplateInput,
 )
+from orb.application.services.template_generation_service import TemplateGenerationService
 from orb.domain.base.exceptions import EntityNotFoundError
 from orb.infrastructure.error.decorators import handle_rest_exceptions
 
@@ -42,7 +50,8 @@ UPDATE_ORCHESTRATOR = Depends(get_update_template_orchestrator)
 DELETE_ORCHESTRATOR = Depends(get_delete_template_orchestrator)
 VALIDATE_ORCHESTRATOR = Depends(get_validate_template_orchestrator)
 REFRESH_ORCHESTRATOR = Depends(get_refresh_templates_orchestrator)
-SCHEDULER_STRATEGY = Depends(get_scheduler_strategy)
+SCHEDULER_STRATEGY = Depends(get_request_scheduler)
+TEMPLATE_GENERATION_SERVICE = Depends(get_template_generation_service)
 PROVIDER_API_QUERY = Query(None, description="Filter by provider API")
 TEMPLATE_DATA_BODY = Body(...)
 
@@ -97,23 +106,40 @@ async def list_templates(
     provider_api: Optional[str] = PROVIDER_API_QUERY,
     limit: int = Query(50, description="Limit number of results"),
     offset: int = Query(0, description="Number of results to skip"),
+    cursor: Optional[str] = Query(
+        None, description="Opaque pagination cursor (preferred over offset)"
+    ),
+    q: Optional[str] = Query(None, description="Case-insensitive substring search"),
+    sort: Optional[str] = Query(None, description='Sort: "field" or "-field" (desc)'),
     orchestrator=LIST_ORCHESTRATOR,
     scheduler=SCHEDULER_STRATEGY,
 ) -> JSONResponse:
-    """
-    List all available templates.
-
-    - **provider_api**: Filter templates by provider API
-    - **limit**: Limit number of results
-    - **offset**: Number of results to skip
-    """
+    """List all available templates with server-side filter/sort/pagination."""
     result = await orchestrator.execute(
-        ListTemplatesInput(active_only=True, provider_api=provider_api, limit=limit, offset=offset)
+        ListTemplatesInput(
+            active_only=True,
+            provider_api=provider_api,
+            limit=limit,
+            offset=offset,
+            cursor=cursor,
+            q=q,
+            sort=sort,
+        )
     )
-    return JSONResponse(
-        status_code=200,
-        content=scheduler.format_templates_response(result.templates),
-    )
+    payload = scheduler.format_templates_response(result.templates)
+    # The scheduler formatter does not carry pagination metadata, so the
+    # orchestrator's total_count and next_cursor are overlaid on the
+    # response body. total_count falls back to the page size when the
+    # orchestrator does not provide it.
+    if isinstance(payload, dict):
+        payload = {
+            **payload,
+            "total_count": (
+                result.total_count if result.total_count is not None else len(result.templates)
+            ),
+            "next_cursor": result.next_cursor,
+        }
+    return JSONResponse(status_code=200, content=payload)
 
 
 @router.post(
@@ -161,6 +187,7 @@ async def validate_template(
 )
 @handle_rest_exceptions(endpoint="/api/v1/templates/refresh", method="POST")
 async def refresh_templates(
+    _user=Depends(require_role("admin")),
     orchestrator=REFRESH_ORCHESTRATOR,
     scheduler=SCHEDULER_STRATEGY,
 ) -> JSONResponse:
@@ -171,6 +198,53 @@ async def refresh_templates(
     return JSONResponse(
         status_code=200,
         content=scheduler.format_templates_response(result.templates),
+    )
+
+
+@router.post(
+    "/generate",
+    summary="Generate example templates",
+    description="Generate example templates per provider (idempotent unless force=true)",
+)
+@handle_rest_exceptions(endpoint="/api/v1/templates/generate", method="POST")
+async def generate_templates(
+    body: GenerateTemplatesBody,
+    _user=Depends(require_role("admin")),
+    service: TemplateGenerationService = TEMPLATE_GENERATION_SERVICE,
+) -> JSONResponse:
+    """
+    Generate example templates for one or all providers.
+
+    - **body**: Generation options (provider selection, force overwrite, etc.)
+    """
+    request = TemplateGenerationRequest(
+        specific_provider=body.provider,
+        all_providers=body.all_providers,
+        provider_api=body.provider_api,
+        provider_specific=body.provider_specific,
+        provider_type_filter=body.provider_type,
+        force_overwrite=body.force,
+    )
+    result = await service.generate_templates(request)
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": result.status,
+            "message": result.message,
+            "total_templates": result.total_templates,
+            "created_count": result.created_count,
+            "skipped_count": result.skipped_count,
+            "providers": [
+                {
+                    "provider": p.provider,
+                    "filename": p.filename,
+                    "templates_count": p.templates_count,
+                    "status": p.status,
+                    "reason": p.reason,
+                }
+                for p in result.providers
+            ],
+        },
     )
 
 
@@ -209,6 +283,7 @@ async def get_template(
 @handle_rest_exceptions(endpoint="/api/v1/templates", method="POST")
 async def create_template(
     template_data: TemplateCreateRequest,
+    _user=Depends(require_role("admin")),
     orchestrator=CREATE_ORCHESTRATOR,
     scheduler=SCHEDULER_STRATEGY,
 ) -> JSONResponse:
@@ -253,6 +328,7 @@ async def create_template(
 async def update_template(
     template_id: str,
     template_data: TemplateUpdateRequest,
+    _user=Depends(require_role("admin")),
     orchestrator=UPDATE_ORCHESTRATOR,
     scheduler=SCHEDULER_STRATEGY,
 ) -> JSONResponse:
@@ -295,6 +371,7 @@ async def update_template(
 @handle_rest_exceptions(endpoint="/api/v1/templates/{template_id}", method="DELETE")
 async def delete_template(
     template_id: str,
+    _user=Depends(require_role("admin")),
     orchestrator=DELETE_ORCHESTRATOR,
     scheduler=SCHEDULER_STRATEGY,
 ) -> JSONResponse:

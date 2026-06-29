@@ -1,11 +1,9 @@
 """HostFactory response formatting — converts domain objects to HF wire format.
 
-NOTE (dead code): HostFactoryResponseFormatter is not referenced anywhere in the
-production code path.  All equivalent formatting logic lives inline on
-HostFactorySchedulerStrategy (hostfactory_strategy.py).  This class was
-extracted as a refactoring step but the strategy was never updated to delegate
-to it.  Do not delete — it may be wired up in a future cleanup — but do not
-rely on it being called at runtime.
+This module is the contract-test target for HF response shapes
+(tests/unit/test_hf_response_contracts.py). HostFactorySchedulerStrategy
+keeps inline formatting; this class exists as the reference shape the
+tests assert against.
 """
 
 import json
@@ -177,6 +175,24 @@ class HostFactoryResponseFormatter:
                 hf_request["providerType"] = req_dict["provider_type"]
             if req_dict.get("provider_api"):
                 hf_request["providerApi"] = req_dict["provider_api"]
+
+            # Lifecycle timestamps. HostFactory's wire spec is silent on
+            # these but our UI drawer + dashboard activity stepper rely on
+            # them. Forwarding when present keeps HF clients ignoring them
+            # (they're additional fields) while giving the UI what it needs.
+            for ts_field in (
+                "created_at",
+                "started_at",
+                "first_status_check",
+                "last_status_check",
+                "completed_at",
+                "request_type",
+                "successful_count",
+                "requested_count",
+                "template_id",
+            ):
+                if req_dict.get(ts_field) is not None:
+                    hf_request[ts_field] = req_dict[ts_field]
 
             formatted_requests.append(hf_request)
 

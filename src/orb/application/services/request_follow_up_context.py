@@ -4,7 +4,7 @@ Import from ``orb.domain.base.follow_up_context`` directly for new code.
 This module exists only for backward compatibility.
 """
 
-from orb.domain.base.follow_up_context import (  # noqa: F401
+from orb.domain.base.follow_up_context import (
     DeploymentPollingFollowUpContext,
     FollowUpContext,
     TerminationFollowUpContext,

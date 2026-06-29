@@ -84,16 +84,6 @@ class StorageTestCommandData:
         self.verbose = kwargs.get("verbose", False)
 
 
-class SystemServeCommandData:
-    """Data structure for system serve command."""
-
-    def __init__(self, **kwargs: Any):
-        self.host = kwargs.get("host", "localhost")
-        self.port = kwargs.get("port", 8000)
-        self.reload = kwargs.get("reload", False)
-        self.log_level = kwargs.get("log_level", "INFO")
-
-
 class UtilityCommandFactory:
     """Factory for creating utility command data structures."""
 
@@ -134,7 +124,3 @@ class UtilityCommandFactory:
     def create_storage_test_command_data(self, **kwargs: Any) -> StorageTestCommandData:
         """Create storage test command data structure."""
         return StorageTestCommandData(**kwargs)
-
-    def create_system_serve_command_data(self, **kwargs: Any) -> SystemServeCommandData:
-        """Create system serve command data structure."""
-        return SystemServeCommandData(**kwargs)

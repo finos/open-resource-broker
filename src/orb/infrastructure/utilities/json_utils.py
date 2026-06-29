@@ -6,7 +6,7 @@ use these utilities to ensure consistent error handling across the codebase.
 """
 
 import json
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from orb.infrastructure.logging.logger import get_logger
 
@@ -22,7 +22,7 @@ class JSONParseError(Exception):
 
 
 def safe_json_loads(
-    data: Union[str, bytes],
+    data: str | bytes,
     default: Any = None,
     raise_on_error: bool = False,
     context: Optional[str] = None,

@@ -35,6 +35,11 @@ _HF_TEMPLATE_WITH_TAGS: dict[str, Any] = {
 }
 
 
+def _no_op_config(_container: Any) -> None:
+    """Config factory used by the scheduler-registry tests below."""
+    return None
+
+
 # ---------------------------------------------------------------------------
 # load_templates_from_path — both schedulers
 # ---------------------------------------------------------------------------
@@ -145,9 +150,19 @@ def test_default_load_delegates_hf_file_to_hf_strategy(tmp_path):
 
     registry = get_scheduler_registry()
     if not registry.is_registered("hostfactory"):
-        registry.register("hostfactory", HostFactorySchedulerStrategy, lambda c: None)
+        registry.register(
+            "hostfactory",
+            HostFactorySchedulerStrategy,
+            _no_op_config,
+            strategy_class=HostFactorySchedulerStrategy,
+        )
     if not registry.is_registered("default"):
-        registry.register("default", DefaultSchedulerStrategy, lambda c: None)
+        registry.register(
+            "default",
+            DefaultSchedulerStrategy,
+            _no_op_config,
+            strategy_class=DefaultSchedulerStrategy,
+        )
 
     f = tmp_path / "hf_file.json"
     write_hf_file(f, [_MINIMAL_HF_TEMPLATE_ON_DISK])
@@ -163,9 +178,19 @@ def test_hf_load_delegates_default_file_to_default_strategy(tmp_path):
 
     registry = get_scheduler_registry()
     if not registry.is_registered("hostfactory"):
-        registry.register("hostfactory", HostFactorySchedulerStrategy, lambda c: None)
+        registry.register(
+            "hostfactory",
+            HostFactorySchedulerStrategy,
+            _no_op_config,
+            strategy_class=HostFactorySchedulerStrategy,
+        )
     if not registry.is_registered("default"):
-        registry.register("default", DefaultSchedulerStrategy, lambda c: None)
+        registry.register(
+            "default",
+            DefaultSchedulerStrategy,
+            _no_op_config,
+            strategy_class=DefaultSchedulerStrategy,
+        )
 
     f = tmp_path / "default_file.json"
     write_default_file(f, [_MINIMAL_SNAKE_TEMPLATE])

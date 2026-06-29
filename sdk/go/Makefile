@@ -13,4 +13,4 @@ lint:
 	golangci-lint run ./...
 
 export-spec:
-	@echo "Start ORB and export: orb system serve --port 18999 & sleep 3 && curl -s http://localhost:18999/openapi.json > openapi.json"
+	@echo "Start ORB and export: orb server start --foreground --api-only --port 18999 & sleep 3 && curl -s http://localhost:18999/openapi.json > openapi.json"

@@ -8,6 +8,28 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 <!-- insertion marker -->
 ## Unreleased
 
+### BREAKING CHANGES
+
+- **Daemon token file at `<work_dir>/server/orb-server.token`.**
+  When `orb server start` is invoked (daemon or `--foreground` mode), a
+  random bearer token is written to `<work_dir>/server/orb-server.token`
+  with mode `0600`.  The CLI reads this file to authenticate loopback admin
+  requests such as `orb server reload`.  The file is removed when the daemon
+  exits.  Operators who snapshot the work directory should exclude
+  `*.token` from backups.
+
+- **`allow_destructive_admin` config field (default `false`).**
+  Administrative endpoints that can wipe state (purge, bulk-delete, etc.)
+  now require `allow_destructive_admin: true` in the server config.  The
+  field defaults to `false` and must be opted in explicitly.
+
+- **SQL storage strategy applies Alembic migrations on startup.**
+  When `storage.strategy` is `sql`, the server now runs `alembic upgrade
+  head` automatically on startup.  Operators using a managed database
+  (RDS, Aurora) should ensure the database user has DDL privileges, or run
+  migrations out-of-band with `orb db upgrade` before starting the server
+  with `allow_auto_migrate: false`.
+
 ### Added
 
 - New `[aws]` extra (alias for AWS deps currently in core). The canonical install

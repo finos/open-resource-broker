@@ -29,6 +29,37 @@ def _id_str(value_obj: Any) -> str:
     return str(value_obj.value) if hasattr(value_obj, "value") else str(value_obj)
 
 
+def _unwrap_provider_data(raw: Any) -> dict[str, Any]:
+    """Normalise the stored ``provider_data`` dict to a flat envelope.
+
+    Old records were persisted with a nested wrapper shape written by the AWS
+    provisioning adapter before the envelope was flattened:
+
+        {"method": "provisioning_adapter", "provider_data": {"target_units": 3, ...}}
+
+    The new shape places all keys at the top level:
+
+        {"method": "provisioning_adapter", "target_units": 3, ...}
+
+    This shim detects the legacy shape on read (presence of a "provider_data"
+    dict value nested inside the top-level provider_data dict) and promotes its
+    contents to the top level, removing the redundant nested key.  It is
+    idempotent: records already written in the flat format pass through
+    unchanged.
+    """
+    if not isinstance(raw, dict):
+        return raw or {}
+
+    nested = raw.get("provider_data")
+    if not isinstance(nested, dict):
+        return raw  # already flat or no nesting — nothing to do
+
+    # Promote nested keys; caller's top-level keys take priority.
+    merged: dict[str, Any] = {**nested, **raw}
+    del merged["provider_data"]
+    return merged
+
+
 class RequestSerializer(BaseEntitySerializer):
     """Handles Request aggregate serialization/deserialization."""
 
@@ -36,6 +67,26 @@ class RequestSerializer(BaseEntitySerializer):
         """Initialize the instance."""
         super().__init__()
         self._dt = GenericEntitySerializer(Request, "Request", "request_id")
+
+    @staticmethod
+    def _apply_nullable_defaults(data: dict[str, Any]) -> dict[str, Any]:
+        """Coerce nullable JSON columns to safe empty containers.
+
+        Applied unconditionally so NULL values stored in legacy rows before
+        the NOT NULL migration are never passed as Python None to from_dict
+        for fields that expect a list or dict.
+        """
+        if data.get("metadata") is None:
+            data["metadata"] = {}
+        if data.get("error_details") is None:
+            data["error_details"] = {}
+        if data.get("provider_data") is None:
+            data["provider_data"] = {}
+        if data.get("resource_ids") is None:
+            data["resource_ids"] = []
+        if data.get("machine_ids") is None:
+            data["machine_ids"] = []
+        return data
 
     def _parse_request_id(self, request_id_data: Any) -> RequestId:
         """Parse RequestId from various formats."""
@@ -112,6 +163,9 @@ class RequestSerializer(BaseEntitySerializer):
     def from_dict(self, data: dict[str, Any]) -> Request:
         """Convert dictionary to Request aggregate with additional field support."""
         try:
+            data = dict(data)  # shallow copy — never mutate the caller's dict
+            data = self._apply_nullable_defaults(data)
+
             # Parse datetime fields using shared helper
             created_at = datetime.fromisoformat(data["created_at"])
             started_at = self._dt.deserialize_datetime(data.get("started_at"))
@@ -151,7 +205,7 @@ class RequestSerializer(BaseEntitySerializer):
                 # Metadata and error details
                 "metadata": data.get("metadata", {}),
                 "error_details": data.get("error_details", {}),
-                "provider_data": data.get("provider_data", {}),
+                "provider_data": _unwrap_provider_data(data.get("provider_data", {})),
                 # Timestamps
                 "created_at": created_at,
                 "started_at": started_at,
@@ -421,6 +475,21 @@ class RequestRepositoryImpl(StorageRepositoryMixin, RequestRepositoryInterface):
         except Exception as e:
             self.logger.error("Failed to check if request %s exists: %s", request_id, e)
             raise
+
+    def count_by_status(self) -> dict[str, int]:
+        """Return ``{status: count}`` for all requests.
+
+        Delegates to ``storage_strategy.count_by_column("status")`` when the
+        underlying strategy supports it (SQL fast path).  Falls back to the
+        domain-interface default (list all + group) for file-based backends.
+        """
+        strategy = getattr(self, "storage_strategy", None)
+        if strategy is not None and hasattr(strategy, "count_by_column"):
+            result = strategy.count_by_column("status")
+            if result:
+                return result
+        # Slow path: list all rows and group in Python.
+        return super().count_by_status()
 
     def count_by_date_range(self, start_date: datetime, end_date: datetime) -> int:
         """Count requests within date range."""

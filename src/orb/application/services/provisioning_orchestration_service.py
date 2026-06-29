@@ -227,6 +227,15 @@ class ProvisioningOrchestrationService:
                 self._record_provider_failure(selection_result.provider_name)
                 break
 
+            # Async provider accepted the request and is provisioning out of
+            # band; polling owns the final status from here.  Retrying would
+            # create a second fleet alongside the one already provisioning,
+            # which then shows up as a phantom failure when it reports empty.
+            # Break out and let the status-check loop drive the single
+            # accepted fleet to completion.
+            if isinstance(last_result.outcome, Accepted):
+                break
+
             if remaining > 0 and not last_result.is_final:
                 # Partial fulfillment, retry may help — persist ACQUIRING status
                 self._logger.info(
@@ -358,26 +367,36 @@ class ProvisioningOrchestrationService:
                 resource_ids = result.data.get("resource_ids", [])
                 instances = result.data.get("instances", [])
 
-                provider_data = result.data.get("provider_data", None) or (
-                    result.metadata or {}
-                ).get("provider_data", {})
-                fulfillment_final = provider_data.get("fulfillment_final", False)
-                has_capacity_error = provider_data.get("capacity_constrained", False)
+                # Handler provider_data is now flat-merged into result.metadata
+                # by the instance-operation service. Read fulfillment signals
+                # from the top-level metadata. Falls back to result.data's
+                # provider_data sub-key for handlers that have not yet been
+                # migrated to the flat shape (e.g. legacy code paths).
+                metadata_dict: dict[str, Any] = dict(result.metadata or {})
+                legacy_pd = result.data.get("provider_data") or {}
+                if isinstance(legacy_pd, dict):
+                    for k, v in legacy_pd.items():
+                        metadata_dict.setdefault(k, v)
 
-                # Merge routing telemetry (strategy-level) into provider_data so it
-                # reaches persistence alongside the provider-level data.
-                merged_provider_data: dict[str, Any] = dict(result.metadata or {})
+                fulfillment_final = bool(metadata_dict.get("fulfillment_final", False))
+                has_capacity_error = bool(metadata_dict.get("capacity_constrained", False))
+
+                merged_provider_data: dict[str, Any] = dict(metadata_dict)
                 if result.routing_info:
                     merged_provider_data.update(result.routing_info)
+                # Surface the capacity-constrained signal on the outcome
+                # metadata so status handlers + telemetry can distinguish
+                # "still pending" (provider just hasn't reported yet) from
+                # "stuck pending" (provider returned a capacity error).
+                # Provider handlers set the flag; consumers read it.
+                merged_provider_data["capacity_constrained"] = has_capacity_error
 
-                # Build a typed OperationOutcome from the ProviderResult payload.
-                # AWS provider returns request-IDs with pending instances (async
-                # model) — express that as Accepted rather than pretending it is
-                # immediately Completed.
-                is_immediately_final = (
-                    not has_capacity_error and len(instances) >= count
-                ) or fulfillment_final
-                if is_immediately_final:
+                # fulfillment_final=True means the provider has finished
+                # provisioning and the result is the final word — emit
+                # Completed. False means instances exist but may still be
+                # pending; emit Accepted so the polling loop owns the final
+                # status transition.
+                if fulfillment_final:
                     outcome: OperationOutcome = Completed(
                         resource_ids=resource_ids,
                         metadata=merged_provider_data,

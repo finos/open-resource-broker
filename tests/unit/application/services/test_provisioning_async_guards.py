@@ -7,7 +7,7 @@ Covers:
 
 import asyncio
 from typing import cast
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -200,112 +200,43 @@ class TestDispatchTimeout:
 
 
 # ---------------------------------------------------------------------------
-# asyncio.to_thread tests
+# Accepted-outcome short-circuit
 # ---------------------------------------------------------------------------
 
 
-class TestPersistAcquiringToThread:
-    """_persist_acquiring must run in a worker thread via asyncio.to_thread."""
+class TestAcceptedOutcomeBreaksRetryLoop:
+    """Async providers that return Accepted must not be retried.
+
+    A retry creates a SECOND fleet / batch alongside the one the provider
+    already accepted; downstream status-check then sees one healthy fleet and
+    N-1 empty fleets and flips the request to ``complete_with_error``.
+
+    This contract replaces the previous retry-loop tests against
+    ``_persist_acquiring``: the persist hook only ran on the retry path,
+    and the retry path now exits immediately on ``Accepted`` (the only
+    outcome any in-tree provider emits when more attempts could possibly
+    help).  If a future provider emits ``RequiresFollowUp``, the retry
+    persist path becomes reachable again and tests should be restored.
+    """
 
     @pytest.mark.asyncio
-    async def test_persist_acquiring_called_via_to_thread(self):
-        """asyncio.to_thread is used when calling _persist_acquiring."""
+    async def test_accepted_outcome_exits_loop_after_one_attempt(self):
+        """A single Accepted attempt must end the loop even with remaining > 0."""
         from orb.providers.base.strategy.provider_strategy import ProviderResult
 
         svc = _make_service(dispatch_timeout=10.0)
 
-        # First attempt: partial (is_final=False) — triggers persist_acquiring
-        # Second attempt: fully fulfilled
-        first_result = ProviderResult.success_result(
+        accepted_result = ProviderResult.success_result(
             data={
-                "resource_ids": ["i-partial"],
-                "instances": [{"id": "i-partial"}],
-                "instance_ids": ["i-partial"],
+                "resource_ids": ["fleet-abc"],
+                "instances": [],
+                "instance_ids": [],
             },
-            metadata={},
-        )
-        second_result = ProviderResult.success_result(
-            data={
-                "resource_ids": ["i-rest"],
-                "instances": [{"id": "i-rest"}],
-                "instance_ids": ["i-rest"],
-            },
+            # fulfillment_final omitted (defaults to False) → Accepted outcome.
             metadata={},
         )
         svc._provider_selection_port.execute_operation = AsyncMock(
-            side_effect=[first_result, second_result]
-        )
-
-        scheduler = MagicMock()
-        scheduler.format_template_for_provider.return_value = {}
-        cast(MagicMock, svc._container).get.return_value = scheduler
-
-        to_thread_calls: list = []
-
-        original_to_thread = asyncio.to_thread
-
-        async def _spy_to_thread(func, *args, **kwargs):
-            to_thread_calls.append(func)
-            return await original_to_thread(func, *args, **kwargs)
-
-        # Build a request that needs 2 instances so a second attempt is triggered
-        request = MagicMock()
-        request.request_id = "req-persist-test"
-        request.requested_count = 2
-        request.metadata = {}
-
-        call_counter = [0]
-
-        def _update_metadata(d):
-            call_counter[0] += 1
-            return request
-
-        request.update_metadata = _update_metadata
-
-        # _persist_acquiring needs update_status
-        request.update_status = MagicMock(return_value=request)
-
-        # Patch asyncio.to_thread in the module under test
-        with patch(
-            "orb.application.services.provisioning_orchestration_service.asyncio.to_thread",
-            side_effect=_spy_to_thread,
-        ):
-            # We don't need the full loop to run — just verify to_thread is called
-            # by exercising the partial-fulfillment path
-            await svc.execute_provisioning(_make_template(), request, _make_selection_result())
-
-        # _persist_acquiring should have been scheduled via to_thread
-        persist_calls = [f for f in to_thread_calls if f == svc._persist_acquiring]
-        assert len(persist_calls) >= 1, (
-            "_persist_acquiring was not dispatched via asyncio.to_thread"
-        )
-
-    @pytest.mark.asyncio
-    async def test_persist_acquiring_failure_does_not_abort_loop(self):
-        """If _persist_acquiring raises, the retry loop continues with in-memory state."""
-        from orb.providers.base.strategy.provider_strategy import ProviderResult
-
-        svc = _make_service(dispatch_timeout=10.0)
-
-        # Two partial attempts, then a final one
-        partial_result = ProviderResult.success_result(
-            data={
-                "resource_ids": ["i-p"],
-                "instances": [{"id": "i-p"}],
-                "instance_ids": ["i-p"],
-            },
-            metadata={},
-        )
-        final_result = ProviderResult.success_result(
-            data={
-                "resource_ids": ["i-f"],
-                "instances": [{"id": "i-f"}],
-                "instance_ids": ["i-f"],
-            },
-            metadata={},
-        )
-        svc._provider_selection_port.execute_operation = AsyncMock(
-            side_effect=[partial_result, final_result]
+            side_effect=[accepted_result, accepted_result, accepted_result]
         )
 
         scheduler = MagicMock()
@@ -313,28 +244,16 @@ class TestPersistAcquiringToThread:
         cast(MagicMock, svc._container).get.return_value = scheduler
 
         request = MagicMock()
-        request.request_id = "req-persist-fail"
+        request.request_id = "req-accepted-once"
         request.requested_count = 2
         request.metadata = {}
         request.update_metadata = lambda d: request
         request.update_status = MagicMock(return_value=request)
 
-        # Make _persist_acquiring return failure (second return value = False)
-        def _failing_persist(req):
-            return req, False
+        result = await svc.execute_provisioning(_make_template(), request, _make_selection_result())
 
-        svc._persist_acquiring = _failing_persist  # type: ignore[method-assign]
-
-        async def _inline_to_thread(func, *args, **kwargs):
-            return func(*args, **kwargs)
-
-        with patch(
-            "orb.application.services.provisioning_orchestration_service.asyncio.to_thread",
-            side_effect=_inline_to_thread,
-        ):
-            await svc.execute_provisioning(_make_template(), request, _make_selection_result())
-
-        # Loop should have continued despite persist failure
-        cast(MagicMock, svc._logger).warning.assert_called()
-        warning_msgs = " ".join(str(c) for c in cast(MagicMock, svc._logger).warning.call_args_list)
-        assert "ACQUIRING persist failed" in warning_msgs or "persist" in warning_msgs.lower()
+        # Exactly one provider call: the Accepted outcome short-circuits the
+        # loop before another attempt can be made.
+        assert svc._provider_selection_port.execute_operation.await_count == 1
+        # The single accepted fleet is recorded in the returned resource_ids.
+        assert result.resource_ids == ["fleet-abc"]

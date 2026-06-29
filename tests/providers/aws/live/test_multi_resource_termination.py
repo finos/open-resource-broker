@@ -554,16 +554,23 @@ def test_multi_resource_termination(setup_multi_resource_templates):
                 "timeout",
             }:
                 if _status != "complete":
-                    pytest.fail(
-                        f"Request {request_id} reached terminal status '{_status}'. Response: {status_response}"
+                    from tests.providers.aws.live._capacity_helpers import (
+                        assert_terminal_ok,
                     )
+
+                    assert_terminal_ok(status_response, capacity_to_request)
                 break
 
             time.sleep(5)
 
-        # Verify instances are provisioned
-        assert status_response["requests"][0]["status"] == "complete"
+        _final_status = status_response["requests"][0]["status"]
         machines = status_response["requests"][0]["machines"]
+        if _final_status == "complete":
+            assert len(machines) == capacity_to_request, (
+                f"status=complete but got {len(machines)}/{capacity_to_request} machines"
+            )
+        else:
+            assert len(machines) >= 1, f"status={_final_status!r} with zero machines"
 
         instance_ids = [
             machine.get("machineId") or machine.get("machine_id") for machine in machines

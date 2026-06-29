@@ -3,6 +3,10 @@
 Tests in this subtree require real AWS credentials and a pre-configured ORB
 environment (``orb init``).  They are skipped by default; pass ``--live`` (or
 the legacy ``--run-aws``) to enable them.
+
+All live tests are marked ``serial`` — they share AWS quotas, write to a
+shared ``./logs`` directory, and run a session-scoped nuclear-cleanup
+fixture that mustn't race with other tests.
 """
 
 import json
@@ -16,6 +20,18 @@ import boto3
 import pytest
 from boto3 import Session
 from botocore.exceptions import ClientError, NoCredentialsError
+
+
+def pytest_collection_modifyitems(config, items):
+    """Apply the serial marker to every test collected in this subtree.
+
+    ``pytestmark`` only works at module-level — conftest-level constants
+    are not picked up by pytest's marker discovery. The collection hook
+    is the canonical place to bulk-apply markers across a directory.
+    """
+    marker = pytest.mark.serial
+    for item in items:
+        item.add_marker(marker)
 
 
 def _find_repo_root(start: Path) -> Path:

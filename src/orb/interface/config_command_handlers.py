@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 @handle_interface_exceptions(context="get_system_config", interface_type="cli")
-async def handle_get_system_config(args: Any) -> "Union[dict[str, Any], InterfaceResponse]":
+async def handle_get_system_config(args: Any) -> dict[str, Any] | InterfaceResponse:
     from orb.cli.factories.cli_command_factory_orchestrator import CLICommandFactoryOrchestrator
     from orb.infrastructure.di.buses import QueryBus
 
@@ -31,7 +31,7 @@ async def handle_get_system_config(args: Any) -> "Union[dict[str, Any], Interfac
 
 
 @handle_interface_exceptions(context="get_configuration", interface_type="cli")
-async def handle_get_configuration(args: Any) -> "Union[dict[str, Any], InterfaceResponse]":
+async def handle_get_configuration(args: Any) -> dict[str, Any] | InterfaceResponse:
     from orb.cli.factories.cli_command_factory_orchestrator import CLICommandFactoryOrchestrator
     from orb.infrastructure.di.buses import QueryBus
 
@@ -48,7 +48,7 @@ async def handle_get_configuration(args: Any) -> "Union[dict[str, Any], Interfac
 
 
 @handle_interface_exceptions(context="set_configuration", interface_type="cli")
-async def handle_set_configuration(args: Any) -> "Union[dict[str, Any], InterfaceResponse]":
+async def handle_set_configuration(args: Any) -> dict[str, Any] | InterfaceResponse:
     from orb.cli.factories.cli_command_factory_orchestrator import CLICommandFactoryOrchestrator
     from orb.infrastructure.di.buses import CommandBus
 
@@ -68,7 +68,7 @@ async def handle_set_configuration(args: Any) -> "Union[dict[str, Any], Interfac
 
 
 @handle_interface_exceptions(context="validate_provider_config", interface_type="cli")
-async def handle_validate_provider_config(args: Any) -> "Union[dict[str, Any], InterfaceResponse]":
+async def handle_validate_provider_config(args: Any) -> dict[str, Any] | InterfaceResponse:
     from orb.cli.factories.cli_command_factory_orchestrator import CLICommandFactoryOrchestrator
     from orb.infrastructure.di.buses import QueryBus
 

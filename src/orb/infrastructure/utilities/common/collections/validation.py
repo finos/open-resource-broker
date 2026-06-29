@@ -1,7 +1,7 @@
 """Collection validation utility functions."""
 
 from collections.abc import Iterable
-from typing import Callable, Protocol, TypeVar, Union
+from typing import Callable, Protocol, TypeVar
 
 
 class Comparable(Protocol):
@@ -17,7 +17,7 @@ T = TypeVar("T")
 C = TypeVar("C", bound=Comparable)
 
 
-def is_empty(collection: Union[list, dict, set, tuple, str]) -> bool:
+def is_empty(collection: list | dict | set | tuple | str) -> bool:
     """
     Check if a collection is empty.
 
@@ -30,7 +30,7 @@ def is_empty(collection: Union[list, dict, set, tuple, str]) -> bool:
     return len(collection) == 0
 
 
-def is_not_empty(collection: Union[list, dict, set, tuple, str]) -> bool:
+def is_not_empty(collection: list | dict | set | tuple | str) -> bool:
     """
     Check if a collection is not empty.
 

@@ -102,7 +102,10 @@ def _run_handler_with_requests(all_requests, query):
 
         import asyncio
 
-        return asyncio.run(handler.execute_query(query))
+        # ListRequestsHandler now returns Paginated[RequestDTO]; tests
+        # expect the legacy list shape, so unwrap .items here.
+        paginated = asyncio.run(handler.execute_query(query))
+        return paginated.items if hasattr(paginated, "items") else paginated
 
 
 @pytest.mark.unit

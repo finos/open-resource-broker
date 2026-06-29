@@ -315,7 +315,7 @@ orb --provider aws-prod mcp serve --stdio
 
 ```bash
 # Start API server with provider override
-orb --provider aws-dev system serve --port 8000
+orb --provider aws-dev server start --foreground --port 8000
 ```
 
 ### Batch Operations

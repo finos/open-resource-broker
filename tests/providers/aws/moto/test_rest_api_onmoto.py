@@ -45,6 +45,7 @@ def fastapi_app(orb_config_dir, moto_aws):
     registers server services with server.enabled=True, then calls create_fastapi_app().
     Injects moto-backed AWS factory so all boto3 calls are intercepted by moto.
     """
+    from orb.api.dependencies import CurrentUser, get_current_user
     from orb.api.server import create_fastapi_app
     from orb.bootstrap.server_services import _register_orchestrators
     from orb.config.schemas.server_schema import ServerConfig
@@ -64,6 +65,12 @@ def fastapi_app(orb_config_dir, moto_aws):
     # Build the FastAPI app with auth disabled
     server_config = ServerConfig.model_validate({"enabled": True, "auth": {"enabled": False}})
     app = create_fastapi_app(server_config)
+
+    # Route guards require at least operator; inject a suitable identity so that
+    # tests exercise business logic rather than the RBAC layer.
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        username="test-admin", role="admin", claims={}
+    )
     return app
 
 
