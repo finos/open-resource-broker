@@ -75,6 +75,15 @@ def _is_forbidden(exc: BaseException) -> bool:
     return isinstance(exc, ApiException) and getattr(exc, "status", None) == 403
 
 
+def _is_not_found(exc: BaseException) -> bool:
+    """Return ``True`` when ``exc`` is a 404 ``ApiException``."""
+    try:
+        from kubernetes.client.exceptions import ApiException  # noqa: PLC0415
+    except ImportError:  # pragma: no cover — extra not installed
+        return False
+    return isinstance(exc, ApiException) and getattr(exc, "status", None) == 404
+
+
 class K8sInfrastructureDiscoveryService:
     """Discovery service for Kubernetes provider infrastructure.
 
@@ -784,12 +793,136 @@ class K8sInfrastructureDiscoveryService:
     def validate_infrastructure(self, provider_config: dict[str, Any]) -> dict[str, Any]:
         """Validate that a configured K8s provider can reach its cluster.
 
-        Returns a valid scaffold (no issues) until Phase D implements the
-        real validation checks.
+        Performs five checks in order:
+
+        1. **API server reachable** — ``CoreV1Api.get_api_resources()`` with a
+           5-second timeout.  Any exception is treated as an unreachable server.
+        2. **Context exists** — ``kubernetes.config.list_kube_config_contexts()``
+           is used to verify the configured context is present in the kubeconfig.
+           Skipped when running in-cluster (contexts are irrelevant in-cluster).
+        3. **Namespace exists** — ``CoreV1Api.read_namespace(name=ns)`` is called
+           to confirm the target namespace is present in the cluster.  A 404
+           ``ApiException`` is reported as a missing-namespace issue.
+        4. **ServiceAccount exists** — when a ``service_account`` is configured
+           (via ``provider_config["template_defaults"]["service_account"]`` or
+           the provider-level ``config["service_account"]``), checks that the
+           named ServiceAccount exists in the target namespace via
+           ``CoreV1Api.read_namespaced_service_account``.
+        5. **RBAC probe** — re-runs :meth:`probe_rbac` on the target namespace
+           and reports any denied verb as an issue.
+
+        Args:
+            provider_config: Raw provider config dict with optional
+                ``"name"``, ``"config"``, and ``"template_defaults"`` keys.
+
+        Returns:
+            ``{"provider": str, "valid": bool, "issues": list[str]}``
         """
         provider_name: str = provider_config.get("name", "")
+        instance_cfg: dict[str, Any] = provider_config.get("config", {}) or {}
+        template_defaults: dict[str, Any] = provider_config.get("template_defaults", {}) or {}
+        issues: list[str] = []
+
+        # Resolve the effective namespace to validate against.
+        # Priority: provider_config["config"]["namespace"] → K8sProviderConfig.namespace
+        namespace: str = instance_cfg.get("namespace") or self._config.namespace or "default"
+
+        # Resolve the configured context (out-of-cluster only).
+        context: Optional[str] = instance_cfg.get("context") or self._config.context
+
+        # Resolve whether we are in-cluster.
+        in_cluster_flag: Optional[bool] = instance_cfg.get("in_cluster")
+        if in_cluster_flag is None:
+            in_cluster_flag = self._config.in_cluster
+        if in_cluster_flag is None:
+            in_cluster_flag = is_in_cluster()
+
+        # Derive the cluster endpoint for use in error messages.
+        cluster_endpoint: str = self.discover_cluster_endpoint(context=context)
+
+        # ------------------------------------------------------------------
+        # Check 1 — API server reachable
+        # ------------------------------------------------------------------
+        api_reachable = True
+        try:
+            # Apply a tight 5-second timeout to avoid hanging on unreachable clusters.
+            self._core_v1().get_api_resources(_request_timeout=5)
+        except K8sError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            issues.append(f"Apiserver unreachable at {cluster_endpoint}: {exc}")
+            api_reachable = False
+
+        # Checks 2–5 are skipped when the API server itself is not reachable;
+        # they would all generate redundant noise.
+        if api_reachable:
+            # ------------------------------------------------------------------
+            # Check 2 — Configured context exists in kubeconfig (out-of-cluster only)
+            # ------------------------------------------------------------------
+            if not in_cluster_flag and context is not None:
+                try:
+                    from kubernetes import config as _k8s_config  # noqa: PLC0415
+
+                    config_file = (
+                        str(self._config.kubeconfig_path) if self._config.kubeconfig_path else None
+                    )
+                    raw_contexts, _ = _k8s_config.list_kube_config_contexts(config_file=config_file)
+                    known_names: list[str] = [
+                        (dict(c).get("name") or "") for c in (raw_contexts or [])
+                    ]
+                    if context not in known_names:
+                        issues.append(f"Configured context '{context}' not found in kubeconfig")
+                except Exception as exc:  # noqa: BLE001
+                    self._logger.warning(
+                        "validate_infrastructure: could not list kubeconfig contexts: %s", exc
+                    )
+
+            # ------------------------------------------------------------------
+            # Check 3 — Namespace exists in cluster
+            # ------------------------------------------------------------------
+            try:
+                self._core_v1().read_namespace(name=namespace)
+            except K8sError:
+                raise
+            except Exception:  # noqa: BLE001
+                issues.append(f"Namespace '{namespace}' not found in cluster")
+
+            # ------------------------------------------------------------------
+            # Check 4 — ServiceAccount exists (when one is configured)
+            # ------------------------------------------------------------------
+            service_account: Optional[str] = template_defaults.get(
+                "service_account"
+            ) or instance_cfg.get("service_account")
+            if service_account:
+                try:
+                    self._core_v1().read_namespaced_service_account(
+                        name=service_account, namespace=namespace
+                    )
+                except K8sError:
+                    raise
+                except Exception:  # noqa: BLE001
+                    issues.append(
+                        f"ServiceAccount '{service_account}' not found in namespace '{namespace}'"
+                    )
+
+            # ------------------------------------------------------------------
+            # Check 5 — RBAC probe
+            # ------------------------------------------------------------------
+            try:
+                rbac = self.probe_rbac(namespace=namespace)
+                for verb, allowed in (
+                    ("create", rbac.can_create_pods),
+                    ("watch", rbac.can_watch_pods),
+                    ("delete", rbac.can_delete_pods),
+                ):
+                    if not allowed:
+                        issues.append(f"Missing permission: pods.{verb} in namespace {namespace}")
+            except Exception as exc:  # noqa: BLE001
+                self._logger.warning("validate_infrastructure: RBAC probe failed: %s", exc)
+                issues.append(f"RBAC probe failed: {exc}")
+
         return {
             "provider": provider_name,
-            "valid": True,
-            "issues": [],
+            "valid": len(issues) == 0,
+            "issues": issues,
         }

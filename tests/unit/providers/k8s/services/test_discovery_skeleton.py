@@ -253,14 +253,39 @@ class TestDiscoverInfrastructure:
 class TestValidateInfrastructure:
     def test_returns_valid_true_with_empty_issues(self) -> None:
         svc = _make_service()
-        result = svc.validate_infrastructure({"name": "my-k8s", "type": "k8s"})
+        core = MagicMock()
+        rbac = RBACProbeResult(
+            namespace="default",
+            can_create_pods=True,
+            can_watch_pods=True,
+            can_delete_pods=True,
+        )
+        with (
+            patch.object(svc, "discover_cluster_endpoint", return_value="https://localhost:6443"),
+            patch.object(svc, "_core_v1", return_value=core),
+            patch.object(svc, "probe_rbac", return_value=rbac),
+        ):
+            result = svc.validate_infrastructure(
+                {
+                    "name": "my-k8s",
+                    "type": "k8s",
+                    "config": {"in_cluster": True},
+                    "template_defaults": {},
+                }
+            )
         assert result["valid"] is True
         assert result["issues"] == []
         assert result["provider"] == "my-k8s"
 
     def test_issues_is_a_list(self) -> None:
         svc = _make_service()
-        result = svc.validate_infrastructure({})
+        core = MagicMock()
+        core.get_api_resources.side_effect = OSError("boom")
+        with (
+            patch.object(svc, "discover_cluster_endpoint", return_value="unknown"),
+            patch.object(svc, "_core_v1", return_value=core),
+        ):
+            result = svc.validate_infrastructure({})
         assert isinstance(result["issues"], list)
 
 
@@ -324,6 +349,14 @@ class TestStrategyDiscoveryDelegation:
 
     def test_validate_infrastructure_returns_valid_true(self) -> None:
         strategy = _make_strategy()
+        # Inject a fully mocked discovery service so no real kubernetes calls are made.
+        fake_service = MagicMock()
+        fake_service.validate_infrastructure.return_value = {
+            "provider": "test",
+            "valid": True,
+            "issues": [],
+        }
+        strategy._discovery_service = fake_service  # type: ignore[attr-defined]
         result = strategy.validate_infrastructure({"type": "k8s", "name": "test"})
         assert isinstance(result, dict)
         assert result["valid"] is True
