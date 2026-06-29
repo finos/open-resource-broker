@@ -719,7 +719,12 @@ class K8sProviderStrategy(ProviderStrategy):
 
         Returns ``in_cluster`` (when a ServiceAccount token is mounted) and
         every available kubeconfig context as a separate selectable source.
-        Matches the AWS shape: each entry has ``id``, ``name``, ``description``.
+
+        Matches the AWS shape consumed by ``init_command_handler``: each
+        entry has ``name`` (technical identifier — kubeconfig context name
+        or ``"in_cluster"``) and ``description`` (human-readable label).
+        ``test_credentials`` receives the ``name`` value as
+        ``credential_source``.
         """
         sources: list[dict] = []
 
@@ -729,10 +734,9 @@ class K8sProviderStrategy(ProviderStrategy):
             if is_in_cluster():
                 sources.append(
                     {
-                        "id": "in_cluster",
-                        "name": "In-cluster ServiceAccount",
+                        "name": "in_cluster",
                         "description": (
-                            "Use the ServiceAccount token mounted at "
+                            "In-cluster ServiceAccount token mounted at "
                             "/var/run/secrets/kubernetes.io/serviceaccount/"
                         ),
                     }
@@ -753,9 +757,10 @@ class K8sProviderStrategy(ProviderStrategy):
                 cluster = ctx.get("context", {}).get("cluster", "?")
                 sources.append(
                     {
-                        "id": f"kubeconfig:{name}",
-                        "name": f"kubeconfig context: {name}{marker}",
-                        "description": f"Cluster {cluster} from your kubeconfig",
+                        "name": name,
+                        "description": (
+                            f"kubeconfig context '{name}'{marker} -> cluster {cluster}"
+                        ),
                     }
                 )
         except Exception as exc:
@@ -764,10 +769,9 @@ class K8sProviderStrategy(ProviderStrategy):
         if not sources:
             sources.append(
                 {
-                    "id": "default",
-                    "name": "Default credentials",
+                    "name": "default",
                     "description": (
-                        "Use whatever the kubernetes-client SDK resolves "
+                        "Default credentials resolved by the kubernetes-client SDK "
                         "(in-cluster token or KUBECONFIG / ~/.kube/config)"
                     ),
                 }
@@ -798,10 +802,10 @@ class K8sProviderStrategy(ProviderStrategy):
             if credential_source == "in_cluster":
                 _k8s_config.load_incluster_config()
                 context_label = "in-cluster"
-            elif credential_source and credential_source.startswith("kubeconfig:"):
-                context_name = credential_source.split(":", 1)[1]
-                _k8s_config.load_kube_config(context=context_name)
-                context_label = context_name
+            elif credential_source and credential_source not in ("default", ""):
+                # The credential_source is a kubeconfig context name.
+                _k8s_config.load_kube_config(context=credential_source)
+                context_label = credential_source
             else:
                 _k8s_config.load_config()
                 context_label = "auto-detected"
@@ -851,11 +855,21 @@ class K8sProviderStrategy(ProviderStrategy):
         }
 
     def get_operational_requirements(self) -> dict:
-        """Document the operational permissions ORB needs in the target cluster."""
+        """Document operational parameters the init flow may prompt for.
+
+        Mirrors the AWS shape: each entry is ``{required, description}``.
+        Kubernetes has no hard-required parameter at init time — namespace
+        is optional (in-cluster mode auto-detects from the SA token,
+        out-of-cluster defaults to ``"default"``).
+        """
         return {
-            "rbac_verbs": ["create", "get", "list", "watch", "delete", "patch"],
-            "rbac_resources": ["pods", "deployments", "statefulsets", "jobs"],
-            "namespaces_scope": "single namespace, or cluster-scoped if 'namespaces' is ['*']",
+            "namespace": {
+                "required": False,
+                "description": (
+                    "Target namespace for managed pods "
+                    "(defaults to in-cluster SA namespace or 'default')"
+                ),
+            },
         }
 
     # ------------------------------------------------------------------
