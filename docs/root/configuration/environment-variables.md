@@ -138,9 +138,6 @@ ORB_SCHEDULER_OVERRIDE=hostfactory
 `ORB_WORK_DIR` and `ORB_LOG_DIR` are documented under
 [Directory variables](#directory-variables) above.
 
-For the corresponding production deployment steps, see
-[Embedded UI deployment](../deployment/embedded-ui.md).
-
 ## HostFactory integration variables
 
 When running under IBM Spectrum LSF HostFactory, these variables are set by the scheduler and read by ORB's HostFactory adapter. They are not processed by the core config loader.
