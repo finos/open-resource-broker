@@ -72,6 +72,7 @@ class K8sHandlerRegistry:
         native_spec_service_provider: Callable[[], Optional[Any]],
         handler_overrides: Optional[dict[str, K8sHandlerBase]] = None,
         node_state_cache_provider: Optional[Callable[[], Optional[K8sNodeStateCache]]] = None,
+        api_aliases: Optional[dict[str, str]] = None,
     ) -> None:
         self._config = config
         self._logger = logger
@@ -83,6 +84,10 @@ class K8sHandlerRegistry:
         # metadata (instance type, zone, capacity type) by node_name to
         # enrich the per-instance ``provider_data`` block.
         self._node_state_cache_provider = node_state_cache_provider
+        # Alias table for alternate-case provider_api spellings.  Consulted
+        # by resolve_provider_api before the handler cache lookup so that
+        # lowercase submissions (e.g. "pod") route to the correct handler.
+        self._api_aliases: dict[str, str] = dict(api_aliases or {})
         # Handler cache keyed by provider_api value.  Tests can pre-seed
         # this via ``handler_overrides`` to inject mock handlers.
         self._handlers: dict[str, K8sHandlerBase] = dict(handler_overrides or {})
@@ -99,16 +104,25 @@ class K8sHandlerRegistry:
     def resolve_provider_api(self, request: "Request") -> str:
         """Pick the provider-API key for ``request``.
 
-        Defaults to :attr:`KubernetesProviderApi.POD` so legacy callers
-        that omit the provider_api field still route to the Pod handler.
+        Applies alias normalisation (e.g. ``"pod"`` → ``"Pod"``) before
+        returning so that case-variant submissions reach the correct handler.
+        Defaults to :attr:`KubernetesProviderApi.POD` when the request
+        carries no ``provider_api`` field.
         """
         api = getattr(request, "provider_api", None)
         if api:
-            return str(api)
+            raw = str(api)
+            return self._api_aliases.get(raw, raw)
         return KubernetesProviderApi.POD.value
 
     def get_handler(self, provider_api: str) -> K8sHandlerBase:
-        """Return (and lazily construct) the handler for ``provider_api``."""
+        """Return (and lazily construct) the handler for ``provider_api``.
+
+        Applies alias normalisation before the cache lookup so that
+        lowercase submissions (e.g. ``"pod"``) reach the correct handler
+        without requiring callers to pre-normalise the key.
+        """
+        provider_api = self._api_aliases.get(provider_api, provider_api)
         handler = self._handlers.get(provider_api)
         if handler is not None:
             return handler
@@ -282,6 +296,16 @@ class K8sHandlerRegistry:
             provider_data: dict[str, Any] = getattr(request, "provider_data", None) or {}
             confirmed_pod_names: set[str] = set(provider_data.get("pod_names") or [])
 
+            # Derive instance_type from the workload kind so machine rows
+            # group and filter correctly by provider_api.
+            _API_TO_INSTANCE_TYPE: dict[str, str] = {
+                "Pod": "k8s/Pod",
+                "Deployment": "k8s/Deployment",
+                "StatefulSet": "k8s/StatefulSet",
+                "Job": "k8s/Job",
+            }
+            synthetic_instance_type = _API_TO_INSTANCE_TYPE.get(provider_api, f"k8s/{provider_api}")
+
             live_ids = {i.get("instance_id", "") for i in instances}
             missing_ids = [mid for mid in (resource_ids or []) if mid and mid not in live_ids]
             for mid in missing_ids:
@@ -290,7 +314,7 @@ class K8sHandlerRegistry:
                         {
                             "instance_id": mid,
                             "resource_id": mid,
-                            "instance_type": "k8s-pod",
+                            "instance_type": synthetic_instance_type,
                             "image_id": "unknown",
                             "launch_time": None,
                             "status": "terminated",
@@ -303,7 +327,7 @@ class K8sHandlerRegistry:
                         {
                             "instance_id": mid,
                             "resource_id": mid,
-                            "instance_type": "k8s-pod",
+                            "instance_type": synthetic_instance_type,
                             "image_id": "unknown",
                             "launch_time": None,
                             "status": "unknown",

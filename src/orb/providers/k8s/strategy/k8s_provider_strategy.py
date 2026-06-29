@@ -74,6 +74,18 @@ class K8sProviderStrategy(ProviderStrategy):
 
     _SUPPORTED_APIS: tuple[str, ...] = tuple(api.value for api in KubernetesProviderApi)
 
+    # Canonical aliases for lowercase (or alternate-case) provider_api values.
+    # REST or CLI submissions that spell ``provider_api="pod"`` (lowercase) are
+    # normalised to ``"Pod"`` before reaching the handler registry, preventing
+    # opaque ``NotImplementedError`` failures.  Extend this dict to cover any
+    # additional aliases as new workload kinds are introduced.
+    _API_ALIASES: dict[str, str] = {
+        "pod": "Pod",
+        "deployment": "Deployment",
+        "statefulset": "StatefulSet",
+        "job": "Job",
+    }
+
     # Plugin extension point — class-level registry of handler factories
     # keyed by ``provider_api`` value.  Third-party plugins call
     # :meth:`register_handler` from their ``orb.providers`` entry-point
@@ -195,6 +207,7 @@ class K8sProviderStrategy(ProviderStrategy):
             native_spec_service_provider=self._resolve_native_spec_service,
             handler_overrides=handler_overrides,
             node_state_cache_provider=lambda: self._node_state_cache,
+            api_aliases=type(self)._API_ALIASES,
         )
 
     # ------------------------------------------------------------------
@@ -562,6 +575,27 @@ class K8sProviderStrategy(ProviderStrategy):
                 "Kubernetes provider strategy not initialized", "NOT_INITIALIZED"
             )
 
+        dry_run = bool(operation.context.get("dry_run", False)) if operation.context else False
+        if dry_run:
+            self._logger.info(
+                "Kubernetes strategy: dry-run requested for operation %s — returning synthetic "
+                "success without contacting the cluster.",
+                operation.operation_type,
+            )
+            return ProviderResult.success_result(
+                {
+                    "resource_ids": [],
+                    "instances": [],
+                    "instance_ids": [],
+                    "provider_data": {"dry_run": True},
+                },
+                {
+                    "operation": str(operation.operation_type),
+                    "provider": "k8s",
+                    "fulfillment_final": True,
+                },
+            )
+
         start_time = time.time()
         try:
             if operation.operation_type == ProviderOperationType.HEALTH_CHECK:
@@ -580,6 +614,8 @@ class K8sProviderStrategy(ProviderStrategy):
                 result = await self._handle_terminate_instances(operation)
             elif operation.operation_type == ProviderOperationType.GET_INSTANCE_STATUS:
                 result = await self._handle_get_instance_status(operation)
+            elif operation.operation_type == ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES:
+                result = await self._handle_describe_resource_instances(operation)
             else:
                 result = ProviderResult.error_result(
                     f"Operation {operation.operation_type} is not supported by the "
@@ -680,6 +716,49 @@ class K8sProviderStrategy(ProviderStrategy):
         outcome = await self.get_status(resource_ids, request)
         return _outcome_to_provider_result(outcome, fallback_operation="get_instance_status")
 
+    async def _handle_describe_resource_instances(
+        self, operation: ProviderOperation
+    ) -> ProviderResult:
+        """Dispatch ``DESCRIBE_RESOURCE_INSTANCES`` to the per-API status handler.
+
+        Status-polling code paths use this operation type to interrogate a
+        specific set of resource IDs without the full acquire/return lifecycle.
+        The call is forwarded to :meth:`get_status` — the handler returns live
+        pod state via ``check_hosts_status`` and the fulfilment value is
+        surfaced as ``provider_fulfilment`` in metadata so callers can
+        distinguish in-progress from terminal states.
+        """
+        request = operation.parameters.get("request")
+        if request is None:
+            return ProviderResult.error_result(
+                "DESCRIBE_RESOURCE_INSTANCES requires the typed 'request' object in "
+                "operation.parameters for the kubernetes provider.",
+                "MISSING_REQUEST",
+            )
+        resource_ids = list(
+            operation.parameters.get("resource_ids")
+            or operation.parameters.get("instance_ids")
+            or []
+        )
+        outcome = await self.get_status(resource_ids, request)
+        result = _outcome_to_provider_result(outcome, fallback_operation="describe_resource_instances")
+        # Surface the fulfilment state in metadata so callers have a stable
+        # field to inspect without digging into provider_data.
+        from orb.domain.base.operation_outcome import Accepted, Completed  # noqa: PLC0415
+
+        if isinstance(outcome, (Accepted, Completed)):
+            fulfilment = (outcome.metadata or {}).get("fulfilment")
+            if fulfilment is not None:
+                result = result.model_copy(
+                    update={
+                        "metadata": {
+                            **result.metadata,
+                            "provider_fulfilment": getattr(fulfilment, "state", str(fulfilment)),
+                        }
+                    }
+                )
+        return result
+
     # ------------------------------------------------------------------
     # Capabilities & health
     # ------------------------------------------------------------------
@@ -691,6 +770,7 @@ class K8sProviderStrategy(ProviderStrategy):
                 ProviderOperationType.CREATE_INSTANCES,
                 ProviderOperationType.TERMINATE_INSTANCES,
                 ProviderOperationType.GET_INSTANCE_STATUS,
+                ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
                 ProviderOperationType.HEALTH_CHECK,
             ],
             supported_apis=list(self._SUPPORTED_APIS),
@@ -767,6 +847,16 @@ class K8sProviderStrategy(ProviderStrategy):
 
     def get_supported_apis(self) -> list[str]:
         return list(self._SUPPORTED_APIS)
+
+    def resolve_api_alias(self, raw_api: str) -> str:
+        """Normalise alternate-case provider_api spellings to canonical form.
+
+        Consults :attr:`_API_ALIASES` first so that submissions with
+        ``provider_api="pod"`` (lowercase) resolve to ``"Pod"`` rather than
+        raising an opaque ``NotImplementedError`` from the handler registry.
+        Unknown values are returned unchanged.
+        """
+        return self._API_ALIASES.get(raw_api, raw_api)
 
     # ------------------------------------------------------------------
     # Region / CLI helpers
@@ -1166,6 +1256,24 @@ def _build_provider_result_data(
     return data
 
 
+def _all_instances_terminal(instances: list[dict[str, Any]]) -> bool:
+    """Return True when every instance dict has reached a non-pending state.
+
+    Used by the bridge to detect synchronous completions: when an Accepted
+    outcome carries ``pending_resource_ids`` but ``metadata['instances']``
+    already shows every pod as running, succeeded, or terminated, the request
+    has effectively completed and ``fulfillment_final`` should be set so the
+    provisioning service does not keep it in IN_PROGRESS indefinitely.
+
+    An empty instances list is not considered terminal — the status resolver
+    has not yet populated instance data, so we cannot make a determination.
+    """
+    if not instances:
+        return False
+    terminal_states = {"running", "succeeded", "terminated"}
+    return all(inst.get("status") in terminal_states for inst in instances)
+
+
 def _outcome_to_provider_result(
     outcome: OperationOutcome, *, fallback_operation: str
 ) -> ProviderResult:
@@ -1174,6 +1282,14 @@ def _outcome_to_provider_result(
     Used by ``execute_operation`` to bridge the kubernetes provider's typed
     provisioning interface back to the shared ``ProviderOperation`` envelope
     that the provisioning orchestration service consumes.
+
+    ``fulfillment_final=True`` is set in two cases:
+    * ``Completed`` outcome — always terminal.
+    * ``Accepted`` outcome where ``pending_resource_ids`` is non-empty AND
+      every instance in ``metadata['instances']`` already has a
+      running/terminal status.  This covers Pod handlers that schedule pods
+      synchronously so the provisioning service does not keep the request
+      in IN_PROGRESS waiting for a state transition that already happened.
     """
     from orb.domain.base.operation_outcome import (  # noqa: PLC0415
         Accepted,
@@ -1195,10 +1311,17 @@ def _outcome_to_provider_result(
         )
 
     if isinstance(outcome, Accepted):
+        meta = dict(outcome.metadata or {})
+        pending = list(outcome.pending_resource_ids)
+        if pending and _all_instances_terminal(list(meta.get("instances") or [])):
+            # All pods are already in a terminal/running state at accept time —
+            # promote to fulfillment_final so the provisioning service closes
+            # the request without a redundant status poll.
+            meta["fulfillment_final"] = True
         return ProviderResult.success_result(
             _build_provider_result_data(
-                resource_ids=list(outcome.pending_resource_ids),
-                metadata=outcome.metadata,
+                resource_ids=pending,
+                metadata=meta,
                 tracking_request_id=outcome.request_id,
             ),
             {"operation": fallback_operation, "provider": "k8s"},
