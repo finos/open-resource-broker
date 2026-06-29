@@ -90,9 +90,7 @@ class K8sHandlerRegistry:
         # Per-instance mutable copy of the handler-class table.  Seeded from
         # the class-level defaults so every registry instance starts with the
         # four built-in kinds but is fully isolated from every other instance.
-        self._handler_classes: dict[str, type[K8sHandlerBase]] = dict(
-            self._DEFAULT_HANDLER_CLASSES
-        )
+        self._handler_classes: dict[str, type[K8sHandlerBase]] = dict(self._DEFAULT_HANDLER_CLASSES)
         # Handler cache keyed by provider_api value.  Tests can pre-seed
         # this via ``handler_overrides`` to inject mock handlers.
         self._handlers: dict[str, K8sHandlerBase] = dict(handler_overrides or {})

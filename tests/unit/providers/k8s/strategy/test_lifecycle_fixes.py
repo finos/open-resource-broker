@@ -285,9 +285,7 @@ class TestPluginFactoryKwargs:
         assert "native_spec_service" in received_kwargs, (
             "plugin factory must receive native_spec_service"
         )
-        assert "node_state_cache" in received_kwargs, (
-            "plugin factory must receive node_state_cache"
-        )
+        assert "node_state_cache" in received_kwargs, "plugin factory must receive node_state_cache"
         assert received_kwargs["native_spec_service"] is mock_native
         assert received_kwargs["node_state_cache"] is mock_node_cache
 
@@ -341,9 +339,7 @@ class TestCheckHealthEnrichment:
 
         mock_client = MagicMock()
         mock_client.api_client = mock_api_client
-        mock_client.core_v1.get_api_resources.return_value = MagicMock(
-            resources=[MagicMock()] * 5
-        )
+        mock_client.core_v1.get_api_resources.return_value = MagicMock(resources=[MagicMock()] * 5)
 
         mock_version_info = MagicMock()
         mock_version_info.git_version = git_version
@@ -365,9 +361,7 @@ class TestCheckHealthEnrichment:
         assert status.error_details.get("cluster_endpoint") == "https://my-cluster.example.com:6443"
 
     def test_healthy_status_includes_server_version(self) -> None:
-        strategy, mock_version_info = self._make_strategy_with_mock_client(
-            git_version="v1.31.0"
-        )
+        strategy, mock_version_info = self._make_strategy_with_mock_client(git_version="v1.31.0")
         with patch(self._VERSION_API_PATH) as mock_va:
             mock_va.return_value.get_code.return_value = mock_version_info
             status = strategy.check_health()
