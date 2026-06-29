@@ -227,6 +227,28 @@ class ProvisioningOrchestrationService:
                 self._record_provider_failure(selection_result.provider_name)
                 break
 
+            # Checkpoint: persist the resource IDs returned by this attempt before
+            # proceeding.  This closes the crash window between the provider creating
+            # resources (e.g. k8s pods) and the caller writing the final request row.
+            # A startup reconciler can re-associate any orphan provider resources with
+            # the dangling request row using the request-id label / tag.
+            # The write is best-effort: a DB failure is logged but does not abort the
+            # provisioning loop because the resource_ids are still tracked in memory
+            # and the caller performs a full persist on return.
+            if last_result.resource_ids:
+                request, checkpoint_ok = await asyncio.to_thread(
+                    self._persist_resource_ids_checkpoint, request, last_result.resource_ids
+                )
+                if not checkpoint_ok:
+                    self._logger.warning(
+                        "Resource-ID checkpoint persist failed for request %s attempt %d — "
+                        "continuing with in-memory state; provider resources %s are recorded "
+                        "only in memory until the final persist succeeds",
+                        request.request_id,
+                        attempt_number,
+                        last_result.resource_ids,
+                    )
+
             if remaining > 0 and not last_result.is_final:
                 # Partial fulfillment, retry may help — persist ACQUIRING status
                 self._logger.info(
@@ -261,6 +283,50 @@ class ProvisioningOrchestrationService:
             fulfilled_count=total_fulfilled,
             is_final=last_result.is_final if last_result else True,
         )
+
+    def _persist_resource_ids_checkpoint(
+        self, request: Request, new_resource_ids: list[str]
+    ) -> tuple[Request, bool]:
+        """Persist newly acquired provider resource IDs onto the request row.
+
+        Called immediately after a successful provider dispatch so that the DB
+        always contains the resource IDs returned by the provider, even if ORB
+        crashes before the caller writes the final request row.  Orphan provider
+        resources (e.g. k8s pods) carry a request-id label/tag; a startup
+        reconciler can match them to a request row whose resource_ids list
+        already contains the resource ID, avoiding duplicate creation.
+
+        The status is advanced to ACQUIRING when the request is still PENDING
+        so that status queries reflect that work has begun.
+
+        Returns:
+            (updated_request, success) — success is False when the DB write
+            failed.  The caller continues with the in-memory request; the final
+            persist in the handler will still carry the correct resource IDs.
+        """
+        from orb.domain.base import UnitOfWorkFactory
+
+        try:
+            updated = request
+            for rid in new_resource_ids:
+                updated = updated.add_resource_id(rid)
+            # Advance PENDING → ACQUIRING so the request is visibly in-flight;
+            # any other active status is left unchanged.
+            if updated.status == RequestStatus.PENDING:
+                updated = updated.update_status(
+                    RequestStatus.ACQUIRING, "Provider resources created, waiting for completion"
+                )
+            uow_factory = self._container.get(UnitOfWorkFactory)
+            with uow_factory.create_unit_of_work() as uow:
+                uow.requests.save(updated)
+            return updated, True
+        except Exception as e:
+            self._logger.warning(
+                "Failed to persist resource-ID checkpoint for request %s: %s",
+                request.request_id,
+                e,
+            )
+            return request, False
 
     def _persist_acquiring(self, request: Request) -> tuple[Request, bool]:
         """Persist request with ACQUIRING status between retry attempts.
@@ -336,6 +402,11 @@ class ProvisioningOrchestrationService:
                     "count": count,
                     "request_id": str(request.request_id),
                     "request_metadata": dict(request.metadata),
+                    # Typed objects passed through verbatim for providers that
+                    # implement the typed provisioning interface (k8s).  AWS
+                    # ignores these and consumes the flat scalars above.
+                    "request": request,
+                    "template": template,
                 },
                 context={
                     "correlation_id": str(request.request_id),

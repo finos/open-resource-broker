@@ -140,6 +140,7 @@ class RequestStatus(str, Enum):
         valid_transitions = {
             RequestStatus.PENDING: [
                 RequestStatus.IN_PROGRESS,
+                RequestStatus.ACQUIRING,  # provider resources created, waiting for completion
                 RequestStatus.CANCELLED,
                 RequestStatus.FAILED,
                 RequestStatus.COMPLETED,  # instant provisioning (e.g. RunInstances)

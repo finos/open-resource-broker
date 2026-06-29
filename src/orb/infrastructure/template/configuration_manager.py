@@ -168,6 +168,11 @@ class TemplateConfigurationManager:
                     self.logger.error("Failed to load templates from %s: %s", template_path, e)
                     continue
 
+            # Drop templates whose declared provider_type is not in the active set.
+            # This prevents inactive-provider templates loaded from a shared
+            # templates.json from appearing in the listing.
+            all_template_dicts = self._filter_templates_by_active_providers(all_template_dicts)
+
             # Apply batch image resolution before converting to DTOs
             resolved_template_dicts = await self._batch_resolve_images(all_template_dicts)
 
@@ -211,6 +216,53 @@ class TemplateConfigurationManager:
 
         # Convert domain → DTO using existing method
         return TemplateDTO.from_domain(template_domain)
+
+    def _get_active_provider_types(self) -> set[str]:
+        """Return the set of active provider type strings, or an empty set on failure."""
+        try:
+            provider_config = self.config_manager.get_provider_config()
+            if provider_config is None:
+                return set()
+            active = provider_config.get_active_providers()
+            return {t for p in active if (t := getattr(p, "type", None)) is not None}
+        except Exception as e:
+            self.logger.debug("Could not read active provider types for template filter: %s", e)
+            return set()
+
+    def _filter_templates_by_active_providers(
+        self, template_dicts: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """Remove templates whose provider_type is not in the active-provider set.
+
+        Templates with no provider_type field are kept so that legacy or
+        un-typed templates continue to load without disruption.
+        When the active-provider set cannot be determined the full list is
+        returned unchanged.
+        """
+        active_types = self._get_active_provider_types()
+        if not active_types:
+            # Cannot determine active types — keep everything to avoid silent data loss.
+            return template_dicts
+
+        kept: list[dict[str, Any]] = []
+        for tpl in template_dicts:
+            declared_type = tpl.get("provider_type")
+            if declared_type is None:
+                self.logger.debug(
+                    "Retaining template '%s' without a provider_type guard",
+                    tpl.get("template_id") or tpl.get("templateId", "<unknown>"),
+                )
+                kept.append(tpl)
+            elif declared_type in active_types:
+                kept.append(tpl)
+            else:
+                self.logger.debug(
+                    "Dropping template '%s' with provider_type='%s' (active types: %s)",
+                    tpl.get("template_id") or tpl.get("templateId", "<unknown>"),
+                    declared_type,
+                    sorted(active_types),
+                )
+        return kept
 
     def _resolve_active_provider_once(self) -> Optional[str]:
         """Resolve the active provider name from configuration exactly once.

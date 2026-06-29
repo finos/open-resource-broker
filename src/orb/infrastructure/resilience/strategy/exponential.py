@@ -32,6 +32,13 @@ class ExponentialBackoffStrategy:
         self.max_delay = max_delay
         self.jitter = jitter
 
+    # HTTP status codes that indicate a permanent client error and must not be
+    # retried regardless of the retry budget.  400 (bad request), 403 (RBAC
+    # denied), 404 (not found), 409 (conflict / already exists), 410 (gone —
+    # the watcher path resets rv independently; handler-side 410s must not
+    # spin), and 422 (unprocessable entity / validation failure).
+    _NON_RETRYABLE_K8S_STATUSES: frozenset[int] = frozenset({400, 403, 404, 409, 410, 422})
+
     def should_retry(self, attempt: int, exception: Exception) -> bool:
         """
         Determine if operation should be retried.
@@ -46,6 +53,22 @@ class ExponentialBackoffStrategy:
         # Check if we've exceeded max attempts
         if attempt >= self.max_attempts:
             return False
+
+        # Fast-fail on non-retryable Kubernetes API status codes.  The import
+        # is lazy so the generic resilience layer has no hard dependency on the
+        # kubernetes SDK — it only runs this branch when the SDK is installed
+        # and the exception is actually an ApiException.
+        try:
+            from kubernetes.client.exceptions import ApiException  # noqa: PLC0415
+
+            if isinstance(exception, ApiException):
+                status = getattr(exception, "status", None)
+                if status in self._NON_RETRYABLE_K8S_STATUSES:
+                    return False
+        except ImportError:
+            # kubernetes SDK not installed (the [k8s] optional extra is absent);
+            # the exception cannot be a k8s ApiException, so treat as retryable.
+            pass
 
         return True
 

@@ -73,6 +73,14 @@ aws = [
     "botocore>=1.42.21",
 ]
 
+# Modern Kubernetes provider — explicit opt-in extra.  Install with:
+#   pip install orb-py[k8s]
+# Only the SDK client is required here; everything else (jinja2, watchdog,
+# alembic etc.) is legacy-plugin baggage and stays in the [k8s-legacy] extra.
+k8s = [
+    "kubernetes",
+]
+
 # Placeholder entries for future providers (add when provider is implemented)
 # azure = [
 #     "azure-mgmt-compute>=30.0.0",
@@ -87,6 +95,7 @@ aws = [
 # Meta-extra: all currently implemented providers
 all-providers = [
     "orb-py[aws]",
+    "orb-py[k8s]",
 ]
 
 # Legacy k8s HostFactory plugin — heavy deps gated behind optional extra.
@@ -194,6 +203,7 @@ ci = [
     # Essential Type Stubs
     "types-PyYAML>=6.0.12.12,<7.0.0",
     "types-python-dateutil>=2.8.19.14,<3.0.0",
+    "kubernetes-stubs-elephant-fork>=36.0.2,<37.0.0",
     # Build Tools
     "tomli>=2.0.0,<3.0.0",
     # Security Scanning
@@ -280,6 +290,7 @@ ci = [
     # Essential Type Stubs
     "types-PyYAML>=6.0.12.12,<7.0.0",
     "types-python-dateutil>=2.8.19.14,<3.0.0",
+    "kubernetes-stubs-elephant-fork>=36.0.2,<37.0.0",
 
     # Build Tools
     "tomli>=2.0.0,<3.0.0",  # For pyproject.toml parsing in dev scripts (Python < 3.11)
@@ -354,6 +365,7 @@ include-package-data = true
 "orb.k8s_legacy.alembic" = ["alembic.ini", "script.py.mako"]
 "orb.k8s_legacy.alembic.versions" = ["*.py"]
 "orb.k8s_legacy.tests.resources" = ["*.yml", "*.tpl"]
+"orb.providers.k8s.hostfactory" = ["providers/k8s-hf/scripts/*.sh"]
 
 [tool.setuptools.data-files]
 "orb_scripts" = ["src/orb/infrastructure/scheduler/hostfactory/scripts/*.sh", "src/orb/infrastructure/scheduler/hostfactory/scripts/*.bat"]  # keep in sync with .project.yml build.package_root

@@ -235,6 +235,27 @@ class ProviderStrategy(ABC):
         with concurrent.futures.ThreadPoolExecutor() as executor:
             return await loop.run_in_executor(executor, self.execute_operation, operation)  # type: ignore[arg-type]
 
+    async def start_daemon_services(self) -> None:
+        """Start background services that require an asyncio event loop.
+
+        Default implementation is a no-op.  Providers that maintain background
+        tasks (watch streams, periodic reconcilers, garbage collectors) override
+        this to start them.
+
+        Lifecycle contract:
+
+        * ``initialize`` must be cheap and synchronous: validate config, set up
+          lazy state, return ``True``.  No I/O, no event-loop work, no
+          background tasks.
+        * ``start_daemon_services`` runs after ``initialize`` succeeds and only
+          in long-lived daemon contexts (the REST API server).  CLI commands
+          never call it because they don't keep a loop running long enough for
+          background tasks to be useful and shouldn't pay the cost.
+
+        Implementations must be idempotent: calling more than once is safe.
+        """
+        return
+
     @abstractmethod
     def get_capabilities(self) -> ProviderCapabilities:
         """

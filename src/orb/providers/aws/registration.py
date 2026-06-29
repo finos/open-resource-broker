@@ -369,9 +369,18 @@ def register_aws_provider_instance(provider_instance, logger=None) -> bool:
         return True
 
     except Exception as e:
+        # Extract the config snippet that was attempted so operators can diagnose
+        # the failure without grepping code.
+        config_data = getattr(provider_instance, "config", None) or {}
         if logger:
             logger.error(
-                "Failed to register AWS provider instance '%s': %s", provider_instance.name, str(e)
+                "Failed to register AWS provider instance '%s': %s  "
+                "(config keys attempted: region=%r, profile=%r)",
+                provider_instance.name,
+                e,
+                config_data.get("region"),
+                config_data.get("profile"),
+                exc_info=True,
             )
         return False
 

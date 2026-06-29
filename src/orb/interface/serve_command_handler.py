@@ -84,6 +84,16 @@ async def handle_serve_api(args) -> dict[str, Any]:
         )
         if not await orb_app.initialize():
             logger.error("Failed to initialize application — providers may not be available")
+        else:
+            # Start provider daemon services (watch streams, startup reconcilers,
+            # orphan GC, etc.).  Only the REST/daemon path calls this — CLI commands
+            # explicitly skip it so they stay synchronous and don't issue per-command
+            # cluster sweeps.
+            if not await orb_app.start_daemon_services():
+                logger.warning(
+                    "One or more provider daemon services failed to start; "
+                    "the REST API will continue with reduced functionality."
+                )
 
         # Create and configure the FastAPI app
         app = create_fastapi_app(server_config)

@@ -2,7 +2,8 @@
 
 from typing import Any
 
-from jinja2 import BaseLoader, Environment, select_autoescape
+from jinja2 import BaseLoader, select_autoescape
+from jinja2.sandbox import SandboxedEnvironment
 
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports.logging_port import LoggingPort
@@ -11,11 +12,17 @@ from orb.domain.base.ports.spec_rendering_port import SpecRenderingPort
 
 @injectable
 class JinjaSpecRenderer(SpecRenderingPort):
-    """Jinja2 implementation of spec rendering."""
+    """Jinja2 implementation of spec rendering.
+
+    Uses a sandboxed Jinja2 environment to prevent server-side template injection
+    (SSTI) attacks.  Operators supplying native_spec templates cannot use class
+    traversal chains (e.g. ``{{ ''.__class__.__mro__[1].__subclasses__() }}``)
+    to escape the render context or execute arbitrary code.
+    """
 
     def __init__(self, logger: LoggingPort):
         self.logger = logger
-        self.jinja_env = Environment(
+        self.jinja_env = SandboxedEnvironment(
             loader=BaseLoader(), autoescape=select_autoescape(["json", "yaml", "yml"])
         )
 

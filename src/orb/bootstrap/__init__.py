@@ -186,6 +186,59 @@ class Application:
         except Exception as e:
             self.logger.error("Failed to register configured providers: %s", e, exc_info=True)
 
+    async def start_daemon_services(self) -> bool:
+        """Start every registered provider strategy's daemon services.
+
+        Called by long-lived entry points (the REST API server) after
+        ``initialize`` completes.  CLI entry points must NOT call this
+        method: it kicks off watch streams, periodic reconcilers and
+        background GC tasks that only make sense in a process that lives
+        long enough to consume their output.
+
+        Returns ``True`` if every strategy's hook completed without
+        raising, ``False`` otherwise.  A failure in one strategy does not
+        prevent the others from running: each is invoked independently
+        inside a try/except and the overall return value is the AND of
+        all sub-results.
+        """
+        if not self._initialized:
+            self.logger.warning(
+                "start_daemon_services called before Application.initialize succeeded; skipping."
+            )
+            return False
+        try:
+            provider_config = self._config_manager.get_provider_config()
+            if not provider_config:
+                return True
+            ok = True
+            for provider_instance in provider_config.get_active_providers():
+                strategy = self._provider_registry.get_or_create_strategy(provider_instance.name)
+                if strategy is None:
+                    self.logger.warning(
+                        "start_daemon_services: no strategy resolved for %s",
+                        provider_instance.name,
+                    )
+                    ok = False
+                    continue
+                try:
+                    await strategy.start_daemon_services()
+                    self.logger.info(
+                        "Daemon services started for provider instance %s",
+                        provider_instance.name,
+                    )
+                except Exception as exc:
+                    self.logger.error(
+                        "Failed to start daemon services for %s: %s",
+                        provider_instance.name,
+                        exc,
+                        exc_info=True,
+                    )
+                    ok = False
+            return ok
+        except Exception as exc:
+            self.logger.error("start_daemon_services failed: %s", exc, exc_info=True)
+            return False
+
     def _log_provider_configuration(self, config_manager) -> None:
         """Log provider configuration information during initialization."""
         try:

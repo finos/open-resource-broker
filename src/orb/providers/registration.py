@@ -7,12 +7,19 @@ To add a new provider:
      - ``initialize_<name>_provider(container)`` – wires DI services (optional)
 
 That is the only edit outside the new provider package.
+
+Third-party plugins are discovered via the ``orb.providers`` entry-point
+group (see ``docs/root/providers/k8s/plugin-authoring.md``) and
+are loaded by :func:`discover_provider_plugins` immediately after the
+built-in providers have registered.
 """
 
 from __future__ import annotations
 
 import importlib
+import importlib.metadata
 import importlib.util
+import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -21,7 +28,82 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # Central provider list – the single line to edit when adding a new provider.
 # ---------------------------------------------------------------------------
-_REGISTERED_PROVIDERS: list[str] = ["aws"]
+_REGISTERED_PROVIDERS: list[str] = ["aws", "k8s"]
+
+# Entry-point group used by third-party plugins to register provider
+# extensions.  See ``discover_provider_plugins`` and
+# ``docs/root/providers/k8s/plugin-authoring.md``.
+_PROVIDER_ENTRY_POINT_GROUP = "orb.providers"
+
+_logger = logging.getLogger(__name__)
+
+
+def discover_provider_plugins(
+    entry_point_group: str = _PROVIDER_ENTRY_POINT_GROUP,
+) -> list[str]:
+    """Discover and load third-party provider plugins.
+
+    Walks ``importlib.metadata.entry_points(group=entry_point_group)`` and
+    invokes each entry point's loaded callable.  The contract for the
+    callable is documented in
+    ``docs/root/providers/k8s/plugin-authoring.md``:
+
+    * Zero-argument callable.
+    * Returns ``None``.
+    * Must not raise — plugins should log and swallow internal errors.
+
+    Failure modes are tolerant by design: a broken plugin is logged at
+    ERROR and skipped so ORB still boots with its built-in providers.
+
+    Args:
+        entry_point_group: Entry-point group to query.  Defaults to
+            ``orb.providers``; tests can pass a custom group to drive
+            simulated entry points.
+
+    Returns:
+        The names of plugins that were loaded successfully (in discovery
+        order).
+    """
+    loaded: list[str] = []
+    try:
+        entry_points = importlib.metadata.entry_points(group=entry_point_group)
+    except TypeError:
+        # Python <3.10 selectable-entry-points API differences.  ORB's
+        # supported Python range is 3.10+, so this branch is defensive.
+        try:
+            entry_points = importlib.metadata.entry_points().get(entry_point_group, ())  # type: ignore[attr-defined]
+        except Exception as exc:  # pragma: no cover — extremely defensive
+            _logger.error("Failed to query entry points for group %r: %s", entry_point_group, exc)
+            return loaded
+
+    for entry_point in entry_points:
+        name = getattr(entry_point, "name", "<unknown>")
+        try:
+            callable_ = entry_point.load()
+        except Exception as exc:
+            _logger.error(
+                "Failed to load provider plugin entry point %r: %s",
+                name,
+                exc,
+                exc_info=True,
+            )
+            continue
+        if not callable(callable_):
+            _logger.error("Provider plugin entry point %r resolved to a non-callable target", name)
+            continue
+        try:
+            callable_()
+        except Exception as exc:
+            _logger.error(
+                "Provider plugin %r raised during registration: %s",
+                name,
+                exc,
+                exc_info=True,
+            )
+            continue
+        loaded.append(name)
+        _logger.info("Loaded provider plugin %r", name)
+    return loaded
 
 
 def register_all_providers(container: "DIContainer | None" = None) -> None:
@@ -64,6 +146,13 @@ def register_all_providers(container: "DIContainer | None" = None) -> None:
             if init_fn is not None:
                 init_fn(container)
 
+    # Third-party provider plugins are discovered after the built-in
+    # providers register so plugins can rely on the built-in registries
+    # (provider registry, template extension registry, etc.) being
+    # populated.  Failures are logged and tolerated — see
+    # :func:`discover_provider_plugins`.
+    discover_provider_plugins()
+
 
 # ---------------------------------------------------------------------------
 # Deprecated aliases – kept for backward compatibility with existing callers.
@@ -90,15 +179,39 @@ def register_all_provider_cli_specs() -> None:
     as part of ``initialize_<name>_provider``.  This alias is retained so that
     ``cli/args.py`` and other early-bootstrap callers continue to work.
     """
+    from orb.domain.base.ports.provider_cli_spec_port import ProviderCLISpecPort
     from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
 
-    try:
-        from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec
-
-        if CLISpecRegistry.get("aws") is None:
-            CLISpecRegistry.register("aws", AWSCLISpec())
-    except ImportError:
-        pass  # [aws] extra not installed; AWS CLI spec unavailable
+    # Provider-agnostic discovery: import ``orb.providers.<name>.cli.<name>_cli_spec``
+    # and pick the first class defined in that module whose runtime instance
+    # satisfies ``ProviderCLISpecPort``.  Each provider owns its own class
+    # name; this loop stays generic.
+    for name in _REGISTERED_PROVIDERS:
+        if CLISpecRegistry.get(name) is not None:
+            continue
+        module_path = f"orb.providers.{name}.cli.{name}_cli_spec"
+        if importlib.util.find_spec(module_path) is None:
+            continue
+        try:
+            mod = importlib.import_module(module_path)
+        except ImportError:
+            continue  # provider extra not installed
+        spec_instance = None
+        for attr_name in dir(mod):
+            attr = getattr(mod, attr_name)
+            if not isinstance(attr, type):
+                continue
+            if attr.__module__ != mod.__name__:
+                continue
+            try:
+                instance = attr()
+            except Exception:
+                continue
+            if isinstance(instance, ProviderCLISpecPort):
+                spec_instance = instance
+                break
+        if spec_instance is not None:
+            CLISpecRegistry.register(name, spec_instance)
 
 
 def register_all_defaults_loaders() -> None:
@@ -113,15 +226,43 @@ def register_all_defaults_loaders() -> None:
     retained so that ``config/loader.py`` and other early-bootstrap callers
     continue to work.
     """
+    # Provider-agnostic discovery: each provider's ``defaults_loader`` module
+    # is expected to export exactly one class whose runtime instance satisfies
+    # ``ProviderDefaultsLoaderPort``.  We import the module from the well-known
+    # path ``orb.providers.<name>.defaults_loader`` and pick the first such
+    # class.  Provider-specific class names live inside the provider's own
+    # folder; the loop here stays generic.
+    from orb.domain.base.ports.provider_defaults_loader_port import (
+        ProviderDefaultsLoaderPort,
+    )
     from orb.providers.registry.defaults_loader_registry import DefaultsLoaderRegistry
 
-    if DefaultsLoaderRegistry.get("aws") is None:
+    for name in _REGISTERED_PROVIDERS:
+        if DefaultsLoaderRegistry.get(name) is not None:
+            continue
+        module_path = f"orb.providers.{name}.defaults_loader"
+        if importlib.util.find_spec(module_path) is None:
+            continue
         try:
-            from orb.providers.aws.defaults_loader import AWSDefaultsLoader
-
-            DefaultsLoaderRegistry.register("aws", AWSDefaultsLoader())
+            mod = importlib.import_module(module_path)
         except ImportError:
-            pass  # [aws] extra not installed; AWS defaults loader unavailable
+            continue  # provider extra not installed
+        loader_instance = None
+        for attr_name in dir(mod):
+            attr = getattr(mod, attr_name)
+            if not isinstance(attr, type):
+                continue
+            if attr.__module__ != mod.__name__:
+                continue
+            try:
+                instance = attr()
+            except Exception:
+                continue
+            if isinstance(instance, ProviderDefaultsLoaderPort):
+                loader_instance = instance
+                break
+        if loader_instance is not None:
+            DefaultsLoaderRegistry.register(name, loader_instance)
 
 
 def register_fallback_provider(
