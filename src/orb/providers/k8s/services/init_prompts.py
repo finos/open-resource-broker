@@ -40,9 +40,7 @@ def confirm_in_cluster(console: "ConsolePort", detected: bool) -> bool:
         Operator-confirmed boolean for the in-cluster flag.
     """
     detection_str = "yes" if detected else "no"
-    console.info(
-        f"  Running inside a Kubernetes pod (auto-detected: {detection_str})."
-    )
+    console.info(f"  Running inside a Kubernetes pod (auto-detected: {detection_str}).")
     answer = input("  Confirm? [Y/n]: ").strip().lower()
     if answer == "":
         return detected
