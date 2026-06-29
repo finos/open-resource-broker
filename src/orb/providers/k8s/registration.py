@@ -38,6 +38,32 @@ if TYPE_CHECKING:  # pragma: no cover — type-checking only
 # ---------------------------------------------------------------------------
 
 
+def _k8s_config_is_empty(provider_config: Any) -> bool:
+    """Return ``True`` when *provider_config* carries no cluster-targeting information.
+
+    A config is considered empty when it is ``None``, an empty dict, or a raw
+    dict that specifies none of the explicit cluster-targeting fields:
+    ``kubeconfig_path``, ``context``, or ``in_cluster``.  In that situation the
+    kubernetes client library falls back to whatever ``$KUBECONFIG`` or
+    ``~/.kube/config`` happens to be loaded in the current environment, which
+    risks silently targeting an unintended cluster.
+
+    Note: ``in_cluster=True`` is an explicit targeting signal (operator
+    deliberately opts in to in-cluster mode) and therefore not considered empty.
+    ``in_cluster=False`` offers no useful targeting information on its own and
+    is treated as empty.
+    """
+    if provider_config is None:
+        return True
+    if isinstance(provider_config, dict):
+        return (
+            not provider_config.get("kubeconfig_path")
+            and not provider_config.get("context")
+            and not provider_config.get("in_cluster")
+        )
+    return False
+
+
 def create_k8s_strategy(provider_config: Any) -> Any:
     """Create a :class:`K8sProviderStrategy` from configuration.
 
@@ -45,6 +71,16 @@ def create_k8s_strategy(provider_config: Any) -> Any:
     or a raw config dict.  The DI container is consulted opportunistically
     for ``ConfigurationPort`` and ``ConsolePort`` — failures are logged at
     debug level and the strategy is constructed without them.
+
+    Raises:
+        RuntimeError: When *provider_config* is ``None`` or carries no
+            cluster-targeting information (no ``kubeconfig_path``, no
+            ``context``).  Without explicit targeting the kubernetes client
+            would silently connect to whatever cluster the ambient
+            ``$KUBECONFIG`` points at, which risks submitting pods to an
+            unintended cluster.  Callers that legitimately want in-cluster
+            auto-detection must pass ``{"in_cluster": True}`` explicitly, or
+            supply a proper :class:`K8sProviderConfig` instance.
     """
     from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
     from orb.providers.k8s.configuration.config import K8sProviderConfig
@@ -63,6 +99,18 @@ def create_k8s_strategy(provider_config: Any) -> Any:
             provider_name = provider_config.name
             k8s_config = K8sProviderConfig(**config_data)
         else:
+            # Reject empty / None configs before constructing a strategy that
+            # would silently connect to the wrong cluster.
+            if _k8s_config_is_empty(provider_config):
+                raise RuntimeError(
+                    "Cannot create a Kubernetes strategy without explicit cluster-targeting "
+                    "configuration (kubeconfig_path or context).  "
+                    "The instance config is missing or empty; ORB refuses to fall back to "
+                    "the ambient $KUBECONFIG default to avoid accidentally targeting an "
+                    "unintended cluster.  "
+                    "Ensure the provider instance is present in config.json, or pass "
+                    "{'in_cluster': True} when running inside a Kubernetes pod."
+                )
             provider_instance_config = None
             provider_name = None
             k8s_config = K8sProviderConfig(**(provider_config or {}))
@@ -371,11 +419,23 @@ def register_k8s_provider_instance(provider_instance, logger=None) -> bool:
         return True
 
     except Exception as exc:
+        # Extract the config snippet that was attempted so operators can diagnose
+        # the failure without grepping code.
+        config_data = getattr(provider_instance, "config", None) or {}
+        config_snippet = {
+            k: config_data.get(k)
+            for k in ("kubeconfig_path", "context", "namespace")
+        }
         if logger:
             logger.error(
-                "Failed to register Kubernetes provider instance '%s': %s",
+                "Failed to register Kubernetes provider instance '%s': %s  "
+                "(config keys attempted: kubeconfig_path=%r, context=%r, namespace=%r)",
                 provider_instance.name,
                 exc,
+                config_snippet.get("kubeconfig_path"),
+                config_snippet.get("context"),
+                config_snippet.get("namespace"),
+                exc_info=True,
             )
         return False
 

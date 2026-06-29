@@ -133,7 +133,19 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
                         provider_identifier,
                         provider_type,
                     )
-                strategy = self.create_strategy_by_type(provider_type, config)
+                try:
+                    strategy = self.create_strategy_by_type(provider_type, config)
+                except Exception as fallback_exc:
+                    if self._logger:
+                        self._logger.warning(
+                            "Type-level fallback strategy for instance %r (type %r) could not "
+                            "be created; the instance will be treated as not found. "
+                            "Reason: %s",
+                            provider_identifier,
+                            provider_type,
+                            fallback_exc,
+                        )
+                    strategy = None
 
         if strategy:
             # Initialize strategy

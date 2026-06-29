@@ -64,7 +64,7 @@ def test_create_k8s_strategy_initialises_with_dict() -> None:
         "orb.infrastructure.di.container.get_container",
         side_effect=Exception("DI not ready"),
     ):
-        strategy = create_k8s_strategy({"namespace": "orb-system"})
+        strategy = create_k8s_strategy({"namespace": "orb-system", "in_cluster": True})
     assert isinstance(strategy, K8sProviderStrategy)
     assert strategy.is_initialized is True
     assert strategy._k8s_config.namespace == "orb-system"  # type: ignore[attr-defined]
@@ -152,7 +152,7 @@ def test_create_k8s_strategy_registers_health_checks() -> None:
         ),
         patch("orb.providers.k8s.health.register_k8s_health_checks") as mock_register,
     ):
-        strategy = create_k8s_strategy({"namespace": "orb-system"})
+        strategy = create_k8s_strategy({"namespace": "orb-system", "in_cluster": True})
 
     # The health check registration must have been called with the
     # HealthCheckPort instance resolved from the container.
