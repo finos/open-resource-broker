@@ -65,8 +65,7 @@ def test_get_or_create_strategy_k8s_fallback_no_config_returns_none() -> None:
     result = registry.get_or_create_strategy("k8s-prod", config=None)
 
     assert result is None, (
-        "Expected None when k8s fallback factory rejects empty config, "
-        f"got {result!r}"
+        f"Expected None when k8s fallback factory rejects empty config, got {result!r}"
     )
     # The registry must log a warning so operators know the fallback was skipped
     registry._logger.warning.assert_called()
@@ -94,12 +93,8 @@ def test_get_or_create_strategy_k8s_fallback_logs_provider_type() -> None:
     call_args = registry._logger.warning.call_args
     # First arg is the format string; positional args after that fill the %r slots
     positional = call_args.args
-    assert "k8s-staging" in positional, (
-        "Instance name must appear in warning args"
-    )
-    assert "k8s" in positional, (
-        "Provider type must appear in warning args"
-    )
+    assert "k8s-staging" in positional, "Instance name must appear in warning args"
+    assert "k8s" in positional, "Provider type must appear in warning args"
 
 
 # ---------------------------------------------------------------------------

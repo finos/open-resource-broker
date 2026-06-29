@@ -22,7 +22,9 @@ class _FakeApplication:
     so tests run without the full DI container.
     """
 
-    def __init__(self, *, initialized: bool = False, provider_instances: list | None = None) -> None:
+    def __init__(
+        self, *, initialized: bool = False, provider_instances: list | None = None
+    ) -> None:
         self._initialized = initialized
         self._provider_instances = provider_instances or []
 
@@ -37,8 +39,8 @@ class _FakeApplication:
         # Fake provider registry returns strategy by name.
         self._strategy_by_name: dict[str, Any] = {}
         self._provider_registry = MagicMock()
-        self._provider_registry.get_or_create_strategy.side_effect = (
-            lambda name, **_kw: self._strategy_by_name.get(name)
+        self._provider_registry.get_or_create_strategy.side_effect = lambda name, **_kw: (
+            self._strategy_by_name.get(name)
         )
 
     def register_strategy(self, name: str, strategy: Any) -> None:

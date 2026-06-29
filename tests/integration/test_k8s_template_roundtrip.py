@@ -59,7 +59,9 @@ _RICH_FIELDS = dict(
     image_id="registry.example.com/myapp:v2",
     namespace="orb-system",
     node_selector={"role": "compute", "zone": "us-east-1a"},
-    tolerations=[{"key": "dedicated", "operator": "Equal", "value": "compute", "effect": "NoSchedule"}],
+    tolerations=[
+        {"key": "dedicated", "operator": "Equal", "value": "compute", "effect": "NoSchedule"}
+    ],
     resource_requests={"cpu": "500m", "memory": "1Gi"},
     resource_limits={"cpu": "2", "memory": "4Gi"},
     command=["python"],

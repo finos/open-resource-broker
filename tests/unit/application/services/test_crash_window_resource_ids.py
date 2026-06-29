@@ -243,6 +243,7 @@ class TestExecuteProvisioningCrashWindow:
 
         scheduler = MagicMock()
         scheduler.format_template_for_provider.return_value = {}
+
         # The service fetches both the scheduler (SchedulerPort) and the
         # uow_factory (UnitOfWorkFactory) from the container.  Return the
         # scheduler for the first get call and the uow_factory for subsequent

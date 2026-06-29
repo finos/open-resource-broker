@@ -423,8 +423,7 @@ def register_k8s_provider_instance(provider_instance, logger=None) -> bool:
         # the failure without grepping code.
         config_data = getattr(provider_instance, "config", None) or {}
         config_snippet = {
-            k: config_data.get(k)
-            for k in ("kubeconfig_path", "context", "namespace")
+            k: config_data.get(k) for k in ("kubeconfig_path", "context", "namespace")
         }
         if logger:
             logger.error(

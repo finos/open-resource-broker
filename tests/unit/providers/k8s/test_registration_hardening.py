@@ -27,11 +27,11 @@ from orb.providers.k8s.registration import (
     [
         (None, True),
         ({}, True),
-        ({"namespace": "orb"}, True),                        # namespace alone is not cluster-targeting
-        ({"in_cluster": False}, True),                       # explicit False offers no target
+        ({"namespace": "orb"}, True),  # namespace alone is not cluster-targeting
+        ({"in_cluster": False}, True),  # explicit False offers no target
         ({"kubeconfig_path": "/tmp/k"}, False),
         ({"context": "my-cluster"}, False),
-        ({"in_cluster": True}, False),                       # explicit in-cluster opt-in is valid
+        ({"in_cluster": True}, False),  # explicit in-cluster opt-in is valid
         ({"kubeconfig_path": "/tmp/k", "context": "ctx"}, False),
     ],
 )
