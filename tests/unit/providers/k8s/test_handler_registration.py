@@ -47,54 +47,53 @@ class _OtherStubHandler(_StubHandler):
     """Different subclass — used to test the conflict path."""
 
 
-@pytest.fixture(autouse=True)
-def _clean_registry():
-    """Snapshot + restore the class-level registry between tests."""
-    snapshot = dict(K8sProviderStrategy._HANDLER_FACTORIES)
-    try:
-        yield
-    finally:
-        K8sProviderStrategy._HANDLER_FACTORIES = snapshot
-
-
-def test_register_handler_inserts_into_registry() -> None:
-    K8sProviderStrategy.register_handler("KubernetesPluginTest", _StubHandler)
-    assert K8sProviderStrategy._HANDLER_FACTORIES["KubernetesPluginTest"] is _StubHandler
-
-
-def test_register_handler_is_idempotent_for_same_class() -> None:
-    K8sProviderStrategy.register_handler("KubernetesPluginTest", _StubHandler)
-    # Re-registering the same class is allowed so plugin reloads do not fail.
-    K8sProviderStrategy.register_handler("KubernetesPluginTest", _StubHandler)
-    assert K8sProviderStrategy._HANDLER_FACTORIES["KubernetesPluginTest"] is _StubHandler
-
-
-def test_register_handler_rejects_conflicting_class() -> None:
-    K8sProviderStrategy.register_handler("KubernetesPluginTest", _StubHandler)
-    with pytest.raises(ValueError, match="already registered"):
-        K8sProviderStrategy.register_handler("KubernetesPluginTest", _OtherStubHandler)
-
-
-def test_unregister_handler_removes_entry() -> None:
-    K8sProviderStrategy.register_handler("KubernetesPluginTest", _StubHandler)
-    K8sProviderStrategy.unregister_handler("KubernetesPluginTest")
-    assert "KubernetesPluginTest" not in K8sProviderStrategy._HANDLER_FACTORIES
-
-
-def test_unregister_handler_is_safe_when_absent() -> None:
-    # Must not raise when the key is not registered.
-    K8sProviderStrategy.unregister_handler("never-registered")
-
-
-def test_strategy_dispatches_plugin_handler_via_get_handler() -> None:
-    """``_get_handler`` resolves plugin-registered handlers."""
-    K8sProviderStrategy.register_handler("KubernetesPluginTest", _StubHandler)
-
-    strategy = K8sProviderStrategy(
+def _make_strategy() -> K8sProviderStrategy:
+    return K8sProviderStrategy(
         config=K8sProviderConfig(),
         logger=MagicMock(),
         kubernetes_client=MagicMock(),
     )
+
+
+def test_register_handler_inserts_into_registry() -> None:
+    strategy = _make_strategy()
+    strategy.register_handler("KubernetesPluginTest", _StubHandler)
+    assert strategy._handler_factories["KubernetesPluginTest"] is _StubHandler
+
+
+def test_register_handler_is_idempotent_for_same_class() -> None:
+    strategy = _make_strategy()
+    strategy.register_handler("KubernetesPluginTest", _StubHandler)
+    # Re-registering the same class is allowed so plugin reloads do not fail.
+    strategy.register_handler("KubernetesPluginTest", _StubHandler)
+    assert strategy._handler_factories["KubernetesPluginTest"] is _StubHandler
+
+
+def test_register_handler_rejects_conflicting_class() -> None:
+    strategy = _make_strategy()
+    strategy.register_handler("KubernetesPluginTest", _StubHandler)
+    with pytest.raises(ValueError, match="already registered"):
+        strategy.register_handler("KubernetesPluginTest", _OtherStubHandler)
+
+
+def test_unregister_handler_removes_entry() -> None:
+    strategy = _make_strategy()
+    strategy.register_handler("KubernetesPluginTest", _StubHandler)
+    strategy.unregister_handler("KubernetesPluginTest")
+    assert "KubernetesPluginTest" not in strategy._handler_factories
+
+
+def test_unregister_handler_is_safe_when_absent() -> None:
+    # Must not raise when the key is not registered.
+    strategy = _make_strategy()
+    strategy.unregister_handler("never-registered")
+
+
+def test_strategy_dispatches_plugin_handler_via_get_handler() -> None:
+    """``_get_handler`` resolves plugin-registered handlers."""
+    strategy = _make_strategy()
+    strategy.register_handler("KubernetesPluginTest", _StubHandler)
+
     handler = strategy._get_handler("KubernetesPluginTest")
     assert isinstance(handler, _StubHandler)
     # The same instance is cached for subsequent lookups.
@@ -103,10 +102,6 @@ def test_strategy_dispatches_plugin_handler_via_get_handler() -> None:
 
 def test_strategy_still_raises_for_unknown_provider_api() -> None:
     """Unknown provider_api keys raise ``NotImplementedError``."""
-    strategy = K8sProviderStrategy(
-        config=K8sProviderConfig(),
-        logger=MagicMock(),
-        kubernetes_client=MagicMock(),
-    )
+    strategy = _make_strategy()
     with pytest.raises(NotImplementedError, match="not yet implemented"):
         strategy._get_handler("KubernetesDoesNotExist")

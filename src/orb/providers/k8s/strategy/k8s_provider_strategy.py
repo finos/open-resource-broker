@@ -86,27 +86,27 @@ class K8sProviderStrategy(ProviderStrategy):
         "job": "Job",
     }
 
-    # Plugin extension point — class-level registry of handler factories
-    # keyed by ``provider_api`` value.  Third-party plugins call
-    # :meth:`register_handler` from their ``orb.providers`` entry-point
-    # callable to attach a handler to the Kubernetes provider without
-    # forking the strategy.  See
-    # ``docs/root/providers/k8s/plugin-authoring.md``.
-    _HANDLER_FACTORIES: dict[str, Callable[..., K8sHandlerBase]] = {}
+    # Class-level frozen seed for plugin factories — used only to seed the
+    # per-instance dict created in ``__init__``.  Never mutate this dict
+    # directly; use :meth:`register_handler` which operates on the instance.
+    _DEFAULT_HANDLER_FACTORIES: dict[str, Callable[..., K8sHandlerBase]] = {}
 
-    @classmethod
     def register_handler(
-        cls,
+        self,
         provider_api: str,
         handler_class: Callable[..., K8sHandlerBase],
     ) -> None:
-        """Register a handler class against a ``provider_api`` key.
+        """Register a plugin handler factory against a ``provider_api`` key.
 
-        The ``handler_class`` must accept the standard handler kwargs:
+        The factory must accept the full seven-kwarg surface:
         ``kubernetes_client``, ``config``, ``logger``, ``pod_state_cache``,
-        and ``cache_alive``.  Plugin authors typically subclass
+        ``cache_alive``, ``native_spec_service``, and ``node_state_cache``.
+        Plugin authors typically subclass
         :class:`orb.providers.k8s.handlers.base_handler.K8sHandlerBase`
         which already accepts those kwargs.
+
+        Registration is scoped to this strategy instance — two strategy
+        objects for different clusters do not share plugin state.
 
         Args:
             provider_api: The ``provider_api`` template field this handler
@@ -120,18 +120,17 @@ class K8sProviderStrategy(ProviderStrategy):
                 the same class is allowed so that plugin reloads do not
                 fail.
         """
-        existing = cls._HANDLER_FACTORIES.get(provider_api)
+        existing = self._handler_factories.get(provider_api)
         if existing is not None and existing is not handler_class:
             raise ValueError(
                 f"provider_api {provider_api!r} is already registered to a "
                 f"different handler class ({existing!r}); refusing to overwrite."
             )
-        cls._HANDLER_FACTORIES[provider_api] = handler_class
+        self._handler_factories[provider_api] = handler_class
 
-    @classmethod
-    def unregister_handler(cls, provider_api: str) -> None:
-        """Remove a plugin-registered handler (intended for tests / reload)."""
-        cls._HANDLER_FACTORIES.pop(provider_api, None)
+    def unregister_handler(self, provider_api: str) -> None:
+        """Remove a plugin-registered handler from this instance (for tests / reload)."""
+        self._handler_factories.pop(provider_api, None)
 
     def __init__(
         self,
@@ -193,17 +192,29 @@ class K8sProviderStrategy(ProviderStrategy):
         # Infrastructure discovery service — constructed lazily by
         # :meth:`_get_discovery_service` on first use.
         self._discovery_service: Optional[K8sInfrastructureDiscoveryService] = None
+        # Per-instance plugin factory registry — seeded from the class-level
+        # defaults so every instance starts with the same empty set but is
+        # fully isolated from other instances.  Two strategy objects for
+        # different clusters in the same process do not share plugin state.
+        self._handler_factories: dict[str, Callable[..., K8sHandlerBase]] = dict(
+            type(self)._DEFAULT_HANDLER_FACTORIES
+        )
+        # Guard that ensures :meth:`start_daemon_services` is idempotent.
+        # Set to True only after all four sub-systems start successfully;
+        # a second invocation (e.g. uvicorn worker recycle) short-circuits
+        # immediately to prevent double-reconciliation.
+        self._daemon_services_started: bool = False
         # Handler registry — does the per-API handler factory wiring and
         # the typed acquire/return/status dispatch.  Wired with closures
         # over the strategy's lazy client, watcher, native-spec accessors
-        # and the class-level plugin factory dict so the registry never
+        # and the per-instance plugin factory dict so the registry never
         # re-implements those lifecycles.
         self._handler_registry = K8sHandlerRegistry(
             config=self._k8s_config,
             logger=self._logger,
             client_provider=lambda: self.kubernetes_client,
             watch_manager_provider=lambda: self._watch_manager,
-            plugin_factories=lambda: type(self)._HANDLER_FACTORIES,
+            plugin_factories=lambda: self._handler_factories,
             native_spec_service_provider=self._resolve_native_spec_service,
             handler_overrides=handler_overrides,
             node_state_cache_provider=lambda: self._node_state_cache,
@@ -270,38 +281,73 @@ class K8sProviderStrategy(ProviderStrategy):
         background watchers, and the synchronous ``list_pods`` issued by the
         reconciler would otherwise block every command on apiserver latency.
 
-        Each sub-step is idempotent and tolerates being skipped — the watch
-        manager and orphan GC short-circuit when their respective config
-        flags are False, and the startup reconciler safely no-ops if invoked
-        again.  Failures inside any sub-step are logged and tolerated; the
-        provider continues to serve reads via the cache-less fallback path.
+        This method is idempotent: a second call (e.g. from a uvicorn worker
+        recycle) short-circuits immediately without re-running reconciliation.
+        Re-running reconciliation against an already-running provider can
+        misclassify pods that were created between the two invocations as
+        orphans, so the guard is intentional.  ``_daemon_services_started`` is
+        set to ``True`` only after all four sub-systems complete successfully;
+        if startup raises, a subsequent call will retry.
+
+        Each sub-step tolerates failure — errors are logged and the provider
+        continues to serve reads via the cache-less fallback path.
         """
+        if self._daemon_services_started:
+            self._logger.debug(
+                "Kubernetes daemon services already started; skipping second invocation."
+            )
+            return
         self._run_startup_reconciler()
         self._maybe_start_watch_manager()
         self._maybe_start_orphan_gc()
         self._maybe_start_node_watcher()
+        self._daemon_services_started = True
 
     def cleanup(self) -> None:
+        # Each stage is wrapped independently so that a failure in an
+        # earlier stage does not prevent later stages from running.
+        # In particular, an ApiClient connection-pool leak from an
+        # orphan-GC stop failure is avoided by always reaching the
+        # client cleanup stage.
         try:
             if self._orphan_gc is not None:
                 self._stop_orphan_gc_sync()
+        except Exception as exc:
+            self._logger.warning(
+                "Failed to stop Kubernetes orphan GC during cleanup: %s", exc, exc_info=True
+            )
+
+        try:
             if self._watch_manager is not None:
                 # ``stop`` is async; schedule it on the running loop if
                 # there is one, otherwise drive it synchronously via
                 # ``asyncio.run``.  CLI cleanup paths typically have no
                 # loop running while daemon paths do.
                 self._stop_watch_manager_sync()
+        except Exception as exc:
+            self._logger.warning(
+                "Failed to stop Kubernetes watch manager during cleanup: %s", exc, exc_info=True
+            )
+
+        try:
             if self._node_watcher is not None:
                 self._node_watcher.stop()
                 self._node_watcher = None
+        except Exception as exc:
+            self._logger.warning(
+                "Failed to stop Kubernetes node watcher during cleanup: %s", exc, exc_info=True
+            )
+
+        try:
             if self._kubernetes_client is not None:
                 self._kubernetes_client.cleanup()
             self._kubernetes_client = None
-            self._initialized = False
         except Exception as exc:
             self._logger.warning(
-                "Failed during Kubernetes provider cleanup: %s", exc, exc_info=True
+                "Failed to clean up Kubernetes client during cleanup: %s", exc, exc_info=True
             )
+
+        self._initialized = False
 
     def _ensure_watch_manager(self) -> MultiNamespaceWatcher:
         """Lazily construct (but do NOT start) the watch fan-out.
@@ -800,15 +846,78 @@ class K8sProviderStrategy(ProviderStrategy):
         )
 
     def check_health(self) -> ProviderHealthStatus:
-        """Probe the Kubernetes API server via ``CoreV1Api.get_api_resources``."""
+        """Probe the Kubernetes API server via ``CoreV1Api.get_api_resources``.
+
+        On success the status message and ``error_details`` dict are enriched
+        with the cluster endpoint, server version, and current namespace so
+        operators running against multiple clusters can identify which cluster
+        the probe hit.  Each enrichment field is fetched defensively — a
+        failure to retrieve the server version or endpoint never causes the
+        overall health check to fail.
+        """
         start = time.time()
         try:
-            resources = self.kubernetes_client.core_v1.get_api_resources()
+            client = self.kubernetes_client
+            resources = client.core_v1.get_api_resources()
             response_time_ms = (time.time() - start) * 1000.0
             resource_count = len(getattr(resources, "resources", []) or [])
-            return ProviderHealthStatus.healthy(
-                message=(f"Kubernetes API server reachable; {resource_count} core/v1 resources"),
+
+            # --- enrichment: cluster endpoint ---
+            cluster_endpoint: Optional[str] = None
+            try:
+                cluster_endpoint = getattr(
+                    client.api_client.configuration,  # type: ignore[union-attr]
+                    "host",
+                    None,
+                )
+            except Exception:  # noqa: BLE001
+                pass
+
+            # --- enrichment: server version ---
+            server_version: Optional[str] = None
+            try:
+                from kubernetes.client import VersionApi  # noqa: PLC0415
+
+                version_info = VersionApi(api_client=client.api_client).get_code()
+                server_version = getattr(version_info, "git_version", None)
+            except Exception:  # noqa: BLE001
+                pass
+
+            # --- enrichment: current namespace ---
+            current_namespace: Optional[str] = self._k8s_config.namespace
+            if current_namespace is None and self._k8s_config.in_cluster:
+                try:
+                    from orb.providers.k8s.configuration.config import (  # noqa: PLC0415
+                        _read_in_cluster_namespace,
+                    )
+
+                    current_namespace = _read_in_cluster_namespace()
+                except Exception:  # noqa: BLE001
+                    pass
+
+            parts: list[str] = [
+                f"Kubernetes API server reachable; {resource_count} core/v1 resources"
+            ]
+            if cluster_endpoint:
+                parts.append(f"endpoint={cluster_endpoint}")
+            if server_version:
+                parts.append(f"version={server_version}")
+            if current_namespace:
+                parts.append(f"namespace={current_namespace}")
+
+            details: dict[str, Any] = {"response_time_ms": response_time_ms}
+            if cluster_endpoint:
+                details["cluster_endpoint"] = cluster_endpoint
+            if server_version:
+                details["server_version"] = server_version
+            if current_namespace:
+                details["namespace"] = current_namespace
+
+            return ProviderHealthStatus(
+                is_healthy=True,
+                status_message="; ".join(parts),
                 response_time_ms=response_time_ms,
+                error_details=details,
             )
         except Exception as exc:
             response_time_ms = (time.time() - start) * 1000.0

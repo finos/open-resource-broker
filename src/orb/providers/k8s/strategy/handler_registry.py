@@ -49,12 +49,11 @@ class K8sHandlerRegistry:
     remains the single source of truth for plugin state.
     """
 
-    # Single source of truth for the built-in handler classes.  Mirrors
-    # ``AWSHandlerFactory._handler_classes``: the same dict drives
-    # :meth:`get_handler` (live dispatch) and :meth:`generate_example_templates`
-    # (read-only enumeration).  Adding a handler means adding ONE entry here
-    # and nothing else — no separate adapter file to keep in sync.
-    _HANDLER_CLASSES: dict[str, type[K8sHandlerBase]] = {
+    # Frozen default handler classes — used only as the seed for
+    # per-instance copies constructed in ``__init__``.  Never mutate
+    # this dict directly; handler registration operates on the
+    # instance's ``_handler_classes`` instead.
+    _DEFAULT_HANDLER_CLASSES: dict[str, type[K8sHandlerBase]] = {
         KubernetesProviderApi.POD.value: K8sPodHandler,
         KubernetesProviderApi.DEPLOYMENT.value: K8sDeploymentHandler,
         KubernetesProviderApi.STATEFUL_SET.value: K8sStatefulSetHandler,
@@ -88,6 +87,12 @@ class K8sHandlerRegistry:
         # by resolve_provider_api before the handler cache lookup so that
         # lowercase submissions (e.g. "pod") route to the correct handler.
         self._api_aliases: dict[str, str] = dict(api_aliases or {})
+        # Per-instance mutable copy of the handler-class table.  Seeded from
+        # the class-level defaults so every registry instance starts with the
+        # four built-in kinds but is fully isolated from every other instance.
+        self._handler_classes: dict[str, type[K8sHandlerBase]] = dict(
+            self._DEFAULT_HANDLER_CLASSES
+        )
         # Handler cache keyed by provider_api value.  Tests can pre-seed
         # this via ``handler_overrides`` to inject mock handlers.
         self._handlers: dict[str, K8sHandlerBase] = dict(handler_overrides or {})
@@ -137,7 +142,7 @@ class K8sHandlerRegistry:
             else None
         )
 
-        handler_class = self._HANDLER_CLASSES.get(provider_api)
+        handler_class = self._handler_classes.get(provider_api)
         if handler_class is not None:
             handler = handler_class(
                 kubernetes_client=self._client_provider(),
@@ -153,6 +158,9 @@ class K8sHandlerRegistry:
 
         # Plugin-supplied handlers — see ``K8sProviderStrategy.register_handler``
         # and ``docs/root/providers/k8s/plugin-authoring.md``.
+        # Factories receive the full seven-kwarg surface so plugins that
+        # consume ``native_spec_service`` or ``node_state_cache`` do not
+        # silently receive ``None``.
         factory = self._plugin_factories().get(provider_api)
         if factory is not None:
             handler = factory(
@@ -161,6 +169,8 @@ class K8sHandlerRegistry:
                 logger=self._logger,
                 pod_state_cache=cache,
                 cache_alive=alive,
+                native_spec_service=native_spec_service,
+                node_state_cache=node_cache,
             )
             self._handlers[provider_api] = handler
             return handler
@@ -191,7 +201,7 @@ class K8sHandlerRegistry:
         :meth:`AWSHandlerFactory.generate_example_templates`.
         """
         examples: list[Any] = []
-        sources: dict[str, Any] = {**cls._HANDLER_CLASSES, **(plugin_factories or {})}
+        sources: dict[str, Any] = {**cls._DEFAULT_HANDLER_CLASSES, **(plugin_factories or {})}
         for handler_target in sources.values():
             getter = getattr(handler_target, "get_example_templates", None)
             if getter is None:
