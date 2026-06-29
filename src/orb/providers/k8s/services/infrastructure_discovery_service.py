@@ -1,9 +1,10 @@
 """Kubernetes Infrastructure Discovery Service.
 
 Implements the non-interactive discovery flow that feeds ``orb init`` for the
-k8s provider.  The interactive prompt loop lives in Phase C; this module
-provides the full non-interactive leaf-method implementations plus the
-composition method :meth:`K8sInfrastructureDiscoveryService.discover_infrastructure`.
+k8s provider.  The interactive prompt loop lives in
+:meth:`K8sInfrastructureDiscoveryService.discover_infrastructure_interactive`;
+this module provides the full non-interactive leaf-method implementations plus
+the composition method :meth:`K8sInfrastructureDiscoveryService.discover_infrastructure`.
 
 Public leaf methods (all non-interactive, all safe to call without a live
 cluster in unit tests when the ``api_client`` constructor argument is

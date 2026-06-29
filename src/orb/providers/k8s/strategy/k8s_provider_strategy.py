@@ -834,7 +834,7 @@ class K8sProviderStrategy(ProviderStrategy):
         """Discover Kubernetes infrastructure for the configured cluster.
 
         Delegates to :class:`K8sInfrastructureDiscoveryService`.  Returns
-        a valid (empty-stub) discovery dict until Phase B is implemented.
+        a valid discovery dict.
         """
         return self._get_discovery_service().discover_infrastructure(provider_config)
 
@@ -844,8 +844,7 @@ class K8sProviderStrategy(ProviderStrategy):
         """Interactively discover Kubernetes infrastructure via operator prompts.
 
         Delegates to :class:`K8sInfrastructureDiscoveryService`.  Returns
-        the same scaffold as :meth:`discover_infrastructure` until Phase C
-        is implemented.
+        the same scaffold as :meth:`discover_infrastructure`.
         """
         return self._get_discovery_service().discover_infrastructure_interactive(provider_config)
 
@@ -853,7 +852,7 @@ class K8sProviderStrategy(ProviderStrategy):
         """Validate that the configured Kubernetes cluster is reachable.
 
         Delegates to :class:`K8sInfrastructureDiscoveryService`.  Returns
-        ``{provider, valid: True, issues: []}`` until Phase D is implemented.
+        ``{provider, valid: True, issues: []}``.
         """
         return self._get_discovery_service().validate_infrastructure(provider_config)
 
