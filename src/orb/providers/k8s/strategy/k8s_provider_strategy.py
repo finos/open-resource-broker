@@ -741,7 +741,9 @@ class K8sProviderStrategy(ProviderStrategy):
             or []
         )
         outcome = await self.get_status(resource_ids, request)
-        result = _outcome_to_provider_result(outcome, fallback_operation="describe_resource_instances")
+        result = _outcome_to_provider_result(
+            outcome, fallback_operation="describe_resource_instances"
+        )
         # Surface the fulfilment state in metadata so callers have a stable
         # field to inspect without digging into provider_data.
         from orb.domain.base.operation_outcome import Accepted, Completed  # noqa: PLC0415
