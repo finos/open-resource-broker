@@ -110,9 +110,7 @@ class TestActiveProviderTypePaths:
         paths = strategy.get_template_paths()
         assert len(paths) == len(set(paths)), f"Duplicate paths found: {paths}"
 
-    def test_paths_fall_back_to_generic_only_on_provider_read_failure(
-        self, tmp_path, monkeypatch
-    ):
+    def test_paths_fall_back_to_generic_only_on_provider_read_failure(self, tmp_path, monkeypatch):
         """If provider config read raises, the path list contains only templates.json."""
         monkeypatch.setenv("ORB_CONFIG_DIR", str(tmp_path))
         config_manager = ConfigurationManager(config_dict={})
@@ -128,20 +126,14 @@ class TestActiveProviderTypePaths:
 
 
 class TestHostFactoryProviderFilename:
-    def test_hostfactory_provider_specific_filename_pattern_preserved(
-        self, tmp_path, monkeypatch
-    ):
+    def test_hostfactory_provider_specific_filename_pattern_preserved(self, tmp_path, monkeypatch):
         """HF strategy uses <provider_name>_templates.json, not <provider_type>_templates.json."""
         monkeypatch.setenv("ORB_CONFIG_DIR", str(tmp_path))
-        strategy = _make_strategy(
-            ["aws"], provider_name="hf-fleet", use_hf=True
-        )
+        strategy = _make_strategy(["aws"], provider_name="hf-fleet", use_hf=True)
         paths = strategy.get_template_paths()
         names = [Path(p).name for p in paths]
         # HF fallback is provider_name-based
-        assert "hf-fleet_templates.json" in names, (
-            f"Expected hf-fleet_templates.json in {names}"
-        )
+        assert "hf-fleet_templates.json" in names, f"Expected hf-fleet_templates.json in {names}"
         # The type-based file should also appear
         assert "aws_templates.json" in names, f"Expected aws_templates.json in {names}"
 

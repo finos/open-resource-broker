@@ -92,11 +92,7 @@ class TestFilterTemplatesByActiveProviders:
         ]
         manager._filter_templates_by_active_providers(raw)
         # Two aws templates dropped → two debug calls that mention "Dropping"
-        dropping_calls = [
-            call
-            for call in logger.debug.call_args_list
-            if "Dropping" in str(call)
-        ]
+        dropping_calls = [call for call in logger.debug.call_args_list if "Dropping" in str(call)]
         assert len(dropping_calls) == 2, (
             f"Expected 2 'Dropping' debug calls, got {len(dropping_calls)}: {dropping_calls}"
         )
@@ -109,9 +105,7 @@ class TestFilterTemplatesByActiveProviders:
         ]
         manager._filter_templates_by_active_providers(raw)
         retain_calls = [
-            call
-            for call in logger.debug.call_args_list
-            if "without a provider_type" in str(call)
+            call for call in logger.debug.call_args_list if "without a provider_type" in str(call)
         ]
         assert len(retain_calls) == 1, (
             f"Expected 1 retain debug call, got {len(retain_calls)}: {retain_calls}"

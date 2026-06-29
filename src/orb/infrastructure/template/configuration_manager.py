@@ -224,9 +224,7 @@ class TemplateConfigurationManager:
             if provider_config is None:
                 return set()
             active = provider_config.get_active_providers()
-            return {
-                t for p in active if (t := getattr(p, "type", None)) is not None
-            }
+            return {t for p in active if (t := getattr(p, "type", None)) is not None}
         except Exception as e:
             self.logger.debug("Could not read active provider types for template filter: %s", e)
             return set()
@@ -259,8 +257,7 @@ class TemplateConfigurationManager:
                 kept.append(tpl)
             else:
                 self.logger.debug(
-                    "Dropping template '%s' with provider_type='%s' "
-                    "(active types: %s)",
+                    "Dropping template '%s' with provider_type='%s' (active types: %s)",
                     tpl.get("template_id") or tpl.get("templateId", "<unknown>"),
                     declared_type,
                     sorted(active_types),
