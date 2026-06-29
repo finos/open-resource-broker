@@ -46,9 +46,7 @@ class KubernetesTemplateExampleGeneratorAdapter(TemplateExampleGeneratorPort):
             return []
 
         plugin_factories = _resolve_plugin_factories()
-        examples = K8sHandlerRegistry.generate_example_templates(
-            plugin_factories=plugin_factories
-        )
+        examples = K8sHandlerRegistry.generate_example_templates(plugin_factories=plugin_factories)
 
         if provider_api:
             examples = [t for t in examples if getattr(t, "provider_api", None) == provider_api]
