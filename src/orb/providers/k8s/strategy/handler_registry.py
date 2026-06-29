@@ -226,15 +226,23 @@ class K8sHandlerRegistry:
         try:
             provider_api = self.resolve_provider_api(request)
             handler = self.get_handler(provider_api)
-            await handler.release_hosts(list(machine_ids), request)
+            release_result = await handler.release_hosts(list(machine_ids), request)
+            # release_hosts returns a dict with ``deleted`` and
+            # ``failed_deletes`` when partial failure occurred.  The caller
+            # only needs the successfully deleted IDs as pending_resource_ids
+            # so the status-poll path can observe them draining.
+            release_info: dict[str, Any] = (
+                release_result if isinstance(release_result, dict) else {}
+            )
+            deleted = release_info.get("deleted", list(machine_ids))
             self._logger.info(
                 "Kubernetes return accepted: request_id=%s machine_ids=%s",
                 request.request_id,
-                machine_ids,
+                deleted,
             )
             return Accepted(
                 request_id=str(request.request_id),
-                pending_resource_ids=list(machine_ids),
+                pending_resource_ids=deleted,
                 metadata={"provider_api": provider_api},
             )
         except Exception as exc:
@@ -266,20 +274,41 @@ class K8sHandlerRegistry:
             instances = list(check_result.instances)
             fulfilment = check_result.fulfilment
 
+            # Only synthesise ``terminated`` entries for IDs that were
+            # confirmed submitted at acquire time (recorded in
+            # provider_data["pod_names"]).  IDs that were never successfully
+            # created must not be closed out as terminated — they surface as
+            # ``unknown`` instead, preventing phantom machine rows.
+            provider_data: dict[str, Any] = getattr(request, "provider_data", None) or {}
+            confirmed_pod_names: set[str] = set(provider_data.get("pod_names") or [])
+
             live_ids = {i.get("instance_id", "") for i in instances}
             missing_ids = [mid for mid in (resource_ids or []) if mid and mid not in live_ids]
-            if missing_ids:
-                instances.extend(
-                    {
-                        "instance_id": mid,
-                        "resource_id": mid,
-                        "instance_type": "k8s-pod",
-                        "image_id": "unknown",
-                        "launch_time": None,
-                        "status": "terminated",
-                    }
-                    for mid in missing_ids
-                )
+            for mid in missing_ids:
+                if confirmed_pod_names and mid in confirmed_pod_names:
+                    instances.append(
+                        {
+                            "instance_id": mid,
+                            "resource_id": mid,
+                            "instance_type": "k8s-pod",
+                            "image_id": "unknown",
+                            "launch_time": None,
+                            "status": "terminated",
+                        }
+                    )
+                else:
+                    # ID was not in the confirmed submitted set — treat as
+                    # unknown rather than falsely marking it terminated.
+                    instances.append(
+                        {
+                            "instance_id": mid,
+                            "resource_id": mid,
+                            "instance_type": "k8s-pod",
+                            "image_id": "unknown",
+                            "launch_time": None,
+                            "status": "unknown",
+                        }
+                    )
 
             metadata: dict[str, Any] = {
                 "provider_api": provider_api,
@@ -292,16 +321,31 @@ class K8sHandlerRegistry:
                 or getattr(getattr(request, "request_type", None), "value", None) == "return"
             )
             if is_return:
-                # Return is complete when every targeted pod is gone.
-                if missing_ids and not [i for i in instances if i.get("status") != "terminated"]:
-                    return Completed(resource_ids=missing_ids, metadata=metadata)
-                # Otherwise still draining.
-                pending_ids = [
-                    i.get("instance_id", "") for i in instances if i.get("status") != "terminated"
+                # Return is complete when every *confirmed* pod is gone (either
+                # seen as live-and-terminated or absent from the list — i.e.
+                # in "terminated" synthetic status).  Phantom IDs (status
+                # "unknown") are excluded from the completion check so they do
+                # not falsely advance the return to Completed.
+                non_terminal = [
+                    i.get("instance_id", "")
+                    for i in instances
+                    if i.get("status") not in ("terminated", "unknown")
                 ]
+                all_confirmed_gone = not non_terminal and any(
+                    i.get("status") == "terminated" for i in instances
+                )
+                if all_confirmed_gone:
+                    completed_ids = [
+                        i.get("instance_id", "")
+                        for i in instances
+                        if i.get("status") == "terminated"
+                    ]
+                    return Completed(resource_ids=completed_ids, metadata=metadata)
+                # Otherwise still draining.
+                pending_ids = non_terminal or list(resource_ids)
                 return Accepted(
                     request_id=str(request.request_id),
-                    pending_resource_ids=pending_ids or list(resource_ids),
+                    pending_resource_ids=pending_ids,
                     metadata=metadata,
                 )
 

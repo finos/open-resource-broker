@@ -255,8 +255,19 @@ class K8sPodHandler(K8sHandlerBase):
         self,
         machine_ids: list[str],
         request: Request,
-    ) -> None:
+    ) -> dict[str, Any]:
         """Delete the named pods concurrently; 404s are best-effort.
+
+        Mirrors the partial-failure semantics of ``acquire_hosts``:
+        individual pod deletes that fail are logged at WARNING and
+        collected, but do not abort the remaining deletes.  The method
+        only raises when *all* deletes failed, so that orphaned pods are
+        surfaced rather than silently dropped.
+
+        Returns a dict with:
+        * ``deleted``        — pod names successfully removed.
+        * ``failed_deletes`` — pod names that could not be deleted after
+          retries (each entry is a ``(name, reason)`` tuple).
 
         Args:
             machine_ids: Pod names to delete.  For the Pod handler the
@@ -270,7 +281,7 @@ class K8sPodHandler(K8sHandlerBase):
                 "release_hosts called with no machine_ids for request %s — no-op",
                 request.request_id,
             )
-            return
+            return {"deleted": [], "failed_deletes": []}
 
         namespace = self._resolve_request_namespace(request)
         self._logger.info(
@@ -281,13 +292,37 @@ class K8sPodHandler(K8sHandlerBase):
         )
 
         sem = asyncio.Semaphore(self._max_concurrent_creates)
-        await asyncio.gather(
+        results = await asyncio.gather(
             *(
                 self._delete_one_pod(sem=sem, namespace=namespace, pod_name=pid)
                 for pid in machine_ids
             ),
-            return_exceptions=False,
+            return_exceptions=True,
         )
+
+        deleted: list[str] = []
+        failed_deletes: list[tuple[str, str]] = []
+        for pod_name, result in zip(machine_ids, results):
+            if isinstance(result, BaseException):
+                reason = str(result)
+                failed_deletes.append((pod_name, reason))
+                self._logger.warning(
+                    "Pod delete failed: request_id=%s pod=%s reason=%s",
+                    request.request_id,
+                    pod_name,
+                    reason,
+                )
+            else:
+                deleted.append(pod_name)
+
+        if failed_deletes and not deleted:
+            # All deletes failed — raise so the caller can surface the error.
+            first_error = failed_deletes[0][1]
+            raise RuntimeError(
+                f"All pod deletes failed for request {request.request_id}: {first_error}"
+            )
+
+        return {"deleted": deleted, "failed_deletes": failed_deletes}
 
     async def _delete_one_pod(
         self,

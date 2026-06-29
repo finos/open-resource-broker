@@ -64,8 +64,9 @@ def _build_template(**k8s_fields) -> Template:
 
 
 def test_make_pod_name_pads_sequence() -> None:
+    # Hyphens are stripped and up to 20 chars are taken from the request_id.
     name = make_pod_name("abcdef1234567890", 7)
-    assert name == "orb-abcdef12-0007"
+    assert name == "orb-abcdef1234567890-0007"
     assert len(name) <= 63
 
 
@@ -77,6 +78,20 @@ def test_make_pod_name_handles_short_request_id() -> None:
 def test_make_pod_name_handles_empty_request_id() -> None:
     name = make_pod_name("", 3)
     assert name == "orb-unknown-0003"
+
+
+def test_make_pod_name_strips_uuid_hyphens() -> None:
+    # UUID-formatted request_id: hyphens stripped before slicing.
+    name = make_pod_name("550e8400-e29b-41d4-a716-446655440000", 1)
+    # Stripped UUID = "550e8400e29b41d4a716446655440000" → first 20 chars = "550e8400e29b41d4a716"
+    assert name == "orb-550e8400e29b41d4a716-0001"
+    assert len(name) <= 63
+
+
+def test_make_pod_name_collision_uniqueness() -> None:
+    """1000 random UUIDs must all produce distinct pod names for seq=0."""
+    names = {make_pod_name(str(uuid.uuid4()), 0) for _ in range(1000)}
+    assert len(names) == 1000
 
 
 # ---------------------------------------------------------------------------
@@ -239,3 +254,64 @@ def test_build_pod_spec_respects_custom_label_prefix() -> None:
     assert pod.metadata.labels is not None
     assert "example.com/managed" in pod.metadata.labels
     assert LEGACY_REQUEST_ID_LABEL not in pod.metadata.labels
+
+
+# ---------------------------------------------------------------------------
+# apply_pod_spec_override — restartPolicy invariant
+# ---------------------------------------------------------------------------
+
+
+def test_apply_pod_spec_override_preserves_restart_policy_never() -> None:
+    """A benign override that does not touch restartPolicy must succeed."""
+    from orb.providers.k8s.utilities.pod_spec import apply_pod_spec_override
+
+    request = _build_request()
+    template = _build_template()
+    pod = build_pod_spec(
+        template, request, pod_name="orb-x-0000", machine_id="orb-x-0000", namespace="default"
+    )
+    # Applying an innocuous override must not raise.
+    patched = apply_pod_spec_override(pod, {"active_deadline_seconds": 3600})
+    assert patched.spec.restart_policy == "Never"
+    assert patched.spec.active_deadline_seconds == 3600
+
+
+def test_apply_pod_spec_override_rejects_snake_case_restart_policy() -> None:
+    """Supplying restart_policy != 'Never' in snake_case must raise K8sError."""
+    from orb.providers.k8s.exceptions.k8s_errors import K8sError
+    from orb.providers.k8s.utilities.pod_spec import apply_pod_spec_override
+
+    request = _build_request()
+    template = _build_template()
+    pod = build_pod_spec(
+        template, request, pod_name="orb-x-0001", machine_id="orb-x-0001", namespace="default"
+    )
+    with pytest.raises(K8sError, match="restart_policy"):
+        apply_pod_spec_override(pod, {"restart_policy": "Always"})
+
+
+def test_apply_pod_spec_override_rejects_camel_case_restart_policy() -> None:
+    """Supplying restartPolicy != 'Never' in camelCase must raise K8sError."""
+    from orb.providers.k8s.exceptions.k8s_errors import K8sError
+    from orb.providers.k8s.utilities.pod_spec import apply_pod_spec_override
+
+    request = _build_request()
+    template = _build_template()
+    pod = build_pod_spec(
+        template, request, pod_name="orb-x-0002", machine_id="orb-x-0002", namespace="default"
+    )
+    with pytest.raises(K8sError, match="restartPolicy"):
+        apply_pod_spec_override(pod, {"restartPolicy": "OnFailure"})
+
+
+def test_apply_pod_spec_override_allows_explicit_never() -> None:
+    """Passing restartPolicy=Never explicitly must not raise."""
+    from orb.providers.k8s.utilities.pod_spec import apply_pod_spec_override
+
+    request = _build_request()
+    template = _build_template()
+    pod = build_pod_spec(
+        template, request, pod_name="orb-x-0003", machine_id="orb-x-0003", namespace="default"
+    )
+    patched = apply_pod_spec_override(pod, {"restartPolicy": "Never"})
+    assert patched.spec.restart_policy == "Never"

@@ -44,17 +44,23 @@ LEGACY_REQUEST_ID_LABEL = "symphony/open-resource-broker-reqid"
 
 # Maximum length of a pod name segment we will accept.  K8s allows up to 63
 # characters total for the metadata.name field (DNS-1123 label); we use
-# ``orb-{request_id[:8]}-{seq:04d}`` which is 17 chars and fits comfortably.
+# ``orb-{uuid_no_hyphens[:20]}-{seq:04d}`` which is 31 chars and fits
+# comfortably inside the 63-char budget.
 _POD_NAME_MAX_LEN = 63
 
 
 def make_pod_name(request_id: str, seq: int) -> str:
     """Build a deterministic pod name for a single ORB unit.
 
-    Pattern: ``orb-{request_id[:8]}-{seq:04d}``.  Stays under the 63-char
-    DNS-1123 label limit and is human-readable.
+    Pattern: ``orb-{uuid_no_hyphens[:20]}-{seq:04d}`` where
+    ``uuid_no_hyphens`` is the request_id with hyphens stripped.  Taking
+    20 hex digits gives ~2^80 distinct prefixes — a negligible collision
+    probability even with thousands of concurrent requests sharing the same
+    namespace.  The resulting name is 31 chars, well under the 63-char
+    DNS-1123 label limit.
     """
-    prefix = (request_id or "unknown")[:8]
+    safe = (request_id or "unknown").replace("-", "")
+    prefix = safe[:20] if safe else "unknown"
     name = f"orb-{prefix}-{seq:04d}"
     if len(name) > _POD_NAME_MAX_LEN:  # pragma: no cover — defensive
         name = name[:_POD_NAME_MAX_LEN]
@@ -124,17 +130,55 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
 
 
 def apply_pod_spec_override(pod: "V1Pod", override: Optional[dict[str, Any]]) -> "V1Pod":
-    """Deep-merge ``override`` onto the pod's ``spec`` payload."""
+    """Deep-merge ``override`` onto the pod's ``spec`` payload.
+
+    The ``restartPolicy: Never`` invariant is mandatory: ORB relies on pods
+    not self-restarting so that a pod deletion is always a clean release.
+    Any override that tries to change this is rejected before and after the
+    merge so the error message points at the offending key.
+    """
     if not override:
         return pod
     from kubernetes.client import V1PodSpec  # noqa: PLC0415
 
+    from orb.providers.k8s.exceptions.k8s_errors import K8sError  # noqa: PLC0415
+
     if pod.spec is None:  # pragma: no cover — defensive
         return pod
+
+    # Early check on both snake_case and camelCase keys before the merge so
+    # the error points directly at the override the operator supplied.
+    _RESTART_OVERRIDE_KEYS = ("restart_policy", "restartPolicy")
+    for key in _RESTART_OVERRIDE_KEYS:
+        if key in override and override[key] != "Never":
+            raise K8sError(
+                f"pod_spec_override contains '{key}: {override[key]!r}' which would "
+                "overwrite the mandatory restartPolicy=Never invariant. "
+                "ORB requires restartPolicy=Never so that pod deletion is always a "
+                "clean release. Remove the offending key from pod_spec_override."
+            )
+
+    # Normalise operator-supplied override: the kubernetes Python SDK uses
+    # snake_case constructor arguments, so any camelCase key that slipped in
+    # must be converted before we pass the merged dict to V1PodSpec().
+    # We do this via the shared _normalise_sdk_kwargs helper (top-level keys
+    # only for the spec dict; nested dicts are handled by the helper itself).
+    normalised_override = _normalise_sdk_kwargs(override)
+
     raw_spec: Any = pod.spec.to_dict() if hasattr(pod.spec, "to_dict") else pod.spec
     spec_dict: dict[str, Any] = dict(raw_spec) if raw_spec else {}
-    merged = _deep_merge(spec_dict, override)
+    merged = _deep_merge(spec_dict, normalised_override)
     pod.spec = V1PodSpec(**merged)
+
+    # Post-merge assertion: the deep-merge must not have silently clobbered
+    # restart_policy through a nested path we did not anticipate.
+    if pod.spec.restart_policy != "Never":
+        raise K8sError(
+            f"pod_spec_override silently changed restartPolicy to "
+            f"{pod.spec.restart_policy!r} after deep-merge. "
+            "The mandatory restartPolicy=Never invariant must be preserved."
+        )
+
     return pod
 
 
