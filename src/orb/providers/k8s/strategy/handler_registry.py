@@ -49,6 +49,18 @@ class K8sHandlerRegistry:
     remains the single source of truth for plugin state.
     """
 
+    # Single source of truth for the built-in handler classes.  Mirrors
+    # ``AWSHandlerFactory._handler_classes``: the same dict drives
+    # :meth:`get_handler` (live dispatch) and :meth:`generate_example_templates`
+    # (read-only enumeration).  Adding a handler means adding ONE entry here
+    # and nothing else — no separate adapter file to keep in sync.
+    _HANDLER_CLASSES: dict[str, type[K8sHandlerBase]] = {
+        KubernetesProviderApi.POD.value: K8sPodHandler,
+        KubernetesProviderApi.DEPLOYMENT.value: K8sDeploymentHandler,
+        KubernetesProviderApi.STATEFUL_SET.value: K8sStatefulSetHandler,
+        KubernetesProviderApi.JOB.value: K8sJobHandler,
+    }
+
     def __init__(
         self,
         *,
@@ -111,44 +123,9 @@ class K8sHandlerRegistry:
             else None
         )
 
-        if provider_api == KubernetesProviderApi.POD.value:
-            handler = K8sPodHandler(
-                kubernetes_client=self._client_provider(),
-                config=self._config,
-                logger=self._logger,
-                pod_state_cache=cache,
-                cache_alive=alive,
-                native_spec_service=native_spec_service,
-                node_state_cache=node_cache,
-            )
-            self._handlers[provider_api] = handler
-            return handler
-        if provider_api == KubernetesProviderApi.DEPLOYMENT.value:
-            handler = K8sDeploymentHandler(
-                kubernetes_client=self._client_provider(),
-                config=self._config,
-                logger=self._logger,
-                pod_state_cache=cache,
-                cache_alive=alive,
-                native_spec_service=native_spec_service,
-                node_state_cache=node_cache,
-            )
-            self._handlers[provider_api] = handler
-            return handler
-        if provider_api == KubernetesProviderApi.STATEFUL_SET.value:
-            handler = K8sStatefulSetHandler(
-                kubernetes_client=self._client_provider(),
-                config=self._config,
-                logger=self._logger,
-                pod_state_cache=cache,
-                cache_alive=alive,
-                native_spec_service=native_spec_service,
-                node_state_cache=node_cache,
-            )
-            self._handlers[provider_api] = handler
-            return handler
-        if provider_api == KubernetesProviderApi.JOB.value:
-            handler = K8sJobHandler(
+        handler_class = self._HANDLER_CLASSES.get(provider_api)
+        if handler_class is not None:
+            handler = handler_class(
                 kubernetes_client=self._client_provider(),
                 config=self._config,
                 logger=self._logger,
@@ -179,6 +156,37 @@ class K8sHandlerRegistry:
             "plugins may register additional handlers via "
             "K8sProviderStrategy.register_handler)."
         )
+
+    @classmethod
+    def generate_example_templates(
+        cls,
+        *,
+        plugin_factories: Optional[dict[str, Callable[..., K8sHandlerBase]]] = None,
+    ) -> list[Any]:
+        """Return example templates contributed by every registered handler.
+
+        Iterates the built-in :attr:`_HANDLER_CLASSES` dict plus any plugin-
+        registered factories.  Each handler exposes a classmethod
+        ``get_example_templates`` (or a callable on the plugin factory's
+        target class).  Handlers without that method or that fail to produce
+        examples are skipped silently — the adapter degrades gracefully.
+
+        Class-level entry point so it can be called without constructing a
+        live :class:`K8sHandlerRegistry` (i.e. without ``K8sClient`` /
+        watcher providers).  Mirrors
+        :meth:`AWSHandlerFactory.generate_example_templates`.
+        """
+        examples: list[Any] = []
+        sources: dict[str, Any] = {**cls._HANDLER_CLASSES, **(plugin_factories or {})}
+        for handler_target in sources.values():
+            getter = getattr(handler_target, "get_example_templates", None)
+            if getter is None:
+                continue
+            try:
+                examples.extend(getter())
+            except Exception:  # noqa: BLE001 — best-effort enumeration
+                continue
+        return examples
 
     # ------------------------------------------------------------------
     # Typed provisioning interface

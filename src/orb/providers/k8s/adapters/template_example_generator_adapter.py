@@ -1,9 +1,9 @@
-"""Infrastructure adapter implementing TemplateExampleGeneratorPort for the Kubernetes provider.
+"""Infrastructure adapter implementing TemplateExampleGeneratorPort via K8sHandlerRegistry.
 
-Mirrors :mod:`orb.providers.aws.adapters.template_example_generator_adapter` — collects
-example templates from every concrete handler class and exposes them through the
-:class:`~orb.domain.base.ports.template_example_generator_port.TemplateExampleGeneratorPort`
-so ``orb templates list --provider k8s`` produces results.
+Mirrors :mod:`orb.providers.aws.adapters.template_example_generator_adapter` —
+delegates to the same registry that drives live ``acquire`` dispatch so the
+handler list has a single source of truth.  Adding or removing a handler
+means editing :attr:`K8sHandlerRegistry._HANDLER_CLASSES` only.
 """
 
 from __future__ import annotations
@@ -11,43 +11,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Optional
 
 from orb.domain.base.ports.template_example_generator_port import TemplateExampleGeneratorPort
+from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
 
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
     from orb.domain.base.ports import LoggingPort
 
-# Concrete handler classes that ship example templates.
-_HANDLER_CLASSES = [
-    "orb.providers.k8s.handlers.pod_handler:K8sPodHandler",
-    "orb.providers.k8s.handlers.deployment_handler:K8sDeploymentHandler",
-    "orb.providers.k8s.handlers.statefulset_handler:K8sStatefulSetHandler",
-    "orb.providers.k8s.handlers.job_handler:K8sJobHandler",
-]
-
-
-def _collect_handler_examples() -> list[Any]:
-    """Return example templates from all registered handler classes.
-
-    Iterates ``_HANDLER_CLASSES``, imports each one defensively, and calls
-    :meth:`get_example_templates` on the class object.  Import errors are
-    silenced so the function degrades gracefully when optional handler modules
-    are unavailable in a given deployment.
-    """
-    import importlib
-
-    templates: list[Any] = []
-    for ref in _HANDLER_CLASSES:
-        module_path, class_name = ref.split(":")
-        try:
-            mod = importlib.import_module(module_path)
-            handler_cls = getattr(mod, class_name)
-            templates.extend(handler_cls.get_example_templates())
-        except Exception:  # noqa: BLE001 — degrade gracefully
-            pass
-    return templates
-
 
 class KubernetesTemplateExampleGeneratorAdapter(TemplateExampleGeneratorPort):
-    """Generates example templates by calling each handler's ``get_example_templates``."""
+    """Generates example templates by delegating to :class:`K8sHandlerRegistry`."""
 
     def __init__(self, logger: Optional["LoggingPort"] = None) -> None:
         self._logger = logger
@@ -74,12 +45,32 @@ class KubernetesTemplateExampleGeneratorAdapter(TemplateExampleGeneratorPort):
         if provider_type != "k8s":
             return []
 
-        examples = _collect_handler_examples()
+        plugin_factories = _resolve_plugin_factories()
+        examples = K8sHandlerRegistry.generate_example_templates(
+            plugin_factories=plugin_factories
+        )
 
         if provider_api:
             examples = [t for t in examples if getattr(t, "provider_api", None) == provider_api]
 
         return examples
+
+
+def _resolve_plugin_factories() -> dict[str, Any]:
+    """Return the plugin-registered handler factories, or an empty dict.
+
+    Reads :attr:`K8sProviderStrategy._HANDLER_FACTORIES` directly so we
+    do not need a live strategy instance.  Best-effort: if the strategy
+    module fails to import we return an empty dict so the built-in
+    handlers still surface their examples.
+    """
+    try:
+        from orb.providers.k8s.strategy.k8s_provider_strategy import (  # noqa: PLC0415
+            K8sProviderStrategy,
+        )
+    except Exception:  # noqa: BLE001
+        return {}
+    return dict(getattr(K8sProviderStrategy, "_HANDLER_FACTORIES", {}) or {})
 
 
 def create_k8s_template_example_generator(
