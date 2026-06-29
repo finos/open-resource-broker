@@ -306,39 +306,67 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
         ...
 
     def get_template_paths(self) -> list[str]:
-        """Get template file paths with fallback hierarchy."""
-        paths = []
+        """Get template file paths driven by the set of active provider types.
+
+        For each active provider type, resolve the per-scheduler filename (which
+        may be provider-name-based for HostFactory, or type-based for the default
+        scheduler) and then the generic ``<type>_templates.json`` counterpart.
+        The shared ``templates.json`` is always appended last so that operator-managed
+        generic files are consulted after provider-specific ones.  Any duplicate
+        paths produced by the loop are removed while preserving order.
+        """
+        paths: list[str] = []
 
         try:
-            provider_name = self._get_provider_name()
-            provider_type = self._get_active_provider_type()
+            provider_config = self.config_manager.get_provider_config()
+            active_providers = provider_config.get_active_providers() if provider_config else []
 
-            provider_specific_filename = self.get_templates_filename(provider_name, provider_type)
-            provider_specific_path = self.config_manager.resolve_file(
-                "template", provider_specific_filename
-            )
-            paths.append(provider_specific_path)
+            # Collect unique active provider types in declaration order.
+            seen_types: list[str] = []
+            for p in active_providers:
+                pt = getattr(p, "type", None)
+                if pt and pt not in seen_types:
+                    seen_types.append(pt)
 
-            generic_filename = f"{provider_type}_templates.json"
-            generic_path = self.config_manager.resolve_file("template", generic_filename)
-
-            if generic_path != provider_specific_path:
-                paths.append(generic_path)
+            if not seen_types:
+                # No configured providers — fall back to the single-provider path
+                # using whatever the registry / environment reports.
+                provider_name = self._get_provider_name()
+                provider_type = self._get_active_provider_type()
+                seen_types = [provider_type]
+                per_scheduler = self.get_templates_filename(provider_name, provider_type)
+                path = self.config_manager.resolve_file("template", per_scheduler)
+                if path not in paths:
+                    paths.append(path)
+                type_path = self.config_manager.resolve_file(
+                    "template", f"{provider_type}_templates.json"
+                )
+                if type_path not in paths:
+                    paths.append(type_path)
+            else:
+                provider_name = self._get_provider_name()
+                for provider_type in seen_types:
+                    per_scheduler = self.get_templates_filename(provider_name, provider_type)
+                    path = self.config_manager.resolve_file("template", per_scheduler)
+                    if path not in paths:
+                        paths.append(path)
+                    type_path = self.config_manager.resolve_file(
+                        "template", f"{provider_type}_templates.json"
+                    )
+                    if type_path not in paths:
+                        paths.append(type_path)
 
         except Exception as e:
             from orb.infrastructure.logging.logger import get_logger
 
             logger = get_logger(__name__)
-            logger.debug(f"Failed to get provider info for path resolution: {e}")
+            logger.debug("Failed to get provider info for template path resolution: %s", e)
 
-        default_paths = [
-            self.config_manager.resolve_file("template", "aws_templates.json"),
-            self.config_manager.resolve_file("template", "templates.json"),
-        ]
-
-        for default_path in default_paths:
-            if default_path not in paths:
-                paths.append(default_path)
+        # Always include the generic templates file last; it is a first-class option
+        # independent of any provider type.
+        generic_path = self.config_manager.resolve_file("template", "templates.json")
+        if generic_path not in paths:
+            paths.append(generic_path)
 
         return paths
 
