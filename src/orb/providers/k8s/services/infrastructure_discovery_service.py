@@ -35,6 +35,7 @@ from orb.providers.k8s.services.discovery_models import (
 
 if TYPE_CHECKING:
     from orb.domain.base.ports import LoggingPort
+    from orb.domain.base.ports.console_port import ConsolePort
     from orb.providers.k8s.configuration.config import K8sProviderConfig
 
 # Kubernetes kubelet writes the pod's own namespace here.
@@ -93,10 +94,19 @@ class K8sInfrastructureDiscoveryService:
         config: "K8sProviderConfig",
         logger: "LoggingPort",
         api_client: Optional[Any] = None,
+        console: Optional["ConsolePort"] = None,
     ) -> None:
         self._config = config
         self._logger = logger
         self._api_client = api_client
+        if console is None:
+            from orb.infrastructure.adapters.null_console_adapter import (  # noqa: PLC0415
+                NullConsoleAdapter,
+            )
+
+            self._console: "ConsolePort" = NullConsoleAdapter()
+        else:
+            self._console = console
 
     # ------------------------------------------------------------------
     # Helpers — lazy API client construction
@@ -594,12 +604,182 @@ class K8sInfrastructureDiscoveryService:
     ) -> dict[str, Any]:
         """Interactive prompt-driven infrastructure discovery.
 
-        Drives the six-step prompt sequence documented in the API design.
-        Phase C replaces this stub with the real interactive implementation;
-        for now it delegates to :meth:`discover_infrastructure` so the
-        non-interactive path is exercised during ``orb init --non-interactive``.
+        Drives the six-step prompt sequence:
+
+        1. Detect whether ORB is running in-cluster; ask the operator to confirm.
+        2. When out-of-cluster: discover kubeconfig contexts; prompt for selection.
+        3. Discover the cluster endpoint (display only).
+        4. Discover namespaces; prompt for selection (or auto-select on 403).
+        5. Discover ServiceAccounts in chosen namespace; prompt for template default.
+        6. Discover image pull secrets in chosen namespace; prompt for default.
+        7. Probe RBAC; display results and offer to continue on failure.
+
+        Args:
+            provider_config: Raw provider config dict (``"name"`` key used for
+                the ``"provider"`` field in the return dict).
+
+        Returns:
+            Discovery dict with the same shape as :meth:`discover_infrastructure`:
+            ``in_cluster``, ``contexts``, ``current_context``, ``cluster_endpoint``,
+            ``namespaces``, ``default_namespace``, ``service_accounts``,
+            ``image_pull_secrets``, ``rbac_probe``, ``provider``.
         """
-        return self.discover_infrastructure(provider_config)
+        from orb.providers.k8s.services.init_prompts import (  # noqa: PLC0415
+            confirm_in_cluster,
+            display_rbac_probe,
+            pick_context,
+            pick_image_pull_secret,
+            pick_namespace,
+            pick_service_account,
+        )
+
+        provider_name: str = provider_config.get("name", "")
+
+        # ------------------------------------------------------------------
+        # Step 1 — In-cluster detection + confirm
+        # ------------------------------------------------------------------
+        detected_in_cluster = self.detect_in_cluster()
+        in_cluster = confirm_in_cluster(self._console, detected_in_cluster)
+
+        # ------------------------------------------------------------------
+        # Step 2 — Context selection (out-of-cluster only)
+        # ------------------------------------------------------------------
+        kubeconfig_path: Optional[Path] = None
+        if self._config.kubeconfig_path:
+            kubeconfig_path = Path(self._config.kubeconfig_path)
+
+        all_contexts: list[KubeContextInfo] = []
+        current_context: Optional[KubeContextInfo] = None
+        chosen_context_name: Optional[str] = None
+
+        if not in_cluster:
+            all_contexts, current_context = self.discover_contexts(kubeconfig_path=kubeconfig_path)
+            chosen_context = pick_context(self._console, all_contexts, current_context)
+            chosen_context_name = (
+                chosen_context
+                if isinstance(chosen_context, str)
+                else (chosen_context.name if chosen_context else None)
+            )
+
+        context_names: list[str] = [c.name for c in all_contexts]
+        current_context_name: Optional[str] = (
+            current_context.name if current_context is not None else None
+        )
+
+        # ------------------------------------------------------------------
+        # Step 3 — Cluster endpoint (display only)
+        # ------------------------------------------------------------------
+        effective_context = chosen_context_name or self._config.context or current_context_name
+        cluster_endpoint = self.discover_cluster_endpoint(context=effective_context)
+        self._console.info(f"  Cluster endpoint: {cluster_endpoint}")
+
+        # ------------------------------------------------------------------
+        # Step 4 — Namespace selection
+        # ------------------------------------------------------------------
+        # Read SA-bound namespace from the kubelet file (in-cluster fallback).
+        sa_bound_ns: Optional[str] = None
+        try:
+            if _SA_NAMESPACE_FILE.exists():
+                sa_bound_ns = _SA_NAMESPACE_FILE.read_text(encoding="utf-8").strip() or None
+        except OSError:
+            pass
+
+        namespace_infos = self.discover_namespaces()
+
+        if len(namespace_infos) == 1 and sa_bound_ns and namespace_infos[0].name == sa_bound_ns:
+            # 403 fallback already applied by discover_namespaces(); auto-select with a notice.
+            self._console.info(
+                f"  Note: namespace list permission not available;"
+                f" using SA-bound namespace '{sa_bound_ns}'"
+            )
+            chosen_namespace = sa_bound_ns
+        elif not namespace_infos and sa_bound_ns:
+            self._console.info(
+                f"  Note: namespace list permission not available;"
+                f" using SA-bound namespace '{sa_bound_ns}'"
+            )
+            chosen_namespace = sa_bound_ns
+        else:
+            # Compute default: config value → SA-bound → first active → "default"
+            config_ns = self._config.namespace or ""
+            if config_ns and config_ns != "default":
+                fallback = config_ns
+            elif sa_bound_ns:
+                fallback = sa_bound_ns
+            else:
+                active = [n for n in namespace_infos if n.status in ("Active", "active")]
+                fallback = active[0].name if active else "default"
+
+            chosen_namespace = pick_namespace(self._console, namespace_infos, fallback)
+
+        namespace_names: list[str] = [n.name for n in namespace_infos]
+
+        # ------------------------------------------------------------------
+        # Step 5 — ServiceAccount selection
+        # ------------------------------------------------------------------
+        sa_infos = self.discover_service_accounts(namespace=chosen_namespace)
+        if not sa_infos:
+            self._console.info(
+                "  Note: could not list ServiceAccounts — you can set"
+                " `service_account` in your template later."
+            )
+            chosen_sa = ""
+        else:
+            chosen_sa = pick_service_account(self._console, sa_infos, default="default")
+
+        sa_names: list[str] = [sa.name for sa in sa_infos]
+
+        # ------------------------------------------------------------------
+        # Step 6 — Image pull secret selection
+        # ------------------------------------------------------------------
+        pull_secret_names = self.discover_image_pull_secrets(namespace=chosen_namespace)
+        if not pull_secret_names:
+            self._console.info("  Note: no image pull secrets found in namespace.")
+        chosen_pull_secret: Optional[str] = pick_image_pull_secret(self._console, pull_secret_names)
+
+        # ------------------------------------------------------------------
+        # Step 7 — RBAC probe + confirm on failure
+        # ------------------------------------------------------------------
+        try:
+            rbac = self.probe_rbac(namespace=chosen_namespace)
+        except K8sDiscoveryError as exc:
+            self._logger.warning("discover_infrastructure_interactive: RBAC probe failed: %s", exc)
+            rbac = RBACProbeResult(
+                namespace=chosen_namespace,
+                can_create_pods=False,
+                can_watch_pods=False,
+                can_delete_pods=False,
+            )
+
+        should_continue = display_rbac_probe(
+            self._console,
+            rbac,
+            namespace=chosen_namespace,
+            sa=chosen_sa or None,
+        )
+        if not should_continue:
+            raise K8sDiscoveryError("Operator aborted orb init due to missing RBAC permissions.")
+
+        rbac_probe: dict[str, bool] = {
+            "create_pods": rbac.can_create_pods,
+            "watch_pods": rbac.can_watch_pods,
+            "delete_pods": rbac.can_delete_pods,
+        }
+
+        return {
+            "in_cluster": in_cluster,
+            "contexts": context_names,
+            "current_context": current_context_name,
+            "cluster_endpoint": cluster_endpoint,
+            "namespaces": namespace_names,
+            "default_namespace": chosen_namespace,
+            "service_accounts": sa_names,
+            "chosen_service_account": chosen_sa or None,
+            "image_pull_secrets": pull_secret_names,
+            "chosen_image_pull_secret": chosen_pull_secret,
+            "rbac_probe": rbac_probe,
+            "provider": provider_name,
+        }
 
     def validate_infrastructure(self, provider_config: dict[str, Any]) -> dict[str, Any]:
         """Validate that a configured K8s provider can reach its cluster.
