@@ -124,9 +124,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         # with provider-side defaults (boto3 reads ~/.aws/credentials, etc.).
         else:
             provider_type = extract_provider_type(provider_identifier)
-            if provider_type != provider_identifier and self.is_provider_registered(
-                provider_type
-            ):
+            if provider_type != provider_identifier and self.is_provider_registered(provider_type):
                 if self._logger:
                     self._logger.info(
                         "Provider instance %r not registered; falling back to "
