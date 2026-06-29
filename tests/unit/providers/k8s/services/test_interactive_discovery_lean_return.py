@@ -78,8 +78,14 @@ def _stub_out_of_cluster_service(
     svc.detect_in_cluster = MagicMock(return_value=False)  # type: ignore[method-assign]
     svc.discover_contexts = MagicMock(  # type: ignore[method-assign]
         return_value=(
-            [KubeContextInfo(name=chosen_context, cluster="c1", user="u1", namespace=None, is_current=True)],
-            KubeContextInfo(name=chosen_context, cluster="c1", user="u1", namespace=None, is_current=True),
+            [
+                KubeContextInfo(
+                    name=chosen_context, cluster="c1", user="u1", namespace=None, is_current=True
+                )
+            ],
+            KubeContextInfo(
+                name=chosen_context, cluster="c1", user="u1", namespace=None, is_current=True
+            ),
         )
     )
     svc.discover_cluster_endpoint = MagicMock(return_value="https://example.k8s:6443")  # type: ignore[method-assign]
@@ -87,7 +93,9 @@ def _stub_out_of_cluster_service(
         return_value=[NamespaceInfo(name=chosen_namespace, status="Active", age_days=0)]
     )
     svc.discover_service_accounts = MagicMock(  # type: ignore[method-assign]
-        return_value=[ServiceAccountInfo(name=chosen_sa, namespace=chosen_namespace, secrets_count=1)]
+        return_value=[
+            ServiceAccountInfo(name=chosen_sa, namespace=chosen_namespace, secrets_count=1)
+        ]
     )
     svc.discover_image_pull_secrets = MagicMock(return_value=[chosen_secret])  # type: ignore[method-assign]
     svc.probe_rbac = MagicMock(return_value=_rbac_all_ok(chosen_namespace))  # type: ignore[method-assign]
@@ -154,7 +162,9 @@ class TestDiscoverReturnsOnlyChosenLeaves:
 
 
 class TestInClusterPath:
-    def _make_in_cluster_service(self, chosen_namespace: str = "team-ns") -> K8sInfrastructureDiscoveryService:
+    def _make_in_cluster_service(
+        self, chosen_namespace: str = "team-ns"
+    ) -> K8sInfrastructureDiscoveryService:
         svc = _make_service()
         svc.detect_in_cluster = MagicMock(return_value=True)  # type: ignore[method-assign]
         svc.discover_namespaces = MagicMock(  # type: ignore[method-assign]
@@ -348,8 +358,12 @@ class TestClassifierRoutesTemplateDefaultKeys:
         config_only_keys: set[str],
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Mirrors the classifier logic in init_command_handler lines 684-696."""
-        template_level = {k: v for k, v in infrastructure_defaults.items() if k not in config_only_keys}
-        config_level = {k: infrastructure_defaults[k] for k in config_only_keys if k in infrastructure_defaults}
+        template_level = {
+            k: v for k, v in infrastructure_defaults.items() if k not in config_only_keys
+        }
+        config_level = {
+            k: infrastructure_defaults[k] for k in config_only_keys if k in infrastructure_defaults
+        }
         return template_level, config_level
 
     def test_out_of_cluster_full_pick_routes_correctly(self) -> None:
@@ -367,7 +381,9 @@ class TestClassifierRoutesTemplateDefaultKeys:
             "image_pull_secret": "ecr-pull",
         }
         config_only_keys = strategy.get_cli_extra_config_keys()
-        template_defaults, config_extras = self._apply_classifier(discovery_result, config_only_keys)
+        template_defaults, config_extras = self._apply_classifier(
+            discovery_result, config_only_keys
+        )
 
         # Connection-level keys go to config
         assert config_extras.get("context") == "prod"
@@ -395,7 +411,9 @@ class TestClassifierRoutesTemplateDefaultKeys:
             "namespace": "default",
         }
         config_only_keys = strategy.get_cli_extra_config_keys()
-        template_defaults, config_extras = self._apply_classifier(discovery_result, config_only_keys)
+        template_defaults, config_extras = self._apply_classifier(
+            discovery_result, config_only_keys
+        )
 
         assert config_extras.get("in_cluster") is True
         assert config_extras.get("namespace") == "default"
