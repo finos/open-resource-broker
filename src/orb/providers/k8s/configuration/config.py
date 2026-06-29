@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -161,8 +161,12 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
     default_node_selector: Optional[dict[str, str]] = Field(
         None, description="Default ``nodeSelector`` applied to every managed pod."
     )
-    default_tolerations: Optional[list[dict[str, str]]] = Field(
-        None, description="Default ``tolerations`` applied to every managed pod."
+    default_tolerations: Optional[list[dict[str, Any]]] = Field(
+        None,
+        description=(
+            "Default ``tolerations`` applied to every managed pod.  Values may "
+            "be strings (key/operator/value/effect) or int (tolerationSeconds)."
+        ),
     )
     default_image_pull_secret: Optional[str] = Field(
         None, description="Default image pull secret name applied to every managed pod."

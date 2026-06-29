@@ -711,6 +711,154 @@ class K8sProviderStrategy(ProviderStrategy):
         return {}
 
     # ------------------------------------------------------------------
+    # Credential surface (called by `orb init` and credential probes)
+    # ------------------------------------------------------------------
+
+    def get_available_credential_sources(self) -> list[dict]:
+        """Return Kubernetes credential sources visible to ORB.
+
+        Returns ``in_cluster`` (when a ServiceAccount token is mounted) and
+        every available kubeconfig context as a separate selectable source.
+        Matches the AWS shape: each entry has ``id``, ``name``, ``description``.
+        """
+        sources: list[dict] = []
+
+        try:
+            from orb.providers.k8s.auth.in_cluster import is_in_cluster  # noqa: PLC0415
+
+            if is_in_cluster():
+                sources.append(
+                    {
+                        "id": "in_cluster",
+                        "name": "In-cluster ServiceAccount",
+                        "description": (
+                            "Use the ServiceAccount token mounted at "
+                            "/var/run/secrets/kubernetes.io/serviceaccount/"
+                        ),
+                    }
+                )
+        except Exception as exc:
+            self._logger.debug("in_cluster detection failed: %s", exc)
+
+        try:
+            import kubernetes.config as _k8s_config  # noqa: PLC0415
+
+            contexts, current = _k8s_config.list_kube_config_contexts()
+            current_name = current.get("name") if current else None
+            for ctx in contexts or []:
+                name = ctx.get("name", "")
+                if not name:
+                    continue
+                marker = " (current)" if name == current_name else ""
+                cluster = ctx.get("context", {}).get("cluster", "?")
+                sources.append(
+                    {
+                        "id": f"kubeconfig:{name}",
+                        "name": f"kubeconfig context: {name}{marker}",
+                        "description": f"Cluster {cluster} from your kubeconfig",
+                    }
+                )
+        except Exception as exc:
+            self._logger.debug("kubeconfig context enumeration failed: %s", exc)
+
+        if not sources:
+            sources.append(
+                {
+                    "id": "default",
+                    "name": "Default credentials",
+                    "description": (
+                        "Use whatever the kubernetes-client SDK resolves "
+                        "(in-cluster token or KUBECONFIG / ~/.kube/config)"
+                    ),
+                }
+            )
+
+        return sources
+
+    def test_credentials(self, credential_source: Optional[str] = None, **kwargs: Any) -> dict:
+        """Verify the selected credentials can reach the apiserver.
+
+        Calls ``CoreV1Api().get_api_resources()`` with a short timeout.  On
+        success, returns the apiserver endpoint and the resolved current
+        namespace (in-cluster) or kubeconfig context (out-of-cluster).
+        """
+        try:
+            import kubernetes.client as _k8s_client  # noqa: PLC0415
+            import kubernetes.config as _k8s_config  # noqa: PLC0415
+            from kubernetes.client.exceptions import ApiException  # noqa: PLC0415
+        except ImportError:
+            return {
+                "success": False,
+                "error": (
+                    "The kubernetes SDK is not installed.  Install with: pip install 'orb-py[k8s]'"
+                ),
+            }
+
+        try:
+            if credential_source == "in_cluster":
+                _k8s_config.load_incluster_config()
+                context_label = "in-cluster"
+            elif credential_source and credential_source.startswith("kubeconfig:"):
+                context_name = credential_source.split(":", 1)[1]
+                _k8s_config.load_kube_config(context=context_name)
+                context_label = context_name
+            else:
+                _k8s_config.load_config()
+                context_label = "auto-detected"
+
+            # Build the ApiClient ourselves so we keep a typed handle to the
+            # configuration object (the auto-built api_client attribute on
+            # CoreV1Api is not exposed by the type stubs).
+            from kubernetes.client.api_client import ApiClient  # noqa: PLC0415
+
+            api_client = ApiClient()
+            # kubernetes-stubs-elephant-fork omits the `configuration`
+            # attribute from ApiClient; it exists at runtime.
+            api_client.configuration.timeout = 5  # type: ignore[attr-defined]
+            api = _k8s_client.CoreV1Api(api_client=api_client)
+            resources = api.get_api_resources()
+            endpoint = api_client.configuration.host  # type: ignore[attr-defined]
+
+            return {
+                "success": True,
+                "context": context_label,
+                "endpoint": endpoint,
+                "api_groups": len(resources.resources) if resources else 0,
+            }
+        except ApiException as exc:
+            return {
+                "success": False,
+                "error": (f"Apiserver rejected the probe ({exc.status}): {exc.reason}"),
+            }
+        except Exception as exc:  # ConfigException, network errors, etc.
+            return {"success": False, "error": str(exc)}
+
+    def get_credential_requirements(self) -> dict:
+        """Document the Kubernetes credential parameters operators may set."""
+        return {
+            "kubeconfig_path": {
+                "required": False,
+                "description": "Path to a kubeconfig file (defaults to KUBECONFIG / ~/.kube/config)",
+            },
+            "context": {
+                "required": False,
+                "description": "Kubeconfig context name (defaults to current-context)",
+            },
+            "namespace": {
+                "required": False,
+                "description": "Target namespace (defaults to in-cluster SA namespace or 'default')",
+            },
+        }
+
+    def get_operational_requirements(self) -> dict:
+        """Document the operational permissions ORB needs in the target cluster."""
+        return {
+            "rbac_verbs": ["create", "get", "list", "watch", "delete", "patch"],
+            "rbac_resources": ["pods", "deployments", "statefulsets", "jobs"],
+            "namespaces_scope": "single namespace, or cluster-scoped if 'namespaces' is ['*']",
+        }
+
+    # ------------------------------------------------------------------
     # Health-check integration
     # ------------------------------------------------------------------
 

@@ -128,7 +128,7 @@ class K8sInfrastructureDiscoveryService:
             return self._api_client
         try:
             from kubernetes import config as _k8s_config  # noqa: PLC0415
-            from kubernetes.client import ApiClient  # noqa: PLC0415
+            from kubernetes.client.api_client import ApiClient  # noqa: PLC0415
         except ImportError as exc:
             raise K8sError(
                 "kubernetes SDK is not installed; install with `pip install orb-py[k8s]`"
@@ -270,7 +270,9 @@ class K8sInfrastructureDiscoveryService:
 
         try:
             client = _k8s_config.new_client_from_config(context=context)
-            host: str = client.configuration.host or "unknown"
+            # kubernetes-stubs-elephant-fork omits the `configuration`
+            # attribute from ApiClient; it exists at runtime.
+            host: str = client.configuration.host or "unknown"  # type: ignore[attr-defined]
             return host
         except Exception as exc:  # noqa: BLE001 — ConfigException, etc.
             self._logger.warning(
@@ -869,7 +871,7 @@ class K8sInfrastructureDiscoveryService:
                     )
                     raw_contexts, _ = _k8s_config.list_kube_config_contexts(config_file=config_file)
                     known_names: list[str] = [
-                        (dict(c).get("name") or "") for c in (raw_contexts or [])
+                        str(dict(c).get("name") or "") for c in (raw_contexts or [])
                     ]
                     if context not in known_names:
                         issues.append(f"Configured context '{context}' not found in kubeconfig")

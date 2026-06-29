@@ -29,7 +29,8 @@ from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.exceptions.k8s_errors import K8sAuthError
 
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
-    from kubernetes.client import ApiClient, AppsV1Api, BatchV1Api, CoreV1Api
+    from kubernetes.client import AppsV1Api, BatchV1Api, CoreV1Api
+    from kubernetes.client.api_client import ApiClient
 
 
 class K8sClient:
@@ -111,7 +112,7 @@ class K8sClient:
         if self._api_client is None:
             self.load_config()
             try:
-                from kubernetes.client import ApiClient as _ApiClient  # noqa: PLC0415
+                from kubernetes.client.api_client import ApiClient as _ApiClient  # noqa: PLC0415
             except ImportError as exc:  # pragma: no cover — extra not installed
                 raise K8sAuthError(
                     "kubernetes SDK is not installed; install with `pip install orb-py[k8s]`"

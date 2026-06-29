@@ -131,7 +131,8 @@ def apply_pod_spec_override(pod: "V1Pod", override: Optional[dict[str, Any]]) ->
 
     if pod.spec is None:  # pragma: no cover — defensive
         return pod
-    spec_dict = pod.spec.to_dict() if hasattr(pod.spec, "to_dict") else dict(pod.spec)
+    raw_spec: Any = pod.spec.to_dict() if hasattr(pod.spec, "to_dict") else pod.spec
+    spec_dict: dict[str, Any] = dict(raw_spec) if raw_spec else {}
     merged = _deep_merge(spec_dict, override)
     pod.spec = V1PodSpec(**merged)
     return pod

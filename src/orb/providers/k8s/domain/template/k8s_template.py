@@ -52,8 +52,13 @@ class K8sToleration(BaseModel):
     toleration_seconds: Optional[int] = Field(default=None, alias="tolerationSeconds")
 
     def to_api_dict(self) -> dict[str, Any]:
-        """Serialise to the dict shape accepted by the kubernetes SDK."""
-        return self.model_dump(by_alias=True, exclude_none=True)
+        """Serialise to the dict shape accepted by the kubernetes SDK.
+
+        The SDK expects snake_case (V1Toleration accepts ``toleration_seconds``,
+        not the alias ``tolerationSeconds``), so we deliberately disable
+        ``by_alias`` here.
+        """
+        return self.model_dump(by_alias=False, exclude_none=True)
 
 
 class K8sResourceQuantities(BaseModel):
