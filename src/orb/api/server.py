@@ -117,6 +117,41 @@ def _load_loopback_token(server_config: Any) -> None:
         _server_logger.debug("loopback-admin token load skipped: %s", exc)
 
 
+class _LoopbackAdminTokenMiddleware:
+    """Always-on middleware that stamps admin identity for valid loopback tokens.
+
+    Runs regardless of whether the primary auth middleware is enabled.  When
+    the request carries ``Authorization: Bearer <token>`` and that token
+    matches the value the daemon wrote to ``<work_dir>/server/orb-server.token``
+    at startup, the middleware stamps ``request.state`` with the admin role so
+    role-guarded routes (POST /machines/request, /admin/*, etc.) accept the
+    call.
+
+    Fall-through (no header, or non-matching token) leaves request state
+    untouched so the ``AuthMiddleware`` (when present) and ``get_current_user``
+    dependency continue to behave as before.
+    """
+
+    def __init__(self, app: Any) -> None:
+        from starlette.middleware.base import BaseHTTPMiddleware
+
+        self._impl = BaseHTTPMiddleware(app, dispatch=self._dispatch)
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        await self._impl(scope, receive, send)
+
+    @staticmethod
+    async def _dispatch(request: Any, call_next: Any) -> Any:
+        auth = request.headers.get("authorization", "")
+        if auth.startswith("Bearer "):
+            candidate = auth[7:].strip()
+            if candidate and candidate in _LOOPBACK_ADMIN_TOKENS:
+                request.state.user_id = "loopback-admin"
+                request.state.user_roles = ["admin"]
+                request.state.permissions = ["*"]
+        return await call_next(request)
+
+
 def create_fastapi_app(server_config: Any) -> Any:
     """
     Create and configure FastAPI application.
@@ -225,13 +260,21 @@ def create_fastapi_app(server_config: Any) -> Any:
     app.add_middleware(LoggingMiddleware)
     logger.info("Logging middleware enabled")
 
+    # Load the daemon-issued loopback-admin token unconditionally so the CLI's
+    # reload command and the live REST tests can authenticate as admin
+    # regardless of whether the primary auth middleware is enabled.  The
+    # token-only middleware below validates Authorization headers and stamps
+    # request.state with the admin role; if no token (or a non-matching token)
+    # is present, request.state is left untouched and the rest of the pipeline
+    # behaves as before.
+    _load_loopback_token(server_config)
+    app.add_middleware(_LoopbackAdminTokenMiddleware)
+    logger.info("Loopback-admin token middleware enabled")
+
     # Add authentication middleware if enabled
     if server_config.auth.enabled:
         auth_strategy = _create_auth_strategy(server_config.auth)
         if auth_strategy:
-            # Load the daemon-issued loopback-admin token (if present) so the
-            # CLI reload command can authenticate without a user-facing JWT.
-            _load_loopback_token(server_config)
             # Wrap the real strategy so loopback tokens are checked first.
             auth_port: Any = _LoopbackAdminAuthWrapper(auth_strategy)
             app.add_middleware(
