@@ -458,7 +458,7 @@ def tail_log(*, log_file: str | os.PathLike[str], lines: int = 50) -> str:
     (rename + reopen) will silently keep writing to the old inode.  Use
     ``copytruncate`` in your logrotate configuration instead::
 
-        /var/log/orb/orb-api.log {
+        /var/log/orb/orb-server.log {
             daily
             rotate 14
             compress

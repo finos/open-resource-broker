@@ -91,7 +91,7 @@ After=network.target
 
 [Service]
 Type=forking
-PIDFile=/run/orb/orb-api.pid
+PIDFile=/run/orb/server/orb-server.pid
 User=orb
 Group=orb
 WorkingDirectory=/opt/orb
@@ -100,11 +100,10 @@ RuntimeDirectoryMode=0755
 Environment=ORB_SERVER_ENABLED=true
 Environment=ORB_AUTH_ENABLED=true
 Environment=ORB_CONFIG_FILE=/etc/orb/config.json
-ExecStart=/opt/orb/venv/bin/orb server start \
-    --pid-file /run/orb/orb-api.pid \
-    --log-file /var/log/orb/orb-api.log
-ExecStop=/opt/orb/venv/bin/orb server stop \
-    --pid-file /run/orb/orb-api.pid
+Environment=ORB_WORK_DIR=/run/orb
+Environment=ORB_LOG_DIR=/var/log/orb
+ExecStart=/opt/orb/venv/bin/orb server start
+ExecStop=/opt/orb/venv/bin/orb server stop
 Restart=on-failure
 RestartSec=10
 
@@ -112,9 +111,18 @@ RestartSec=10
 WantedBy=multi-user.target
 ```
 
-> **Note:** With `Type=forking` the daemon writes its own log file
-> (`--log-file`). No rotation is applied automatically — configure
-> `logrotate` for that file (see [Log Rotation](#log-rotation) below).
+The PID file and log file paths are derived from `ORB_WORK_DIR` and
+`ORB_LOG_DIR` respectively:
+
+- PID file: `${ORB_WORK_DIR}/server/orb-server.pid`
+- Log file: `${ORB_LOG_DIR}/orb-server.log`
+
+Operators who need explicit pinning can override either path via the
+`server.pid_file` and `server.log_file` keys in `config.json`.
+
+> **Note:** With `Type=forking` the daemon writes its own log file. No
+> rotation is applied automatically — configure `logrotate` for that file
+> (see [Log Rotation](#log-rotation) below).
 
 ### Log Rotation
 
@@ -124,7 +132,7 @@ old inode. Use `copytruncate` instead, which copies the current file and
 truncates in place:
 
 ```
-/var/log/orb/orb-api.log {
+/var/log/orb/orb-server.log {
     daily
     rotate 14
     compress

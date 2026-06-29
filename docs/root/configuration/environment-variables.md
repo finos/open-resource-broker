@@ -109,35 +109,6 @@ ORB_AWS_LAUNCH_TEMPLATE__ON_UPDATE_FAILURE=fail
 ORB_AWS_TAGGING__ON_TAG_FAILURE=warn
 ```
 
-## Embedded UI environment variables
-
-These variables are read when ORB runs with the optional Reflex-based web UI
-(`pip install "orb-py[ui]"`).  They are not processed by the core config loader
-but are consumed by the UI startup code and `rxconfig.py`.
-
-```bash
-# Set to "embedded" when ORB acts as the backend for the Reflex UI.
-# Signals to startup scripts that the Reflex backend and ORB API share a port.
-ORB_MODE=embedded
-
-# Port for the Reflex backend process (also the ORB API port in embedded mode).
-# Default: 8001
-ORB_UI_BACKEND_PORT=8001
-
-# Port for the Reflex frontend dev/build server (development mode only;
-# not used when serving pre-built static assets in production).
-# Default: 3000
-ORB_UI_FRONTEND_PORT=3000
-
-# Override the scheduler type at runtime without editing config.json.
-# Useful in ephemeral container environments where config files are baked in.
-# Values: hostfactory | default | <custom>
-ORB_SCHEDULER_OVERRIDE=hostfactory
-```
-
-`ORB_WORK_DIR` and `ORB_LOG_DIR` are documented under
-[Directory variables](#directory-variables) above.
-
 ## HostFactory integration variables
 
 When running under IBM Spectrum LSF HostFactory, these variables are set by the scheduler and read by ORB's HostFactory adapter. They are not processed by the core config loader.
