@@ -42,12 +42,16 @@ class K8sTemplateDTOConfig(BaseModel):
         None, description="``tolerations`` applied to pods."
     )
 
-    # Resource requests / limits
-    resource_requests: Optional[dict[str, str]] = Field(
+    # Resource requests / limits.  Values are quantity strings on the wire
+    # (``"500m"``, ``"1Gi"``) but the DTO accepts ``Any`` so the
+    # ``K8sResourceQuantities.model_dump()`` round-trip — which emits
+    # ``None`` for unset accelerator fields (``ephemeral_storage``,
+    # ``gpu_count``, ``gpu_type``) — does not fail validation.
+    resource_requests: Optional[dict[str, Any]] = Field(
         None,
         description='Container resource requests, e.g. ``{"cpu": "500m", "memory": "1Gi"}``.',
     )
-    resource_limits: Optional[dict[str, str]] = Field(
+    resource_limits: Optional[dict[str, Any]] = Field(
         None,
         description='Container resource limits, e.g. ``{"cpu": "2", "memory": "4Gi"}``.',
     )
