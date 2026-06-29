@@ -335,9 +335,7 @@ def register_k8s_provider_instance(provider_instance, logger=None) -> bool:
     """
     try:
         if logger:
-            logger.debug(
-                "Registering Kubernetes provider instance: %s", provider_instance.name
-            )
+            logger.debug("Registering Kubernetes provider instance: %s", provider_instance.name)
 
         from orb.providers.registry import get_provider_registry
 
