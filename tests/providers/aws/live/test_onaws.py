@@ -1157,8 +1157,10 @@ def _check_request_machines_response_status(status_response, requested_count=Non
     # instance came up and the message names the shortfall.  Zero-fulfilment
     # or non-capacity-shaped errors still fail loudly.
     _req = status_response["requests"][0]
-    _fallback = requested_count if requested_count is not None else len(
-        _req.get("machines") or _req.get("machine_ids") or []
+    _fallback = (
+        requested_count
+        if requested_count is not None
+        else len(_req.get("machines") or _req.get("machine_ids") or [])
     )
     assert_terminal_ok(status_response, _fallback)
     for machine in status_response["requests"][0]["machines"]:
@@ -1421,8 +1423,10 @@ def _wait_for_request_completion(hfm, request_id: str, scheduler_type: str):
             from tests.providers.aws.live._capacity_helpers import assert_terminal_ok
 
             _req = status_response["requests"][0]
-            _target = _req.get("target_units") or _req.get("requested_count") or len(
-                _req.get("machines") or _req.get("machine_ids") or []
+            _target = (
+                _req.get("target_units")
+                or _req.get("requested_count")
+                or len(_req.get("machines") or _req.get("machine_ids") or [])
             )
             assert_terminal_ok(status_response, int(_target))
             return status_response

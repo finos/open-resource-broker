@@ -533,9 +533,7 @@ def test_multi_asg_termination(setup_multi_asg_templates):
                 f"status=complete but got {len(machines)}/{capacity_to_request} machines"
             )
         else:
-            assert len(machines) >= 1, (
-                f"status={_final_status!r} with zero machines"
-            )
+            assert len(machines) >= 1, f"status={_final_status!r} with zero machines"
 
         instance_ids = [
             machine.get("machineId") or machine.get("machine_id") for machine in machines

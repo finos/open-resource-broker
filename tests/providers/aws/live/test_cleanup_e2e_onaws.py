@@ -776,7 +776,14 @@ class TestRunInstancesCleanupE2E:
 
             # 2. Poll until provisioning complete
             deadline = time.time() + SDK_TIMEOUTS["request_completion"]
-            terminal = {"complete", "complete_with_error", "partial", "failed", "cancelled", "timeout"}
+            terminal = {
+                "complete",
+                "complete_with_error",
+                "partial",
+                "failed",
+                "cancelled",
+                "timeout",
+            }
             status_response = None
             while True:
                 status_response = await sdk.get_request_status(request_id=request_id)  # type: ignore[attr-defined]
