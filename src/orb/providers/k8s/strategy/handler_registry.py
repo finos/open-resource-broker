@@ -289,9 +289,7 @@ class K8sHandlerRegistry:
                     return Completed(resource_ids=missing_ids, metadata=metadata)
                 # Otherwise still draining.
                 pending_ids = [
-                    i.get("instance_id", "")
-                    for i in instances
-                    if i.get("status") != "terminated"
+                    i.get("instance_id", "") for i in instances if i.get("status") != "terminated"
                 ]
                 return Accepted(
                     request_id=str(request.request_id),
