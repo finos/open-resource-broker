@@ -349,7 +349,7 @@ async def _run_full_cycle_mcp(mcp_server, test_case: dict, tracked_request_ids: 
 
     # 2. Poll until complete
     deadline = time.time() + MCP_TIMEOUTS["request_completion"]
-    terminal = {"complete", "complete_with_error", "failed", "cancelled", "timeout"}
+    terminal = {"complete", "complete_with_error", "partial", "failed", "cancelled", "timeout"}
     status_result = None
 
     while True:
@@ -360,7 +360,12 @@ async def _run_full_cycle_mcp(mcp_server, test_case: dict, tracked_request_ids: 
         status = _extract_request_status(status_result)
         if status in terminal:
             if status != "complete":
-                pytest.fail(f"Request ended with non-success status: {status}")
+                # Capacity-aware: accept complete_with_error / partial when
+                # the provider returned some-but-not-all capacity due to an
+                # AWS shortfall.
+                from tests.providers.aws.live._capacity_helpers import assert_terminal_ok
+
+                assert_terminal_ok(status_result, capacity)
             break
         if time.time() > deadline:
             pytest.fail("Timed out waiting for request to complete")
@@ -384,18 +389,31 @@ async def _run_full_cycle_mcp(mcp_server, test_case: dict, tracked_request_ids: 
     fulfilled_units = (
         _req0["fulfilled_units"] if _req0.get("fulfilled_units") is not None else len(machine_ids)
     )
-    assert fulfilled_units >= target_units, (
-        f"Fleet not fully fulfilled: fulfilled={fulfilled_units}, target={target_units}"
-    )
+    _final_status = _req0.get("status")
+    if _final_status == "complete":
+        assert fulfilled_units >= target_units, (
+            f"Fleet not fully fulfilled despite status=complete: "
+            f"fulfilled={fulfilled_units}, target={target_units}"
+        )
+    else:
+        assert fulfilled_units >= 1, (
+            f"status={_final_status!r} with zero fulfilled units: target={target_units}"
+        )
 
     # Template-aware instance count sanity check.
     if scenarios.template_uses_weighted_capacity(test_case):
         assert len(machine_ids) >= 1, (
             f"Expected at least 1 machine (weighted template), got: {machine_ids}"
         )
-    else:
+    elif _final_status == "complete":
         assert len(machine_ids) == capacity, (
-            f"Expected {capacity} machines (unweighted template), got {len(machine_ids)}: {machine_ids}"
+            f"Expected {capacity} machines (unweighted template, status=complete), "
+            f"got {len(machine_ids)}: {machine_ids}"
+        )
+    else:
+        assert 1 <= len(machine_ids) <= capacity, (
+            f"Expected 1..{capacity} machines (unweighted template, status={_final_status!r}), "
+            f"got {len(machine_ids)}: {machine_ids}"
         )
 
     for machine_id in machine_ids:

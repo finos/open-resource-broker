@@ -547,7 +547,7 @@ async def _run_cleanup_verification(
 
     # 2. Poll provisioning until complete
     deadline = time.time() + SDK_TIMEOUTS["request_completion"]
-    terminal = {"complete", "complete_with_error", "failed", "cancelled", "timeout"}
+    terminal = {"complete", "complete_with_error", "partial", "failed", "cancelled", "timeout"}
     status_response = None
 
     while True:
@@ -556,7 +556,13 @@ async def _run_cleanup_verification(
         log.debug("provisioning status: %s", status)
         if status in terminal:
             if status != "complete":
-                pytest.fail(f"Request ended with non-success status: {status}")
+                # Capacity-aware: accept complete_with_error / partial when
+                # the provider returned some-but-not-all capacity due to an
+                # AWS shortfall.  Zero-fulfilment or non-capacity errors still
+                # fail loudly via assert_terminal_ok.
+                from tests.providers.aws.live._capacity_helpers import assert_terminal_ok
+
+                assert_terminal_ok(status_response, capacity)
             break
         if time.time() > deadline:
             pytest.fail("Timed out waiting for request to complete")
@@ -573,18 +579,31 @@ async def _run_cleanup_verification(
     fulfilled_units = (
         _req0["fulfilled_units"] if _req0.get("fulfilled_units") is not None else len(machine_ids)
     )
-    assert fulfilled_units >= target_units, (
-        f"Fleet not fully fulfilled: fulfilled={fulfilled_units}, target={target_units}"
-    )
+    _final_status = _req0.get("status")
+    if _final_status == "complete":
+        assert fulfilled_units >= target_units, (
+            f"Fleet not fully fulfilled despite status=complete: "
+            f"fulfilled={fulfilled_units}, target={target_units}"
+        )
+    else:
+        assert fulfilled_units >= 1, (
+            f"status={_final_status!r} with zero fulfilled units: target={target_units}"
+        )
 
     # Template-aware instance count sanity check.
     if scenarios.template_uses_weighted_capacity(test_case):
         assert len(machine_ids) >= 1, (
             f"Expected at least 1 machine (weighted template), got: {machine_ids}"
         )
-    else:
+    elif _final_status == "complete":
         assert len(machine_ids) == capacity, (
-            f"Expected {capacity} machines (unweighted template), got {len(machine_ids)}: {machine_ids}"
+            f"Expected {capacity} machines (unweighted template, status=complete), "
+            f"got {len(machine_ids)}: {machine_ids}"
+        )
+    else:
+        assert 1 <= len(machine_ids) <= capacity, (
+            f"Expected 1..{capacity} machines (unweighted template, status={_final_status!r}), "
+            f"got {len(machine_ids)}: {machine_ids}"
         )
 
     returned_id = status_response.get("requests", [{}])[0].get("request_id") or status_response.get(
@@ -757,7 +776,7 @@ class TestRunInstancesCleanupE2E:
 
             # 2. Poll until provisioning complete
             deadline = time.time() + SDK_TIMEOUTS["request_completion"]
-            terminal = {"complete", "complete_with_error", "failed", "cancelled", "timeout"}
+            terminal = {"complete", "complete_with_error", "partial", "failed", "cancelled", "timeout"}
             status_response = None
             while True:
                 status_response = await sdk.get_request_status(request_id=request_id)  # type: ignore[attr-defined]
@@ -765,7 +784,11 @@ class TestRunInstancesCleanupE2E:
                 log.debug("provisioning status: %s", status)
                 if status in terminal:
                     if status != "complete":
-                        pytest.fail(f"Request ended with non-success status: {status}")
+                        from tests.providers.aws.live._capacity_helpers import (
+                            assert_terminal_ok,
+                        )
+
+                        assert_terminal_ok(status_response, capacity)
                     break
                 if time.time() > deadline:
                     pytest.fail("Timed out waiting for RunInstances request to complete")
@@ -773,9 +796,18 @@ class TestRunInstancesCleanupE2E:
 
             # 3. Assert instances provisioned
             machine_ids = _extract_machine_ids(status_response)
-            assert len(machine_ids) == capacity, (
-                f"Expected {capacity} machines, got {len(machine_ids)}: {machine_ids}"
+            _status_final = (
+                status_response.get("requests", [{}])[0].get("status") if status_response else None
             )
+            if _status_final == "complete":
+                assert len(machine_ids) == capacity, (
+                    f"Expected {capacity} machines (status=complete), got {len(machine_ids)}: {machine_ids}"
+                )
+            else:
+                assert 1 <= len(machine_ids) <= capacity, (
+                    f"Expected 1..{capacity} machines (status={_status_final!r}), "
+                    f"got {len(machine_ids)}: {machine_ids}"
+                )
             for machine_id in machine_ids:
                 try:
                     resp = _get_ec2_client().describe_instances(InstanceIds=[machine_id])
