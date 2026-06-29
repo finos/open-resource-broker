@@ -142,11 +142,41 @@ def _health_url(server_config: Any, ui_config: Any | None) -> str:
 @handle_interface_exceptions(context="server_start", interface_type="cli")
 async def handle_server_start(args) -> dict[str, Any]:
     """Start the server. Daemonized by default; ``--foreground`` to block."""
+    import os
+
     from orb.interface import server_daemon as daemon_mod
 
     runtime, server_config, _ui_config = _build_runtime(args)
     pid_file, log_file, working_dir = _resolve_lifecycle_paths(server_config)
     foreground = getattr(args, "foreground", False)
+
+    if foreground:
+        # Foreground mode runs inside the CLI's own event loop (orb.run.main
+        # is dispatched via asyncio.run).  Routing through daemon_mod.start
+        # in this path would nest a second asyncio.run, which RuntimeError's
+        # and surfaces as exit_code=1 with no actual server having started.
+        # Take the pid + token lock directly here and await the runtime.
+        logger = get_logger(__name__)
+        pid_path = daemon_mod._expand(str(pid_file))
+        log_path = daemon_mod._expand(str(log_file))
+        wd_path = daemon_mod._expand(str(working_dir))
+        wd_path.mkdir(parents=True, exist_ok=True)
+        lock_fd = daemon_mod._acquire_pid_lock(pid_path)
+        try:
+            daemon_mod._write_pid(lock_fd, os.getpid())
+            try:
+                daemon_mod._write_token_file(pid_path)
+            except OSError as exc:
+                logger.warning("loopback handshake file write failed: %s", exc)
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            result = await runtime()
+            rc = int(result.get("exit_code", 0)) if isinstance(result, dict) else 0
+        finally:
+            pid_path.unlink(missing_ok=True)
+            daemon_mod._cleanup_token_file(pid_path)
+            os.close(lock_fd)
+        return {"pid": os.getpid(), "status": "exited", "exit_code": rc}
+
     return daemon_mod.start(
         pid_file=pid_file,
         log_file=log_file,

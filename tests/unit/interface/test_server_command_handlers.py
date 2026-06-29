@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -100,21 +101,40 @@ class TestHandleServerStart:
     @pytest.mark.asyncio
     @patch(_BUILD_RUNTIME)
     @patch(_RESOLVE_PATHS, return_value=("/tmp/srv.pid", "/tmp/srv.log", "/tmp"))
-    async def test_start_foreground_true_passes_flag(self, _mock_paths, mock_build_runtime):
+    async def test_start_foreground_awaits_runtime_directly(self, _mock_paths, mock_build_runtime):
+        """Foreground mode must await the runtime in the caller's event loop.
+
+        Routing through daemon_mod.start would nest a second asyncio.run inside
+        the CLI's own asyncio.run(main()) and the runtime would never reach
+        ``await server.serve()``.  The handler now drives the lock/token
+        lifecycle directly and ``await``s the runtime.
+        """
         server_cfg = _make_server_config()
-        runtime = AsyncMock(return_value={"message": "Server stopped"})
+        runtime = AsyncMock(return_value={"exit_code": 0})
         mock_build_runtime.return_value = (runtime, server_cfg, None)
 
         mock_daemon = MagicMock()
-        mock_daemon.start.return_value = {"pid": 42, "status": "foreground"}
+        mock_daemon._expand.side_effect = lambda p: Path(p)
+        mock_daemon._acquire_pid_lock.return_value = 99
 
-        with patch("orb.interface.server_daemon", mock_daemon, create=True):
+        with (
+            patch("orb.interface.server_daemon", mock_daemon, create=True),
+            patch("os.close"),
+        ):
             from orb.interface.server_command_handlers import handle_server_start
 
-            await handle_server_start(_args(foreground=True))
+            result = await handle_server_start(_args(foreground=True))
 
-        call_kwargs = mock_daemon.start.call_args.kwargs
-        assert call_kwargs["foreground"] is True
+        # daemon_mod.start MUST NOT be called in foreground mode — that
+        # would re-enter asyncio.run and crash silently with exit_code=1.
+        mock_daemon.start.assert_not_called()
+        # The runtime coroutine must be awaited in the existing loop.
+        runtime.assert_awaited_once()
+        # The handler still owns lock + token lifecycle.
+        mock_daemon._acquire_pid_lock.assert_called_once()
+        mock_daemon._write_pid.assert_called_once()
+        assert result["status"] == "exited"
+        assert result["exit_code"] == 0
 
     @pytest.mark.asyncio
     @patch(_BUILD_RUNTIME)

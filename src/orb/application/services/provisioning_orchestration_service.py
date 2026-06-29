@@ -227,6 +227,15 @@ class ProvisioningOrchestrationService:
                 self._record_provider_failure(selection_result.provider_name)
                 break
 
+            # Async provider accepted the request and is provisioning out of
+            # band; polling owns the final status from here.  Retrying would
+            # create a second fleet alongside the one already provisioning,
+            # which then shows up as a phantom failure when it reports empty.
+            # Break out and let the status-check loop drive the single
+            # accepted fleet to completion.
+            if isinstance(last_result.outcome, Accepted):
+                break
+
             if remaining > 0 and not last_result.is_final:
                 # Partial fulfillment, retry may help — persist ACQUIRING status
                 self._logger.info(
