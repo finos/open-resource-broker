@@ -104,6 +104,9 @@ workloads).
 
 ## What is in this section
 
+* [Infrastructure discovery](discovery.md) - interactive `orb init` flow, the
+  six operator prompts, minimum RBAC, 403 fallback paths, and deployment
+  examples for in-cluster and out-of-cluster modes.
 * [Configuration reference](configuration.md) - every `K8sProviderConfig` field.
 * [Handlers](handlers.md) - Pod, Deployment, StatefulSet, Job; when to pick each.
 * [Native spec escape hatch](native-spec.md) - submit a full kubernetes

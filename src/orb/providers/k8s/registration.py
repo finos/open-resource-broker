@@ -391,6 +391,14 @@ def register_k8s_services_with_di(container) -> None:
     registration is the explicit binding for callers who want the
     container to own the lifecycle.
 
+    **Infrastructure discovery service** (:class:`K8sInfrastructureDiscoveryService`)
+    is intentionally NOT registered in the DI container.  It depends on
+    :class:`K8sProviderConfig`, which is a per-strategy-instance value and
+    therefore not resolvable from a global container.  The strategy constructs
+    and owns the service lazily via
+    :meth:`K8sProviderStrategy._get_discovery_service`, mirroring the AWS
+    pattern (``AWSProviderStrategy._get_infrastructure_service``).
+
     The :class:`TemplateExampleGeneratorPort` registration is wrapped in
     ``suppress(ImportError)`` for defensive resilience; the concrete adapter
     lives under ``providers/k8s/adapters/template_example_generator_adapter``.

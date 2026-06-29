@@ -167,6 +167,7 @@ nav:
   - Providers:
     - Kubernetes:
       - Overview: providers/k8s/index.md
+      - Infrastructure Discovery: providers/k8s/discovery.md
       - Configuration: providers/k8s/configuration.md
       - Handlers: providers/k8s/handlers.md
       - Authentication: providers/k8s/auth.md

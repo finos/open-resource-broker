@@ -691,7 +691,21 @@ class K8sProviderStrategy(ProviderStrategy):
         return ""
 
     def get_cli_extra_config_keys(self) -> set[str]:
-        return set()
+        """Return k8s keys that belong in provider config, not template_defaults.
+
+        ``init_command_handler`` calls this after ``discover_infrastructure``
+        to route each discovered field to the correct section.  Keys returned
+        here land in ``provider_instance.config``; all other keys land in
+        ``provider_instance.template_defaults``.
+
+        Routing table:
+        - ``context``                  → ``K8sProviderConfig.context``
+        - ``in_cluster``               → ``K8sProviderConfig.in_cluster``
+        - ``namespace``                → ``K8sProviderConfig.namespace``
+        - ``default_image_pull_secret``→ ``K8sProviderConfig.default_image_pull_secret``
+        - ``service_account``          → ``K8sTemplate.service_account`` (template default)
+        """
+        return {"context", "in_cluster", "namespace", "default_image_pull_secret"}
 
     def get_cli_infrastructure_defaults(self, args: Any) -> dict[str, Any]:
         return {}
@@ -800,11 +814,19 @@ class K8sProviderStrategy(ProviderStrategy):
     # ------------------------------------------------------------------
 
     def _get_discovery_service(self) -> K8sInfrastructureDiscoveryService:
-        """Return the infrastructure discovery service, constructing it lazily."""
+        """Return the infrastructure discovery service, constructing it lazily.
+
+        The discovery service is NOT registered in the DI container — the
+        strategy owns and constructs it here, exactly as
+        ``AWSProviderStrategy._get_infrastructure_service()`` does.  This keeps
+        the DI container light and avoids requiring ``K8sProviderConfig`` (a
+        per-strategy-instance value) to be resolvable from the container.
+        """
         if self._discovery_service is None:
             self._discovery_service = K8sInfrastructureDiscoveryService(
                 config=self._k8s_config,
                 logger=self._logger,
+                console=self._console,
             )
         return self._discovery_service
 
