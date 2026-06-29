@@ -189,14 +189,17 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     "resource_type": "ec2_fleet",
                     "fleet_type": fleet_type_value,
                     "fleet_errors": fleet_errors,
-                    # ``fulfillment_final`` reports whether the provider's
-                    # CREATE call is the final word from the provisioning
-                    # layer.  All fleet types return a stable fleet ID at
-                    # create time; whether instances are actually running is
-                    # a separate ``check_hosts_status`` polling concern that
-                    # drives the request from IN_PROGRESS to COMPLETED.  See
-                    # ``fulfilment-model.md`` for the two-layer design.
-                    "fulfillment_final": True,
+                    # ``fulfillment_final=True`` means the provider's CREATE
+                    # call returned the entire fulfilment story synchronously.
+                    # MAINTAIN / REQUEST fleets return only a fleet ID and no
+                    # instances yet (instance arrival is purely a polling
+                    # concern), so the create call IS the final synchronous
+                    # answer for those types.  INSTANT fleets return instance
+                    # IDs synchronously but those instances are still in
+                    # ``pending`` state at create time, so the create call is
+                    # NOT the final answer — the polling loop must observe the
+                    # running state.  Matches the pre-redesign main semantics.
+                    "fulfillment_final": fleet_type is not AWSFleetType.INSTANT,
                     "capacity_constrained": capacity_constrained,
                 },
             }
