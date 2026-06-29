@@ -13,3 +13,14 @@ class K8sAuthError(K8sError):
 
 class K8sHealthCheckError(K8sError):
     """Raised when the Kubernetes API server health check fails."""
+
+
+class K8sDiscoveryError(K8sError):
+    """Raised when Kubernetes infrastructure discovery encounters a non-recoverable error.
+
+    Distinct from :class:`K8sAuthError` (authentication / config loading) and
+    :class:`K8sHealthCheckError` (server reachability).  ``K8sDiscoveryError`` is
+    raised when a specific discovery call fails in a way that prevents the
+    discovery flow from continuing — for example a 404 on a named namespace that
+    was expected to exist, or a kubeconfig that is absent or malformed.
+    """
