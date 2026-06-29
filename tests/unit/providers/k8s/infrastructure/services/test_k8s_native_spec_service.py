@@ -367,7 +367,7 @@ class TestContextBuilding:
 
 
 class TestNativeSpecSafetyHoles:
-    """Covers the three safety holes identified in the adversarial review.
+    """Covers three native_spec safety guarantees.
 
     1. native_spec set but native_spec_enabled=False → warning + typed path.
     2. Both native_spec and pod_spec_override set with native_spec_enabled=True

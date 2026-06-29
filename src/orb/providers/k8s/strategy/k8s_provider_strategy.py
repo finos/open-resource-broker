@@ -1116,6 +1116,56 @@ class K8sProviderStrategy(ProviderStrategy):
         )
 
 
+def _build_provider_result_data(
+    *,
+    resource_ids: list[str],
+    metadata: Optional[dict[str, Any]] = None,
+    tracking_request_id: Optional[str] = None,
+) -> dict[str, Any]:
+    """Build the ``ProviderResult.data`` dict for k8s outcomes.
+
+    Resource-vs-machine model (Kubernetes):
+
+    * **Pod handler** — every Pod IS its own resource.  Acquire emits
+      ``resource_ids == machine_ids == [pod_name, ...]`` (1:1).  The
+      handler also surfaces a per-machine ``instances`` list with the
+      pod's ``status``, ``image_id`` and so on, populated lazily by the
+      status resolver.
+    * **Deployment / StatefulSet / Job handler** — the workload controller
+      is the *resource* (1 entry: ``[deployment_name]``); the Pods it
+      spawns are the *machines* (N entries, populated by the status
+      resolver).  Acquire emits ``machine_ids=[]`` because the
+      controller has not yet scheduled any pods.
+
+    The bridge therefore propagates whatever the handler put under
+    ``metadata['instances']`` verbatim (it carries the authoritative
+    ``resource_id`` ↔ ``machine_id`` mapping per pod) and otherwise
+    leaves ``instances`` empty so that downstream machine creation is
+    driven by a subsequent status read rather than by manufactured rows.
+    """
+    meta_dict = dict(metadata or {})
+    # ``machine_ids`` are the per-pod identifiers (1 per machine row);
+    # ``resource_ids`` are the per-controller (or per-pod for the Pod
+    # handler) identifiers.  Both are propagated through ``provider_data``
+    # so the application layer can reason about them independently.
+    machine_ids = list(meta_dict.get("machine_ids") or [])
+    instances = list(meta_dict.get("instances") or [])
+
+    data: dict[str, Any] = {
+        "resource_ids": resource_ids,
+        "instances": instances,
+        # ``instance_ids`` consumed by deprovisioning / sync paths that
+        # want the per-pod identifiers.  Falls back to ``resource_ids``
+        # for the Pod handler (where resource = machine) when the
+        # handler did not put machine_ids in metadata.
+        "instance_ids": machine_ids or resource_ids,
+        "provider_data": meta_dict,
+    }
+    if tracking_request_id is not None:
+        data["tracking_request_id"] = tracking_request_id
+    return data
+
+
 def _outcome_to_provider_result(
     outcome: OperationOutcome, *, fallback_operation: str
 ) -> ProviderResult:
@@ -1145,78 +1195,50 @@ def _outcome_to_provider_result(
         )
 
     if isinstance(outcome, Accepted):
-        meta_dict = dict(outcome.metadata or {})
-        # ``handler_registry.get_status`` puts the full instance list (with
-        # ``status``) into ``metadata['instances']``; prefer that.  Fall back
-        # to synthesising minimal dicts from machine_ids / pending_resource_ids
-        # for the acquire-time path where the handler hasn't been polled yet.
-        machine_ids = list(meta_dict.get("machine_ids") or [])
-        resource_ids = list(outcome.pending_resource_ids)
-        metadata_instances = list(meta_dict.get("instances") or [])
-        if metadata_instances:
-            instance_dicts = metadata_instances
-        else:
-            instance_dicts = [
-                {
-                    "instance_id": machine_id,
-                    "resource_id": machine_id,
-                    "instance_type": "k8s-pod",
-                    "image_id": "unknown",
-                    "launch_time": None,
-                }
-                for machine_id in (machine_ids or resource_ids)
-            ]
-        data = {
-            "resource_ids": resource_ids,
-            "instances": instance_dicts,
-            "instance_ids": list(machine_ids or resource_ids),
-            "provider_data": meta_dict,
-            "tracking_request_id": outcome.request_id,
-        }
         return ProviderResult.success_result(
-            data,
+            _build_provider_result_data(
+                resource_ids=list(outcome.pending_resource_ids),
+                metadata=outcome.metadata,
+                tracking_request_id=outcome.request_id,
+            ),
             {"operation": fallback_operation, "provider": "k8s"},
         )
 
     if isinstance(outcome, Completed):
-        meta_dict = dict(outcome.metadata or {})
-        machine_ids = list(meta_dict.get("machine_ids") or [])
-        resource_ids = list(outcome.resource_ids)
-        metadata_instances = list(meta_dict.get("instances") or [])
-        if metadata_instances:
-            instance_dicts = metadata_instances
-        else:
-            instance_dicts = [
-                {
-                    "instance_id": machine_id,
-                    "resource_id": machine_id,
-                    "instance_type": "k8s-pod",
-                    "image_id": "unknown",
-                    "launch_time": None,
-                }
-                for machine_id in (machine_ids or resource_ids)
-            ]
-        data = {
-            "resource_ids": resource_ids,
-            "instances": instance_dicts,
-            "instance_ids": list(machine_ids or resource_ids),
-            "provider_data": {**meta_dict, "fulfillment_final": True},
-        }
+        # ``fulfillment_final=True`` signals to the provisioning service
+        # that the request has reached a terminal state — without it the
+        # request would stay IN_PROGRESS forever.
+        meta = {**dict(outcome.metadata or {}), "fulfillment_final": True}
         return ProviderResult.success_result(
-            data,
+            _build_provider_result_data(
+                resource_ids=list(outcome.resource_ids),
+                metadata=meta,
+            ),
             {"operation": fallback_operation, "provider": "k8s"},
         )
 
     if isinstance(outcome, RequiresFollowUp):
+        ctx = outcome.context
+        # Both follow-up variants carry an ID list; surface it as
+        # ``resource_ids`` so the application layer keeps a handle on
+        # what's still pending.  ``follow_up_kind`` and the typed context
+        # ride along in ``provider_data`` for the background poller.
+        pending_ids: list[str] = list(
+            getattr(ctx, "pending_resource_ids", None)
+            or getattr(ctx, "pending_instance_ids", None)
+            or []
+        )
+        meta = {
+            **dict(outcome.metadata or {}),
+            "follow_up_kind": ctx.follow_up_kind,
+            "provider_handle": getattr(ctx, "provider_handle", None),
+            "expected_terminal_state": getattr(ctx, "expected_terminal_state", None),
+        }
         return ProviderResult.success_result(
-            {
-                "resource_ids": [],
-                "instances": [],
-                "provider_data": {
-                    **dict(outcome.metadata or {}),
-                    "follow_up_kind": outcome.context.follow_up_kind,
-                },
-            },
+            _build_provider_result_data(
+                resource_ids=pending_ids,
+                metadata=meta,
+            ),
             {"operation": fallback_operation, "provider": "k8s"},
         )
 
