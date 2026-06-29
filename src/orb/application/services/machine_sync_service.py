@@ -93,6 +93,9 @@ class MachineSyncService:
             else:
                 return [], {}
 
+            # Typed Request aggregate for providers that implement the typed
+            # get_status interface (k8s).  AWS ignores it.
+            parameters = {**parameters, "request": request}
             operation = ProviderOperation(
                 operation_type=operation_type,
                 parameters=parameters,

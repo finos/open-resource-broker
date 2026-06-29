@@ -238,19 +238,66 @@ class K8sHandlerRegistry:
 
         Returns ``Completed`` when fulfilment is terminal (``fulfilled``,
         ``partial``, or ``failed``); ``Accepted`` while ``in_progress``.
+
+        Caller-supplied ``resource_ids`` (machine IDs that the caller knows
+        about) are reconciled against the live cluster: any ID absent from
+        the live list is surfaced as a synthetic ``status='terminated'``
+        instance.  This is what lets a return request observe its target
+        pods disappearing — the typed ``Accepted`` outcome carries the
+        full machine surface so :mod:`machine_sync_service` can mark the
+        machine row as terminated when it sees ``status='terminated'``.
         """
         try:
+            from orb.domain.request.request_types import (  # noqa: PLC0415
+                RequestType,
+            )
+
             provider_api = self.resolve_provider_api(request)
             handler = self.get_handler(provider_api)
             check_result = await asyncio.to_thread(handler.check_hosts_status, request)
-            instances = check_result.instances
+            instances = list(check_result.instances)
             fulfilment = check_result.fulfilment
+
+            live_ids = {i.get("instance_id", "") for i in instances}
+            missing_ids = [mid for mid in (resource_ids or []) if mid and mid not in live_ids]
+            if missing_ids:
+                instances.extend(
+                    {
+                        "instance_id": mid,
+                        "resource_id": mid,
+                        "instance_type": "k8s-pod",
+                        "image_id": "unknown",
+                        "launch_time": None,
+                        "status": "terminated",
+                    }
+                    for mid in missing_ids
+                )
 
             metadata: dict[str, Any] = {
                 "provider_api": provider_api,
                 "fulfilment": fulfilment,
                 "instances": instances,
             }
+
+            is_return = (
+                getattr(request, "request_type", None) == RequestType.RETURN
+                or getattr(getattr(request, "request_type", None), "value", None) == "return"
+            )
+            if is_return:
+                # Return is complete when every targeted pod is gone.
+                if missing_ids and not [i for i in instances if i.get("status") != "terminated"]:
+                    return Completed(resource_ids=missing_ids, metadata=metadata)
+                # Otherwise still draining.
+                pending_ids = [
+                    i.get("instance_id", "")
+                    for i in instances
+                    if i.get("status") != "terminated"
+                ]
+                return Accepted(
+                    request_id=str(request.request_id),
+                    pending_resource_ids=pending_ids or list(resource_ids),
+                    metadata=metadata,
+                )
 
             if fulfilment.state == "in_progress":
                 pending = [

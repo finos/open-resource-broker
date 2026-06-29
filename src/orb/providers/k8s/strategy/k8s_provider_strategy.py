@@ -1146,22 +1146,26 @@ def _outcome_to_provider_result(
 
     if isinstance(outcome, Accepted):
         meta_dict = dict(outcome.metadata or {})
+        # ``handler_registry.get_status`` puts the full instance list (with
+        # ``status``) into ``metadata['instances']``; prefer that.  Fall back
+        # to synthesising minimal dicts from machine_ids / pending_resource_ids
+        # for the acquire-time path where the handler hasn't been polled yet.
         machine_ids = list(meta_dict.get("machine_ids") or [])
         resource_ids = list(outcome.pending_resource_ids)
-        # ``RequestStatusManagementService._create_machine_aggregate`` expects
-        # each ``instances`` entry to be a dict with ``instance_id`` /
-        # ``resource_id`` / ``launch_time`` keys.  Pod names are the canonical
-        # k8s machine IDs; expose them in the shape the shared service expects.
-        instance_dicts = [
-            {
-                "instance_id": machine_id,
-                "resource_id": machine_id,
-                "instance_type": "k8s-pod",
-                "image_id": "unknown",
-                "launch_time": None,
-            }
-            for machine_id in (machine_ids or resource_ids)
-        ]
+        metadata_instances = list(meta_dict.get("instances") or [])
+        if metadata_instances:
+            instance_dicts = metadata_instances
+        else:
+            instance_dicts = [
+                {
+                    "instance_id": machine_id,
+                    "resource_id": machine_id,
+                    "instance_type": "k8s-pod",
+                    "image_id": "unknown",
+                    "launch_time": None,
+                }
+                for machine_id in (machine_ids or resource_ids)
+            ]
         data = {
             "resource_ids": resource_ids,
             "instances": instance_dicts,
@@ -1178,16 +1182,20 @@ def _outcome_to_provider_result(
         meta_dict = dict(outcome.metadata or {})
         machine_ids = list(meta_dict.get("machine_ids") or [])
         resource_ids = list(outcome.resource_ids)
-        instance_dicts = [
-            {
-                "instance_id": machine_id,
-                "resource_id": machine_id,
-                "instance_type": "k8s-pod",
-                "image_id": "unknown",
-                "launch_time": None,
-            }
-            for machine_id in (machine_ids or resource_ids)
-        ]
+        metadata_instances = list(meta_dict.get("instances") or [])
+        if metadata_instances:
+            instance_dicts = metadata_instances
+        else:
+            instance_dicts = [
+                {
+                    "instance_id": machine_id,
+                    "resource_id": machine_id,
+                    "instance_type": "k8s-pod",
+                    "image_id": "unknown",
+                    "launch_time": None,
+                }
+                for machine_id in (machine_ids or resource_ids)
+            ]
         data = {
             "resource_ids": resource_ids,
             "instances": instance_dicts,
