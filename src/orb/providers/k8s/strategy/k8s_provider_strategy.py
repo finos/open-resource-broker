@@ -46,6 +46,9 @@ from orb.providers.k8s.reconciliation.startup_reconciler import (
     ReconciliationReport,
     StartupReconciler,
 )
+from orb.providers.k8s.services.infrastructure_discovery_service import (
+    K8sInfrastructureDiscoveryService,
+)
 from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
 from orb.providers.k8s.value_objects import KubernetesProviderApi
 from orb.providers.k8s.watch.multi_namespace import MultiNamespaceWatcher
@@ -175,6 +178,9 @@ class K8sProviderStrategy(ProviderStrategy):
         # to the typed builder path.
         self._native_spec_service_resolved: bool = False
         self._k8s_native_spec_service: Optional[Any] = None
+        # Infrastructure discovery service — constructed lazily by
+        # :meth:`_get_discovery_service` on first use.
+        self._discovery_service: Optional[K8sInfrastructureDiscoveryService] = None
         # Handler registry — does the per-API handler factory wiring and
         # the typed acquire/return/status dispatch.  Wired with closures
         # over the strategy's lazy client, watcher, native-spec accessors
@@ -788,6 +794,46 @@ class K8sProviderStrategy(ProviderStrategy):
     def _build_template_for_request(self, request: "Request") -> "Template":
         """Resolve the :class:`Template` carried by ``request``."""
         return self._handler_registry.build_template_for_request(request)
+
+    # ------------------------------------------------------------------
+    # Infrastructure discovery — ProviderDiscoveryPort implementation
+    # ------------------------------------------------------------------
+
+    def _get_discovery_service(self) -> K8sInfrastructureDiscoveryService:
+        """Return the infrastructure discovery service, constructing it lazily."""
+        if self._discovery_service is None:
+            self._discovery_service = K8sInfrastructureDiscoveryService(
+                config=self._k8s_config,
+                logger=self._logger,
+            )
+        return self._discovery_service
+
+    def discover_infrastructure(self, provider_config: dict[str, Any]) -> dict[str, Any]:
+        """Discover Kubernetes infrastructure for the configured cluster.
+
+        Delegates to :class:`K8sInfrastructureDiscoveryService`.  Returns
+        a valid (empty-stub) discovery dict until Phase B is implemented.
+        """
+        return self._get_discovery_service().discover_infrastructure(provider_config)
+
+    def discover_infrastructure_interactive(
+        self, provider_config: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Interactively discover Kubernetes infrastructure via operator prompts.
+
+        Delegates to :class:`K8sInfrastructureDiscoveryService`.  Returns
+        the same scaffold as :meth:`discover_infrastructure` until Phase C
+        is implemented.
+        """
+        return self._get_discovery_service().discover_infrastructure_interactive(provider_config)
+
+    def validate_infrastructure(self, provider_config: dict[str, Any]) -> dict[str, Any]:
+        """Validate that the configured Kubernetes cluster is reachable.
+
+        Delegates to :class:`K8sInfrastructureDiscoveryService`.  Returns
+        ``{provider, valid: True, issues: []}`` until Phase D is implemented.
+        """
+        return self._get_discovery_service().validate_infrastructure(provider_config)
 
     def __str__(self) -> str:  # pragma: no cover — trivial
         return (
