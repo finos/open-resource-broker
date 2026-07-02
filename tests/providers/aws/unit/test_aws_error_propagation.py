@@ -4,8 +4,8 @@ Covers:
   - _convert_client_error preserves aws_error_code, aws_error_message,
     aws_request_id, error_source on every mapped exception subclass.
   - Access-key redaction in error messages.
-  - _extract_aws_error_fields helper extracts attrs from AWSError subclasses
-    and returns None values for non-AWSError exceptions.
+  - _extract_provider_error_fields helper extracts attrs from AWSError subclasses
+    (via aws_* fallback) and returns None values for non-provider exceptions.
   - ProvisioningResult carries AWS error fields through from the exception.
   - RequestStatusManagementService._handle_provisioning_failure writes
     error_details["provider_error"] onto the Request aggregate.
@@ -149,16 +149,16 @@ class TestConvertClientError:
 
 
 # ---------------------------------------------------------------------------
-# _extract_aws_error_fields helper
+# _extract_provider_error_fields helper
 # ---------------------------------------------------------------------------
 
 
-class TestExtractAwsErrorFields:
-    """_extract_aws_error_fields returns correct dict for AWSError and falls back for others."""
+class TestExtractProviderErrorFields:
+    """_extract_provider_error_fields returns correct dict for AWSError and falls back for others."""
 
     def test_returns_aws_fields_from_aws_error(self):
         from orb.application.services.provisioning_orchestration_service import (
-            _extract_aws_error_fields,
+            _extract_provider_error_fields,
         )
         from orb.providers.aws.exceptions.aws_exceptions import AuthorizationError
 
@@ -169,7 +169,7 @@ class TestExtractAwsErrorFields:
             aws_request_id="rid-xyz",
             error_source="aws.ec2.run_instances",
         )
-        result = _extract_aws_error_fields(exc)
+        result = _extract_provider_error_fields(exc)
         assert result["provider_error_code"] == "UnauthorizedOperation"
         assert result["provider_error_message"] == "You are not authorized."
         assert result["provider_request_id"] == "rid-xyz"
@@ -177,10 +177,10 @@ class TestExtractAwsErrorFields:
 
     def test_returns_none_values_for_generic_exception(self):
         from orb.application.services.provisioning_orchestration_service import (
-            _extract_aws_error_fields,
+            _extract_provider_error_fields,
         )
 
-        result = _extract_aws_error_fields(ValueError("some error"))
+        result = _extract_provider_error_fields(ValueError("some error"))
         assert result["provider_error_code"] is None
         assert result["provider_error_message"] is None
         assert result["provider_request_id"] is None
@@ -188,7 +188,7 @@ class TestExtractAwsErrorFields:
 
     def test_partial_aws_error_attrs(self):
         from orb.application.services.provisioning_orchestration_service import (
-            _extract_aws_error_fields,
+            _extract_provider_error_fields,
         )
         from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 
@@ -196,7 +196,7 @@ class TestExtractAwsErrorFields:
             "infra error",
             aws_error_code="InsufficientInstanceCapacity",
         )
-        result = _extract_aws_error_fields(exc)
+        result = _extract_provider_error_fields(exc)
         assert result["provider_error_code"] == "InsufficientInstanceCapacity"
         assert result["provider_error_message"] is None
 
