@@ -14,8 +14,23 @@ class HostFactoryFieldMapper(SchedulerFieldMapper):
 
     @property
     def field_mappings(self) -> Dict[str, str]:
-        """Get HostFactory field mappings for the provider."""
-        return HostFactoryFieldMappings.get_mappings(self.provider_type or "")
+        """Get HostFactory field mappings for the provider.
+
+        Merges the static ``HostFactoryFieldMappings`` table (generic +
+        the no-bootstrap AWS fallback) with the per-provider adapter
+        registered via :class:`FieldMappingRegistry` during provider
+        bootstrap.  Adapter entries win on conflicting keys, mirroring
+        the documented integration order in :class:`FieldMappingPort`.
+        """
+        from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import (
+            FieldMappingRegistry,
+        )
+
+        base = dict(HostFactoryFieldMappings.get_mappings(self.provider_type or ""))
+        adapter = FieldMappingRegistry.get(self.provider_type or "")
+        if adapter is not None:
+            base.update(adapter.get_mappings())
+        return base
 
     def map_input_fields(self, external_template: Dict[str, Any]) -> Dict[str, Any]:
         """Map HostFactory format → internal format with transformations."""
