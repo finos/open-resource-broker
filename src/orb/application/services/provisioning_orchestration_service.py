@@ -2,7 +2,7 @@
 
 import asyncio
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Callable, assert_never
 
 if TYPE_CHECKING:
@@ -78,16 +78,31 @@ class ProvisioningResult:
                     assert_never(unreachable)
 
 
-def _extract_aws_error_fields(exc: BaseException) -> dict[str, Any]:
+def _extract_provider_error_fields(exc: BaseException) -> dict[str, Any]:
     """Extract provider error fields from a provider exception (if applicable).
 
     Returns a dict suitable for **-unpacking into ProvisioningResult.  When the
     exception carries no provider error attributes the dict will contain only
     None values so the ProvisioningResult fields stay empty (safe default).
+
+    Attribute lookup order (first non-None value wins):
+      provider_error_code  → ``provider_error_code`` then ``aws_error_code``
+      provider_error_message → ``provider_error_message`` then ``aws_error_message``
+      provider_request_id  → ``provider_request_id`` then ``aws_request_id``
+      error_source         → ``error_source``
+
+    The ``aws_*`` names are kept as a backward-compatible fallback so that
+    existing AWS exception classes do not need to be modified.
     """
-    provider_error_code: str | None = getattr(exc, "aws_error_code", None)
-    provider_error_message: str | None = getattr(exc, "aws_error_message", None)
-    provider_request_id: str | None = getattr(exc, "aws_request_id", None)
+    provider_error_code: str | None = getattr(exc, "provider_error_code", None) or getattr(
+        exc, "aws_error_code", None
+    )
+    provider_error_message: str | None = getattr(exc, "provider_error_message", None) or getattr(
+        exc, "aws_error_message", None
+    )
+    provider_request_id: str | None = getattr(exc, "provider_request_id", None) or getattr(
+        exc, "aws_request_id", None
+    )
     error_source: str | None = getattr(exc, "error_source", None)
     return {
         "provider_error_code": provider_error_code,
@@ -227,6 +242,28 @@ class ProvisioningOrchestrationService:
                 self._record_provider_failure(selection_result.provider_name)
                 break
 
+            # Checkpoint: persist the resource IDs returned by this attempt before
+            # proceeding.  This closes the crash window between the provider creating
+            # resources (e.g. k8s pods) and the caller writing the final request row.
+            # A startup reconciler can re-associate any orphan provider resources with
+            # the dangling request row using the request-id label / tag.
+            # The write is best-effort: a DB failure is logged but does not abort the
+            # provisioning loop because the resource_ids are still tracked in memory
+            # and the caller performs a full persist on return.
+            if last_result.resource_ids:
+                request, checkpoint_ok = await asyncio.to_thread(
+                    self._persist_resource_ids_checkpoint, request, last_result.resource_ids
+                )
+                if not checkpoint_ok:
+                    self._logger.warning(
+                        "Resource-ID checkpoint persist failed for request %s attempt %d — "
+                        "continuing with in-memory state; provider resources %s are recorded "
+                        "only in memory until the final persist succeeds",
+                        request.request_id,
+                        attempt_number,
+                        last_result.resource_ids,
+                    )
+
             # Async provider accepted the request and is provisioning out of
             # band; polling owns the final status from here.  Retrying would
             # create a second fleet alongside the one already provisioning,
@@ -271,6 +308,50 @@ class ProvisioningOrchestrationService:
             is_final=last_result.is_final if last_result else True,
         )
 
+    def _persist_resource_ids_checkpoint(
+        self, request: Request, new_resource_ids: list[str]
+    ) -> tuple[Request, bool]:
+        """Persist newly acquired provider resource IDs onto the request row.
+
+        Called immediately after a successful provider dispatch so that the DB
+        always contains the resource IDs returned by the provider, even if ORB
+        crashes before the caller writes the final request row.  Orphan provider
+        resources (e.g. k8s pods) carry a request-id label/tag; a startup
+        reconciler can match them to a request row whose resource_ids list
+        already contains the resource ID, avoiding duplicate creation.
+
+        The status is advanced to ACQUIRING when the request is still PENDING
+        so that status queries reflect that work has begun.
+
+        Returns:
+            (updated_request, success) — success is False when the DB write
+            failed.  The caller continues with the in-memory request; the final
+            persist in the handler will still carry the correct resource IDs.
+        """
+        from orb.domain.base import UnitOfWorkFactory
+
+        try:
+            updated = request
+            for rid in new_resource_ids:
+                updated = updated.add_resource_id(rid)
+            # Advance PENDING → ACQUIRING so the request is visibly in-flight;
+            # any other active status is left unchanged.
+            if updated.status == RequestStatus.PENDING:
+                updated = updated.update_status(
+                    RequestStatus.ACQUIRING, "Provider resources created, waiting for completion"
+                )
+            uow_factory = self._container.get(UnitOfWorkFactory)
+            with uow_factory.create_unit_of_work() as uow:
+                uow.requests.save(updated)
+            return updated, True
+        except Exception as e:
+            self._logger.warning(
+                "Failed to persist resource-ID checkpoint for request %s: %s",
+                request.request_id,
+                e,
+            )
+            return request, False
+
     def _persist_acquiring(self, request: Request) -> tuple[Request, bool]:
         """Persist request with ACQUIRING status between retry attempts.
 
@@ -304,6 +385,92 @@ class ProvisioningOrchestrationService:
             self._logger.warning(
                 "Failed to reset circuit breaker state for %s: %s", provider_name, e
             )
+
+    def recover_stuck_acquiring_requests(self, timeout_seconds: int = 3600) -> int:
+        """Transition ACQUIRING requests that have exceeded their timeout to FAILED.
+
+        Called at startup to clean up rows that were left in ACQUIRING state by
+        a previous ORB process that crashed or was killed mid-provisioning.  Any
+        request whose ``created_at`` timestamp is older than ``timeout_seconds``
+        is failed with an explanatory message.  Resource IDs already recorded on
+        the request row are preserved so operators can investigate orphaned
+        provider resources.
+
+        Args:
+            timeout_seconds: Age threshold in seconds.  Requests in ACQUIRING
+                state with ``created_at`` older than this are failed.  Defaults
+                to 3600 s (one hour) which matches the
+                ``request.default_timeout`` config default.
+
+        Returns:
+            The number of requests that were transitioned to FAILED.
+        """
+        from orb.domain.base import UnitOfWorkFactory
+        from orb.domain.request.repository import RequestRepository
+
+        cutoff: datetime = datetime.now(timezone.utc) - timedelta(seconds=timeout_seconds)
+        failed_count = 0
+
+        try:
+            uow_factory = self._container.get(UnitOfWorkFactory)
+            with uow_factory.create_unit_of_work() as uow:
+                repo: RequestRepository = uow.requests  # type: ignore[assignment]
+                acquiring = repo.find_by_status(RequestStatus.ACQUIRING)
+
+            expired = [r for r in acquiring if r.created_at is not None and r.created_at < cutoff]
+
+            if not acquiring:
+                self._logger.debug(
+                    "startup scan: no ACQUIRING requests found — nothing to recover."
+                )
+                return 0
+
+            if not expired:
+                self._logger.debug(
+                    "startup scan: %d ACQUIRING request(s) found, none older than %ds — "
+                    "leaving untouched.",
+                    len(acquiring),
+                    timeout_seconds,
+                )
+                return 0
+
+            self._logger.info(
+                "startup scan: %d ACQUIRING request(s) found; %d exceed timeout of %ds "
+                "and will be transitioned to FAILED.",
+                len(acquiring),
+                len(expired),
+                timeout_seconds,
+            )
+
+            for request in expired:
+                try:
+                    failed_request = request.update_status(
+                        RequestStatus.FAILED,
+                        "Request abandoned in ACQUIRING state (timeout exceeded)",
+                        force=True,
+                    )
+                    uow_factory2 = self._container.get(UnitOfWorkFactory)
+                    with uow_factory2.create_unit_of_work() as uow2:
+                        uow2.requests.save(failed_request)
+                    failed_count += 1
+                    self._logger.info(
+                        "startup scan: failed ACQUIRING request %s "
+                        "(created_at=%s, resource_ids=%s)",
+                        request.request_id,
+                        request.created_at.isoformat() if request.created_at else "unknown",
+                        request.resource_ids,
+                    )
+                except Exception as exc:
+                    self._logger.warning(
+                        "startup scan: could not recover ACQUIRING request %s: %s",
+                        request.request_id,
+                        exc,
+                    )
+
+        except Exception as exc:
+            self._logger.warning("startup scan: ACQUIRING recovery scan failed: %s", exc)
+
+        return failed_count
 
     def _record_provider_failure(self, provider_name: str) -> None:
         """Increment circuit breaker failure count and open circuit if threshold is reached."""
@@ -345,6 +512,8 @@ class ProvisioningOrchestrationService:
                     "count": count,
                     "request_id": str(request.request_id),
                     "request_metadata": dict(request.metadata),
+                    "request": request,
+                    "template": template,
                 },
                 context={
                     "correlation_id": str(request.request_id),
@@ -471,7 +640,7 @@ class ProvisioningOrchestrationService:
                     "error_type": type(e).__name__,
                 },
             )
-            aws_fields = _extract_aws_error_fields(e)
+            aws_fields = _extract_provider_error_fields(e)
             return ProvisioningResult(
                 success=False,
                 resource_ids=[],
@@ -498,7 +667,7 @@ class ProvisioningOrchestrationService:
                     "error_type": type(e).__name__,
                 },
             )
-            aws_fields = _extract_aws_error_fields(e)
+            aws_fields = _extract_provider_error_fields(e)
             return ProvisioningResult(
                 success=False,
                 resource_ids=[],

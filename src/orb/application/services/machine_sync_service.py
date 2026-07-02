@@ -94,6 +94,7 @@ class MachineSyncService:
             else:
                 return [], {}
 
+            parameters = {**parameters, "request": request}
             operation = ProviderOperation(
                 operation_type=operation_type,
                 parameters=parameters,
