@@ -141,16 +141,16 @@ HostFactory adapter depend on them.
 
 ```bash
 # Pod (default)
-orb templates generate --provider kubernetes --provider-api Pod
+orb templates generate --provider-name kubernetes --provider-api Pod
 
 # Deployment
-orb templates generate --provider kubernetes --provider-api Deployment
+orb templates generate --provider-name kubernetes --provider-api Deployment
 
 # StatefulSet
-orb templates generate --provider kubernetes --provider-api StatefulSet
+orb templates generate --provider-name kubernetes --provider-api StatefulSet
 
 # Job
-orb templates generate --provider kubernetes --provider-api Job
+orb templates generate --provider-name kubernetes --provider-api Job
 ```
 
 Existing templates can be retargeted by editing the `provider_api` field

@@ -69,7 +69,7 @@ complete, flip it to `false`.
    template against the modern schema.  Generate the stub with:
 
    ```bash
-   orb templates generate --provider kubernetes --provider-api Pod
+   orb templates generate --provider-name kubernetes --provider-api Pod
    ```
 
    then fill in the legacy field equivalents.
@@ -169,7 +169,7 @@ src/orb/providers/k8s/hostfactory/providers/k8s-hf/scripts/
 └── getAvailableTemplates.sh
 ```
 
-Each script calls the installed `orb` command with `--provider k8s` and
+Each script calls the installed `orb` command with `--provider-type k8s` and
 the appropriate sub-command verb, forwarding the Symphony JSON payload path
 (`$2`) verbatim.  Errors from `orb` are appended to `/tmp/orb-k8s.log`
 rather than mixed with HF stdout so that Symphony can parse the JSON

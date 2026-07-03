@@ -74,7 +74,7 @@ the current kubeconfig context.
 ### 3. Create a template
 
 ```bash
-orb templates generate --provider kubernetes --provider-api Pod
+orb templates generate --provider-name kubernetes --provider-api Pod
 ```
 
 This emits a template that targets the Kubernetes provider's Pod handler.

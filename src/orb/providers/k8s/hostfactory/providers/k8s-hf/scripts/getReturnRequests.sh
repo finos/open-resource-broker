@@ -3,5 +3,5 @@ set -euo pipefail
 
 inJson="${2:-}"
 
-orb --provider k8s requests list-returns "$inJson" 2>> /tmp/orb-k8s.log
+orb --provider-type k8s requests list-returns "$inJson" 2>> /tmp/orb-k8s.log
 exit $?

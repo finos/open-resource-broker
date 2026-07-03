@@ -782,6 +782,8 @@ For more information, visit: {DOCS_URL}
         default="aws",
         help="Provider type to initialise (e.g. aws, k8s)",
     )
+    init_parser.add_argument("--region", help="AWS region")
+    init_parser.add_argument("--profile", help="AWS profile")
     init_parser.add_argument("--config-dir", help="Custom configuration directory")
     init_parser.add_argument(
         "--scripts-dir",

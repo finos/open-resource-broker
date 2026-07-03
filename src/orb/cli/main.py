@@ -125,6 +125,50 @@ async def main() -> None:
             except Exception as e:
                 logger.warning("Failed to override scheduler strategy: %s", e, exc_info=True)
 
+        if hasattr(args, "provider_name") and args.provider_name:
+            try:
+                from orb.domain.base.ports.configuration_port import ConfigurationPort
+                from orb.infrastructure.di.container import get_container
+
+                container = get_container()
+                config = container.get(ConfigurationPort)
+                config.override_provider_name(args.provider_name)
+            except Exception as e:
+                logger.warning("Failed to override provider name: %s", e, exc_info=True)
+
+        if hasattr(args, "provider_type") and args.provider_type:
+            try:
+                from orb.domain.base.ports.configuration_port import ConfigurationPort
+                from orb.infrastructure.di.container import get_container
+
+                container = get_container()
+                config = container.get(ConfigurationPort)
+                config.override_provider_type(args.provider_type)
+            except Exception as e:
+                logger.warning("Failed to override provider type: %s", e, exc_info=True)
+
+        if hasattr(args, "region") and args.region:
+            try:
+                from orb.domain.base.ports.configuration_port import ConfigurationPort
+                from orb.infrastructure.di.container import get_container
+
+                container = get_container()
+                config = container.get(ConfigurationPort)
+                config.override_provider_region(args.region)
+            except Exception as e:
+                logger.warning("Failed to override provider region: %s", e, exc_info=True)
+
+        if hasattr(args, "profile") and args.profile:
+            try:
+                from orb.domain.base.ports.configuration_port import ConfigurationPort
+                from orb.infrastructure.di.container import get_container
+
+                container = get_container()
+                config = container.get(ConfigurationPort)
+                config.override_provider_profile(args.profile)
+            except Exception as e:
+                logger.warning("Failed to override provider profile: %s", e, exc_info=True)
+
         # Skip application initialization for init command
         if args.resource == "init":
             from orb.interface.init_command_handler import handle_init

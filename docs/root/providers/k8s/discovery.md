@@ -1,13 +1,13 @@
-# Infrastructure discovery (`orb init --provider k8s`)
+# Infrastructure discovery (`orb init --provider-type k8s`)
 
-`orb init --provider k8s` walks an operator through a six-step interactive
+`orb init --provider-type k8s` walks an operator through a six-step interactive
 prompt that discovers cluster topology and populates `K8sProviderConfig`
 fields automatically.  This page describes what each step does, what RBAC
 the discovery path requires, and what to expect when permissions are missing.
 
 ---
 
-## What `orb init --provider k8s` does
+## What `orb init --provider-type k8s` does
 
 1. **In-cluster detection** — reads the kubelet sentinel at
    `/var/run/secrets/kubernetes.io` to decide automatically whether ORB is
@@ -186,7 +186,7 @@ skipped entirely:
 ### Out-of-cluster deployment (kubeconfig)
 
 ```bash
-orb init --provider k8s
+orb init --provider-type k8s
 ```
 
 ORB detects out-of-cluster mode, reads `~/.kube/config`, lists contexts and
@@ -221,7 +221,7 @@ When ORB runs as a pod, it auto-detects in-cluster mode and the context
 selection step (step 2) is skipped:
 
 ```bash
-orb init --provider k8s
+orb init --provider-type k8s
 ```
 
 ```
@@ -254,7 +254,7 @@ Typical output config fragment:
 
 ```bash
 kind create cluster --name orb-dev
-orb init --provider k8s
+orb init --provider-type k8s
 ```
 
 `kind create cluster` writes a context named `kind-orb-dev` to

@@ -159,6 +159,7 @@ class TestFleetRoleResolutionPassesValidation:
         provider.config = {"fleet_role": "AWSServiceRoleForEC2SpotFleet"}
         provider_config.providers = [provider]
         config_port.get_provider_config.return_value = provider_config
+        config_port.get_active_provider_name_override.return_value = None
 
         # Use a real validator so we confirm it actually passes
         aws_client = MagicMock()
