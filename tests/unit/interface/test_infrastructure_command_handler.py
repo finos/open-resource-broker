@@ -92,7 +92,7 @@ class TestHandleInfrastructureDiscover:
                 return_value=mock_container,
             ),
         ):
-            args = _ns(provider="aws-a")
+            args = _ns(provider_name="aws-a")
             result = await handle_infrastructure_discover(args)
 
         assert result["status"] == "success"
@@ -116,7 +116,7 @@ class TestHandleInfrastructureDiscover:
                 return_value=mock_container,
             ),
         ):
-            args = _ns(provider=None, all_providers=True)
+            args = _ns(provider_name=None, all_providers=True)
             result = await handle_infrastructure_discover(args)
 
         assert result["status"] == "success"
@@ -133,7 +133,7 @@ class TestHandleInfrastructureDiscover:
             "orb.interface.infrastructure_command_handler.get_config_location",
             return_value=tmp_path,
         ):
-            args = _ns(provider="nonexistent")
+            args = _ns(provider_name="nonexistent")
             result = await handle_infrastructure_discover(args)
 
         assert result["status"] == "error"
@@ -164,7 +164,7 @@ class TestHandleInfrastructureShow:
                 return_value=mock_container,
             ),
         ):
-            args = _ns(provider="aws-a")
+            args = _ns(provider_name="aws-a")
             result = await handle_infrastructure_show(args)
 
         assert result["status"] == "success"
@@ -187,7 +187,7 @@ class TestHandleInfrastructureShow:
                 return_value=mock_container,
             ),
         ):
-            args = _ns(provider=None, all_providers=True)
+            args = _ns(provider_name=None, all_providers=True)
             result = await handle_infrastructure_show(args)
 
         assert result["status"] == "success"
@@ -203,7 +203,7 @@ class TestHandleInfrastructureShow:
             "orb.interface.infrastructure_command_handler.get_config_location",
             return_value=tmp_path,
         ):
-            args = _ns(provider="nonexistent")
+            args = _ns(provider_name="nonexistent")
             result = await handle_infrastructure_show(args)
 
         assert result["status"] == "error"
@@ -234,7 +234,7 @@ class TestHandleInfrastructureValidate:
                 return_value=mock_container,
             ),
         ):
-            args = _ns(provider="aws-a")
+            args = _ns(provider_name="aws-a")
             result = await handle_infrastructure_validate(args)
 
         assert result["status"] == "success"
@@ -258,7 +258,7 @@ class TestHandleInfrastructureValidate:
                 return_value=mock_container,
             ),
         ):
-            args = _ns(provider=None)
+            args = _ns(provider_name=None)
             result = await handle_infrastructure_validate(args)
 
         assert result["status"] == "success"
@@ -275,7 +275,7 @@ class TestHandleInfrastructureValidate:
             "orb.interface.infrastructure_command_handler.get_config_location",
             return_value=tmp_path,
         ):
-            args = _ns(provider="nonexistent")
+            args = _ns(provider_name="nonexistent")
             result = await handle_infrastructure_validate(args)
 
         assert result["status"] == "error"

@@ -280,3 +280,185 @@ class TestProviderTypeAllowlist:
             result = registry.ensure_provider_instance_registered_from_config(provider_instance)
 
         assert result is False  # ImportError → False, but no ValueError
+
+
+def _make_registry_multi(providers, config_port_overrides=None) -> ProviderRegistry:
+    """Build a ProviderRegistry backed by multiple provider instances."""
+    registry = cast(ProviderRegistry, ProviderRegistry.__new__(ProviderRegistry))
+    registry._type_registrations = {}
+    registry._instance_registrations = {}
+    registry._registry_lock = __import__("threading").RLock()
+    registry.mode = __import__(
+        "orb.infrastructure.registry.base_registry", fromlist=["RegistryMode"]
+    ).RegistryMode.MULTI_CHOICE
+    registry._factory = None
+    registry._initialized = True
+    registry._strategy_cache = {}
+    registry._health_states = {}
+    registry._fallback_strategy = None
+
+    provider_config = MagicMock()
+    provider_config.providers = providers
+    provider_config.selection_policy = "FIRST_AVAILABLE"
+    provider_config.get_active_providers.return_value = [p for p in providers if p.enabled]
+
+    config_port = MagicMock()
+    config_port.get_provider_config.return_value = provider_config
+    # Default: no overrides
+    config_port.get_active_provider_name_override.return_value = None
+    config_port.get_active_provider_type_override.return_value = None
+    if config_port_overrides:
+        for attr, value in config_port_overrides.items():
+            getattr(config_port, attr).return_value = value
+
+    registry._config_port = config_port
+    registry._logger = MagicMock()
+    return registry
+
+
+@pytest.mark.unit
+class TestSelectActiveProviderOverrides:
+    """select_active_provider honours --provider-name and --provider-type CLI overrides."""
+
+    def _make_provider(self, name, provider_type="aws", enabled=True):
+        p = MagicMock()
+        p.name = name
+        p.type = provider_type
+        p.enabled = enabled
+        p.priority = 1
+        return p
+
+    def test_name_override_returns_single_matching_instance(self):
+        """--provider-name returns exactly the named instance."""
+        aws1 = self._make_provider("aws-us-east-1", "aws")
+        aws2 = self._make_provider("aws-eu-west-1", "aws")
+        registry = _make_registry_multi(
+            [aws1, aws2],
+            config_port_overrides={"get_active_provider_name_override": "aws-eu-west-1"},
+        )
+
+        result = registry.select_active_provider()
+
+        assert result.provider_name == "aws-eu-west-1"
+        assert result.provider_type == "aws"
+        assert "name override" in result.selection_reason
+
+    def test_name_override_raises_when_instance_not_found(self):
+        """--provider-name raises ValueError when the named instance does not exist."""
+        aws1 = self._make_provider("aws-us-east-1", "aws")
+        registry = _make_registry_multi(
+            [aws1],
+            config_port_overrides={"get_active_provider_name_override": "nonexistent"},
+        )
+
+        with pytest.raises(ValueError, match="'nonexistent' not found"):
+            registry.select_active_provider()
+
+    def test_name_override_raises_when_instance_disabled(self):
+        """--provider-name raises ValueError when the named instance is disabled."""
+        disabled = self._make_provider("aws-disabled", "aws", enabled=False)
+        registry = _make_registry_multi(
+            [disabled],
+            config_port_overrides={"get_active_provider_name_override": "aws-disabled"},
+        )
+
+        with pytest.raises(ValueError, match="'aws-disabled' is disabled"):
+            registry.select_active_provider()
+
+    def test_type_override_filters_to_matching_type_single(self):
+        """--provider-type returns the sole instance of that type."""
+        aws1 = self._make_provider("aws-us-east-1", "aws")
+        k8s1 = self._make_provider("k8s-main", "k8s")
+        registry = _make_registry_multi(
+            [aws1, k8s1],
+            config_port_overrides={"get_active_provider_type_override": "k8s"},
+        )
+
+        result = registry.select_active_provider()
+
+        assert result.provider_name == "k8s-main"
+        assert result.provider_type == "k8s"
+        assert "type override" in result.selection_reason
+
+    def test_type_override_load_balances_over_filtered_set(self):
+        """--provider-type load-balances when multiple instances of that type are active."""
+        k8s1 = self._make_provider("k8s-main", "k8s")
+        k8s2 = self._make_provider("k8s-secondary", "k8s")
+        aws1 = self._make_provider("aws-us-east-1", "aws")
+        registry = _make_registry_multi(
+            [k8s1, k8s2, aws1],
+            config_port_overrides={"get_active_provider_type_override": "k8s"},
+        )
+
+        result = registry.select_active_provider()
+
+        # Must be one of the k8s instances — aws is excluded
+        assert result.provider_type == "k8s"
+        assert result.provider_name in {"k8s-main", "k8s-secondary"}
+        assert "aws" not in result.provider_name
+
+    def test_type_override_raises_when_no_matching_instances(self):
+        """--provider-type raises ValueError when no active instances match."""
+        aws1 = self._make_provider("aws-us-east-1", "aws")
+        registry = _make_registry_multi(
+            [aws1],
+            config_port_overrides={"get_active_provider_type_override": "k8s"},
+        )
+
+        with pytest.raises(ValueError, match="No active providers of type 'k8s'"):
+            registry.select_active_provider()
+
+    def test_no_override_uses_default_behaviour(self):
+        """Without overrides, select_active_provider falls back to normal selection."""
+        aws1 = self._make_provider("aws-us-east-1", "aws")
+        registry = _make_registry_multi([aws1])
+
+        result = registry.select_active_provider()
+
+        assert result.provider_name == "aws-us-east-1"
+
+    def test_name_override_takes_precedence_over_type_override(self):
+        """When both overrides are set, name override wins."""
+        aws1 = self._make_provider("aws-us-east-1", "aws")
+        aws2 = self._make_provider("aws-eu-west-1", "aws")
+        registry = _make_registry_multi(
+            [aws1, aws2],
+            config_port_overrides={
+                "get_active_provider_name_override": "aws-eu-west-1",
+                "get_active_provider_type_override": "aws",
+            },
+        )
+
+        result = registry.select_active_provider()
+
+        assert result.provider_name == "aws-eu-west-1"
+        assert "name override" in result.selection_reason
+
+
+@pytest.mark.unit
+class TestListMachinesQueryProviderFilter:
+    """ListMachinesQuery provider_name and provider_type fields filter results correctly."""
+
+    def _make_machine(self, provider_name, provider_type):
+        m = MagicMock()
+        m.provider_name = provider_name
+        m.provider_type = provider_type
+        m.status = MagicMock()
+        m.status.value = "running"
+        m.request_id = None
+        return m
+
+    def test_provider_type_field_present_on_query(self):
+        """ListMachinesQuery accepts provider_type without validation errors."""
+        from orb.application.dto.queries import ListMachinesQuery
+
+        q = ListMachinesQuery(provider_type="k8s", all_resources=True)
+        assert q.provider_type == "k8s"
+
+    def test_provider_name_and_type_default_to_none(self):
+        """Both filter fields default to None."""
+        from orb.application.dto.queries import ListMachinesQuery
+
+        q = ListMachinesQuery()
+        assert q.provider_name is None
+        assert q.provider_type is None

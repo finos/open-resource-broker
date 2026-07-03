@@ -35,7 +35,7 @@ orb infra discover [OPTIONS]
 | `--show` | Display specific resource types without updating config: `vpcs`, `subnets`, `security-groups` (or `sg`), or `all` | `--show subnets` |
 | `--summary` | Show only counts per resource type, no details | `--summary` |
 | `--all-providers` | Run discovery across all configured providers | `--all-providers` |
-| `--provider` | Run discovery for a specific provider instance | `--provider aws-prod` |
+| `--provider-name` | Run discovery for a specific provider instance | `--provider-name aws-prod` |
 | `--region` | AWS region override | `--region eu-west-1` |
 | `--profile` | AWS profile override | `--profile production` |
 
@@ -57,7 +57,7 @@ orb infrastructure discover --show security-groups
 orb infrastructure discover --summary
 
 # Discover for a specific provider
-orb infrastructure discover --provider aws-prod
+orb infrastructure discover --provider-name aws-prod
 
 # Discover across all providers
 orb infrastructure discover --all-providers
@@ -103,7 +103,7 @@ orb infra show [OPTIONS]
 | Flag | Description | Example |
 |------|-------------|---------|
 | `--all-providers` | Show configuration for all providers | `--all-providers` |
-| `--provider` | Show configuration for a specific provider | `--provider aws-prod` |
+| `--provider-name` | Show configuration for a specific provider | `--provider-name aws-prod` |
 | `--format` | Output format (`json`, `yaml`, `table`) | `--format table` |
 
 **Examples:**
@@ -145,7 +145,7 @@ orb infra validate [OPTIONS]
 **Options:**
 | Flag | Description | Example |
 |------|-------------|---------|
-| `--provider` | Validate for a specific provider | `--provider aws-prod` |
+| `--provider-name` | Validate for a specific provider | `--provider-name aws-prod` |
 | `--region` | AWS region override | `--region us-east-1` |
 | `--profile` | AWS profile override | `--profile production` |
 | `--format` | Output format | `--format table` |
@@ -156,7 +156,7 @@ orb infra validate [OPTIONS]
 orb infrastructure validate
 
 # Validate for a specific provider
-orb infrastructure validate --provider aws-prod
+orb infrastructure validate --provider-name aws-prod
 ```
 
 Validation checks that each configured resource ID resolves in AWS. Resources that no longer exist (deleted subnets, removed security groups) are reported so you can re-run discovery and update your config.

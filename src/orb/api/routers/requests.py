@@ -81,6 +81,11 @@ async def list_requests(
     cursor: Optional[str] = Query(None, description="Opaque pagination cursor"),
     q: Optional[str] = Query(None, description="Substring search"),
     sort: Optional[str] = Query(None, description='Sort: "field" / "-field"'),
+    provider_name: Optional[str] = Query(None, description="Filter by provider instance name"),
+    provider_type: Optional[str] = Query(None, description="Filter by provider type"),
+    template_id: Optional[str] = Query(None, description="Filter by template ID"),
+    request_type: Optional[str] = Query(None, description="Filter by request type"),
+    filter_expressions: list[str] = Query(default=[]),
     _user=Depends(require_role("viewer")),
     orchestrator=LIST_ORCHESTRATOR,
     formatter=FORMATTER,
@@ -95,6 +100,11 @@ async def list_requests(
             cursor=cursor,
             q=q,
             sort=sort,
+            provider_name=provider_name,
+            provider_type=provider_type,
+            template_id=template_id,
+            request_type=request_type,
+            filter_expressions=filter_expressions,
         )
     )
     payload = formatter.format_request_status(result.requests).data
@@ -122,6 +132,9 @@ async def list_return_requests(
     cursor: Optional[str] = Query(None, description="Opaque pagination cursor"),
     q: Optional[str] = Query(None, description="Substring search"),
     sort: Optional[str] = Query(None, description='Sort: "field" / "-field"'),
+    provider_name: Optional[str] = Query(None, description="Filter by provider instance name"),
+    provider_type: Optional[str] = Query(None, description="Filter by provider type"),
+    filter_expressions: list[str] = Query(default=[]),
     _user=Depends(require_role("viewer")),
     orchestrator=RETURN_LIST_ORCHESTRATOR,
     formatter=FORMATTER,
@@ -134,6 +147,9 @@ async def list_return_requests(
             cursor=cursor,
             q=q,
             sort=sort,
+            provider_name=provider_name,
+            provider_type=provider_type,
+            filter_expressions=filter_expressions,
         )
     )
     payload = formatter.format_request_status(result.requests).data

@@ -40,9 +40,11 @@ class ListReturnRequestsOrchestrator(
 
     async def execute(self, input: ListReturnRequestsInput) -> ListReturnRequestsOutput:  # type: ignore[return]
         self._logger.info(
-            "ListReturnRequestsOrchestrator: status=%s limit=%s",
+            "ListReturnRequestsOrchestrator: status=%s limit=%s provider_name=%s provider_type=%s",
             input.status,
             input.limit,
+            input.provider_name,
+            input.provider_type,
         )
 
         offset = decode_cursor(input.cursor) if input.cursor else input.offset
@@ -54,6 +56,9 @@ class ListReturnRequestsOrchestrator(
             offset=offset,
             q=input.q,
             sort=sort,
+            provider_name=input.provider_name,
+            provider_type=input.provider_type,
+            filter_expressions=input.filter_expressions,
         )
         result = await self._query_bus.execute(query)
 

@@ -570,7 +570,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         """Select provider instance for template requirements.
 
         Selection hierarchy:
-        1. CLI override (--provider flag)
+        1. CLI override (--provider-name flag)
         2. Explicit provider instance (template.provider_name)
         3. Provider type with load balancing (template.provider_type)
         4. Auto-selection based on API capabilities (template.provider_api)
@@ -606,9 +606,42 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         return self._select_default_provider(template, logger)
 
     def select_active_provider(self, logger: Optional[Any] = None) -> ProviderSelectionResult:
-        """Select active provider instance from configuration."""
+        """Select active provider instance from configuration.
+
+        Precedence:
+        1. Provider name override (--provider-name) — exact instance lookup.
+        2. Provider type override (--provider-type) — filter active instances by type,
+           then apply load-balancing over the filtered set.
+        3. Default behaviour — load-balance across all active instances.
+        """
         if logger:
             logger.debug("Selecting active provider using selection policy")
+
+        # Check for CLI overrides via the injected config port.
+        config_port = self._get_config_port()
+        name_override: Optional[str] = None
+        type_override: Optional[str] = None
+        if config_port is not None:
+            try:
+                name_override = config_port.get_active_provider_name_override()
+                type_override = config_port.get_active_provider_type_override()
+            except Exception:
+                pass
+
+        if name_override:
+            provider_instance = self._get_provider_instance_config(name_override)
+            if not provider_instance:
+                raise ValueError(f"Provider instance '{name_override}' not found in configuration")
+            if not provider_instance.enabled:
+                raise ValueError(f"Provider instance '{name_override}' is disabled")
+            if logger:
+                logger.info("Selected provider by name override: %s", name_override)
+            return ProviderSelectionResult(
+                provider_type=provider_instance.type,
+                provider_name=name_override,
+                selection_reason="CLI name override (--provider-name)",
+                confidence=1.0,
+            )
 
         provider_config = self._get_provider_config()
         if not provider_config:
@@ -617,6 +650,30 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         active_providers = provider_config.get_active_providers()
         if not active_providers:
             raise ValueError("No active providers found in configuration")
+
+        if type_override:
+            filtered = [p for p in active_providers if p.type == type_override]
+            if not filtered:
+                raise ValueError(f"No active providers of type '{type_override}'")
+            if len(filtered) == 1:
+                selected = filtered[0]
+                reason = f"type_override_{type_override}_single"
+            else:
+                selected = self._apply_load_balancing_strategy(
+                    filtered, provider_config.selection_policy
+                )
+                reason = f"type_override_{type_override}_load_balanced"
+            if logger:
+                logger.info(
+                    "Selected provider by type override '%s': %s", type_override, selected.name
+                )
+            return ProviderSelectionResult(
+                provider_type=selected.type,
+                provider_name=selected.name,
+                selection_reason=f"CLI type override (--provider-type {type_override})",
+                confidence=1.0,
+                alternatives=[p.name for p in filtered if p.name != selected.name],
+            )
 
         if len(active_providers) == 1:
             selected = active_providers[0]
@@ -653,7 +710,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         return ProviderSelectionResult(
             provider_type=provider_instance.type,
             provider_name=provider_name,
-            selection_reason=f"CLI override (--provider {provider_name})",
+            selection_reason=f"CLI name override (--provider-name {provider_name})",
             confidence=1.0,
         )
 

@@ -14,8 +14,8 @@ from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
 async def handle_infrastructure_discover(args) -> Dict[str, Any]:
     """Handle orb infrastructure discover command."""
     try:
-        if args.provider:
-            providers = [_get_provider_config(args.provider)]
+        if args.provider_name:
+            providers = [_get_provider_config(args.provider_name)]
         else:
             providers = _get_active_providers_with_overrides()
 
@@ -40,8 +40,8 @@ async def handle_infrastructure_discover(args) -> Dict[str, Any]:
 async def handle_infrastructure_show(args) -> Dict[str, Any]:
     """Handle orb infrastructure show command."""
     try:
-        if args.provider:
-            providers = [_get_provider_config(args.provider)]
+        if args.provider_name:
+            providers = [_get_provider_config(args.provider_name)]
         else:
             providers = _get_active_providers_with_overrides()
 
@@ -63,8 +63,8 @@ async def handle_infrastructure_show(args) -> Dict[str, Any]:
 async def handle_infrastructure_validate(args) -> Dict[str, Any]:
     """Handle orb infrastructure validate command."""
     try:
-        if args.provider:
-            providers = [_get_provider_config(args.provider)]
+        if args.provider_name:
+            providers = [_get_provider_config(args.provider_name)]
         else:
             providers = _get_active_providers_with_overrides()
 

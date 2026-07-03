@@ -20,9 +20,11 @@ class MachineCommandFactory:
         **kwargs: Any,
     ) -> ListMachinesQuery:
         """Create query to list machines."""
-        provider_name = kwargs.get("provider_name") or provider
+        provider_name = kwargs.get("provider_name")
+        provider_type = kwargs.get("provider_type")
         return ListMachinesQuery(
             provider_name=provider_name,
+            provider_type=provider_type,
             status=status,
             request_id=request_id,
             limit=min(limit or 50, 1000),

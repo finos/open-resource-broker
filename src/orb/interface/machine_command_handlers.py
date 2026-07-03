@@ -53,7 +53,20 @@ async def handle_get_machine_status(
 
     if has_all:
         orchestrator = container.get(ListMachinesOrchestrator)
-        result = await orchestrator.execute(ListMachinesInput())
+        _limit = getattr(args, "limit", None)
+        _offset = getattr(args, "offset", None)
+        result = await orchestrator.execute(
+            ListMachinesInput(
+                status=getattr(args, "status", None),
+                provider_name=getattr(args, "provider_name", None),
+                provider_type=getattr(args, "provider_type", None),
+                request_id=getattr(args, "request_id", None),
+                limit=int(_limit) if _limit is not None else 100,
+                offset=int(_offset) if _offset is not None else 0,
+                timestamp_format=getattr(args, "timestamp_format", None),
+                filter_expressions=getattr(args, "filter", None) or [],
+            )
+        )
         return formatter.format_machine_list(result.machines)
 
     if not machine_ids_from_args:
@@ -101,11 +114,13 @@ async def handle_list_machines(
     result = await orchestrator.execute(
         ListMachinesInput(
             status=getattr(args, "status", None),
-            provider_name=getattr(args, "provider", None),
+            provider_name=getattr(args, "provider_name", None),
+            provider_type=getattr(args, "provider_type", None),
             request_id=getattr(args, "request_id", None),
             limit=limit,
             offset=offset,
             timestamp_format=getattr(args, "timestamp_format", None),
+            filter_expressions=getattr(args, "filter", None) or [],
         )
     )
     return formatter.format_machine_list(result.machines)
@@ -171,6 +186,9 @@ async def handle_stop_machines(
             machine_ids=machine_ids_from_args,
             all_machines=has_all,
             force=has_force,
+            provider_name=getattr(args, "provider_name", None),
+            provider_type=getattr(args, "provider_type", None),
+            filter_expressions=getattr(args, "filter", None) or [],
         )
     )
     return formatter.format_success(
@@ -230,6 +248,9 @@ async def handle_start_machines(
         StartMachinesInput(
             machine_ids=machine_ids_from_args,
             all_machines=has_all,
+            provider_name=getattr(args, "provider_name", None),
+            provider_type=getattr(args, "provider_type", None),
+            filter_expressions=getattr(args, "filter", None) or [],
         )
     )
     return formatter.format_success(

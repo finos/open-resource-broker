@@ -49,6 +49,8 @@ class ORBClient:
         config_path: Optional[str] = None,
         app_config: Optional[dict[str, Any]] = None,
         scheduler: Optional[str] = None,
+        provider_type: Optional[str] = None,
+        provider_name: Optional[str] = None,
         **kwargs,
     ) -> None:
         """
@@ -60,6 +62,12 @@ class ORBClient:
             config_path: Path to configuration file
             app_config: Application config dict — replaces config.json on disk.
                         Pass the same structure as config.json to run without filesystem.
+            scheduler: Scheduler strategy override (e.g. ``"default"`` or ``"hostfactory"``).
+            provider_type: Provider type filter applied via ConfigurationPort on initialise.
+                           Narrows which provider is selected when multiple providers are
+                           registered (e.g. ``"k8s"``).
+            provider_name: Provider instance name applied via ConfigurationPort on initialise.
+                           Selects a specific named provider instance (e.g. ``"my-k8s-cluster"``).
             **kwargs: Additional configuration options
         """
         # Configuration setup
@@ -77,6 +85,10 @@ class ORBClient:
             self._config.scheduler = scheduler
         if config_path:
             self._config.config_path = config_path
+        if provider_type is not None:
+            self._config.provider_type = provider_type
+        if provider_name is not None:
+            self._config.provider_name = provider_name
 
         # Add any additional kwargs to custom config
         if kwargs:
@@ -156,16 +168,25 @@ class ORBClient:
                     provider=self._config.provider,
                 )
 
-            # Apply region/profile overrides from SDK config (mirrors CLI pattern).
+            # Apply region/profile/provider overrides from SDK config (mirrors CLI pattern).
             # Use self._container (the per-client isolated container), not the
             # module-level singleton returned by get_container(), so that overrides
             # from one ORBClient instance never bleed into another.
-            if self._config.region or self._config.profile:
+            if (
+                self._config.region
+                or self._config.profile
+                or self._config.provider_type
+                or self._config.provider_name
+            ):
                 config_port = self._container.get(ConfigurationPort)
                 if self._config.region:
                     config_port.override_provider_region(self._config.region)
                 if self._config.profile:
                     config_port.override_provider_profile(self._config.profile)
+                if self._config.provider_type:
+                    config_port.override_provider_type(self._config.provider_type)
+                if self._config.provider_name:
+                    config_port.override_provider_name(self._config.provider_name)
 
             # Get CQRS buses directly from the initialized application
             self._query_bus = self._app.get_query_bus()
@@ -424,6 +445,7 @@ class ORBClient:
             "request_machines",
             "get_request_status",
             "list_requests",
+            "list_return_requests",
             "return_machines",
             "cancel_request",
             "list_machines",
@@ -537,6 +559,9 @@ class ORBClient:
                 limit=kwargs.get("limit", 50),
                 offset=kwargs.get("offset", 0),
                 sync=kwargs.get("sync", False),
+                provider_name=kwargs.get("provider_name") or self._config.provider_name,
+                provider_type=kwargs.get("provider_type") or self._config.provider_type,
+                filter_expressions=kwargs.get("filter_expressions") or [],
             )
         )
         scheduler = self._container.get_optional(SchedulerPort)
@@ -562,6 +587,8 @@ class ORBClient:
                 machine_ids=list(machine_ids),
                 all_machines=kwargs.get("all_machines", False),
                 force=kwargs.get("force", False),
+                provider_name=kwargs.get("provider_name") or self._config.provider_name,
+                provider_type=kwargs.get("provider_type") or self._config.provider_type,
             )
         )
         scheduler = self._container.get_optional(SchedulerPort)
@@ -616,10 +643,13 @@ class ORBClient:
         result = await orchestrator.execute(
             ListMachinesInput(
                 status=kwargs.get("status"),
-                provider_name=kwargs.get("provider_name"),
+                provider_name=kwargs.get("provider_name") or self._config.provider_name,
+                provider_type=kwargs.get("provider_type") or self._config.provider_type,
                 request_id=kwargs.get("request_id"),
                 limit=kwargs.get("limit", 100),
                 offset=kwargs.get("offset", 0),
+                timestamp_format=kwargs.get("timestamp_format"),
+                filter_expressions=kwargs.get("filter_expressions") or [],
             )
         )
         scheduler = self._container.get_optional(SchedulerPort)
@@ -664,8 +694,12 @@ class ORBClient:
         result = await orchestrator.execute(
             ListTemplatesInput(
                 active_only=kwargs.get("active_only", True),
-                provider_name=kwargs.get("provider_name"),
+                provider_name=kwargs.get("provider_name") or self._config.provider_name,
+                provider_type=kwargs.get("provider_type") or self._config.provider_type,
+                provider_api=kwargs.get("provider_api"),
                 limit=kwargs.get("limit", 50),
+                offset=kwargs.get("offset", 0),
+                filter_expressions=kwargs.get("filter_expressions") or [],
             )
         )
         scheduler = self._container.get_optional(SchedulerPort)
@@ -911,7 +945,32 @@ class ORBClient:
         pass
 
     async def list_return_requests(self, **kwargs: Any) -> Any:
-        pass
+        """List return requests via ListReturnRequestsOrchestrator."""
+        if not self._initialized:
+            raise SDKError("SDK not initialized. Use as async context manager.")
+        assert self._container is not None
+
+        from orb.application.ports.scheduler_port import SchedulerPort
+        from orb.application.services.orchestration.dtos import ListReturnRequestsInput
+        from orb.application.services.orchestration.list_return_requests import (
+            ListReturnRequestsOrchestrator,
+        )
+
+        orchestrator = self._container.get(ListReturnRequestsOrchestrator)
+        result = await orchestrator.execute(
+            ListReturnRequestsInput(
+                status=kwargs.get("status"),
+                limit=kwargs.get("limit", 50),
+                offset=kwargs.get("offset", 0),
+                provider_name=kwargs.get("provider_name") or self._config.provider_name,
+                provider_type=kwargs.get("provider_type") or self._config.provider_type,
+                filter_expressions=kwargs.get("filter_expressions") or [],
+            )
+        )
+        scheduler = self._container.get_optional(SchedulerPort)
+        if scheduler is not None:
+            return scheduler.format_request_status_response(result.requests)
+        return {"requests": result.requests}
 
     async def list_active_requests(self, **kwargs: Any) -> Any:
         pass

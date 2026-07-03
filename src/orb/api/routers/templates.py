@@ -103,6 +103,8 @@ class TemplateUpdateRequest(APIRequest):
 )
 @handle_rest_exceptions(endpoint="/api/v1/templates", method="GET")
 async def list_templates(
+    provider_name: Optional[str] = Query(None, description="Filter by provider instance name"),
+    provider_type: Optional[str] = Query(None, description="Filter by provider type"),
     provider_api: Optional[str] = PROVIDER_API_QUERY,
     limit: int = Query(50, description="Limit number of results"),
     offset: int = Query(0, description="Number of results to skip"),
@@ -111,6 +113,7 @@ async def list_templates(
     ),
     q: Optional[str] = Query(None, description="Case-insensitive substring search"),
     sort: Optional[str] = Query(None, description='Sort: "field" or "-field" (desc)'),
+    filter_expressions: list[str] = Query(default=[]),
     _user=Depends(require_role("viewer")),
     orchestrator=LIST_ORCHESTRATOR,
     scheduler=SCHEDULER_STRATEGY,
@@ -119,12 +122,15 @@ async def list_templates(
     result = await orchestrator.execute(
         ListTemplatesInput(
             active_only=True,
+            provider_name=provider_name,
+            provider_type=provider_type,
             provider_api=provider_api,
             limit=limit,
             offset=offset,
             cursor=cursor,
             q=q,
             sort=sort,
+            filter_expressions=filter_expressions,
         )
     )
     payload = scheduler.format_templates_response(result.templates)

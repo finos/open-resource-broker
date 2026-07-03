@@ -100,10 +100,6 @@ class ArgsExtractor:
         """Extract output format from args."""
         return getattr(self.args, "format", default)
 
-    def extract_provider_override(self) -> Optional[str]:
-        """Extract provider override from global args."""
-        return getattr(self.args, "provider", None)
-
     def has_flag(self, flag_name: str) -> bool:
         """Check if a boolean flag is set."""
         return getattr(self.args, flag_name, False)

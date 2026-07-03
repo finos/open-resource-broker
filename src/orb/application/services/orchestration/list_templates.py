@@ -45,9 +45,11 @@ class ListTemplatesOrchestrator(OrchestratorBase[ListTemplatesInput, ListTemplat
         query = ListTemplatesQuery(
             active_only=input.active_only,
             provider_name=input.provider_name,
+            provider_type=input.provider_type,
             provider_api=input.provider_api,
             limit=input.limit,
             offset=offset,
+            filter_expressions=input.filter_expressions,
             q=input.q,
             sort=input.sort,
         )

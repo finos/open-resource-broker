@@ -72,12 +72,20 @@ class ConfigurationPort(ProviderConfigPort):
         """Get metrics configuration."""
 
     @abstractmethod
-    def get_active_provider_override(self) -> str | None:
-        """Get current provider override from CLI."""
+    def get_active_provider_name_override(self) -> str | None:
+        """Get current provider name override from CLI (exact instance name)."""
 
     @abstractmethod
-    def override_provider_instance(self, provider_name: str) -> None:
-        """Override the active provider instance."""
+    def get_active_provider_type_override(self) -> str | None:
+        """Get current provider type override from CLI (type filter)."""
+
+    @abstractmethod
+    def override_provider_name(self, provider_name: str) -> None:
+        """Override the active provider by exact instance name."""
+
+    @abstractmethod
+    def override_provider_type(self, provider_type: str) -> None:
+        """Restrict selection to a provider type."""
 
     def override_provider_region(self, region: str) -> None:  # pyright: ignore[reportUnusedParameter]
         """Override the provider region for this session.

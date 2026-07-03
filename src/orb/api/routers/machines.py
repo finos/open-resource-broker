@@ -70,6 +70,8 @@ class ReturnMachinesRequest(APIRequest):
     machine_ids: list[str]
     all_machines: bool = False
     force: bool = False
+    provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
 
 
 @router.post(
@@ -135,6 +137,8 @@ async def return_machines(
             machine_ids=request_data.machine_ids,
             all_machines=request_data.all_machines,
             force=request_data.force,
+            provider_name=request_data.provider_name,
+            provider_type=request_data.provider_type,
         )
     )
     response_data: dict = {
@@ -159,6 +163,7 @@ async def return_machines(
 async def list_machines(
     status: Optional[str] = STATUS_QUERY,
     provider_name: Optional[str] = Query(None),
+    provider_type: Optional[str] = Query(None),
     request_id: Optional[str] = REQUEST_ID_QUERY,
     limit: int = Query(50),
     offset: int = OFFSET_QUERY,
@@ -173,6 +178,8 @@ async def list_machines(
             "use /machines/{id}/status to refresh a single row instead."
         ),
     ),
+    timestamp_format: Optional[str] = Query(None, description="Timestamp format override"),
+    filter_expressions: list[str] = Query(default=[]),
     _user=Depends(require_role("viewer")),
     orchestrator=LIST_ORCHESTRATOR,
     formatter=FORMATTER,
@@ -181,6 +188,7 @@ async def list_machines(
         ListMachinesInput(
             status=status,
             provider_name=provider_name,
+            provider_type=provider_type,
             request_id=request_id,
             limit=limit,
             offset=offset,
@@ -188,6 +196,8 @@ async def list_machines(
             q=q,
             sort=sort,
             sync=sync,
+            timestamp_format=timestamp_format,
+            filter_expressions=filter_expressions,
         )
     )
     payload = formatter.format_machine_list(result.machines).data

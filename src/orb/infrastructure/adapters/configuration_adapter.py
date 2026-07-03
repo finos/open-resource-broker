@@ -380,9 +380,13 @@ class ConfigurationAdapter(ConfigurationPort):
         """Override scheduler strategy - delegate to ConfigurationManager."""
         self._config_manager.override_scheduler_strategy(strategy)
 
-    def override_provider_instance(self, provider_name: str) -> None:
-        """Override provider instance - delegate to ConfigurationManager."""
-        self._config_manager.override_provider_instance(provider_name)
+    def override_provider_name(self, provider_name: str) -> None:
+        """Override provider instance by exact name - delegate to ConfigurationManager."""
+        self._config_manager.override_provider_name(provider_name)
+
+    def override_provider_type(self, provider_type: str) -> None:
+        """Restrict selection to a provider type - delegate to ConfigurationManager."""
+        self._config_manager.override_provider_type(provider_type)
 
     def override_provider_region(self, region: str) -> None:
         """Override provider region - delegate to ConfigurationManager."""
@@ -413,9 +417,13 @@ class ConfigurationAdapter(ConfigurationPort):
             )
             return ""
 
-    def get_active_provider_override(self) -> str | None:
-        """Get current provider override from CLI."""
-        return self._config_manager.get_active_provider_override()
+    def get_active_provider_name_override(self) -> str | None:
+        """Get current provider name override from CLI."""
+        return self._config_manager.get_active_provider_name_override()
+
+    def get_active_provider_type_override(self) -> str | None:
+        """Get current provider type override from CLI."""
+        return self._config_manager.get_active_provider_type_override()
 
     def get_configuration_value(self, key: str, default: Any = None) -> Any:
         """Get configuration value."""

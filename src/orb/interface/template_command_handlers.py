@@ -35,12 +35,14 @@ async def handle_list_templates(
     if hasattr(args, "input_data") and args.input_data:
         input_data = args.input_data
         provider_name = input_data.get("provider_api") or input_data.get("provider_name")
+        provider_type = input_data.get("provider_type")
         provider_api = input_data.get("provider_api")
         active_only = input_data.get("active_only", True)
         limit = input_data.get("limit") or 50
         offset = input_data.get("offset") or 0
     else:
-        provider_name = getattr(args, "provider", None) or getattr(args, "provider_name", None)
+        provider_name = getattr(args, "provider_name", None)
+        provider_type = getattr(args, "provider_type", None)
         provider_api = getattr(args, "provider_api", None)
         active_only = getattr(args, "active_only", True)
         # argparse leaves --limit/--offset as None when omitted; coerce here
@@ -52,9 +54,11 @@ async def handle_list_templates(
         ListTemplatesInput(
             active_only=active_only,
             provider_name=provider_name,
+            provider_type=provider_type,
             provider_api=provider_api,
             limit=limit,
             offset=offset,
+            filter_expressions=getattr(args, "filter", None) or [],
         )
     )
 
@@ -505,11 +509,7 @@ async def handle_refresh_templates(
     orchestrator = container.get(RefreshTemplatesOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
-    provider_name = (
-        getattr(args, "provider", None)
-        or getattr(args, "provider_name", None)
-        or getattr(args, "provider_api", None)
-    )
+    provider_name = getattr(args, "provider_name", None) or getattr(args, "provider_api", None)
     result = await orchestrator.execute(RefreshTemplatesInput(provider_name=provider_name))
 
     return formatter.format_template_list(result.templates)

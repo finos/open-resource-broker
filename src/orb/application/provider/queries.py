@@ -13,6 +13,7 @@ class GetProviderHealthQuery(BaseQuery):
     """Query to get provider health status."""
 
     provider_name: Optional[str] = None  # None = all providers
+    provider_type: Optional[str] = None
     include_details: bool = True
     include_history: bool = False
 

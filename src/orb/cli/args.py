@@ -56,8 +56,16 @@ def add_global_arguments(parser):
         help="Input JSON data string (HostFactory compatibility)",
     )
     parser.add_argument(
-        "--provider",
-        help="Override provider instance (per-command flag, e.g. orb templates list --provider aws-prod)",
+        "--provider-name",
+        dest="provider_name",
+        metavar="NAME",
+        help="Restrict to a specific provider instance by exact name (e.g. aws-prod)",
+    )
+    parser.add_argument(
+        "--provider-type",
+        dest="provider_type",
+        metavar="TYPE",
+        help="Restrict to all active instances of a provider type (e.g. aws, k8s)",
     )
     parser.add_argument("--region", help="AWS region override")
     parser.add_argument("--profile", help="AWS profile override")
@@ -305,9 +313,6 @@ def add_provider_actions(subparsers):
 
     providers_add = subparsers.add_parser("add", help="Add new provider")
     add_global_arguments(providers_add)
-    providers_add.add_argument(
-        "--provider-type", dest="provider_type", required=True, help="Provider type (e.g. aws)"
-    )
     for _spec in CLISpecRegistry.all().values():
         _spec.add_arguments(providers_add)
     providers_add.add_argument("--name", help="Provider instance name")
@@ -418,10 +423,6 @@ def add_template_actions(subparsers):
         action="store_true",
         help="Generate templates with hardcoded infrastructure",
     )
-    templates_generate.add_argument(
-        "--generic", action="store_true", help="Generate generic templates"
-    )
-    templates_generate.add_argument("--provider-type", help="Provider type (e.g., aws)")
 
 
 def build_parser() -> tuple[argparse.ArgumentParser, dict]:
@@ -446,12 +447,13 @@ def build_parser() -> tuple[argparse.ArgumentParser, dict]:
         epilog=f"""
 Examples:
   %(prog)s templates list                              # List all templates
-  %(prog)s templates list --provider aws-prod         # Use specific provider
+  %(prog)s templates list --provider-name aws-prod    # Use specific provider instance
   %(prog)s templates generate --all-providers         # Generate for all providers
   %(prog)s machines request template-id 5             # Request 5 machines
   %(prog)s machines list --filter "machine_types~t3"  # Filter machines by type
   %(prog)s requests status req-123                    # Check request status
-  %(prog)s providers health --provider aws-prod       # Check provider health
+  %(prog)s providers health --provider-name aws-prod  # Check provider health
+  %(prog)s machines return --all --provider-type k8s  # Return only k8s machines
 
 For more information, visit: {DOCS_URL}
         """,
@@ -776,7 +778,12 @@ For more information, visit: {DOCS_URL}
     init_parser.add_argument(
         "--scheduler", choices=["default", "hostfactory"], help="Scheduler type"
     )
-    init_parser.add_argument("--provider", default="aws", help="Provider type")
+    init_parser.add_argument(
+        "--provider-type",
+        dest="provider_type",
+        default="aws",
+        help="Provider type to initialise (e.g. aws, k8s)",
+    )
     init_parser.add_argument("--region", help="AWS region")
     init_parser.add_argument("--profile", help="AWS profile")
     init_parser.add_argument("--config-dir", help="Custom configuration directory")

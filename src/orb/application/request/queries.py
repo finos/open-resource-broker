@@ -9,6 +9,7 @@ class ListRequestsQuery(BaseQuery):
     """Query to list requests with optional filtering."""
 
     provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
     status: Optional[str] = None
     template_id: Optional[str] = None
     request_type: Optional[str] = None

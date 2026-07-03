@@ -120,6 +120,13 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, Paginated[Templa
 
             total_unfiltered = len(template_dtos)
 
+            if query.provider_type:
+                template_dtos = [
+                    t
+                    for t in template_dtos
+                    if getattr(t, "provider_type", None) == query.provider_type
+                ]
+
             # active_only filter runs first, while items are still DTOs and the
             # is_active attribute is reliably present.  filter_expressions may
             # convert items to plain dicts (via model_dump), after which

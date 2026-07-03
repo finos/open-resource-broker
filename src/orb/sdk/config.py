@@ -25,6 +25,8 @@ class SDKConfig:
 
     # Provider configuration
     provider: str = "aws"
+    provider_type: Optional[str] = None
+    provider_name: Optional[str] = None
     region: Optional[str] = None
     profile: Optional[str] = None
     scheduler: Optional[str] = None
@@ -51,6 +53,8 @@ class SDKConfig:
         """
         return cls(
             provider=os.getenv("ORB_PROVIDER", "aws"),
+            provider_type=os.getenv("ORB_PROVIDER_TYPE"),
+            provider_name=os.getenv("ORB_PROVIDER_NAME"),
             region=os.getenv("ORB_REGION"),
             profile=os.getenv("ORB_PROFILE"),
             timeout=int(os.getenv("ORB_TIMEOUT", "300")),
@@ -126,6 +130,8 @@ class SDKConfig:
         """Convert configuration to dictionary."""
         result = {
             "provider": self.provider,
+            "provider_type": self.provider_type,
+            "provider_name": self.provider_name,
             "region": self.region,
             "profile": self.profile,
             "timeout": self.timeout,

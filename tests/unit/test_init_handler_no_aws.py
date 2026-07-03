@@ -288,13 +288,13 @@ def test_interactive_setup_raises_when_no_providers_registered():
 
 
 def test_get_default_config_raises_when_no_providers_and_no_provider_arg():
-    """_get_default_config raises ValueError when registry is empty and args.provider is None."""
+    """_get_default_config raises ValueError when registry is empty and args.provider_type is None."""
     from unittest.mock import MagicMock, patch
 
     from orb.interface.init_command_handler import _get_default_config
 
     args = MagicMock()
-    args.provider = None
+    args.provider_type = None
 
     with patch(
         "orb.interface.init_command_handler._get_available_providers",

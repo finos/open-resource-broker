@@ -118,6 +118,9 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, Paginated[MachineD
                         if m.provider_name and query.provider_name in m.provider_name
                     ]
 
+                if query.provider_type:
+                    machines = [m for m in machines if m.provider_type == query.provider_type]
+
                 # q: substring search over user-visible domain fields
                 if query.q:
                     needle = query.q.lower()

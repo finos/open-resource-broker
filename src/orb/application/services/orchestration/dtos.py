@@ -107,6 +107,9 @@ class ListRequestsInput:
     offset: int = 0
     template_id: Optional[str] = None
     request_type: Optional[str] = None
+    provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
+    filter_expressions: list[str] = dataclasses.field(default_factory=list)
     # Server-side filtering / sorting / cursor pagination
     q: Optional[str] = None
     sort: Optional[str] = None
@@ -128,6 +131,8 @@ class ReturnMachinesInput:
     force: bool = False
     wait: bool = False
     timeout_seconds: int = 300
+    provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -157,10 +162,12 @@ class CancelRequestOutput:
 class ListMachinesInput:
     status: Optional[str] = None
     provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
     request_id: Optional[str] = None
     limit: int = 100
     offset: int = 0
     timestamp_format: Optional[str] = None
+    filter_expressions: list[str] = dataclasses.field(default_factory=list)
     # Server-side filtering / sorting / cursor pagination
     q: Optional[str] = None
     sort: Optional[str] = None
@@ -214,9 +221,11 @@ class SyncMachineOutput:
 class ListTemplatesInput:
     active_only: bool = True
     provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
     provider_api: Optional[str] = None
     limit: int = 50
     offset: int = 0
+    filter_expressions: list[str] = dataclasses.field(default_factory=list)
     # Server-side filtering / sorting / cursor pagination
     q: Optional[str] = None
     sort: Optional[str] = None
@@ -236,6 +245,9 @@ class ListReturnRequestsInput:
     status: Optional[str] = None
     limit: int = 50
     offset: int = 0
+    provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
+    filter_expressions: list[str] = dataclasses.field(default_factory=list)
     # Server-side filtering / sorting / cursor pagination
     q: Optional[str] = None
     sort: Optional[str] = None
@@ -336,6 +348,9 @@ class StopMachinesInput:
     machine_ids: list[str] = dataclasses.field(default_factory=list)
     all_machines: bool = False
     force: bool = False
+    provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
+    filter_expressions: list[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -350,6 +365,9 @@ class StopMachinesOutput:
 class StartMachinesInput:
     machine_ids: list[str] = dataclasses.field(default_factory=list)
     all_machines: bool = False
+    provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
+    filter_expressions: list[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -363,6 +381,7 @@ class StartMachinesOutput:
 @dataclasses.dataclass(frozen=True)
 class GetProviderHealthInput:
     provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -397,6 +416,8 @@ class GetProviderMetricsOutput:
 @dataclasses.dataclass(frozen=True)
 class ListProvidersInput:
     provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
+    filter_expressions: list[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(frozen=True)

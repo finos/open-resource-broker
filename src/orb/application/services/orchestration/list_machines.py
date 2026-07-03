@@ -37,9 +37,10 @@ class ListMachinesOrchestrator(OrchestratorBase[ListMachinesInput, ListMachinesO
 
     async def execute(self, input: ListMachinesInput) -> ListMachinesOutput:  # type: ignore[return]
         self._logger.info(
-            "ListMachinesOrchestrator: status=%s provider=%s request_id=%s limit=%s",
+            "ListMachinesOrchestrator: status=%s provider_name=%s provider_type=%s request_id=%s limit=%s",
             input.status,
             input.provider_name,
+            input.provider_type,
             input.request_id,
             input.limit,
         )
@@ -52,9 +53,12 @@ class ListMachinesOrchestrator(OrchestratorBase[ListMachinesInput, ListMachinesO
         query = ListMachinesQuery(
             status=input.status,
             provider_name=input.provider_name,
+            provider_type=input.provider_type,
             request_id=input.request_id,
             limit=input.limit,
             offset=offset,
+            timestamp_format=input.timestamp_format,
+            filter_expressions=input.filter_expressions,
             q=input.q,
             sort=input.sort if input.sort else _DEFAULT_SORT,
             sync=input.sync,

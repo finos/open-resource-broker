@@ -24,7 +24,7 @@ Available for all commands:
 | `--region` | AWS region override | `--region us-west-2` |
 | `--profile` | AWS profile override | `--profile production` |
 | `--scheduler` | Override scheduler strategy (`default`, `hostfactory`, `hf`) | `--scheduler hostfactory` |
-| `--provider` | Override provider instance | `--provider aws_prod_us-east-1` |
+| `--provider-name` | Override provider instance by name | `--provider-name aws_prod_us-east-1` |
 | `--completion` | Generate shell completion script (`bash`, `zsh`) | `--completion bash` |
 | `--version` | Show version and exit | `--version` |
 
@@ -226,7 +226,7 @@ orb templates generate [OPTIONS]
 **Options:**
 | Flag | Description | Example |
 |------|-------------|---------|
-| `--provider` | Generate for specific provider instance | `--provider aws_prod_us-east-1` |
+| `--provider-name` | Generate for specific provider instance | `--provider-name aws_prod_us-east-1` |
 | `--all-providers` | Explicitly generate for all active providers | `--all-providers` |
 | `--provider-api` | Specific provider API | `--provider-api EC2Fleet` |
 
@@ -236,7 +236,7 @@ orb templates generate [OPTIONS]
 orb templates generate
 
 # Generate for specific provider
-orb templates generate --provider aws_prod_us-east-1
+orb templates generate --provider-name aws_prod_us-east-1
 
 # Generate for specific API
 orb templates generate --provider-api SpotFleet
@@ -768,7 +768,7 @@ orb providers show [OPTIONS]
 | Flag | Description | Example |
 |------|-------------|---------|
 | `--format` | Output format | `--format yaml` |
-| `--provider` | Show specific provider details | `--provider aws_prod_us-east-1` |
+| `--provider-name` | Show specific provider details | `--provider-name aws_prod_us-east-1` |
 
 #### `providers health`
 
@@ -783,7 +783,7 @@ orb providers health [OPTIONS]
 | Flag | Description | Example |
 |------|-------------|---------|
 | `--format` | Output format | `--format table` |
-| `--provider` | Check specific provider health | `--provider aws_prod_us-east-1` |
+| `--provider-name` | Check specific provider health | `--provider-name aws_prod_us-east-1` |
 
 #### `providers add`
 
@@ -923,7 +923,7 @@ orb providers exec OPERATION [OPTIONS]
 **Options:**
 | Flag | Description | Example |
 |------|-------------|---------|
-| `--provider` | Provider to execute operation on | `--provider aws_prod_us-east-1` |
+| `--provider-name` | Provider to execute operation on | `--provider-name aws_prod_us-east-1` |
 | `--params` | Operation parameters (JSON format) | `--params '{"count":5}'` |
 
 #### `providers metrics`
@@ -939,7 +939,7 @@ orb providers metrics [OPTIONS]
 | Flag | Description | Example |
 |------|-------------|---------|
 | `--format` | Output format | `--format table` |
-| `--provider` | Show metrics for specific provider | `--provider aws_prod_us-east-1` |
+| `--provider-name` | Show metrics for specific provider | `--provider-name aws_prod_us-east-1` |
 
 ### Storage
 
@@ -1235,7 +1235,7 @@ orb init [OPTIONS]
 | `--non-interactive` | Non-interactive mode | `--non-interactive` |
 | `--force` | Force overwrite existing config | `--force` |
 | `--scheduler` | Scheduler type | `--scheduler hostfactory` |
-| `--provider` | Provider type | `--provider aws` |
+| `--provider-type` | Provider type | `--provider-type aws` |
 | `--region` | AWS region | `--region us-west-2` |
 | `--profile` | AWS profile | `--profile production` |
 | `--config-dir` | Custom configuration directory | `--config-dir /custom/config` |
@@ -1250,7 +1250,7 @@ orb init [OPTIONS]
 **Examples:**
 ```bash
 # Interactive init (discovers infrastructure from AWS)
-orb init --scheduler hostfactory --provider aws --region us-east-1
+orb init --scheduler hostfactory --provider-type aws --region us-east-1
 
 # Non-interactive init with pre-known infrastructure values
 orb init --non-interactive --region us-east-1 \
@@ -1323,17 +1323,17 @@ orb --scheduler hf requests status req-123
 
 ### Provider Override
 
-Use `--provider` to override the selected provider instance for any command:
+Use `--provider-name` to override the selected provider instance for any command:
 
 ```bash
 # Use specific provider instance
-orb --provider aws_prod_us-east-1 templates list
+orb --provider-name aws_prod_us-east-1 templates list
 
 # Override for machine requests
-orb --provider aws_dev_us-east-1 machines request template-id 3
+orb --provider-name aws_dev_us-east-1 machines request template-id 3
 
 # Combined with scheduler override
-orb --scheduler hostfactory --provider aws_prod_us-east-1 requests status req-123
+orb --scheduler hostfactory --provider-name aws_prod_us-east-1 requests status req-123
 ```
 
 **Provider Instance Names:**
@@ -1358,7 +1358,7 @@ orb templates generate
 ### Provider-Specific Generation
 ```bash
 # Generate for specific provider instance
-orb templates generate --provider aws_prod_us-east-1
+orb templates generate --provider-name aws_prod_us-east-1
 
 # Generate for specific provider API
 orb templates generate --provider-api EC2Fleet
@@ -1450,7 +1450,7 @@ orb --completion zsh > ~/.zsh/completions/_orb
 ### Basic Workflow
 ```bash
 # Initialize configuration
-orb init --scheduler hostfactory --provider aws --region us-east-1
+orb init --scheduler hostfactory --provider-type aws --region us-east-1
 
 # Generate example templates
 orb templates generate
@@ -1474,10 +1474,10 @@ orb system health --detailed
 orb templates generate --all-providers
 
 # Use specific provider
-orb --provider aws_prod_us-east-1 machines request template-id 5
+orb --provider-name aws_prod_us-east-1 machines request template-id 5
 
 # Check provider health
-orb providers health --provider aws_prod_us-east-1
+orb providers health --provider-name aws_prod_us-east-1
 ```
 
 ### Development Workflow

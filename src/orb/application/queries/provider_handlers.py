@@ -53,12 +53,23 @@ class GetProviderHealthHandler(BaseQueryHandler[GetProviderHealthQuery, dict[str
         self.logger.info("Getting health for provider: %s", query.provider_name)
 
         try:
-            # If no provider specified, get the active provider
+            # If no provider specified, resolve via provider_type or active provider
             provider_name = query.provider_name
             if not provider_name:
                 try:
                     selection_result = self._provider_registry_service.select_active_provider()
-                    provider_name = selection_result.provider_name
+                    candidate_name = selection_result.provider_name
+                    # When provider_type is set, only return health if types match
+                    if query.provider_type:
+                        candidate_type = getattr(selection_result, "provider_type", None)
+                        if candidate_type and candidate_type != query.provider_type:
+                            return {
+                                "provider_name": None,
+                                "status": "not_found",
+                                "health": "unknown",
+                                "message": f"No active provider of type '{query.provider_type}' found",
+                            }
+                    provider_name = candidate_name
                     self.logger.debug("Using active provider: %s", provider_name)
                 except Exception as e:
                     self.logger.warning("Failed to get active provider: %s", e, exc_info=True)
@@ -160,6 +171,10 @@ class ListAvailableProvidersHandler(BaseQueryHandler[ListAvailableProvidersQuery
                         "count": 0,
                         "message": f"Provider '{query.provider_name}' not found in configuration",
                     }
+
+            # Filter by provider type if specified
+            if query.provider_type:
+                active_providers = [p for p in active_providers if p.type == query.provider_type]
 
             providers_info = []
             for provider_instance in active_providers:

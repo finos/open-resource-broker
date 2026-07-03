@@ -153,7 +153,7 @@ Template files are automatically named based on provider names, ensuring clear a
 orb templates generate
 
 # Generate templates for specific provider
-orb templates generate --provider aws_prod_us-east-1
+orb templates generate --provider-name aws_prod_us-east-1
 
 # Generate templates for specific provider API
 orb templates generate --provider-api EC2Fleet
@@ -232,17 +232,17 @@ When migrating from old naming conventions:
 
 ### Provider Override
 
-Use the `--provider` flag to specify a particular provider:
+Use the `--provider-name` flag to specify a particular provider:
 
 ```bash
 # Use specific provider for template operations
-orb templates list --provider aws_prod_us-east-1
+orb templates list --provider-name aws_prod_us-east-1
 
 # Use specific provider for machine requests
-orb machines request template-id 5 --provider aws_dev_us-west-2
+orb machines request template-id 5 --provider-name aws_dev_us-west-2
 
 # Check health of specific provider
-orb system health --provider aws_staging_eu-west-1
+orb system health --provider-name aws_staging_eu-west-1
 ```
 
 ### Provider Discovery
@@ -283,7 +283,7 @@ orb providers health aws_prod_us-east-1
 
 ```bash
 # Validate provider configuration
-orb config validate --provider aws_prod_us-east-1
+orb config validate --provider-name aws_prod_us-east-1
 
 # Show detailed provider information
 orb providers show aws_prod_us-east-1 --detailed

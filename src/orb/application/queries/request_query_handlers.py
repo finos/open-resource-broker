@@ -215,11 +215,10 @@ class ListRequestsHandler(BaseQueryHandler[ListRequestsQuery, Paginated[RequestD
                 total_unfiltered = len(requests)
 
                 if query.provider_name:
-                    requests = [
-                        r
-                        for r in requests
-                        if r.provider_api and query.provider_name in r.provider_api
-                    ]
+                    requests = [r for r in requests if r.provider_name == query.provider_name]
+
+                if query.provider_type:
+                    requests = [r for r in requests if r.provider_type == query.provider_type]
 
                 if query.status:
                     from orb.domain.request.value_objects import RequestStatus
@@ -403,6 +402,16 @@ class ListReturnRequestsHandler(BaseQueryHandler[ListReturnRequestsQuery, Pagina
                     request_dto = self._dto_factory.create_from_domain(request, machines)
                     request_dtos.append(request_dto)
 
+                if query.provider_name:
+                    request_dtos = [
+                        r for r in request_dtos if r.provider_name == query.provider_name
+                    ]
+
+                if query.provider_type:
+                    request_dtos = [
+                        r for r in request_dtos if r.provider_type == query.provider_type
+                    ]
+
                 if query.machine_names:
                     machine_name_set = set(query.machine_names)
                     filtered = []
@@ -554,8 +563,8 @@ class ListActiveRequestsHandler(BaseQueryHandler[ListActiveRequestsQuery, Pagina
                     all_requests = uow.requests.find_all()
                     requests = [r for r in all_requests if r.status in active_statuses]
 
-                    if hasattr(query, "template_id") and query.template_id:  # type: ignore[union-attr]
-                        requests = [r for r in requests if r.template_id == query.template_id]  # type: ignore[union-attr]
+                if query.template_id:
+                    requests = [r for r in requests if r.template_id == query.template_id]
 
                 total_count = len(requests)
                 limit = min(query.limit or 50, 1000)  # type: ignore[union-attr]
@@ -650,6 +659,12 @@ class ListActiveRequestsHandler(BaseQueryHandler[ListActiveRequestsQuery, Pagina
 
                 request_dto = self._dto_factory.create_from_domain(request, db_machines)
                 request_dtos.append(request_dto)
+
+            if query.provider_name:
+                request_dtos = [r for r in request_dtos if r.provider_name == query.provider_name]
+
+            if query.provider_type:
+                request_dtos = [r for r in request_dtos if r.provider_type == query.provider_type]
 
             if query.filter_expressions:
                 request_dicts = [dto.model_dump() for dto in request_dtos]

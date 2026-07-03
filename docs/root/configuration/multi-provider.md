@@ -40,23 +40,23 @@ providers:
 orb templates generate --all-providers
 
 # Generate templates for specific provider instance
-orb templates generate --provider aws_prod_us-west-2
+orb templates generate --provider-name aws_prod_us-west-2
 
 # Generate templates for specific provider API
 orb templates generate --provider-api EC2Fleet
 
 # Override provider for any command
-orb --provider aws_dev_eu-west-1 system health
-orb --provider aws_prod_us-west-2 requests status req-123
+orb --provider-name aws_dev_eu-west-1 system health
+orb --provider-name aws_prod_us-west-2 requests status req-123
 ```
 
 ## Provider Override
 
-Use the global `--provider` flag with any command:
+Use the global `--provider-name` flag with any command:
 
 ```bash
-orb --provider aws_prod_us-west-2 templates list
-orb --provider aws_dev_eu-west-1 machines request template-id 3
+orb --provider-name aws_prod_us-west-2 templates list
+orb --provider-name aws_dev_eu-west-1 machines request template-id 3
 
 # List available provider instances
 orb providers list

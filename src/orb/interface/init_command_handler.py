@@ -605,11 +605,11 @@ def _get_default_config(args) -> Dict[str, Any]:
     """Get default configuration from args."""
     # Get first available provider as default
     providers = _get_available_providers()
-    if not providers and not args.provider:
+    if not providers and not args.provider_type:
         raise ValueError("No providers registered. Install a provider plugin to continue.")
-    default_provider = providers[0]["type"] if providers else args.provider
+    default_provider = providers[0]["type"] if providers else args.provider_type
 
-    provider_type = args.provider or default_provider
+    provider_type = args.provider_type or default_provider
     strategy_class = _get_provider_strategy(provider_type)
     default_region = strategy_class.get_default_region() if strategy_class is not None else ""
     infrastructure_defaults = (

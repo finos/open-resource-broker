@@ -56,7 +56,7 @@ orb init
 
 ```bash
 # Basic — provider discovers infrastructure automatically
-orb init --non-interactive --provider aws
+orb init --non-interactive --provider-type aws
 
 # Reinitialize over an existing config
 orb init --force
@@ -67,7 +67,7 @@ Non-interactive flags available:
 | Flag | Description |
 |---|---|
 | `--non-interactive` | Skip the interactive wizard |
-| `--provider <type>` | Provider type (e.g. `aws`) |
+| `--provider-type <type>` | Provider type (e.g. `aws`) |
 | `--scheduler <type>` | Scheduler type (`default` or `hostfactory`) |
 | `--config-dir <path>` | Custom config directory |
 | `--force` | Overwrite existing config |

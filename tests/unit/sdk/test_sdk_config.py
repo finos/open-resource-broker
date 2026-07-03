@@ -154,3 +154,29 @@ class TestSDKConfigToDict:
         config = SDKConfig(custom_config={"extra": "val"})
         d = config.to_dict()
         assert d["extra"] == "val"
+
+
+class TestSDKConfigProviderTypeAndName:
+    def test_fields_default_to_none(self):
+        config = SDKConfig()
+        assert config.provider_type is None
+        assert config.provider_name is None
+
+    def test_all_three_provider_fields_are_independent(self):
+        config = SDKConfig(provider="aws", provider_type="k8s", provider_name="my-k8s-instance")
+        assert config.provider == "aws"
+        assert config.provider_type == "k8s"
+        assert config.provider_name == "my-k8s-instance"
+
+    def test_to_dict_includes_provider_type_and_name_when_set(self):
+        config = SDKConfig(provider="aws", provider_type="k8s", provider_name="my-k8s-instance")
+        d = config.to_dict()
+        assert d["provider"] == "aws"
+        assert d["provider_type"] == "k8s"
+        assert d["provider_name"] == "my-k8s-instance"
+
+    def test_to_dict_omits_provider_type_and_name_when_none(self):
+        config = SDKConfig(provider="aws")
+        d = config.to_dict()
+        assert "provider_type" not in d
+        assert "provider_name" not in d

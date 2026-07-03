@@ -58,6 +58,10 @@ class ListRequestsOrchestrator(OrchestratorBase[ListRequestsInput, ListRequestsO
                 offset=offset,
                 all_resources=True,
                 status=input.status,
+                template_id=input.template_id,
+                provider_name=input.provider_name,
+                provider_type=input.provider_type,
+                filter_expressions=input.filter_expressions,
             )
         else:
             query = ListRequestsQuery(  # type: ignore[assignment]
@@ -65,6 +69,10 @@ class ListRequestsOrchestrator(OrchestratorBase[ListRequestsInput, ListRequestsO
                 limit=input.limit,
                 offset=offset,
                 template_id=input.template_id,
+                request_type=input.request_type,
+                provider_name=input.provider_name,
+                provider_type=input.provider_type,
+                filter_expressions=input.filter_expressions,
                 q=input.q,
                 sort=sort,
             )

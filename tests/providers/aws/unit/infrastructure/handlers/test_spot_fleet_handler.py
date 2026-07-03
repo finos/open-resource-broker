@@ -415,7 +415,7 @@ class TestResolveFleetRole:
     def test_fleet_role_resolved_from_provider_config(self):
         """When fleet_role is absent from template but present in provider config, it is injected."""
         config_port = MagicMock()
-        config_port.get_active_provider_override.return_value = None
+        config_port.get_active_provider_name_override.return_value = None
         config_port.get_provider_config.return_value = _make_provider_config(
             fleet_role_in_config=FULL_SPOT_FLEET_ARN
         )
@@ -429,7 +429,7 @@ class TestResolveFleetRole:
     def test_fleet_role_not_found_returns_template_unchanged(self):
         """When fleet_role is absent from both template and provider config, template is unchanged."""
         config_port = MagicMock()
-        config_port.get_active_provider_override.return_value = None
+        config_port.get_active_provider_name_override.return_value = None
         config_port.get_provider_config.return_value = _make_provider_config()
         handler = _make_handler_with_config_port(config_port)
         template = self._make_template(fleet_role=None)
@@ -450,7 +450,7 @@ class TestResolveFleetRole:
     def test_provider_override_matches_correct_provider(self):
         """When active_provider_override is set, only the matching provider's fleet_role is used."""
         config_port = MagicMock()
-        config_port.get_active_provider_override.return_value = "aws_test_eu-west-2"
+        config_port.get_active_provider_name_override.return_value = "aws_test_eu-west-2"
         config_port.get_provider_config.return_value = _make_provider_config(
             fleet_role_in_config=FULL_SPOT_FLEET_ARN
         )
@@ -464,7 +464,7 @@ class TestResolveFleetRole:
     def test_provider_override_no_match_returns_template_unchanged(self):
         """When active_provider_override names a different provider, fleet_role stays None."""
         config_port = MagicMock()
-        config_port.get_active_provider_override.return_value = "aws_other_provider"
+        config_port.get_active_provider_name_override.return_value = "aws_other_provider"
         config_port.get_provider_config.return_value = _make_provider_config(
             fleet_role_in_config=FULL_SPOT_FLEET_ARN
         )
@@ -482,7 +482,7 @@ class TestResolveFleetRole:
             "ec2fleet.amazonaws.com/AWSServiceRoleForEC2Fleet"
         )
         config_port = MagicMock()
-        config_port.get_active_provider_override.return_value = None
+        config_port.get_active_provider_name_override.return_value = None
         config_port.get_provider_config.return_value = _make_provider_config(
             fleet_role_in_config=ec2fleet_arn
         )
@@ -498,7 +498,7 @@ class TestResolveFleetRole:
     def test_short_role_name_expanded_to_full_arn(self):
         """The short name 'AWSServiceRoleForEC2SpotFleet' is expanded to a full ARN."""
         config_port = MagicMock()
-        config_port.get_active_provider_override.return_value = None
+        config_port.get_active_provider_name_override.return_value = None
         config_port.get_provider_config.return_value = _make_provider_config(
             fleet_role_in_config="AWSServiceRoleForEC2SpotFleet"
         )

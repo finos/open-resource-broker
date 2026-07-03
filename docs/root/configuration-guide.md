@@ -68,7 +68,7 @@ Generate templates for multiple providers:
 orb templates generate
 
 # Generate for specific provider
-orb templates generate --provider aws_prod_us-east-1
+orb templates generate --provider-name aws_prod_us-east-1
 
 # Generate for specific provider type
 orb templates generate --provider-api EC2Fleet
@@ -508,7 +508,7 @@ orb providers list
 orb templates list
 
 # Get templates for specific provider
-orb templates list --provider aws-primary
+orb templates list --provider-name aws-primary
 
 # Request machines
 orb machines request basic-template 2

@@ -33,10 +33,10 @@ Generated templates for 3 providers:
 
 ```bash
 # Generate for specific provider instance
-orb templates generate --provider aws-prod
+orb templates generate --provider-name aws-prod
 
 # Generate for development environment
-orb templates generate --provider aws-dev
+orb templates generate --provider-name aws-dev
 ```
 
 ### Specific Provider API
@@ -194,7 +194,7 @@ $ orb templates generate
 
 ```bash
 # Generate for production provider only
-$ orb templates generate --provider aws_prod_us-west-2
+$ orb templates generate --provider-name aws_prod_us-west-2
 {
   "status": "success",
   "message": "Generated templates for 1 provider",
@@ -302,10 +302,10 @@ When using provider override:
 
 ```bash
 # Loads templates for specific provider
-orb --provider aws_prod_us-west-2 templates list
+orb --provider-name aws_prod_us-west-2 templates list
 
 # Generates and loads for specific provider
-orb --provider aws_dev_eu-west-1 templates generate
+orb --provider-name aws_dev_eu-west-1 templates generate
 ```
 
 ## Advanced Usage
@@ -314,8 +314,8 @@ orb --provider aws_dev_eu-west-1 templates generate
 
 ```bash
 # Generate templates for specific provider, then use them
-orb --provider aws-prod templates generate --provider-api EC2Fleet
-orb --provider aws-prod templates list --format table
+orb --provider-name aws-prod templates generate --provider-api EC2Fleet
+orb --provider-name aws-prod templates list --format table
 ```
 
 ### Combined with Scheduler Override
@@ -332,9 +332,9 @@ orb --scheduler default templates generate
 
 ```bash
 # Generate different APIs for different providers
-orb templates generate --provider aws-prod --provider-api EC2Fleet
-orb templates generate --provider aws-dev --provider-api SpotFleet
-orb templates generate --provider aws-staging --provider-api ASG
+orb templates generate --provider-name aws-prod --provider-api EC2Fleet
+orb templates generate --provider-name aws-dev --provider-api SpotFleet
+orb templates generate --provider-name aws-staging --provider-api ASG
 ```
 
 ## File Management
@@ -374,7 +374,7 @@ When multiple template files exist, they are merged with precedence:
 ### Provider Not Found
 
 ```bash
-$ orb templates generate --provider nonexistent-provider
+$ orb templates generate --provider-name nonexistent-provider
 {
   "status": "error",
   "message": "Provider 'nonexistent-provider' not found",
@@ -385,7 +385,7 @@ $ orb templates generate --provider nonexistent-provider
 ### Provider Disabled
 
 ```bash
-$ orb templates generate --provider disabled-provider
+$ orb templates generate --provider-name disabled-provider
 {
   "status": "error",
   "message": "Provider 'disabled-provider' is disabled"
@@ -409,25 +409,25 @@ $ orb templates generate --provider-api InvalidAPI
 
 ```bash
 # 1. Generate templates for development
-orb templates generate --provider aws-dev
+orb templates generate --provider-name aws-dev
 
 # 2. Test templates
-orb --provider aws-dev templates list --format table
+orb --provider-name aws-dev templates list --format table
 
 # 3. Generate for staging
-orb templates generate --provider aws-staging
+orb templates generate --provider-name aws-staging
 
 # 4. Generate for production
-orb templates generate --provider aws-prod
+orb templates generate --provider-name aws-prod
 ```
 
 ### Environment-Specific Templates
 
 ```bash
 # Generate different template sets per environment
-orb templates generate --provider aws-dev --provider-api SpotFleet    # Cost-optimized dev
-orb templates generate --provider aws-staging --provider-api EC2Fleet # Mixed staging
-orb templates generate --provider aws-prod --provider-api ASG         # Auto-scaling prod
+orb templates generate --provider-name aws-dev --provider-api SpotFleet    # Cost-optimized dev
+orb templates generate --provider-name aws-staging --provider-api EC2Fleet # Mixed staging
+orb templates generate --provider-name aws-prod --provider-api ASG         # Auto-scaling prod
 ```
 
 ### Template Maintenance
@@ -437,7 +437,7 @@ orb templates generate --provider aws-prod --provider-api ASG         # Auto-sca
 orb templates generate --all-providers
 
 # Update specific provider templates
-orb templates generate --provider aws-prod
+orb templates generate --provider-name aws-prod
 
 # Refresh template cache after generation
 orb templates refresh --force

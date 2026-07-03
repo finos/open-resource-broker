@@ -134,7 +134,7 @@ class TestHandleProviderHealthForwardsParams:
         mock_orch.execute = AsyncMock(return_value=MagicMock(health={}, message="ok"))
         container = _make_container(GetProviderHealthOrchestrator=mock_orch)
 
-        args = _make_args(provider="aws")
+        args = _make_args(provider_name="aws")
 
         with patch("orb.interface.system_command_handlers.get_container", return_value=container):
             asyncio.run(handle_provider_health(args))

@@ -27,7 +27,9 @@ class ListActiveRequestsQuery(Query, BaseModel):
     model_config = ConfigDict(frozen=True)
 
     provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
     status: Optional[str] = None
+    template_id: Optional[str] = None
     filter_expressions: list[str] = []
     all_resources: bool = False
     limit: Optional[int] = 50  # Default: 50, Max: 1000
@@ -44,6 +46,7 @@ class ListReturnRequestsQuery(Query, BaseModel):
     model_config = ConfigDict(frozen=True)
 
     provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
     status: Optional[str] = None
     requester_id: Optional[str] = None
     machine_names: list[str] = []
@@ -69,6 +72,7 @@ class ListTemplatesQuery(Query, BaseModel):
     model_config = ConfigDict(frozen=True)
 
     provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
     provider_api: Optional[str] = None
     active_only: bool = True
     filter_expressions: list[str] = []
@@ -102,6 +106,7 @@ class ListMachinesQuery(Query, BaseModel):
     model_config = ConfigDict(frozen=True)
 
     provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
     request_id: Optional[str] = None
     status: Optional[str] = None
     active_only: bool = False

@@ -58,7 +58,14 @@ class ReturnMachinesOrchestrator(OrchestratorBase[ReturnMachinesInput, ReturnMac
 
         if input.all_machines:
             machine_dtos = (
-                await self._query_bus.execute(ListMachinesQuery(all_resources=True)) or []
+                await self._query_bus.execute(
+                    ListMachinesQuery(
+                        all_resources=True,
+                        provider_name=input.provider_name,
+                        provider_type=input.provider_type,
+                    )
+                )
+                or []
             )
             machine_ids = [dto.machine_id for dto in machine_dtos]
             if not machine_ids:
