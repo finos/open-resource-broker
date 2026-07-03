@@ -67,9 +67,9 @@ class Application:
 
                 self._container = get_container()
 
-            # Pre-register ConfigurationManager with config_dict and/or
-            # config_path if provided, so DI container uses the explicit
-            # source instead of file discovery.
+            # Pre-register ConfigurationManager when an explicit config_path or
+            # config_dict is supplied, so DI uses the caller's source instead of
+            # falling back to platform-dirs / cwd discovery.
             if self.config_dict is not None or self.config_path is not None:
                 from orb.config.managers.configuration_manager import ConfigurationManager
 
