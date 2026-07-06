@@ -60,9 +60,17 @@ dependencies = [
     # breaking change for operators who installed without extras.
     "boto3>=1.42.21",
     "botocore>=1.42.21",
+    "psutil>=5.9.0", # Required by the system health check (CPU/memory)
 ]
 
 [project.optional-dependencies]
+# ── Storage extras ─────────────────────────────────────────────────────────
+# SQL storage strategy — includes Alembic for schema migration support.
+# Install with: pip install orb-py[sql]
+sql = [
+    "alembic>=1.13",
+]
+
 # ── Provider extras ────────────────────────────────────────────────────────
 # AWS provider — explicit opt-in alias for the AWS deps currently in core.
 # Pinning the same versions keeps `pip install orb-py[aws]` resolving identically
@@ -142,7 +150,7 @@ monitoring-aws = [
 
 # All optional features (providers + features)
 all = [
-    "orb-py[cli,api,monitoring,all-providers]",
+    "orb-py[cli,api,sql,monitoring,all-providers]",
 ]
 
 # ── Test extras ────────────────────────────────────────────────────────────
@@ -191,6 +199,14 @@ ci = [
     "joserfc>=1.6.1",
     "werkzeug>=3.1.6",
     "nltk>=3.9.3",
+    # k8s-legacy extra deps — required for tests/integration/k8s_legacy/
+    "kubernetes",
+    "watchdog",
+    "tenacity",
+    "pg8000",
+    "uvicorn>=0.24.0",
+    "prometheus-client>=0.17.0",
+    "alembic>=1.13",
     # Essential Type Stubs
     "types-PyYAML>=6.0.12.12,<7.0.0",
     "types-python-dateutil>=2.8.19.14,<3.0.0",
@@ -277,6 +293,18 @@ ci = [
     # Security override for safety's vulnerable nltk dependency (GHSA-7p94-766c-hgjp)
     "nltk>=3.9.3",
 
+    # k8s-legacy extra deps — required for tests/integration/k8s_legacy/
+    # The [k8s-legacy] optional extra gates the shim on `kubernetes`; listing
+    # them here ensures the integration test job installs them via --all-groups
+    # without relying solely on --all-extras (which the cached env may skip).
+    "kubernetes",
+    "watchdog",
+    "tenacity",
+    "pg8000",
+    "uvicorn>=0.24.0",
+    "prometheus-client>=0.17.0",
+    "alembic>=1.13",
+
     # Essential Type Stubs
     "types-PyYAML>=6.0.12.12,<7.0.0",
     "types-python-dateutil>=2.8.19.14,<3.0.0",
@@ -351,6 +379,7 @@ include-package-data = true
 "*" = ["py.typed"]
 "orb.config" = ["default_config.json"]
 "orb.providers.aws.config" = ["*.json"]
+"orb.ui" = ["rxconfig.py"]
 "orb.k8s_legacy.alembic" = ["alembic.ini", "script.py.mako"]
 "orb.k8s_legacy.alembic.versions" = ["*.py"]
 "orb.k8s_legacy.tests.resources" = ["*.yml", "*.tpl"]
@@ -407,6 +436,7 @@ markers = [
     "benchmark: marks benchmark/performance tests",
     "api: marks API tests",
     "security: marks security tests",
+    "serial: forces serial execution (use ``-n0`` or filter with ``-m 'not serial'`` under xdist)",
 ]
 env = [
     "AWS_DEFAULT_REGION=us-east-1",
