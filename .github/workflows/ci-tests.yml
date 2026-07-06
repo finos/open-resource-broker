@@ -162,6 +162,21 @@ jobs:
       environment: ${{ needs.config.outputs.environment }}
       testing-flag: ${{ needs.config.outputs.testing-flag }}
 
+  ui-unit-tests:
+    name: UI Unit Tests
+    needs: [config, setup-cache]
+    uses: ./.github/workflows/reusable-test.yml
+    with:
+      test-type: ui-unit
+      python-version: ${{ needs.config.outputs.default-python-version }}
+      default-python-version: ${{ needs.config.outputs.default-python-version }}
+      continue-on-error: false
+      aws-region: ${{ needs.config.outputs.aws-region }}
+      aws-access-key: ${{ needs.config.outputs.aws-access-key }}
+      aws-secret-key: ${{ needs.config.outputs.aws-secret-key }}
+      environment: ${{ needs.config.outputs.environment }}
+      testing-flag: ${{ needs.config.outputs.testing-flag }}
+
   ui-smoke:
     name: UI Smoke
     needs: [config, setup-cache]
@@ -209,7 +224,7 @@ jobs:
   test-report:
     name: Generate Test Report
     runs-on: ubuntu-latest
-    needs: [config, setup-cache, tests, integration-tests, e2e-tests, providers-tests, providers-tests-serial, infrastructure-tests, ui-smoke]
+    needs: [config, setup-cache, tests, integration-tests, e2e-tests, providers-tests, providers-tests-serial, infrastructure-tests, ui-unit-tests, ui-smoke]
     if: always()
     permissions:
       contents: read

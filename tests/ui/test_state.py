@@ -1237,3 +1237,56 @@ class TestConfigStateVisibleRows:
         )
         rows = self._call_visible_rows(s)
         assert len(rows) == 2
+
+
+# ---------------------------------------------------------------------------
+# M6 — RequestsState.set_provider_filter reset behaviour
+# ---------------------------------------------------------------------------
+
+
+class TestRequestsStateSetProviderFilter:
+    """RequestsState.set_provider_filter — cursor + total reset + load triggered."""
+
+    def test_set_provider_filter_resets_cursor_and_total(self):
+        """Changing the provider filter must reset pagination state and call load()."""
+        import asyncio
+        from unittest.mock import AsyncMock, patch
+
+        async def _run():
+            with patch("orb.ui.pages.requests.api") as mock_api:
+                from orb.ui.pages.requests import RequestsState
+
+                mock_api.list_requests = AsyncMock(
+                    return_value={
+                        "requests": [],
+                        "next_cursor": "",
+                        "total_count": 0,
+                    }
+                )
+
+                s = RequestsState.__new__(RequestsState)
+                s.provider_filter = "aws"
+                s.next_cursor = "c-1"
+                s.api_total_count = 42
+                s.requests = []
+                s.loading = False
+                s.error = ""
+                s.tab = "all"
+                s.page_size = 200
+                s.visible_columns = ",request_id,status,"
+                s.last_refresh = ""
+                s.search_text = ""
+                s._poll_started = False
+                s.loading_more = False
+
+                await RequestsState.set_provider_filter(s, "azure")
+
+            # Provider filter updated
+            assert s.provider_filter == "azure"
+            # Pagination state reset before load()
+            assert s.next_cursor == ""
+            assert s.api_total_count == 0
+            # load() was called (verified by api.list_requests being invoked)
+            mock_api.list_requests.assert_called_once()
+
+        asyncio.run(_run())

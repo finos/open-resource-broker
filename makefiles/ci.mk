@@ -108,6 +108,10 @@ ci-tests-unit:  ## Run unit tests only (matches ci.yml unit-tests job)
 	@echo "Running unit tests (parallel)..."
 	$(call run-tool,pytest,$(TESTS_UNIT) $(PYTEST_PARALLEL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-unit.xml --junitxml=junit-unit.xml)
 
+ci-tests-ui-unit:  ## Run UI unit tests (tests/ui/) on every pull_request
+	@echo "Running UI unit tests..."
+	$(call run-tool,pytest,tests/ui/ $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-ui-unit.xml --junitxml=junit-ui-unit.xml)
+
 ci-tests-integration:  ## Run integration tests only (matches ci.yml integration-tests job)
 	@echo "Running integration tests (parallel)..."
 	$(call run-tool,pytest,$(TESTS_INTEGRATION) $(PYTEST_PARALLEL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-integration.xml --junitxml=junit-integration.xml)

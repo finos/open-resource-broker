@@ -111,6 +111,50 @@ else
     FAILED=1
 fi
 
+echo "INFO: Checking machines API returns 200 with pagination fields..."
+MACHINES_BODY=$(curl -sf "${BASE}/orb/api/v1/machines/" 2>/dev/null || echo "")
+MACHINES_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${BASE}/orb/api/v1/machines/" 2>/dev/null || echo "000")
+if [ "$MACHINES_STATUS" = "200" ]; then
+    printf "  OK   %-40s %s\n" "/orb/api/v1/machines/" "$MACHINES_STATUS"
+    # Verify response body contains pagination fields
+    if echo "$MACHINES_BODY" | "${PY[@]}" -c "import sys, json; d=json.load(sys.stdin); assert 'total_count' in d and 'next_cursor' in d" 2>/dev/null; then
+        echo "  OK   machines response contains total_count and next_cursor"
+    else
+        echo "  FAIL machines response missing total_count or next_cursor"
+        FAILED=1
+    fi
+else
+    printf "  FAIL %-40s got %s (expected 200)\n" "/orb/api/v1/machines/" "$MACHINES_STATUS"
+    FAILED=1
+fi
+
+echo "INFO: Checking config endpoint returns 403 without auth token..."
+CONFIG_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${BASE}/orb/api/v1/config/" 2>/dev/null || echo "000")
+if [ "$CONFIG_STATUS" = "403" ]; then
+    printf "  OK   %-40s %s (auth gate active)\n" "/orb/api/v1/config/" "$CONFIG_STATUS"
+else
+    printf "  WARN %-40s got %s (expected 403 — auth gate may not be active)\n" "/orb/api/v1/config/" "$CONFIG_STATUS"
+    # Not a hard failure — auth may be disabled in test environments
+fi
+
+echo "INFO: Checking compiled JS bundle for stale port reference (:8001)..."
+JS_BUNDLE=$("${PY[@]}" -c "
+import glob, os
+pattern = 'src/orb/ui/_static/assets/reflex-env-*.js'
+paths = glob.glob(pattern)
+print(paths[0] if paths else '')
+" 2>/dev/null || echo "")
+if [ -n "$JS_BUNDLE" ] && [ -f "$JS_BUNDLE" ]; then
+    if grep -q ':8001' "$JS_BUNDLE" 2>/dev/null; then
+        echo "  FAIL $JS_BUNDLE contains stale port :8001"
+        FAILED=1
+    else
+        echo "  OK   $JS_BUNDLE does not contain stale port :8001"
+    fi
+else
+    echo "  WARN no reflex-env-*.js bundle found under src/orb/ui/_static/assets/ — skipping port check"
+fi
+
 if [ "$FAILED" -ne 0 ]; then
     echo "ERROR: one or more probes failed" >&2
     exit 1
