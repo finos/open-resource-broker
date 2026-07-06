@@ -249,9 +249,15 @@ class TestHandleServerStatus:
     @pytest.mark.asyncio
     @patch(_RESOLVE_PATHS, return_value=("/tmp/srv.pid", "/tmp/srv.log", "/tmp"))
     @patch(_RESOLVE_CONFIGS)
-    async def test_status_embedded_ui_uses_backend_port_orb_prefix(
+    async def test_status_embedded_ui_uses_server_port_orb_prefix(
         self, mock_resolve_configs, _mock_paths
     ):
+        """Embedded mode: Reflex backend IS the main server port.
+
+        Health is at /orb/health on server_config.port, not backend_port.
+        The Reflex app mounts ORB FastAPI at /orb via api_transformer so
+        everything lives on one port.
+        """
         server_cfg = _make_server_config(host="127.0.0.1", port=8000)
         ui_cfg = _make_ui_config(enabled=True, mode="embedded", backend_port=3001)
         mock_resolve_configs.return_value = (server_cfg, ui_cfg)
@@ -265,7 +271,7 @@ class TestHandleServerStatus:
             await handle_server_status(_args())
 
         call_kwargs = mock_daemon.status.call_args.kwargs
-        assert call_kwargs["health_url"] == "http://127.0.0.1:3001/orb/health"
+        assert call_kwargs["health_url"] == "http://127.0.0.1:8000/orb/health"
 
     @pytest.mark.asyncio
     @patch(_RESOLVE_PATHS, return_value=("/tmp/srv.pid", "/tmp/srv.log", "/tmp"))

@@ -278,7 +278,11 @@ class TestRunEmbeddedForeground:
         env = call_kwargs.kwargs.get("env") or call_kwargs[1].get("env", {})
         assert env.get("ORB_MODE") == "embedded"
         assert env.get("ORB_UI_BACKEND_PORT") == "3001"
-        assert env.get("ORB_UI_FRONTEND_PORT") == "3000"
+        # ORB_UI_FRONTEND_PORT is deliberately unset in embedded mode --
+        # Reflex 0.9.x rejects a user-supplied frontend_port when running
+        # ``reflex run --backend-only``, so run_embedded_foreground pops
+        # it out of the env even if the parent process had it set.
+        assert env.get("ORB_UI_FRONTEND_PORT") is None
 
     @pytest.mark.asyncio
     async def test_sighup_not_registered_with_embedded_loop(self):
