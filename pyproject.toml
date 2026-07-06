@@ -181,6 +181,15 @@ test-aws = [
     "requests-mock>=1.11.0,<2.0.0",
 ]
 
+# k8s test dependencies — kmock HTTP-level API mock server.
+# kmock runs an in-process aiohttp server that mimics the Kubernetes apiserver.
+# Tests point the real kubernetes SDK client at the kmock URL so the full
+# client stack is exercised without a live cluster.
+test-k8s = [
+    "orb-py[k8s]",
+    "kmock>=0.7",
+]
+
 # ---------------------------------------------------------------------------
 # pip compatibility shims for [dependency-groups] (PEP 735)
 #
@@ -324,6 +333,9 @@ ci = [
     "uvicorn>=0.24.0",
     "prometheus-client>=0.17.0",
     "alembic>=1.13",
+
+    # k8s HTTP-level mock server (test-only, not shipped with the package)
+    "kmock>=0.7",
 
     # Essential Type Stubs
     "types-PyYAML>=6.0.12.12,<7.0.0",
