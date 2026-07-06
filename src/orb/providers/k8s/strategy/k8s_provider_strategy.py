@@ -1063,6 +1063,42 @@ class K8sProviderStrategy(ProviderStrategy):
         # No context, no profile → in-cluster sentinel.
         return "k8s_in-cluster"
 
+    @classmethod
+    def get_defaults_config(cls) -> dict:
+        """Return the k8s provider defaults configuration.
+
+        Mirrors :meth:`AWSProviderStrategy.get_defaults_config`.  Loads the
+        bundled ``k8s_defaults.json`` via :mod:`importlib.resources` so the
+        file is found regardless of the installation method (editable install,
+        wheel, zipimport).  The returned dict is validated by constructing a
+        :class:`K8sProviderConfig` from the ``provider.provider_defaults.k8s``
+        block so schema drift is caught early.
+        """
+        import json  # noqa: PLC0415
+        from importlib.resources import files  # noqa: PLC0415
+
+        from orb.providers.k8s.configuration.config import K8sProviderConfig  # noqa: PLC0415
+
+        text = (
+            files("orb.providers.k8s.config")
+            .joinpath("k8s_defaults.json")
+            .read_text(encoding="utf-8")
+        )
+        raw = json.loads(text)
+        provider_config = (
+            raw.get("provider", {}).get("provider_defaults", {}).get("k8s", {})
+        )
+        # Lightweight structural validation — raises ValidationError on schema drift.
+        if provider_config:
+            K8sProviderConfig(
+                **{
+                    k: v
+                    for k, v in provider_config.items()
+                    if k not in ("handlers", "template_defaults")
+                }
+            )
+        return raw
+
     def parse_provider_name(self, provider_name: str) -> dict[str, str]:
         """Inverse of :meth:`generate_provider_name`."""
         if not provider_name.startswith("k8s_"):
@@ -1122,7 +1158,71 @@ class K8sProviderStrategy(ProviderStrategy):
 
     @classmethod
     def get_cli_infrastructure_defaults(cls, args: Any) -> dict[str, Any]:
+        """Extract k8s infrastructure defaults from parsed CLI args.
+
+        Kubernetes infrastructure is cluster-scoped and not decomposed into
+        subnet/security-group level constructs like AWS.  Returns an empty
+        dict — any relevant cluster-level config comes from
+        :meth:`get_cli_provider_config` instead.
+        """
         return {}
+
+    @classmethod
+    def get_cli_provider_config(cls, args: Any) -> dict[str, Any]:
+        """Extract Kubernetes provider config keys from parsed CLI args.
+
+        Reads the three kubernetes-scoped flags registered via
+        :class:`~orb.providers.k8s.cli.k8s_cli_spec.K8sCLISpec`:
+
+        * ``--kube-context``  → ``context`` key
+        * ``--kubeconfig``    → ``kubeconfig_path`` key
+        * ``--namespace``     → ``namespace`` key
+
+        Fields that were not supplied by the operator are omitted from the
+        returned dict so that the ``_get_default_config`` overlay can fill
+        the remaining gaps without overwriting explicit values with ``None``.
+
+        Args:
+            args: Parsed ``argparse.Namespace`` from the ``orb init`` or
+                ``orb provider add`` invocation.
+
+        Returns:
+            Dict containing only the keys whose values the operator supplied.
+        """
+        result: dict[str, Any] = {}
+        context = getattr(args, "kubernetes_context", None)
+        if context is not None:
+            result["context"] = context
+        kubeconfig = getattr(args, "kubernetes_kubeconfig", None)
+        if kubeconfig is not None:
+            result["kubeconfig_path"] = kubeconfig
+        namespace = getattr(args, "kubernetes_namespace", None)
+        if namespace is not None:
+            result["namespace"] = namespace
+        return result
+
+    @classmethod
+    def get_operational_param_choices(cls, param: str) -> list[tuple[str, str]]:
+        """Return picker choices for an operational parameter, if any.
+
+        Mirrors :meth:`AWSProviderStrategy.get_operational_param_choices`.
+        Kubernetes has no region picker; ``namespace`` is a free-text input so
+        an empty list is returned for all parameters, causing the ``orb init``
+        prompt to fall back to free-text input.
+        """
+        return []
+
+    @classmethod
+    def get_operational_param_default(cls, param: str) -> str:
+        """Return the default value for an operational parameter.
+
+        Mirrors :meth:`AWSProviderStrategy.get_operational_param_default`.
+        Kubernetes uses ``"default"`` as the conventional default namespace;
+        all other parameters have no meaningful pre-filled default.
+        """
+        if param == "namespace":
+            return "default"
+        return ""
 
     # ------------------------------------------------------------------
     # Credential surface (called by `orb init` and credential probes)
