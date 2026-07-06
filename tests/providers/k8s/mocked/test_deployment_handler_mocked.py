@@ -10,6 +10,8 @@ Covered scenarios
 * acquire_hosts POSTs a Deployment body with the correct spec.replicas.
 * release_hosts selective path: annotates victim pods via PATCH then
   scales replicas down by patching the scale sub-resource.
+* check_hosts_status reads pods from the apiserver and returns the correct
+  fulfilment verdict (Group T1 backfill).
 """
 
 from __future__ import annotations
@@ -279,3 +281,185 @@ async def test_deployment_handler_selective_release_annotates_and_patches_replic
             f"Expected pod-deletion-cost annotation on {victim}"
         )
         assert annotations["controller.kubernetes.io/pod-deletion-cost"] == "-9999"
+
+
+# ---------------------------------------------------------------------------
+# check_hosts_status — reads pods via label-selector + Deployment status
+# ---------------------------------------------------------------------------
+
+
+def _preload_deployment_pods(
+    kmock_k8s: KubernetesEmulator,
+    *,
+    deployment_name: str,
+    request_id: str,
+    namespace: str = "orb-test",
+    count: int = 2,
+    phase: str = "Running",
+    ready: bool = True,
+) -> list[str]:
+    """Seed kmock with pods belonging to a Deployment-managed request."""
+    from kmock import resource  # noqa: PLC0415
+
+    pod_res = resource("", "v1", "pods")
+    names = []
+    for i in range(count):
+        pod_name = f"{deployment_name}-pod-{i}"
+        names.append(pod_name)
+        kmock_k8s.objects[pod_res, namespace, pod_name] = {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": pod_name,
+                "namespace": namespace,
+                "labels": {
+                    "orb.io/managed": "true",
+                    "orb.io/request-id": request_id,
+                    "orb.io/provider-api": "Deployment",
+                },
+            },
+            "spec": {
+                "containers": [{"name": "app", "image": "busybox:latest"}],
+            },
+            "status": {
+                "phase": phase,
+                "podIP": "10.0.0.1" if phase == "Running" else None,
+                "hostIP": "10.1.0.1" if phase == "Running" else None,
+                "conditions": [{"type": "Ready", "status": "True" if ready else "False"}],
+                "containerStatuses": [],
+            },
+        }
+    return names
+
+
+def _make_request_with_id(
+    request_id: str,
+    *,
+    requested_count: int = 2,
+    deployment_name: str | None = None,
+    namespace: str = "orb-test",
+) -> Any:
+    """Build a real Request aggregate with the given string request_id."""
+    from orb.domain.request.aggregate import Request  # noqa: PLC0415
+    from orb.domain.request.value_objects import RequestId, RequestType  # noqa: PLC0415
+
+    provider_data: dict[str, Any] = {"namespace": namespace}
+    if deployment_name:
+        provider_data["deployment_name"] = deployment_name
+    return Request(
+        request_id=RequestId(value=request_id),
+        request_type=RequestType.ACQUIRE,
+        provider_type="k8s",
+        provider_api="Deployment",
+        template_id="tpl-1",
+        requested_count=requested_count,
+        provider_data=provider_data,
+    )
+
+
+@pytest.mark.asyncio
+async def test_deployment_handler_check_status_running_pods(
+    kmock_k8s: KubernetesEmulator,
+    k8s_client_facade: Any,
+    k8s_config: Any,
+) -> None:
+    """check_hosts_status sees Running pods and reports an in_progress/partial verdict.
+
+    The Deployment object itself does not exist in this test (we only seed pods),
+    so the controller view will be empty and the verdict is derived from the pod
+    roll-up math only.  The handler must not raise when the Deployment is absent
+    (pre-create or post-release race).
+    """
+    import asyncio  # noqa: PLC0415
+    from kmock import resource  # noqa: PLC0415
+
+    request_id = f"req-{uuid.uuid4()}"
+    dep_name = f"orb-{str(uuid.uuid4())[:8]}"
+
+    # Register both deployments and pods resources in kmock so API discovery works.
+    dep_res = resource("apps", "v1", "deployments")
+    kmock_k8s.resources[dep_res] = {
+        "namespaced": True,
+        "kind": "Deployment",
+        "singular": "deployment",
+        "verbs": ["get", "list", "create", "patch", "delete", "watch"],
+        "shortnames": ["deploy"],
+        "categories": [],
+        "subresources": ["scale", "status"],
+    }
+    pod_res = resource("", "v1", "pods")
+    kmock_k8s.resources[pod_res] = {
+        "namespaced": True,
+        "kind": "Pod",
+        "singular": "pod",
+        "verbs": ["get", "list", "create", "delete", "watch"],
+        "shortnames": ["po"],
+        "categories": [],
+        "subresources": [],
+    }
+
+    _preload_deployment_pods(
+        kmock_k8s,
+        deployment_name=dep_name,
+        request_id=request_id,
+        count=2,
+        phase="Running",
+        ready=True,
+    )
+
+    handler = _make_deployment_handler(k8s_client_facade, k8s_config)
+    request = _make_request_with_id(
+        request_id, requested_count=2, deployment_name=dep_name
+    )
+
+    result = await asyncio.to_thread(handler.check_hosts_status, request)
+
+    # Must produce two instances (one per Running pod).
+    assert len(result.instances) == 2
+    for inst in result.instances:
+        assert inst["status"] == "running"
+
+
+@pytest.mark.asyncio
+async def test_deployment_handler_check_status_no_pods_returns_in_progress(
+    kmock_k8s: KubernetesEmulator,
+    k8s_client_facade: Any,
+    k8s_config: Any,
+) -> None:
+    """check_hosts_status with no pods returns in_progress (Deployment still scaling up)."""
+    import asyncio  # noqa: PLC0415
+    from kmock import resource  # noqa: PLC0415
+
+    request_id = f"req-{uuid.uuid4()}"
+    dep_name = f"orb-{str(uuid.uuid4())[:8]}"
+
+    dep_res = resource("apps", "v1", "deployments")
+    kmock_k8s.resources[dep_res] = {
+        "namespaced": True,
+        "kind": "Deployment",
+        "singular": "deployment",
+        "verbs": ["get", "list", "create", "patch", "delete", "watch"],
+        "shortnames": ["deploy"],
+        "categories": [],
+        "subresources": ["scale", "status"],
+    }
+    pod_res = resource("", "v1", "pods")
+    kmock_k8s.resources[pod_res] = {
+        "namespaced": True,
+        "kind": "Pod",
+        "singular": "pod",
+        "verbs": ["get", "list", "create", "delete", "watch"],
+        "shortnames": ["po"],
+        "categories": [],
+        "subresources": [],
+    }
+
+    handler = _make_deployment_handler(k8s_client_facade, k8s_config)
+    request = _make_request_with_id(
+        request_id, requested_count=3, deployment_name=dep_name
+    )
+
+    result = await asyncio.to_thread(handler.check_hosts_status, request)
+
+    assert result.instances == []
+    assert result.fulfilment.state == "in_progress"

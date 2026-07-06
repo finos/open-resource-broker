@@ -1,4 +1,11 @@
-"""Unit tests for :class:`K8sClient` — token refresh and cleanup behaviour."""
+"""Unit tests for :class:`K8sClient` — token refresh and cleanup behaviour.
+
+Backfill coverage added in Group T1:
+* load_config() with in_cluster=False + a valid kubeconfig path
+* load_config() with in_cluster=False + an invalid kubeconfig path (raises K8sAuthError)
+* api_client lazy-wiring (property builds an ApiClient on first access)
+* core_v1, apps_v1, batch_v1 lazy accessors
+"""
 
 from __future__ import annotations
 
@@ -17,6 +24,194 @@ def _make_client(api_client: object | None = None) -> "K8sClient":
     mock_logger = MagicMock()
     cfg = K8sProviderConfig()
     return K8sClient(config=cfg, logger=mock_logger, api_client=api_client)  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# load_config() — kubeconfig path
+# ---------------------------------------------------------------------------
+
+
+def test_load_config_with_valid_kubeconfig(tmp_path: pytest.TempPathFactory) -> None:
+    """load_config with in_cluster=False calls load_kubeconfig without raising."""
+    from orb.providers.k8s.infrastructure.k8s_client import K8sClient
+
+    # K8sProviderConfig validates that kubeconfig_path exists; create a stub file.
+    kube_file = tmp_path / "kubeconfig"  # type: ignore[operator]
+    kube_file.write_text("# stub kubeconfig for test")
+
+    cfg = K8sProviderConfig(in_cluster=False, kubeconfig_path=str(kube_file))  # type: ignore[call-arg]
+    client = K8sClient(config=cfg, logger=MagicMock())
+
+    with patch("orb.providers.k8s.infrastructure.k8s_client.load_kubeconfig") as mock_lkc:
+        client.load_config()
+
+    mock_lkc.assert_called_once_with(
+        config_file=cfg.kubeconfig_path,
+        context=cfg.context,
+        logger=client._logger,  # noqa: SLF001
+    )
+
+
+def test_load_config_propagates_k8s_auth_error(tmp_path: "pytest.TempPathFactory") -> None:
+    """load_config with in_cluster=False propagates K8sAuthError from load_kubeconfig."""
+    from orb.providers.k8s.exceptions.k8s_errors import K8sAuthError
+    from orb.providers.k8s.infrastructure.k8s_client import K8sClient
+
+    cfg = K8sProviderConfig(in_cluster=False)  # type: ignore[call-arg]
+    client = K8sClient(config=cfg, logger=MagicMock())
+
+    with patch(
+        "orb.providers.k8s.infrastructure.k8s_client.load_kubeconfig",
+        side_effect=K8sAuthError("bad kubeconfig"),
+    ):
+        with pytest.raises(K8sAuthError, match="bad kubeconfig"):
+            client.load_config()
+
+
+def test_load_config_skips_when_api_client_already_set() -> None:
+    """load_config is a no-op when a pre-built api_client has been injected."""
+    mock_api_client = MagicMock()
+    client = _make_client(api_client=mock_api_client)
+
+    with patch("orb.providers.k8s.infrastructure.k8s_client.load_kubeconfig") as mock_lkc:
+        with patch(
+            "orb.providers.k8s.infrastructure.k8s_client.load_in_cluster_config"
+        ) as mock_lic:
+            client.load_config()
+
+    mock_lkc.assert_not_called()
+    mock_lic.assert_not_called()
+
+
+def test_load_config_in_cluster_forced(monkeypatch: pytest.MonkeyPatch) -> None:
+    """load_config with in_cluster=True calls InClusterAuthAdapter.load()."""
+    from orb.providers.k8s.infrastructure.k8s_client import K8sClient
+
+    cfg = K8sProviderConfig(in_cluster=True)  # type: ignore[call-arg]
+    client = K8sClient(config=cfg, logger=MagicMock())
+
+    mock_adapter = MagicMock()
+    client._in_cluster_adapter = mock_adapter  # noqa: SLF001
+
+    client.load_config()
+
+    mock_adapter.load.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# api_client / core_v1 / apps_v1 / batch_v1 lazy wiring
+# ---------------------------------------------------------------------------
+
+
+def test_api_client_lazy_builds_on_first_access() -> None:
+    """api_client property creates an ApiClient when none is pre-supplied."""
+    mock_api = MagicMock()
+    fake_api_client_cls = MagicMock(return_value=mock_api)
+
+    from orb.providers.k8s.infrastructure.k8s_client import K8sClient
+
+    cfg = K8sProviderConfig(in_cluster=False)  # type: ignore[call-arg]
+    client = K8sClient(config=cfg, logger=MagicMock())
+
+    with patch("orb.providers.k8s.infrastructure.k8s_client.load_kubeconfig"):
+        with patch(
+            "kubernetes.client.api_client.ApiClient",
+            fake_api_client_cls,
+        ):
+            # Import the real module to patch the inner import
+            import sys
+
+            import kubernetes.client.api_client as _api_client_mod  # noqa: PLC0415
+
+            orig = _api_client_mod.ApiClient
+            _api_client_mod.ApiClient = fake_api_client_cls  # type: ignore[assignment]
+            try:
+                result = client.api_client
+            finally:
+                _api_client_mod.ApiClient = orig
+
+    # The property must return an ApiClient and memoize it.
+    assert result is not None
+    assert client._api_client is not None  # noqa: SLF001
+
+
+def test_core_v1_lazy_accessor_builds_once() -> None:
+    """core_v1 property wraps the pre-supplied ApiClient in a CoreV1Api."""
+    mock_core = MagicMock()
+    mock_api_client = MagicMock()
+    client = _make_client(api_client=mock_api_client)
+
+    with patch("kubernetes.client.CoreV1Api", return_value=mock_core):
+        import kubernetes.client as _kc  # noqa: PLC0415
+
+        orig = _kc.CoreV1Api
+        _kc.CoreV1Api = MagicMock(return_value=mock_core)  # type: ignore[assignment]
+        try:
+            result = client.core_v1
+            result2 = client.core_v1  # second access should return same object
+        finally:
+            _kc.CoreV1Api = orig
+
+    # Both accesses return the same instance (lazy memoisation).
+    assert result is result2
+
+
+def test_apps_v1_lazy_accessor_builds_once() -> None:
+    """apps_v1 property wraps the pre-supplied ApiClient in an AppsV1Api."""
+    mock_api_client = MagicMock()
+    client = _make_client(api_client=mock_api_client)
+
+    import kubernetes.client as _kc  # noqa: PLC0415
+
+    mock_apps = MagicMock()
+    orig = _kc.AppsV1Api
+    _kc.AppsV1Api = MagicMock(return_value=mock_apps)  # type: ignore[assignment]
+    try:
+        r1 = client.apps_v1
+        r2 = client.apps_v1
+    finally:
+        _kc.AppsV1Api = orig
+
+    assert r1 is r2
+
+
+def test_batch_v1_lazy_accessor_builds_once() -> None:
+    """batch_v1 property wraps the pre-supplied ApiClient in a BatchV1Api."""
+    mock_api_client = MagicMock()
+    client = _make_client(api_client=mock_api_client)
+
+    import kubernetes.client as _kc  # noqa: PLC0415
+
+    mock_batch = MagicMock()
+    orig = _kc.BatchV1Api
+    _kc.BatchV1Api = MagicMock(return_value=mock_batch)  # type: ignore[assignment]
+    try:
+        r1 = client.batch_v1
+        r2 = client.batch_v1
+    finally:
+        _kc.BatchV1Api = orig
+
+    assert r1 is r2
+
+
+def test_cleanup_resets_cached_api_sub_clients() -> None:
+    """cleanup() must null out core_v1, apps_v1, and batch_v1 cached instances."""
+    mock_api_client = MagicMock()
+    client = _make_client(api_client=mock_api_client)
+
+    import kubernetes.client as _kc  # noqa: PLC0415
+
+    # Pre-warm all three lazy accessors.
+    client._core_v1 = MagicMock()  # noqa: SLF001
+    client._apps_v1 = MagicMock()  # noqa: SLF001
+    client._batch_v1 = MagicMock()  # noqa: SLF001
+
+    client.cleanup()
+
+    assert client._core_v1 is None  # noqa: SLF001
+    assert client._apps_v1 is None  # noqa: SLF001
+    assert client._batch_v1 is None  # noqa: SLF001
+    assert client._api_client is None  # noqa: SLF001
 
 
 # ---------------------------------------------------------------------------

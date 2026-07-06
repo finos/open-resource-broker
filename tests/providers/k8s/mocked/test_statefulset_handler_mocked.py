@@ -8,6 +8,8 @@ Covered scenarios
 * acquire_hosts POSTs a StatefulSet with spec.replicas matching the count.
 * release_hosts scale-down path patches spec.replicas targeting the
   highest ordinals (StatefulSet controller semantics).
+* check_hosts_status reads pods from the apiserver and returns the correct
+  fulfilment verdict (Group T1 backfill).
 """
 
 from __future__ import annotations
@@ -222,3 +224,181 @@ async def test_statefulset_handler_scale_down_from_highest_ordinal(
     # After the release the spec.replicas stored in kmock must be 2.
     stored = kmock_k8s.objects[sts_res, "orb-test", sts_name]
     assert stored.raw["spec"]["replicas"] == 2
+
+
+# ---------------------------------------------------------------------------
+# check_hosts_status — reads pods via label-selector + StatefulSet status
+# ---------------------------------------------------------------------------
+
+
+def _preload_sts_pods(
+    kmock_k8s: KubernetesEmulator,
+    *,
+    sts_name: str,
+    request_id: str,
+    namespace: str = "orb-test",
+    count: int = 2,
+    phase: str = "Running",
+    ready: bool = True,
+) -> list[str]:
+    """Seed kmock with pods belonging to a StatefulSet-managed request."""
+    from kmock import resource  # noqa: PLC0415
+
+    pod_res = resource("", "v1", "pods")
+    names = []
+    for i in range(count):
+        pod_name = f"{sts_name}-{i}"
+        names.append(pod_name)
+        kmock_k8s.objects[pod_res, namespace, pod_name] = {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": pod_name,
+                "namespace": namespace,
+                "labels": {
+                    "orb.io/managed": "true",
+                    "orb.io/request-id": request_id,
+                    "orb.io/provider-api": "StatefulSet",
+                },
+            },
+            "spec": {
+                "containers": [{"name": "app", "image": "busybox:latest"}],
+            },
+            "status": {
+                "phase": phase,
+                "podIP": "10.0.0.2" if phase == "Running" else None,
+                "hostIP": "10.1.0.2" if phase == "Running" else None,
+                "conditions": [{"type": "Ready", "status": "True" if ready else "False"}],
+                "containerStatuses": [],
+            },
+        }
+    return names
+
+
+def _make_request_with_id(
+    request_id: str,
+    *,
+    requested_count: int = 2,
+    statefulset_name: str | None = None,
+    namespace: str = "orb-test",
+) -> Any:
+    """Build a real Request aggregate with the given string request_id."""
+    from orb.domain.request.aggregate import Request  # noqa: PLC0415
+    from orb.domain.request.value_objects import RequestId, RequestType  # noqa: PLC0415
+
+    provider_data: dict[str, Any] = {"namespace": namespace}
+    if statefulset_name:
+        provider_data["statefulset_name"] = statefulset_name
+    return Request(
+        request_id=RequestId(value=request_id),
+        request_type=RequestType.ACQUIRE,
+        provider_type="k8s",
+        provider_api="StatefulSet",
+        template_id="tpl-1",
+        requested_count=requested_count,
+        provider_data=provider_data,
+    )
+
+
+@pytest.mark.asyncio
+async def test_statefulset_handler_check_status_running_pods(
+    kmock_k8s: KubernetesEmulator,
+    k8s_client_facade: Any,
+    k8s_config: Any,
+) -> None:
+    """check_hosts_status sees Running pods and reports running instances.
+
+    The StatefulSet object itself is absent here, so the controller view is
+    empty.  The verdict is derived from the pod roll-up.
+    """
+    import asyncio  # noqa: PLC0415
+    from kmock import resource  # noqa: PLC0415
+
+    request_id = f"req-{uuid.uuid4()}"
+    sts_name = f"orb-{str(uuid.uuid4())[:8]}"
+
+    sts_res = resource("apps", "v1", "statefulsets")
+    kmock_k8s.resources[sts_res] = {
+        "namespaced": True,
+        "kind": "StatefulSet",
+        "singular": "statefulset",
+        "verbs": ["get", "list", "create", "patch", "delete", "watch"],
+        "shortnames": ["sts"],
+        "categories": [],
+        "subresources": ["scale", "status"],
+    }
+    pod_res = resource("", "v1", "pods")
+    kmock_k8s.resources[pod_res] = {
+        "namespaced": True,
+        "kind": "Pod",
+        "singular": "pod",
+        "verbs": ["get", "list", "create", "delete", "watch"],
+        "shortnames": ["po"],
+        "categories": [],
+        "subresources": [],
+    }
+
+    _preload_sts_pods(
+        kmock_k8s,
+        sts_name=sts_name,
+        request_id=request_id,
+        count=2,
+        phase="Running",
+        ready=True,
+    )
+
+    handler = _make_sts_handler(k8s_client_facade, k8s_config)
+    request = _make_request_with_id(
+        request_id, requested_count=2, statefulset_name=sts_name
+    )
+
+    result = await asyncio.to_thread(handler.check_hosts_status, request)
+
+    assert len(result.instances) == 2
+    for inst in result.instances:
+        assert inst["status"] == "running"
+
+
+@pytest.mark.asyncio
+async def test_statefulset_handler_check_status_no_pods_in_progress(
+    kmock_k8s: KubernetesEmulator,
+    k8s_client_facade: Any,
+    k8s_config: Any,
+) -> None:
+    """check_hosts_status with no pods returns in_progress (StatefulSet starting)."""
+    import asyncio  # noqa: PLC0415
+    from kmock import resource  # noqa: PLC0415
+
+    request_id = f"req-{uuid.uuid4()}"
+    sts_name = f"orb-{str(uuid.uuid4())[:8]}"
+
+    sts_res = resource("apps", "v1", "statefulsets")
+    kmock_k8s.resources[sts_res] = {
+        "namespaced": True,
+        "kind": "StatefulSet",
+        "singular": "statefulset",
+        "verbs": ["get", "list", "create", "patch", "delete", "watch"],
+        "shortnames": ["sts"],
+        "categories": [],
+        "subresources": ["scale", "status"],
+    }
+    pod_res = resource("", "v1", "pods")
+    kmock_k8s.resources[pod_res] = {
+        "namespaced": True,
+        "kind": "Pod",
+        "singular": "pod",
+        "verbs": ["get", "list", "create", "delete", "watch"],
+        "shortnames": ["po"],
+        "categories": [],
+        "subresources": [],
+    }
+
+    handler = _make_sts_handler(k8s_client_facade, k8s_config)
+    request = _make_request_with_id(
+        request_id, requested_count=2, statefulset_name=sts_name
+    )
+
+    result = await asyncio.to_thread(handler.check_hosts_status, request)
+
+    assert result.instances == []
+    assert result.fulfilment.state == "in_progress"
