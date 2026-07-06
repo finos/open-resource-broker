@@ -354,7 +354,8 @@ class ProviderStrategy(ABC):
         """
         return {}
 
-    def get_ui_column_schema(self) -> list[Any]:
+    @classmethod
+    def get_ui_column_schema(cls) -> list[Any]:
         """Return UI column descriptors contributed by this provider strategy.
 
         Each descriptor is a :class:`~orb.application.dto.system.UIColumnDescriptor`
@@ -362,6 +363,10 @@ class ProviderStrategy(ABC):
 
         The import is deferred so that provider packages without the application
         DTO layer installed can still load without error.
+
+        Declared as a ``@classmethod`` so callers can retrieve the schema from
+        the class directly — no instance (and therefore no live AWS credentials
+        or I/O) is required.
 
         Default implementation returns an empty list — providers opt in by
         overriding this method.  Existing provider strategies that do not

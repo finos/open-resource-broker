@@ -104,12 +104,18 @@ services:
     image: orb-api:${VERSION:-latest}
     container_name: orb-ui-split
     restart: unless-stopped
-    # Launch Reflex production backend directly, bypassing the entrypoint's
-    # `orb server start` path so it only runs the UI process.
-    entrypoint: ["reflex", "run", "--env", "prod", "--backend-only",
-                 "--backend-port", "${ORB_UI_PORT:-8001}",
-                 "--backend-host", "0.0.0.0"]
-    working_dir: /opt/venv/lib/python3.13/site-packages/orb/ui
+    # Bootstrap: resolve the orb/ui package directory at runtime so the
+    # working_dir is correct for any supported Python version (3.10-3.14).
+    # Using the ORB package path rather than a hardcoded site-packages path
+    # ensures the container keeps working when the Python version changes.
+    entrypoint:
+      - "sh"
+      - "-c"
+      - >
+        cd $(python -c 'import orb.ui, pathlib; print(pathlib.Path(orb.ui.__file__).parent)') &&
+        exec reflex run --env prod --backend-only
+        --backend-port ${ORB_UI_PORT:-8001}
+        --backend-host 0.0.0.0
 
     environment:
       ORB_MODE: remote
@@ -128,6 +134,13 @@ services:
 
     ports:
       - "${ORB_UI_PORT:-8001}:${ORB_UI_PORT:-8001}"
+
+    # Mount the shared work volume so the UI container can read the loopback
+    # auth token written by orb-api to /app/data/server/orb-server.token.
+    # Without this mount the UI falls back to unauthenticated (viewer) mode
+    # even when the operator has enabled bearer-token auth on the API.
+    volumes:
+      - orb-work:/app/data:ro
 
     depends_on:
       orb-api:

@@ -330,7 +330,9 @@ def topbar(title: str) -> rx.Component:
 
 
 def page(title: str, *children: rx.Component, on_mount=None) -> rx.Component:
-    handlers = [AppState.poll_health]
+    # load_provider_schemas has a single-flight guard (_schemas_loaded) so
+    # firing it on every page mount is safe — subsequent calls are no-ops.
+    handlers = [AppState.poll_health, AppState.load_provider_schemas]
     if on_mount is not None:
         if isinstance(on_mount, list):
             handlers.extend(on_mount)

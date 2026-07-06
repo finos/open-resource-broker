@@ -457,6 +457,14 @@ class MachinesState(rx.State):
         All dict/list fields are pre-serialised to strings so Reflex
         column formatters receive typed scalars at compile time.
         """
+        # Fetch provider schemas once (from AppState — single HTTP call, shared).
+        try:
+            _mach_schemas: dict[str, list[dict[str, Any]]] = self._get_state_from_cache(
+                AppState
+            ).provider_schemas  # type: ignore[union-attr]
+        except Exception:
+            _mach_schemas = {}
+
         rows: list[dict[str, Any]] = []
         for m in self.filtered_machines:
             uptime_seconds = m.get("uptime_seconds")
@@ -479,10 +487,9 @@ class MachinesState(rx.State):
 
             # Extract provider-declared fields so dynamic column formatters
             # can do a simple row[key] lookup at render time.
-            # Provider schemas are owned by AppState (single fetch, shared).
             provider_fields = resolve_provider_row_fields(
                 m,
-                self.get_state(AppState).provider_schemas,
+                _mach_schemas,
                 "machines",
                 self.provider_filter,
             )
@@ -549,9 +556,14 @@ class MachinesState(rx.State):
 
         Returns columns from all providers when ``provider_filter`` is ``"All"``,
         or only the active provider's columns when a specific provider is selected.
-        Reads from AppState.provider_schemas (single fetch, shared across all pages).
+        Reads from AppState.provider_schemas (single HTTP fetch, shared across pages).
         """
-        schemas = self.get_state(AppState).provider_schemas
+        try:
+            schemas: dict[str, list[dict[str, Any]]] = self._get_state_from_cache(
+                AppState
+            ).provider_schemas  # type: ignore[union-attr]
+        except Exception:
+            schemas = {}
         return build_provider_columns(
             schemas,
             "machines",

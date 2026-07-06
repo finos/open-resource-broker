@@ -39,6 +39,7 @@ from ..components.request_modal import RequestModalState, request_modal, request
 from ..components.template_drawer import delete_confirm_dialog, template_drawer
 from ..components.template_form import template_form
 from ..components.view_toggle import view_toggle
+from ..state import AppState
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -447,22 +448,6 @@ class TemplatesState(rx.State):
     loading_more: bool = False
     page_size: int = 200
 
-    # Provider column schemas — fetched on mount into this state so that
-    # dynamic_columns and card_rows operate on a plain Python dict rather
-    # than a cross-state Reflex Var (which cannot be coerced to bool).
-    provider_schemas: dict[str, list[dict[str, Any]]] = {}
-
-    @rx.event(background=True)
-    async def load_provider_schemas(self):
-        """Fetch provider column schemas and store in this state."""
-        try:
-            schemas = await api.get_provider_schemas()
-            async with self:
-                self.provider_schemas = schemas if isinstance(schemas, dict) else {}
-        except Exception:
-            async with self:
-                self.provider_schemas = {}
-
     # ── Computed ────────────────────────────────────────────────────────────
 
     @rx.var
@@ -499,9 +484,18 @@ class TemplatesState(rx.State):
 
     @rx.var
     def dynamic_columns(self) -> list[ColumnDef]:
-        """Provider-declared column definitions merged from backend schemas."""
+        """Provider-declared column definitions merged from backend schemas.
+
+        Reads from AppState.provider_schemas (single HTTP fetch, shared across pages).
+        """
+        try:
+            schemas: dict[str, list[dict[str, Any]]] = self._get_state_from_cache(
+                AppState
+            ).provider_schemas  # type: ignore[union-attr]
+        except Exception:
+            schemas = {}
         return build_provider_columns(
-            self.provider_schemas,
+            schemas,
             "templates",
             self.provider_filter,
         )
@@ -514,6 +508,14 @@ class TemplatesState(rx.State):
         All dict/list fields are pre-serialised to strings here so that
         Reflex column formatters receive typed scalars at compile time.
         """
+        # Fetch provider schemas once (from AppState — single HTTP call, shared).
+        try:
+            _tmpl_schemas: dict[str, list[dict[str, Any]]] = self._get_state_from_cache(
+                AppState
+            ).provider_schemas  # type: ignore[union-attr]
+        except Exception:
+            _tmpl_schemas = {}
+
         rows: list[dict[str, Any]] = []
         for t in self.filtered_templates:
             tags = t.get("tags") or {}
@@ -622,7 +624,7 @@ class TemplatesState(rx.State):
                     # ── Provider-declared fields ───────────────────────────────
                     **resolve_provider_row_fields(
                         t,
-                        self.provider_schemas,
+                        _tmpl_schemas,
                         "templates",
                         self.provider_filter,
                     ),
@@ -1447,7 +1449,7 @@ def _filter_row() -> rx.Component:
     (``provider_filter``) is driven from live backend schemas and lets users scope
     the table to a specific registered provider's machines/requests.
     """
-    provider_options = rx.Var.create(["All"]) + TemplatesState.provider_schemas.keys().to(list)  # type: ignore[attr-defined]
+    provider_options = rx.Var.create(["All"]) + AppState.provider_schemas.keys().to(list)  # type: ignore[attr-defined]
     return rx.hstack(
         rx.foreach(
             PROVIDER_FILTER_OPTIONS,
@@ -1688,6 +1690,5 @@ def templates_page() -> rx.Component:
         on_mount=[
             TemplatesState.load,
             TemplatesState.auto_refresh,
-            TemplatesState.load_provider_schemas,
         ],
     )
