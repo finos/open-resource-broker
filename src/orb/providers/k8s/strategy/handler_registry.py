@@ -304,12 +304,15 @@ class K8sHandlerRegistry:
             # created must not be closed out as terminated — they surface as
             # ``unknown`` instead, preventing phantom machine rows.
             #
-            # Exception: for return requests, every ID in ``resource_ids``
-            # was explicitly submitted for deletion by the caller.  When such
-            # an ID is absent from the live cluster it has been deleted, so
-            # it must be classified as ``"terminated"`` rather than
-            # ``"unknown"`` — otherwise the return-request state machine
-            # can never advance to Completed.
+            # Exception: for return requests where ``pod_names`` was never
+            # recorded in provider_data (e.g. Job handler stores ``job_name``,
+            # not individual pod names; or older acquire paths that pre-date the
+            # pod_names field), every ID in ``resource_ids`` was explicitly
+            # submitted for deletion so its absence from the cluster confirms
+            # deletion.  We only expand the confirmed set when ``pod_names``
+            # is entirely absent from provider_data — when it is explicitly set
+            # to ``[]`` the acquire confirmed zero pods and we must not falsely
+            # advance the return request.
             provider_data: dict[str, Any] = getattr(request, "provider_data", None) or {}
             confirmed_pod_names: set[str] = set(provider_data.get("pod_names") or [])
 
@@ -318,12 +321,12 @@ class K8sHandlerRegistry:
                 or getattr(getattr(request, "request_type", None), "value", None) == "return"
             )
 
-            # For return requests, treat the explicitly-requested IDs as
-            # confirmed so that their absence from the cluster signals deletion.
-            # This covers the Job handler (which stores job_name, not pod_names)
-            # and any provider_api where pod_names is not populated at acquire.
-            if is_return:
-                confirmed_pod_names = confirmed_pod_names | set(resource_ids or [])
+            # For return requests where pod_names is not recorded at all (key absent),
+            # treat the caller-supplied resource_ids as the confirmed set.  This
+            # covers the Job handler (which records job_name, not pod names) and
+            # any provider_api that does not populate pod_names at acquire time.
+            if is_return and "pod_names" not in provider_data:
+                confirmed_pod_names = set(resource_ids or [])
 
             # Derive instance_type from the workload kind so machine rows
             # group and filter correctly by provider_api.
@@ -453,8 +456,18 @@ class K8sHandlerRegistry:
                 flat = template_payload.model_dump()
                 provider_config = flat.pop("provider_config", None) or {}
                 if isinstance(provider_config, dict):
+                    # Merge provider_config keys into flat, preferring non-None
+                    # provider_config values over None flat values.  The standard
+                    # dict.setdefault() only inserts when the key is absent, so it
+                    # silently ignores top-level None fields produced by model_dump()
+                    # — e.g. flat["namespace"] = None would prevent
+                    # provider_config["namespace"] = "custom-ns" from taking effect.
+                    # We override flat[key] when it is absent or None, which matches
+                    # the intended precedence: explicit top-level fields win; fields
+                    # set only in provider_config are promoted.
                     for key, value in provider_config.items():
-                        flat.setdefault(key, value)
+                        if value is not None and flat.get(key) is None:
+                            flat[key] = value
                 return K8sTemplate.model_validate(flat)
 
         # Fall back to a minimal K8sTemplate built from the request fields.

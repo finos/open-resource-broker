@@ -198,3 +198,65 @@ async def test_acquire_request_in_progress_when_pods_pending() -> None:
     assert isinstance(outcome, Accepted)
     assert "pod-1" in outcome.pending_resource_ids
     assert "pod-2" in outcome.pending_resource_ids
+
+
+# ---------------------------------------------------------------------------
+# F5 — providerConfig.namespace is respected in build_template_for_request
+# ---------------------------------------------------------------------------
+
+
+def test_build_template_namespace_from_provider_config_is_promoted() -> None:
+    """providerConfig.namespace in a TemplateDTO must be promoted to K8sTemplate.namespace.
+
+    Regression for the bug where build_template_for_request used
+    dict.setdefault() to merge provider_config keys into the flat model_dump()
+    dict. setdefault() only inserts when the key is absent, but model_dump()
+    always includes all fields (including those set to None). When
+    flat['namespace'] = None, setdefault('namespace', 'custom-ns') was silently
+    ignored, leaving the namespace as None and falling through to the
+    provider-level default.
+    """
+    from types import SimpleNamespace  # noqa: PLC0415
+    from unittest.mock import MagicMock  # noqa: PLC0415
+
+    import uuid  # noqa: PLC0415
+
+    from orb.domain.request.aggregate import Request  # noqa: PLC0415
+    from orb.domain.request.value_objects import RequestId, RequestType  # noqa: PLC0415
+    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate  # noqa: PLC0415
+
+    # Build a fake TemplateDTO-like object that carries namespace only in
+    # provider_config (as the REST submission path would produce).
+    class _FakeTemplateDTO:
+        def model_dump(self) -> dict:
+            return {
+                "template_id": "tpl-test",
+                "image_id": "busybox:latest",
+                "max_instances": 1,
+                "provider_type": "k8s",
+                "provider_api": "Pod",
+                # namespace is NOT set at the top level — it is None.
+                "namespace": None,
+                # The operator set it in provider_config.
+                "provider_config": {"namespace": "custom-namespace-xyz"},
+            }
+
+    request = Request(
+        request_id=RequestId(value=f"req-{uuid.uuid4()}"),
+        request_type=RequestType.ACQUIRE,
+        provider_type="k8s",
+        provider_api="Pod",
+        template_id="tpl-test",
+        requested_count=1,
+        metadata={"template": _FakeTemplateDTO()},
+        provider_data={},
+    )
+
+    registry = _make_registry()
+    template = registry.build_template_for_request(request)
+
+    assert isinstance(template, K8sTemplate), f"Expected K8sTemplate, got {type(template)}"
+    assert template.namespace == "custom-namespace-xyz", (
+        f"Expected namespace='custom-namespace-xyz', got {template.namespace!r}. "
+        "providerConfig.namespace was silently ignored."
+    )

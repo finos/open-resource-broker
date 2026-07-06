@@ -524,3 +524,65 @@ async def test_pod_handler_invalid_image_name_surfaced_as_failed(
         f"Expected failed fulfilment for InvalidImageName pod, "
         f"got {result.fulfilment.state!r} (message: {result.fulfilment.message!r})"
     )
+
+
+# ---------------------------------------------------------------------------
+# F5 — template providerConfig.namespace override is respected
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_pod_created_in_template_namespace_override(
+    kmock_k8s: KubernetesEmulator,
+    k8s_client_facade: Any,
+    k8s_config: Any,
+) -> None:
+    """A template with providerConfig.namespace must create pods in that namespace.
+
+    Regression for the bug where providerConfig.namespace was silently ignored
+    because build_template_for_request used dict.setdefault() to merge it, which
+    does not override None values produced by model_dump().
+    """
+    from kmock import resource  # noqa: PLC0415
+
+    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate  # noqa: PLC0415
+
+    # Register the pods resource under both namespaces so kmock accepts creates.
+    pod_res = resource("", "v1", "pods")
+    kmock_k8s.resources[pod_res] = {
+        "namespaced": True,
+        "kind": "Pod",
+        "singular": "pod",
+        "verbs": ["get", "list", "create", "delete", "watch"],
+        "shortnames": ["po"],
+        "categories": [],
+        "subresources": [],
+    }
+
+    # Template with explicit namespace override (different from provider default).
+    template_with_ns = K8sTemplate(
+        template_id="tpl-ns-override",
+        provider_api="Pod",
+        image_id="busybox:latest",
+        max_instances=1,
+        namespace="custom-namespace",
+    )
+
+    handler = _make_pod_handler(k8s_client_facade, k8s_config)
+    request = _make_request(requested_count=1)
+
+    result = await handler.acquire_hosts(request, template_with_ns)
+
+    # Pod must have been created in the template-level namespace.
+    pod_name = result["resource_ids"][0]
+    assert result["provider_data"]["namespace"] == "custom-namespace", (
+        f"Expected pod created in 'custom-namespace', "
+        f"got namespace={result['provider_data']['namespace']!r}"
+    )
+    # Verify the pod is actually stored under the correct namespace in kmock.
+    stored = [(res, ns, name) for res, ns, name in kmock_k8s.objects]
+    custom_ns_pods = [name for res, ns, name in stored if ns == "custom-namespace"]
+    assert pod_name in custom_ns_pods, (
+        f"Pod {pod_name!r} not found under 'custom-namespace' in kmock. "
+        f"Stored objects: {stored}"
+    )
