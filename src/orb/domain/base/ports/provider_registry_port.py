@@ -25,8 +25,18 @@ class ProviderRegistryPort(ABC):
         pass
 
     @abstractmethod
-    def select_active_provider(self, logger: Optional[Any] = None) -> ProviderSelectionResult:
-        """Select the currently active provider."""
+    def select_active_provider(
+        self,
+        logger: Optional[Any] = None,
+        *,
+        provider_name: Optional[str] = None,
+        provider_type: Optional[str] = None,
+    ) -> ProviderSelectionResult:
+        """Select the currently active provider.
+
+        provider_name: when provided, selects the exact named instance.
+        provider_type: when provided, filters to instances of that type.
+        """
         pass
 
     @abstractmethod

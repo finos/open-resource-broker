@@ -31,8 +31,16 @@ class ProviderSelectionPort(ABC):
         """
 
     @abstractmethod
-    def select_active_provider(self) -> ProviderSelectionResult:
+    def select_active_provider(
+        self,
+        *,
+        provider_name: Optional[str] = None,
+        provider_type: Optional[str] = None,
+    ) -> ProviderSelectionResult:
         """Select active provider instance from configuration.
+
+        provider_name: when provided, selects the exact named instance.
+        provider_type: when provided, filters to instances of that type.
 
         Returns:
             ProviderSelectionResult with active provider details

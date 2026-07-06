@@ -29,9 +29,16 @@ class ProviderSelectionAdapter(ProviderSelectionPort):
         """Select provider instance for template requirements."""
         return self._service.select_provider_for_template(template, provider_name)
 
-    def select_active_provider(self) -> ProviderSelectionResult:
+    def select_active_provider(
+        self,
+        *,
+        provider_name: str | None = None,
+        provider_type: str | None = None,
+    ) -> ProviderSelectionResult:
         """Select active provider instance from configuration."""
-        return self._service.select_active_provider()
+        return self._service.select_active_provider(
+            provider_name=provider_name, provider_type=provider_type
+        )
 
     def validate_template_requirements(
         self, template: Template, provider_instance: str

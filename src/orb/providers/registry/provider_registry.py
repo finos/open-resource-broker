@@ -605,31 +605,26 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         # Strategy 5: Fallback to default
         return self._select_default_provider(template, logger)
 
-    def select_active_provider(self, logger: Optional[Any] = None) -> ProviderSelectionResult:
+    def select_active_provider(
+        self,
+        logger: Optional[Any] = None,
+        *,
+        provider_name: Optional[str] = None,
+        provider_type: Optional[str] = None,
+    ) -> ProviderSelectionResult:
         """Select active provider instance from configuration.
 
         Precedence:
-        1. Provider name override (--provider-name) — exact instance lookup.
-        2. Provider type override (--provider-type) — filter active instances by type,
+        1. provider_name argument — exact instance lookup.
+        2. provider_type argument — filter active instances by type,
            then apply load-balancing over the filtered set.
         3. Default behaviour — load-balance across all active instances.
         """
         if logger:
             logger.debug("Selecting active provider using selection policy")
 
-        # Check for CLI overrides via the injected config port.
-        config_port = self._get_config_port()
-        name_override: Optional[str] = None
-        type_override: Optional[str] = None
-        if config_port is not None:
-            try:
-                name_override = config_port.get_active_provider_name_override()
-                type_override = config_port.get_active_provider_type_override()
-            except Exception:
-                # Override lookup is best-effort; a stale or dead config port must
-                # not block selection. Fall through with both overrides unset.
-                name_override = None
-                type_override = None
+        name_override = provider_name
+        type_override = provider_type
 
         if name_override:
             provider_instance = self._get_provider_instance_config(name_override)
