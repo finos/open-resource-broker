@@ -366,3 +366,79 @@ async def test_pod_handler_succeeded_pod_classified_as_fulfilled(
         f"Expected fulfilled for Succeeded pod, got {result.fulfilment.state!r} "
         f"(message: {result.fulfilment.message!r})"
     )
+
+
+# ---------------------------------------------------------------------------
+# F2 — Return requests advance to complete when pod deletion is confirmed
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_return_request_completes_when_pod_deleted(
+    kmock_k8s: KubernetesEmulator,
+    k8s_client_facade: Any,
+    k8s_config: Any,
+) -> None:
+    """A return request must reach Completed once the pod is gone from the cluster.
+
+    Regression for the bug where return requests stayed in 'running' state
+    permanently after pod deletion because missing IDs were classified as
+    'unknown' (not 'terminated') when provider_data['pod_names'] was absent,
+    preventing all_confirmed_gone from becoming True.
+
+    Sequence:
+    1. Seed kmock with a Running pod.
+    2. Delete the pod via release_hosts.
+    3. Call get_status on the handler registry with a RETURN-typed request
+       and the pod name in resource_ids.
+    4. Assert the result is Completed (return request reached terminal state).
+    """
+    from orb.domain.base.operation_outcome import Completed  # noqa: PLC0415
+    from orb.domain.request.aggregate import Request  # noqa: PLC0415
+    from orb.domain.request.value_objects import RequestId, RequestType  # noqa: PLC0415
+    from orb.providers.k8s.infrastructure.handlers.pod_handler import K8sPodHandler  # noqa: PLC0415
+    from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry  # noqa: PLC0415
+
+    request_id = f"req-{uuid.uuid4()}"
+    pod_name = f"orb-{request_id[4:12]}-0000"
+    _preload_pod(kmock_k8s, name=pod_name, phase="Running", ready=True, request_id=request_id)
+
+    # --- Step 1: release_hosts deletes the pod ---
+    handler = _make_pod_handler(k8s_client_facade, k8s_config)
+    await handler.release_hosts(
+        [pod_name],
+        {"namespace": "orb-test", "request_id": request_id},
+    )
+
+    # --- Step 2: build a RETURN-typed request with no pod_names in provider_data ---
+    # Deliberately omit pod_names to reproduce the original bug scenario
+    # (e.g. Job handler or requests created before pod_names was populated).
+    return_request = Request(
+        request_id=RequestId(value=request_id),
+        request_type=RequestType.RETURN,
+        provider_type="k8s",
+        provider_api="Pod",
+        template_id="tpl-1",
+        requested_count=1,
+        provider_data={"namespace": "orb-test"},  # no pod_names key
+    )
+
+    # --- Step 3: poll get_status via the registry ---
+    registry = K8sHandlerRegistry(
+        config=k8s_config,
+        logger=MagicMock(),
+        client_provider=lambda: k8s_client_facade,
+        watch_manager_provider=lambda: None,
+        plugin_factories=lambda: {},
+        native_spec_service_provider=lambda: None,
+        handler_overrides={"Pod": handler},
+    )
+
+    outcome = await registry.get_status([pod_name], return_request)
+
+    # The return request must be Completed once the pod is confirmed deleted.
+    assert isinstance(outcome, Completed), (
+        f"Expected Completed for deleted pod on return request, "
+        f"got {type(outcome).__name__}: {outcome!r}"
+    )
+    assert pod_name in outcome.resource_ids

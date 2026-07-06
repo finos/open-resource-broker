@@ -303,8 +303,27 @@ class K8sHandlerRegistry:
             # provider_data["pod_names"]).  IDs that were never successfully
             # created must not be closed out as terminated — they surface as
             # ``unknown`` instead, preventing phantom machine rows.
+            #
+            # Exception: for return requests, every ID in ``resource_ids``
+            # was explicitly submitted for deletion by the caller.  When such
+            # an ID is absent from the live cluster it has been deleted, so
+            # it must be classified as ``"terminated"`` rather than
+            # ``"unknown"`` — otherwise the return-request state machine
+            # can never advance to Completed.
             provider_data: dict[str, Any] = getattr(request, "provider_data", None) or {}
             confirmed_pod_names: set[str] = set(provider_data.get("pod_names") or [])
+
+            is_return = (
+                getattr(request, "request_type", None) == RequestType.RETURN
+                or getattr(getattr(request, "request_type", None), "value", None) == "return"
+            )
+
+            # For return requests, treat the explicitly-requested IDs as
+            # confirmed so that their absence from the cluster signals deletion.
+            # This covers the Job handler (which stores job_name, not pod_names)
+            # and any provider_api where pod_names is not populated at acquire.
+            if is_return:
+                confirmed_pod_names = confirmed_pod_names | set(resource_ids or [])
 
             # Derive instance_type from the workload kind so machine rows
             # group and filter correctly by provider_api.
@@ -350,10 +369,6 @@ class K8sHandlerRegistry:
                 "instances": instances,
             }
 
-            is_return = (
-                getattr(request, "request_type", None) == RequestType.RETURN
-                or getattr(getattr(request, "request_type", None), "value", None) == "return"
-            )
             if is_return:
                 # Return is complete when every *confirmed* pod is gone (either
                 # seen as live-and-terminated or absent from the list — i.e.
