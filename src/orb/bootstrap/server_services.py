@@ -129,6 +129,7 @@ def _register_orchestrators(container: DIContainer) -> None:
                 lambda c: CancelRequestOrchestrator(
                     command_bus=c.get(CommandBus),
                     query_bus=c.get(QueryBus),
+                    return_orchestrator=c.get(ReturnMachinesOrchestrator),
                     logger=c.get(LoggingPort),
                 ),
             )

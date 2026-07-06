@@ -163,11 +163,15 @@ class ConfigurationManager:
             return config_type()  # Use Pydantic defaults
 
     def reload(self) -> None:
-        """Reload configuration from sources."""
-        try:
-            # Do NOT re-derive _config_file — preserve construction parameters (_config_dict, _config_file)
-            # Only reset cached derived state
+        """Reload configuration from sources.
 
+        Forces the next access to ``_ensure_raw_config`` to go to disk via
+        the loader instead of rebuilding from the cached ``_config_dict``
+        snapshot taken at construction. Without invalidating
+        ``_config_dict``, on-disk edits (e.g. after a CLI ``orb init``)
+        never propagate to the running server.
+        """
+        try:
             # Clear all caches
             self._cache_manager.clear_cache()
             self._raw_config = None
@@ -176,9 +180,18 @@ class ConfigurationManager:
             self._path_resolver = None
             self._provider_manager = None
 
-            # Force reload of loader
-            if self._loader:
-                self._loader.reload()  # type: ignore[attr-defined]
+            # Drop the stale in-memory snapshot so the next access
+            # re-reads from disk via the loader. Preserve ``_config_file``
+            # so the loader knows what path to read.
+            if self._config_file:
+                self._config_dict = None
+
+            # Force loader-level reload if the loader supports it.
+            if self._loader and hasattr(self._loader, "reload"):
+                try:
+                    self._loader.reload()  # type: ignore[attr-defined]
+                except Exception as loader_exc:
+                    logger.warning("Loader reload hook failed: %s", loader_exc)
 
             # Mark reload time
             self._cache_manager.mark_reload(time.time())

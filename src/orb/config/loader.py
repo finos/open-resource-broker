@@ -155,7 +155,7 @@ class ConfigurationLoader:
     def _build_raw_config_from_dict(
         cls,
         config_dict: dict[str, Any],
-        config_manager: Optional["ConfigurationManager"] = None,
+        config_manager: Optional[ConfigurationManager] = None,
     ) -> dict[str, Any]:
         """
         Apply the full normalisation pipeline to an in-memory dict.
@@ -473,7 +473,7 @@ class ConfigurationLoader:
                 )
 
             # Propagate scripts_dir written by `orb init` back into the config model
-            if "scripts_dir" in config and config["scripts_dir"]:
+            if config.get("scripts_dir"):
                 scripts_dir = config["scripts_dir"]
                 get_config_logger().debug("scripts_dir from config: %s", scripts_dir)
                 os.environ.setdefault("ORB_SCRIPTS_DIR", scripts_dir)

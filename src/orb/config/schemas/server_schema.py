@@ -2,7 +2,49 @@
 
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
+
+
+class RateLimitConfig(BaseModel):
+    """Typed configuration for the in-process token-bucket rate limiter.
+
+    The rate limiter uses a token-bucket algorithm:
+    - ``requests_per_minute`` sets the steady-state refill rate and the
+      maximum bucket capacity (tokens per minute added continuously).
+    - ``burst`` caps the initial and maximum instantaneous token count so
+      short bursts beyond the per-minute average are tolerated but bounded.
+      When ``burst`` is smaller than ``requests_per_minute`` the bucket
+      starts pre-filled to ``burst`` tokens rather than the full capacity.
+    - ``max_buckets`` bounds memory by capping the number of tracked
+      identities (LRU eviction once exceeded).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = Field(
+        True, description="Enable the rate limiter (disable for benchmarks or trusted networks)"
+    )
+    requests_per_minute: int = Field(
+        300,
+        description="Steady-state refill rate and maximum capacity (requests per minute per identity)",
+        ge=1,
+    )
+    burst: int = Field(
+        60,
+        description=(
+            "Maximum instantaneous token count (burst allowance). "
+            "Controls how many back-to-back requests are accepted before throttling begins. "
+            "Must be >= 1. When smaller than requests_per_minute the bucket is initialised "
+            "to this value rather than the full per-minute capacity."
+        ),
+        ge=1,
+    )
+    max_buckets: int = Field(
+        10_000,
+        description="Maximum number of tracked identities; oldest entry is evicted on overflow (LRU)",
+        ge=1,
+    )
+
 
 _ALLOWED_JWT_ALGORITHMS = frozenset({"HS256", "HS384", "HS512"})
 
@@ -12,7 +54,13 @@ class BearerTokenAuthSubConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    secret_key: str = Field(..., description="Secret key for JWT signing/verification (>=32 bytes)")
+    secret_key: SecretStr = Field(
+        ...,
+        description=(
+            "Secret key for JWT signing/verification (>=32 bytes). "
+            "Stored as SecretStr so the value is never exposed in repr() or log output."
+        ),
+    )
     algorithm: str = Field("HS256", description="JWT algorithm (HS256, HS384, or HS512)")
     token_expiry: int = Field(3600, description="Token expiry in seconds")
 
@@ -154,5 +202,81 @@ class ServerConfig(BaseModel):
     request_timeout: int = Field(30, description="Request timeout in seconds")
     max_request_size: int = Field(16 * 1024 * 1024, description="Maximum request size in bytes")
 
-    # Rate limiting (for future implementation)
-    rate_limiting: Optional[dict[str, Any]] = Field(None, description="Rate limiting configuration")
+    # Audit logging
+    audit_log_enabled: bool = Field(True, description="Emit audit logs for mutating requests")
+    audit_log_file: Optional[str] = Field(
+        None,
+        description=(
+            "Path to a dedicated audit log file.  When set, a rotating JSON-line "
+            "handler is attached to the 'orb.audit' logger so audit records are "
+            "written to a separate file in addition to (or instead of) the root "
+            "handlers.  When None, audit records flow through the root logging "
+            "configuration (stdout/stderr in container deployments)."
+        ),
+    )
+
+    # Rate limiting
+    rate_limiting: RateLimitConfig = Field(
+        default_factory=RateLimitConfig,  # type: ignore[arg-type]
+        description="Token-bucket rate limiter configuration",
+    )
+
+    # Read-only mode
+    read_only: bool = Field(
+        False, description="Reject all mutating requests (POST, PUT, PATCH, DELETE) with HTTP 403"
+    )
+
+    # ── Process lifecycle (orb server start/stop/status) ─────────────────────
+    # Paths are optional — when None the daemon module resolves them from
+    # platform_dirs (ORB work/logs locations, honouring ORB_WORK_DIR and
+    # ORB_LOG_DIR env vars). Override here to pin specific paths per deploy.
+    pid_file: Optional[str] = Field(
+        None,
+        description=(
+            "Path to the PID file written by 'orb server start' (daemon mode). "
+            "Defaults to <work_dir>/server/orb-server.pid via platform_dirs."
+        ),
+    )
+    log_file: Optional[str] = Field(
+        None,
+        description=(
+            "Path to the combined stdout/stderr log file in daemon mode. "
+            "Defaults to <log_dir>/orb-server.log via platform_dirs."
+        ),
+    )
+    working_dir: Optional[str] = Field(
+        None,
+        description=(
+            "Working directory for the daemon process (after chdir). "
+            "Defaults to the ORB work_dir from platform_dirs."
+        ),
+    )
+    stop_timeout_seconds: int = Field(
+        10,
+        description="Seconds to wait for SIGTERM before escalating to SIGKILL on stop",
+    )
+
+    @model_validator(mode="after")
+    def _check_cors_origins_when_auth_enabled(self) -> "ServerConfig":
+        """Reject configs that enable auth without specifying explicit CORS origins.
+
+        When authentication is turned on, leaving CORS origins empty (the secure
+        default) is fine — the browser will reject cross-origin preflight requests
+        and you must explicitly allow only the UI origins you trust.  However,
+        operators sometimes copy examples that have ``origins=['*']`` and forget to
+        tighten them.  This validator surfaces the mistake at startup rather than
+        silently accepting it.
+
+        If you really need wildcard origins with auth (e.g. an internal API where all
+        callers are trusted), set ``cors.origins=['*']`` explicitly — that documents
+        the intentional choice.
+        """
+        if self.auth.enabled and self.cors.enabled and not self.cors.origins:
+            raise ValueError(
+                "auth.enabled=true requires cors.origins to be set explicitly. "
+                "An empty origins list means the browser will block all cross-origin "
+                "requests to authenticated endpoints.  "
+                "Set cors.origins to the list of allowed UI origins, or use ['*'] "
+                "only if you intentionally allow all origins."
+            )
+        return self

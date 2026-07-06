@@ -20,6 +20,7 @@ from .scheduler_schema import SchedulerConfig
 from .server_schema import ServerConfig
 from .storage_schema import StorageConfig
 from .template_schema import TemplateConfig
+from .ui_schema import UIConfig
 
 
 class AppConfig(BaseModel):
@@ -39,9 +40,18 @@ class AppConfig(BaseModel):
     circuit_breaker: CircuitBreakerConfig = Field(default_factory=lambda: CircuitBreakerConfig())  # type: ignore[call-arg]
     performance: PerformanceConfig = Field(default_factory=lambda: PerformanceConfig())  # type: ignore[call-arg]
     server: ServerConfig = Field(default_factory=lambda: ServerConfig())  # type: ignore[call-arg]
+    ui: UIConfig = Field(default_factory=UIConfig)  # type: ignore[arg-type]
     native_spec: NativeSpecConfig = Field(default_factory=lambda: NativeSpecConfig())  # type: ignore[call-arg]
     environment: str = Field("development", description="Environment")
     debug: bool = Field(False, description="Debug mode")
+    allow_destructive_admin: bool = Field(
+        False,
+        description=(
+            "Enable destructive administrative endpoints (e.g. POST /admin/database/wipe). "
+            "MUST be False in production. Defaults to False so the feature is opt-in and "
+            "requires explicit configuration in the environment's config file."
+        ),
+    )
     scripts_dir: Optional[str] = Field(None, description="Path to ORB provider scripts directory")
 
     @model_validator(mode="after")
