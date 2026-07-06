@@ -365,7 +365,7 @@ class ORBClient:
 
     # Configuration and status methods
     @property
-    def provider(self) -> str:
+    def provider(self) -> Optional[str]:
         """Get the configured provider type."""
         return self._config.provider
 

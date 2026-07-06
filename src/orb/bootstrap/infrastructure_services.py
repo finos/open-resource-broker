@@ -94,7 +94,10 @@ def _register_template_services(container: DIContainer):
         # classes are registered below.  Guarded by ImportError so the factory
         # builds cleanly when the k8s extra is not installed.
         try:
-            from orb.providers.k8s import register_k8s_extensions, register_k8s_template_factory
+            from orb.providers.k8s.registration import (  # noqa: PLC0415
+                register_k8s_extensions,
+                register_k8s_template_factory,
+            )
 
             register_k8s_extensions(logger_port)
             register_k8s_template_factory(factory, logger_port)
