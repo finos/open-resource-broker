@@ -318,3 +318,51 @@ async def test_pod_handler_release_tolerates_404(
     # a 404 status which the handler should tolerate without raising.
     await handler.release_hosts(["ghost-pod"], request.provider_data)
     # Reaching here without an exception is the assertion.
+
+
+# ---------------------------------------------------------------------------
+# F1 — Succeeded pods classified as success, not fail/terminated
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_pod_handler_succeeded_pod_classified_as_fulfilled(
+    kmock_k8s: KubernetesEmulator,
+    k8s_client_facade: Any,
+    k8s_config: Any,
+) -> None:
+    """A pod that exits 0 (Kubernetes phase=Succeeded) must map to result: succeed.
+
+    Regression for the bug where Succeeded pods were classified as
+    'fail'/'terminated' with 'Machine failed (no detail available)' because
+    the fulfilment math did not count 'terminated' status as fulfilled capacity.
+    After the fix, check_hosts_status must return state='fulfilled' and the
+    instance status must be 'terminated' (run-to-completion semantics, not a
+    failure) with a success message.
+    """
+    request_id = f"req-{uuid.uuid4()}"
+    pod_name = f"orb-{request_id[4:12]}-0000"
+    _preload_pod(
+        kmock_k8s,
+        name=pod_name,
+        phase="Succeeded",
+        ready=False,
+        request_id=request_id,
+    )
+
+    handler = _make_pod_handler(k8s_client_facade, k8s_config)
+    request = _make_request(requested_count=1, request_id=request_id)
+
+    result = await asyncio.to_thread(handler.check_hosts_status, request)
+
+    assert len(result.instances) == 1
+    inst = result.instances[0]
+    # Succeeded phase maps to 'terminated' (run-to-completion, not a failure).
+    assert inst["status"] == "terminated", (
+        f"Expected 'terminated' for Succeeded pod, got {inst['status']!r}"
+    )
+    # The fulfilment verdict must be 'fulfilled', not 'in_progress' or 'failed'.
+    assert result.fulfilment.state == "fulfilled", (
+        f"Expected fulfilled for Succeeded pod, got {result.fulfilment.state!r} "
+        f"(message: {result.fulfilment.message!r})"
+    )

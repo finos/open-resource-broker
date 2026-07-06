@@ -94,18 +94,38 @@ class PodStatusResolver:
 
         Mirrors the RunInstances handler's compute helper so the
         downstream presentation is identical.
+
+        A ``"terminated"`` status on a bare-Pod or Job-owned pod means the
+        container exited 0 (Kubernetes ``Succeeded`` phase).  Those pods
+        count as fulfilled capacity — run-to-completion semantics — so they
+        are tallied as ``succeeded_count`` and promote the verdict to
+        ``fulfilled`` when the full requested count is satisfied.
         """
         running_count = sum(1 for i in instances if i.get("status") == "running")
         pending_count = sum(1 for i in instances if i.get("status") in ("pending", "starting"))
         failed_count = sum(1 for i in instances if i.get("status") == "failed")
+        # Bare pods that exited 0 land here: pod_status_string maps
+        # Succeeded → "terminated" for the Pod provider-API.
+        succeeded_count = sum(1 for i in instances if i.get("status") == "terminated")
 
-        if running_count >= requested_count and failed_count == 0 and requested_count > 0:
+        effective_fulfilled = running_count + succeeded_count
+
+        if effective_fulfilled >= requested_count and failed_count == 0 and requested_count > 0:
+            if succeeded_count > 0 and running_count == 0:
+                message = f"All {succeeded_count} pod(s) completed successfully"
+            elif succeeded_count > 0:
+                message = (
+                    f"{running_count} running, {succeeded_count} completed "
+                    f"({effective_fulfilled}/{requested_count})"
+                )
+            else:
+                message = f"All {running_count} pod(s) running"
             return ProviderFulfilment(
                 state="fulfilled",
-                message=f"All {running_count} pod(s) running",
+                message=message,
                 target_units=requested_count,
-                fulfilled_units=running_count,
-                running_count=running_count,
+                fulfilled_units=effective_fulfilled,
+                running_count=effective_fulfilled,
                 pending_count=pending_count,
                 failed_count=failed_count,
             )
