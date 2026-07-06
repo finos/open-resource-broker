@@ -381,6 +381,28 @@ class ProviderStrategy(ABC):
         return set()
 
     @classmethod
+    def get_cli_provider_config(cls, args: Any) -> dict[str, Any]:
+        """Extract provider-specific config keys from parsed CLI args.
+
+        Returns a dict of key/value pairs that should populate the
+        ``provider_instance.config`` block written by ``orb init``.  The
+        returned dict is passed through the init helpers as a single
+        ``provider_config`` argument rather than spreading individual
+        positional parameters such as ``region`` and ``profile``.
+
+        Override in provider-specific strategies to expose the full set of
+        provider config fields.  The base implementation returns an empty
+        dict so providers that have not yet adopted this slot are unaffected.
+
+        Args:
+            args: Parsed argparse.Namespace from the ``orb init`` invocation.
+
+        Returns:
+            Dict mapping provider config key names to their CLI-sourced values.
+        """
+        return {}
+
+    @classmethod
     def get_cli_infrastructure_defaults(cls, args: Any) -> dict[str, Any]:
         """Extract provider-specific infrastructure defaults from parsed CLI args.
 

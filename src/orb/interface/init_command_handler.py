@@ -263,9 +263,9 @@ def _interactive_setup() -> Dict[str, Any]:
                     prompt = f"  {info['description']}: "
                     provider_config[param] = input(prompt).strip()
 
-        # Step 5: extract final values
-        region = provider_config.get("region") or default_region
-        profile = provider_config.get("profile") or None
+        # Step 5: ensure region is present in the provider config dict
+        if not provider_config.get("region"):
+            provider_config["region"] = default_region
 
         console.info("")
         console.separator(char="-", color="cyan")
@@ -283,14 +283,14 @@ def _interactive_setup() -> Dict[str, Any]:
         if discover_choice in ["y", "yes"]:
             registry = get_container().get(ProviderRegistryPort)
             infrastructure_defaults = _discover_infrastructure(
-                provider_type, region, profile, registry
+                provider_type, provider_config, registry
             )
 
         # Create first provider instance
         first_provider = {
             "type": provider_type,
-            "profile": profile,
-            "region": region,
+            "profile": provider_config.get("profile") or None,
+            "region": provider_config.get("region") or default_region,
             "infrastructure_defaults": infrastructure_defaults,
         }
 
@@ -426,9 +426,9 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
                     prompt = f"  {info['description']}: "
                     provider_config[param] = input(prompt).strip()
 
-        # Step 5: extract final values
-        region = provider_config.get("region") or default_region
-        profile = provider_config.get("profile") or None
+        # Step 5: ensure region is present in the provider config dict
+        if not provider_config.get("region"):
+            provider_config["region"] = default_region
 
         # Infrastructure discovery
         console.info("")
@@ -440,7 +440,7 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
         if discover_choice in ["y", "yes"]:
             registry = get_container().get(ProviderRegistryPort)
             infrastructure_defaults = _discover_infrastructure(
-                provider_type, region, profile, registry
+                provider_type, provider_config, registry
             )
 
         return {
@@ -567,30 +567,32 @@ def _get_operational_requirements(provider_type: str) -> dict:
 
 
 def _discover_infrastructure(
-    provider_type: str, region: str, profile: str | None, registry: ProviderRegistryPort
+    provider_type: str, provider_config: Dict[str, Any], registry: ProviderRegistryPort
 ) -> Dict[str, Any]:
     """Discover infrastructure interactively using the provider strategy.
 
     Discovery requires a live provider instance (cluster / account access).
     The instance is constructed via ``create_strategy_by_type`` using the
     credentials and region the operator already confirmed in the init flow.
-    Provider-specific bootstrap values (``region``, ``profile``) are
-    forwarded via the ``full_config`` payload that reaches
-    ``discover_infrastructure_interactive`` — providers that ignore them
-    are unaffected.
+    All provider config keys collected during the init flow are forwarded
+    together as a single dict; providers that only use a subset of them are
+    unaffected.
+
+    Args:
+        provider_type: The provider type identifier (e.g. ``"aws"``).
+        provider_config: Dict of provider config key/value pairs already
+            collected from the operator (e.g. ``{"region": ..., "profile": ...}``).
+        registry: Live provider registry used to construct the strategy.
     """
     console = get_container().get(ConsolePort)
     try:
-        # Build a minimal config dict from the operator's confirmed choices so
-        # the factory has enough information to construct a usable strategy.
-        minimal_config = {"region": region, "profile": profile}
-        strategy = registry.create_strategy_by_type(provider_type, minimal_config)
+        strategy = registry.create_strategy_by_type(provider_type, provider_config)
         if strategy is None:
             console.error(f"Failed to construct strategy for provider type: {provider_type}")
             return {}
 
         if hasattr(strategy, "discover_infrastructure_interactive"):
-            full_config = {"type": provider_type, "config": {"region": region, "profile": profile}}
+            full_config = {"type": provider_type, "config": provider_config}
             return strategy.discover_infrastructure_interactive(full_config)
         console.info(f"Infrastructure discovery not supported for provider type: {provider_type}")
         return {}
