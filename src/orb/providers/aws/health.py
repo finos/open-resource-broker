@@ -2,7 +2,6 @@
 
 from typing import TYPE_CHECKING
 
-from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from orb.domain.base.ports.health_check_port import HealthCheckPort
@@ -15,23 +14,22 @@ if TYPE_CHECKING:
 def register_aws_health_checks(
     health_check: HealthCheckPort,
     aws_client: "AWSClient",
-    storage_strategy: str = "json",
+    storage_strategy: str = "json",  # kept for back-compat with callers
 ) -> None:
-    """Register AWS-specific health checks with the given HealthCheck instance.
+    """Register AWS-specific health checks (``aws``, ``ec2``).
 
-    The ``aws`` (STS) and ``ec2`` checks are always registered because they
-    validate core AWS connectivity.  The ``dynamodb`` check is only registered
-    when the configured storage backend is ``"dynamodb"``; registering it
-    unconditionally causes ``/health`` to return 503 when the default
-    file/JSON storage is in use because the ``dynamodb:ListTables`` call
-    fails with no credentials or permissions.
+    The ``database`` check is registered provider-agnostically by
+    ``monitoring/health.py::register_storage_health_checks`` from the
+    monitoring bootstrap, so it no longer needs to be wired here for
+    DynamoDB. The ``storage_strategy`` parameter is retained for caller
+    compatibility but is intentionally unused.
 
     Args:
         health_check: The application HealthCheckPort to register checks on.
         aws_client: Authenticated AWS client used by the checks.
-        storage_strategy: The configured storage backend (e.g. ``"json"``,
-            ``"sql"``, ``"dynamodb"``).  Defaults to ``"json"``.
+        storage_strategy: Ignored; retained for back-compat.
     """
+    _ = storage_strategy
 
     def _check_aws_health() -> HealthStatus:
         try:
@@ -72,31 +70,5 @@ def register_aws_health_checks(
                 dependencies=["aws", "ec2"],
             )
 
-    def _check_dynamodb_health() -> HealthStatus:
-        try:
-            tables = aws_client.session.client(
-                "dynamodb",
-                config=Config(connect_timeout=10, read_timeout=30, retries={"max_attempts": 3}),
-            ).list_tables()
-            return HealthStatus(
-                name="database",
-                status="healthy",
-                details={
-                    "type": "dynamodb",
-                    "table_count": len(tables.get("TableNames", [])),
-                    "tables": tables.get("TableNames", []),
-                },
-                dependencies=["database", "dynamodb"],
-            )
-        except Exception as e:
-            return HealthStatus(
-                name="database",
-                status="unhealthy",
-                details={"error": str(e)},
-                dependencies=["database", "dynamodb"],
-            )
-
     health_check.register_check("aws", _check_aws_health)
     health_check.register_check("ec2", _check_ec2_health)
-    if storage_strategy == "dynamodb":
-        health_check.register_check("dynamodb", _check_dynamodb_health)

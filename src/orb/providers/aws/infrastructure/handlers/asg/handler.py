@@ -39,6 +39,7 @@ from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from orb.infrastructure.error.decorators import handle_infrastructure_exceptions
 from orb.infrastructure.logging.logger import get_logger
+from orb.providers.aws.aws_fleet_capacity import FleetCapacityFulfilment
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.exceptions.aws_exceptions import (
     AWSConfigurationError,
@@ -147,7 +148,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 "success": True,
                 "resource_ids": [asg_name],
                 "instances": [],  # ASG instances come later
-                "provider_data": {"resource_type": "asg", "fulfillment_final": True},
+                "provider_data": {"resource_type": "asg", "requires_async_polling": True},
             }
         except Exception as e:
             return {
@@ -263,12 +264,8 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             provider_api="ASG",
         )
 
-    def _resolve_provider_api(
-        self, request: Request, aws_template: Optional[AWSTemplate] = None
-    ) -> str:
-        """Resolve the provider_api value to stamp onto instance data."""
-        metadata = getattr(request, "metadata", {}) or {}
-        return metadata.get("provider_api", "ASG")
+    def _default_provider_api(self) -> str:
+        return "ASG"
 
     @staticmethod
     def detect_asg_instances(aws_client, instance_ids: list[str]) -> dict[str, list[str]]:
@@ -628,23 +625,15 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             )
 
         group = groups[0]
-        desired_capacity: int = group.get("DesiredCapacity") or 0
         raw_instances = group.get("Instances") or []
-
-        # Compute weighted fulfilment from ASG Instances list
-        in_service_weighted = sum(
-            int(inst.get("WeightedCapacity") or 1)
-            for inst in raw_instances
-            if inst.get("LifecycleState") == "InService"
-        )
-        pending_raw = [
-            inst
+        capacity = self._fetch_asg_capacity(group)
+        desired_capacity = capacity.target_capacity_units or 0
+        in_service_weighted = capacity.fulfilled_capacity_units
+        in_service_count = capacity.provisioned_instance_count
+        pending_count = sum(
+            1
             for inst in raw_instances
             if inst.get("LifecycleState") in ("Pending", "Pending:Wait", "Pending:Proceed")
-        ]
-        pending_count = len(pending_raw)
-        in_service_count = sum(
-            1 for inst in raw_instances if inst.get("LifecycleState") == "InService"
         )
 
         # Get full EC2 instance details for instances in the ASG
@@ -694,6 +683,41 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             ec2_instances=formatted,
         )
         return CheckHostsStatusResult(instances=formatted, fulfilment=fulfilment)
+
+    @staticmethod
+    def _fetch_asg_capacity(group: dict[str, Any]) -> FleetCapacityFulfilment:
+        """Extract a typed capacity snapshot from a DescribeAutoScalingGroups entry.
+
+        Args:
+            group: One element from the ``AutoScalingGroups`` list returned by
+                ``describe_auto_scaling_groups``.
+
+        Returns:
+            A :class:`FleetCapacityFulfilment` with:
+            - ``target_capacity_units``:  ``DesiredCapacity``
+            - ``fulfilled_capacity_units``: sum of ``WeightedCapacity`` (or 1)
+              for InService instances.
+            - ``provisioned_instance_count``: count of InService instances.
+            - ``fulfillment_complete``: True when weighted in-service capacity
+              meets or exceeds desired capacity.
+        """
+        raw_instances: list[dict[str, Any]] = group.get("Instances") or []
+        desired_capacity: int = group.get("DesiredCapacity") or 0
+        in_service_weighted = sum(
+            int(inst.get("WeightedCapacity") or 1)
+            for inst in raw_instances
+            if inst.get("LifecycleState") == "InService"
+        )
+        in_service_count = sum(
+            1 for inst in raw_instances if inst.get("LifecycleState") == "InService"
+        )
+        fulfillment_complete = desired_capacity > 0 and in_service_weighted >= desired_capacity
+        return FleetCapacityFulfilment(
+            target_capacity_units=desired_capacity,
+            fulfilled_capacity_units=in_service_weighted,
+            provisioned_instance_count=in_service_count,
+            fulfillment_complete=fulfillment_complete,
+        )
 
     def _compute_asg_fulfilment(
         self,

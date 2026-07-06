@@ -62,6 +62,37 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
 
         self._logger.debug("Initialized DynamoDB storage strategy for table %s", table_name)
 
+    def is_healthy(self) -> tuple[bool, dict[str, Any]]:
+        """Probe DynamoDB: confirm we can list tables AND the configured
+        table exists with the expected key schema.
+
+        Returns ``(healthy, details)``. Details include table name, region,
+        whether the configured table is present, and the partition key.
+        """
+        details: dict[str, Any] = {
+            "type": "dynamodb",
+            "table": self.table_name,
+            "region": self.region,
+        }
+        try:
+            if not self.client_manager.is_healthy():
+                details["reason"] = "list_tables probe failed"
+                return False, details
+            # Confirm the configured table exists and inspect its schema.
+            try:
+                table_exists = self.client_manager.table_exists(self.table_name)
+            except Exception as exc:
+                details["error"] = f"table_exists check failed: {exc}"
+                return False, details
+            details["table_exists"] = table_exists
+            if not table_exists:
+                details["reason"] = "configured table does not exist"
+                return False, details
+            return True, details
+        except Exception as exc:
+            details["error"] = str(exc)
+            return False, details
+
     def _initialize_table(self) -> None:
         """Initialize DynamoDB table if it doesn't exist."""
         try:

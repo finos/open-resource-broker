@@ -143,6 +143,12 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                     "resource_type": "run_instances",
                     "reservation_id": resource_id,
                     "instance_ids": instance_ids,
+                    # RunInstances is synchronous provisioning — the CREATE
+                    # call returns all instance IDs immediately.  No further
+                    # async polling of the provider is needed to settle this
+                    # request; ``requires_async_polling=False`` tells the
+                    # dispatch layer to emit Completed directly.
+                    "requires_async_polling": False,
                 },
             }
         except Exception as e:
@@ -192,17 +198,8 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
 
         return response
 
-    def _resolve_provider_api(
-        self, request: Request, aws_template: Optional[AWSTemplate] = None
-    ) -> str:
-        """Resolve the provider_api value to stamp onto instance data."""
-        if aws_template and aws_template.provider_api is not None:
-            return (
-                aws_template.provider_api.value
-                if hasattr(aws_template.provider_api, "value")
-                else str(aws_template.provider_api)
-            )
-        return request.provider_api or "RunInstances"
+    def _default_provider_api(self) -> str:
+        return "RunInstances"
 
     def _prepare_template_context(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
         """Prepare context with all computed values for template rendering."""

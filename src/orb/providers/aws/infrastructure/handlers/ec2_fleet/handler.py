@@ -39,6 +39,7 @@ from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from orb.infrastructure.error.decorators import handle_infrastructure_exceptions
 from orb.infrastructure.resilience import CircuitBreakerOpenError
+from orb.providers.aws.aws_fleet_capacity import FleetCapacityFulfilment
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.domain.template.value_objects import AWSFleetType
 from orb.providers.aws.exceptions.aws_exceptions import (
@@ -189,7 +190,18 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     "resource_type": "ec2_fleet",
                     "fleet_type": fleet_type_value,
                     "fleet_errors": fleet_errors,
-                    "fulfillment_final": fleet_type is not AWSFleetType.INSTANT,
+                    # ``requires_async_polling`` — True means the caller must
+                    # continue polling the provider to observe further
+                    # fulfillment before considering this request settled.
+                    # INSTANT fleets return instance IDs synchronously but
+                    # those instances are still in ``pending`` state at create
+                    # time, so the create call is NOT the final answer — the
+                    # polling loop must observe the running state.
+                    # MAINTAIN / REQUEST fleets return only a fleet ID and no
+                    # instances yet (instance arrival is purely a polling
+                    # concern), so the create call IS the final synchronous
+                    # answer for those types and no further polling is needed.
+                    "requires_async_polling": fleet_type is AWSFleetType.INSTANT,
                     "capacity_constrained": capacity_constrained,
                 },
             }
@@ -351,18 +363,8 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             metadata_updates["instance_ids"] = instance_ids
         return {"metadata_updates": metadata_updates}
 
-    def _resolve_provider_api(
-        self, request: Request, aws_template: Optional[AWSTemplate] = None
-    ) -> str:
-        """Resolve the provider_api value to stamp onto instance data."""
-        if aws_template and aws_template.provider_api is not None:
-            return (
-                aws_template.provider_api.value
-                if hasattr(aws_template.provider_api, "value")
-                else str(aws_template.provider_api)
-            )
-        metadata = getattr(request, "metadata", {}) or {}
-        return metadata.get("provider_api", "EC2Fleet")
+    def _default_provider_api(self) -> str:
+        return "EC2Fleet"
 
     def _create_fleet_config(
         self,
@@ -384,8 +386,8 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
         Fulfilment semantics (per fleet type):
         - Instant: same as RunInstances — running_count >= requested_count
-          and failed_count == 0 → fulfilled.  ``fulfillment_final=True`` so
-          partial/failed can be detected when pending reaches zero.
+          and failed_count == 0 → fulfilled.  ``requires_async_polling=True``
+          so partial/failed can be detected when pending reaches zero.
         - Maintain / Request: FulfilledCapacity >= TargetCapacity AND
           pending_count == 0 AND failed_count == 0 → fulfilled.  This is the
           weighted-fleet path that fixes the live test timeout.
@@ -424,10 +426,25 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             )
 
         # Multiple fleets: aggregate — all must be fulfilled for overall fulfilled.
+        # Priority order matters here:
+        #   1. all fulfilled              -> fulfilled
+        #   2. ANY in_progress            -> in_progress  (transient — wait)
+        #   3. all failed (or only fail+partial with no progress signal)
+        #                                 -> failed
+        #   4. any partial (no in_progress) -> partial   (terminal partial)
+        #   5. fallback                   -> in_progress
+        #
+        # in_progress is checked BEFORE partial because we don't want a
+        # request to flip to terminal-partial while another fleet is still
+        # booting; that classification can only be made once every fleet
+        # has reached a terminal verdict.
         states = [r.fulfilment.state for r in fleet_results]
         if all(s == "fulfilled" for s in states):
             combined_state = "fulfilled"
             combined_msg = f"All {len(fleet_results)} fleets fulfilled"
+        elif any(s == "in_progress" for s in states):
+            combined_state = "in_progress"
+            combined_msg = "One or more fleets still provisioning"
         elif any(s == "failed" for s in states):
             combined_state = "failed"
             combined_msg = "One or more fleets failed"
@@ -489,9 +506,9 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             self._logger.debug(f" check_hosts_status final fleet_type: {fleet_type}")
 
             # Read capacity data from DescribeFleets (already called above — no extra API call)
-            spec = fleet.get("TargetCapacitySpecification") or {}
-            target_capacity = spec.get("TotalTargetCapacity")
-            fulfilled_capacity = fleet.get("FulfilledCapacity") or 0
+            capacity = self._fetch_ec2_fleet_capacity(fleet)
+            target_capacity = capacity.target_capacity_units
+            fulfilled_capacity = float(capacity.fulfilled_capacity_units)
 
             self._logger.debug(
                 "Fleet status: %s, Target capacity: %s, Fulfilled capacity: %s",
@@ -535,6 +552,23 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     f" check_hosts_status instance_ids: {fleet_id} :: {instance_ids}"
                 )
 
+            # Per-fleet requested_count: AWS describe_fleets is the canonical
+            # source. TargetCapacitySpecification.TotalTargetCapacity tells us
+            # exactly how many instances this fleet was asked to provision —
+            # independent of the ORB request total (which is the SUM across
+            # all fleets and only meaningful for single-fleet requests).
+            #
+            # Without this, a request split across N fleets would have each
+            # fleet's running count compared against the request total, so a
+            # fully-running N-way split would look only 1/N fulfilled per
+            # fleet and the aggregator would emit a wrong partial verdict.
+            #
+            # Fallback to request.requested_count is for the rare case where
+            # AWS returns the fleet without TargetCapacitySpecification.
+            per_fleet_requested = (
+                int(target_capacity) if target_capacity is not None else request.requested_count
+            )
+
             if not instance_ids:
                 self._logger.info("No active instances found in fleet %s", fleet_id)
                 fulfilment = self._compute_ec2fleet_fulfilment(
@@ -542,7 +576,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     instances=[],
                     target_capacity=target_capacity,
                     fulfilled_capacity=fulfilled_capacity,
-                    requested_count=request.requested_count,
+                    requested_count=per_fleet_requested,
                 )
                 return CheckHostsStatusResult(instances=[], fulfilment=fulfilment)
 
@@ -560,7 +594,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 instances=instances,
                 target_capacity=target_capacity,
                 fulfilled_capacity=fulfilled_capacity,
-                requested_count=request.requested_count,
+                requested_count=per_fleet_requested,
             )
             return CheckHostsStatusResult(instances=instances, fulfilment=fulfilment)
 
@@ -571,6 +605,37 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         except Exception as e:
             self._logger.error("Unexpected error checking EC2 Fleet status: %s", str(e))
             raise AWSInfrastructureError(f"Failed to check EC2 Fleet status: {e!s}")
+
+    @staticmethod
+    def _fetch_ec2_fleet_capacity(
+        fleet: dict[str, Any],
+        active_instance_count: int = 0,
+    ) -> FleetCapacityFulfilment:
+        """Extract a typed capacity snapshot from a DescribeFleets fleet entry.
+
+        Args:
+            fleet: One element from the ``DescribeFleets.Fleets`` list.
+            active_instance_count: Number of instances currently observed in
+                active lifecycle states.  Used as ``provisioned_instance_count``.
+                For INSTANT fleets this is derived from the create-fleet
+                response and is not available at describe time; callers may
+                pass 0 and the field is informational only.
+
+        Returns:
+            A :class:`FleetCapacityFulfilment` with the normalised capacity
+            data for this fleet.
+        """
+        spec = fleet.get("TargetCapacitySpecification") or {}
+        target_capacity: int | None = spec.get("TotalTargetCapacity")
+        fulfilled_raw: float = fleet.get("FulfilledCapacity") or 0.0
+        fulfilled_units = int(fulfilled_raw)
+        fulfillment_complete = target_capacity is not None and fulfilled_raw >= target_capacity
+        return FleetCapacityFulfilment(
+            target_capacity_units=target_capacity,
+            fulfilled_capacity_units=fulfilled_units,
+            provisioned_instance_count=active_instance_count,
+            fulfillment_complete=fulfillment_complete,
+        )
 
     def _compute_ec2fleet_fulfilment(
         self,
@@ -613,38 +678,37 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     pending_count=pending_count,
                     failed_count=failed_count,
                 )
+            # requires_async_polling=True for instant — pending state must be observed
+            elif running_count > 0:
+                return ProviderFulfilment(
+                    state="partial",
+                    message=f"Instant fleet: {running_count}/{requested_count} instance(s) running",
+                    target_units=target_units,
+                    fulfilled_units=running_count,
+                    running_count=running_count,
+                    pending_count=pending_count,
+                    failed_count=failed_count,
+                )
+            elif not instances:
+                return ProviderFulfilment(
+                    state="in_progress",
+                    message="Instant fleet: waiting for instances",
+                    target_units=target_units,
+                    fulfilled_units=0,
+                    running_count=0,
+                    pending_count=0,
+                    failed_count=0,
+                )
             else:
-                # fulfillment_final=True for instant — no more instances coming
-                if running_count > 0:
-                    return ProviderFulfilment(
-                        state="partial",
-                        message=f"Instant fleet: {running_count}/{requested_count} instance(s) running",
-                        target_units=target_units,
-                        fulfilled_units=running_count,
-                        running_count=running_count,
-                        pending_count=pending_count,
-                        failed_count=failed_count,
-                    )
-                elif not instances:
-                    return ProviderFulfilment(
-                        state="in_progress",
-                        message="Instant fleet: waiting for instances",
-                        target_units=target_units,
-                        fulfilled_units=0,
-                        running_count=0,
-                        pending_count=0,
-                        failed_count=0,
-                    )
-                else:
-                    return ProviderFulfilment(
-                        state="failed",
-                        message="Instant fleet: all instances failed",
-                        target_units=target_units,
-                        fulfilled_units=0,
-                        running_count=running_count,
-                        pending_count=pending_count,
-                        failed_count=failed_count,
-                    )
+                return ProviderFulfilment(
+                    state="failed",
+                    message="Instant fleet: all instances failed",
+                    target_units=target_units,
+                    fulfilled_units=0,
+                    running_count=running_count,
+                    pending_count=pending_count,
+                    failed_count=failed_count,
+                )
         else:
             # Maintain / Request fleet: capacity-unit based fulfilment
             return compute_capacity_based_fulfilment(

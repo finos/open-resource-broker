@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 _REGISTERED_PROVIDERS: list[str] = ["aws"]
 
 
-def register_all_providers(container: "DIContainer | None" = None) -> None:
+def register_all_providers(container: DIContainer | None = None) -> None:
     """Register all providers listed in ``_REGISTERED_PROVIDERS``.
 
     For each provider name ``n`` this function:

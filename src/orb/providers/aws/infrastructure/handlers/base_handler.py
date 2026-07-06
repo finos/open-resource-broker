@@ -194,6 +194,48 @@ class AWSHandler(ABC):
         """Extract instance IDs from API response if available."""
         return extractor(api_response)
 
+    def _resolve_provider_api(self, request: Any, aws_template: Any = None) -> str:
+        """Resolve the provider_api value to stamp onto instance data.
+
+        Priority order:
+          1. ``aws_template.provider_api`` — explicit template-level override
+          2. ``request.metadata["provider_api"]`` — per-request metadata
+          3. ``request.provider_api`` — top-level request field
+          4. ``self._default_provider_api()`` — handler-specific default
+
+        Args:
+            request: The ORB request object.
+            aws_template: The AWS template (optional).  When present, its
+                ``provider_api`` attribute takes highest priority.
+
+        Returns:
+            Resolved provider_api string.
+        """
+        if aws_template is not None:
+            value = getattr(aws_template, "provider_api", None)
+            if value:
+                return value.value if hasattr(value, "value") else str(value)
+        metadata = getattr(request, "metadata", None) or {}
+        value = metadata.get("provider_api")
+        if value:
+            return value
+        value = getattr(request, "provider_api", None)
+        if value:
+            return value
+        return self._default_provider_api()
+
+    def _default_provider_api(self) -> str:
+        """Return the default provider_api string for this handler type.
+
+        Subclasses must override this method to return their handler-specific
+        default (e.g. ``"EC2Fleet"``, ``"SpotFleet"``, ``"ASG"``,
+        ``"RunInstances"``).
+
+        Raises:
+            NotImplementedError: If the subclass has not implemented this method.
+        """
+        raise NotImplementedError(f"{type(self).__name__} must implement _default_provider_api()")
+
     def _format_instance_data(
         self,
         instance_details: list[dict[str, Any]],

@@ -36,6 +36,7 @@ from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from orb.infrastructure.error.decorators import handle_infrastructure_exceptions
+from orb.providers.aws.aws_fleet_capacity import FleetCapacityFulfilment
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.exceptions.aws_exceptions import (
     AWSInfrastructureError,
@@ -145,7 +146,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 "resource_ids": [fleet_id],
                 "instance_ids": [],  # SpotFleet doesn't return instance IDs immediately
                 "instances": instances,
-                "provider_data": {"resource_type": "spot_fleet", "fulfillment_final": True},
+                "provider_data": {"resource_type": "spot_fleet", "requires_async_polling": False},
             }
         except Exception as e:
             self._logger.error("SpotFleet creation failed: %s", e)
@@ -322,6 +323,36 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             self._logger.error("Unexpected error checking Spot Fleet status: %s", str(e))
             raise AWSInfrastructureError(f"Failed to check Spot Fleet status: {e!s}")
 
+    @staticmethod
+    def _fetch_spot_fleet_capacity(
+        fleet_config_entry: dict[str, Any],
+        active_instance_count: int,
+    ) -> FleetCapacityFulfilment:
+        """Extract a typed capacity snapshot from a DescribeSpotFleetRequests entry.
+
+        Args:
+            fleet_config_entry: One element from
+                ``DescribeSpotFleetRequests.SpotFleetRequestConfigs``.
+            active_instance_count: Number of instances currently returned by
+                ``DescribeSpotFleetInstances``.  Used as
+                ``provisioned_instance_count``.
+
+        Returns:
+            A :class:`FleetCapacityFulfilment` containing the normalised
+            capacity data for this fleet.
+        """
+        fleet_cfg = fleet_config_entry.get("SpotFleetRequestConfig") or {}
+        target_capacity: int | None = fleet_cfg.get("TargetCapacity")
+        fulfilled_raw: float = fleet_cfg.get("FulfilledCapacity") or 0.0
+        fulfilled_units = int(fulfilled_raw)
+        fulfillment_complete = target_capacity is not None and fulfilled_raw >= target_capacity
+        return FleetCapacityFulfilment(
+            target_capacity_units=target_capacity,
+            fulfilled_capacity_units=fulfilled_units,
+            provisioned_instance_count=active_instance_count,
+            fulfillment_complete=fulfillment_complete,
+        )
+
     def _get_spot_fleet_status(
         self,
         fleet_id: str,
@@ -353,12 +384,8 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             )
 
         fleet_config_entry = fleet_list[0]
-        fleet_cfg = fleet_config_entry.get("SpotFleetRequestConfig") or {}
-        target_capacity: Optional[int] = fleet_cfg.get("TargetCapacity")
-        fulfilled_capacity: float = fleet_cfg.get("FulfilledCapacity") or 0.0
-        target_units = target_capacity if target_capacity is not None else requested_count
-
-        # Get active instances
+        # Get active instances before computing capacity so provisioned_instance_count
+        # is available to _fetch_spot_fleet_capacity.
         active_instances = self._retry_with_backoff(
             lambda fid=fleet_id: self._paginate(
                 self.aws_client.ec2_client.describe_spot_fleet_instances,
@@ -366,13 +393,16 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 SpotFleetRequestId=fid,
             )
         )
+        capacity = self._fetch_spot_fleet_capacity(
+            fleet_config_entry, active_instance_count=len(active_instances)
+        )
+        target_capacity = capacity.target_capacity_units
+        fulfilled_capacity = float(capacity.fulfilled_capacity_units)
+        target_units = target_capacity if target_capacity is not None else requested_count
 
         if not active_instances:
             # Fleet submitted but no instances yet — check if capacity has been allocated
-            fleet_fully_fulfilled = (
-                target_capacity is not None and fulfilled_capacity >= target_capacity
-            )
-            if fleet_fully_fulfilled:
+            if capacity.fulfillment_complete:
                 # Capacity allocated but instances not visible yet
                 return CheckHostsStatusResult(
                     instances=[],
@@ -446,12 +476,8 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         result = self._get_spot_fleet_status(fleet_id, request_id=request_id)
         return result.instances
 
-    def _resolve_provider_api(
-        self, request: Request, aws_template: Optional[AWSTemplate] = None
-    ) -> str:
-        """Resolve the provider_api value to stamp onto instance data."""
-        metadata = getattr(request, "metadata", {}) or {}
-        return metadata.get("provider_api", "SpotFleet")
+    def _default_provider_api(self) -> str:
+        return "SpotFleet"
 
     def release_hosts(
         self,
