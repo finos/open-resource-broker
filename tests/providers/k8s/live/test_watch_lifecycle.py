@@ -212,7 +212,7 @@ async def test_watch_receives_pod_delete_event(
         "410 Gone reconnect requires apiserver-side event ejection (resource version "
         "compaction) which cannot be triggered reliably from a test client.  "
         "The reconnect path is covered by unit tests in "
-        "tests/unit/providers/k8s/watch/test_watcher.py."
+        "tests/providers/k8s/unit/watch/test_watcher.py."
     )
 )
 async def test_watch_survives_410_gone_reconnect(

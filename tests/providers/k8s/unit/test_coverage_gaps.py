@@ -277,7 +277,7 @@ def test_409_conflict_retry_test_exists() -> None:
 
     # The module should be importable; if not, the Wave 2 commit was reverted.
     mod = importlib.import_module(
-        "tests.unit.providers.k8s.handlers.test_base_handler_circuit_breaker"
+        "tests.providers.k8s.unit.handlers.test_base_handler_circuit_breaker"
     )
     assert mod is not None
 
