@@ -79,6 +79,32 @@ class TestOpenResourceBrokerConstruction:
         assert "not initialized" in repr(sdk)
         assert "aws" in repr(sdk)
 
+    # F3 — SDKConfig instance accepted directly in constructor
+    def test_config_as_sdk_config_instance_used_directly(self):
+        """ORBClient(config=SDKConfig(...)) must not raise AttributeError.
+
+        Regression: when config was an SDKConfig instance, the constructor
+        called SDKConfig.from_dict(config) which expects a dict, causing an
+        AttributeError deep in from_dict's iteration over config.items().
+        """
+        sdk_config = SDKConfig(provider="aws", timeout=120)
+        sdk = OpenResourceBroker(config=sdk_config)
+        assert sdk.config is sdk_config
+        assert sdk.config.provider == "aws"
+        assert sdk.config.timeout == 120
+
+    def test_config_as_dict_still_works(self):
+        """Passing a dict for config must still produce a valid SDKConfig."""
+        sdk = OpenResourceBroker(config={"provider": "aws", "timeout": 60})
+        assert sdk.config.provider == "aws"
+        assert sdk.config.timeout == 60
+
+    def test_config_as_sdk_config_instance_respects_explicit_provider_kwarg(self):
+        """Explicit provider= kwarg must override the value in the SDKConfig instance."""
+        sdk_config = SDKConfig(provider="aws")
+        sdk = OpenResourceBroker(config=sdk_config, provider="mock")
+        assert sdk.config.provider == "mock"
+
 
 # ---------------------------------------------------------------------------
 # initialize() / context manager

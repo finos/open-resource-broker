@@ -51,7 +51,7 @@ class ORBClient:
     def __init__(
         self,
         provider: Optional[str] = None,
-        config: Optional[dict[str, Any]] = None,
+        config: "Optional[dict[str, Any] | SDKConfig]" = None,
         config_path: Optional[str] = None,
         app_config: Optional[dict[str, Any]] = None,
         scheduler: Optional[str] = None,
@@ -102,7 +102,10 @@ class ORBClient:
             provider_config = merged
 
         # Configuration setup
-        if config:
+        if isinstance(config, SDKConfig):
+            # Caller passed a pre-built SDKConfig instance — use it directly.
+            self._config = config
+        elif config:
             self._config = SDKConfig.from_dict(config)
         elif config_path:
             self._config = SDKConfig.from_file(config_path)
