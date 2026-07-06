@@ -244,12 +244,12 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         ),
     )
     reject_high_risk_pod_fields: bool = Field(
-        False,
+        True,
         description=(
-            "When True, ORB raises a K8sError instead of logging a warning when the "
+            "When True (default), ORB raises a K8sError instead of logging a warning when the "
             "rendered pod spec contains high-risk fields.  Requires "
             "``audit_high_risk_pod_fields=True`` (the default) to take effect.  "
-            "Default False so operators opt in to hard rejection deliberately."
+            "Set to False to revert to warning-only behaviour (operators must opt out explicitly)."
         ),
     )
 
@@ -328,5 +328,28 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         if not prefix or "/" in prefix or " " in prefix:
             raise ValueError(
                 "label_prefix must be a non-empty DNS subdomain (no slashes or spaces)"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_native_spec_requires_rejection(self) -> "K8sProviderConfig":
+        """``native_spec_enabled=True`` requires ``reject_high_risk_pod_fields=True``.
+
+        Allowing native specs through the escape hatch whilst the high-risk
+        pod-spec audit is configured to only warn (not reject) means an
+        operator-supplied spec with privileged containers or hostPath volumes
+        is silently accepted.  Requiring hard rejection when the escape hatch
+        is open closes that gap.
+
+        Operators who need to temporarily diagnose a failure can set
+        ``native_spec_enabled=False`` or re-enable rejection explicitly.
+        """
+        if self.native_spec_enabled and not self.reject_high_risk_pod_fields:
+            raise ValueError(
+                "native_spec_enabled=True requires reject_high_risk_pod_fields=True.  "
+                "Enabling the native-spec escape hatch whilst the high-risk pod-spec "
+                "audit is configured to warn only is unsafe — set "
+                "reject_high_risk_pod_fields=True (the default) or disable the "
+                "native-spec hatch."
             )
         return self

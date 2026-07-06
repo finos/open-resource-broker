@@ -132,3 +132,34 @@ def test_namespace_defaults_to_default_when_no_in_cluster_file() -> None:
         cfg = K8sProviderConfig()
 
     assert cfg.namespace == "default"
+
+
+# ---------------------------------------------------------------------------
+# Group B: native_spec + audit enforcement defaults and constraint
+# ---------------------------------------------------------------------------
+
+
+def test_reject_high_risk_pod_fields_default_is_true() -> None:
+    """reject_high_risk_pod_fields must default to True (secure-by-default)."""
+    cfg = K8sProviderConfig()
+    assert cfg.reject_high_risk_pod_fields is True
+
+
+def test_native_spec_enabled_requires_rejection() -> None:
+    """native_spec_enabled=True with reject_high_risk_pod_fields=False is rejected."""
+    with pytest.raises(ValidationError, match="native_spec_enabled=True requires"):
+        K8sProviderConfig(native_spec_enabled=True, reject_high_risk_pod_fields=False)
+
+
+def test_native_spec_enabled_with_rejection_is_valid() -> None:
+    """native_spec_enabled=True is valid when reject_high_risk_pod_fields=True."""
+    cfg = K8sProviderConfig(native_spec_enabled=True, reject_high_risk_pod_fields=True)
+    assert cfg.native_spec_enabled is True
+    assert cfg.reject_high_risk_pod_fields is True
+
+
+def test_native_spec_disabled_with_no_rejection_is_valid() -> None:
+    """native_spec_enabled=False with reject_high_risk_pod_fields=False is valid."""
+    cfg = K8sProviderConfig(native_spec_enabled=False, reject_high_risk_pod_fields=False)
+    assert cfg.native_spec_enabled is False
+    assert cfg.reject_high_risk_pod_fields is False
