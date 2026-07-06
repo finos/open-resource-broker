@@ -544,11 +544,10 @@ def register_k8s_services_with_di(container) -> None:
 
     Also registers :class:`K8sNativeSpecService` so plugin code and tests
     can resolve it from the container when the kubernetes provider's
-    native-spec escape hatch is in use.  The strategy itself resolves the
-    service lazily (see
-    :meth:`K8sProviderStrategy._resolve_native_spec_service`) so this
-    registration is the explicit binding for callers who want the
-    container to own the lifecycle.
+    native-spec escape hatch is in use.  :func:`create_k8s_strategy`
+    resolves the service from this container binding at strategy-creation
+    time and passes it as a constructor argument, removing any in-method
+    ``get_container()`` call from the strategy itself.
 
     **Infrastructure discovery service** (:class:`K8sInfrastructureDiscoveryService`)
     is intentionally NOT registered in the DI container.  It depends on

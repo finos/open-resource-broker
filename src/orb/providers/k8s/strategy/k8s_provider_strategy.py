@@ -201,15 +201,14 @@ class K8sProviderStrategy(ProviderStrategy):
         self._node_state_cache: K8sNodeStateCache = node_state_cache or K8sNodeStateCache()
         self._node_watcher: Optional[K8sNodeWatcher] = node_watcher
         # Native-spec escape hatch.  Resolved lazily on first handler
-        # construction so tests / CLI bootstrap paths without a DI
-        # container do not pay the resolution cost up front.  ``None``
-        # after resolution means the service is unavailable (jinja2
-        # missing, DI container empty, etc.) — handlers will fall back
-        # to the typed builder path.
-        # When a NativeSpecService is supplied at construction time (injected
-        # by the registration factory to avoid a providers→application import
-        # at call time) the lazy resolver fast-paths directly to building
-        # K8sNativeSpecService without touching the DI container.
+        # construction.  ``None`` after resolution means the service is
+        # unavailable (jinja2 missing, injected service not provided, etc.)
+        # — handlers fall back to the typed builder path.  The injected
+        # ``native_spec_service`` is the raw ``NativeSpecService`` from the
+        # application layer; :meth:`_resolve_native_spec_service` wraps it
+        # in ``K8sNativeSpecService`` on first call.  There is no DI
+        # container fallback — callers that need native-spec support must
+        # supply the service via this constructor parameter.
         self._injected_native_spec_service: Optional[Any] = native_spec_service
         self._native_spec_service_resolved: bool = False
         self._k8s_native_spec_service: Optional[Any] = None
@@ -1322,15 +1321,14 @@ class K8sProviderStrategy(ProviderStrategy):
     def _resolve_native_spec_service(self) -> Optional[Any]:
         """Resolve :class:`K8sNativeSpecService` once on first handler build.
 
-        Caches the result (including the negative resolution) so the
-        lookup cost — and any warning — fires at most once per strategy
-        instance.  Returns ``None`` when the provider config opts out
-        (``native_spec_enabled=False``) or when the generic service is
-        not available.
-
-        When a ``native_spec_service`` was supplied at construction time
-        (injected by the registration factory), it is used directly so no
-        DI container lookup or cross-layer import is required at call time.
+        Returns ``None`` when the provider config opts out
+        (``native_spec_enabled=False``), when no ``ConfigurationPort`` is
+        wired, or when no ``native_spec_service`` was passed at construction
+        time.  All construction paths that need native-spec support must
+        supply the service via the constructor parameter — the
+        :func:`orb.providers.k8s.registration.create_k8s_strategy` factory
+        resolves it from the DI container at strategy-creation time and
+        passes it explicitly.  There is no ``get_container()`` fallback.
         """
         if self._native_spec_service_resolved:
             return self._k8s_native_spec_service
@@ -1346,38 +1344,22 @@ class K8sProviderStrategy(ProviderStrategy):
             )
             return None
 
-        # Fast path: service was injected at construction time.
-        if self._injected_native_spec_service is not None:
-            try:
-                from orb.providers.k8s.infrastructure.services.k8s_native_spec_service import (
-                    K8sNativeSpecService,
-                )
+        if self._injected_native_spec_service is None:
+            self._logger.debug(
+                "Kubernetes native-spec service unavailable: no NativeSpecService "
+                "injected at construction time (typed builder path will be used).  "
+                "Ensure create_k8s_strategy is used so the service is resolved from "
+                "the DI container before strategy construction."
+            )
+            return None
 
-                self._k8s_native_spec_service = K8sNativeSpecService(
-                    native_spec_service=self._injected_native_spec_service,
-                    config_port=self._config_port,
-                    k8s_config=self._k8s_config,
-                )
-                return self._k8s_native_spec_service
-            except Exception as exc:
-                self._logger.warning(
-                    "K8sNativeSpecService unavailable, native spec enrichment disabled: %s",
-                    exc,
-                )
-                return None
-
-        # Fallback: resolve via the DI container when no service was injected
-        # (e.g. strategy constructed outside the normal registration factory).
         try:
-            from orb.application.services.native_spec_service import NativeSpecService
-            from orb.infrastructure.di.container import get_container
-            from orb.providers.k8s.infrastructure.services.k8s_native_spec_service import (
+            from orb.providers.k8s.infrastructure.services.k8s_native_spec_service import (  # noqa: PLC0415
                 K8sNativeSpecService,
             )
 
-            container = get_container()
             self._k8s_native_spec_service = K8sNativeSpecService(
-                native_spec_service=container.get(NativeSpecService),
+                native_spec_service=self._injected_native_spec_service,
                 config_port=self._config_port,
                 k8s_config=self._k8s_config,
             )
