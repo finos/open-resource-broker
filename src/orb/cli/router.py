@@ -6,12 +6,11 @@ command or query handlers via the flat registry.
 """
 
 import json
-from typing import Union
 
 from orb.domain.base.exceptions import DomainException
 
 
-async def execute_command(args, app, resource_parsers) -> Union[str, tuple[str, int]]:
+async def execute_command(args, app, resource_parsers) -> str | tuple[str, int]:
     """Execute command using flat registry dispatch."""
     from orb.application.ports.scheduler_port import SchedulerPort
     from orb.cli.registry import build_registry, lookup

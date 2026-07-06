@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Union
+import asyncio
+import re
+import sys
+from typing import TYPE_CHECKING, Any
 
 from orb.application.dto.interface_response import InterfaceResponse
 from orb.infrastructure.di.container import get_container
@@ -15,8 +18,8 @@ if TYPE_CHECKING:
 
 @handle_interface_exceptions(context="list_storage_strategies", interface_type="cli")
 async def handle_list_storage_strategies(
-    args: "argparse.Namespace",
-) -> Union[dict[str, Any], InterfaceResponse]:
+    args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
     """Handle list storage strategies operations."""
     from orb.application.services.orchestration.dtos import ListStorageStrategiesInput
     from orb.application.services.orchestration.list_storage_strategies import (
@@ -35,8 +38,8 @@ async def handle_list_storage_strategies(
 
 @handle_interface_exceptions(context="show_storage_config", interface_type="cli")
 async def handle_show_storage_config(
-    args: "argparse.Namespace",
-) -> Union[dict[str, Any], InterfaceResponse]:
+    args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
     """Handle show storage configuration operations."""
     from orb.application.services.orchestration.dtos import GetStorageConfigInput
     from orb.application.services.orchestration.get_storage_config import (
@@ -55,8 +58,8 @@ async def handle_show_storage_config(
 
 @handle_interface_exceptions(context="validate_storage_config", interface_type="cli")
 async def handle_validate_storage_config(  # type: ignore[return]
-    _args: "argparse.Namespace",
-) -> "Union[dict[str, Any], InterfaceResponse]":
+    _args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
     """Handle validate storage configuration operations."""
     container = get_container()
     formatter = container.get(ResponseFormattingService)
@@ -79,8 +82,8 @@ async def handle_validate_storage_config(  # type: ignore[return]
 
 @handle_interface_exceptions(context="test_storage", interface_type="cli")
 async def handle_test_storage(
-    args: "argparse.Namespace",
-) -> "Union[dict[str, Any], InterfaceResponse]":
+    args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
     """Handle test storage operations."""
     from orb.infrastructure.di.buses import QueryBus
 
@@ -102,8 +105,8 @@ async def handle_test_storage(
 
 @handle_interface_exceptions(context="storage_health", interface_type="cli")
 async def handle_storage_health(
-    args: "argparse.Namespace",
-) -> "Union[dict[str, Any], InterfaceResponse]":
+    args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
     """Handle storage health operations."""
     container = get_container()
     formatter = container.get(ResponseFormattingService)
@@ -132,10 +135,136 @@ async def handle_storage_health(
         return formatter.format_error("Storage health query not available")
 
 
+@handle_interface_exceptions(context="storage_migrate", interface_type="cli")
+async def handle_storage_migrate(
+    args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
+    """Run Alembic migrations for the SQL storage strategy.
+
+    Subcommands: up (upgrade head), down (downgrade -1), current, history.
+    The database URL is read from the ORB configuration so it respects
+    whatever connection string the operator has configured.
+    """
+    container = get_container()
+    formatter = container.get(ResponseFormattingService)
+
+    subcommand = getattr(args, "migrate_subcommand", "up")
+
+    # "stamp" needs the target revision as an additional argument, so it
+    # is handled separately from the static cmd map.
+    if subcommand == "stamp":
+        stamp_target = getattr(args, "revision", None) or "head"
+        alembic_args: list[str] = ["stamp", stamp_target]
+    else:
+        alembic_cmd_map = {
+            "up": ["upgrade", "head"],
+            "down": ["downgrade", "-1"],
+            "current": ["current"],
+            "history": ["history"],
+        }
+
+        alembic_args = alembic_cmd_map.get(subcommand)  # type: ignore[assignment]
+        if alembic_args is None:
+            return formatter.format_error(
+                f"Unknown migrate subcommand '{subcommand}'. "
+                "Valid values: up, down, current, history, stamp"
+            )
+
+    try:
+        # Guard: alembic is an optional dependency shipped in the [sql] extra.
+        # Give a clear install hint before attempting the subprocess so the
+        # error message is actionable rather than a generic "No module named alembic".
+        import importlib.util
+
+        if importlib.util.find_spec("alembic") is None:
+            return formatter.format_error(
+                "Alembic is not installed.  "
+                "Run: pip install orb-py[sql]  (or: pip install alembic>=1.13)"
+            )
+
+        # Resolve the DB URL from config and pass via environment variable so
+        # alembic env.py can pick it up without touching alembic.ini at runtime.
+        import os
+
+        db_url: str | None = None
+        try:
+            from orb.config.manager import ConfigurationManager
+            from orb.config.schemas.storage_schema import StorageConfig
+
+            cfg = container.get(ConfigurationManager)
+            storage_cfg = cfg.get_typed(StorageConfig)
+            sql_cfg = storage_cfg.sql_strategy
+            if sql_cfg.type == "sqlite":
+                db_url = f"sqlite:///{sql_cfg.name}"
+            elif sql_cfg.type == "postgresql":
+                db_url = (
+                    f"postgresql://{sql_cfg.username}:{sql_cfg.password}"
+                    f"@{sql_cfg.host}:{sql_cfg.port}/{sql_cfg.name}"
+                )
+        except Exception:
+            pass  # Fall back to alembic.ini default
+
+        env = os.environ.copy()
+        if db_url:
+            env["ORB_SQL_URL"] = db_url
+
+        # alembic.ini ships inside the package at
+        # src/orb/infrastructure/storage/sql/migrations/alembic.ini so it
+        # lands wherever the orb package is installed (no dependency on
+        # the repo layout being intact).
+        import orb
+
+        alembic_ini = os.path.join(
+            os.path.dirname(os.path.abspath(orb.__file__)),
+            "infrastructure",
+            "storage",
+            "sql",
+            "migrations",
+            "alembic.ini",
+        )
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable,
+            "-m",
+            "alembic",
+            "--config",
+            alembic_ini,
+            *alembic_args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+        )
+        raw_stdout_bytes, raw_stderr_bytes = await proc.communicate()
+        raw_stdout = raw_stdout_bytes.decode("utf-8", errors="replace")
+        raw_stderr = raw_stderr_bytes.decode("utf-8", errors="replace")
+
+        # Log full output server-side (operators with shell access can debug).
+        from orb.infrastructure.logging.logger import get_logger as _get_logger
+
+        _migrate_logger = _get_logger(__name__)
+        _migrate_logger.debug("alembic stdout: %s", raw_stdout)
+        _migrate_logger.debug("alembic stderr: %s", raw_stderr)
+
+        # Scrub DB credentials before returning to caller.  Matches both
+        # postgresql:// and the future postgres+driver:// variants.
+        _DB_URL_RE = re.compile(r"((?:postgresql|postgres)[^:]*://[^:]+:)[^@]+(@)", re.IGNORECASE)
+
+        def _scrub(text: str) -> str:
+            return _DB_URL_RE.sub(r"\1***\2", text)
+
+        output = _scrub((raw_stdout + raw_stderr).strip())
+        if proc.returncode != 0:
+            return formatter.format_error(f"Alembic migration failed:\n{output}")
+        return formatter.format_success(
+            {"message": f"Migration '{subcommand}' completed", "output": output}
+        )
+    except Exception as exc:
+        return formatter.format_error(f"Migration error: {exc}")
+
+
 @handle_interface_exceptions(context="storage_metrics", interface_type="cli")
 async def handle_storage_metrics(
-    _args: "argparse.Namespace",
-) -> "Union[dict[str, Any], InterfaceResponse]":
+    _args: argparse.Namespace,
+) -> dict[str, Any] | InterfaceResponse:
     """Handle storage metrics operations."""
     container = get_container()
     formatter = container.get(ResponseFormattingService)

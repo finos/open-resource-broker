@@ -3,7 +3,7 @@
 import json
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional
 
 from orb._package import PACKAGE_NAME, __version__
 from orb.domain.constants import PROVIDER_TYPE_AWS
@@ -24,7 +24,7 @@ class MCPMessage:
     """MCP message structure."""
 
     jsonrpc: str = "2.0"
-    id: Optional[Union[str, int]] = None
+    id: Optional[str | int] = None
     method: Optional[str] = None
     params: Optional[dict[str, Any]] = None
     result: Optional[Any] = None
