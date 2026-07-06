@@ -12,7 +12,6 @@ lifting is per-handler.
 
 from __future__ import annotations
 
-import copy
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar
 
@@ -24,12 +23,10 @@ from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.resilience import retry
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
-from orb.providers.k8s.utilities.labels import validate_namespace as _validate_namespace
 from orb.providers.k8s.utilities.pod_spec import request_id_label_selector
 from orb.providers.k8s.utilities.pod_spec_audit import audit_pod_spec
 from orb.providers.k8s.utilities.pod_state import (
     extract_status_reason,
-    is_fatal_waiting_reason,
     is_pod_ready,
     pod_status_string,
 )
@@ -429,47 +426,14 @@ class K8sHandlerBase(ABC):
     def _instance_dict_for_state(self, state: PodState) -> dict[str, Any]:
         """Convert a cached :class:`PodState` into the instance-dict shape.
 
-        Mirrors :meth:`_instance_dict_for_pod` so the list-fed and
-        cache-fed code paths produce identical dicts downstream.
+        Delegates to
+        :func:`~orb.providers.k8s.infrastructure.handlers.shared.pod_state_translator.instance_dict_for_state`.
         """
-        provider_data: dict[str, Any] = {
-            "namespace": state.namespace,
-            "node_name": state.node_name,
-            "phase": state.phase,
-            "ready": state.ready,
-            "restart_count": state.restart_count,
-            "disrupted_reason": state.disrupted_reason,
-            "disrupted_message": state.disrupted_message,
-        }
-        # Enrich with node metadata when the node watcher is active and the
-        # pod has been scheduled to a node.
-        if state.node_name and self._node_state_cache is not None:
-            node_state = self._node_state_cache.get(state.node_name)
-            if node_state is not None:
-                provider_data["node_instance_type"] = node_state.instance_type
-                provider_data["node_zone"] = node_state.zone
-                provider_data["node_capacity_type"] = node_state.capacity_type
-
-        return {
-            "instance_id": state.pod_name,
-            "resource_id": state.pod_name,
-            "name": state.pod_name,
-            "status": state.status,
-            "status_reason": state.status_reason,
-            "private_ip": state.pod_ip,
-            "public_ip": state.host_ip,
-            "launch_time": state.start_time,
-            "instance_type": "",
-            "image_id": "",
-            "subnet_id": None,
-            "security_group_ids": [],
-            "vpc_id": None,
-            "tags": dict(state.labels),
-            "price_type": None,
-            "provider_api": self.PROVIDER_API,
-            "provider_data": provider_data,
-            "metadata": {},
-        }
+        return _instance_dict_for_state(
+            state,
+            provider_api=self.PROVIDER_API,
+            node_state_cache=self._node_state_cache,
+        )
 
     def _resolve_namespace_from_provider_data(self, provider_data: dict[str, Any]) -> str:
         """Resolve a namespace from a ``provider_data`` dict.
