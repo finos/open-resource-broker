@@ -12,7 +12,7 @@
 //
 // The ORB server must be started with --scheduler hostfactory:
 //
-//	orb system serve --scheduler hostfactory
+//	orb --scheduler hostfactory server start --foreground
 package main
 
 import (

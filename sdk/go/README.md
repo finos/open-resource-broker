@@ -37,7 +37,7 @@ ORB communicates over a **Unix domain socket** (UDS). The pattern is similar to 
 The subprocess is started with:
 
 ```
-orb system serve --socket-path /tmp/orb-<pid>.sock
+orb server start --foreground --api-only --socket-path /tmp/orb-<pid>.sock
 ```
 
 The SDK polls `/health` on the socket until ORB reports healthy (up to `StartTimeout`, default 30 s), then begins serving requests. On `Close()` the SDK sends SIGTERM and waits up to `StopTimeout` before SIGKILL.
@@ -65,7 +65,7 @@ defer c.Close() // stops the ORB subprocess
 
 The SDK automatically:
 - Generates a temp socket path (`/tmp/orb-<pid>.sock`)
-- Starts `orb system serve --socket-path /tmp/orb-<pid>.sock`
+- Starts `orb server start --foreground --api-only --socket-path /tmp/orb-<pid>.sock`
 - Waits up to 30 s for ORB to become healthy
 - Routes all API calls through the socket
 - Kills the process on `Close()`
