@@ -11,6 +11,9 @@ if TYPE_CHECKING:
 from orb.domain.base.exceptions import QuotaError
 from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.resilience.exceptions import CircuitBreakerOpenError
+from orb.infrastructure.resilience.retry_classifier_registry import (
+    is_non_retryable as _registry_is_non_retryable,
+)
 from orb.infrastructure.resilience.strategy.base import RetryStrategy
 
 logger = get_logger(__name__)
@@ -111,27 +114,6 @@ class CircuitBreakerStrategy(RetryStrategy):
             extra={"service_name": service_name, "state": CircuitState.OPEN.value},
         )
 
-    # HTTP status codes that indicate a permanent client error.  These must not
-    # consume retry budget or count as circuit-breaker failures — they represent
-    # operator / caller errors, not apiserver degradation.
-    _NON_RETRYABLE_K8S_STATUSES: frozenset[int] = frozenset({400, 403, 404, 409, 410, 422})
-
-    @staticmethod
-    def _is_non_retryable_k8s_exception(exception: Exception) -> bool:
-        """Return True when ``exception`` is a Kubernetes ApiException with a
-        status code that must not be retried or counted as a circuit failure."""
-        try:
-            from kubernetes.client.exceptions import ApiException  # noqa: PLC0415
-
-            if isinstance(exception, ApiException):
-                status = getattr(exception, "status", None)
-                return status in CircuitBreakerStrategy._NON_RETRYABLE_K8S_STATUSES
-        except ImportError:
-            # kubernetes SDK not installed (the [k8s] optional extra is absent);
-            # the exception cannot be a k8s ApiException, so treat as retryable.
-            pass
-        return False
-
     def should_retry(self, attempt: int, exception: Exception) -> bool:
         """
         Determine if operation should be retried based on circuit state.
@@ -148,11 +130,11 @@ class CircuitBreakerStrategy(RetryStrategy):
             self._force_open(self.service_name)
             return False
 
-        # Non-retryable Kubernetes API status codes (client errors such as
-        # 409 Conflict and 403 RBAC denied) must not be retried and must not
-        # be counted as circuit failures — they are permanent caller errors,
-        # not apiserver degradation signals.
-        if self._is_non_retryable_k8s_exception(exception):
+        # Provider-registered classifiers flag permanent client errors (e.g.
+        # 409 Conflict, 403 RBAC denied from a provider SDK) that must not be
+        # retried and must not be counted as circuit failures — they are caller
+        # errors, not service degradation signals.
+        if _registry_is_non_retryable(exception):
             return False
 
         current_time = time.time()

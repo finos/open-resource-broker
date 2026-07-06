@@ -2,7 +2,8 @@
 
 Covers:
 * ExponentialBackoffStrategy.should_retry fast-fails on non-retryable
-  Kubernetes ApiException status codes (400, 403, 404, 409, 410, 422).
+  Kubernetes ApiException status codes (400, 403, 404, 409, 410, 422) when
+  the K8sRetryClassifier is registered.
 * 5xx and transient errors are still retried.
 """
 
@@ -11,7 +12,21 @@ from __future__ import annotations
 import pytest
 from kubernetes.client.exceptions import ApiException
 
+from orb.infrastructure.resilience.retry_classifier_registry import (
+    clear_classifiers,
+    register_retry_classifier,
+)
 from orb.infrastructure.resilience.strategy.exponential import ExponentialBackoffStrategy
+from orb.providers.k8s.resilience.retry_classifier import K8sRetryClassifier
+
+
+@pytest.fixture(autouse=True)
+def _register_k8s_classifier():
+    """Register the K8s classifier for tests in this module, then clean up."""
+    register_retry_classifier(K8sRetryClassifier())
+    yield
+    clear_classifiers()
+
 
 # ---------------------------------------------------------------------------
 # ExponentialBackoffStrategy — non-retryable k8s status codes
