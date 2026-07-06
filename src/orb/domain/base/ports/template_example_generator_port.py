@@ -17,4 +17,5 @@ class TemplateExampleGeneratorPort(Protocol):
         self,
         provider_name: str,
         provider_api: Optional[str] = None,
-    ) -> list[Any]: ...
+    ) -> list[Any]:  # type: ignore[return]
+        pass

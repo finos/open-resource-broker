@@ -1151,10 +1151,7 @@ class K8sProviderStrategy(ProviderStrategy):
                 sources.append(
                     {
                         "name": _IN_CLUSTER_SENTINEL,
-                        "description": (
-                            "In-cluster ServiceAccount token mounted at "
-                            "/var/run/secrets/kubernetes.io/serviceaccount/"
-                        ),
+                        "description": "in-cluster ServiceAccount",
                         "config_delta": {"in_cluster": True},
                     }
                 )
@@ -1172,12 +1169,14 @@ class K8sProviderStrategy(ProviderStrategy):
                     continue
                 marker = " (current)" if name == current_name else ""
                 cluster = ctx.get("context", {}).get("cluster", "?")
+                if name == cluster:
+                    label = f"{name}{marker}"
+                else:
+                    label = f"{name} → {cluster}{marker}"
                 sources.append(
                     {
                         "name": name,
-                        "description": (
-                            f"kubeconfig context '{name}'{marker} -> cluster {cluster}"
-                        ),
+                        "description": label,
                         "config_delta": {"context": name},
                     }
                 )
