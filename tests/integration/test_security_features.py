@@ -646,20 +646,19 @@ class TestInputValidatorIntegration:
 
 
 # ===========================================================================
-# AuthMiddleware – security headers
+# SecurityHeadersMiddleware – security headers
 # ===========================================================================
 
 
-class TestAuthMiddlewareSecurityHeaders:
-    """Integration tests for security headers added by AuthMiddleware."""
+class TestSecurityHeadersMiddleware:
+    """Integration tests for headers added by SecurityHeadersMiddleware."""
 
-    def _make_app_with_enhanced_middleware(self, require_auth: bool = False):
-        """Build a minimal FastAPI app with AuthMiddleware."""
+    def _make_app(self, require_https: bool = False):
+        """Build a minimal FastAPI app with SecurityHeadersMiddleware."""
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
 
-        from orb.api.middleware.auth_middleware import AuthMiddleware
-        from orb.infrastructure.auth.strategy.no_auth_strategy import NoAuthStrategy
+        from orb.api.middleware.security_headers_middleware import SecurityHeadersMiddleware
 
         app = FastAPI()
 
@@ -667,65 +666,65 @@ class TestAuthMiddlewareSecurityHeaders:
         def ping():
             return {"ok": True}
 
-        auth_port = NoAuthStrategy(enabled=False)
-        app.add_middleware(
-            AuthMiddleware,
-            auth_port=auth_port,
-            excluded_paths=["/ping"],
-            require_auth=require_auth,
-        )
+        app.add_middleware(SecurityHeadersMiddleware, require_https=require_https)
         return TestClient(app)
 
     def test_x_frame_options_deny(self):
-        client = self._make_app_with_enhanced_middleware()
+        client = self._make_app()
         response = client.get("/ping")
         assert response.headers.get("x-frame-options") == "DENY"
 
     def test_x_content_type_options_nosniff(self):
-        client = self._make_app_with_enhanced_middleware()
+        client = self._make_app()
         response = client.get("/ping")
         assert response.headers.get("x-content-type-options") == "nosniff"
 
-    def test_x_xss_protection(self):
-        client = self._make_app_with_enhanced_middleware()
+    def test_x_xss_protection_absent(self):
+        """X-XSS-Protection is intentionally omitted (deprecated)."""
+        client = self._make_app()
         response = client.get("/ping")
-        assert response.headers.get("x-xss-protection") == "1; mode=block"
+        assert "x-xss-protection" not in response.headers
 
-    def test_strict_transport_security(self):
-        client = self._make_app_with_enhanced_middleware()
+    def test_strict_transport_security_absent_without_https(self):
+        """HSTS must NOT be emitted when require_https is False."""
+        client = self._make_app(require_https=False)
+        response = client.get("/ping")
+        assert "strict-transport-security" not in response.headers
+
+    def test_strict_transport_security_present_with_https(self):
+        """HSTS is emitted when require_https=True."""
+        client = self._make_app(require_https=True)
         response = client.get("/ping")
         hsts = response.headers.get("strict-transport-security", "")
         assert "max-age=31536000" in hsts
         assert "includeSubDomains" in hsts
 
     def test_content_security_policy_present(self):
-        client = self._make_app_with_enhanced_middleware()
+        client = self._make_app()
         response = client.get("/ping")
         csp = response.headers.get("content-security-policy", "")
         assert "default-src" in csp
         assert "frame-ancestors 'none'" in csp
 
     def test_referrer_policy(self):
-        client = self._make_app_with_enhanced_middleware()
+        client = self._make_app()
         response = client.get("/ping")
         assert response.headers.get("referrer-policy") == "strict-origin-when-cross-origin"
 
     def test_permissions_policy(self):
-        client = self._make_app_with_enhanced_middleware()
+        client = self._make_app()
         response = client.get("/ping")
         pp = response.headers.get("permissions-policy", "")
         assert "geolocation=()" in pp
         assert "camera=()" in pp
 
-    def test_all_eight_security_headers_present(self):
-        """All 8 expected security headers must be present on every response."""
-        client = self._make_app_with_enhanced_middleware()
+    def test_required_security_headers_present(self):
+        """All required security headers must be present on every response."""
+        client = self._make_app()
         response = client.get("/ping")
         expected = [
             "x-frame-options",
             "x-content-type-options",
-            "x-xss-protection",
-            "strict-transport-security",
             "content-security-policy",
             "referrer-policy",
             "permissions-policy",

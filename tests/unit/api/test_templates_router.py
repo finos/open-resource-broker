@@ -7,11 +7,14 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from orb.api.dependencies import (
+    CurrentUser,
     get_create_template_orchestrator,
+    get_current_user,
     get_delete_template_orchestrator,
     get_get_template_orchestrator,
     get_list_templates_orchestrator,
     get_refresh_templates_orchestrator,
+    get_request_scheduler,
     get_scheduler_strategy,
     get_update_template_orchestrator,
     get_validate_template_orchestrator,
@@ -38,10 +41,15 @@ def templates_app():
     app = FastAPI()
     app.include_router(templates_router)
 
+    # Supply an admin identity so all template CRUD role guards are satisfied.
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        username="test-admin", role="admin"
+    )
+
     exception_handler = get_exception_handler()
 
     @app.exception_handler(Exception)
-    async def global_exception_handler(__request, exc):  # noqa: N807
+    async def global_exception_handler(__request, exc):
         error_response = exception_handler.handle_error_for_http(exc)
         return JSONResponse(
             status_code=error_response.http_status or 500,
@@ -75,6 +83,7 @@ class TestTemplatesRouter:
 
     def _make_client(self, app, overrides=None):
         scheduler = self._make_scheduler_mock()
+        app.dependency_overrides[get_request_scheduler] = lambda: scheduler
         app.dependency_overrides[get_scheduler_strategy] = lambda: scheduler
         for dep, factory in (overrides or {}).items():
             app.dependency_overrides[dep] = factory
@@ -456,9 +465,10 @@ class TestTemplatesRouteOrder:
         return scheduler
 
     def _make_client(self, app, overrides=None):
-        from orb.api.dependencies import get_scheduler_strategy
+        from orb.api.dependencies import get_request_scheduler, get_scheduler_strategy
 
         scheduler = self._make_scheduler_mock()
+        app.dependency_overrides[get_request_scheduler] = lambda: scheduler
         app.dependency_overrides[get_scheduler_strategy] = lambda: scheduler
         for dep, factory in (overrides or {}).items():
             app.dependency_overrides[dep] = factory
