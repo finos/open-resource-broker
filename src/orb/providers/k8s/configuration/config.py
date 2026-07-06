@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import re
 from pathlib import Path
 from typing import Any, Optional
 
@@ -18,6 +19,23 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from orb.infrastructure.interfaces.provider import BaseProviderConfig
 
 _SA_NAMESPACE_FILE = Path("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+
+# RFC 1123 DNS subdomain: one or more labels separated by dots where each
+# label starts and ends with [a-z0-9] and may contain hyphens in the middle.
+_DNS_SUBDOMAIN_RE = re.compile(
+    r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+)
+
+# Symphony-era field names that were renamed when the k8s provider was
+# introduced.  Keys are the legacy names; values are the canonical names.
+_LEGACY_FIELD_MAP: dict[str, str] = {
+    "kube_config_path": "kubeconfig_path",
+    "kube_context": "context",
+    "default_namespace": "namespace",
+    "pod_timeout": "pod_timeout_seconds",
+    "orphan_gc_interval": "orphan_gc_interval_seconds",
+    "orphan_min_age": "orphan_min_age_seconds",
+}
 
 _logger = logging.getLogger(__name__)
 
@@ -93,7 +111,7 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         case_sensitive=False,
         populate_by_name=True,
         env_nested_delimiter="__",
-        extra="allow",
+        extra="forbid",
     )
 
     provider_type: str = "k8s"
@@ -285,6 +303,73 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         ),
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_keys(cls, data: Any) -> Any:
+        """Remap Symphony-era field names to their canonical equivalents.
+
+        Mirrors
+        :meth:`orb.providers.aws.configuration.config.AWSProviderConfig.normalize_connect_timeout`.
+        Any key present in ``_LEGACY_FIELD_MAP`` is moved to the canonical
+        name unless the canonical name is already set (to avoid clobbering
+        an explicit operator value).
+        """
+        if not isinstance(data, dict):
+            return data
+        updated = dict(data)
+        for legacy, canonical in _LEGACY_FIELD_MAP.items():
+            if legacy in updated:
+                if canonical not in updated:
+                    updated[canonical] = updated.pop(legacy)
+                else:
+                    # Canonical key wins; discard the legacy copy.
+                    updated.pop(legacy)
+        return updated
+
+    @field_validator("namespace")
+    @classmethod
+    def _validate_namespace_format(cls, v: Optional[str]) -> Optional[str]:
+        """Reject namespace values that do not satisfy RFC 1123 DNS subdomain rules.
+
+        ``None`` passes through so the ``_resolve_namespace`` model_validator
+        can set the in-cluster / default fall-back afterwards.
+        """
+        if v is None:
+            return v
+        if not _DNS_SUBDOMAIN_RE.match(v):
+            raise ValueError(
+                f"namespace {v!r} is not a valid RFC 1123 DNS subdomain.  "
+                "Namespace names must consist of lowercase alphanumeric characters "
+                "or hyphens, start and end with an alphanumeric character, "
+                "and may be separated by dots (e.g. 'orb-system', 'production.jobs')."
+            )
+        return v
+
+    @field_validator("context")
+    @classmethod
+    def _validate_context_format(cls, v: Optional[str]) -> Optional[str]:
+        """Reject a context value that is set but empty or whitespace-only."""
+        if v is not None and not v.strip():
+            raise ValueError(
+                "context must be a non-empty string when supplied; "
+                "pass None to omit it (the provider will use the current kubeconfig context)."
+            )
+        return v
+
+    @field_validator("kubeconfig_path")
+    @classmethod
+    def _validate_kubeconfig_path(cls, v: Optional[str]) -> Optional[str]:
+        """Verify the kubeconfig file exists when a path is explicitly supplied."""
+        if v is None:
+            return v
+        path = Path(v)
+        if not path.exists():
+            raise ValueError(
+                f"kubeconfig_path {v!r} does not exist.  "
+                "Provide the absolute path to a readable kubeconfig file."
+            )
+        return v
+
     @field_validator("namespaces")
     @classmethod
     def _validate_namespaces(cls, v: Optional[list[str]]) -> Optional[list[str]]:
@@ -323,11 +408,23 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
 
     @model_validator(mode="after")
     def _validate_label_prefix(self) -> "K8sProviderConfig":
-        """``label_prefix`` must look like a DNS subdomain (RFC 1123)."""
+        """``label_prefix`` must satisfy RFC 1123 DNS subdomain rules.
+
+        Rejects empty strings, values containing ``=``, ``,``, ``(``, ``)``,
+        spaces, slashes, or any character outside the RFC 1123 label character
+        set.
+        """
         prefix = self.label_prefix
-        if not prefix or "/" in prefix or " " in prefix:
+        if not prefix:
+            raise ValueError("label_prefix must be a non-empty string")
+        if not _DNS_SUBDOMAIN_RE.match(prefix):
             raise ValueError(
-                "label_prefix must be a non-empty DNS subdomain (no slashes or spaces)"
+                f"label_prefix {prefix!r} is not a valid RFC 1123 DNS subdomain.  "
+                "The prefix must consist of lowercase alphanumeric characters or hyphens, "
+                "start and end with an alphanumeric character, and may contain dots "
+                "as label separators (e.g. 'orb.io', 'my-company.example.com').  "
+                "Characters such as '=', ',', '(', ')', spaces, slashes, or uppercase "
+                "letters are not permitted."
             )
         return self
 

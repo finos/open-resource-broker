@@ -31,10 +31,13 @@ def test_defaults_match_documented_spec() -> None:
     assert cfg.min_kubernetes_version == "1.28"
 
 
-def test_overrides_are_applied() -> None:
+def test_overrides_are_applied(tmp_path) -> None:  # type: ignore[no-untyped-def]
     """All operator-supplied overrides flow through Pydantic."""
+    # kubeconfig_path validator checks the file exists; create a real stub.
+    kube_cfg = tmp_path / "kube.cfg"
+    kube_cfg.write_text("apiVersion: v1\n", encoding="utf-8")
     cfg = K8sProviderConfig(
-        kubeconfig_path="/tmp/kube.cfg",  # noqa: S108 — test fixture path
+        kubeconfig_path=str(kube_cfg),
         context="prod",
         in_cluster=False,
         namespace="orb-system",
@@ -50,7 +53,7 @@ def test_overrides_are_applied() -> None:
         min_kubernetes_version="1.30",
     )
 
-    assert cfg.kubeconfig_path == "/tmp/kube.cfg"  # noqa: S108
+    assert cfg.kubeconfig_path == str(kube_cfg)
     assert cfg.context == "prod"
     assert cfg.in_cluster is False
     assert cfg.namespaces == ["orb-system", "orb-jobs"]
