@@ -1215,6 +1215,10 @@ class RequestsState(rx.State):
             )
             self.next_cursor = res.get("next_cursor") or ""
             self.api_total_count = int(res.get("total_count") or len(raw))
+            # Stamp last_refresh so the shared refresh_control widget
+            # renders the "Last updated" label consistently with the
+            # machines and templates pages.
+            self.last_refresh = datetime.datetime.now().strftime("%H:%M:%S")
         except Exception as exc:
             self.error = f"Failed to load requests: {exc}"
         finally:
