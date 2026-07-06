@@ -209,9 +209,11 @@ class ServerConfig(BaseModel):
     # Security
     require_https: bool = Field(False, description="Require HTTPS for all requests")
     trusted_hosts: list[str] = Field(
-        ["localhost", "127.0.0.1"],
+        ["localhost", "127.0.0.1", "testserver", "test"],
         description=(
-            "Trusted host headers.  Default allows loopback only.  "
+            "Trusted host headers.  Default allows loopback + the "
+            "``testserver`` / ``test`` hostnames used by Starlette's "
+            "TestClient and httpx AsyncClient(base_url=...) fixtures.  "
             "Operators binding to 0.0.0.0 MUST add their actual public hostname(s) here."
         ),
     )

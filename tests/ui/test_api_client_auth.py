@@ -55,14 +55,18 @@ class TestLoopbackToken:
 
         monkeypatch.delenv("ORB_LOOPBACK_TOKEN_FILE", raising=False)
 
+        # Exercise the fully-mocked path first (proves the wrapper
+        # doesn't accidentally raise when the underlying function is
+        # patched).  Discarding the return value keeps CodeQL happy —
+        # the assertion runs against the real code path below.
         with patch.object(mod, "_loopback_token", wraps=mod._loopback_token):
-            # Patch get_work_location inside the function
             with patch("orb.ui.api_http._loopback_token") as mock_fn:
                 mock_fn.return_value = "my-secret-token"
-                result = mod._loopback_token()
+                mod._loopback_token()
 
-        # Re-implement the real function call with patched get_work_location
-        # so we exercise the actual code path.
+        # Now exercise the real code path with ``get_work_location``
+        # pointing at the tmp_path fixture, so the token is actually
+        # read from disk.
         import orb.config.platform_dirs as pd_mod
 
         with patch.object(pd_mod, "get_work_location", return_value=work_dir):
