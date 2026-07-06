@@ -1097,3 +1097,143 @@ class TestTemplatesStateLoadMore:
             assert len(s.templates) == 1
 
         asyncio.run(_run())
+
+
+# ---------------------------------------------------------------------------
+# ConfigState.visible_rows — source_filter + search_query logic
+# ---------------------------------------------------------------------------
+
+
+class TestConfigStateVisibleRows:
+    """ConfigState.visible_rows computed var — filter and search behaviour."""
+
+    # Sample rows used across tests
+    _FILE_ROWS = [
+        {
+            "section": "server",
+            "key": "server.host",
+            "leaf": "host",
+            "value": "0.0.0.0",
+            "editable": "1",
+            "origin": "file",
+        },
+        {
+            "section": "server",
+            "key": "server.port",
+            "leaf": "port",
+            "value": "8000",
+            "editable": "1",
+            "origin": "file",
+        },
+    ]
+    _DEFAULT_ROWS = [
+        {
+            "section": "scheduler",
+            "key": "scheduler.interval",
+            "leaf": "interval",
+            "value": "60",
+            "editable": "1",
+            "origin": "default",
+        },
+        {
+            "section": "naming",
+            "key": "naming.prefix",
+            "leaf": "prefix",
+            "value": "orb",
+            "editable": "1",
+            "origin": "default",
+        },
+    ]
+
+    def _make_state(
+        self,
+        flat_file: list,
+        flat_defaults: list,
+        source_filter: str = "all",
+        search_query: str = "",
+    ):
+        from orb.ui.pages.config import ConfigState
+
+        s = ConfigState.__new__(ConfigState)
+        # Store the pre-built lists under private names, then monkeypatch the
+        # computed var properties so visible_rows can read them without the
+        # Reflex runtime.
+        object.__setattr__(s, "_flat_rows_file_data", flat_file)
+        object.__setattr__(s, "_flat_rows_defaults_data", flat_defaults)
+        s.source_filter = source_filter
+        s.search_query = search_query
+        # Monkeypatch at the instance level via __class__ override (works with
+        # our rx stub because rx.var is a passthrough decorator leaving plain
+        # instance methods).
+        return s
+
+    def _call_visible_rows(self, s):
+        """Call visible_rows directly, but use the patched flat lists."""
+        from orb.ui.pages.config import ConfigState
+
+        # Temporarily patch the computed vars so visible_rows reads the
+        # pre-built lists we set above.
+        original_file = ConfigState.flat_rows_file
+        original_defaults = ConfigState.flat_rows_defaults
+        try:
+            ConfigState.flat_rows_file = property(lambda self: self._flat_rows_file_data)
+            ConfigState.flat_rows_defaults = property(lambda self: self._flat_rows_defaults_data)
+            return ConfigState.visible_rows(s)
+        finally:
+            ConfigState.flat_rows_file = original_file
+            ConfigState.flat_rows_defaults = original_defaults
+
+    def test_all_filter_returns_file_and_defaults(self):
+        s = self._make_state(self._FILE_ROWS, self._DEFAULT_ROWS, source_filter="all")
+        rows = self._call_visible_rows(s)
+        assert len(rows) == 4
+
+    def test_file_filter_returns_only_file_rows(self):
+        s = self._make_state(self._FILE_ROWS, self._DEFAULT_ROWS, source_filter="file")
+        rows = self._call_visible_rows(s)
+        assert len(rows) == 2
+        assert all(r["origin"] == "file" for r in rows)
+
+    def test_defaults_filter_returns_only_default_rows(self):
+        s = self._make_state(self._FILE_ROWS, self._DEFAULT_ROWS, source_filter="defaults")
+        rows = self._call_visible_rows(s)
+        assert len(rows) == 2
+        assert all(r["origin"] == "default" for r in rows)
+
+    def test_search_filters_by_key_contains(self):
+        s = self._make_state(
+            self._FILE_ROWS, self._DEFAULT_ROWS, source_filter="all", search_query="server"
+        )
+        rows = self._call_visible_rows(s)
+        assert len(rows) == 2
+        assert all("server" in r["key"] for r in rows)
+
+    def test_search_is_case_insensitive(self):
+        s = self._make_state(
+            self._FILE_ROWS, self._DEFAULT_ROWS, source_filter="all", search_query="SCHEDULER"
+        )
+        rows = self._call_visible_rows(s)
+        assert len(rows) == 1
+        assert rows[0]["key"] == "scheduler.interval"
+
+    def test_search_with_no_match_returns_empty(self):
+        s = self._make_state(
+            self._FILE_ROWS, self._DEFAULT_ROWS, source_filter="all", search_query="zzznomatch"
+        )
+        rows = self._call_visible_rows(s)
+        assert rows == []
+
+    def test_file_filter_plus_search(self):
+        s = self._make_state(
+            self._FILE_ROWS, self._DEFAULT_ROWS, source_filter="file", search_query="port"
+        )
+        rows = self._call_visible_rows(s)
+        assert len(rows) == 1
+        assert rows[0]["key"] == "server.port"
+
+    def test_empty_search_returns_all_for_filter(self):
+        s = self._make_state(
+            self._FILE_ROWS, self._DEFAULT_ROWS, source_filter="file", search_query=""
+        )
+        rows = self._call_visible_rows(s)
+        assert len(rows) == 2

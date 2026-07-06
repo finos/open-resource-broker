@@ -9,7 +9,11 @@ import httpx
 import reflex as rx
 
 from .. import api
+from ..components.empty_state import empty_state
+from ..components.error_callout import error_callout
 from ..components.layout import page
+from ..components.list_grid_view import ColumnDef, list_grid_view
+from ..components.list_page_shell import list_page_shell
 from ..state import AppState
 
 _ORB_BASE_URL = os.getenv("ORB_BASE_URL", "in-process")
@@ -192,6 +196,12 @@ class ConfigState(rx.State):
     save_in_progress: bool = False
     save_note: str = ""
 
+    # ── Source filter (All / File / Defaults) ─────────────────────────────────
+    source_filter: str = rx.LocalStorage("all", name="orb-config-source-filter")
+
+    # ── Key-path search ───────────────────────────────────────────────────────
+    search_query: str = ""
+
     @rx.var
     def section_names(self) -> list[str]:
         """Top-level config section names (e.g. server, storage, naming)."""
@@ -291,6 +301,52 @@ class ConfigState(rx.State):
     @rx.var
     def default_row_count(self) -> int:
         return len(self.flat_rows_defaults)
+
+    @rx.var
+    def visible_rows(self) -> list[dict[str, str]]:
+        """Rows visible after applying source_filter and search_query.
+
+        source_filter logic:
+          - ``"all"``      → all effective config leaves (with origin tagged)
+          - ``"file"``     → only leaves present in the on-disk config file
+          - ``"defaults"`` → only compiled-in defaults (not in file)
+
+        search_query filters by key-path prefix (case-insensitive contains).
+        """
+        if self.source_filter == "file":
+            base = self.flat_rows_file
+        elif self.source_filter == "defaults":
+            base = self.flat_rows_defaults
+        else:
+            # "all": merge file rows + default rows to get full effective set
+            # with correct per-row origin tags
+            base = self.flat_rows_file + self.flat_rows_defaults
+
+        q = self.search_query.strip().lower()
+        if not q:
+            return base
+        return [r for r in base if q in r.get("key", "").lower()]
+
+    @rx.var
+    def visible_row_count(self) -> int:
+        return len(self.visible_rows)
+
+    @rx.var
+    def total_row_count(self) -> int:
+        """Total effective config rows (file + defaults combined)."""
+        return len(self.flat_rows_file) + len(self.flat_rows_defaults)
+
+    # ── Filter / search events ────────────────────────────────────────────────
+
+    @rx.event
+    def set_source_filter(self, value: str) -> None:
+        """Set the source filter pill (all / file / defaults)."""
+        self.source_filter = value
+
+    @rx.event
+    def set_search_query(self, value: str) -> None:
+        """Update the key-path search query."""
+        self.search_query = value
 
     @rx.event(background=True)
     async def load(self):
@@ -440,78 +496,136 @@ class ConfigState(rx.State):
 
 
 # ---------------------------------------------------------------------------
-# Config section UI helpers
+# Config table — column definitions + formatters
 # ---------------------------------------------------------------------------
 
+_ORIGIN_COLOR_MAP = {
+    "file": "green",
+    "default": "gray",
+    "effective": "blue",
+}
 
-def _scalar_leaf_row(section_key: str, leaf_key: str, value: Any) -> rx.Component:
-    """Render a single scalar config key/value row with an edit button."""
-    full_key = f"{section_key}.{leaf_key}"
-    str_value = value.to_string() if hasattr(value, "to_string") else rx.Var.create(str(value))
 
-    return rx.hstack(
-        rx.text(
-            leaf_key,
-            size="2",
-            color=rx.color("gray", 11),
-            min_width="200px",
-            flex_shrink="0",
+def _origin_badge(row: Any) -> rx.Component:
+    """Render the origin column as a colour-coded badge."""
+    return rx.badge(
+        row["origin"],
+        color_scheme=rx.match(
+            row["origin"],
+            ("file", "green"),
+            ("default", "gray"),
+            "blue",
         ),
-        rx.cond(
-            ConfigState.editing_key == full_key,
-            # Editing mode: input + save/cancel
+        variant="soft",
+        size="1",
+    )
+
+
+def _value_cell(row: Any) -> rx.Component:
+    """Render value as rx.code (truncated for long strings)."""
+    return rx.code(row["value"], size="1")
+
+
+def _actions_cell(row: Any) -> rx.Component:
+    """Inline edit icon — active only for scalar (editable) leaves."""
+    return rx.cond(
+        row["editable"] == "1",
+        rx.tooltip(
+            rx.icon_button(
+                rx.icon("pencil", size=12),
+                size="1",
+                variant="ghost",
+                color_scheme="gray",
+                on_click=ConfigState.start_edit(row["key"], row["value"]),
+            ),
+            content="Edit (in-memory only — reload reverts)",
+        ),
+        rx.tooltip(
+            rx.icon("lock", size=12, color=rx.color("gray", 9)),
+            content="Nested value — not editable inline.",
+        ),
+    )
+
+
+CONFIG_COLUMNS: list[ColumnDef] = [
+    ColumnDef(
+        "section",
+        "Section",
+        default_visible=True,
+        lockable=True,
+        width="120px",
+    ),
+    ColumnDef(
+        "key",
+        "Key",
+        default_visible=True,
+        lockable=True,
+        sortable=True,
+    ),
+    ColumnDef(
+        "value",
+        "Value",
+        default_visible=True,
+        lockable=True,
+        formatter=_value_cell,
+    ),
+    ColumnDef(
+        "origin",
+        "Origin",
+        default_visible=True,
+        lockable=True,
+        formatter=_origin_badge,
+        width="90px",
+    ),
+    ColumnDef(
+        "_actions",
+        "Actions",
+        default_visible=True,
+        lockable=True,
+        formatter=_actions_cell,
+        width="64px",
+        align="end",
+    ),
+]
+
+# visible_columns sentinel: all lockable so we just pass a fenced full string
+_CONFIG_VISIBLE_DEFAULT = ",section,key,value,origin,_actions,"
+
+
+def _config_card(row: Any) -> rx.Component:
+    """Card renderer for the config table (grid mode)."""
+    return rx.card(
+        rx.vstack(
             rx.hstack(
-                rx.input(
-                    value=ConfigState.edit_buffer,
-                    on_change=ConfigState.set_edit_buffer,
-                    size="1",
-                    width="260px",
-                ),
-                rx.button(
-                    rx.cond(
-                        ConfigState.save_in_progress,
-                        rx.spinner(size="1"),
-                        rx.icon("check", size=12),
-                    ),
-                    "Save",
-                    size="1",
-                    variant="solid",
-                    color_scheme="green",
-                    on_click=ConfigState.save_edit,
-                    disabled=ConfigState.save_in_progress,
-                ),
-                rx.button(
-                    rx.icon("x", size=12),
+                rx.badge(row["section"], variant="soft", color_scheme="blue", size="1"),
+                rx.spacer(),
+                _origin_badge(row),
+                align="center",
+                width="100%",
+            ),
+            rx.code(row["key"], size="1"),
+            rx.code(row["value"], size="1", color=rx.color("gray", 11)),
+            rx.cond(
+                row["editable"] == "1",
+                rx.icon_button(
+                    rx.icon("pencil", size=12),
                     size="1",
                     variant="ghost",
                     color_scheme="gray",
-                    on_click=ConfigState.cancel_edit,
+                    on_click=ConfigState.start_edit(row["key"], row["value"]),
                 ),
-                spacing="2",
-                align="center",
+                rx.fragment(),
             ),
-            # Display mode: value + edit button
-            rx.hstack(
-                rx.code(str_value, size="2"),
-                rx.tooltip(
-                    rx.icon_button(
-                        rx.icon("pencil", size=12),
-                        size="1",
-                        variant="ghost",
-                        color_scheme="gray",
-                        on_click=ConfigState.start_edit(full_key, str_value),
-                    ),
-                    content="Edit (in-memory only)",
-                ),
-                spacing="2",
-                align="center",
-            ),
+            spacing="2",
+            width="100%",
         ),
-        spacing="3",
-        align="center",
         width="100%",
-        padding_y="2px",
     )
+
+
+# ---------------------------------------------------------------------------
+# Config section UI helpers (server / health / system panels — unchanged)
+# ---------------------------------------------------------------------------
 
 
 def _section_box(*children: rx.Component) -> rx.Component:
@@ -542,42 +656,7 @@ def _row(label: str, value: Any) -> rx.Component:
     )
 
 
-def _check_badge(ok: bool) -> rx.Component:
-    return rx.badge(
-        rx.cond(ok, "ok", "fail"),
-        color_scheme=rx.cond(ok, "green", "red"),
-        variant="soft",
-        size="1",
-    )
-
-
-def _health_check_row(name: str, detail: dict[str, Any]) -> rx.Component:
-    """Single component health-check row."""
-    status = detail.get("status", "unknown") if detail else "unknown"
-    ok = status in ("ok", "healthy", "pass", "passed")
-    message = detail.get("message", "") if detail else ""
-    return rx.hstack(
-        rx.text(name, size="2", color=rx.color("gray", 11), min_width="180px"),
-        rx.badge(
-            status,
-            color_scheme="green" if ok else "red",
-            variant="soft",
-            size="1",
-        ),
-        rx.cond(
-            message != "",
-            rx.text(message, size="1", color=rx.color("gray", 10)),
-            rx.fragment(),
-        ),
-        spacing="3",
-        align="center",
-        width="100%",
-    )
-
-
-# The health "checks" dict keys we want to surface.  The /health endpoint
-# returns an arbitrary dict — we iterate over all keys generically.
-def _health_check_row_var(row) -> rx.Component:
+def _health_check_row_var(row: Any) -> rx.Component:
     """Render one health-check row from AppState.health_check_rows (typed)."""
     return rx.hstack(
         rx.text(
@@ -618,86 +697,192 @@ def _health_checks_section() -> rx.Component:
     return rx.foreach(AppState.health_check_rows, _health_check_row_var)
 
 
-def _config_section() -> rx.Component:
-    """Render the live configuration editor section."""
-    return rx.vstack(
-        rx.heading("Configuration", size="5", margin_bottom="0.5rem"),
-        # Source + reload header
-        rx.box(
-            rx.hstack(
-                rx.vstack(
-                    rx.hstack(
-                        rx.text("Source:", size="2", color=rx.color("gray", 11)),
-                        rx.cond(
-                            ConfigState.source_file != "",
-                            rx.code(ConfigState.source_file, size="1"),
-                            rx.text("—", size="2", color=rx.color("gray", 10)),
-                        ),
-                        spacing="2",
-                        align="center",
-                    ),
-                    rx.hstack(
-                        rx.text("Last reloaded:", size="2", color=rx.color("gray", 11)),
-                        rx.cond(
-                            ConfigState.last_reloaded != "",
-                            rx.text(ConfigState.last_reloaded, size="2"),
-                            rx.text("—", size="2", color=rx.color("gray", 10)),
-                        ),
-                        spacing="2",
-                        align="center",
-                    ),
-                    spacing="1",
-                    align="start",
-                ),
-                rx.hstack(
-                    rx.button(
-                        rx.icon("save", size=14),
-                        "Save to disk",
-                        on_click=ConfigState.persist_to_disk,
-                        variant="solid",
-                        color_scheme="blue",
-                        disabled=ConfigState.loading,
-                        title="Write the in-memory config to the loaded config file (persists across restarts)",
-                    ),
-                    rx.button(
-                        rx.cond(
-                            ConfigState.loading,
-                            rx.spinner(size="2"),
-                            rx.icon("refresh-cw", size=14),
-                        ),
-                        "Reload from disk",
-                        on_click=ConfigState.reload,
-                        variant="soft",
-                        disabled=ConfigState.loading,
-                        title="Discard in-memory edits and re-read the config file from disk",
-                    ),
-                    spacing="2",
-                    align="center",
-                ),
-                justify="between",
-                align="center",
-                width="100%",
-            ),
-            padding="1rem",
-            background=rx.color("gray", 2),
-            border_radius="0.5rem",
-            border=f"1px solid {rx.color('gray', 5)}",
-            width="100%",
-            max_width="860px",
+# ---------------------------------------------------------------------------
+# Config table sub-components (filter row / toolbar / edit overlay)
+# ---------------------------------------------------------------------------
+
+_SOURCE_FILTERS: list[tuple[str, str]] = [
+    ("all", "All"),
+    ("file", "File"),
+    ("defaults", "Defaults"),
+]
+
+
+def _config_filter_row() -> rx.Component:
+    """Filter row: source pills + search input + reload button (right)."""
+    return rx.hstack(
+        # Source filter pills
+        rx.hstack(
+            *[
+                rx.button(
+                    label,
+                    size="2",
+                    variant=rx.cond(ConfigState.source_filter == value, "solid", "soft"),
+                    color_scheme=rx.cond(ConfigState.source_filter == value, "blue", "gray"),
+                    radius="full",
+                    on_click=ConfigState.set_source_filter(value),
+                    role="tab",
+                    aria_selected=rx.cond(ConfigState.source_filter == value, "true", "false"),
+                )
+                for value, label in _SOURCE_FILTERS
+            ],
+            role="tablist",
+            spacing="2",
+            align="center",
         ),
-        # Error callout
-        rx.cond(
-            ConfigState.error != "",
-            rx.callout(
-                ConfigState.error,
-                icon="alert-triangle",
-                color_scheme="red",
+        # Key-path search
+        rx.input(
+            placeholder="Search key…",
+            value=ConfigState.search_query,
+            on_change=ConfigState.set_search_query,
+            width="240px",
+        ),
+        rx.spacer(),
+        # Reload / save buttons
+        rx.hstack(
+            rx.button(
+                rx.icon("save", size=14),
+                "Save to disk",
+                on_click=ConfigState.persist_to_disk,
+                variant="solid",
+                color_scheme="blue",
+                disabled=ConfigState.loading,
+                size="2",
+                title="Write the in-memory config to the loaded config file",
+            ),
+            rx.button(
+                rx.cond(
+                    ConfigState.loading,
+                    rx.spinner(size="2"),
+                    rx.icon("refresh-cw", size=14),
+                ),
+                "Reload",
+                on_click=ConfigState.reload,
+                variant="soft",
+                disabled=ConfigState.loading,
+                size="2",
+                title="Discard in-memory edits and re-read from disk",
+            ),
+            spacing="2",
+            align="center",
+        ),
+        spacing="2",
+        flex_wrap="wrap",
+        align="center",
+        margin_bottom="1rem",
+        width="100%",
+    )
+
+
+def _config_toolbar() -> rx.Component:
+    """Toolbar: Showing X of Y badge + source file info (right)."""
+    return rx.hstack(
+        # Count badge (left)
+        rx.hstack(
+            rx.text("Showing", size="2", color=rx.color("gray", 11)),
+            rx.badge(
+                ConfigState.visible_row_count.to_string()
+                + " of "
+                + ConfigState.total_row_count.to_string(),
+                variant="soft",
+                color_scheme="gray",
                 size="1",
-                max_width="860px",
+            ),
+            rx.text("keys", size="2", color=rx.color("gray", 11)),
+            spacing="2",
+            align="center",
+        ),
+        rx.spacer(),
+        # Source file path (right)
+        rx.cond(
+            ConfigState.source_file != "",
+            rx.hstack(
+                rx.text("Source:", size="2", color=rx.color("gray", 11)),
+                rx.code(ConfigState.source_file, size="1"),
+                spacing="2",
+                align="center",
             ),
             rx.fragment(),
         ),
-        # Save note (in-memory warning or error)
+        rx.cond(
+            ConfigState.last_reloaded != "",
+            rx.text(
+                "Last reloaded: ",
+                rx.text.span(ConfigState.last_reloaded, font_weight="500"),
+                size="2",
+                color=rx.color("gray", 10),
+            ),
+            rx.fragment(),
+        ),
+        align="center",
+        margin_bottom="1rem",
+        width="100%",
+        flex_wrap="wrap",
+        row_gap="0.5rem",
+        spacing="2",
+    )
+
+
+def _edit_overlay() -> rx.Component:
+    """Floating edit bar shown while a key is being edited."""
+    return rx.cond(
+        ConfigState.editing_key != "",
+        rx.box(
+            rx.hstack(
+                rx.text(
+                    "Editing: ",
+                    rx.code(ConfigState.editing_key, size="2"),
+                    size="2",
+                    color=rx.color("gray", 11),
+                ),
+                rx.input(
+                    value=ConfigState.edit_buffer,
+                    on_change=ConfigState.set_edit_buffer,
+                    size="1",
+                    width="300px",
+                    placeholder="New value…",
+                ),
+                rx.button(
+                    rx.cond(
+                        ConfigState.save_in_progress,
+                        rx.spinner(size="1"),
+                        rx.icon("check", size=12),
+                    ),
+                    "Save",
+                    size="1",
+                    variant="solid",
+                    color_scheme="green",
+                    on_click=ConfigState.save_edit,
+                    disabled=ConfigState.save_in_progress,
+                ),
+                rx.button(
+                    rx.icon("x", size=12),
+                    "Cancel",
+                    size="1",
+                    variant="ghost",
+                    color_scheme="gray",
+                    on_click=ConfigState.cancel_edit,
+                ),
+                spacing="2",
+                align="center",
+                flex_wrap="wrap",
+            ),
+            padding="0.75rem 1rem",
+            background=rx.color("amber", 2),
+            border_radius="0.5rem",
+            border=f"1px solid {rx.color('amber', 6)}",
+            width="100%",
+            max_width="860px",
+        ),
+        rx.fragment(),
+    )
+
+
+def _config_table_section() -> rx.Component:
+    """Config table using list_page_shell + list_grid_view."""
+    return rx.vstack(
+        rx.heading("Configuration", size="5", margin_bottom="0.5rem"),
+        # Save note / error banners above the shell
         rx.cond(
             ConfigState.save_note != "",
             rx.callout(
@@ -709,255 +894,34 @@ def _config_section() -> rx.Component:
             ),
             rx.fragment(),
         ),
-        # Config tree — two collapsible accordions: File vs Defaults
-        rx.cond(
-            ConfigState.loading,
-            rx.hstack(
-                rx.spinner(size="2"),
-                rx.text("Loading configuration…", size="2", color=rx.color("gray", 10)),
-                spacing="2",
-                align="center",
-                padding_y="1rem",
+        _edit_overlay(),
+        list_page_shell(
+            error_banner=rx.cond(
+                ConfigState.error != "",
+                error_callout(ConfigState.error, retry=ConfigState.load),
+                rx.fragment(),
             ),
-            rx.accordion.root(
-                # ── Accordion 1: From File ──────────────────────────────────
-                rx.accordion.item(
-                    header=rx.hstack(
-                        rx.text("From File", size="2", weight="medium"),
-                        rx.badge(
-                            ConfigState.file_row_count.to_string(),
-                            color_scheme="blue",
-                            variant="soft",
-                            size="1",
-                        ),
-                        spacing="2",
-                        align="center",
-                    ),
-                    content=rx.box(
-                        rx.table.root(
-                            rx.table.header(
-                                rx.table.row(
-                                    rx.table.column_header_cell("Section"),
-                                    rx.table.column_header_cell("Key"),
-                                    rx.table.column_header_cell("Value"),
-                                    rx.table.column_header_cell(""),
-                                ),
-                            ),
-                            rx.table.body(
-                                rx.foreach(
-                                    ConfigState.flat_rows_file,
-                                    lambda row: rx.table.row(
-                                        rx.table.cell(
-                                            rx.text(
-                                                row["section"], size="2", color=rx.color("gray", 11)
-                                            ),
-                                        ),
-                                        rx.table.cell(
-                                            rx.hstack(
-                                                rx.text(row["leaf"], size="2"),
-                                                rx.badge(
-                                                    "from file",
-                                                    color_scheme="blue",
-                                                    size="1",
-                                                    variant="outline",
-                                                ),
-                                                spacing="2",
-                                                align="center",
-                                            ),
-                                        ),
-                                        rx.table.cell(
-                                            rx.code(row["value"], size="1"),
-                                        ),
-                                        rx.table.cell(
-                                            rx.cond(
-                                                row["editable"] == "1",
-                                                rx.tooltip(
-                                                    rx.icon_button(
-                                                        rx.icon("pencil", size=12),
-                                                        size="1",
-                                                        variant="ghost",
-                                                        color_scheme="gray",
-                                                        on_click=ConfigState.start_edit(
-                                                            row["key"],
-                                                            row["value"],
-                                                        ),
-                                                    ),
-                                                    content="Edit (in-memory only — reload reverts)",
-                                                ),
-                                                rx.tooltip(
-                                                    rx.icon(
-                                                        "lock", size=12, color=rx.color("gray", 9)
-                                                    ),
-                                                    content="Nested value — not editable inline.",
-                                                ),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            ),
-                            variant="surface",
-                            width="100%",
-                        ),
-                        width="100%",
-                        overflow="hidden",
-                    ),
-                    value="file",
-                ),
-                # ── Accordion 2: From Defaults ──────────────────────────────
-                rx.accordion.item(
-                    header=rx.hstack(
-                        rx.text("From Defaults", size="2", weight="medium"),
-                        rx.badge(
-                            ConfigState.default_row_count.to_string(),
-                            color_scheme="gray",
-                            variant="soft",
-                            size="1",
-                        ),
-                        spacing="2",
-                        align="center",
-                    ),
-                    content=rx.box(
-                        rx.table.root(
-                            rx.table.header(
-                                rx.table.row(
-                                    rx.table.column_header_cell("Section"),
-                                    rx.table.column_header_cell("Key"),
-                                    rx.table.column_header_cell("Value"),
-                                    rx.table.column_header_cell(""),
-                                ),
-                            ),
-                            rx.table.body(
-                                rx.foreach(
-                                    ConfigState.flat_rows_defaults,
-                                    lambda row: rx.table.row(
-                                        rx.table.cell(
-                                            rx.text(
-                                                row["section"],
-                                                size="2",
-                                                color=rx.color("gray", 9),
-                                                style={"font_style": "italic"},
-                                            ),
-                                        ),
-                                        rx.table.cell(
-                                            rx.hstack(
-                                                rx.text(
-                                                    row["leaf"],
-                                                    size="2",
-                                                    color=rx.color("gray", 11),
-                                                    style={"font_style": "italic"},
-                                                ),
-                                                rx.badge(
-                                                    "default",
-                                                    color_scheme="gray",
-                                                    size="1",
-                                                    variant="outline",
-                                                ),
-                                                spacing="2",
-                                                align="center",
-                                            ),
-                                        ),
-                                        rx.table.cell(
-                                            rx.code(
-                                                row["value"],
-                                                size="1",
-                                                color=rx.color("gray", 11),
-                                            ),
-                                        ),
-                                        rx.table.cell(
-                                            rx.cond(
-                                                row["editable"] == "1",
-                                                rx.tooltip(
-                                                    rx.icon_button(
-                                                        rx.icon("pencil", size=12),
-                                                        size="1",
-                                                        variant="ghost",
-                                                        color_scheme="gray",
-                                                        on_click=ConfigState.start_edit(
-                                                            row["key"],
-                                                            row["value"],
-                                                        ),
-                                                    ),
-                                                    content="Edit to override default (in-memory only)",
-                                                ),
-                                                rx.tooltip(
-                                                    rx.icon(
-                                                        "lock", size=12, color=rx.color("gray", 9)
-                                                    ),
-                                                    content="Nested value — not editable inline.",
-                                                ),
-                                            ),
-                                        ),
-                                        opacity="0.75",
-                                    ),
-                                ),
-                            ),
-                            variant="surface",
-                            width="100%",
-                        ),
-                        width="100%",
-                        overflow="hidden",
-                    ),
-                    value="defaults",
-                ),
-                collapsible=True,
-                type="multiple",
-                default_value=["file"],
-                variant="surface",
-                width="100%",
-                max_width="960px",
+            filter_row=_config_filter_row(),
+            toolbar=_config_toolbar(),
+            grid=list_grid_view(
+                rows=ConfigState.visible_rows,
+                columns=CONFIG_COLUMNS,
+                view_mode=rx.Var.create("list"),
+                visible_columns=rx.Var.create(_CONFIG_VISIBLE_DEFAULT),
+                sort_key=rx.Var.create(""),
+                sort_dir=rx.Var.create("asc"),
+                card_renderer=_config_card,
+                on_row_click=None,
+                on_sort=None,
             ),
-        ),
-        # Edit in-progress overlay (key being edited shown here too)
-        rx.cond(
-            ConfigState.editing_key != "",
-            rx.box(
-                rx.hstack(
-                    rx.text(
-                        "Editing: ",
-                        rx.code(ConfigState.editing_key, size="2"),
-                        size="2",
-                        color=rx.color("gray", 11),
-                    ),
-                    rx.input(
-                        value=ConfigState.edit_buffer,
-                        on_change=ConfigState.set_edit_buffer,
-                        size="1",
-                        width="300px",
-                        placeholder="New value…",
-                    ),
-                    rx.button(
-                        rx.cond(
-                            ConfigState.save_in_progress,
-                            rx.spinner(size="1"),
-                            rx.icon("check", size=12),
-                        ),
-                        "Save",
-                        size="1",
-                        variant="solid",
-                        color_scheme="green",
-                        on_click=ConfigState.save_edit,
-                        disabled=ConfigState.save_in_progress,
-                    ),
-                    rx.button(
-                        rx.icon("x", size=12),
-                        "Cancel",
-                        size="1",
-                        variant="ghost",
-                        color_scheme="gray",
-                        on_click=ConfigState.cancel_edit,
-                    ),
-                    spacing="2",
-                    align="center",
-                    flex_wrap="wrap",
-                ),
-                padding="0.75rem 1rem",
-                background=rx.color("amber", 2),
-                border_radius="0.5rem",
-                border=f"1px solid {rx.color('amber', 6)}",
-                width="100%",
-                max_width="860px",
+            load_more=rx.fragment(),
+            empty=empty_state(
+                icon="settings",
+                title="No configuration keys found",
+                description="Try adjusting the source filter or search query.",
             ),
-            rx.fragment(),
+            is_loading=ConfigState.loading,
+            is_empty=ConfigState.visible_row_count == 0,
         ),
         spacing="3",
         align="start",
@@ -966,15 +930,20 @@ def _config_section() -> rx.Component:
     )
 
 
+# ---------------------------------------------------------------------------
+# Config page entry point
+# ---------------------------------------------------------------------------
+
+
 def config_page() -> rx.Component:
     return page(
         "Configuration",
-        # ── Ephemeral-edits banner — always visible, never dismissable ────
+        # ── Ephemeral-edits banner ─────────────────────────────────────────
         rx.callout(
             rx.text(
                 "Config edits apply to the running process only. "
                 'Click "Save to disk" to persist changes across restarts, '
-                'or "Reload from disk" to discard them.',
+                'or "Reload" to discard them.',
                 size="2",
             ),
             icon="alert-triangle",
@@ -985,9 +954,9 @@ def config_page() -> rx.Component:
             max_width="860px",
             margin_bottom="1rem",
         ),
-        # ── Configuration section (live editor) ───────────────────────────
-        _config_section(),
-        # ── Server section ────────────────────────────────────────────────
+        # ── Config table (list_page_shell) ─────────────────────────────────
+        _config_table_section(),
+        # ── Server section ─────────────────────────────────────────────────
         rx.vstack(
             rx.heading("Server", size="5", margin_bottom="0.5rem"),
             _section_box(
@@ -1012,7 +981,7 @@ def config_page() -> rx.Component:
                     AppState.info.get("auth_strategy", "none"),
                 ),
             ),
-            # ── Health section ────────────────────────────────────────────
+            # ── Health section ─────────────────────────────────────────────
             rx.heading("Health", size="5", margin_top="1rem", margin_bottom="0.5rem"),
             _section_box(
                 rx.hstack(
@@ -1030,7 +999,7 @@ def config_page() -> rx.Component:
                 rx.divider(),
                 _health_checks_section(),
             ),
-            # ── System section ────────────────────────────────────────────
+            # ── System section ─────────────────────────────────────────────
             rx.heading("System", size="5", margin_top="1rem", margin_bottom="0.5rem"),
             _section_box(
                 _row("API base URL", _ORB_BASE_URL),
@@ -1048,7 +1017,7 @@ def config_page() -> rx.Component:
             align="start",
             width="100%",
         ),
-        # ── Danger Zone ───────────────────────────────────────────────────
+        # ── Danger Zone ────────────────────────────────────────────────────
         rx.vstack(
             rx.heading(
                 "Danger Zone",
@@ -1120,7 +1089,7 @@ def config_page() -> rx.Component:
                         rx.fragment(),
                     ),
                     rx.divider(),
-                    # ── Initialize ORB ──────────────────────────────────────────
+                    # ── Initialize ORB ──────────────────────────────────────
                     rx.hstack(
                         rx.vstack(
                             rx.text(
@@ -1185,7 +1154,7 @@ def config_page() -> rx.Component:
             align="start",
             width="100%",
         ),
-        # ── Wipe confirmation dialog ──────────────────────────────────────
+        # ── Wipe confirmation dialog ───────────────────────────────────────
         rx.alert_dialog.root(
             rx.alert_dialog.content(
                 rx.alert_dialog.title(
@@ -1250,7 +1219,7 @@ def config_page() -> rx.Component:
             ),
             open=AdminState.wipe_dialog_open,
         ),
-        # ── Initialize ORB confirmation dialog ───────────────────────────
+        # ── Initialize ORB confirmation dialog ────────────────────────────
         rx.alert_dialog.root(
             rx.alert_dialog.content(
                 rx.alert_dialog.title(
