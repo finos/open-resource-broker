@@ -40,6 +40,13 @@ class ORBClient:
             templates = await sdk.list_templates(active_only=True)
             request = await sdk.create_request(template_id="basic", count=5)
             status = await sdk.get_request_status(request_id=request.id)
+
+    Deprecation notice
+    ------------------
+    The ``region`` and ``profile`` constructor kwargs were removed in v1.7 and
+    are now available as backward-compatibility shims forwarding to
+    ``provider_config``.  They will be removed in v2.0.  Pass
+    ``provider_config={"region": ..., "profile": ...}`` instead.
     """
 
     def __init__(
@@ -51,10 +58,13 @@ class ORBClient:
         scheduler: Optional[str] = None,
         provider_type: Optional[str] = None,
         provider_name: Optional[str] = None,
+        provider_config: Optional[dict[str, Any]] = None,
+        region: Optional[str] = None,  # DEPRECATED — use provider_config
+        profile: Optional[str] = None,  # DEPRECATED — use provider_config
         **kwargs,
     ) -> None:
         """
-        Initialize the Open Resource Broker SDK.
+        Initialise the Open Resource Broker SDK.
 
         Args:
             provider: Cloud provider type (aws, mock, etc.). Defaults to value from config/env.
@@ -68,8 +78,29 @@ class ORBClient:
                            registered (e.g. ``"k8s"``).
             provider_name: Provider instance name applied via ConfigurationPort on initialise.
                            Selects a specific named provider instance (e.g. ``"my-k8s-cluster"``).
+            provider_config: Provider-specific key/value pairs (e.g. ``{"region": "us-east-1"}``).
+            region: **Deprecated.** Use ``provider_config={"region": ...}`` instead.
+            profile: **Deprecated.** Use ``provider_config={"profile": ...}`` instead.
             **kwargs: Additional configuration options
         """
+        # Backward-compat shim: merge deprecated region/profile into provider_config.
+        if region is not None or profile is not None:
+            import warnings
+
+            warnings.warn(
+                "ORBClient(region=..., profile=...) is deprecated and will be removed "
+                "in the next major release; pass "
+                "provider_config={'region': ..., 'profile': ...} instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            merged = dict(provider_config or {})
+            if region is not None:
+                merged.setdefault("region", region)
+            if profile is not None:
+                merged.setdefault("profile", profile)
+            provider_config = merged
+
         # Configuration setup
         if config:
             self._config = SDKConfig.from_dict(config)
@@ -89,6 +120,8 @@ class ORBClient:
             self._config.provider_type = provider_type
         if provider_name is not None:
             self._config.provider_name = provider_name
+        if provider_config is not None:
+            self._config.provider_config = {**self._config.provider_config, **provider_config}
 
         # Add any additional kwargs to custom config
         if kwargs:

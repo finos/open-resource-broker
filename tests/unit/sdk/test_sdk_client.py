@@ -349,3 +349,48 @@ class TestInitializeMissingConfigSafety:
         with patch("orb.sdk.client.Application", side_effect=SystemExit(1)):
             with pytest.raises(ConfigurationError, match="exit code 1"):
                 await sdk.initialize()
+
+
+# ---------------------------------------------------------------------------
+# Deprecated region / profile constructor kwargs
+# ---------------------------------------------------------------------------
+
+
+class TestDeprecatedRegionProfile:
+    """Backward-compatibility shims for the removed region / profile constructor surface."""
+
+    def test_region_kwarg_warns_and_populates_provider_config(self):
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            sdk = OpenResourceBroker(config={"provider": "aws"}, region="us-east-1")
+        assert sdk.config.provider_config.get("region") == "us-east-1"
+
+    def test_profile_kwarg_warns_and_populates_provider_config(self):
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            sdk = OpenResourceBroker(config={"provider": "aws"}, profile="my-profile")
+        assert sdk.config.provider_config.get("profile") == "my-profile"
+
+    def test_region_and_profile_together_warn_once_and_both_set(self):
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            sdk = OpenResourceBroker(
+                config={"provider": "aws"}, region="eu-west-1", profile="staging"
+            )
+        assert sdk.config.provider_config.get("region") == "eu-west-1"
+        assert sdk.config.provider_config.get("profile") == "staging"
+
+    def test_deprecated_region_does_not_override_explicit_provider_config(self):
+        # provider_config takes precedence over the deprecated kwarg (setdefault semantics).
+        with pytest.warns(DeprecationWarning):
+            sdk = OpenResourceBroker(
+                config={"provider": "aws"},
+                provider_config={"region": "eu-central-1"},
+                region="us-east-1",
+            )
+        assert sdk.config.provider_config.get("region") == "eu-central-1"
+
+    def test_no_warning_when_neither_region_nor_profile_passed(self):
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            # Must not raise.
+            OpenResourceBroker(config={"provider": "aws"})

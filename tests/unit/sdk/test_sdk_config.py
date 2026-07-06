@@ -126,10 +126,13 @@ class TestSDKConfigFromDict:
         )
         assert config.provider_config == {"region": "us-east-1", "profile": "prod"}
 
-    def test_legacy_top_level_region_goes_to_custom_config(self):
-        # A caller that passes region= at the top level gets it in custom_config, not a field.
-        config = SDKConfig.from_dict({"provider": "aws", "region": "eu-central-1"})
-        assert config.custom_config.get("region") == "eu-central-1"
+    def test_legacy_top_level_region_folded_into_provider_config(self):
+        # A caller that still passes region= at the top level gets it folded into
+        # provider_config (not custom_config) via the deprecation shim.
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            config = SDKConfig.from_dict({"provider": "aws", "region": "eu-central-1"})
+        assert config.provider_config.get("region") == "eu-central-1"
+        assert "region" not in config.custom_config
 
 
 class TestSDKConfigFromFile:
@@ -192,3 +195,112 @@ class TestSDKConfigProviderTypeAndName:
         d = config.to_dict()
         assert "provider_type" not in d
         assert "provider_name" not in d
+
+
+class TestDeprecatedRegionProfile:
+    """Backward-compatibility shims for the removed region / profile surface."""
+
+    # --- SDKConfig.from_dict top-level keys ---
+
+    def test_from_dict_legacy_region_key_warns_and_populates_provider_config(self):
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            config = SDKConfig.from_dict({"provider": "aws", "region": "us-east-1"})
+        assert config.provider_config.get("region") == "us-east-1"
+        assert "region" not in config.custom_config
+
+    def test_from_dict_legacy_profile_key_warns_and_populates_provider_config(self):
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            config = SDKConfig.from_dict({"provider": "aws", "profile": "my-profile"})
+        assert config.provider_config.get("profile") == "my-profile"
+        assert "profile" not in config.custom_config
+
+    def test_from_dict_legacy_keys_do_not_override_explicit_provider_config(self):
+        # Existing provider_config values take precedence (setdefault semantics).
+        with pytest.warns(DeprecationWarning):
+            config = SDKConfig.from_dict(
+                {
+                    "provider": "aws",
+                    "region": "us-east-1",
+                    "provider_config": {"region": "eu-west-1"},
+                }
+            )
+        assert config.provider_config["region"] == "eu-west-1"
+
+    # --- SDKConfig.from_env legacy env vars ---
+
+    def test_from_env_legacy_orb_region_warns_and_populates_provider_config(self, monkeypatch):
+        monkeypatch.setenv("ORB_REGION", "ap-southeast-1")
+        monkeypatch.delenv("ORB_PROFILE", raising=False)
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            config = SDKConfig.from_env()
+        assert config.provider_config.get("region") == "ap-southeast-1"
+
+    def test_from_env_legacy_orb_profile_warns_and_populates_provider_config(self, monkeypatch):
+        monkeypatch.setenv("ORB_PROFILE", "staging")
+        monkeypatch.delenv("ORB_REGION", raising=False)
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            config = SDKConfig.from_env()
+        assert config.provider_config.get("profile") == "staging"
+
+    def test_from_env_no_legacy_vars_no_warning(self, monkeypatch):
+        monkeypatch.delenv("ORB_REGION", raising=False)
+        monkeypatch.delenv("ORB_PROFILE", raising=False)
+        # Should not raise or warn.
+        config = SDKConfig.from_env()
+        assert config.provider_config == {}
+
+    # --- SDKConfig.region property (read) ---
+
+    def test_region_property_read_warns_and_returns_provider_config_value(self):
+        config = SDKConfig(provider_config={"region": "us-west-2"})
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            value = config.region
+        assert value == "us-west-2"
+
+    def test_region_property_read_returns_none_when_absent(self):
+        config = SDKConfig()
+        with pytest.warns(DeprecationWarning):
+            value = config.region
+        assert value is None
+
+    # --- SDKConfig.region property (write) ---
+
+    def test_region_setter_warns_and_updates_provider_config(self):
+        config = SDKConfig()
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            config.region = "us-east-2"
+        assert config.provider_config["region"] == "us-east-2"
+
+    def test_region_setter_none_removes_from_provider_config(self):
+        config = SDKConfig(provider_config={"region": "us-east-1"})
+        with pytest.warns(DeprecationWarning):
+            config.region = None
+        assert "region" not in config.provider_config
+
+    # --- SDKConfig.profile property (read) ---
+
+    def test_profile_property_read_warns_and_returns_provider_config_value(self):
+        config = SDKConfig(provider_config={"profile": "prod"})
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            value = config.profile
+        assert value == "prod"
+
+    def test_profile_property_read_returns_none_when_absent(self):
+        config = SDKConfig()
+        with pytest.warns(DeprecationWarning):
+            value = config.profile
+        assert value is None
+
+    # --- SDKConfig.profile property (write) ---
+
+    def test_profile_setter_warns_and_updates_provider_config(self):
+        config = SDKConfig()
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            config.profile = "dev"
+        assert config.provider_config["profile"] == "dev"
+
+    def test_profile_setter_none_removes_from_provider_config(self):
+        config = SDKConfig(provider_config={"profile": "prod"})
+        with pytest.warns(DeprecationWarning):
+            config.profile = None
+        assert "profile" not in config.provider_config
