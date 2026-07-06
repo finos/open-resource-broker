@@ -38,7 +38,7 @@ services:
       HF_LOGGING_LEVEL: INFO
       HF_LOGGING_CONSOLE_ENABLED: true
       HF_LOGGING_FILE_ENABLED: true
-      HF_LOGGING_FILE_PATH: /app/logs/app.log
+      HF_LOGGING_FILE_PATH: /app/logs/orb.log
 
       # Storage configuration
       HF_STORAGE_STRATEGY: ${HF_STORAGE_STRATEGY:-json}
