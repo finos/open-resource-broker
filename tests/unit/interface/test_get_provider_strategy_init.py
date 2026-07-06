@@ -13,7 +13,11 @@ def _mock_strategy_class():
     cls.get_available_regions.return_value = []
     cls.get_default_region.return_value = "us-east-1"
     cls.get_available_credential_sources.return_value = [
-        {"name": "default", "description": "Default profile"}
+        {
+            "name": "default",
+            "description": "Default profile",
+            "config_delta": {"profile": "default"},
+        }
     ]
     cls.test_credentials.return_value = {"success": True}
     cls.get_credential_requirements.return_value = {}

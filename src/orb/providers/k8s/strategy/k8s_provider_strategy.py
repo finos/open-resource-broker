@@ -1155,6 +1155,7 @@ class K8sProviderStrategy(ProviderStrategy):
                             "In-cluster ServiceAccount token mounted at "
                             "/var/run/secrets/kubernetes.io/serviceaccount/"
                         ),
+                        "config_delta": {"in_cluster": True},
                     }
                 )
         except Exception as exc:
@@ -1177,6 +1178,7 @@ class K8sProviderStrategy(ProviderStrategy):
                         "description": (
                             f"kubeconfig context '{name}'{marker} -> cluster {cluster}"
                         ),
+                        "config_delta": {"context": name},
                     }
                 )
         except Exception as exc:
@@ -1190,6 +1192,7 @@ class K8sProviderStrategy(ProviderStrategy):
                         "Default credentials resolved by the kubernetes-client SDK "
                         "(in-cluster token or KUBECONFIG / ~/.kube/config)"
                     ),
+                    "config_delta": {"context": "default"},
                 }
             )
 

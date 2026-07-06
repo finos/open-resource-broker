@@ -10,7 +10,11 @@ def _make_strategy(regions=None, default_region="us-east-1"):
     strategy.get_available_regions.return_value = regions or []
     strategy.get_default_region.return_value = default_region
     strategy.get_available_credential_sources.return_value = [
-        {"name": "default", "description": "Default profile"}
+        {
+            "name": "default",
+            "description": "Default profile",
+            "config_delta": {"profile": "default"},
+        }
     ]
     strategy.test_credentials.return_value = {"success": True}
     strategy.get_credential_requirements.return_value = {}
@@ -47,7 +51,9 @@ def test_discover_infrastructure_uses_create_strategy_by_type():
             return_value=_mock_container(),
         ),
     ):
-        result = _mod._discover_infrastructure("aws", "us-east-1", "my-profile", mock_registry)
+        result = _mod._discover_infrastructure(
+            "aws", {"region": "us-east-1", "profile": "my-profile"}, mock_registry
+        )
 
     mock_registry.create_strategy_by_type.assert_called_once_with(
         "aws", {"region": "us-east-1", "profile": "my-profile"}
@@ -105,7 +111,9 @@ def test_discover_infrastructure_forwards_region_and_profile_to_strategy():
         patch("orb.providers.registry.get_provider_registry", return_value=mock_registry),
         patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
     ):
-        _mod._discover_infrastructure("aws", "eu-west-2", "my-prod-profile", mock_registry)
+        _mod._discover_infrastructure(
+            "aws", {"region": "eu-west-2", "profile": "my-prod-profile"}, mock_registry
+        )
 
     mock_registry.create_strategy_by_type.assert_called_once_with(
         "aws", {"region": "eu-west-2", "profile": "my-prod-profile"}
@@ -125,9 +133,9 @@ def test_interactive_setup_tests_credentials_before_asking_for_region():
         call_order.append("test_credentials")
         return (True, "")
 
-    def mock_pick_region(regions, default):
-        call_order.append("pick_region")
-        return "us-east-1"
+    def mock_prompt_operational_params(strategy_class):
+        call_order.append("prompt_operational_params")
+        return {"region": "us-east-1"}
 
     # inputs: scheduler choice, provider choice, credential choice, discover infra, add another
     inputs = iter(["1", "1", "1", "N", "N"])
@@ -136,7 +144,9 @@ def test_interactive_setup_tests_credentials_before_asking_for_region():
     with (
         patch("builtins.input", side_effect=inputs),
         patch.object(_mod, "_test_provider_credentials", side_effect=mock_test_creds),
-        patch.object(_mod, "_pick_region", side_effect=mock_pick_region),
+        patch.object(
+            _mod, "_prompt_operational_params", side_effect=mock_prompt_operational_params
+        ),
         patch.object(
             _mod,
             "_get_available_schedulers",
@@ -152,7 +162,13 @@ def test_interactive_setup_tests_credentials_before_asking_for_region():
         patch.object(
             _mod,
             "_get_available_credential_sources",
-            return_value=[{"name": "default", "description": "Default"}],
+            return_value=[
+                {
+                    "name": "default",
+                    "description": "Default",
+                    "config_delta": {"profile": "default"},
+                }
+            ],
         ),
         patch.object(
             _mod,
@@ -164,8 +180,8 @@ def test_interactive_setup_tests_credentials_before_asking_for_region():
         _mod._interactive_setup()
 
     assert "test_credentials" in call_order
-    assert "pick_region" in call_order
-    assert call_order.index("test_credentials") < call_order.index("pick_region")
+    assert "prompt_operational_params" in call_order
+    assert call_order.index("test_credentials") < call_order.index("prompt_operational_params")
 
 
 def test_interactive_setup_returns_empty_on_credential_failure():
@@ -193,7 +209,13 @@ def test_interactive_setup_returns_empty_on_credential_failure():
         patch.object(
             _mod,
             "_get_available_credential_sources",
-            return_value=[{"name": "default", "description": "Default"}],
+            return_value=[
+                {
+                    "name": "default",
+                    "description": "Default",
+                    "config_delta": {"profile": "default"},
+                }
+            ],
         ),
         patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
     ):
@@ -462,8 +484,7 @@ def test_init_handler_fallback_name_when_strategy_unavailable(tmp_path) -> None:
         "providers": [
             {
                 "type": "aws",
-                "profile": "default",
-                "region": "us-west-2",
+                "config": {"profile": "default", "region": "us-west-2"},
                 "is_default": False,
                 "infrastructure_defaults": {},
             }
@@ -504,5 +525,7 @@ def test_init_handler_fallback_name_when_strategy_unavailable(tmp_path) -> None:
         written = json.load(f)
 
     p = written["provider"]["providers"][0]
-    # Fallback: aws_{sanitized_profile}_{region}
-    assert p["name"] == "aws_default_us-west-2"
+    # Fallback: provider_type + sha256(sorted config) — provider-agnostic; the
+    # specific hash isn't stable across config-key additions but the shape is.
+    assert p["name"].startswith("aws_")
+    assert len(p["name"].split("_")[1]) == 8  # sha256 first-8-chars

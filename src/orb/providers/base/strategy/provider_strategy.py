@@ -315,9 +315,22 @@ class ProviderStrategy(ABC):
     def get_available_credential_sources(cls) -> list[dict]:
         """Get available credential sources for this provider.
 
+        Each entry in the returned list must contain:
+
+        - ``name`` (str | None): technical identifier passed to
+          ``test_credentials`` as ``credential_source``.
+        - ``description`` (str): human-readable label shown in ``orb init``.
+        - ``config_delta`` (dict): provider-config keys to merge into the
+          provider config when this source is selected.  The base
+          ``init_command_handler`` calls ``provider_config.update(config_delta)``
+          so providers declare exactly which keys they populate.  An empty dict
+          means the selected source contributes no extra config keys (e.g. an
+          environment-credential entry that needs no profile name).
+
         Returns:
-            List of credential sources with name and description.
-            Default implementation returns empty list.
+            List of credential source dicts.  Default implementation returns
+            an empty list (providers that ship no credential discovery skip the
+            selection step entirely).
         """
         return []
 

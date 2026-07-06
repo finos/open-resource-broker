@@ -243,8 +243,13 @@ def _interactive_setup() -> Dict[str, Any]:
         )
         if success:
             console.success("Credentials verified successfully")
-            if selected_source:
-                provider_config["profile"] = selected_source
+            if selected_source is not None:
+                source_entry = next(
+                    (s for s in credential_sources if s["name"] == selected_source),
+                    None,
+                )
+                if source_entry is not None:
+                    provider_config.update(source_entry["config_delta"])
         else:
             console.error("[bold red]ERROR[/bold red] Authentication failed:")
             console.error(f"        {error_msg}")
@@ -398,8 +403,13 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
         )
         if success:
             console.success("Credentials verified successfully")
-            if selected_source:
-                provider_config["profile"] = selected_source
+            if selected_source is not None:
+                source_entry = next(
+                    (s for s in credential_sources if s["name"] == selected_source),
+                    None,
+                )
+                if source_entry is not None:
+                    provider_config.update(source_entry["config_delta"])
         else:
             console.error(f"Authentication failed: {error_msg}")
             return None
