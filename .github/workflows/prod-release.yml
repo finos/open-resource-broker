@@ -78,6 +78,14 @@ jobs:
         cache-key: prod-${{ needs.config.outputs.package-version }}-py${{ matrix.python-version }}
         fail-on-cache-miss: false
 
+    - name: Setup Bun (for UI static bundle)
+      uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f4b11  # v2
+      with:
+        bun-version: latest
+
+    - name: Build UI static bundle
+      run: make ui-build
+
     - name: Build package wheel
       run: make build
 
@@ -173,6 +181,14 @@ jobs:
         cache-key: prod-pypi-${{ needs.config.outputs.package-version }}
         fail-on-cache-miss: false
 
+    - name: Setup Bun (for UI static bundle)
+      uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f4b11  # v2
+      with:
+        bun-version: latest
+
+    - name: Build UI static bundle
+      run: make ui-build
+
     - name: Build package
       run: make build
 
@@ -250,6 +266,14 @@ jobs:
       with:
         cache-key: prod-assets-${{ needs.config.outputs.package-version }}
         fail-on-cache-miss: false
+
+    - name: Setup Bun (for UI static bundle)
+      uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f4b11  # v2
+      with:
+        bun-version: latest
+
+    - name: Build UI static bundle
+      run: make ui-build
 
     - name: Build package
       run: make build

@@ -87,6 +87,14 @@ jobs:
         cache-key: deps-${{ needs.config.outputs.default-python-version }}-${{ hashFiles('.project.yml', 'pyproject.toml', 'requirements*.txt') }}
         fail-on-cache-miss: false
 
+    - name: Setup Bun (for UI static bundle)
+      uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f4b11  # v2
+      with:
+        bun-version: latest
+
+    - name: Build UI static bundle
+      run: make ui-build
+
     - name: Build package
       run: |
         make build-with-version
