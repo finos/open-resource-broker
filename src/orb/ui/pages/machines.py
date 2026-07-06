@@ -17,6 +17,7 @@ from ..components.layout import page
 from ..components.list_grid_view import ColumnDef, list_grid_view
 from ..components.list_page_shell import list_page_shell
 from ..components.machine_drawer import machine_drawer
+from ..components.provider_columns import build_provider_columns, resolve_provider_row_fields
 from ..components.refresh_control import refresh_control
 from ..components.request_modal import request_modal, request_success_banner
 from ..components.status_badge import machine_status_badge
@@ -369,6 +370,7 @@ class MachinesState(rx.State):
     # Filters
     status_filter: str = "all"
     search_text: str = ""
+    provider_filter: str = rx.LocalStorage("All", name="orb-machines-provider-filter")
 
     # Selection
     selected_ids: list[str] = []  # list instead of set — Reflex serialises to JSON
@@ -420,6 +422,22 @@ class MachinesState(rx.State):
     api_total_count: int = 0
     loading_more: bool = False
     page_size: int = 200
+
+    # Provider column schemas — fetched on mount into this state so that
+    # dynamic_columns and machine_rows operate on a plain Python dict rather
+    # than a cross-state Reflex Var (which cannot be coerced to bool).
+    provider_schemas: dict[str, list[dict[str, Any]]] = {}
+
+    @rx.event(background=True)
+    async def load_provider_schemas(self):
+        """Fetch provider column schemas and store in this state."""
+        try:
+            schemas = await api.get_provider_schemas()
+            async with self:
+                self.provider_schemas = schemas if isinstance(schemas, dict) else {}
+        except Exception:
+            async with self:
+                self.provider_schemas = {}
 
     # -----------------------------------------------------------------------
     # Computed vars
@@ -519,6 +537,15 @@ class MachinesState(rx.State):
                     return ""
                 return f"{len(v)} items"
 
+            # Extract provider-declared fields so dynamic column formatters
+            # can do a simple row[key] lookup at render time.
+            provider_fields = resolve_provider_row_fields(
+                m,
+                self.provider_schemas,
+                "machines",
+                self.provider_filter,
+            )
+
             rows.append(
                 {
                     # --- Core identity ---
@@ -569,9 +596,24 @@ class MachinesState(rx.State):
                     "_launch_ts": int(launch_time) if isinstance(launch_time, int) else 0,
                     # Pass through the raw dict so card/drawer can open it
                     "raw": m,
+                    # --- Provider-declared fields (injected last; keys from schemas) ---
+                    **provider_fields,
                 }
             )
         return rows
+
+    @rx.var
+    def dynamic_columns(self) -> list[ColumnDef]:
+        """Provider-declared column definitions merged from backend schemas.
+
+        Returns columns from all providers when ``provider_filter`` is ``"All"``,
+        or only the active provider's columns when a specific provider is selected.
+        """
+        return build_provider_columns(
+            self.provider_schemas,
+            "machines",
+            self.provider_filter,
+        )
 
     @rx.var
     def sorted_rows(self) -> list[dict[str, Any]]:
@@ -668,7 +710,10 @@ class MachinesState(rx.State):
         self.api_total_count = 0
         try:
             status = None if self.status_filter == "all" else self.status_filter
-            res = await api.list_machines(status=status, limit=self.page_size)
+            provider_name = None if self.provider_filter == "All" else self.provider_filter
+            res = await api.list_machines(
+                status=status, provider_name=provider_name, limit=self.page_size
+            )
             rows = res.get("machines", [])
             self.machines = rows
             self.next_cursor = res.get("next_cursor") or ""
@@ -708,8 +753,13 @@ class MachinesState(rx.State):
                     if not self.loading:
                         try:
                             status = None if self.status_filter == "all" else self.status_filter
+                            provider_name = (
+                                None if self.provider_filter == "All" else self.provider_filter
+                            )
                             page_size = self.page_size
-                            res = await api.list_machines(status=status, limit=page_size)
+                            res = await api.list_machines(
+                                status=status, provider_name=provider_name, limit=page_size
+                            )
                             rows = res.get("machines", [])
                             self.machines = rows
                             self.next_cursor = res.get("next_cursor") or ""
@@ -839,6 +889,19 @@ class MachinesState(rx.State):
     @rx.event
     async def set_status_filter(self, value: str) -> None:
         self.status_filter = value
+        self.next_cursor = ""
+        self.api_total_count = 0
+        await self.load()  # type: ignore[misc]
+
+    @rx.event
+    async def set_provider_filter(self, value: str) -> None:
+        """Update the active provider filter and reload the machine list.
+
+        When the list API supports server-side provider filtering via the
+        ``provider_name`` parameter the value is forwarded; "All" sends no
+        filter so all providers' machines are returned.
+        """
+        self.provider_filter = value
         self.next_cursor = ""
         self.api_total_count = 0
         await self.load()  # type: ignore[misc]
@@ -1462,11 +1525,12 @@ def _selection_actions() -> rx.Component:
 
 
 def _filter_row() -> rx.Component:
-    """Canonical filter row: status pills + search input + spacer + refresh_control.
+    """Canonical filter row: status pills + provider select + search input + refresh_control.
 
     Layout:
-        [Status pills] [Search input] <spacer> [refresh_control]
+        [Status pills] [Provider dropdown] [Search input] <spacer> [refresh_control]
     """
+    provider_options = rx.Var.create(["All"]) + MachinesState.provider_schemas.keys().to(list)  # type: ignore[attr-defined]
     return rx.hstack(
         # Status filter pills (replaces rx.select dropdown)
         rx.hstack(
@@ -1487,6 +1551,15 @@ def _filter_row() -> rx.Component:
             spacing="2",
             flex_wrap="wrap",
             align="center",
+        ),
+        # Provider filter dropdown — dynamically populated from schema keys
+        rx.select(
+            provider_options,
+            value=MachinesState.provider_filter,
+            on_change=MachinesState.set_provider_filter,
+            size="2",
+            width="130px",
+            placeholder="Provider…",
         ),
         # Search input
         rx.input(
@@ -1737,6 +1810,16 @@ def _load_more_button() -> rx.Component:
     )
 
 
+def _all_columns_with_dynamic() -> list[ColumnDef]:
+    """Return base columns; dynamic provider columns are added at render time.
+
+    The base list (ALL_MACHINE_COLUMNS_WITH_ACTIONS) is compiled at import
+    time.  Dynamic provider columns are merged by the state's ``dynamic_columns``
+    computed var and passed to ``list_grid_view`` at runtime.
+    """
+    return ALL_MACHINE_COLUMNS_WITH_ACTIONS
+
+
 def machines_page() -> rx.Component:
     """Machines page component — entry point registered in orb_ui.py."""
     return page(
@@ -1772,5 +1855,9 @@ def machines_page() -> rx.Component:
                 _confirm_return_all_dialog(),
             ],
         ),
-        on_mount=[MachinesState.load, MachinesState.auto_refresh],
+        on_mount=[
+            MachinesState.load,
+            MachinesState.auto_refresh,
+            MachinesState.load_provider_schemas,
+        ],
     )

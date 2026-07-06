@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 try:
-    from fastapi import APIRouter, Depends
+    from fastapi import APIRouter, Depends, HTTPException
     from fastapi.responses import JSONResponse
 except ImportError:
     raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
@@ -70,6 +70,101 @@ async def _probe_provider_health(provider_name: str) -> tuple[str, dict[str, Any
     if data.get("status_message"):
         details["status_message"] = data["status_message"]
     return ("healthy" if is_healthy else "degraded"), details
+
+
+def _get_schema_for_provider_type(provider_type: str) -> list[dict[str, Any]]:
+    """Return serialised UIColumnDescriptors for a single provider type.
+
+    Resolves the strategy class registered under *provider_type* (no
+    live instance needed — schema is declared on the class/method level)
+    and calls ``get_ui_column_schema()``.
+
+    Raises ``KeyError`` when the provider type is not registered.
+    """
+    from orb.providers.registry.provider_registry import get_provider_registry
+    from orb.providers.registry.types import ProviderRegistration
+
+    registry = get_provider_registry()
+    reg = registry._get_type_registration(provider_type)  # raises ValueError if missing
+    if not isinstance(reg, ProviderRegistration) or reg.strategy_class is None:
+        return []
+
+    try:
+        # Instantiate a lightweight sentinel to call get_ui_column_schema.
+        # The method only constructs UIColumnDescriptor objects — no AWS I/O.
+        instance = object.__new__(reg.strategy_class)
+        schema = instance.get_ui_column_schema()
+        return [col.to_dict() for col in schema]
+    except Exception as exc:
+        logger.warning(
+            "Failed to retrieve UI column schema for provider '%s': %s",
+            provider_type,
+            exc,
+            exc_info=True,
+        )
+        return []
+
+
+@router.get(
+    "/schemas",
+    summary="All Provider UI Column Schemas",
+    description=(
+        "Returns a mapping of provider name → list of UIColumnDescriptor objects "
+        "contributed by every registered provider strategy. "
+        "The UI layer merges these at render time to build per-resource column sets."
+    ),
+)
+@handle_rest_exceptions(endpoint="/api/v1/providers/schemas", method="GET")
+async def get_all_provider_schemas(
+    _user=Depends(require_role("viewer")),
+) -> JSONResponse:
+    """Aggregate UI column schemas from all registered provider strategies."""
+    from orb.providers.registry.provider_registry import get_provider_registry
+
+    registry = get_provider_registry()
+    result: dict[str, list[dict[str, Any]]] = {}
+
+    for provider_type in registry.get_registered_providers():
+        try:
+            result[provider_type] = _get_schema_for_provider_type(provider_type)
+        except Exception as exc:
+            logger.warning(
+                "Skipping schema for provider '%s': %s", provider_type, exc, exc_info=True
+            )
+            result[provider_type] = []
+
+    return JSONResponse(content=result, status_code=200)
+
+
+@router.get(
+    "/{name}/schema",
+    summary="Provider UI Column Schema",
+    description=(
+        "Returns the list of UIColumnDescriptor objects contributed by the named "
+        "provider strategy.  Use this to discover provider-specific columns for "
+        "machines, requests, and templates resource types."
+    ),
+)
+@handle_rest_exceptions(endpoint="/api/v1/providers/{name}/schema", method="GET")
+async def get_provider_schema(
+    name: str,
+    _user=Depends(require_role("viewer")),
+) -> JSONResponse:
+    """Return UI column schema for a single named provider."""
+    from orb.providers.registry.provider_registry import get_provider_registry
+
+    registry = get_provider_registry()
+
+    if not registry.is_provider_registered(name):
+        raise HTTPException(status_code=404, detail=f"Provider '{name}' not found.")
+
+    try:
+        schema = _get_schema_for_provider_type(name)
+    except Exception as exc:
+        logger.warning("Failed to build schema for provider '%s': %s", name, exc, exc_info=True)
+        schema = []
+
+    return JSONResponse(content=schema, status_code=200)
 
 
 @router.get(

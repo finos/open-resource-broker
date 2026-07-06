@@ -30,6 +30,7 @@ from ..components.column_picker import column_picker
 from ..components.layout import page
 from ..components.list_grid_view import ColumnDef, list_grid_view
 from ..components.list_page_shell import list_page_shell
+from ..components.provider_columns import build_provider_columns, resolve_provider_row_fields
 from ..components.refresh_control import refresh_control
 from ..components.request_modal import RequestModalState, request_modal, request_success_banner
 from ..components.template_drawer import delete_confirm_dialog, template_drawer
@@ -465,6 +466,9 @@ class TemplatesState(rx.State):
     # Search text for client-side filtering
     search_text: str = ""
 
+    # Provider filter (persisted in localStorage)
+    provider_filter: str = rx.LocalStorage("All", name="orb-templates-provider-filter")
+
     # ── Auto-refresh (persisted in localStorage) ─────────────────────────────
     auto_refresh_enabled: str = rx.LocalStorage("false", name="orb-templates-auto-refresh-enabled")
     auto_refresh_interval: str = rx.LocalStorage("10", name="orb-templates-auto-refresh-interval")
@@ -486,6 +490,22 @@ class TemplatesState(rx.State):
     api_total_count: int = 0
     loading_more: bool = False
     page_size: int = 200
+
+    # Provider column schemas — fetched on mount into this state so that
+    # dynamic_columns and card_rows operate on a plain Python dict rather
+    # than a cross-state Reflex Var (which cannot be coerced to bool).
+    provider_schemas: dict[str, list[dict[str, Any]]] = {}
+
+    @rx.event(background=True)
+    async def load_provider_schemas(self):
+        """Fetch provider column schemas and store in this state."""
+        try:
+            schemas = await api.get_provider_schemas()
+            async with self:
+                self.provider_schemas = schemas if isinstance(schemas, dict) else {}
+        except Exception:
+            async with self:
+                self.provider_schemas = {}
 
     # ── Computed ────────────────────────────────────────────────────────────
 
@@ -520,6 +540,15 @@ class TemplatesState(rx.State):
     @rx.var
     def filtered_count(self) -> int:
         return len(self.filtered_templates)
+
+    @rx.var
+    def dynamic_columns(self) -> list[ColumnDef]:
+        """Provider-declared column definitions merged from backend schemas."""
+        return build_provider_columns(
+            self.provider_schemas,
+            "templates",
+            self.provider_filter,
+        )
 
     @rx.var
     def card_rows(self) -> list[dict[str, Any]]:
@@ -634,6 +663,13 @@ class TemplatesState(rx.State):
                     "created_by": created_by,
                     "badge_color": badge_color,
                     "raw": t,
+                    # ── Provider-declared fields ───────────────────────────────
+                    **resolve_provider_row_fields(
+                        t,
+                        self.provider_schemas,
+                        "templates",
+                        self.provider_filter,
+                    ),
                 }
             )
         return rows
@@ -1096,6 +1132,12 @@ class TemplatesState(rx.State):
     def set_search_text(self, value: str) -> None:
         self.search_text = value
 
+    @rx.event
+    async def set_provider_filter(self, value: str) -> None:
+        """Update the active provider filter and reload the template list."""
+        self.provider_filter = value
+        await self.load()  # type: ignore[misc]
+
     # ── Auto-refresh events ──────────────────────────────────────────────────
 
     @rx.event
@@ -1387,11 +1429,17 @@ def _empty_state() -> rx.Component:
 
 
 def _filter_row() -> rx.Component:
-    """Canonical filter row: provider pills + search input + spacer + refresh_control.
+    """Canonical filter row: provider pills + provider select + search input + refresh_control.
 
     Layout:
-        [Provider pills] [Search input] <spacer> [refresh_control]
+        [Provider pills] [Provider dropdown] [Search input] <spacer> [refresh_control]
+
+    The pill filter (``active_filter``) works against the static ``PROVIDER_FILTER_OPTIONS``
+    list already present in the React PoC.  The new provider dropdown
+    (``provider_filter``) is driven from live backend schemas and lets users scope
+    the table to a specific registered provider's machines/requests.
     """
+    provider_options = rx.Var.create(["All"]) + TemplatesState.provider_schemas.keys().to(list)  # type: ignore[attr-defined]
     return rx.hstack(
         rx.foreach(
             PROVIDER_FILTER_OPTIONS,
@@ -1411,6 +1459,14 @@ def _filter_row() -> rx.Component:
                 on_click=TemplatesState.set_filter(f),
                 radius="full",
             ),
+        ),
+        rx.select(
+            provider_options,
+            value=TemplatesState.provider_filter,
+            on_change=TemplatesState.set_provider_filter,
+            size="2",
+            width="130px",
+            placeholder="Provider…",
         ),
         rx.input(
             placeholder="Search…",
@@ -1655,5 +1711,5 @@ def templates_page() -> rx.Component:
                 _generate_dialog(),
             ],
         ),
-        on_mount=TemplatesState.load,
+        on_mount=[TemplatesState.load, TemplatesState.load_provider_schemas],
     )

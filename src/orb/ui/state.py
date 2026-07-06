@@ -17,6 +17,33 @@ class AppState(rx.State):
     info: dict[str, Any] = {}
     health_error: str = ""
 
+    # Provider column schemas — fetched once on mount and shared across all
+    # list pages.  Shape: ``{provider_name: [column_descriptor_dict, ...]}``.
+    # Populated by ``load_provider_schemas``; defaults to empty dict so pages
+    # render with base columns only until the fetch completes.
+    provider_schemas: dict[str, list[dict[str, Any]]] = {}
+    _schemas_loaded: bool = False
+
+    @rx.event(background=True)
+    async def load_provider_schemas(self):
+        """Fetch provider column schemas once and cache in state.
+
+        Single-flight: subsequent calls while schemas are already loaded
+        are no-ops.  Schema data is stable for the lifetime of a server
+        process so re-fetching is not required.
+        """
+        async with self:
+            if self._schemas_loaded:
+                return
+            self._schemas_loaded = True
+        try:
+            schemas = await api.get_provider_schemas()
+            async with self:
+                self.provider_schemas = schemas if isinstance(schemas, dict) else {}
+        except Exception:
+            async with self:
+                self.provider_schemas = {}
+
     # Sidebar collapse state — persisted in LocalStorage so it survives
     # page navigation and hard reloads. Stored as a string ("true"/"false")
     # because LocalStorage values are always strings.

@@ -5,8 +5,10 @@ This module provides strongly-typed DTOs for system operations,
 replacing Dict[str, Any] returns with appropriate type safety.
 """
 
+from __future__ import annotations
+
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import Field
 
@@ -318,3 +320,31 @@ class ValidationDTO(BaseDTO):
         description="When validation was performed",
     )
     schema_version: str = Field(description="Schema version used for validation")
+
+
+class UIColumnDescriptor(BaseDTO):
+    """Descriptor for a single UI column contributed by a provider strategy.
+
+    Each provider declares the columns it contributes for a given resource type.
+    The UI layer merges descriptors from all registered providers at render time.
+    """
+
+    key: str = Field(description="Unique column key across all providers, e.g. 'aws_instance_type'")
+    path: str = Field(description="Dot-path into the row dict, e.g. 'provider_data.instance_type'")
+    label: str = Field(description="Human-readable display label, e.g. 'Instance Type'")
+    kind: Literal["text", "code", "badge", "timestamp", "count", "link"] = Field(
+        description="Rendering hint for the UI column cell"
+    )
+    resource_type: Literal["machines", "requests", "templates"] = Field(
+        description="Which resource type this column belongs to"
+    )
+    provider: Optional[str] = Field(
+        None, description="Provider name for provider-declared columns; None for base columns"
+    )
+    sortable: bool = Field(False, description="Whether the column supports server-side sorting")
+    default_visible: bool = Field(False, description="Whether the column is visible by default")
+    lockable: bool = Field(False, description="Whether the column can be locked/pinned")
+    badge_color_map: Optional[dict[str, str]] = Field(
+        None,
+        description="Mapping of cell value to badge colour token, used when kind='badge'",
+    )

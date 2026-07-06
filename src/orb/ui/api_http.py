@@ -412,6 +412,23 @@ async def get_config_sources() -> dict[str, Any]:
     return await _get("/config/sources")
 
 
+async def get_provider_schemas() -> dict[str, list[dict[str, Any]]]:
+    """Return all registered provider UI column schemas keyed by provider name.
+
+    Calls ``GET /api/v1/providers/schemas`` which returns a JSON object whose
+    keys are provider names (e.g. ``"aws"``) and whose values are arrays of
+    UIColumnDescriptor dicts.  An empty dict is returned when the endpoint is
+    absent or returns an empty body.
+    """
+    try:
+        result = await _get("/providers/schemas")
+        if isinstance(result, dict):
+            return result
+        return {}
+    except Exception:
+        return {}
+
+
 async def subscribe_events(event_types=None):
     """Yield (event_type, data) from the backend SSE stream.
 

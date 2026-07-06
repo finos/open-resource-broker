@@ -127,6 +127,166 @@ class AWSProviderStrategy(ProviderStrategy):
         """Resolve AWS-specific API name aliases to canonical registry keys."""
         return self._API_ALIASES.get(raw_api, raw_api)
 
+    def get_ui_column_schema(self) -> list:  # type: ignore[override]
+        """Return AWS-specific UI column descriptors for all resource types."""
+        from orb.application.dto.system import UIColumnDescriptor
+
+        return [
+            # ------------------------------------------------------------------
+            # machines
+            # ------------------------------------------------------------------
+            UIColumnDescriptor(
+                key="aws_instance_type",
+                path="provider_data.instance_type",
+                label="Instance Type",
+                kind="badge",
+                resource_type="machines",
+                provider="aws",
+                sortable=True,
+                default_visible=True,
+            ),
+            UIColumnDescriptor(
+                key="aws_availability_zone",
+                path="provider_data.availability_zone",
+                label="AZ",
+                kind="text",
+                resource_type="machines",
+                provider="aws",
+                sortable=True,
+                default_visible=True,
+            ),
+            UIColumnDescriptor(
+                key="aws_lifecycle",
+                path="provider_data.lifecycle",
+                label="Lifecycle",
+                kind="badge",
+                resource_type="machines",
+                provider="aws",
+                badge_color_map={"spot": "orange", "ondemand": "blue"},
+            ),
+            UIColumnDescriptor(
+                key="aws_image_id",
+                path="provider_data.image_id",
+                label="AMI",
+                kind="code",
+                resource_type="machines",
+                provider="aws",
+            ),
+            UIColumnDescriptor(
+                key="aws_subnet_id",
+                path="provider_data.subnet_id",
+                label="Subnet",
+                kind="code",
+                resource_type="machines",
+                provider="aws",
+            ),
+            # ------------------------------------------------------------------
+            # requests
+            # ------------------------------------------------------------------
+            UIColumnDescriptor(
+                key="aws_request_type",
+                path="provider_data.request_type",
+                label="Request Type",
+                kind="badge",
+                resource_type="requests",
+                provider="aws",
+                badge_color_map={
+                    "RunInstances": "teal",
+                    "EC2Fleet": "blue",
+                    "SpotFleet": "purple",
+                    "ASG": "orange",
+                },
+                default_visible=True,
+            ),
+            UIColumnDescriptor(
+                key="aws_launch_template_id",
+                path="provider_data.launch_template_id",
+                label="Launch Template",
+                kind="code",
+                resource_type="requests",
+                provider="aws",
+            ),
+            UIColumnDescriptor(
+                key="aws_launch_template_version",
+                path="provider_data.launch_template_version",
+                label="LT Version",
+                kind="text",
+                resource_type="requests",
+                provider="aws",
+            ),
+            UIColumnDescriptor(
+                key="aws_fulfillment_method",
+                path="provider_data.fulfillment_method",
+                label="Fulfillment Method",
+                kind="text",
+                resource_type="requests",
+                provider="aws",
+            ),
+            # ------------------------------------------------------------------
+            # templates
+            # ------------------------------------------------------------------
+            UIColumnDescriptor(
+                key="aws_provider_api",
+                path="provider_api",
+                label="Provider API",
+                kind="badge",
+                resource_type="templates",
+                provider="aws",
+                badge_color_map={
+                    "RunInstances": "teal",
+                    "EC2Fleet": "blue",
+                    "SpotFleet": "purple",
+                    "ASG": "orange",
+                    "aws": "indigo",
+                },
+                default_visible=True,
+                sortable=True,
+            ),
+            UIColumnDescriptor(
+                key="aws_instance_type",
+                path="instance_type",
+                label="Instance Type",
+                kind="text",
+                resource_type="templates",
+                provider="aws",
+                default_visible=True,
+                sortable=True,
+            ),
+            UIColumnDescriptor(
+                key="aws_allocation_strategy",
+                path="allocation_strategy",
+                label="Allocation Strategy",
+                kind="text",
+                resource_type="templates",
+                provider="aws",
+            ),
+            UIColumnDescriptor(
+                key="aws_price_type",
+                path="price_type",
+                label="Price Type",
+                kind="badge",
+                resource_type="templates",
+                provider="aws",
+                badge_color_map={"ondemand": "blue", "spot": "orange", "mixed": "purple"},
+            ),
+            UIColumnDescriptor(
+                key="aws_key_name",
+                path="key_name",
+                label="Key Name",
+                kind="text",
+                resource_type="templates",
+                provider="aws",
+            ),
+            UIColumnDescriptor(
+                key="aws_image_id",
+                path="image_id",
+                label="AMI",
+                kind="code",
+                resource_type="templates",
+                provider="aws",
+            ),
+        ]
+
     @property
     def provider_name(self) -> Optional[str]:
         """Get the provider name for this strategy."""

@@ -34,6 +34,7 @@ from ..components.list_grid_view import ColumnDef, list_grid_view
 from ..components.list_page_shell import list_page_shell
 from ..components.machine_drawer import machine_drawer
 from ..components.machine_quick_view import MachineQuickViewState
+from ..components.provider_columns import build_provider_columns, resolve_provider_row_fields
 from ..components.refresh_control import refresh_control
 from ..components.request_drawer import request_drawer
 from ..components.request_modal import RequestModalState, request_modal, request_success_banner
@@ -517,6 +518,9 @@ class RequestsState(rx.State):
     # Search text for client-side filtering
     search_text: str = ""
 
+    # Provider filter (persisted in localStorage)
+    provider_filter: str = rx.LocalStorage("All", name="orb-requests-provider-filter")
+
     # Drawer
     drawer_open: bool = False
     # Initialise from RequestDTO so every field defined by ORB is
@@ -585,9 +589,34 @@ class RequestsState(rx.State):
     loading_more: bool = False
     page_size: int = 200
 
+    # Provider column schemas — fetched on mount into this state so that
+    # dynamic_columns and request_rows operate on a plain Python dict rather
+    # than a cross-state Reflex Var (which cannot be coerced to bool).
+    provider_schemas: dict[str, list[dict[str, Any]]] = {}
+
+    @rx.event(background=True)
+    async def load_provider_schemas(self):
+        """Fetch provider column schemas and store in this state."""
+        try:
+            schemas = await api.get_provider_schemas()
+            async with self:
+                self.provider_schemas = schemas if isinstance(schemas, dict) else {}
+        except Exception:
+            async with self:
+                self.provider_schemas = {}
+
     # ---------------------------------------------------------------------------
     # Computed vars
     # ---------------------------------------------------------------------------
+
+    @rx.var
+    def dynamic_columns(self) -> list[ColumnDef]:
+        """Provider-declared column definitions merged from backend schemas."""
+        return build_provider_columns(
+            self.provider_schemas,
+            "requests",
+            self.provider_filter,
+        )
 
     @rx.var
     def filtered_count(self) -> int:
@@ -983,6 +1012,14 @@ class RequestsState(rx.State):
     def set_search_text(self, value: str) -> None:
         self.search_text = value
 
+    @rx.event
+    async def set_provider_filter(self, value: str) -> None:
+        """Update the active provider filter and reload the request list."""
+        self.provider_filter = value
+        self.next_cursor = ""
+        self.api_total_count = 0
+        await self.load()  # type: ignore[misc]
+
     @rx.var
     def request_rows(self) -> list[dict[str, Any]]:
         """Pre-formatted rows for the table — all string ops & defaults computed
@@ -1115,6 +1152,13 @@ class RequestsState(rx.State):
                     "version": str(r.get("version") or ""),
                     # --- Raw for drawer ---
                     "raw": r,
+                    # --- Provider-declared fields ---
+                    **resolve_provider_row_fields(
+                        r,
+                        self.provider_schemas,
+                        "requests",
+                        self.provider_filter,
+                    ),
                 }
             )
         return rows
@@ -2025,11 +2069,12 @@ def _request_row(row) -> rx.Component:
 
 
 def _filter_row() -> rx.Component:
-    """Canonical filter row: filter pills + search input + spacer + refresh_control.
+    """Canonical filter row: filter pills + provider select + search input + refresh_control.
 
     Layout matches the canonical pattern:
-        [Filter pills] [Search input] <spacer> [refresh_control]
+        [Filter pills] [Provider dropdown] [Search input] <spacer> [refresh_control]
     """
+    provider_options = rx.Var.create(["All"]) + RequestsState.provider_schemas.keys().to(list)  # type: ignore[attr-defined]
     return rx.hstack(
         rx.hstack(
             *[
@@ -2049,6 +2094,14 @@ def _filter_row() -> rx.Component:
             spacing="2",
             flex_wrap="wrap",
             align="center",
+        ),
+        rx.select(
+            provider_options,
+            value=RequestsState.provider_filter,
+            on_change=RequestsState.set_provider_filter,
+            size="2",
+            width="130px",
+            placeholder="Provider…",
         ),
         rx.input(
             placeholder="Search…",
@@ -2467,5 +2520,6 @@ def requests_page() -> rx.Component:
             RequestsState.load,
             RequestsState.open_from_query,
             RequestsState.auto_refresh,
+            RequestsState.load_provider_schemas,
         ],
     )
