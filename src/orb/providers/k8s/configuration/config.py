@@ -37,7 +37,19 @@ _LEGACY_FIELD_MAP: dict[str, str] = {
     "orphan_min_age": "orphan_min_age_seconds",
 }
 
-_logger = logging.getLogger(__name__)
+def _get_logger() -> "logging.Logger":
+    """Return a stdlib logger for namespace auto-detection messages.
+
+    The K8sProviderConfig model validator runs during Pydantic construction,
+    before any DI container is available, so injecting a LoggingPort here is
+    not feasible without a service-locator.  The stdlib logging module is used
+    directly and the call-site is limited to a single informational message.
+
+    TODO: move namespace auto-detection out of the validator and into the
+    provider strategy's initialize() path so the injected LoggingPort can
+    be used instead.
+    """
+    return logging.getLogger(__name__)
 
 
 def _read_in_cluster_namespace() -> Optional[str]:
@@ -396,7 +408,7 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         if self.namespace is None:
             detected = _read_in_cluster_namespace()
             if detected is not None:
-                _logger.info(
+                _get_logger().info(
                     "K8s provider: namespace auto-detected from in-cluster ServiceAccount "
                     "token file (namespace=%r).",
                     detected,
