@@ -13,7 +13,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from orb.providers.aws.exceptions.aws_exceptions import AWSValidationError
-from tests.providers.aws.moto.conftest import (
+from tests.providers.aws.mocked.conftest import (
     _make_config_port,
     _make_logger,
     _make_moto_aws_client as _make_aws_client,
@@ -312,7 +312,7 @@ class TestEC2FleetHandlerEdgeCases:
         aws_client = _make_aws_client(region=REGION)
         logger = _make_logger()
         config_port = _make_config_port(prefix="")
-        from tests.providers.aws.moto.conftest import make_ec2_fleet_handler
+        from tests.providers.aws.mocked.conftest import make_ec2_fleet_handler
 
         return make_ec2_fleet_handler(aws_client, logger, config_port)
 
@@ -350,7 +350,7 @@ class TestEC2FleetHandlerEdgeCases:
             handler.check_hosts_status(request)
 
     def test_check_hosts_status_after_acquire_maintain(self, handler, vpc):
-        from tests.providers.aws.moto.conftest import make_ec2_fleet_handler
+        from tests.providers.aws.mocked.conftest import make_ec2_fleet_handler
 
         aws_client = _make_aws_client(region=REGION)
         h = make_ec2_fleet_handler(aws_client, _make_logger(), _make_config_port())
@@ -392,7 +392,7 @@ SPOT_FLEET_ROLE = "arn:aws:iam::123456789012:role/aws-service-role/spotfleet.ama
 
 
 def _make_spot_handler_patched(moto_aws):
-    from tests.providers.aws.moto.conftest import make_spot_fleet_handler
+    from tests.providers.aws.mocked.conftest import make_spot_fleet_handler
 
     aws_client = _make_aws_client(region=REGION)
     h = make_spot_fleet_handler(aws_client, _make_logger(), _make_config_port())
@@ -482,7 +482,7 @@ class TestRunInstancesHandlerEdgeCases:
     @pytest.fixture
     def handler(self, moto_aws):
         aws_client = _make_aws_client(region=REGION)
-        from tests.providers.aws.moto.conftest import make_run_instances_handler
+        from tests.providers.aws.mocked.conftest import make_run_instances_handler
 
         return make_run_instances_handler(aws_client, _make_logger(), _make_config_port())
 

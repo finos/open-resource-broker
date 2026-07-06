@@ -31,7 +31,7 @@ from orb.providers.aws.infrastructure.handlers.spot_fleet.config_builder import 
 )
 from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
 from orb.providers.aws.utilities.aws_operations import AWSOperations
-from tests.providers.aws.moto.conftest import (
+from tests.providers.aws.mocked.conftest import (
     REGION,
     _make_config_port,
     _make_launch_template_manager,

@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
 from orb.providers.aws.utilities.aws_operations import AWSOperations
-from tests.providers.aws.moto.conftest import (
+from tests.providers.aws.mocked.conftest import (
     _make_config_port,
     _make_launch_template_manager,
     _make_logger,

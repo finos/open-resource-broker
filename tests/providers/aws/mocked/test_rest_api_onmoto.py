@@ -19,7 +19,7 @@ import pytest_asyncio
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from tests.providers.aws.moto.conftest import (
+from tests.providers.aws.mocked.conftest import (
     _inject_moto_factory,
     _make_logger,
     _make_moto_aws_client,

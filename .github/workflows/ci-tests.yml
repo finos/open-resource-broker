@@ -98,7 +98,7 @@ jobs:
   # Per-provider matrix. One job per provider subtree under
   # tests/providers/. New providers land here as new matrix entries —
   # no separate onmoto job needed (moto-mocked tests live under
-  # tests/providers/aws/moto and run as part of the aws entry).
+  # tests/providers/aws/mocked and run as part of the aws entry).
   providers-tests:
     name: Providers Tests
     needs: [config, setup-cache]

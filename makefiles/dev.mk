@@ -114,14 +114,14 @@ test-no-live: dev-install  ## Run all tests except live cloud suites (pre-PR che
 test-providers: dev-install  ## Run all provider tests except live
 	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/providers --ignore=tests/providers/aws/live
 
-test-providers-aws: dev-install  ## Run AWS provider unit + moto tests
-	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/providers/aws/unit tests/providers/aws/moto
+test-providers-aws: dev-install  ## Run AWS provider unit + mocked tests
+	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/providers/aws/unit tests/providers/aws/mocked
 
 test-providers-aws-unit: dev-install  ## Run AWS provider unit tests only
 	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/providers/aws/unit
 
-test-providers-aws-moto: dev-install  ## Run AWS moto (mocked) tests only
-	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/providers/aws/moto
+test-providers-aws-mocked: dev-install  ## Run AWS mocked tests only
+	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/providers/aws/mocked
 
 test-providers-aws-live: dev-install  ## Run AWS live tests (requires real AWS credentials; parallel by default)
 	@uv run --extra api pytest --no-cov -q -ra -n $(PYTEST_WORKERS) --live tests/providers/aws/live

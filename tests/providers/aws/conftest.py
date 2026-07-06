@@ -48,7 +48,7 @@ REGION = "eu-west-2"
 
 # ---------------------------------------------------------------------------
 # Moto compatibility patches (applied to all moto/ tests via autouse=True
-# in tests/providers/aws/moto/conftest.py)
+# in tests/providers/aws/mocked/conftest.py)
 # ---------------------------------------------------------------------------
 
 

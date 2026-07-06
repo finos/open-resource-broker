@@ -3,7 +3,7 @@
 Applies the moto compat patch to every test in this subtree and re-exports
 helpers from the parent AWS conftest so that imports such as:
 
-    from tests.providers.aws.moto.conftest import _inject_moto_factory
+    from tests.providers.aws.mocked.conftest import _inject_moto_factory
 
 continue to work without modification.
 """
