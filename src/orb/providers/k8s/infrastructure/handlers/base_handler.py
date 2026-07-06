@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import copy
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar
 
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
@@ -24,10 +24,6 @@ from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.resilience import retry
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
-from orb.providers.k8s.reconciliation.timeout_gc import (
-    apply_pod_timeout,
-    delete_timed_out_pod_async,
-)
 from orb.providers.k8s.utilities.pod_spec import request_id_label_selector
 from orb.providers.k8s.utilities.pod_spec_audit import audit_pod_spec
 from orb.providers.k8s.utilities.pod_state import (
@@ -36,7 +32,9 @@ from orb.providers.k8s.utilities.pod_state import (
     pod_status_string,
 )
 from orb.providers.k8s.watch.node_state_cache import K8sNodeStateCache
-from orb.providers.k8s.watch.pod_state_cache import PodState, PodStateCache
+
+if TYPE_CHECKING:  # pragma: no cover — type-checking only
+    from orb.providers.k8s.watch.pod_state_cache import PodState, PodStateCache
 
 T = TypeVar("T")
 
@@ -289,6 +287,10 @@ class K8sHandlerBase(ABC):
         When there is no running event loop (CLI / unit-test context) the
         deletion step is silently skipped.
         """
+        from orb.providers.k8s.reconciliation.timeout_gc import (  # noqa: PLC0415
+            apply_pod_timeout,
+        )
+
         rewritten = apply_pod_timeout(
             instances,
             pod_timeout_seconds=float(self._config.pod_timeout_seconds),
@@ -313,6 +315,9 @@ class K8sHandlerBase(ABC):
         none is available (CLI / synchronous test context).
         """
         import asyncio  # noqa: PLC0415
+        from orb.providers.k8s.reconciliation.timeout_gc import (  # noqa: PLC0415
+            delete_timed_out_pod_async,
+        )
 
         try:
             loop = asyncio.get_running_loop()
