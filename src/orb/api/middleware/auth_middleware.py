@@ -7,6 +7,7 @@ from fastapi import HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from orb.api.middleware._utils import get_real_client_ip
 from orb.infrastructure.adapters.ports.auth import (
     AuthContext,
     AuthPort,
@@ -76,14 +77,12 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Skip authentication for excluded paths (exact match only)
         if self._is_excluded_path(normalized_path):
             self.logger.debug("Skipping auth for excluded path: %s", request.url.path)
-            response = await call_next(request)
-            return self._add_security_headers(response)
+            return await call_next(request)
 
         # Skip authentication if not required and auth is disabled
         if not self.require_auth and not self.auth_port.is_enabled():
             self.logger.debug("Authentication not required and disabled")
-            response = await call_next(request)
-            return self._add_security_headers(response)
+            return await call_next(request)
 
         try:
             # Create authentication context
@@ -110,9 +109,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
             # Continue to next middleware/handler
             response = await call_next(request)
-
-            # Add security headers
-            response = self._add_security_headers(response)
 
             # The token is not echoed back — it was supplied by the client in the
             # Authorization request header and reflecting it in responses would expose
@@ -195,10 +191,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
         """
         Get client IP address.
 
-        X-Forwarded-For is only trusted when the direct client IP is in the
-        configured trusted_proxies list. When trusted_proxies is empty (the
-        default) the direct connection IP is always used, preventing clients
-        from spoofing their IP via the X-Forwarded-For header.
+        Delegates to the shared ``get_real_client_ip`` helper so that the
+        trusted-proxy resolution logic is not duplicated across middleware.
 
         Args:
             request: FastAPI request
@@ -206,14 +200,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         Returns:
             Client IP address
         """
-        direct_ip = request.client.host if request.client else None
-
-        if direct_ip and self.trusted_proxies and direct_ip in self.trusted_proxies:
-            forwarded_for = request.headers.get("x-forwarded-for")
-            if forwarded_for:
-                return forwarded_for.split(",")[0].strip()
-
-        return direct_ip
+        return get_real_client_ip(request, self.trusted_proxies)
 
     def _handle_auth_failure(self, auth_result: AuthResult) -> Response:
         """
@@ -250,46 +237,3 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Invalid credentials"},
                 headers={"WWW-Authenticate": "Bearer"},
             )
-
-    def _add_security_headers(self, response: Response) -> Response:
-        """
-        Add security headers to response.
-
-        Args:
-            response: Response object
-
-        Returns:
-            Response with security headers
-        """
-        # Prevent clickjacking
-        response.headers["X-Frame-Options"] = "DENY"
-
-        # Prevent MIME type sniffing
-        response.headers["X-Content-Type-Options"] = "nosniff"
-
-        # Enable XSS protection
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-
-        # Strict Transport Security (HTTPS only)
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-
-        # Content Security Policy
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
-            "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data:; "
-            "font-src 'self'; "
-            "connect-src 'self'; "
-            "frame-ancestors 'none'"
-        )
-
-        # Referrer Policy
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-
-        # Permissions Policy
-        response.headers["Permissions-Policy"] = (
-            "geolocation=(), microphone=(), camera=(), payment=()"
-        )
-
-        return response

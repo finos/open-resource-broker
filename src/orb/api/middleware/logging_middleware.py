@@ -8,6 +8,40 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from orb.infrastructure.logging.logger import get_logger
 
+# Query-parameter keys that must never appear in logs unredacted.
+_REDACT_QUERY_KEYS: frozenset[str] = frozenset(
+    {
+        "token",
+        "api_key",
+        "apikey",
+        "access_token",
+        "password",
+        "passwd",
+        "secret",
+        "authorization",
+        "auth",
+        "private_key",
+        "client_secret",
+    }
+)
+
+_REDACTED = "[REDACTED]"
+
+
+def _scrub_query_params(params: dict) -> dict:
+    """Return a copy of *params* with sensitive keys replaced by ``[REDACTED]``.
+
+    Key comparison is case-insensitive so ``Token``, ``TOKEN``, and ``token``
+    are all scrubbed.
+
+    Args:
+        params: Raw query-parameter mapping.
+
+    Returns:
+        A new dict safe to include in log output.
+    """
+    return {k: (_REDACTED if k.lower() in _REDACT_QUERY_KEYS else v) for k, v in params.items()}
+
 
 class LoggingMiddleware(BaseHTTPMiddleware):
     """Logging middleware for FastAPI requests."""
@@ -79,9 +113,13 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             user_id,
         )
 
-        # Log query parameters if present
+        # Log query parameters if present — scrub sensitive keys first
         if request.query_params:
-            self.logger.debug("Request %s query params: %s", request_id, dict(request.query_params))
+            self.logger.debug(
+                "Request %s query params: %s",
+                request_id,
+                _scrub_query_params(dict(request.query_params)),
+            )
 
     def _log_response(
         self, request: Request, response: Response, request_id: str, duration: float

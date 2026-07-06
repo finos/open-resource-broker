@@ -1,7 +1,7 @@
 """Request validation utilities for API handlers."""
 
 import json
-from typing import Any, Optional, TypeVar, Union
+from typing import Any, Optional, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
@@ -32,7 +32,7 @@ class ValidationException(Exception):
 
 
 @handle_interface_exceptions(context="request_body_validation", interface_type="api")
-def validate_request_body(model_class: type[T], request_body: Union[str, dict[str, Any]]) -> T:
+def validate_request_body(model_class: type[T], request_body: str | dict[str, Any]) -> T:
     """
     Validate request body against a Pydantic model.
 
@@ -111,7 +111,7 @@ class RequestValidator:
     """Request validator for API handlers."""
 
     @staticmethod
-    def validate(model_class: type[T], request_body: Union[str, dict[str, Any]]) -> T:
+    def validate(model_class: type[T], request_body: str | dict[str, Any]) -> T:
         """
         Validate request body against a Pydantic model.
 

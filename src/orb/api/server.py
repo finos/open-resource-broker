@@ -1,7 +1,8 @@
 """FastAPI server factory and application setup."""
 
+import secrets
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 try:
     from fastapi import Depends, FastAPI
@@ -28,7 +29,148 @@ if TYPE_CHECKING:
 from orb._package import __version__
 from orb.domain.base.exceptions import ConfigurationError
 from orb.infrastructure.auth.registry import get_auth_registry
-from orb.infrastructure.logging.logger import get_logger
+from orb.infrastructure.logging.logger import get_logger, setup_audit_logger
+
+_server_logger = get_logger(__name__)
+
+
+class _LoopbackAdminAuthWrapper:
+    """Thin auth-port wrapper that accepts the loopback-admin token.
+
+    When the daemon's loopback reload IPC sends ``Authorization: Bearer <token>``
+    and that token matches the value written to ``orb-server.token``, this
+    wrapper short-circuits normal JWT validation and grants an admin identity.
+    For every other token it delegates to the real inner strategy unchanged.
+
+    This keeps the loopback capability fully isolated: it never modifies the
+    existing JWT strategy, and the token is only ever read from a file that is
+    mode 0o600 (daemon-UID-only readable).
+
+    The token set is stored as a class attribute so that it is tied to the class
+    object rather than the module namespace.  This survives module reloads in
+    test scenarios (where ``sys.modules["orb.api.server"]`` is mutated) because
+    code that holds a reference to this class always reads the same set regardless
+    of which module object ``orb.api.server`` currently points to.
+    """
+
+    _tokens: ClassVar[set[str]] = set()
+
+    def __init__(self, inner: Any) -> None:
+        self._inner = inner
+        self._logger = get_logger(__name__)
+
+    async def authenticate(self, context: Any) -> Any:
+        from orb.infrastructure.adapters.ports.auth import AuthResult, AuthStatus
+
+        auth_header: str = context.headers.get("authorization", "")
+        if auth_header.startswith("Bearer "):
+            candidate = auth_header[7:].strip()
+            try:
+                candidate_bytes = candidate.encode("ascii") if candidate else b""
+            except UnicodeEncodeError:
+                # Non-ASCII bearer token can never match the loopback secret;
+                # return UNAUTHENTICATED rather than crashing or silently skipping
+                # the auth stamp (which could constitute an auth bypass).
+                return AuthResult(
+                    status=AuthStatus.INVALID,
+                    user_id=None,
+                    user_roles=[],
+                    permissions=[],
+                    error_message="invalid credentials",
+                )
+            if candidate_bytes and any(
+                secrets.compare_digest(candidate_bytes, t.encode("ascii"))
+                for t in _LoopbackAdminAuthWrapper._tokens
+            ):
+                self._logger.debug("loopback-admin token accepted for %s", context.path)
+                return AuthResult(
+                    status=AuthStatus.SUCCESS,
+                    user_id="loopback-admin",
+                    user_roles=["admin"],
+                    permissions=["*"],
+                    metadata={"strategy": "loopback_admin_token"},
+                )
+        return await self._inner.authenticate(context)
+
+    def get_strategy_name(self) -> str:
+        return self._inner.get_strategy_name()
+
+    def is_enabled(self) -> bool:
+        return self._inner.is_enabled()
+
+    # Delegate all other attribute access to the inner strategy.
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+
+def _load_loopback_token(server_config: Any) -> None:
+    """Read the daemon-written loopback-admin token file and register it.
+
+    The token file path mirrors the PID file path: if the PID file is
+    ``<work_dir>/server/orb-server.pid``, the token file is
+    ``<work_dir>/server/orb-server.token``.
+
+    Silently skips if the file does not exist (auth disabled, fresh install,
+    or daemon not yet started).
+    """
+    try:
+        from orb.config.platform_dirs import get_work_location
+
+        pid_file = getattr(server_config, "pid_file", None) or str(
+            get_work_location() / "server" / "orb-server.pid"
+        )
+        token_file = Path(pid_file).with_name(Path(pid_file).stem + ".token")
+        if token_file.exists():
+            token = token_file.read_text(encoding="ascii").strip()
+            if token:
+                _LoopbackAdminAuthWrapper._tokens.add(token)
+                _server_logger.debug("loopback-admin token loaded from %s", token_file)
+    except Exception as exc:
+        _server_logger.debug("loopback-admin token load skipped: %s", exc)
+
+
+class _LoopbackAdminTokenMiddleware:
+    """Always-on middleware that stamps admin identity for valid loopback tokens.
+
+    Runs regardless of whether the primary auth middleware is enabled.  When
+    the request carries ``Authorization: Bearer <token>`` and that token
+    matches the value the daemon wrote to ``<work_dir>/server/orb-server.token``
+    at startup, the middleware stamps ``request.state`` with the admin role so
+    role-guarded routes (POST /machines/request, /admin/*, etc.) accept the
+    call.
+
+    Fall-through (no header, or non-matching token) leaves request state
+    untouched so the ``AuthMiddleware`` (when present) and ``get_current_user``
+    dependency continue to behave as before.
+    """
+
+    def __init__(self, app: Any) -> None:
+        from starlette.middleware.base import BaseHTTPMiddleware
+
+        self._impl = BaseHTTPMiddleware(app, dispatch=self._dispatch)
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        await self._impl(scope, receive, send)
+
+    @staticmethod
+    async def _dispatch(request: Any, call_next: Any) -> Any:
+        auth = request.headers.get("authorization", "")
+        if auth.startswith("Bearer "):
+            candidate = auth[7:].strip()
+            try:
+                candidate_bytes = candidate.encode("ascii") if candidate else b""
+            except UnicodeEncodeError:
+                # Non-ASCII bearer value can never match the loopback secret;
+                # skip the stamp so the request is not erroneously elevated.
+                return await call_next(request)
+            if candidate_bytes and any(
+                secrets.compare_digest(candidate_bytes, t.encode("ascii"))
+                for t in _LoopbackAdminAuthWrapper._tokens
+            ):
+                request.state.user_id = "loopback-admin"
+                request.state.user_roles = ["admin"]
+                request.state.permissions = ["*"]
+        return await call_next(request)
 
 
 def create_fastapi_app(server_config: Any) -> Any:
@@ -67,8 +209,23 @@ def create_fastapi_app(server_config: Any) -> Any:
         server_config = ServerConfig()  # type: ignore[call-arg]
 
     from orb.api.documentation import configure_openapi
-    from orb.api.middleware import AuthMiddleware, LoggingMiddleware
+    from orb.api.middleware import (
+        AuditLogMiddleware,
+        AuthMiddleware,
+        LoggingMiddleware,
+        RateLimitMiddleware,
+        ReadOnlyMiddleware,
+        SecurityHeadersMiddleware,
+    )
     from orb.infrastructure.error.exception_handler import get_exception_handler
+
+    # Install the dedicated audit-log handler early so that audit records
+    # written during middleware setup (e.g. by AuditLogMiddleware) land in the
+    # right place from the first request onward.
+    _audit_log_file: str | None = getattr(server_config, "audit_log_file", None)
+    setup_audit_logger(_audit_log_file)
+    if _audit_log_file:
+        logger.info("orb.audit logger writing to dedicated file: %s", _audit_log_file)
 
     # Create FastAPI app with configuration
     app = FastAPI(  # type: ignore[operator]
@@ -82,9 +239,36 @@ def create_fastapi_app(server_config: Any) -> Any:
 
     logger = get_logger(__name__)
 
-    # Add trusted host middleware if configured
-    if server_config.trusted_hosts and server_config.trusted_hosts != ["*"]:
+    # Warn loudly when auth is disabled but the server is bound to a non-loopback
+    # address — this combination exposes every endpoint without authentication.
+    _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
+    bind_host: str = getattr(server_config, "host", "127.0.0.1") or "127.0.0.1"
+    if not server_config.auth.enabled and bind_host not in _LOOPBACK_HOSTS:
+        logger.warning(
+            "SECURITY WARNING: authentication is DISABLED and the server is bound to '%s' "
+            "(non-loopback). All API endpoints are accessible without credentials. "
+            "Enable authentication (server.auth.enabled=true) before exposing this service "
+            "on a network interface.",
+            bind_host,
+        )
+
+    # Add security headers middleware unconditionally — all responses, including
+    # excluded-auth paths and auth-disabled deployments, must carry hardening headers.
+    app.add_middleware(
+        SecurityHeadersMiddleware,
+        require_https=getattr(server_config, "require_https", False),
+    )
+    logger.info("Security headers middleware enabled")
+
+    # Add trusted host middleware only when an explicit allowlist is provided.
+    # The default is [] (disabled), so omitting this in config is safe.
+    if server_config.trusted_hosts:
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=server_config.trusted_hosts)  # type: ignore[arg-type]
+
+    # Add read-only mode middleware (runs before CORS so preflight OPTIONS still pass freely)
+    if getattr(server_config, "read_only", False):
+        app.add_middleware(ReadOnlyMiddleware, enabled=True)
+        logger.info("Read-only mode middleware enabled")
 
     # Add CORS middleware
     if server_config.cors.enabled:
@@ -96,18 +280,36 @@ def create_fastapi_app(server_config: Any) -> Any:
             allow_headers=server_config.cors.headers,
         )
         logger.info("CORS middleware enabled")
+        if server_config.cors.origins == ["*"] and server_config.auth.enabled:
+            logger.warning(
+                "CORS allows all origins (origins=['*']) with auth enabled — "
+                "consider restricting to known UI origins in production."
+            )
 
     # Add logging middleware
     app.add_middleware(LoggingMiddleware)
     logger.info("Logging middleware enabled")
 
+    # Load the daemon-issued loopback-admin token unconditionally so the CLI's
+    # reload command and the live REST tests can authenticate as admin
+    # regardless of whether the primary auth middleware is enabled.  The
+    # token-only middleware below validates Authorization headers and stamps
+    # request.state with the admin role; if no token (or a non-matching token)
+    # is present, request.state is left untouched and the rest of the pipeline
+    # behaves as before.
+    _load_loopback_token(server_config)
+    app.add_middleware(_LoopbackAdminTokenMiddleware)
+    logger.info("Loopback-admin token middleware enabled")
+
     # Add authentication middleware if enabled
     if server_config.auth.enabled:
         auth_strategy = _create_auth_strategy(server_config.auth)
         if auth_strategy:
+            # Wrap the real strategy so loopback tokens are checked first.
+            auth_port: Any = _LoopbackAdminAuthWrapper(auth_strategy)
             app.add_middleware(
                 AuthMiddleware,
-                auth_port=auth_strategy,
+                auth_port=auth_port,
                 require_auth=True,
                 trusted_proxies=server_config.trusted_proxies,
             )
@@ -119,6 +321,47 @@ def create_fastapi_app(server_config: Any) -> Any:
             raise ConfigurationError(
                 f"Authentication enabled but strategy '{server_config.auth.strategy}' could not be created"
             )
+
+    # Workers count is used by both the rate-limit and SSE multi-worker warnings below.
+    _workers = getattr(server_config, "workers", 1) or 1
+
+    # Add rate-limit middleware (runs inside Auth so user identity is already resolved).
+    # Pass trusted_proxies so the limiter keys on the real client IP rather than the
+    # proxy's IP when requests arrive through a known reverse proxy.
+    rate_limiting_cfg = getattr(server_config, "rate_limiting", None)
+    if rate_limiting_cfg is not None and getattr(rate_limiting_cfg, "enabled", True):
+        app.add_middleware(
+            RateLimitMiddleware,
+            rate_limiting_config=rate_limiting_cfg,
+            trusted_proxies=server_config.trusted_proxies,
+        )
+        _rpm = getattr(rate_limiting_cfg, "requests_per_minute", 300)
+        logger.info(
+            "Rate-limit middleware enabled (%s req/min, burst %s)",
+            _rpm,
+            getattr(rate_limiting_cfg, "burst", 60),
+        )
+        # Rate-limit buckets are per-process: each worker maintains its own
+        # in-memory counter, so the effective limit seen by a single client is
+        # requests_per_minute × workers when requests are spread across processes
+        # by the load balancer.  Warn operators so they can scale the configured
+        # limit down (divide by workers) or move to a shared backend limiter.
+        if _workers > 1:
+            logger.warning(
+                "MULTI_WORKER_RATE_LIMIT: server.workers=%d but rate-limit buckets are "
+                "per-process. The effective per-client limit is %d req/min × %d workers = "
+                "%d req/min. Divide requests_per_minute by the worker count or use a "
+                "shared rate-limit backend to enforce the intended per-client cap.",
+                _workers,
+                _rpm,
+                _workers,
+                _rpm * _workers,
+            )
+
+    # Add audit-log middleware (innermost — status_code and latency are most accurate here)
+    if getattr(server_config, "audit_log_enabled", True):
+        app.add_middleware(AuditLogMiddleware)
+        logger.info("Audit-log middleware enabled")
 
     # Add global exception handler
     exception_handler = get_exception_handler()
@@ -203,7 +446,6 @@ def create_fastapi_app(server_config: Any) -> Any:
             "version": __version__,
             "description": "REST API for Open Resource Broker",
             "auth_enabled": server_config.auth.enabled,
-            "auth_strategy": (server_config.auth.strategy if server_config.auth.enabled else None),
         }
 
     # Serve favicon from project logo assets
@@ -218,6 +460,24 @@ def create_fastapi_app(server_config: Any) -> Any:
 
     # Register API routers
     _register_routers(app)
+
+    # Warn when multiple uvicorn workers are configured alongside the SSE
+    # events router.  The in-process pubsub (SseEventBus) is not shared across
+    # worker processes, so events published in one worker are invisible to
+    # subscribers connected to a different worker.  This is a data-loss risk,
+    # not an error — operators may have valid reasons (e.g. a shared queue
+    # upstream), so we warn but do not refuse to start.
+    if _workers > 1:
+        _registered_routes = {getattr(r, "path", "") for r in app.routes}
+        _has_events_route = any("/events" in p for p in _registered_routes)
+        if _has_events_route:
+            logger.warning(
+                "MULTI_WORKER_SSE: server.workers=%d but the SSE events router is registered. "
+                "The in-process event queue is NOT shared across worker processes — SSE "
+                "subscribers may silently miss events published by other workers. "
+                "Set server.workers=1 or route SSE through a shared pub/sub backend.",
+                _workers,
+            )
 
     # Configure OpenAPI documentation
     configure_openapi(app, server_config)
@@ -264,11 +524,29 @@ def _register_routers(app: Any) -> None:
         app: FastAPI application
     """
     try:
-        from orb.api.routers import machines, requests, templates
+        from orb.api.routers import (
+            admin,
+            config,
+            events,
+            machines,
+            me,
+            observability,
+            providers,
+            requests,
+            system,
+            templates,
+        )
 
         app.include_router(templates.router, prefix="/api/v1")
         app.include_router(machines.router, prefix="/api/v1")
         app.include_router(requests.router, prefix="/api/v1")
+        app.include_router(system.router, prefix="/api/v1")
+        app.include_router(events.router, prefix="/api/v1")
+        app.include_router(me.router, prefix="/api/v1")
+        app.include_router(observability.router, prefix="/api/v1")
+        app.include_router(providers.router, prefix="/api/v1")
+        app.include_router(admin.router, prefix="/api/v1")
+        app.include_router(config.router, prefix="/api/v1")
 
     except ImportError as e:
         logger = get_logger(__name__)
