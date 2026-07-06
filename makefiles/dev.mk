@@ -126,6 +126,9 @@ test-providers-aws-moto: dev-install  ## Run AWS moto (mocked) tests only
 test-providers-aws-live: dev-install  ## Run AWS live tests (requires real AWS credentials; parallel by default)
 	@uv run --extra api pytest --no-cov -q -ra -n $(PYTEST_WORKERS) --live tests/providers/aws/live
 
+test-providers-k8s-live: dev-install  ## Run k8s live tests (requires a real Kubernetes cluster)
+	@uv run --extra k8s pytest --no-cov -q -ra --run-k8s tests/providers/k8s/live
+
 test-architecture: dev-install  ## Run architecture compliance tests
 	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/unit/architecture tests/unit/test_architectural_compliance.py
 

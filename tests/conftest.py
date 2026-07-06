@@ -17,6 +17,12 @@ def pytest_addoption(parser):
         help="Enable tests under tests/providers/<name>/live/ (require real credentials)",
     )
     parser.addoption(
+        "--run-k8s",
+        action="store_true",
+        default=False,
+        help="Enable live tests under tests/providers/k8s/live/ (require a real Kubernetes cluster)",
+    )
+    parser.addoption(
         "--no-mocked",
         action="store_true",
         default=False,
@@ -34,6 +40,12 @@ def pytest_addoption(parser):
         default=False,
         help="Keep per-test run_templates directories after test (for log inspection)",
     )
+    parser.addoption(
+        "--run-slow",
+        action="store_true",
+        default=False,
+        help="Run tests marked ``slow`` (e.g. GC tests with long grace-period waits)",
+    )
 
 
 def _is_live_test(item) -> bool:
@@ -48,6 +60,12 @@ def _is_moto_test(item) -> bool:
     return "/providers/" in path and "/moto/" in path
 
 
+def _is_k8s_live_test(item: pytest.Item) -> bool:
+    """Return True when the test lives under tests/providers/k8s/live/."""
+    path = str(item.fspath)
+    return "/providers/k8s/" in path and "/live/" in path
+
+
 def pytest_collection_modifyitems(config, items):
     # Live tests require real AWS credentials and a real account: they must be
     # opted into explicitly with --live (or --run-aws).  We deliberately do NOT
@@ -58,11 +76,15 @@ def pytest_collection_modifyitems(config, items):
     # file.  The path-based shortcut also makes it dangerously easy for an
     # operator to launch real AWS provisioning by accident.
     live_enabled = config.getoption("--live") or config.getoption("--run-aws")
+    k8s_live_enabled = config.getoption("--run-k8s", default=False)
     no_mocked = config.getoption("--no-mocked")
     provider_filter = config.getoption("--provider")
 
     skip_live = pytest.mark.skip(
         reason="requires real credentials — pass --live (or --run-aws) to run"
+    )
+    skip_k8s_live = pytest.mark.skip(
+        reason="requires a real Kubernetes cluster — pass --run-k8s to run"
     )
     skip_mocked = pytest.mark.skip(reason="moto tests skipped — remove --no-mocked to run")
     skip_provider = pytest.mark.skip(reason=f"filtered to --provider {provider_filter}")
@@ -89,8 +111,14 @@ def pytest_collection_modifyitems(config, items):
             if "/providers/" in path:
                 item.add_marker(skip_provider)
 
-        # Live gate
-        if _is_live_test(item) and not live_enabled:
+        # k8s live gate — checked before the generic live gate so it gets its
+        # own skip reason and its own opt-in flag.
+        if _is_k8s_live_test(item) and not k8s_live_enabled:
+            item.add_marker(skip_k8s_live)
+            continue
+
+        # Live gate (AWS / generic)
+        if _is_live_test(item) and not _is_k8s_live_test(item) and not live_enabled:
             item.add_marker(skip_live)
             continue
 
