@@ -591,7 +591,11 @@ classmethod-decorators = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["PLC0415"]  # Allow conditional imports in tests for optional dependencies
+"tests/**/*.py" = [
+    "PLC0415",  # Allow conditional imports in tests for optional dependencies
+    "N803",     # Allow PascalCase argument names (e.g. StateClass helper)
+    "N806",     # Allow PascalCase local names for dynamically-constructed test subclasses
+]
 
 [tool.ruff.format]
 quote-style = "double"

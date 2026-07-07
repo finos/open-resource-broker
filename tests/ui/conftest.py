@@ -31,7 +31,7 @@ def _make_rx_stub() -> types.ModuleType:
     class _LocalStorage(str):
         """Behaves like a str default value but carries the storage key."""
 
-        def __new__(cls, default: str = "", *, name: str = "") -> "_LocalStorage":
+        def __new__(cls, default: str = "", *, name: str = "") -> _LocalStorage:
             return str.__new__(cls, default)
 
         def __init__(self, default: str = "", *, name: str = "") -> None:

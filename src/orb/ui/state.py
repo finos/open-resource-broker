@@ -83,6 +83,25 @@ class AppState(rx.State):
     # 15s, causing visible status flicker and websocket churn.
     _poll_started: bool = False
 
+    async def _poll_health_tick(self) -> None:
+        """Execute a single health-poll iteration: fetch health + info, update state.
+
+        Extracted from the ``poll_health`` background loop so tests can call it
+        directly without needing to run the full infinite-loop coroutine.
+        The ``async with self:`` block is retained so the method works correctly
+        whether called in a test (with the no-op CM subclass) or inside the real
+        Reflex event loop.
+        """
+        async with self:
+            try:
+                self.health = await api.get_health()
+                self.info = await api.get_info()
+                self.health_error = ""
+            except httpx.HTTPError as e:
+                self.health_error = str(e)
+            except Exception as e:
+                self.health_error = str(e)
+
     @rx.event(background=True)
     async def poll_health(self):
         # Single-flight guard so re-mounting a page doesn't spawn a
@@ -92,18 +111,10 @@ class AppState(rx.State):
                 return
             self._poll_started = True
         try:
-            while True:
-                async with self:
-                    try:
-                        self.health = await api.get_health()
-                        self.info = await api.get_info()
-                        self.health_error = ""
-                    except httpx.HTTPError as e:
-                        self.health_error = str(e)
-                    except Exception as e:
-                        self.health_error = str(e)
-                import asyncio
+            import asyncio
 
+            while True:
+                await self._poll_health_tick()
                 await asyncio.sleep(15)
         finally:
             async with self:

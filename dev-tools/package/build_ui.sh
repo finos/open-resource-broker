@@ -121,6 +121,18 @@ if [ ! -f "$STATIC_DIR/index.html" ]; then
     exit 1
 fi
 
+# Verify the SPA bundle baked the expected backend port. If someone runs
+# ORB_UI_BACKEND_PORT=<other> make ui-build the resulting bundle only
+# works on that port; catching this at build-time is easier than
+# debugging a broken deployment.
+EXPECTED_PORT="${ORB_UI_BACKEND_PORT:-8000}"
+BUNDLE_ENV=$(find src/orb/ui/_static/assets -name "reflex-env-*.js" 2>/dev/null | head -1)
+if [ -n "$BUNDLE_ENV" ] && ! grep -q "localhost:${EXPECTED_PORT}" "$BUNDLE_ENV"; then
+    echo "ERROR: SPA bundle does not reference localhost:${EXPECTED_PORT}" >&2
+    echo "       (Rxconfig may have baked a wrong api_url; check ORB_UI_BACKEND_PORT.)" >&2
+    exit 1
+fi
+
 log "SUCCESS: Static bundle written to $STATIC_DIR/"
 if [ "$QUIET" = false ]; then
     du -sh "$STATIC_DIR" 2>/dev/null || true
