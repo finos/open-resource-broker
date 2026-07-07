@@ -160,7 +160,7 @@ def create_k8s_strategy(provider_config: Any) -> Any:
         native_spec_service = None
         try:
             from orb.application.services.native_spec_service import (
-                NativeSpecService,  # noqa: PLC0415
+                NativeSpecService,
             )
             from orb.infrastructure.di.container import get_container
 
@@ -234,7 +234,7 @@ def create_k8s_validator(provider_config: Any = None) -> Any:
         instance.
     """
     from orb.providers.k8s.validation.template_validator import (
-        K8sTemplateValidator,  # noqa: PLC0415
+        K8sTemplateValidator,
     )
 
     return K8sTemplateValidator()
@@ -260,7 +260,7 @@ def register_k8s_provider_settings() -> None:
         raise RuntimeError(f"Failed to register Kubernetes provider settings: {exc!s}")
 
 
-def register_k8s_extensions(logger: "Optional[LoggingPort]" = None) -> None:
+def register_k8s_extensions(logger: Optional[LoggingPort] = None) -> None:
     """Register template-DTO extensions with the global template extension registry.
 
     Registers :class:`K8sTemplateDTOConfig` as the typed
@@ -300,7 +300,7 @@ def get_k8s_extension_defaults() -> dict[str, Any]:
     return K8sTemplateExtensionConfig().to_template_defaults()  # type: ignore[call-arg]
 
 
-def register_k8s_auth_strategies(logger: "Optional[LoggingPort]" = None) -> None:
+def register_k8s_auth_strategies(logger: Optional[LoggingPort] = None) -> None:
     """Register Kubernetes auth strategies with the auth registry.
 
     The kubernetes provider does not currently ship an inbound HTTP auth
@@ -319,7 +319,7 @@ def register_k8s_auth_strategies(logger: "Optional[LoggingPort]" = None) -> None
 
 
 def register_k8s_template_factory(
-    factory: "TemplateFactory", logger: "Optional[LoggingPort]" = None
+    factory: TemplateFactory, logger: Optional[LoggingPort] = None
 ) -> None:
     """Register the Kubernetes template class with the template factory.
 
@@ -328,7 +328,7 @@ def register_k8s_template_factory(
     importing this module unconditionally.
     """
     try:
-        from orb.providers.k8s.domain.template.k8s_template import (  # noqa: PLC0415
+        from orb.providers.k8s.domain.template.k8s_template import (
             K8sTemplate,
         )
 
@@ -355,8 +355,8 @@ def register_k8s_template_factory(
 
 
 def register_k8s_provider(
-    registry: "Optional[ProviderRegistry]" = None,
-    logger: "Optional[LoggingPort]" = None,
+    registry: Optional[ProviderRegistry] = None,
+    logger: Optional[LoggingPort] = None,
     instance_name: Optional[str] = None,
 ) -> None:
     """Register the Kubernetes provider with the provider registry.
@@ -474,8 +474,8 @@ def register_k8s_provider_instance(provider_instance, logger=None) -> bool:
 
 
 def initialize_k8s_provider(
-    template_factory: "Optional[TemplateFactory]" = None,
-    logger: "Optional[LoggingPort]" = None,
+    template_factory: Optional[TemplateFactory] = None,
+    logger: Optional[LoggingPort] = None,
 ) -> None:
     """Initialize Kubernetes provider components.
 
@@ -576,7 +576,7 @@ def register_k8s_services_with_di(container) -> None:
 
     with suppress(ImportError):
         from orb.domain.base.ports.configuration_port import ConfigurationPort
-        from orb.providers.k8s.infrastructure.services.k8s_native_spec_service import (  # noqa: PLC0415
+        from orb.providers.k8s.infrastructure.services.k8s_native_spec_service import (
             K8sNativeSpecService,
         )
 
@@ -585,7 +585,7 @@ def register_k8s_services_with_di(container) -> None:
             # to this factory closure so the providers layer does not carry a
             # static providers→application dependency.
             from orb.application.services.native_spec_service import (
-                NativeSpecService,  # noqa: PLC0415
+                NativeSpecService,
             )
 
             return K8sNativeSpecService(
@@ -599,10 +599,10 @@ def register_k8s_services_with_di(container) -> None:
     # Register the Kubernetes template example generator into the per-provider
     # registry.  The suppress guard is retained for defensive resilience only.
     with suppress(ImportError):
-        from orb.infrastructure.registry.template_example_generator_registry import (  # noqa: PLC0415
+        from orb.infrastructure.registry.template_example_generator_registry import (
             TemplateExampleGeneratorRegistry,
         )
-        from orb.providers.k8s.adapters.template_example_generator_adapter import (  # noqa: PLC0415
+        from orb.providers.k8s.adapters.template_example_generator_adapter import (
             create_k8s_template_example_generator,
         )
 

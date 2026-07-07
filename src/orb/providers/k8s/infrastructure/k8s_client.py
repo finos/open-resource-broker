@@ -53,7 +53,7 @@ _T = TypeVar("_T")
 def _is_401(exc: BaseException) -> bool:
     """Return ``True`` when *exc* is an ``ApiException`` with status 401."""
     try:
-        from kubernetes.client.exceptions import ApiException  # noqa: PLC0415
+        from kubernetes.client.exceptions import ApiException
     except ImportError:  # pragma: no cover
         return False
     return isinstance(exc, ApiException) and getattr(exc, "status", None) == 401
@@ -76,15 +76,15 @@ class K8sClient:
         self,
         config: K8sProviderConfig,
         logger: LoggingPort,
-        api_client: "Optional[ApiClient]" = None,
+        api_client: Optional[ApiClient] = None,
         token_refresh_seconds: Optional[int] = None,
     ) -> None:
         self._config = config
         self._logger = logger
-        self._api_client: "Optional[ApiClient]" = api_client
-        self._core_v1: "Optional[CoreV1Api]" = None
-        self._apps_v1: "Optional[AppsV1Api]" = None
-        self._batch_v1: "Optional[BatchV1Api]" = None
+        self._api_client: Optional[ApiClient] = api_client
+        self._core_v1: Optional[CoreV1Api] = None
+        self._apps_v1: Optional[AppsV1Api] = None
+        self._batch_v1: Optional[BatchV1Api] = None
 
         # Auth adapter — only populated for in-cluster auth; None for kubeconfig
         # auth (kubeconfig credentials are typically long-lived certificates).
@@ -212,11 +212,11 @@ class K8sClient:
             adapter = self._in_cluster_adapter
             if adapter is not None:
                 try:
-                    import time  # noqa: PLC0415
+                    import time
 
                     load_in_cluster_config()
                     # Update the adapter's timestamp so the TTL window resets.
-                    adapter._last_loaded_at = time.monotonic()  # noqa: SLF001
+                    adapter._last_loaded_at = time.monotonic()
                 except K8sAuthError as auth_exc:
                     self._logger.error("K8sClient: token refresh on 401 failed: %s", auth_exc)
                     raise exc from None
@@ -228,12 +228,12 @@ class K8sClient:
     # ------------------------------------------------------------------
 
     @property
-    def api_client(self) -> "ApiClient":
+    def api_client(self) -> ApiClient:
         """Return the underlying ``kubernetes.client.ApiClient``, building one on demand."""
         if self._api_client is None:
             self.load_config()
             try:
-                from kubernetes.client.api_client import ApiClient as _ApiClient  # noqa: PLC0415
+                from kubernetes.client.api_client import ApiClient as _ApiClient
             except ImportError as exc:  # pragma: no cover — extra not installed
                 raise K8sAuthError(
                     "kubernetes SDK is not installed; install with `pip install orb-py[k8s]`"
@@ -242,28 +242,28 @@ class K8sClient:
         return self._api_client
 
     @property
-    def core_v1(self) -> "CoreV1Api":
+    def core_v1(self) -> CoreV1Api:
         """Lazy ``CoreV1Api`` accessor (pods, services, namespaces, nodes)."""
         if self._core_v1 is None:
-            from kubernetes.client import CoreV1Api as _CoreV1Api  # noqa: PLC0415
+            from kubernetes.client import CoreV1Api as _CoreV1Api
 
             self._core_v1 = _CoreV1Api(self.api_client)
         return self._core_v1
 
     @property
-    def apps_v1(self) -> "AppsV1Api":
+    def apps_v1(self) -> AppsV1Api:
         """Lazy ``AppsV1Api`` accessor (Deployment, StatefulSet)."""
         if self._apps_v1 is None:
-            from kubernetes.client import AppsV1Api as _AppsV1Api  # noqa: PLC0415
+            from kubernetes.client import AppsV1Api as _AppsV1Api
 
             self._apps_v1 = _AppsV1Api(self.api_client)
         return self._apps_v1
 
     @property
-    def batch_v1(self) -> "BatchV1Api":
+    def batch_v1(self) -> BatchV1Api:
         """Lazy ``BatchV1Api`` accessor (Job, CronJob)."""
         if self._batch_v1 is None:
-            from kubernetes.client import BatchV1Api as _BatchV1Api  # noqa: PLC0415
+            from kubernetes.client import BatchV1Api as _BatchV1Api
 
             self._batch_v1 = _BatchV1Api(self.api_client)
         return self._batch_v1

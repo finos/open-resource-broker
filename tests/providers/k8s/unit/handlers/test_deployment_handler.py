@@ -289,7 +289,6 @@ async def test_release_hosts_partial_annotation_failure_minority_proceeds() -> N
     def _patch(*, name: str, namespace: str, body: Any) -> None:
         if name in _fail_pods:
             raise ApiException(status=503, reason="Service Unavailable")
-        return None
 
     core_v1.patch_namespaced_pod.side_effect = _patch
     apps_v1 = MagicMock()
@@ -327,7 +326,6 @@ async def test_release_hosts_partial_annotation_failure_majority_aborts() -> Non
     def _patch(*, name: str, namespace: str, body: Any) -> None:
         if name in _fail_pods:
             raise ApiException(status=503, reason="Service Unavailable")
-        return None
 
     core_v1.patch_namespaced_pod.side_effect = _patch
     apps_v1 = MagicMock()

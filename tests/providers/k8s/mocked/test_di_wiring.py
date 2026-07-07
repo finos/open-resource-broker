@@ -33,14 +33,14 @@ def _make_logger() -> Any:
 
 
 def _make_k8s_config(namespace: str = "orb-test") -> Any:
-    from orb.providers.k8s.configuration.config import K8sProviderConfig  # noqa: PLC0415
+    from orb.providers.k8s.configuration.config import K8sProviderConfig
 
     return K8sProviderConfig(namespace=namespace)  # type: ignore[call-arg]
 
 
 def _make_fake_k8s_client() -> Any:
     """Return a MagicMock that looks like a K8sClient with a functional core_v1."""
-    from types import SimpleNamespace  # noqa: PLC0415
+    from types import SimpleNamespace
 
     mock_client = MagicMock()
     # Health check calls core_v1.get_api_resources()
@@ -58,7 +58,7 @@ def _make_fake_k8s_client() -> Any:
 def test_k8s_strategy_initialises() -> None:
     """K8sProviderStrategy.initialize() returns True with a mocked K8sClient."""
     from orb.providers.k8s.strategy.k8s_provider_strategy import (
-        K8sProviderStrategy,  # noqa: PLC0415
+        K8sProviderStrategy,
     )
 
     strategy = K8sProviderStrategy(
@@ -76,13 +76,13 @@ def test_k8s_strategy_initialises() -> None:
 
 def test_handler_registry_resolves_pod_handler() -> None:
     """K8sHandlerRegistry resolves a K8sPodHandler for provider_api='Pod'."""
-    from orb.providers.k8s.infrastructure.handlers.pod_handler import K8sPodHandler  # noqa: PLC0415
-    from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry  # noqa: PLC0415
+    from orb.providers.k8s.infrastructure.handlers.pod_handler import K8sPodHandler
+    from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
 
     registry = K8sHandlerRegistry(
         config=_make_k8s_config(),
         logger=_make_logger(),
-        client_provider=lambda: _make_fake_k8s_client(),
+        client_provider=_make_fake_k8s_client,
         watch_manager_provider=lambda: None,
         plugin_factories=lambda: {},
         native_spec_service_provider=lambda: None,
@@ -95,15 +95,15 @@ def test_handler_registry_resolves_pod_handler() -> None:
 
 def test_handler_registry_resolves_deployment_handler() -> None:
     """K8sHandlerRegistry resolves a K8sDeploymentHandler for provider_api='Deployment'."""
-    from orb.providers.k8s.infrastructure.handlers.deployment_handler import (  # noqa: PLC0415
+    from orb.providers.k8s.infrastructure.handlers.deployment_handler import (
         K8sDeploymentHandler,
     )
-    from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry  # noqa: PLC0415
+    from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
 
     registry = K8sHandlerRegistry(
         config=_make_k8s_config(),
         logger=_make_logger(),
-        client_provider=lambda: _make_fake_k8s_client(),
+        client_provider=_make_fake_k8s_client,
         watch_manager_provider=lambda: None,
         plugin_factories=lambda: {},
         native_spec_service_provider=lambda: None,
@@ -115,15 +115,15 @@ def test_handler_registry_resolves_deployment_handler() -> None:
 
 def test_handler_registry_resolves_statefulset_handler() -> None:
     """K8sHandlerRegistry resolves a K8sStatefulSetHandler for provider_api='StatefulSet'."""
-    from orb.providers.k8s.infrastructure.handlers.statefulset_handler import (  # noqa: PLC0415
+    from orb.providers.k8s.infrastructure.handlers.statefulset_handler import (
         K8sStatefulSetHandler,
     )
-    from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry  # noqa: PLC0415
+    from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
 
     registry = K8sHandlerRegistry(
         config=_make_k8s_config(),
         logger=_make_logger(),
-        client_provider=lambda: _make_fake_k8s_client(),
+        client_provider=_make_fake_k8s_client,
         watch_manager_provider=lambda: None,
         plugin_factories=lambda: {},
         native_spec_service_provider=lambda: None,
@@ -135,13 +135,13 @@ def test_handler_registry_resolves_statefulset_handler() -> None:
 
 def test_handler_registry_resolves_job_handler() -> None:
     """K8sHandlerRegistry resolves a K8sJobHandler for provider_api='Job'."""
-    from orb.providers.k8s.infrastructure.handlers.job_handler import K8sJobHandler  # noqa: PLC0415
-    from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry  # noqa: PLC0415
+    from orb.providers.k8s.infrastructure.handlers.job_handler import K8sJobHandler
+    from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
 
     registry = K8sHandlerRegistry(
         config=_make_k8s_config(),
         logger=_make_logger(),
-        client_provider=lambda: _make_fake_k8s_client(),
+        client_provider=_make_fake_k8s_client,
         watch_manager_provider=lambda: None,
         plugin_factories=lambda: {},
         native_spec_service_provider=lambda: None,
@@ -158,7 +158,7 @@ def test_handler_registry_resolves_job_handler() -> None:
 
 def test_resolved_handlers_have_kubernetes_client() -> None:
     """All four handler types have a non-None kubernetes_client after registry construction."""
-    from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry  # noqa: PLC0415
+    from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
 
     fake_client = _make_fake_k8s_client()
     registry = K8sHandlerRegistry(
@@ -185,9 +185,9 @@ def test_resolved_handlers_have_kubernetes_client() -> None:
 
 def test_strategy_capabilities_cover_all_apis() -> None:
     """K8sProviderStrategy.get_capabilities returns all four provider APIs."""
-    from orb.providers.base.strategy import ProviderOperationType  # noqa: PLC0415
+    from orb.providers.base.strategy import ProviderOperationType
     from orb.providers.k8s.strategy.k8s_provider_strategy import (
-        K8sProviderStrategy,  # noqa: PLC0415
+        K8sProviderStrategy,
     )
 
     strategy = K8sProviderStrategy(
@@ -210,7 +210,7 @@ def test_strategy_capabilities_cover_all_apis() -> None:
 
 def test_template_adapter_constructed_with_mocked_client() -> None:
     """K8sTemplateAdapter can be built without a real cluster."""
-    from orb.providers.k8s.infrastructure.adapters.template_adapter import (  # noqa: PLC0415
+    from orb.providers.k8s.infrastructure.adapters.template_adapter import (
         K8sTemplateAdapter,
     )
 
@@ -232,7 +232,7 @@ def test_template_adapter_constructed_with_mocked_client() -> None:
 
 def test_handler_registry_generates_example_templates() -> None:
     """K8sHandlerRegistry.generate_example_templates returns at least one template per API."""
-    from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry  # noqa: PLC0415
+    from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
 
     templates = K8sHandlerRegistry.generate_example_templates()
 

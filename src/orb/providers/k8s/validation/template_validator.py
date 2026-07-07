@@ -275,7 +275,7 @@ def _is_k8s_toleration(obj: Any) -> bool:
     """Return True when *obj* is an instance of K8sToleration."""
     # Avoid importing at module level to keep the validator lightweight.
     try:
-        from orb.providers.k8s.domain.template.k8s_template import K8sToleration  # noqa: PLC0415
+        from orb.providers.k8s.domain.template.k8s_template import K8sToleration
 
         return isinstance(obj, K8sToleration)
     except ImportError:
@@ -288,11 +288,11 @@ def _validate_toleration_dict(entry: dict[str, Any], label: str) -> Optional[str
     Returns an error string on failure or ``None`` on success.
     """
     try:
-        from orb.providers.k8s.domain.template.k8s_template import K8sToleration  # noqa: PLC0415
+        from orb.providers.k8s.domain.template.k8s_template import K8sToleration
 
         K8sToleration.model_validate(entry)
         return None
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"{label}: invalid toleration entry — {exc}"
 
 

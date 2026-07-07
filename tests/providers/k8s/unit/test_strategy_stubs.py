@@ -396,7 +396,7 @@ def test_stop_watch_manager_blocks_until_stop_completes_from_foreign_thread() ->
 
     loop = loop_ref[0]
     # Patch the loop onto the strategy so _stop_watch_manager_sync sees it.
-    import unittest.mock as mock
+    from unittest import mock
 
     with mock.patch(
         "orb.providers.k8s.strategy.k8s_provider_strategy.asyncio.get_running_loop",
@@ -455,7 +455,7 @@ def test_stop_watch_manager_respects_timeout_from_foreign_thread() -> None:
     assert loop_ready.wait(timeout=5), "background loop did not start in time"
 
     loop = loop_ref[0]
-    import unittest.mock as mock
+    from unittest import mock
 
     with mock.patch(
         "orb.providers.k8s.strategy.k8s_provider_strategy.asyncio.get_running_loop",
@@ -466,7 +466,7 @@ def test_stop_watch_manager_respects_timeout_from_foreign_thread() -> None:
 
     warning_calls = [str(c) for c in mock_logger.warning.call_args_list]
     assert any("did not stop" in msg for msg in warning_calls), (
-        "Expected a timeout warning; got: %s" % warning_calls
+        f"Expected a timeout warning; got: {warning_calls}"
     )
 
     # Unblock slow_stop and the loop_main coroutines, then stop the loop.
@@ -490,7 +490,7 @@ def test_stop_watch_manager_no_loop_runs_synchronously() -> None:
     strategy = _make_strategy_no_init()
     strategy._watch_manager = fake_manager  # type: ignore[attr-defined]
 
-    import unittest.mock as mock
+    from unittest import mock
 
     with mock.patch(
         "orb.providers.k8s.strategy.k8s_provider_strategy.asyncio.get_running_loop",

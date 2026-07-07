@@ -34,8 +34,8 @@ def _make_request(
     deployment_name: str | None = None,
     namespace: str = "orb-test",
 ) -> Any:
-    from orb.domain.request.aggregate import Request  # noqa: PLC0415
-    from orb.domain.request.value_objects import RequestId, RequestType  # noqa: PLC0415
+    from orb.domain.request.aggregate import Request
+    from orb.domain.request.value_objects import RequestId, RequestType
 
     provider_data: dict[str, Any] = {"namespace": namespace}
     if deployment_name:
@@ -52,7 +52,7 @@ def _make_request(
 
 
 def _make_template(namespace: str = "orb-test") -> Any:
-    from orb.domain.template.template_aggregate import Template  # noqa: PLC0415
+    from orb.domain.template.template_aggregate import Template
 
     return Template(
         template_id="tpl-1",
@@ -72,7 +72,7 @@ def _make_template(namespace: str = "orb-test") -> Any:
 
 def _make_deployment_handler(k8s_client_facade: Any, k8s_config: Any) -> Any:
     from orb.providers.k8s.infrastructure.handlers.deployment_handler import (
-        K8sDeploymentHandler,  # noqa: PLC0415
+        K8sDeploymentHandler,
     )
 
     return K8sDeploymentHandler(
@@ -84,7 +84,7 @@ def _make_deployment_handler(k8s_client_facade: Any, k8s_config: Any) -> Any:
 
 def _register_deployments_resource(kmock_k8s: KubernetesEmulator) -> Any:
     """Register the apps/v1/deployments resource in kmock so API discovery works."""
-    from kmock import resource  # noqa: PLC0415
+    from kmock import resource
 
     dep_res = resource("apps", "v1", "deployments")
     kmock_k8s.resources[dep_res] = {
@@ -106,7 +106,7 @@ def _preload_deployment(
     namespace: str = "orb-test",
     spec_replicas: int = 3,
 ) -> None:
-    from kmock import resource  # noqa: PLC0415
+    from kmock import resource
 
     dep_res = resource("apps", "v1", "deployments")
     # The kubernetes SDK's V1DeploymentSpec model requires `selector`; include
@@ -140,7 +140,7 @@ def _preload_pod(
     name: str,
     namespace: str = "orb-test",
 ) -> None:
-    from kmock import resource  # noqa: PLC0415
+    from kmock import resource
 
     pod_res = resource("", "v1", "pods")
     # V1PodSpec requires containers; include a minimal container definition
@@ -242,7 +242,7 @@ async def test_deployment_handler_selective_release_annotates_and_patches_replic
     handler did at minimum PATCH the victim pods.  The replicas patch is verified
     indirectly via the request log.
     """
-    from kmock import resource  # noqa: PLC0415
+    from kmock import resource
 
     dep_name = f"orb-{str(uuid.uuid4())[:8]}"
     _register_deployments_resource(kmock_k8s)
@@ -301,7 +301,7 @@ def _preload_deployment_pods(
     ready: bool = True,
 ) -> list[str]:
     """Seed kmock with pods belonging to a Deployment-managed request."""
-    from kmock import resource  # noqa: PLC0415
+    from kmock import resource
 
     pod_res = resource("", "v1", "pods")
     names = []
@@ -342,8 +342,8 @@ def _make_request_with_id(
     namespace: str = "orb-test",
 ) -> Any:
     """Build a real Request aggregate with the given string request_id."""
-    from orb.domain.request.aggregate import Request  # noqa: PLC0415
-    from orb.domain.request.value_objects import RequestId, RequestType  # noqa: PLC0415
+    from orb.domain.request.aggregate import Request
+    from orb.domain.request.value_objects import RequestId, RequestType
 
     provider_data: dict[str, Any] = {"namespace": namespace}
     if deployment_name:
@@ -372,9 +372,9 @@ async def test_deployment_handler_check_status_running_pods(
     roll-up math only.  The handler must not raise when the Deployment is absent
     (pre-create or post-release race).
     """
-    import asyncio  # noqa: PLC0415
+    import asyncio
 
-    from kmock import resource  # noqa: PLC0415
+    from kmock import resource
 
     request_id = f"req-{uuid.uuid4()}"
     dep_name = f"orb-{str(uuid.uuid4())[:8]}"
@@ -428,9 +428,9 @@ async def test_deployment_handler_check_status_no_pods_returns_in_progress(
     k8s_config: Any,
 ) -> None:
     """check_hosts_status with no pods returns in_progress (Deployment still scaling up)."""
-    import asyncio  # noqa: PLC0415
+    import asyncio
 
-    from kmock import resource  # noqa: PLC0415
+    from kmock import resource
 
     request_id = f"req-{uuid.uuid4()}"
     dep_name = f"orb-{str(uuid.uuid4())[:8]}"

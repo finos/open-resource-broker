@@ -26,7 +26,7 @@ on the parent type is preserved and every k8s-specific field is
 from __future__ import annotations
 
 import re
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -129,7 +129,7 @@ class K8sEnvVar(BaseModel):
     value_from: Optional[K8sEnvVarSource] = Field(default=None, alias="valueFrom")
 
     @model_validator(mode="after")
-    def _validate_value_or_value_from(self) -> "K8sEnvVar":
+    def _validate_value_or_value_from(self) -> K8sEnvVar:
         if self.value is not None and self.value_from is not None:
             raise ValueError("K8sEnvVar accepts either 'value' or 'value_from', not both")
         return self
@@ -509,7 +509,7 @@ class K8sTemplate(Template):
     # ------------------------------------------------------------------
 
     @model_validator(mode="after")
-    def _promote_extensions_and_defaults(self) -> "K8sTemplate":
+    def _promote_extensions_and_defaults(self) -> K8sTemplate:
         """Promote DTO-config dict + apply the service-account fallback.
 
         Two responsibilities:
@@ -672,7 +672,7 @@ class K8sTemplate(Template):
 # ---------------------------------------------------------------------------
 
 
-def upcast_to_k8s_template(template: Union[Template, "K8sTemplate"]) -> K8sTemplate:
+def upcast_to_k8s_template(template: Template | K8sTemplate) -> K8sTemplate:
     """Return a :class:`K8sTemplate` view of ``template``.
 
     When ``template`` is already a :class:`K8sTemplate` it is returned

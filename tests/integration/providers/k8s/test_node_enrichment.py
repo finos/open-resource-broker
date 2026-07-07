@@ -196,6 +196,9 @@ async def test_cache_fed_get_status_includes_node_metadata() -> None:
     mock_watcher.is_running.return_value = True
     strategy._watch_manager._watchers = [mock_watcher]
     strategy._watch_manager._started = True
+    # is_healthy() gates on _first_sync_complete since the reconciler-driven
+    # cold-start fix — mark it here so the cache-fed code path is taken.
+    strategy._watch_manager.mark_first_sync_complete()
 
     outcome = await strategy.get_status(["orb-abc-0001"], request)
     instances: list[dict[str, Any]] = outcome.metadata.get("instances", [])

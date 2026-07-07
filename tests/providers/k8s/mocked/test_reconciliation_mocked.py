@@ -39,7 +39,7 @@ def _preload_pod(
     ready: bool = True,
 ) -> None:
     """Seed kmock with a pod carrying ORB labels."""
-    from kmock import resource  # noqa: PLC0415
+    from kmock import resource
 
     pod_res = resource("", "v1", "pods")
     conditions = [{"type": "Ready", "status": "True" if ready else "False"}]
@@ -73,7 +73,7 @@ def _preload_pod(
 
 def _register_pods_resource(kmock_k8s: KubernetesEmulator) -> None:
     """Register the v1/pods resource so kmock API discovery works."""
-    from kmock import resource  # noqa: PLC0415
+    from kmock import resource
 
     pod_res = resource("", "v1", "pods")
     kmock_k8s.resources[pod_res] = {
@@ -108,9 +108,9 @@ async def test_startup_reconciler_populates_cache_from_kmock_pod_list(
     free to serve kmock's aiohttp responses.
     """
     from orb.providers.k8s.reconciliation.startup_reconciler import (
-        StartupReconciler,  # noqa: PLC0415
+        StartupReconciler,
     )
-    from orb.providers.k8s.watch.pod_state_cache import PodStateCache  # noqa: PLC0415
+    from orb.providers.k8s.watch.pod_state_cache import PodStateCache
 
     _register_pods_resource(kmock_k8s)
 
@@ -153,9 +153,9 @@ async def test_startup_reconciler_classifies_unknown_pod_as_orphan(
     Runs in a worker thread to avoid blocking the event loop.
     """
     from orb.providers.k8s.reconciliation.startup_reconciler import (
-        StartupReconciler,  # noqa: PLC0415
+        StartupReconciler,
     )
-    from orb.providers.k8s.watch.pod_state_cache import PodStateCache  # noqa: PLC0415
+    from orb.providers.k8s.watch.pod_state_cache import PodStateCache
 
     _register_pods_resource(kmock_k8s)
 
@@ -197,8 +197,8 @@ async def test_orphan_gc_detects_orphan_pod(
     auto_cleanup_orphans is False so the GC only logs — no DELETE issued.
     We verify the returned orphan list contains the expected pod name.
     """
-    from orb.providers.k8s.configuration.config import K8sProviderConfig  # noqa: PLC0415
-    from orb.providers.k8s.reconciliation.orphan_gc import OrphanGarbageCollector  # noqa: PLC0415
+    from orb.providers.k8s.configuration.config import K8sProviderConfig
+    from orb.providers.k8s.reconciliation.orphan_gc import OrphanGarbageCollector
 
     _register_pods_resource(kmock_k8s)
 
@@ -231,10 +231,10 @@ async def test_orphan_gc_deletes_orphan_via_kmock(
     We seed kmock with an orphan pod, run the GC with auto_cleanup_orphans
     enabled, and verify the pod is gone from the emulator's object store.
     """
-    from kmock import resource  # noqa: PLC0415
+    from kmock import resource
 
-    from orb.providers.k8s.configuration.config import K8sProviderConfig  # noqa: PLC0415
-    from orb.providers.k8s.reconciliation.orphan_gc import OrphanGarbageCollector  # noqa: PLC0415
+    from orb.providers.k8s.configuration.config import K8sProviderConfig
+    from orb.providers.k8s.reconciliation.orphan_gc import OrphanGarbageCollector
 
     _register_pods_resource(kmock_k8s)
 
@@ -275,8 +275,8 @@ async def test_orphan_gc_skips_known_pod(
     k8s_config: Any,
 ) -> None:
     """OrphanGC does not touch pods whose request-id is in the known set."""
-    from orb.providers.k8s.configuration.config import K8sProviderConfig  # noqa: PLC0415
-    from orb.providers.k8s.reconciliation.orphan_gc import OrphanGarbageCollector  # noqa: PLC0415
+    from orb.providers.k8s.configuration.config import K8sProviderConfig
+    from orb.providers.k8s.reconciliation.orphan_gc import OrphanGarbageCollector
 
     _register_pods_resource(kmock_k8s)
 

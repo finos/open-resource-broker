@@ -27,7 +27,7 @@ def _make_adapter() -> K8sTemplateAdapter:
 
 
 def _make_k8s_template(**kwargs: Any) -> Any:
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate  # noqa: PLC0415
+    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
 
     defaults: dict[str, Any] = {
         "template_id": "tpl-unit",
@@ -96,7 +96,7 @@ def test_get_provider_api_returns_pod() -> None:
 
 def test_extend_template_fields_defaults_provider_api_to_pod() -> None:
     """extend_template_fields must set provider_api='Pod' when it is absent."""
-    from orb.domain.template.template_aggregate import Template  # noqa: PLC0415
+    from orb.domain.template.template_aggregate import Template
 
     template = Template(
         template_id="tpl-x",
@@ -125,7 +125,7 @@ def test_extend_template_fields_preserves_existing_provider_api() -> None:
 
 def test_validate_field_values_accepts_valid_template() -> None:
     """A well-formed k8s template with valid resource quantities produces no errors."""
-    from orb.providers.k8s.domain.template.k8s_template import (  # noqa: PLC0415
+    from orb.providers.k8s.domain.template.k8s_template import (
         K8sResourceQuantities,
     )
 
@@ -141,7 +141,7 @@ def test_validate_field_values_accepts_valid_template() -> None:
 
 def test_validate_field_values_requires_image_id() -> None:
     """A template without image_id must produce an error on the image_id field."""
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate  # noqa: PLC0415
+    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
 
     tpl = K8sTemplate(
         template_id="tpl-no-image",
@@ -164,7 +164,7 @@ def test_validate_field_values_rejects_invalid_namespace() -> None:
 
 def test_validate_field_values_rejects_invalid_resource_quantity() -> None:
     """An invalid resource quantity string must produce a resource_requests error."""
-    from orb.providers.k8s.domain.template.k8s_template import (  # noqa: PLC0415
+    from orb.providers.k8s.domain.template.k8s_template import (
         K8sResourceQuantities,
     )
 
@@ -223,20 +223,20 @@ def test_validate_required_fields_rejects_empty_template_id() -> None:
     to verify the guard is in place, avoiding the model-level validation that
     prevents constructing a Template with an empty ID.
     """
-    from unittest.mock import MagicMock  # noqa: PLC0415
+    from unittest.mock import MagicMock
 
     tpl = MagicMock()
     tpl.template_id = ""
     tpl.provider_api = "Pod"
 
     adapter = _make_adapter()
-    errors = adapter._validate_required_fields(tpl)  # noqa: SLF001
+    errors = adapter._validate_required_fields(tpl)
     assert any("template_id" in e for e in errors)
 
 
 def test_validate_template_rejects_unknown_provider_api() -> None:
     """A template with an unknown provider_api must produce an error."""
-    from orb.domain.template.template_aggregate import Template  # noqa: PLC0415
+    from orb.domain.template.template_aggregate import Template
 
     tpl = Template(
         template_id="tpl-bad-api",

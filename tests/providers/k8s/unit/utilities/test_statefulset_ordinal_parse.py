@@ -17,7 +17,6 @@ import pytest
 
 from orb.providers.k8s.utilities.statefulset_spec import parse_statefulset_pod_ordinal
 
-
 # ---------------------------------------------------------------------------
 # Reference implementation (old startswith path) used for equivalence check
 # ---------------------------------------------------------------------------

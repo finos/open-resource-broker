@@ -33,10 +33,6 @@ log = logging.getLogger("k8s.live.cross_request_isolation")
 
 pytestmark = [pytest.mark.asyncio, pytest.mark.k8s_live]
 
-_POD_READY_TIMEOUT = 120  # seconds
-_POLL_INTERVAL = 3  # seconds
-_RELEASE_TIMEOUT = 60  # seconds
-
 
 # ---------------------------------------------------------------------------
 # Helpers

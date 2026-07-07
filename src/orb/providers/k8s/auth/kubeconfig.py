@@ -72,7 +72,7 @@ def _sanitise_load_error(exc: Exception, config_file: Optional[str]) -> str:
 
 def _check_exec_plugins(
     config_file: Optional[str],
-    logger: Optional["LoggingPort"],
+    logger: Optional[LoggingPort],
 ) -> None:
     """Parse *config_file* and reject unknown exec credential plugins.
 
@@ -92,7 +92,7 @@ def _check_exec_plugins(
         K8sAuthError: When an unknown exec plugin is found and the opt-out
             env var is not set.
     """
-    import pathlib  # noqa: PLC0415 — stdlib, deferred to avoid top-level cost
+    import pathlib
 
     # Resolve path
     resolved: Optional[str] = config_file
@@ -108,14 +108,14 @@ def _check_exec_plugins(
         return
 
     try:
-        import yaml  # noqa: PLC0415 — optional; skip check if absent
+        import yaml
     except ImportError:  # pragma: no cover — yaml not installed
         return
 
     try:
         raw = pathlib.Path(resolved).read_bytes()
         kubeconfig_data = yaml.safe_load(raw)
-    except Exception:  # noqa: BLE001 — parse failure; let the SDK report it
+    except Exception:
         return
 
     if not isinstance(kubeconfig_data, dict):
@@ -162,7 +162,7 @@ def _check_exec_plugins(
 def load_kubeconfig(
     config_file: Optional[str] = None,
     context: Optional[str] = None,
-    logger: Optional["LoggingPort"] = None,
+    logger: Optional[LoggingPort] = None,
 ) -> None:
     """Bootstrap the global ``kubernetes`` client config from a kubeconfig file.
 
@@ -192,7 +192,7 @@ def load_kubeconfig(
     _check_exec_plugins(config_file, logger)
 
     try:
-        from kubernetes import config as _k8s_config  # noqa: PLC0415 — confined to this module
+        from kubernetes import config as _k8s_config
     except ImportError as exc:  # pragma: no cover — extra not installed
         raise K8sAuthError(
             "kubernetes SDK is not installed; install with `pip install orb-py[k8s]`"

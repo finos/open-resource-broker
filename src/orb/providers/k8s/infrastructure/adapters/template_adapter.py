@@ -145,7 +145,7 @@ class K8sTemplateAdapter(TemplateAdapterPort):
         Reads the typed :class:`K8sTemplate` fields directly.  Returns a
         mapping of field name -> error message; empty when valid.
         """
-        from orb.providers.k8s.domain.template.k8s_template import (  # noqa: PLC0415
+        from orb.providers.k8s.domain.template.k8s_template import (
             upcast_to_k8s_template,
         )
 

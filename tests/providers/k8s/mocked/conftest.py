@@ -57,7 +57,7 @@ def k8s_api_client(kmock_k8s: KubernetesEmulator):  # type: ignore[return]
     """A kubernetes.client.ApiClient whose host points at the kmock server."""
     # kubernetes is an optional extra; imports are deferred so pyright does
     # not raise errors when the extra is absent at type-check time.
-    import kubernetes.client as _kc  # noqa: PLC0415
+    import kubernetes.client as _kc
 
     ApiClient = _kc.ApiClient  # type: ignore[attr-defined]
     Configuration = _kc.Configuration  # type: ignore[attr-defined]
@@ -71,8 +71,8 @@ def k8s_api_client(kmock_k8s: KubernetesEmulator):  # type: ignore[return]
 @pytest.fixture()
 def k8s_client_facade(k8s_api_client):  # type: ignore[return]
     """The ORB K8sClient facade wrapping the kmock-pointed ApiClient."""
-    from orb.providers.k8s.configuration.config import K8sProviderConfig  # noqa: PLC0415
-    from orb.providers.k8s.infrastructure.k8s_client import K8sClient  # noqa: PLC0415
+    from orb.providers.k8s.configuration.config import K8sProviderConfig
+    from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 
     config = K8sProviderConfig(namespace="orb-test")  # type: ignore[call-arg]
     logger = MagicMock()
@@ -82,7 +82,7 @@ def k8s_client_facade(k8s_api_client):  # type: ignore[return]
 @pytest.fixture()
 def k8s_config():  # type: ignore[return]
     """Minimal K8sProviderConfig targeting the orb-test namespace."""
-    from orb.providers.k8s.configuration.config import K8sProviderConfig  # noqa: PLC0415
+    from orb.providers.k8s.configuration.config import K8sProviderConfig
 
     return K8sProviderConfig(namespace="orb-test")  # type: ignore[call-arg]
 

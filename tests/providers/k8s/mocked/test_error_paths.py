@@ -38,13 +38,13 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def _register_k8s_classifier() -> "Any":
+def _register_k8s_classifier() -> Any:
     """Ensure the K8sRetryClassifier is registered for the duration of each test."""
-    from orb.infrastructure.resilience.retry_classifier_registry import (  # noqa: PLC0415
+    from orb.infrastructure.resilience.retry_classifier_registry import (
         clear_classifiers,
         register_retry_classifier,
     )
-    from orb.providers.k8s.resilience.retry_classifier import K8sRetryClassifier  # noqa: PLC0415
+    from orb.providers.k8s.resilience.retry_classifier import K8sRetryClassifier
 
     classifier = K8sRetryClassifier()
     register_retry_classifier(classifier)
@@ -59,7 +59,7 @@ def _register_k8s_classifier() -> "Any":
 
 def _make_api_exception(status: int) -> Exception:
     """Build a minimal ApiException-like exception with the given status code."""
-    from kubernetes.client.exceptions import ApiException  # noqa: PLC0415
+    from kubernetes.client.exceptions import ApiException
 
     exc = ApiException(status=status)
     exc.status = status
@@ -76,14 +76,14 @@ def _make_logger() -> Any:
 
 
 def _make_k8s_config(namespace: str = "orb-test") -> Any:
-    from orb.providers.k8s.configuration.config import K8sProviderConfig  # noqa: PLC0415
+    from orb.providers.k8s.configuration.config import K8sProviderConfig
 
     return K8sProviderConfig(namespace=namespace)  # type: ignore[call-arg]
 
 
 def _make_acquire_request(provider_api: str, requested_count: int = 1) -> Any:
-    from orb.domain.request.aggregate import Request  # noqa: PLC0415
-    from orb.domain.request.value_objects import RequestId, RequestType  # noqa: PLC0415
+    from orb.domain.request.aggregate import Request
+    from orb.domain.request.value_objects import RequestId, RequestType
 
     return Request(
         request_id=RequestId(value=f"req-{uuid.uuid4()}"),
@@ -97,7 +97,7 @@ def _make_acquire_request(provider_api: str, requested_count: int = 1) -> Any:
 
 
 def _make_template(provider_api: str) -> Any:
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate  # noqa: PLC0415
+    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
 
     return K8sTemplate(
         template_id="tpl-err",
@@ -109,8 +109,8 @@ def _make_template(provider_api: str) -> Any:
 
 
 def _make_pod_handler(api_client: Any) -> Any:
-    from orb.providers.k8s.infrastructure.handlers.pod_handler import K8sPodHandler  # noqa: PLC0415
-    from orb.providers.k8s.infrastructure.k8s_client import K8sClient  # noqa: PLC0415
+    from orb.providers.k8s.infrastructure.handlers.pod_handler import K8sPodHandler
+    from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 
     mock_k8s_client = MagicMock(spec=K8sClient)
     mock_k8s_client.core_v1 = api_client
@@ -120,9 +120,9 @@ def _make_pod_handler(api_client: Any) -> Any:
         logger=_make_logger(),
     )
     # Minimise retry budget to speed up retry-exhaustion tests.
-    handler._max_retries = 1  # noqa: SLF001
-    handler._base_delay = 0.0  # noqa: SLF001
-    handler._max_delay = 0.0  # noqa: SLF001
+    handler._max_retries = 1
+    handler._base_delay = 0.0
+    handler._max_delay = 0.0
     return handler
 
 
@@ -167,7 +167,7 @@ async def test_pod_acquire_403_raises_immediately() -> None:
     request = _make_acquire_request("Pod")
     template = _make_template("Pod")
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         await handler.acquire_hosts(request, template)
 
     assert core_v1.create_namespaced_pod.call_count == 1
@@ -204,7 +204,7 @@ async def test_pod_acquire_409_raises_without_retry() -> None:
     request = _make_acquire_request("Pod")
     template = _make_template("Pod")
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         await handler.acquire_hosts(request, template)
 
     assert core_v1.create_namespaced_pod.call_count == 1
@@ -225,7 +225,7 @@ async def test_pod_acquire_429_is_retried() -> None:
     request = _make_acquire_request("Pod")
     template = _make_template("Pod")
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         await handler.acquire_hosts(request, template)
 
     # max_retries=1 means the operation is attempted once, then one retry.
@@ -247,7 +247,7 @@ async def test_pod_acquire_500_is_retried() -> None:
     request = _make_acquire_request("Pod")
     template = _make_template("Pod")
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         await handler.acquire_hosts(request, template)
 
     assert core_v1.create_namespaced_pod.call_count >= 1
@@ -268,7 +268,7 @@ async def test_pod_acquire_503_is_retried() -> None:
     request = _make_acquire_request("Pod")
     template = _make_template("Pod")
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         await handler.acquire_hosts(request, template)
 
     assert core_v1.create_namespaced_pod.call_count >= 1
@@ -282,10 +282,10 @@ async def test_pod_acquire_503_is_retried() -> None:
 @pytest.mark.asyncio
 async def test_deployment_acquire_403_raises_immediately() -> None:
     """A 403 from create_namespaced_deployment is not retried."""
-    from orb.providers.k8s.infrastructure.handlers.deployment_handler import (  # noqa: PLC0415
+    from orb.providers.k8s.infrastructure.handlers.deployment_handler import (
         K8sDeploymentHandler,
     )
-    from orb.providers.k8s.infrastructure.k8s_client import K8sClient  # noqa: PLC0415
+    from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 
     apps_v1 = MagicMock()
     apps_v1.create_namespaced_deployment.side_effect = _make_api_exception(403)
@@ -297,14 +297,14 @@ async def test_deployment_acquire_403_raises_immediately() -> None:
         config=_make_k8s_config(),
         logger=_make_logger(),
     )
-    handler._max_retries = 1  # noqa: SLF001
-    handler._base_delay = 0.0  # noqa: SLF001
-    handler._max_delay = 0.0  # noqa: SLF001
+    handler._max_retries = 1
+    handler._base_delay = 0.0
+    handler._max_delay = 0.0
 
     request = _make_acquire_request("Deployment", requested_count=2)
     template = _make_template("Deployment")
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         await handler.acquire_hosts(request, template)
 
     assert apps_v1.create_namespaced_deployment.call_count == 1
@@ -318,8 +318,8 @@ async def test_deployment_acquire_403_raises_immediately() -> None:
 @pytest.mark.asyncio
 async def test_job_release_404_tolerated() -> None:
     """A 404 from delete_namespaced_job is tolerated (best-effort delete)."""
-    from orb.providers.k8s.infrastructure.handlers.job_handler import K8sJobHandler  # noqa: PLC0415
-    from orb.providers.k8s.infrastructure.k8s_client import K8sClient  # noqa: PLC0415
+    from orb.providers.k8s.infrastructure.handlers.job_handler import K8sJobHandler
+    from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 
     batch_v1 = MagicMock()
     batch_v1.delete_namespaced_job.side_effect = _make_api_exception(404)
@@ -331,9 +331,9 @@ async def test_job_release_404_tolerated() -> None:
         config=_make_k8s_config(),
         logger=_make_logger(),
     )
-    handler._max_retries = 1  # noqa: SLF001
-    handler._base_delay = 0.0  # noqa: SLF001
-    handler._max_delay = 0.0  # noqa: SLF001
+    handler._max_retries = 1
+    handler._base_delay = 0.0
+    handler._max_delay = 0.0
 
     await handler.release_hosts(["ghost-job"], {"namespace": "orb-test", "job_name": "ghost-job"})
 
@@ -346,10 +346,10 @@ async def test_job_release_404_tolerated() -> None:
 @pytest.mark.asyncio
 async def test_statefulset_acquire_403_raises_immediately() -> None:
     """A 403 from create_namespaced_stateful_set is not retried."""
-    from orb.providers.k8s.infrastructure.handlers.statefulset_handler import (  # noqa: PLC0415
+    from orb.providers.k8s.infrastructure.handlers.statefulset_handler import (
         K8sStatefulSetHandler,
     )
-    from orb.providers.k8s.infrastructure.k8s_client import K8sClient  # noqa: PLC0415
+    from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 
     apps_v1 = MagicMock()
     apps_v1.create_namespaced_stateful_set.side_effect = _make_api_exception(403)
@@ -361,14 +361,14 @@ async def test_statefulset_acquire_403_raises_immediately() -> None:
         config=_make_k8s_config(),
         logger=_make_logger(),
     )
-    handler._max_retries = 1  # noqa: SLF001
-    handler._base_delay = 0.0  # noqa: SLF001
-    handler._max_delay = 0.0  # noqa: SLF001
+    handler._max_retries = 1
+    handler._base_delay = 0.0
+    handler._max_delay = 0.0
 
     request = _make_acquire_request("StatefulSet", requested_count=2)
     template = _make_template("StatefulSet")
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         await handler.acquire_hosts(request, template)
 
     assert apps_v1.create_namespaced_stateful_set.call_count == 1

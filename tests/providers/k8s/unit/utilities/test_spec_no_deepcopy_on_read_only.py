@@ -17,11 +17,9 @@ import uuid
 from typing import Any
 from unittest.mock import patch
 
-
 from orb.domain.request.aggregate import Request
 from orb.domain.request.value_objects import RequestId, RequestType
 from orb.domain.template.template_aggregate import Template
-
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -65,7 +65,7 @@ def load_in_cluster_config() -> None:
             token).
     """
     try:
-        from kubernetes import config as _k8s_config  # noqa: PLC0415 — confined to this module
+        from kubernetes import config as _k8s_config
     except ImportError as exc:  # pragma: no cover — extra not installed
         raise K8sAuthError(
             "kubernetes SDK is not installed; install with `pip install orb-py[k8s]`"

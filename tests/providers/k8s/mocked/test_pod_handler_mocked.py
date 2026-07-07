@@ -35,8 +35,8 @@ def _make_request(
     request_id: str | None = None,
     namespace: str = "orb-test",
 ) -> Any:
-    from orb.domain.request.aggregate import Request  # noqa: PLC0415
-    from orb.domain.request.value_objects import RequestId, RequestType  # noqa: PLC0415
+    from orb.domain.request.aggregate import Request
+    from orb.domain.request.value_objects import RequestId, RequestType
 
     return Request(
         request_id=RequestId(value=request_id or f"req-{uuid.uuid4()}"),
@@ -50,7 +50,7 @@ def _make_request(
 
 
 def _make_template(namespace: str = "orb-test") -> Any:
-    from orb.domain.template.template_aggregate import Template  # noqa: PLC0415
+    from orb.domain.template.template_aggregate import Template
 
     return Template(
         template_id="tpl-1",
@@ -69,7 +69,7 @@ def _make_template(namespace: str = "orb-test") -> Any:
 
 
 def _make_pod_handler(k8s_client_facade: Any, k8s_config: Any) -> Any:
-    from orb.providers.k8s.infrastructure.handlers.pod_handler import K8sPodHandler  # noqa: PLC0415
+    from orb.providers.k8s.infrastructure.handlers.pod_handler import K8sPodHandler
 
     return K8sPodHandler(
         kubernetes_client=k8s_client_facade,
@@ -98,7 +98,7 @@ def _preload_pod(
     for pre-loading.  The pod dict matches the structure the kubernetes SDK
     deserialises when it reads a ``GET /api/v1/namespaces/<ns>/pods/<name>``.
     """
-    from kmock import resource  # noqa: PLC0415
+    from kmock import resource
 
     pod_res = resource("", "v1", "pods")
     conditions = [{"type": "Ready", "status": "True" if ready else "False"}]
@@ -146,7 +146,7 @@ async def test_pod_handler_acquire_calls_create_namespaced_pod(
     After the call the emulator's object store must contain the created pod
     and the requests log must record exactly one POST to the pods collection.
     """
-    from kmock import resource  # noqa: PLC0415
+    from kmock import resource
 
     handler = _make_pod_handler(k8s_client_facade, k8s_config)
     request = _make_request(requested_count=1)
@@ -183,7 +183,7 @@ async def test_pod_handler_acquire_creates_multiple_pods(
     k8s_config: Any,
 ) -> None:
     """acquire_hosts with requested_count=3 issues three POSTs."""
-    from kmock import resource  # noqa: PLC0415
+    from kmock import resource
 
     pod_res = resource("", "v1", "pods")
     kmock_k8s.resources[pod_res] = {
@@ -279,7 +279,7 @@ async def test_pod_handler_release_calls_delete_namespaced_pod(
     k8s_config: Any,
 ) -> None:
     """release_hosts issues a DELETE and the object is gone from the store."""
-    from kmock import resource  # noqa: PLC0415
+    from kmock import resource
 
     request_id = f"req-{uuid.uuid4()}"
     pod_name = f"orb-{request_id[4:12]}-0000"
@@ -393,10 +393,10 @@ async def test_return_request_completes_when_pod_deleted(
        and the pod name in resource_ids.
     4. Assert the result is Completed (return request reached terminal state).
     """
-    from orb.domain.base.operation_outcome import Completed  # noqa: PLC0415
-    from orb.domain.request.aggregate import Request  # noqa: PLC0415
-    from orb.domain.request.value_objects import RequestId, RequestType  # noqa: PLC0415
-    from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry  # noqa: PLC0415
+    from orb.domain.base.operation_outcome import Completed
+    from orb.domain.request.aggregate import Request
+    from orb.domain.request.value_objects import RequestId, RequestType
+    from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
 
     request_id = f"req-{uuid.uuid4()}"
     pod_name = f"orb-{request_id[4:12]}-0000"
@@ -461,7 +461,7 @@ async def test_pod_handler_invalid_image_name_surfaced_as_failed(
     check_hosts_status must return status='failed' and status_reason='InvalidImageName'
     so the operator receives a visible, actionable error.
     """
-    from kmock import resource  # noqa: PLC0415
+    from kmock import resource
 
     request_id = f"req-{uuid.uuid4()}"
     pod_name = f"orb-{request_id[4:12]}-0000"
@@ -542,9 +542,9 @@ async def test_pod_created_in_template_namespace_override(
     because build_template_for_request used dict.setdefault() to merge it, which
     does not override None values produced by model_dump().
     """
-    from kmock import resource  # noqa: PLC0415
+    from kmock import resource
 
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate  # noqa: PLC0415
+    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
 
     # Register the pods resource under both namespaces so kmock accepts creates.
     pod_res = resource("", "v1", "pods")

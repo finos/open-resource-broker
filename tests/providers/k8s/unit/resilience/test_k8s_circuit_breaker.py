@@ -17,10 +17,8 @@ from __future__ import annotations
 import time
 import uuid
 
-
 from orb.infrastructure.resilience.strategy.circuit_breaker import CircuitState
 from orb.providers.k8s.resilience.circuit_breaker import K8sCircuitBreaker
-
 
 # ---------------------------------------------------------------------------
 # Helpers

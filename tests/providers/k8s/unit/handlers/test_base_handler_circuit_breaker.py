@@ -131,7 +131,7 @@ def test_5xx_exhausts_budget_raises() -> None:
         raise ApiException(status=503, reason="Service Unavailable")
 
     # max_retries=1 means 1 initial + 1 retry = 2 total attempts, then raises.
-    with pytest.raises(Exception):  # MaxRetriesExceededError or CircuitBreakerOpenError
+    with pytest.raises(Exception):  # noqa: B017  # MaxRetriesExceededError or CircuitBreakerOpenError
         handler.with_retry(_always_fails, operation_name="test_op")
 
 

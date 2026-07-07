@@ -29,7 +29,7 @@ class KubernetesTemplateExampleGeneratorAdapter:
     type, which is enforced by the registry layer.
     """
 
-    def __init__(self, logger: Optional["LoggingPort"] = None) -> None:
+    def __init__(self, logger: Optional[LoggingPort] = None) -> None:
         self._logger = logger
 
     def generate_example_templates(
@@ -66,10 +66,10 @@ def _resolve_plugin_factories() -> dict[str, Any]:
     handlers still surface their examples.
     """
     try:
-        from orb.providers.k8s.strategy.k8s_provider_strategy import (  # noqa: PLC0415
+        from orb.providers.k8s.strategy.k8s_provider_strategy import (
             K8sProviderStrategy,
         )
-    except Exception:  # noqa: BLE001
+    except Exception:
         return {}
     return dict(getattr(K8sProviderStrategy, "_HANDLER_FACTORIES", {}) or {})
 
@@ -88,6 +88,10 @@ def create_k8s_template_example_generator(
         from orb.domain.base.ports import LoggingPort as _LoggingPort
 
         logger = container.get(_LoggingPort)
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception:  # noqa: BLE001 — DI lookup is best-effort; fall back to no-logger
+        # LoggingPort is not required for example-template generation.  The
+        # caller falls back to a stdlib logger when adapter.logger is None,
+        # so a container miss (test harness, minimal DI setup) is safe to
+        # swallow silently.
+        logger = None
     return KubernetesTemplateExampleGeneratorAdapter(logger=logger)

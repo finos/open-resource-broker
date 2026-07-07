@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from orb.domain.base.ports.console_port import ConsolePort
 
 
-def confirm_in_cluster(console: "ConsolePort", detected: bool) -> bool:
+def confirm_in_cluster(console: ConsolePort, detected: bool) -> bool:
     """Confirm whether ORB is running inside the cluster.
 
     Displays the auto-detected result and asks the operator to confirm.
@@ -48,7 +48,7 @@ def confirm_in_cluster(console: "ConsolePort", detected: bool) -> bool:
 
 
 def pick_context(
-    console: "ConsolePort",
+    console: ConsolePort,
     contexts: list[KubeContextInfo],
     current: Optional[KubeContextInfo],
 ) -> str:
@@ -99,7 +99,7 @@ def pick_context(
 
 
 def pick_namespace(
-    console: "ConsolePort",
+    console: ConsolePort,
     namespaces: list[NamespaceInfo],
     default: str,
 ) -> str:
@@ -145,7 +145,7 @@ def pick_namespace(
 
 
 def pick_service_account(
-    console: "ConsolePort",
+    console: ConsolePort,
     sas: list[ServiceAccountInfo],
     default: str = "default",
 ) -> str:
@@ -191,7 +191,7 @@ def pick_service_account(
 
 
 def pick_image_pull_secret(
-    console: "ConsolePort",
+    console: ConsolePort,
     secrets: list[str],
 ) -> Optional[str]:
     """Prompt the operator to select a default image pull secret.
@@ -231,7 +231,7 @@ def pick_image_pull_secret(
 
 
 def display_rbac_probe(
-    console: "ConsolePort",
+    console: ConsolePort,
     results: RBACProbeResult,
     namespace: Optional[str] = None,
     sa: Optional[str] = None,

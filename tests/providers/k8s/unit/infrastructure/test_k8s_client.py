@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 
 
-def _make_client(api_client: object | None = None) -> "K8sClient":
+def _make_client(api_client: object | None = None) -> K8sClient:
     from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 
     mock_logger = MagicMock()
@@ -51,11 +51,11 @@ def test_load_config_with_valid_kubeconfig(tmp_path: pytest.TempPathFactory) -> 
     mock_lkc.assert_called_once_with(
         config_file=cfg.kubeconfig_path,
         context=cfg.context,
-        logger=client._logger,  # noqa: SLF001
+        logger=client._logger,
     )
 
 
-def test_load_config_propagates_k8s_auth_error(tmp_path: "pytest.TempPathFactory") -> None:
+def test_load_config_propagates_k8s_auth_error(tmp_path: pytest.TempPathFactory) -> None:
     """load_config with in_cluster=False propagates K8sAuthError from load_kubeconfig."""
     from orb.providers.k8s.exceptions.k8s_errors import K8sAuthError
     from orb.providers.k8s.infrastructure.k8s_client import K8sClient
@@ -94,7 +94,7 @@ def test_load_config_in_cluster_forced(monkeypatch: pytest.MonkeyPatch) -> None:
     client = K8sClient(config=cfg, logger=MagicMock())
 
     mock_adapter = MagicMock()
-    client._in_cluster_adapter = mock_adapter  # noqa: SLF001
+    client._in_cluster_adapter = mock_adapter
 
     client.load_config()
 
@@ -123,7 +123,7 @@ def test_api_client_lazy_builds_on_first_access() -> None:
         ):
             # Import the real module to patch the inner import
 
-            import kubernetes.client.api_client as _api_client_mod  # noqa: PLC0415
+            import kubernetes.client.api_client as _api_client_mod
 
             orig = _api_client_mod.ApiClient
             _api_client_mod.ApiClient = fake_api_client_cls  # type: ignore[assignment]
@@ -134,7 +134,7 @@ def test_api_client_lazy_builds_on_first_access() -> None:
 
     # The property must return an ApiClient and memoize it.
     assert result is not None
-    assert client._api_client is not None  # noqa: SLF001
+    assert client._api_client is not None
 
 
 def test_core_v1_lazy_accessor_builds_once() -> None:
@@ -144,7 +144,7 @@ def test_core_v1_lazy_accessor_builds_once() -> None:
     client = _make_client(api_client=mock_api_client)
 
     with patch("kubernetes.client.CoreV1Api", return_value=mock_core):
-        import kubernetes.client as _kc  # noqa: PLC0415
+        import kubernetes.client as _kc
 
         orig = _kc.CoreV1Api
         _kc.CoreV1Api = MagicMock(return_value=mock_core)  # type: ignore[assignment]
@@ -163,7 +163,7 @@ def test_apps_v1_lazy_accessor_builds_once() -> None:
     mock_api_client = MagicMock()
     client = _make_client(api_client=mock_api_client)
 
-    import kubernetes.client as _kc  # noqa: PLC0415
+    import kubernetes.client as _kc
 
     mock_apps = MagicMock()
     orig = _kc.AppsV1Api
@@ -182,7 +182,7 @@ def test_batch_v1_lazy_accessor_builds_once() -> None:
     mock_api_client = MagicMock()
     client = _make_client(api_client=mock_api_client)
 
-    import kubernetes.client as _kc  # noqa: PLC0415
+    import kubernetes.client as _kc
 
     mock_batch = MagicMock()
     orig = _kc.BatchV1Api
@@ -202,16 +202,16 @@ def test_cleanup_resets_cached_api_sub_clients() -> None:
     client = _make_client(api_client=mock_api_client)
 
     # Pre-warm all three lazy accessors.
-    client._core_v1 = MagicMock()  # noqa: SLF001
-    client._apps_v1 = MagicMock()  # noqa: SLF001
-    client._batch_v1 = MagicMock()  # noqa: SLF001
+    client._core_v1 = MagicMock()
+    client._apps_v1 = MagicMock()
+    client._batch_v1 = MagicMock()
 
     client.cleanup()
 
-    assert client._core_v1 is None  # noqa: SLF001
-    assert client._apps_v1 is None  # noqa: SLF001
-    assert client._batch_v1 is None  # noqa: SLF001
-    assert client._api_client is None  # noqa: SLF001
+    assert client._core_v1 is None
+    assert client._apps_v1 is None
+    assert client._batch_v1 is None
+    assert client._api_client is None
 
 
 # ---------------------------------------------------------------------------
@@ -281,7 +281,7 @@ def test_call_with_auth_retry_retries_on_401(monkeypatch: pytest.MonkeyPatch) ->
     # Wire a fake in-cluster adapter so the refresh path is exercised.
     mock_adapter = MagicMock()
     mock_adapter.refresh_if_stale.return_value = False
-    client._in_cluster_adapter = mock_adapter  # noqa: SLF001
+    client._in_cluster_adapter = mock_adapter
 
     # fn fails first with 401, then succeeds.
     fn = MagicMock(side_effect=[_FakeApiException(401), "recovered"])
@@ -331,5 +331,5 @@ def test_refresh_if_stale_noop_with_api_client_override() -> None:
     client = _make_client(api_client=mock_api_client)
 
     # adapter must be None when api_client was pre-supplied
-    assert client._in_cluster_adapter is None  # noqa: SLF001
+    assert client._in_cluster_adapter is None
     assert client.refresh_if_stale() is False

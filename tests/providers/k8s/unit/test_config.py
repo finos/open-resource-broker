@@ -105,7 +105,7 @@ def test_namespace_explicit_value_is_preserved() -> None:
     assert cfg.namespace == "orb-system"
 
 
-def test_namespace_auto_detected_from_in_cluster_file(tmp_path: "pytest.TempPathFactory") -> None:
+def test_namespace_auto_detected_from_in_cluster_file(tmp_path: pytest.TempPathFactory) -> None:
     """When the ServiceAccount namespace file exists, its content is used."""
     ns_file = tmp_path / "namespace"
     ns_file.write_text("kube-production\n", encoding="utf-8")

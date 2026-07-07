@@ -76,7 +76,7 @@ def _make_registry(*, check_result: CheckHostsStatusResult) -> K8sHandlerRegistr
     registry = K8sHandlerRegistry(
         config=config,
         logger=logger,
-        client_provider=lambda: MagicMock(),
+        client_provider=MagicMock,
         watch_manager_provider=lambda: None,
         plugin_factories=lambda: {},
         native_spec_service_provider=lambda: None,

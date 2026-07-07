@@ -4,11 +4,11 @@ import pytest
 from prometheus_client import CollectorRegistry
 
 from orb.providers.k8s.infrastructure.services.metrics import (
+    _METRIC_SPECS,
     POD_CREATION_STATUSES,
     WATCH_EVENT_TYPES,
     WATCH_RECONNECT_REASONS,
     K8sMetrics,
-    _METRIC_SPECS,
 )
 
 _EXPECTED_NAMES = [

@@ -19,7 +19,7 @@ if TYPE_CHECKING:  # pragma: no cover — type-checking only
 
 def register_k8s_health_checks(
     health_check: HealthCheckPort,
-    kubernetes_client: "K8sClient",
+    kubernetes_client: K8sClient,
 ) -> None:
     """Register Kubernetes-specific health checks with the given HealthCheck instance.
 

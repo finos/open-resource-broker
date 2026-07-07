@@ -72,7 +72,7 @@ def _age_days(creation_timestamp: Any) -> int:
 def _is_forbidden(exc: BaseException) -> bool:
     """Return ``True`` when ``exc`` is a 403 ``ApiException``."""
     try:
-        from kubernetes.client.exceptions import ApiException  # noqa: PLC0415
+        from kubernetes.client.exceptions import ApiException
     except ImportError:  # pragma: no cover — extra not installed
         return False
     return isinstance(exc, ApiException) and getattr(exc, "status", None) == 403
@@ -81,7 +81,7 @@ def _is_forbidden(exc: BaseException) -> bool:
 def _is_not_found(exc: BaseException) -> bool:
     """Return ``True`` when ``exc`` is a 404 ``ApiException``."""
     try:
-        from kubernetes.client.exceptions import ApiException  # noqa: PLC0415
+        from kubernetes.client.exceptions import ApiException
     except ImportError:  # pragma: no cover — extra not installed
         return False
     return isinstance(exc, ApiException) and getattr(exc, "status", None) == 404
@@ -103,20 +103,20 @@ class K8sInfrastructureDiscoveryService:
 
     def __init__(
         self,
-        config: "K8sProviderConfig",
-        logger: "LoggingPort",
+        config: K8sProviderConfig,
+        logger: LoggingPort,
         api_client: Optional[Any] = None,
-        console: Optional["ConsolePort"] = None,
+        console: Optional[ConsolePort] = None,
     ) -> None:
         self._config = config
         self._logger = logger
         self._api_client = api_client
         if console is None:
-            from orb.infrastructure.adapters.null_console_adapter import (  # noqa: PLC0415
+            from orb.infrastructure.adapters.null_console_adapter import (
                 NullConsoleAdapter,
             )
 
-            self._console: "ConsolePort" = NullConsoleAdapter()
+            self._console: ConsolePort = NullConsoleAdapter()
         else:
             self._console = console
 
@@ -129,8 +129,8 @@ class K8sInfrastructureDiscoveryService:
         if self._api_client is not None:
             return self._api_client
         try:
-            from kubernetes import config as _k8s_config  # noqa: PLC0415
-            from kubernetes.client.api_client import ApiClient  # noqa: PLC0415
+            from kubernetes import config as _k8s_config
+            from kubernetes.client.api_client import ApiClient
         except ImportError as exc:
             raise K8sError(
                 "kubernetes SDK is not installed; install with `pip install orb-py[k8s]`"
@@ -147,7 +147,7 @@ class K8sInfrastructureDiscoveryService:
     def _core_v1(self) -> Any:
         """Return a ``CoreV1Api`` instance backed by this service's client."""
         try:
-            from kubernetes.client import CoreV1Api  # noqa: PLC0415
+            from kubernetes.client import CoreV1Api
         except ImportError as exc:  # pragma: no cover — extra not installed
             raise K8sError(
                 "kubernetes SDK is not installed; install with `pip install orb-py[k8s]`"
@@ -157,7 +157,7 @@ class K8sInfrastructureDiscoveryService:
     def _auth_v1(self) -> Any:
         """Return an ``AuthorizationV1Api`` instance backed by this service's client."""
         try:
-            from kubernetes.client import AuthorizationV1Api  # noqa: PLC0415
+            from kubernetes.client import AuthorizationV1Api
         except ImportError as exc:  # pragma: no cover — extra not installed
             raise K8sError(
                 "kubernetes SDK is not installed; install with `pip install orb-py[k8s]`"
@@ -205,7 +205,7 @@ class K8sInfrastructureDiscoveryService:
             K8sDiscoveryError: When the kubernetes SDK is not installed.
         """
         try:
-            from kubernetes import config as _k8s_config  # noqa: PLC0415
+            from kubernetes import config as _k8s_config
         except ImportError as exc:
             raise K8sDiscoveryError(
                 "kubernetes SDK is not installed; install with `pip install orb-py[k8s]`"
@@ -216,7 +216,7 @@ class K8sInfrastructureDiscoveryService:
             raw_contexts, raw_current = _k8s_config.list_kube_config_contexts(
                 config_file=config_file
             )
-        except Exception as exc:  # noqa: BLE001 — FileNotFoundError, yaml errors, etc.
+        except Exception as exc:
             self._logger.warning(
                 "discover_contexts: failed to parse kubeconfig (%s=%r): %s",
                 "config_file",
@@ -265,7 +265,7 @@ class K8sInfrastructureDiscoveryService:
             to ``"unknown"`` when the URL cannot be resolved.
         """
         try:
-            from kubernetes import config as _k8s_config  # noqa: PLC0415
+            from kubernetes import config as _k8s_config
         except ImportError:
             self._logger.warning("discover_cluster_endpoint: kubernetes SDK not installed.")
             return "unknown"
@@ -276,7 +276,7 @@ class K8sInfrastructureDiscoveryService:
             # attribute from ApiClient; it exists at runtime.
             host: str = client.configuration.host or "unknown"  # type: ignore[attr-defined]
             return host
-        except Exception as exc:  # noqa: BLE001 — ConfigException, etc.
+        except Exception as exc:
             self._logger.warning(
                 "discover_cluster_endpoint: could not resolve endpoint for context=%r: %s",
                 context,
@@ -308,7 +308,7 @@ class K8sInfrastructureDiscoveryService:
             ns_list = core.list_namespace()
         except K8sError:
             raise
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if _is_forbidden(exc):
                 return self._fallback_namespaces_from_sa_file()
             raise K8sDiscoveryError(f"Failed to list namespaces: {exc}") from exc
@@ -372,7 +372,7 @@ class K8sInfrastructureDiscoveryService:
             sa_list = core.list_namespaced_service_account(namespace)
         except K8sError:
             raise
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if _is_forbidden(exc):
                 self._logger.warning(
                     "discover_service_accounts: 403 from namespace=%r; "
@@ -427,7 +427,7 @@ class K8sInfrastructureDiscoveryService:
             )
         except K8sError:
             raise
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if _is_forbidden(exc):
                 self._logger.warning(
                     "discover_image_pull_secrets: 403 from namespace=%r; "
@@ -466,7 +466,7 @@ class K8sInfrastructureDiscoveryService:
                 self-review).
         """
         try:
-            from kubernetes.client import (  # noqa: PLC0415
+            from kubernetes.client import (
                 AuthorizationV1Api,
                 V1ResourceAttributes,
                 V1SelfSubjectAccessReview,
@@ -494,7 +494,7 @@ class K8sInfrastructureDiscoveryService:
                 response = auth.create_self_subject_access_review(body)
                 resp_status = getattr(response, "status", None)
                 allowed: bool = bool(getattr(resp_status, "allowed", False))
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 raise K8sDiscoveryError(
                     f"SelfSubjectAccessReview for verb={verb!r} in namespace={namespace!r} "
                     f"failed: {exc}"
@@ -678,7 +678,7 @@ class K8sInfrastructureDiscoveryService:
                 permissions, or when no kubeconfig contexts are available in
                 out-of-cluster mode.
         """
-        from orb.providers.k8s.services.init_prompts import (  # noqa: PLC0415
+        from orb.providers.k8s.services.init_prompts import (
             display_rbac_probe,
             pick_image_pull_secret,
             pick_namespace,
@@ -919,7 +919,7 @@ class K8sInfrastructureDiscoveryService:
             self._core_v1().get_api_resources(_request_timeout=5)
         except K8sError:
             raise
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             issues.append(f"Apiserver unreachable at {cluster_endpoint}: {exc}")
             api_reachable = False
 
@@ -931,7 +931,7 @@ class K8sInfrastructureDiscoveryService:
             # ------------------------------------------------------------------
             if not in_cluster_flag and context is not None:
                 try:
-                    from kubernetes import config as _k8s_config  # noqa: PLC0415
+                    from kubernetes import config as _k8s_config
 
                     config_file = (
                         str(self._config.kubeconfig_path) if self._config.kubeconfig_path else None
@@ -942,7 +942,7 @@ class K8sInfrastructureDiscoveryService:
                     ]
                     if context not in known_names:
                         issues.append(f"Configured context '{context}' not found in kubeconfig")
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     self._logger.warning(
                         "validate_infrastructure: could not list kubeconfig contexts: %s", exc
                     )
@@ -954,7 +954,7 @@ class K8sInfrastructureDiscoveryService:
                 self._core_v1().read_namespace(name=namespace)
             except K8sError:
                 raise
-            except Exception:  # noqa: BLE001
+            except Exception:
                 issues.append(f"Namespace '{namespace}' not found in cluster")
 
             # ------------------------------------------------------------------
@@ -970,7 +970,7 @@ class K8sInfrastructureDiscoveryService:
                     )
                 except K8sError:
                     raise
-                except Exception:  # noqa: BLE001
+                except Exception:
                     issues.append(
                         f"ServiceAccount '{service_account}' not found in namespace '{namespace}'"
                     )
@@ -987,7 +987,7 @@ class K8sInfrastructureDiscoveryService:
                 ):
                     if not allowed:
                         issues.append(f"Missing permission: pods.{verb} in namespace {namespace}")
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 self._logger.warning("validate_infrastructure: RBAC probe failed: %s", exc)
                 issues.append(f"RBAC probe failed: {exc}")
 

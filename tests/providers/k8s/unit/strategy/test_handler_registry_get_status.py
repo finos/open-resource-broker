@@ -217,11 +217,11 @@ def test_build_template_namespace_from_provider_config_is_promoted() -> None:
     provider-level default.
     """
 
-    import uuid  # noqa: PLC0415
+    import uuid
 
-    from orb.domain.request.aggregate import Request  # noqa: PLC0415
-    from orb.domain.request.value_objects import RequestId, RequestType  # noqa: PLC0415
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate  # noqa: PLC0415
+    from orb.domain.request.aggregate import Request
+    from orb.domain.request.value_objects import RequestId, RequestType
+    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
 
     # Build a fake TemplateDTO-like object that carries namespace only in
     # provider_config (as the REST submission path would produce).

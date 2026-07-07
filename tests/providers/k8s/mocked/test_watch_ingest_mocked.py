@@ -41,7 +41,7 @@ Covered scenarios
 Flakiness note (Group T3)
 -------------------------
 
-The original tests used ``asyncio.sleep(0.1–0.3s)`` as an imprecise
+The original tests used ``asyncio.sleep(0.1-0.3s)`` as an imprecise
 rendezvous after starting the watcher.  That pattern is timing-sensitive
 on slow CI runners.  The tests below replace the raw sleep with
 ``asyncio.wait_for`` polling on the cache state — the coroutine returns
@@ -139,7 +139,7 @@ class _GoneWatch:
         self.resource_version: str | None = None
 
     def stream(self, func: Any, **kwargs: Any) -> Iterator[dict[str, Any]]:
-        from kubernetes.client.exceptions import ApiException  # noqa: PLC0415
+        from kubernetes.client.exceptions import ApiException
 
         raise ApiException(status=410, reason="Gone")
         yield  # make it a generator function for type checkers
@@ -189,8 +189,8 @@ def _make_watcher(
     namespace: str = "orb-test",
 ) -> tuple[Any, Any]:
     """Return ``(K8sWatcher, PodStateCache)`` with the given watch factory."""
-    from orb.providers.k8s.watch.pod_state_cache import PodStateCache  # noqa: PLC0415
-    from orb.providers.k8s.watch.watcher import K8sWatcher  # noqa: PLC0415
+    from orb.providers.k8s.watch.pod_state_cache import PodStateCache
+    from orb.providers.k8s.watch.watcher import K8sWatcher
 
     cache = PodStateCache()
     watcher = K8sWatcher(

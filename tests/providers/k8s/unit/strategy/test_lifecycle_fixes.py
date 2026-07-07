@@ -34,7 +34,7 @@ def _make_registry(plugin_factories: dict | None = None) -> K8sHandlerRegistry:
     return K8sHandlerRegistry(
         config=_make_config(),
         logger=MagicMock(),
-        client_provider=lambda: MagicMock(),
+        client_provider=MagicMock,
         watch_manager_provider=lambda: None,
         plugin_factories=lambda: plugin_factories or {},
         native_spec_service_provider=lambda: None,
@@ -297,7 +297,7 @@ class TestPluginFactoryKwargs:
         registry = K8sHandlerRegistry(
             config=_make_config(),
             logger=MagicMock(),
-            client_provider=lambda: MagicMock(),
+            client_provider=MagicMock,
             watch_manager_provider=lambda: None,
             plugin_factories=lambda: {"PluginApi": capturing_factory},
             native_spec_service_provider=lambda: mock_native,
@@ -323,7 +323,7 @@ class TestPluginFactoryKwargs:
         registry = K8sHandlerRegistry(
             config=_make_config(),
             logger=MagicMock(),
-            client_provider=lambda: MagicMock(),
+            client_provider=MagicMock,
             watch_manager_provider=lambda: None,
             plugin_factories=lambda: {"PluginApi": capturing_factory},
             native_spec_service_provider=lambda: None,

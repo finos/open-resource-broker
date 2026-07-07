@@ -74,9 +74,9 @@ _JOIN_TIMEOUT_SECONDS = 10.0
 WatchFactory = Callable[[], "Watch"]
 
 
-def _default_watch_factory() -> "Watch":
+def _default_watch_factory() -> Watch:
     """Default factory: returns a fresh ``kubernetes.watch.Watch``."""
-    from kubernetes.watch import Watch as _Watch  # noqa: PLC0415
+    from kubernetes.watch import Watch as _Watch
 
     return _Watch()
 
@@ -129,7 +129,7 @@ class K8sNodeWatcher:
         self._watch_factory = watch_factory
 
         self._stop_event = threading.Event()
-        self._active_watch: "Optional[Watch]" = None
+        self._active_watch: Optional[Watch] = None
         self._thread: Optional[threading.Thread] = None
 
         # Diagnostics — updated by the worker thread.
@@ -301,7 +301,7 @@ class K8sNodeWatcher:
     def _is_resource_version_too_old(exc: BaseException) -> bool:
         """Return ``True`` when ``exc`` is a 410 ``ApiException``."""
         try:
-            from kubernetes.client.exceptions import ApiException  # noqa: PLC0415
+            from kubernetes.client.exceptions import ApiException
         except ImportError:  # pragma: no cover — extra not installed
             return False
         if not isinstance(exc, ApiException):
@@ -372,7 +372,7 @@ class K8sNodeWatcher:
                 return True
         return False
 
-    def _node_to_state(self, node: "V1Node") -> K8sNodeState:
+    def _node_to_state(self, node: V1Node) -> K8sNodeState:
         """Convert a ``V1Node`` event payload into a :class:`K8sNodeState`."""
         metadata = getattr(node, "metadata", None)
         status = getattr(node, "status", None)

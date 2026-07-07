@@ -283,6 +283,7 @@ def test_duration_recorded_on_report() -> None:
 
 
 import asyncio
+
 import pytest
 
 

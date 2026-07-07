@@ -23,7 +23,6 @@ log = logging.getLogger("k8s.live.concurrent_acquire_release")
 
 pytestmark = [pytest.mark.asyncio, pytest.mark.k8s_live]
 
-_ACQUIRE_TIMEOUT = 90  # seconds
 _RELEASE_TIMEOUT = 60  # seconds
 _POLL_INTERVAL = 2  # seconds
 

@@ -33,7 +33,7 @@ def _make_k8s_logger() -> Any:
 
 
 def _make_registry(k8s_client_facade: Any, k8s_config: Any) -> Any:
-    from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry  # noqa: PLC0415
+    from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
 
     return K8sHandlerRegistry(
         config=k8s_config,
@@ -51,9 +51,9 @@ def _make_acquire_request(
     requested_count: int = 1,
     namespace: str = "orb-test",
 ) -> Any:
-    from orb.domain.request.aggregate import Request  # noqa: PLC0415
-    from orb.domain.request.value_objects import RequestId, RequestType  # noqa: PLC0415
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate  # noqa: PLC0415
+    from orb.domain.request.aggregate import Request
+    from orb.domain.request.value_objects import RequestId, RequestType
+    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
 
     # Embed the template in request.metadata so K8sHandlerRegistry.build_template_for_request
     # picks it up (the registry's acquire() builds the template from metadata, not from a
@@ -82,8 +82,8 @@ def _make_return_request(
     resource_ids: list[str],
     provider_data: dict[str, Any],
 ) -> Any:
-    from orb.domain.request.aggregate import Request  # noqa: PLC0415
-    from orb.domain.request.value_objects import RequestId, RequestType  # noqa: PLC0415
+    from orb.domain.request.aggregate import Request
+    from orb.domain.request.value_objects import RequestId, RequestType
 
     return Request(
         request_id=RequestId(value=f"ret-{uuid.uuid4()}"),
@@ -97,7 +97,7 @@ def _make_return_request(
 
 
 def _register_pod_resource(kmock_k8s: KubernetesEmulator) -> None:
-    from kmock import resource  # noqa: PLC0415
+    from kmock import resource
 
     pod_res = resource("", "v1", "pods")
     kmock_k8s.resources[pod_res] = {
@@ -112,7 +112,7 @@ def _register_pod_resource(kmock_k8s: KubernetesEmulator) -> None:
 
 
 def _register_deployment_resource(kmock_k8s: KubernetesEmulator) -> None:
-    from kmock import resource  # noqa: PLC0415
+    from kmock import resource
 
     dep_res = resource("apps", "v1", "deployments")
     kmock_k8s.resources[dep_res] = {
@@ -127,7 +127,7 @@ def _register_deployment_resource(kmock_k8s: KubernetesEmulator) -> None:
 
 
 def _register_statefulset_resource(kmock_k8s: KubernetesEmulator) -> None:
-    from kmock import resource  # noqa: PLC0415
+    from kmock import resource
 
     sts_res = resource("apps", "v1", "statefulsets")
     kmock_k8s.resources[sts_res] = {
@@ -142,7 +142,7 @@ def _register_statefulset_resource(kmock_k8s: KubernetesEmulator) -> None:
 
 
 def _register_job_resource(kmock_k8s: KubernetesEmulator) -> None:
-    from kmock import resource  # noqa: PLC0415
+    from kmock import resource
 
     job_res = resource("batch", "v1", "jobs")
     kmock_k8s.resources[job_res] = {
@@ -168,7 +168,7 @@ async def test_pod_lifecycle_acquire_returns_accepted(
     k8s_config: Any,
 ) -> None:
     """Pod acquire through the registry returns an Accepted outcome."""
-    from orb.domain.base.operation_outcome import Accepted  # noqa: PLC0415
+    from orb.domain.base.operation_outcome import Accepted
 
     _register_pod_resource(kmock_k8s)
     registry = _make_registry(k8s_client_facade, k8s_config)
@@ -188,7 +188,7 @@ async def test_pod_lifecycle_release_returns_accepted(
     k8s_config: Any,
 ) -> None:
     """Pod release through the registry returns an Accepted outcome."""
-    from orb.domain.base.operation_outcome import Accepted  # noqa: PLC0415
+    from orb.domain.base.operation_outcome import Accepted
 
     _register_pod_resource(kmock_k8s)
     registry = _make_registry(k8s_client_facade, k8s_config)
@@ -220,7 +220,7 @@ async def test_deployment_lifecycle_acquire_returns_accepted(
     k8s_config: Any,
 ) -> None:
     """Deployment acquire through the registry returns an Accepted outcome."""
-    from orb.domain.base.operation_outcome import Accepted  # noqa: PLC0415
+    from orb.domain.base.operation_outcome import Accepted
 
     _register_deployment_resource(kmock_k8s)
     _register_pod_resource(kmock_k8s)
@@ -241,7 +241,7 @@ async def test_deployment_lifecycle_release_returns_accepted(
     k8s_config: Any,
 ) -> None:
     """Deployment release returns Accepted; the Deployment is deleted."""
-    from orb.domain.base.operation_outcome import Accepted  # noqa: PLC0415
+    from orb.domain.base.operation_outcome import Accepted
 
     _register_deployment_resource(kmock_k8s)
     _register_pod_resource(kmock_k8s)
@@ -278,7 +278,7 @@ async def test_statefulset_lifecycle_acquire_returns_accepted(
     k8s_config: Any,
 ) -> None:
     """StatefulSet acquire through the registry returns an Accepted outcome."""
-    from orb.domain.base.operation_outcome import Accepted  # noqa: PLC0415
+    from orb.domain.base.operation_outcome import Accepted
 
     _register_statefulset_resource(kmock_k8s)
     registry = _make_registry(k8s_client_facade, k8s_config)
@@ -297,7 +297,7 @@ async def test_job_lifecycle_acquire_returns_accepted(
     k8s_config: Any,
 ) -> None:
     """Job acquire through the registry returns an Accepted outcome."""
-    from orb.domain.base.operation_outcome import Accepted  # noqa: PLC0415
+    from orb.domain.base.operation_outcome import Accepted
 
     _register_job_resource(kmock_k8s)
     registry = _make_registry(k8s_client_facade, k8s_config)
@@ -317,7 +317,7 @@ async def test_job_lifecycle_release_returns_accepted(
     k8s_config: Any,
 ) -> None:
     """Job release deletes the Job; returns Accepted."""
-    from orb.domain.base.operation_outcome import Accepted  # noqa: PLC0415
+    from orb.domain.base.operation_outcome import Accepted
 
     _register_job_resource(kmock_k8s)
     registry = _make_registry(k8s_client_facade, k8s_config)

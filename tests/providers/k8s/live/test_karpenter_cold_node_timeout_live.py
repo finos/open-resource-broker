@@ -29,8 +29,6 @@ pytestmark = [pytest.mark.asyncio, pytest.mark.k8s_live]
 
 _KARPENTER_NODEPOOL_CRD = "nodepools.karpenter.sh"
 _COLD_NODEPOOL_NAME = "orb-test-karpenter-cold"
-_PENDING_TIMEOUT = 120  # seconds ORB should give up waiting
-_POLL_INTERVAL = 5  # seconds
 
 
 # ---------------------------------------------------------------------------

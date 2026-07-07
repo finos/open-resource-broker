@@ -15,7 +15,6 @@ import pytest
 from orb.providers.k8s.exceptions.k8s_errors import K8sError
 from orb.providers.k8s.utilities.pod_spec_audit import audit_pod_spec
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

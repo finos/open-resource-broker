@@ -32,7 +32,6 @@ pytestmark = [pytest.mark.asyncio, pytest.mark.k8s_live]
 
 _METRICS_SCRAPE_ENV = "ORB_PROMETHEUS_SCRAPE_URL"
 _SCRAPE_TIMEOUT = 5  # seconds
-_POLL_INTERVAL = 3  # seconds
 _METRIC_SETTLE_WAIT = 10  # seconds for metrics to propagate after operation
 
 

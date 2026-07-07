@@ -32,7 +32,7 @@ def _make_registry(
     return K8sHandlerRegistry(
         config=K8sProviderConfig(),
         logger=MagicMock(),
-        client_provider=lambda: MagicMock(),
+        client_provider=MagicMock,
         watch_manager_provider=lambda: None,
         plugin_factories=lambda: {},
         native_spec_service_provider=lambda: None,

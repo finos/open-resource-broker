@@ -42,7 +42,6 @@ from prometheus_client import (
     Histogram,
 )
 
-
 # ---------------------------------------------------------------------------
 # Label value enums — pinned to prevent cardinality explosions.
 # ---------------------------------------------------------------------------

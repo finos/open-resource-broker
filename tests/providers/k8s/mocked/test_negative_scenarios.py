@@ -35,14 +35,14 @@ def _make_logger() -> Any:
 
 
 def _make_k8s_config(namespace: str = "orb-test") -> Any:
-    from orb.providers.k8s.configuration.config import K8sProviderConfig  # noqa: PLC0415
+    from orb.providers.k8s.configuration.config import K8sProviderConfig
 
     return K8sProviderConfig(namespace=namespace)  # type: ignore[call-arg]
 
 
 def _make_acquire_request(provider_api: str = "Pod", requested_count: int = 1) -> Any:
-    from orb.domain.request.aggregate import Request  # noqa: PLC0415
-    from orb.domain.request.value_objects import RequestId, RequestType  # noqa: PLC0415
+    from orb.domain.request.aggregate import Request
+    from orb.domain.request.value_objects import RequestId, RequestType
 
     return Request(
         request_id=RequestId(value=f"req-{uuid.uuid4()}"),
@@ -56,8 +56,8 @@ def _make_acquire_request(provider_api: str = "Pod", requested_count: int = 1) -
 
 
 def _make_pod_handler(core_v1: Any) -> Any:
-    from orb.providers.k8s.infrastructure.handlers.pod_handler import K8sPodHandler  # noqa: PLC0415
-    from orb.providers.k8s.infrastructure.k8s_client import K8sClient  # noqa: PLC0415
+    from orb.providers.k8s.infrastructure.handlers.pod_handler import K8sPodHandler
+    from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 
     mock_k8s_client = MagicMock(spec=K8sClient)
     mock_k8s_client.core_v1 = core_v1
@@ -66,14 +66,14 @@ def _make_pod_handler(core_v1: Any) -> Any:
         config=_make_k8s_config(),
         logger=_make_logger(),
     )
-    handler._max_retries = 2  # noqa: SLF001
-    handler._base_delay = 0.0  # noqa: SLF001
-    handler._max_delay = 0.0  # noqa: SLF001
+    handler._max_retries = 2
+    handler._base_delay = 0.0
+    handler._max_delay = 0.0
     return handler
 
 
 def _make_template(provider_api: str = "Pod") -> Any:
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate  # noqa: PLC0415
+    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
 
     return K8sTemplate(
         template_id="tpl-neg",
@@ -85,7 +85,7 @@ def _make_template(provider_api: str = "Pod") -> Any:
 
 
 def _api_exception(status: int) -> Exception:
-    from kubernetes.client.exceptions import ApiException  # noqa: PLC0415
+    from kubernetes.client.exceptions import ApiException
 
     exc = ApiException(status=status)
     exc.status = status
@@ -95,11 +95,11 @@ def _api_exception(status: int) -> Exception:
 @pytest.fixture(autouse=True)
 def _register_k8s_classifier() -> Any:
     """Register K8sRetryClassifier so non-retryable assertions hold."""
-    from orb.infrastructure.resilience.retry_classifier_registry import (  # noqa: PLC0415
+    from orb.infrastructure.resilience.retry_classifier_registry import (
         clear_classifiers,
         register_retry_classifier,
     )
-    from orb.providers.k8s.resilience.retry_classifier import K8sRetryClassifier  # noqa: PLC0415
+    from orb.providers.k8s.resilience.retry_classifier import K8sRetryClassifier
 
     register_retry_classifier(K8sRetryClassifier())
     yield
@@ -119,16 +119,16 @@ def test_load_config_missing_kubeconfig_raises_auth_error(tmp_path: Any) -> None
     we provide a valid path then delete the file to simulate a race condition,
     or we patch load_kubeconfig directly to simulate the SDK error.
     """
-    from unittest.mock import patch  # noqa: PLC0415
+    from unittest.mock import patch
 
-    from orb.providers.k8s.exceptions.k8s_errors import K8sAuthError  # noqa: PLC0415
-    from orb.providers.k8s.infrastructure.k8s_client import K8sClient  # noqa: PLC0415
+    from orb.providers.k8s.exceptions.k8s_errors import K8sAuthError
+    from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 
     # Create a real file so K8sProviderConfig accepts it at construction.
     kube_file = tmp_path / "kubeconfig"
     kube_file.write_text("# stub")
 
-    from orb.providers.k8s.configuration.config import K8sProviderConfig  # noqa: PLC0415
+    from orb.providers.k8s.configuration.config import K8sProviderConfig
 
     cfg = K8sProviderConfig(in_cluster=False, kubeconfig_path=str(kube_file))  # type: ignore[call-arg]
     client = K8sClient(config=cfg, logger=_make_logger())
@@ -161,7 +161,7 @@ async def test_acquire_hosts_403_rbac_denial_not_retried() -> None:
     request = _make_acquire_request()
     template = _make_template()
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         await handler.acquire_hosts(request, template)
 
     # Must have been called exactly once — no retry on 403.
@@ -182,7 +182,7 @@ async def test_acquire_hosts_403_quota_exceeded_not_retried() -> None:
     Kubernetes returns 403 for both RBAC denial and ResourceQuota exceeded.
     Both must be classified as non-retryable.
     """
-    from kubernetes.client.exceptions import ApiException  # noqa: PLC0415
+    from kubernetes.client.exceptions import ApiException
 
     exc = ApiException(status=403)
     exc.status = 403
@@ -197,7 +197,7 @@ async def test_acquire_hosts_403_quota_exceeded_not_retried() -> None:
     request = _make_acquire_request()
     template = _make_template()
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         await handler.acquire_hosts(request, template)
 
     assert core_v1.create_namespaced_pod.call_count == 1, (
@@ -217,7 +217,7 @@ async def test_orphan_gc_500_on_list_returns_empty_and_logs_warning() -> None:
     Graceful degradation: the GC skips the sweep and records the error in
     stats without propagating the exception to the caller.
     """
-    from orb.providers.k8s.reconciliation.orphan_gc import OrphanGarbageCollector  # noqa: PLC0415
+    from orb.providers.k8s.reconciliation.orphan_gc import OrphanGarbageCollector
 
     core_v1 = MagicMock()
     core_v1.list_namespaced_pod.side_effect = _api_exception(500)
@@ -233,9 +233,9 @@ async def test_orphan_gc_500_on_list_returns_empty_and_logs_warning() -> None:
         known_request_ids=lambda: [],
     )
 
-    # run_once delegates to _run_once_sync via asyncio.to_thread; call the
-    # sync variant directly to keep the test synchronous and deterministic.
-    orphans = gc._run_once_sync()  # noqa: SLF001
+    # run_once fans out per namespace via asyncio.gather; a 500 from the
+    # apiserver is captured on gc.stats.last_error rather than raised.
+    orphans = await gc.run_once()
 
     assert orphans == [], "Expected empty orphan list when apiserver returns 500"
     assert gc.stats.last_error is not None, "Expected last_error to be set after 500"
@@ -255,15 +255,15 @@ def test_load_config_connection_refused_raises_auth_error(tmp_path: Any) -> None
     is unreachable during config loading), load_config must surface a
     K8sAuthError with a clean message rather than propagating the raw error.
     """
-    from unittest.mock import patch  # noqa: PLC0415
+    from unittest.mock import patch
 
-    from orb.providers.k8s.exceptions.k8s_errors import K8sAuthError  # noqa: PLC0415
-    from orb.providers.k8s.infrastructure.k8s_client import K8sClient  # noqa: PLC0415
+    from orb.providers.k8s.exceptions.k8s_errors import K8sAuthError
+    from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 
     kube_file = tmp_path / "kubeconfig"
     kube_file.write_text("# stub")
 
-    from orb.providers.k8s.configuration.config import K8sProviderConfig  # noqa: PLC0415
+    from orb.providers.k8s.configuration.config import K8sProviderConfig
 
     cfg = K8sProviderConfig(in_cluster=False, kubeconfig_path=str(kube_file))  # type: ignore[call-arg]
     client = K8sClient(config=cfg, logger=_make_logger())
@@ -298,7 +298,7 @@ async def test_acquire_hosts_429_exhausts_retry_budget() -> None:
     request = _make_acquire_request()
     template = _make_template()
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         await handler.acquire_hosts(request, template)
 
     # With max_retries=2 the handler makes 1 + 2 = 3 attempts total.
@@ -345,7 +345,7 @@ class _SyntheticWatch:
 
 
 def _make_v1pod(*, name: str, namespace: str = "orb-test", request_id: str = "req-test") -> Any:
-    from types import SimpleNamespace  # noqa: PLC0415
+    from types import SimpleNamespace
 
     return SimpleNamespace(
         metadata=SimpleNamespace(
@@ -380,8 +380,8 @@ async def test_watch_reconnects_after_http_500_mid_stream(
     apiserver hiccup mid-stream.  The outer loop must back off and retry.
     The second call delivers a real ADDED event confirming recovery.
     """
-    from orb.providers.k8s.watch.pod_state_cache import PodStateCache  # noqa: PLC0415
-    from orb.providers.k8s.watch.watcher import K8sWatcher  # noqa: PLC0415
+    from orb.providers.k8s.watch.pod_state_cache import PodStateCache
+    from orb.providers.k8s.watch.watcher import K8sWatcher
 
     request_id = str(uuid.uuid4())
     pod = _make_v1pod(name="orb-post-500-0000", request_id=request_id)
