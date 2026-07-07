@@ -41,17 +41,23 @@ class ConfigurationAdapter(ConfigurationPort):
         """Get naming configuration for domain layer."""
         try:
             config = self._config_manager.get_typed(NamingConfig)
+            patterns: dict[str, Any] = {
+                "request_id": config.patterns.get("request_id", r"^(req-|ret-)[a-f0-9\-]{36}$"),
+                "instance_type": config.patterns.get("instance_type", r"^[a-z0-9]+\.[a-z0-9]+$"),
+                "cidr_block": config.patterns.get("cidr_block", r"^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$"),
+            }
+            # Expose the provider-scoped resource-ID pattern under a provider-neutral
+            # key so domain code can read it without knowing which provider is active.
+            # The shared NamingConfig still accepts an "ec2_instance" key for configs
+            # written before this change; we surface it here as "resource_id_pattern"
+            # so callers do not need to hard-code the AWS-specific key name.
+            # New code should prefer calling get_resource_id_pattern() on the active
+            # ProviderStrategy directly.
+            resource_id_pattern = config.patterns.get("ec2_instance")
+            if resource_id_pattern is not None:
+                patterns["resource_id_pattern"] = resource_id_pattern
             return {
-                "patterns": {
-                    "request_id": config.patterns.get("request_id", r"^(req-|ret-)[a-f0-9\-]{36}$"),
-                    "ec2_instance": config.patterns.get("ec2_instance", r"^i-[a-f0-9]{8,17}$"),
-                    "instance_type": config.patterns.get(
-                        "instance_type", r"^[a-z0-9]+\.[a-z0-9]+$"
-                    ),
-                    "cidr_block": config.patterns.get(
-                        "cidr_block", r"^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$"
-                    ),
-                },
+                "patterns": patterns,
                 "prefixes": {
                     "request": (
                         config.prefixes.request
@@ -70,7 +76,6 @@ class ConfigurationAdapter(ConfigurationPort):
             return {
                 "patterns": {
                     "request_id": r"^(req-|ret-)[a-f0-9\-]{36}$",
-                    "ec2_instance": r"^i-[a-f0-9]{8,17}$",
                     "instance_type": r"^[a-z0-9]+\.[a-z0-9]+$",
                     "cidr_block": r"^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$",
                 },

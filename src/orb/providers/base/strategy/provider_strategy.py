@@ -423,6 +423,24 @@ class ProviderStrategy(ABC):
         return {}
 
     @classmethod
+    def get_resource_id_pattern(cls) -> Optional[str]:
+        """Return a regex pattern that validates provider-specific resource IDs.
+
+        Return ``None`` (default) when the provider does not enforce a
+        resource-ID naming convention.  Return a regex string when the
+        provider issues predictable IDs that should be validated at the
+        storage / API boundary — e.g. AWS's ``i-<hex>`` instance IDs.
+
+        Declared as a ``@classmethod`` so callers can retrieve the pattern from
+        the class directly — no instance (and therefore no live credentials or
+        I/O) is required.
+
+        Returns:
+            Regex pattern string, or ``None`` if no pattern is enforced.
+        """
+        return None
+
+    @classmethod
     def get_cli_infrastructure_defaults(cls, args: Any) -> dict[str, Any]:
         """Extract provider-specific infrastructure defaults from parsed CLI args.
 
