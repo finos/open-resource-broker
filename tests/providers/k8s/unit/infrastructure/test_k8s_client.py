@@ -9,13 +9,16 @@ Backfill coverage added in Group T1:
 
 from __future__ import annotations
 
-import time
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from orb.providers.k8s.configuration.config import K8sProviderConfig
+
+if TYPE_CHECKING:
+    from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 
 
 def _make_client(api_client: object | None = None) -> "K8sClient":
@@ -119,7 +122,6 @@ def test_api_client_lazy_builds_on_first_access() -> None:
             fake_api_client_cls,
         ):
             # Import the real module to patch the inner import
-            import sys
 
             import kubernetes.client.api_client as _api_client_mod  # noqa: PLC0415
 
@@ -198,8 +200,6 @@ def test_cleanup_resets_cached_api_sub_clients() -> None:
     """cleanup() must null out core_v1, apps_v1, and batch_v1 cached instances."""
     mock_api_client = MagicMock()
     client = _make_client(api_client=mock_api_client)
-
-    import kubernetes.client as _kc  # noqa: PLC0415
 
     # Pre-warm all three lazy accessors.
     client._core_v1 = MagicMock()  # noqa: SLF001
@@ -286,9 +286,7 @@ def test_call_with_auth_retry_retries_on_401(monkeypatch: pytest.MonkeyPatch) ->
     # fn fails first with 401, then succeeds.
     fn = MagicMock(side_effect=[_FakeApiException(401), "recovered"])
 
-    with patch(
-        "orb.providers.k8s.infrastructure.k8s_client.load_in_cluster_config"
-    ) as mock_reload:
+    with patch("orb.providers.k8s.infrastructure.k8s_client.load_in_cluster_config") as mock_reload:
         result = client.call_with_auth_retry(fn)
 
     assert result == "recovered"

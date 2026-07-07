@@ -53,8 +53,9 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import Callable, Iterator
 from types import SimpleNamespace
-from typing import Any, Iterator
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -125,7 +126,7 @@ class _ErrorWatch:
 
     def stream(self, func: Any, **kwargs: Any) -> Iterator[dict[str, Any]]:
         raise self._exc
-        yield  # make it a generator function for type checkers  # noqa: unreachable
+        yield  # make it a generator function for type checkers
 
     def stop(self) -> None:
         pass
@@ -141,7 +142,7 @@ class _GoneWatch:
         from kubernetes.client.exceptions import ApiException  # noqa: PLC0415
 
         raise ApiException(status=410, reason="Gone")
-        yield  # noqa: unreachable
+        yield  # make it a generator function for type checkers
 
     def stop(self) -> None:
         pass
@@ -153,7 +154,7 @@ class _GoneWatch:
 
 
 async def _wait_for_cache_condition(
-    check: "Callable[[], bool]",
+    check: Callable[[], bool],
     *,
     timeout: float = 5.0,
     poll_interval: float = 0.01,
@@ -164,8 +165,6 @@ async def _wait_for_cache_condition(
     deadline.  This replaces raw ``asyncio.sleep`` rendezvous that are brittle
     on slow CI runners.
     """
-    import asyncio  # noqa: PLC0415
-    from typing import Callable  # noqa: PLC0415
 
     deadline = asyncio.get_event_loop().time() + timeout
     while True:
@@ -173,9 +172,7 @@ async def _wait_for_cache_condition(
             return
         remaining = deadline - asyncio.get_event_loop().time()
         if remaining <= 0:
-            raise asyncio.TimeoutError(
-                f"Cache condition not met within {timeout}s"
-            )
+            raise asyncio.TimeoutError(f"Cache condition not met within {timeout}s")
         await asyncio.sleep(min(poll_interval, remaining))
 
 
@@ -340,10 +337,7 @@ async def test_watch_reconnects_on_410_gone(
     watcher.start()
     # Wait until the cache contains the recovered pod rather than sleeping.
     await _wait_for_cache_condition(
-        lambda: any(
-            s.pod_name == "orb-recovered-0000"
-            for s in (cache.get(request_id) or [])
-        ),
+        lambda: any(s.pod_name == "orb-recovered-0000" for s in (cache.get(request_id) or [])),
         timeout=5.0,
     )
     await watcher.stop()
@@ -393,8 +387,7 @@ async def test_watch_survives_transient_disconnect(
     # condition should be met well within the 5-second timeout.
     await _wait_for_cache_condition(
         lambda: any(
-            s.pod_name == "orb-post-disconnect-0000"
-            for s in (cache.get(request_id) or [])
+            s.pod_name == "orb-post-disconnect-0000" for s in (cache.get(request_id) or [])
         ),
         timeout=5.0,
     )

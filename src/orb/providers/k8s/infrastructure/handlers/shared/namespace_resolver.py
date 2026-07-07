@@ -68,9 +68,11 @@ def resolve_namespace(
         from orb.providers.k8s.utilities.labels import (  # noqa: PLC0415
             validate_namespace as _validate_ns,
         )
+
         _validate_ns(candidate)
     except Exception as _ns_err:
         from orb.providers.k8s.exceptions.k8s_errors import K8sError  # noqa: PLC0415
+
         raise K8sError(
             f"Resolved namespace {candidate!r} is not a valid Kubernetes namespace: {_ns_err}"
         ) from _ns_err

@@ -312,6 +312,7 @@ async def test_statefulset_handler_check_status_running_pods(
     empty.  The verdict is derived from the pod roll-up.
     """
     import asyncio  # noqa: PLC0415
+
     from kmock import resource  # noqa: PLC0415
 
     request_id = f"req-{uuid.uuid4()}"
@@ -348,9 +349,7 @@ async def test_statefulset_handler_check_status_running_pods(
     )
 
     handler = _make_sts_handler(k8s_client_facade, k8s_config)
-    request = _make_request_with_id(
-        request_id, requested_count=2, statefulset_name=sts_name
-    )
+    request = _make_request_with_id(request_id, requested_count=2, statefulset_name=sts_name)
 
     result = await asyncio.to_thread(handler.check_hosts_status, request)
 
@@ -367,6 +366,7 @@ async def test_statefulset_handler_check_status_no_pods_in_progress(
 ) -> None:
     """check_hosts_status with no pods returns in_progress (StatefulSet starting)."""
     import asyncio  # noqa: PLC0415
+
     from kmock import resource  # noqa: PLC0415
 
     request_id = f"req-{uuid.uuid4()}"
@@ -394,9 +394,7 @@ async def test_statefulset_handler_check_status_no_pods_in_progress(
     }
 
     handler = _make_sts_handler(k8s_client_facade, k8s_config)
-    request = _make_request_with_id(
-        request_id, requested_count=2, statefulset_name=sts_name
-    )
+    request = _make_request_with_id(request_id, requested_count=2, statefulset_name=sts_name)
 
     result = await asyncio.to_thread(handler.check_hosts_status, request)
 

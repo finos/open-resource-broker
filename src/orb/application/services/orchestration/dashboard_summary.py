@@ -31,6 +31,8 @@ _REQUEST_STATUS_KEYS = [
     "cancelled",
     "timeout",
 ]
+
+
 def _get_template_provider_api_keys() -> list[str]:
     """Return the list of known provider API names from the registry.
 

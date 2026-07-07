@@ -18,9 +18,6 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import MagicMock
 
-import pytest
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -60,7 +57,9 @@ def _make_fake_k8s_client() -> Any:
 
 def test_k8s_strategy_initialises() -> None:
     """K8sProviderStrategy.initialize() returns True with a mocked K8sClient."""
-    from orb.providers.k8s.strategy.k8s_provider_strategy import K8sProviderStrategy  # noqa: PLC0415
+    from orb.providers.k8s.strategy.k8s_provider_strategy import (
+        K8sProviderStrategy,  # noqa: PLC0415
+    )
 
     strategy = K8sProviderStrategy(
         config=_make_k8s_config(),
@@ -187,7 +186,9 @@ def test_resolved_handlers_have_kubernetes_client() -> None:
 def test_strategy_capabilities_cover_all_apis() -> None:
     """K8sProviderStrategy.get_capabilities returns all four provider APIs."""
     from orb.providers.base.strategy import ProviderOperationType  # noqa: PLC0415
-    from orb.providers.k8s.strategy.k8s_provider_strategy import K8sProviderStrategy  # noqa: PLC0415
+    from orb.providers.k8s.strategy.k8s_provider_strategy import (
+        K8sProviderStrategy,  # noqa: PLC0415
+    )
 
     strategy = K8sProviderStrategy(
         config=_make_k8s_config(),

@@ -626,6 +626,8 @@ def is_k8s_provider_registered() -> bool:
 
         return "k8s" in ProviderSettingsRegistry.get_registered_provider_types()
     except Exception:
+        # Provider-settings registry may be unavailable during early bootstrap
+        # or in stripped test environments; treat as "not registered".
         return False
 
 

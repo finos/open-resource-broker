@@ -64,6 +64,7 @@ _NAMESPACE_MAX_LEN = 63
 # because utilities is imported by handlers which import exceptions already)
 # ---------------------------------------------------------------------------
 
+
 class K8sValidationError(Exception):
     """Raised when a label key, value, or namespace fails validation."""
 

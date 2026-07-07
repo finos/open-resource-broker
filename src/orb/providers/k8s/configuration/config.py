@@ -22,9 +22,7 @@ _SA_NAMESPACE_FILE = Path("/var/run/secrets/kubernetes.io/serviceaccount/namespa
 
 # RFC 1123 DNS subdomain: one or more labels separated by dots where each
 # label starts and ends with [a-z0-9] and may contain hyphens in the middle.
-_DNS_SUBDOMAIN_RE = re.compile(
-    r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
-)
+_DNS_SUBDOMAIN_RE = re.compile(r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$")
 
 # Symphony-era field names that were renamed when the k8s provider was
 # introduced.  Keys are the legacy names; values are the canonical names.
@@ -36,6 +34,7 @@ _LEGACY_FIELD_MAP: dict[str, str] = {
     "orphan_gc_interval": "orphan_gc_interval_seconds",
     "orphan_min_age": "orphan_min_age_seconds",
 }
+
 
 def _get_logger() -> "logging.Logger":
     """Return a stdlib logger for namespace auto-detection messages.

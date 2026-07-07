@@ -30,6 +30,8 @@ class KubernetesDefaultsLoader:
             )
             return json.loads(text)
         except Exception:
+            # Defaults file is optional; missing or unreadable content
+            # falls back to an empty dict so callers can proceed.
             return {}
 
 

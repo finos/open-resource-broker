@@ -136,10 +136,7 @@ def pytest_sessionstart(session: pytest.Session) -> None:
             k8s_config_mod.load_kube_config(config_file=kubeconfig_path, context=context)
             core_v1 = k8s_client_mod.CoreV1Api()
             core_v1.list_namespace(limit=1)
-            print(
-                f"\nk8s credentials valid "
-                f"(kubeconfig={kubeconfig_path!r}, context={context!r})"
-            )
+            print(f"\nk8s credentials valid (kubeconfig={kubeconfig_path!r}, context={context!r})")
             return
         except Exception as exc:
             last_exc = exc
@@ -270,11 +267,7 @@ def request_id_prefix(k8s_live_config: dict) -> str:
     whatever prefix operators have configured; the ``RequestId`` domain
     value object validates against ``naming.patterns.request_id``.
     """
-    return (
-        k8s_live_config.get("naming", {})
-        .get("prefixes", {})
-        .get("request", "req-")
-    )
+    return k8s_live_config.get("naming", {}).get("prefixes", {}).get("request", "req-")
 
 
 @pytest.fixture

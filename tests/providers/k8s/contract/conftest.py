@@ -27,10 +27,10 @@ from orb.domain.base.ports.provider_validation_port import BaseProviderValidatio
 from orb.domain.base.provider_fulfilment import CheckHostsStatusResult
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.domain.template.k8s_template import K8sResourceQuantities, K8sTemplate
-from orb.providers.k8s.infrastructure.handlers.pod_handler import K8sPodHandler
 from orb.providers.k8s.infrastructure.adapters.template_adapter import (  # noqa: PLC2701
     _SUPPORTED_PROVIDER_APIS,
 )
+from orb.providers.k8s.infrastructure.handlers.pod_handler import K8sPodHandler
 from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
 
 # ---------------------------------------------------------------------------

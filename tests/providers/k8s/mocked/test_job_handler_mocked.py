@@ -308,6 +308,7 @@ async def test_job_handler_check_status_running_pods(
     comes from the pod roll-up only.
     """
     import asyncio  # noqa: PLC0415
+
     from kmock import resource  # noqa: PLC0415
 
     request_id = f"req-{uuid.uuid4()}"
@@ -344,9 +345,7 @@ async def test_job_handler_check_status_running_pods(
     )
 
     handler = _make_job_handler(k8s_client_facade, k8s_config)
-    request = _make_request_with_id(
-        request_id, requested_count=2, job_name=job_name
-    )
+    request = _make_request_with_id(request_id, requested_count=2, job_name=job_name)
 
     result = await asyncio.to_thread(handler.check_hosts_status, request)
 
@@ -363,6 +362,7 @@ async def test_job_handler_check_status_no_pods_returns_in_progress(
 ) -> None:
     """check_hosts_status with no pods returns in_progress (Job not yet running)."""
     import asyncio  # noqa: PLC0415
+
     from kmock import resource  # noqa: PLC0415
 
     request_id = f"req-{uuid.uuid4()}"
@@ -390,9 +390,7 @@ async def test_job_handler_check_status_no_pods_returns_in_progress(
     }
 
     handler = _make_job_handler(k8s_client_facade, k8s_config)
-    request = _make_request_with_id(
-        request_id, requested_count=2, job_name=job_name
-    )
+    request = _make_request_with_id(request_id, requested_count=2, job_name=job_name)
 
     result = await asyncio.to_thread(handler.check_hosts_status, request)
 

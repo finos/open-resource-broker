@@ -71,7 +71,9 @@ def _make_template(namespace: str = "orb-test") -> Any:
 
 
 def _make_deployment_handler(k8s_client_facade: Any, k8s_config: Any) -> Any:
-    from orb.providers.k8s.infrastructure.handlers.deployment_handler import K8sDeploymentHandler  # noqa: PLC0415
+    from orb.providers.k8s.infrastructure.handlers.deployment_handler import (
+        K8sDeploymentHandler,  # noqa: PLC0415
+    )
 
     return K8sDeploymentHandler(
         kubernetes_client=k8s_client_facade,
@@ -371,6 +373,7 @@ async def test_deployment_handler_check_status_running_pods(
     (pre-create or post-release race).
     """
     import asyncio  # noqa: PLC0415
+
     from kmock import resource  # noqa: PLC0415
 
     request_id = f"req-{uuid.uuid4()}"
@@ -408,9 +411,7 @@ async def test_deployment_handler_check_status_running_pods(
     )
 
     handler = _make_deployment_handler(k8s_client_facade, k8s_config)
-    request = _make_request_with_id(
-        request_id, requested_count=2, deployment_name=dep_name
-    )
+    request = _make_request_with_id(request_id, requested_count=2, deployment_name=dep_name)
 
     result = await asyncio.to_thread(handler.check_hosts_status, request)
 
@@ -428,6 +429,7 @@ async def test_deployment_handler_check_status_no_pods_returns_in_progress(
 ) -> None:
     """check_hosts_status with no pods returns in_progress (Deployment still scaling up)."""
     import asyncio  # noqa: PLC0415
+
     from kmock import resource  # noqa: PLC0415
 
     request_id = f"req-{uuid.uuid4()}"
@@ -455,9 +457,7 @@ async def test_deployment_handler_check_status_no_pods_returns_in_progress(
     }
 
     handler = _make_deployment_handler(k8s_client_facade, k8s_config)
-    request = _make_request_with_id(
-        request_id, requested_count=3, deployment_name=dep_name
-    )
+    request = _make_request_with_id(request_id, requested_count=3, deployment_name=dep_name)
 
     result = await asyncio.to_thread(handler.check_hosts_status, request)
 

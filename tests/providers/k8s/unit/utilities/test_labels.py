@@ -10,7 +10,6 @@ from orb.providers.k8s.utilities.labels import (
     validate_namespace,
 )
 
-
 # ---------------------------------------------------------------------------
 # build_label_selector — happy paths
 # ---------------------------------------------------------------------------

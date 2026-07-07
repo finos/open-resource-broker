@@ -541,7 +541,9 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
                     except TypeError:
                         supported = strategy_class.get_supported_apis()  # type: ignore[call-arg]
                     apis.extend(supported)
-                elif hasattr(registration, "default_api") and getattr(registration, "default_api", None):
+                elif hasattr(registration, "default_api") and getattr(
+                    registration, "default_api", None
+                ):
                     apis.append(getattr(registration, "default_api"))  # type: ignore[arg-type]
                 else:
                     # Fall back to the provider type name itself as a minimal key.

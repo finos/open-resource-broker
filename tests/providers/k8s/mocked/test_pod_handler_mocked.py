@@ -396,7 +396,6 @@ async def test_return_request_completes_when_pod_deleted(
     from orb.domain.base.operation_outcome import Completed  # noqa: PLC0415
     from orb.domain.request.aggregate import Request  # noqa: PLC0415
     from orb.domain.request.value_objects import RequestId, RequestType  # noqa: PLC0415
-    from orb.providers.k8s.infrastructure.handlers.pod_handler import K8sPodHandler  # noqa: PLC0415
     from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry  # noqa: PLC0415
 
     request_id = f"req-{uuid.uuid4()}"
@@ -583,6 +582,5 @@ async def test_pod_created_in_template_namespace_override(
     stored = [(res, ns, name) for res, ns, name in kmock_k8s.objects]
     custom_ns_pods = [name for res, ns, name in stored if ns == "custom-namespace"]
     assert pod_name in custom_ns_pods, (
-        f"Pod {pod_name!r} not found under 'custom-namespace' in kmock. "
-        f"Stored objects: {stored}"
+        f"Pod {pod_name!r} not found under 'custom-namespace' in kmock. Stored objects: {stored}"
     )

@@ -1,0 +1,23 @@
+{
+  "scheduler_type": "hostfactory",
+  "templates": [
+    {
+      "templateId": "k8s-bad-image-test",
+      "maxNumber": 1,
+      "imageId": "INVALID IMAGE NAME WITH SPACES!!!",
+      "priceType": "ondemand",
+      "name": "Bad Image Test",
+      "providerApi": "Pod",
+      "is_active": true
+    },
+    {
+      "templateId": "k8s-bad-namespace-test",
+      "maxNumber": 1,
+      "imageId": "busybox:latest",
+      "priceType": "ondemand",
+      "name": "Bad Namespace Test",
+      "providerApi": "Pod",
+      "is_active": true
+    }
+  ]
+}

@@ -1080,9 +1080,7 @@ class K8sProviderStrategy(ProviderStrategy):
             .read_text(encoding="utf-8")
         )
         raw = json.loads(text)
-        provider_config = (
-            raw.get("provider", {}).get("provider_defaults", {}).get("k8s", {})
-        )
+        provider_config = raw.get("provider", {}).get("provider_defaults", {}).get("k8s", {})
         # Lightweight structural validation — raises ValidationError on schema drift.
         if provider_config:
             K8sProviderConfig(

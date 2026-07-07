@@ -94,9 +94,7 @@ class K8sClient:
             else {}
         )
         self._in_cluster_adapter: Optional[InClusterAuthAdapter] = (
-            InClusterAuthAdapter(**refresh_kwargs)
-            if api_client is None
-            else None
+            InClusterAuthAdapter(**refresh_kwargs) if api_client is None else None
         )
 
     # ------------------------------------------------------------------
@@ -176,9 +174,7 @@ class K8sClient:
             return False
         refreshed = adapter.refresh_if_stale()
         if refreshed:
-            self._logger.info(
-                "K8sClient: in-cluster service-account token refreshed proactively."
-            )
+            self._logger.info("K8sClient: in-cluster service-account token refreshed proactively.")
         return refreshed
 
     def call_with_auth_retry(self, fn: Callable[..., _T], *args: Any, **kwargs: Any) -> _T:
@@ -222,9 +218,7 @@ class K8sClient:
                     # Update the adapter's timestamp so the TTL window resets.
                     adapter._last_loaded_at = time.monotonic()  # noqa: SLF001
                 except K8sAuthError as auth_exc:
-                    self._logger.error(
-                        "K8sClient: token refresh on 401 failed: %s", auth_exc
-                    )
+                    self._logger.error("K8sClient: token refresh on 401 failed: %s", auth_exc)
                     raise exc from None
             # Single retry.
             return fn(*args, **kwargs)

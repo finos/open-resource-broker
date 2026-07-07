@@ -104,9 +104,7 @@ def instance_dict_for_pod(
             disrupted_message = str(getattr(cond, "message", None) or "")
             break
 
-    restart_count: int = sum(
-        int(getattr(cs, "restart_count", 0) or 0) for cs in container_statuses
-    )
+    restart_count: int = sum(int(getattr(cs, "restart_count", 0) or 0) for cs in container_statuses)
 
     provider_data: dict[str, Any] = {
         "namespace": namespace,

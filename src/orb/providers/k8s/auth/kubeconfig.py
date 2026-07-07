@@ -67,10 +67,7 @@ def _sanitise_load_error(exc: Exception, config_file: Optional[str]) -> str:
     else:
         category = "other"
 
-    return (
-        f"Failed to load kubeconfig (config_file={config_file!r}): "
-        f"{exc_type} — {category}"
-    )
+    return f"Failed to load kubeconfig (config_file={config_file!r}): {exc_type} — {category}"
 
 
 def _check_exec_plugins(

@@ -1,0 +1,49 @@
+{
+  "scheduler_type": "hostfactory",
+  "templates": [
+    {
+      "templateId": "k8s-pod-example",
+      "maxNumber": 1,
+      "imageId": "busybox:latest",
+      "priceType": "ondemand",
+      "allocationStrategy": "lowestPrice",
+      "name": "Kubernetes Pod example",
+      "providerApi": "Pod",
+      "providerType": "k8s",
+      "createdAt": "2026-07-06T22:07:11.808371"
+    },
+    {
+      "templateId": "k8s-deployment-example",
+      "maxNumber": 3,
+      "imageId": "busybox:latest",
+      "priceType": "ondemand",
+      "allocationStrategy": "lowestPrice",
+      "name": "Kubernetes Deployment example",
+      "providerApi": "Deployment",
+      "providerType": "k8s",
+      "createdAt": "2026-07-06T22:07:11.808407"
+    },
+    {
+      "templateId": "k8s-statefulset-example",
+      "maxNumber": 3,
+      "imageId": "busybox:latest",
+      "priceType": "ondemand",
+      "allocationStrategy": "lowestPrice",
+      "name": "Kubernetes StatefulSet example",
+      "providerApi": "StatefulSet",
+      "providerType": "k8s",
+      "createdAt": "2026-07-06T22:07:11.808466"
+    },
+    {
+      "templateId": "k8s-job-example",
+      "maxNumber": 3,
+      "imageId": "busybox:latest",
+      "priceType": "ondemand",
+      "allocationStrategy": "lowestPrice",
+      "name": "Kubernetes Job example",
+      "providerApi": "Job",
+      "providerType": "k8s",
+      "createdAt": "2026-07-06T22:07:11.808487"
+    }
+  ]
+}

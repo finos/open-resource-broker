@@ -10,10 +10,7 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import MagicMock
 
-import pytest
-
 from orb.providers.k8s.infrastructure.adapters.template_adapter import K8sTemplateAdapter
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -186,9 +183,6 @@ def test_validate_field_values_rejects_zero_completions() -> None:
     feed a negative-integer value via a stub to reach the adapter's own
     check without triggering the model-level guard.
     """
-    from unittest.mock import MagicMock  # noqa: PLC0415
-
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate  # noqa: PLC0415
 
     # Use a valid template as the base, then stub out completions to a
     # negative value by wrapping the attribute at the adapter-call level.

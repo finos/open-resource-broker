@@ -47,8 +47,8 @@ class TestK8sProvisioningContract(BaseProvisioningContract):
         from unittest.mock import MagicMock  # noqa: PLC0415
 
         from tests.providers.k8s.contract.conftest import (  # noqa: PLC0415
-            _K8sProviderAdapter,
             _build_pod_handler,
+            _K8sProviderAdapter,
             _make_config,
             _make_core_v1_mock,
             _make_logger,
@@ -81,6 +81,5 @@ class TestK8sProvisioningContract(BaseProvisioningContract):
         ids1 = set(result1.get("resource_ids", []))
         ids2 = set(result2.get("resource_ids", []))
         assert ids1 != ids2, (
-            f"Two separate acquires must produce distinct resource IDs; "
-            f"both returned: {ids1}"
+            f"Two separate acquires must produce distinct resource IDs; both returned: {ids1}"
         )

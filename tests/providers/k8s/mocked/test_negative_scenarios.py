@@ -20,7 +20,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
@@ -325,7 +324,7 @@ class _ErrorWatch:
 
     def stream(self, func: Any, **kwargs: Any) -> Iterator[Any]:
         raise self._exc
-        yield  # make it a generator  # noqa: unreachable
+        yield  # make it a generator function for type checkers
 
     def stop(self) -> None:
         pass
@@ -364,9 +363,7 @@ def _make_v1pod(*, name: str, namespace: str = "orb-test", request_id: str = "re
             pod_ip="10.0.0.1",
             host_ip="10.1.0.1",
             start_time=None,
-            conditions=[
-                SimpleNamespace(type="Ready", status="True", reason=None)
-            ],
+            conditions=[SimpleNamespace(type="Ready", status="True", reason=None)],
             container_statuses=[],
         ),
     )

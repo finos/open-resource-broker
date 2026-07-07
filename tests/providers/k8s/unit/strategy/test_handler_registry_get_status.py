@@ -216,8 +216,6 @@ def test_build_template_namespace_from_provider_config_is_promoted() -> None:
     ignored, leaving the namespace as None and falling through to the
     provider-level default.
     """
-    from types import SimpleNamespace  # noqa: PLC0415
-    from unittest.mock import MagicMock  # noqa: PLC0415
 
     import uuid  # noqa: PLC0415
 
