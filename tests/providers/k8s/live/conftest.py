@@ -122,7 +122,7 @@ def _read_kubeconfig_yaml(path: str) -> dict:
 
     Uses ``yaml.safe_load`` — same parser the kubernetes SDK relies on.
     """
-    import yaml  # noqa: PLC0415 — optional, only present when k8s extra installed
+    import yaml
 
     with open(path) as fh:
         return yaml.safe_load(fh) or {}

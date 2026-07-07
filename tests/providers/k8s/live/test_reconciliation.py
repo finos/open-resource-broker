@@ -190,7 +190,7 @@ async def test_orphan_gc_deletes_orphan_after_grace_period(
         kubernetes_client=client,
         config=config,
         logger=MagicMock(),
-        known_request_ids=lambda: set(),
+        known_request_ids=set,
         interval_seconds=_GC_FAST_INTERVAL,
     )
 
