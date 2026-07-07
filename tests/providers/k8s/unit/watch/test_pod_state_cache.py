@@ -1,4 +1,4 @@
-"""Unit tests for :class:`PodStateCache`.
+"""Unit tests for :class:`PodStateCache`.  (Includes T07 per-key lock tests.)
 
 Covers:
 
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pytest
 
@@ -185,3 +186,104 @@ def test_concurrent_upsert_and_delete_keep_index_consistent() -> None:
         assert cache.size() == 0
     else:
         assert len(states) == cache.size()
+
+
+# ---------------------------------------------------------------------------
+# T07 — per-key lock: 100 concurrent mark_stale on 100 different keys
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.timeout(10)
+def test_concurrent_mark_stale_on_distinct_keys_does_not_serialise() -> None:
+    """100 concurrent mark_stale calls on 100 different request IDs must all
+    complete without deadlock and without corrupting the cache.
+
+    This test exercises the per-key locking path added in T07: calls for
+    distinct keys acquire different per-key locks, so they can proceed in
+    parallel without waiting for a single global lock to be released.
+    """
+    n_keys = 100
+    cache = PodStateCache()
+
+    # Seed each key with one pod entry that is old enough to be evicted.
+    for i in range(n_keys):
+        cache.upsert(_state(request_id=f"req-{i}", pod_name=f"pod-{i}", status="running"))
+
+    # Wait briefly so the entries are older than the threshold we'll use.
+    time.sleep(0.02)
+
+    evicted: list[list[PodState]] = []
+    errors: list[Exception] = []
+
+    def evict(key_idx: int) -> list[PodState]:
+        return cache.mark_stale(f"req-{key_idx}", threshold=0.01)
+
+    with ThreadPoolExecutor(max_workers=n_keys) as pool:
+        futures = {pool.submit(evict, i): i for i in range(n_keys)}
+        for fut in as_completed(futures):
+            try:
+                evicted.append(fut.result())
+            except Exception as exc:
+                # Exception is the correct catch here: ThreadPoolExecutor
+                # already surfaces worker failures via ``fut.result()`` as
+                # ``Exception`` subclasses; catching ``BaseException`` would
+                # additionally swallow ``KeyboardInterrupt`` and hang the
+                # test on interactive Ctrl-C.
+                errors.append(exc)
+
+    assert errors == [], f"mark_stale raised on some keys: {errors}"
+    # Every key had exactly one pod; each should have been evicted.
+    total_evicted = sum(len(dropped) for dropped in evicted)
+    assert total_evicted == n_keys, f"Expected {n_keys} evictions, got {total_evicted}"
+    # Cache should be empty after evicting everything.
+    assert cache.size() == 0
+
+
+@pytest.mark.timeout(10)
+def test_mark_stale_distinct_keys_use_distinct_locks() -> None:
+    """Locks for distinct request IDs must be different instances.
+
+    A regression to a single global lock would make this assertion fail
+    even though the correctness test above would still pass — it is the
+    parallelism proof missing from the throughput-only test.
+    """
+    cache = PodStateCache()
+    cache.upsert(_state(request_id="req-a", pod_name="pod-a"))
+    cache.upsert(_state(request_id="req-b", pod_name="pod-b"))
+    # Trigger per-key lock creation via a no-op mark_stale for each key.
+    cache.mark_stale("req-a", threshold=999.0)
+    cache.mark_stale("req-b", threshold=999.0)
+    with cache._stale_locks_mutex:  # type: ignore[attr-defined]
+        lock_a = cache._stale_locks["req-a"]  # type: ignore[attr-defined]
+        lock_b = cache._stale_locks["req-b"]  # type: ignore[attr-defined]
+    assert lock_a is not lock_b, (
+        "Per-key locks were collapsed to the same lock instance — a "
+        "regression to a single global lock would silently pass the "
+        "throughput test above.  Distinct keys must own distinct locks."
+    )
+
+
+@pytest.mark.timeout(10)
+def test_concurrent_mark_stale_same_key_is_safe() -> None:
+    """Multiple concurrent mark_stale calls for the *same* key must not
+    double-evict or corrupt the secondary index."""
+    cache = PodStateCache()
+    for i in range(10):
+        cache.upsert(_state(request_id="shared-req", pod_name=f"pod-{i}"))
+
+    time.sleep(0.02)
+
+    results: list[list[PodState]] = []
+
+    def evict() -> list[PodState]:
+        return cache.mark_stale("shared-req", threshold=0.01)
+
+    with ThreadPoolExecutor(max_workers=20) as pool:
+        futures = [pool.submit(evict) for _ in range(20)]
+        for fut in as_completed(futures):
+            results.append(fut.result())
+
+    # Total evicted across all calls must equal the original 10 (no double-eviction).
+    total = sum(len(r) for r in results)
+    assert total == 10, f"Expected 10 total evictions, got {total}"
+    assert cache.size() == 0

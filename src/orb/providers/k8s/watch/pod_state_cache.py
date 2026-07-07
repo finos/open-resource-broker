@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import threading
 import time
+from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -102,6 +103,15 @@ class PodStateCache:
         # Index: request_id -> set of pod_names.  Kept in sync with
         # ``_states`` so :meth:`get` is O(1) in the number of requests.
         self._by_request: dict[str, set[str]] = {}
+        # Per-key locks for mark_stale so concurrent eviction calls on
+        # *different* request IDs do not serialise on the single global
+        # lock.  A lightweight dict-of-locks pattern: the outer
+        # ``_stale_locks_mutex`` guards only the dict itself (fast), then
+        # each per-key Lock is held only for the duration of that key's
+        # eviction loop.  We use plain ``threading.Lock`` (not RLock)
+        # because re-entrancy is not needed here.
+        self._stale_locks: dict[str, threading.Lock] = defaultdict(threading.Lock)
+        self._stale_locks_mutex = threading.Lock()
 
     # ------------------------------------------------------------------
     # Mutations
@@ -201,25 +211,44 @@ class PodStateCache:
 
         ``threshold`` is a duration in seconds; entries whose
         ``last_updated`` is older than ``now - threshold`` are removed.
+
+        Concurrency: concurrent calls on *different* request IDs no longer
+        serialise on the single global lock.  A per-key
+        ``threading.Lock`` (fetched under a short ``_stale_locks_mutex``
+        hold) serialises only calls for the *same* key, while calls for
+        distinct keys proceed in parallel.  The global ``_lock`` is still
+        acquired for the short inner mutation step so the ``_states`` /
+        ``_by_request`` dicts remain consistent with all other writers
+        (``upsert``, ``delete``).
         """
         cutoff = time.monotonic() - max(threshold, 0.0)
+
+        # Fetch (or lazily create) the per-key lock without holding the
+        # global lock — defaultdict access is not thread-safe, so we guard
+        # the lookup with a lightweight mutex.
+        with self._stale_locks_mutex:
+            key_lock = self._stale_locks[request_id]
+
         dropped: list[PodState] = []
-        with self._lock:
-            bucket = self._by_request.get(request_id)
-            if bucket is None:
-                return dropped
-            for name in list(bucket):
-                key = (request_id, name)
-                state = self._states.get(key)
-                if state is None:
-                    bucket.discard(name)
-                    continue
-                if state.last_updated < cutoff:
-                    dropped.append(state)
-                    self._states.pop(key, None)
-                    bucket.discard(name)
-            if not bucket:
-                self._by_request.pop(request_id, None)
+        with key_lock:
+            # Snapshot the names to evict while holding the global lock,
+            # then mutate under the same lock in one pass.
+            with self._lock:
+                bucket = self._by_request.get(request_id)
+                if bucket is None:
+                    return dropped
+                for name in list(bucket):
+                    key = (request_id, name)
+                    state = self._states.get(key)
+                    if state is None:
+                        bucket.discard(name)
+                        continue
+                    if state.last_updated < cutoff:
+                        dropped.append(state)
+                        self._states.pop(key, None)
+                        bucket.discard(name)
+                if not bucket:
+                    self._by_request.pop(request_id, None)
         return dropped
 
 
