@@ -227,6 +227,11 @@ class K8sProviderStrategy(ProviderStrategy):
         # a second invocation (e.g. uvicorn worker recycle) short-circuits
         # immediately to prevent double-reconciliation.
         self._daemon_services_started: bool = False
+        # Prometheus metrics — constructed lazily on first use so tests
+        # that never touch the metrics path do not pollute the global
+        # ``prometheus_client.REGISTRY``.  Disabled entirely when
+        # ``config.metrics_enabled=False``.
+        self._metrics: Optional[Any] = None
         # Handler registry — does the per-API handler factory wiring and
         # the typed acquire/return/status dispatch.  Wired with closures
         # over the strategy's lazy client, watcher, native-spec accessors
@@ -242,6 +247,7 @@ class K8sProviderStrategy(ProviderStrategy):
             handler_overrides=handler_overrides,
             node_state_cache_provider=lambda: self._node_state_cache,
             api_aliases=type(self)._API_ALIASES,
+            metrics_provider=self._get_metrics,
         )
 
     # ------------------------------------------------------------------
@@ -320,7 +326,7 @@ class K8sProviderStrategy(ProviderStrategy):
                 "Kubernetes daemon services already started; skipping second invocation."
             )
             return
-        self._run_startup_reconciler()
+        await self._run_startup_reconciler()
         self._maybe_start_watch_manager()
         self._maybe_start_orphan_gc()
         self._maybe_start_node_watcher()
@@ -395,6 +401,7 @@ class K8sProviderStrategy(ProviderStrategy):
                 kubernetes_client=self.kubernetes_client,
                 config=self._k8s_config,
                 logger=self._logger,
+                metrics=self._get_metrics(),
             )
         return self._watch_manager
 
@@ -513,6 +520,32 @@ class K8sProviderStrategy(ProviderStrategy):
         """Surface the most recent :class:`ReconciliationReport` for diagnostics."""
         return self._last_reconciliation_report
 
+    def _get_metrics(self) -> Optional[Any]:
+        """Return the shared :class:`K8sMetrics` instance, constructing on demand.
+
+        Returns ``None`` when ``config.metrics_enabled=False`` so
+        handlers and the watcher stay silent.  Constructed once per
+        strategy instance; a second invocation returns the same
+        object so all recorders share the same registry.
+        """
+        if not self._k8s_config.metrics_enabled:
+            return None
+        if self._metrics is None:
+            from orb.providers.k8s.infrastructure.services.metrics import K8sMetrics
+
+            try:
+                self._metrics = K8sMetrics()
+            except RuntimeError as exc:
+                # Duplicate registration means a second strategy tried
+                # to bind to the same shared REGISTRY.  Log and stay
+                # silent rather than crash provider start-up.
+                self._logger.warning(
+                    "K8sMetrics registration failed; metrics disabled for this instance: %s",
+                    exc,
+                )
+                self._metrics = None
+        return self._metrics
+
     def _shared_cache(self) -> PodStateCache:
         """Return the cache used by both reconciler and watcher.
 
@@ -522,7 +555,7 @@ class K8sProviderStrategy(ProviderStrategy):
         """
         return self._ensure_watch_manager().cache
 
-    def _run_startup_reconciler(self) -> None:
+    async def _run_startup_reconciler(self) -> None:
         """Run the startup reconciler before the watch task spawns.
 
         The reconciler is constructed lazily here so tests that pass
@@ -542,8 +575,24 @@ class K8sProviderStrategy(ProviderStrategy):
             )
             self._startup_reconciler = reconciler
         try:
-            self._last_reconciliation_report = reconciler.run()
-        except Exception as exc:  # noqa: BLE001 — defensive
+            report = await reconciler.run_async()
+            self._last_reconciliation_report = report
+            # Only signal first-sync-complete when the reconciler
+            # actually succeeded.  ``run_async`` captures its own
+            # exceptions internally and sets ``report.completed = False``
+            # + ``report.error`` when the LIST failed — gating on the
+            # flag prevents ``is_healthy()`` from returning True with a
+            # cold, empty cache after a silent reconciler failure.
+            if report.completed and self._watch_manager is not None:
+                self._watch_manager.mark_first_sync_complete()
+            elif not report.completed:
+                self._logger.warning(
+                    "Kubernetes startup reconciler did not complete: %s "
+                    "(provider continues; is_healthy will report False until "
+                    "the next successful sync)",
+                    report.error,
+                )
+        except Exception as exc:
             self._logger.warning(
                 "Kubernetes startup reconciler raised: %s (provider continues)",
                 exc,
@@ -868,7 +917,7 @@ class K8sProviderStrategy(ProviderStrategy):
         # digging into provider_data.  The object is stored as-is — storing
         # only the state string would break every consumer that calls
         # ``.state`` or ``.message`` on the field.
-        from orb.domain.base.operation_outcome import Accepted, Completed  # noqa: PLC0415
+        from orb.domain.base.operation_outcome import Accepted, Completed
 
         if isinstance(outcome, (Accepted, Completed)):
             fulfilment = (outcome.metadata or {}).get("fulfilment")
@@ -947,18 +996,18 @@ class K8sProviderStrategy(ProviderStrategy):
                     "host",
                     None,
                 )
-            except Exception as exc:  # noqa: BLE001 — best-effort; host missing does not fail health
+            except Exception as exc:
                 self._logger.debug("Could not read cluster endpoint from api_client: %s", exc)
 
             # --- enrichment: server version ---
             # Gathers: VersionApi.get_code().git_version (Kubernetes server semver).
             server_version: Optional[str] = None
             try:
-                from kubernetes.client import VersionApi  # noqa: PLC0415
+                from kubernetes.client import VersionApi
 
                 version_info = VersionApi(api_client=client.api_client).get_code()
                 server_version = getattr(version_info, "git_version", None)
-            except Exception as exc:  # noqa: BLE001 — best-effort; version probe unavailable
+            except Exception as exc:
                 self._logger.debug("Could not read server version from VersionApi: %s", exc)
 
             # --- enrichment: current namespace ---
@@ -966,12 +1015,12 @@ class K8sProviderStrategy(ProviderStrategy):
             current_namespace: Optional[str] = self._k8s_config.namespace
             if current_namespace is None and self._k8s_config.in_cluster:
                 try:
-                    from orb.providers.k8s.configuration.config import (  # noqa: PLC0415
+                    from orb.providers.k8s.configuration.config import (
                         _read_in_cluster_namespace,
                     )
 
                     current_namespace = _read_in_cluster_namespace()
-                except Exception as exc:  # noqa: BLE001 — best-effort; namespace file may be absent
+                except Exception as exc:
                     self._logger.debug("Could not read in-cluster namespace: %s", exc)
 
             parts: list[str] = [
@@ -1069,10 +1118,10 @@ class K8sProviderStrategy(ProviderStrategy):
         :class:`K8sProviderConfig` from the ``provider.provider_defaults.k8s``
         block so schema drift is caught early.
         """
-        import json  # noqa: PLC0415
-        from importlib.resources import files  # noqa: PLC0415
+        import json
+        from importlib.resources import files
 
-        from orb.providers.k8s.configuration.config import K8sProviderConfig  # noqa: PLC0415
+        from orb.providers.k8s.configuration.config import K8sProviderConfig
 
         text = (
             files("orb.providers.k8s.config")
@@ -1237,7 +1286,7 @@ class K8sProviderStrategy(ProviderStrategy):
         sources: list[dict] = []
 
         try:
-            from orb.providers.k8s.auth.in_cluster import is_in_cluster  # noqa: PLC0415
+            from orb.providers.k8s.auth.in_cluster import is_in_cluster
 
             if is_in_cluster():
                 sources.append(
@@ -1251,7 +1300,7 @@ class K8sProviderStrategy(ProviderStrategy):
             _logger.debug("in_cluster detection failed: %s", exc)
 
         try:
-            import kubernetes.config as _k8s_config  # noqa: PLC0415
+            import kubernetes.config as _k8s_config
 
             contexts, current = _k8s_config.list_kube_config_contexts()
             current_name = current.get("name") if current else None
@@ -1298,9 +1347,9 @@ class K8sProviderStrategy(ProviderStrategy):
         namespace (in-cluster) or kubeconfig context (out-of-cluster).
         """
         try:
-            import kubernetes.client as _k8s_client  # noqa: PLC0415
-            import kubernetes.config as _k8s_config  # noqa: PLC0415
-            from kubernetes.client.exceptions import ApiException  # noqa: PLC0415
+            import kubernetes.client as _k8s_client
+            import kubernetes.config as _k8s_config
+            from kubernetes.client.exceptions import ApiException
         except ImportError:
             return {
                 "success": False,
@@ -1327,7 +1376,7 @@ class K8sProviderStrategy(ProviderStrategy):
             # Build the ApiClient ourselves so we keep a typed handle to the
             # configuration object (the auto-built api_client attribute on
             # CoreV1Api is not exposed by the type stubs).
-            from kubernetes.client.api_client import ApiClient  # noqa: PLC0415
+            from kubernetes.client.api_client import ApiClient
 
             api_client = ApiClient()
             # kubernetes-stubs-elephant-fork omits the `configuration`
@@ -1392,7 +1441,7 @@ class K8sProviderStrategy(ProviderStrategy):
     # Health-check integration
     # ------------------------------------------------------------------
 
-    def register_health_checks(self, health_check: "HealthCheck") -> None:
+    def register_health_checks(self, health_check: HealthCheck) -> None:
         """Register Kubernetes-specific health checks if the client is reachable."""
         try:
             client = self.kubernetes_client
@@ -1447,7 +1496,7 @@ class K8sProviderStrategy(ProviderStrategy):
             return None
 
         try:
-            from orb.providers.k8s.infrastructure.services.k8s_native_spec_service import (  # noqa: PLC0415
+            from orb.providers.k8s.infrastructure.services.k8s_native_spec_service import (
                 K8sNativeSpecService,
             )
 
@@ -1468,7 +1517,7 @@ class K8sProviderStrategy(ProviderStrategy):
     # Handler dispatch — delegated to K8sHandlerRegistry
     # ------------------------------------------------------------------
 
-    def _resolve_provider_api(self, request: "Request") -> str:
+    def _resolve_provider_api(self, request: Request) -> str:
         """Pick the provider-API key for ``request``."""
         return self._handler_registry.resolve_provider_api(request)
 
@@ -1480,19 +1529,19 @@ class K8sProviderStrategy(ProviderStrategy):
     # Typed provisioning interface
     # ------------------------------------------------------------------
 
-    async def acquire(self, request: "Request") -> OperationOutcome:
+    async def acquire(self, request: Request) -> OperationOutcome:
         """Submit an acquisition request to Kubernetes via the per-API handler."""
         return await self._handler_registry.acquire(request)
 
-    async def return_machines(self, machine_ids: list[str], request: "Request") -> OperationOutcome:
+    async def return_machines(self, machine_ids: list[str], request: Request) -> OperationOutcome:
         """Delete the named pods via the per-API handler."""
         return await self._handler_registry.return_machines(machine_ids, request)
 
-    async def get_status(self, resource_ids: list[str], request: "Request") -> OperationOutcome:
+    async def get_status(self, resource_ids: list[str], request: Request) -> OperationOutcome:
         """Poll the per-API handler's ``check_hosts_status`` for a verdict."""
         return await self._handler_registry.get_status(resource_ids, request)
 
-    def _build_template_for_request(self, request: "Request") -> "Template":
+    def _build_template_for_request(self, request: Request) -> Template:
         """Resolve the :class:`Template` carried by ``request``."""
         return self._handler_registry.build_template_for_request(request)
 
@@ -1636,7 +1685,7 @@ def _outcome_to_provider_result(
       synchronously so the provisioning service does not keep the request
       in IN_PROGRESS waiting for a state transition that already happened.
     """
-    from orb.domain.base.operation_outcome import (  # noqa: PLC0415
+    from orb.domain.base.operation_outcome import (
         Accepted,
         Completed,
         Failed,

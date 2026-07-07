@@ -139,11 +139,13 @@ class OrphanGarbageCollector:
     # ------------------------------------------------------------------
 
     async def run_once(self) -> list[OrphanPod]:
-        """Perform exactly one sweep; return the orphans found."""
-        return await asyncio.to_thread(self._run_once_sync)
+        """Perform exactly one sweep across all namespaces in parallel.
 
-    def _run_once_sync(self) -> list[OrphanPod]:
-        """Synchronous body of one sweep — runs on the worker thread."""
+        Namespace fan-out runs concurrently via :func:`asyncio.gather` so
+        a slow apiserver response for one namespace does not block the
+        others.  Exceptions from individual namespaces are logged and
+        skipped; the overall sweep continues.
+        """
         self.stats.runs += 1
         self.stats.last_run_at = time.monotonic()
         self.stats.last_orphans_found = 0
@@ -151,7 +153,7 @@ class OrphanGarbageCollector:
 
         try:
             known_ids = {str(rid) for rid in self._known_request_ids_fn()}
-        except Exception as exc:  # noqa: BLE001 — defensive
+        except Exception as exc:
             self.stats.last_error = f"known_request_ids lookup failed: {exc}"
             self._logger.warning(
                 "Orphan GC: known_request_ids lookup failed; skipping sweep: %s",
@@ -165,18 +167,27 @@ class OrphanGarbageCollector:
         label_selector = _build_label_selector(self._config.label_prefix, "managed", "true")
         request_id_label = f"{self._config.label_prefix}/request-id"
 
+        results = await asyncio.gather(
+            *[
+                self._gc_namespace(ns, label_selector, request_id_label, known_ids)
+                for ns in namespaces
+            ],
+            return_exceptions=True,
+        )
+
         orphans: list[OrphanPod] = []
-        for ns in namespaces:
-            pods = self._list_pods(ns, label_selector)
-            for pod in pods:
-                orphan = self._classify_orphan(
-                    pod,
-                    namespace=ns,
-                    known_ids=known_ids,
-                    request_id_label=request_id_label,
+        for ns, result in zip(namespaces, results, strict=True):
+            if isinstance(result, BaseException):
+                ns_label = ns if ns is not None else "*"
+                self.stats.last_error = f"gc_namespace failed for {ns_label}: {result}"
+                self._logger.warning(
+                    "Orphan GC: namespace=%s raised an exception (continuing): %s",
+                    ns_label,
+                    result,
+                    exc_info=result,
                 )
-                if orphan is not None:
-                    orphans.append(orphan)
+            else:
+                orphans.extend(result)
 
         self.stats.last_orphans_found = len(orphans)
         self.stats.total_orphans_found += len(orphans)
@@ -196,6 +207,27 @@ class OrphanGarbageCollector:
 
         return orphans
 
+    async def _gc_namespace(
+        self,
+        namespace: Optional[str],
+        label_selector: str,
+        request_id_label: str,
+        known_ids: set[str],
+    ) -> list[OrphanPod]:
+        """Collect orphans for a single namespace; runs the blocking list call in a thread."""
+        pods = await asyncio.to_thread(self._list_pods, namespace, label_selector)
+        orphans: list[OrphanPod] = []
+        for pod in pods:
+            orphan = self._classify_orphan(
+                pod,
+                namespace=namespace,
+                known_ids=known_ids,
+                request_id_label=request_id_label,
+            )
+            if orphan is not None:
+                orphans.append(orphan)
+        return orphans
+
     # ------------------------------------------------------------------
     # Loop body
     # ------------------------------------------------------------------
@@ -207,7 +239,7 @@ class OrphanGarbageCollector:
                 await self.run_once()
             except asyncio.CancelledError:  # pragma: no cover — propagated by stop()
                 raise
-            except Exception as exc:  # noqa: BLE001 — defensive
+            except Exception as exc:
                 self.stats.last_error = str(exc)
                 self._logger.warning("Orphan GC sweep raised: %s (continuing)", exc, exc_info=True)
             try:
@@ -242,7 +274,7 @@ class OrphanGarbageCollector:
                     label_selector=label_selector,
                     timeout_seconds=_LIST_TIMEOUT_SECONDS,
                 )
-        except Exception as exc:  # noqa: BLE001 — defensive
+        except Exception as exc:
             self.stats.last_error = f"list pods failed: {exc}"
             self._logger.warning(
                 "Orphan GC: list pods failed for namespace=%s: %s",
@@ -255,7 +287,7 @@ class OrphanGarbageCollector:
 
     @staticmethod
     def _classify_orphan(
-        pod: "V1Pod",
+        pod: V1Pod,
         *,
         namespace: Optional[str],
         known_ids: set[str],
@@ -311,7 +343,7 @@ class OrphanGarbageCollector:
                 orphan.namespace,
                 orphan.request_id,
             )
-        except Exception as exc:  # noqa: BLE001 — defensive
+        except Exception as exc:
             if _is_not_found(exc):
                 # Already gone — treat as success for accounting.
                 self.stats.total_orphans_deleted += 1
@@ -347,7 +379,7 @@ def _pod_age_seconds(creation_timestamp: str) -> Optional[float]:
 def _is_not_found(exc: BaseException) -> bool:
     """Return ``True`` when ``exc`` is a 404 ``ApiException``."""
     try:
-        from kubernetes.client.exceptions import ApiException  # noqa: PLC0415
+        from kubernetes.client.exceptions import ApiException
     except ImportError:  # pragma: no cover — extra not installed
         return False
     if not isinstance(exc, ApiException):

@@ -30,6 +30,7 @@ and is governed by :attr:`K8sProviderConfig.auto_cleanup_orphans`.
 
 from __future__ import annotations
 
+import asyncio
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
@@ -142,7 +143,7 @@ class StartupReconciler:
 
             try:
                 known_ids = {str(rid) for rid in self._known_request_ids_fn()}
-            except Exception as exc:  # noqa: BLE001 — defensive
+            except Exception as exc:
                 # The caller's storage lookup is not allowed to break
                 # the provider start sequence.  We log and proceed with
                 # an empty known set, which classifies every pod as an
@@ -195,7 +196,7 @@ class StartupReconciler:
                 report.requests_warmed,
                 report.orphan_count,
             )
-        except Exception as exc:  # noqa: BLE001 — defensive
+        except Exception as exc:
             report.error = str(exc)
             self._logger.warning(
                 "Kubernetes reconciler failed: %s (provider will start anyway)",
@@ -205,6 +206,118 @@ class StartupReconciler:
         finally:
             report.duration_seconds = time.monotonic() - start
         return report
+
+    async def run_async(self) -> ReconciliationReport:
+        """Async variant of :meth:`run` that fans out namespace listing in parallel.
+
+        Uses :func:`asyncio.gather` with ``return_exceptions=True`` so a
+        failing namespace is logged and skipped without aborting the whole
+        reconciliation.  The cache is mutated from the coroutine body — all
+        upserts happen on the event-loop thread so no additional locking is
+        required.
+        """
+        report = ReconciliationReport()
+        start = time.monotonic()
+
+        try:
+            namespaces = self._resolve_namespaces()
+            report.namespaces = [ns if ns is not None else "*" for ns in namespaces]
+
+            try:
+                known_ids = {str(rid) for rid in self._known_request_ids_fn()}
+            except Exception as exc:
+                self._logger.warning(
+                    "StartupReconciler: known_request_ids lookup failed; "
+                    "treating every managed pod as an orphan: %s",
+                    exc,
+                    exc_info=True,
+                )
+                known_ids = set()
+
+            label_selector = _build_label_selector(self._config.label_prefix, "managed", "true")
+            request_id_label = f"{self._config.label_prefix}/request-id"
+
+            results = await asyncio.gather(
+                *[
+                    self._reconcile_namespace(ns, label_selector, request_id_label, known_ids)
+                    for ns in namespaces
+                ],
+                return_exceptions=True,
+            )
+
+            for ns, result in zip(namespaces, results, strict=True):
+                if isinstance(result, BaseException):
+                    ns_label = ns if ns is not None else "*"
+                    self._logger.warning(
+                        "StartupReconciler: namespace=%s raised an exception (skipping): %s",
+                        ns_label,
+                        result,
+                        exc_info=result,
+                    )
+                else:
+                    pods_seen, adopted, orphans = result
+                    report.pods_seen += pods_seen
+                    report.pods_adopted += adopted
+                    report.orphans.extend(orphans)
+
+            seen_requests: set[str] = set()
+            for state in self._cache.all_states():
+                if state.request_id in known_ids:
+                    seen_requests.add(state.request_id)
+            report.requests_warmed = len(seen_requests)
+
+            report.completed = True
+            self._logger.info(
+                "Kubernetes reconciler completed: namespaces=%s pods_seen=%d "
+                "pods_adopted=%d requests_warmed=%d orphans=%d",
+                report.namespaces,
+                report.pods_seen,
+                report.pods_adopted,
+                report.requests_warmed,
+                report.orphan_count,
+            )
+        except Exception as exc:
+            report.error = str(exc)
+            self._logger.warning(
+                "Kubernetes reconciler failed: %s (provider will start anyway)",
+                exc,
+                exc_info=True,
+            )
+        finally:
+            report.duration_seconds = time.monotonic() - start
+        return report
+
+    async def _reconcile_namespace(
+        self,
+        namespace: Optional[str],
+        label_selector: str,
+        request_id_label: str,
+        known_ids: set[str],
+    ) -> tuple[int, int, list[OrphanPod]]:
+        """List and classify pods for one namespace; runs the blocking list in a thread.
+
+        Returns ``(pods_seen, pods_adopted, orphans)`` so the caller can
+        aggregate stats without locking.
+        """
+        pods = await asyncio.to_thread(self._list_pods, namespace, label_selector)
+        adopted = 0
+        orphans: list[OrphanPod] = []
+        for pod in pods:
+            classified = self._classify_pod(
+                pod,
+                namespace=namespace,
+                known_ids=known_ids,
+                request_id_label=request_id_label,
+            )
+            if classified is None:
+                continue
+            if classified.kind == "adopted":
+                assert classified.state is not None  # narrow for pyright
+                self._cache.upsert(classified.state)
+                adopted += 1
+            else:
+                orphans.append(classified.orphan)  # type: ignore[arg-type]
+        return len(pods), adopted, orphans
 
     # ------------------------------------------------------------------
     # Internals
@@ -242,7 +355,7 @@ class StartupReconciler:
                     label_selector=label_selector,
                     timeout_seconds=_LIST_TIMEOUT_SECONDS,
                 )
-        except Exception as exc:  # noqa: BLE001 — defensive
+        except Exception as exc:
             self._logger.warning(
                 "StartupReconciler: list pods failed for namespace=%s: %s",
                 namespace if namespace is not None else "*",
@@ -254,12 +367,12 @@ class StartupReconciler:
 
     def _classify_pod(
         self,
-        pod: "V1Pod",
+        pod: V1Pod,
         *,
         namespace: Optional[str],
         known_ids: set[str],
         request_id_label: str,
-    ) -> "Optional[_Classified]":
+    ) -> Optional[_Classified]:
         """Return whether ``pod`` is adopted into the cache or an orphan."""
         metadata = getattr(pod, "metadata", None)
         if metadata is None:
@@ -308,7 +421,7 @@ class _Classified:
 # constructing the full reconciler.
 
 
-def _pod_to_state(pod: "V1Pod", *, request_id: str, namespace: str) -> PodState:
+def _pod_to_state(pod: V1Pod, *, request_id: str, namespace: str) -> PodState:
     metadata = getattr(pod, "metadata", None)
     status = getattr(pod, "status", None)
     spec = getattr(pod, "spec", None)

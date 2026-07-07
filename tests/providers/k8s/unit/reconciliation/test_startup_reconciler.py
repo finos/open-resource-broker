@@ -275,3 +275,156 @@ def test_duration_recorded_on_report() -> None:
     report = reconciler.run()
 
     assert report.duration_seconds >= 0.0
+
+
+# ---------------------------------------------------------------------------
+# Parallel namespace fan-out via run_async (T03)
+# ---------------------------------------------------------------------------
+
+
+import asyncio
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_run_async_reconciles_all_three_namespaces() -> None:
+    """run_async gathers all three namespace list calls concurrently."""
+    cfg = K8sProviderConfig(namespace="orb", namespaces=["alpha", "beta", "gamma"])
+
+    ns_pods: dict[str, list[Any]] = {
+        "alpha": [_pod(name="a1", request_id="r1", namespace="alpha")],
+        "beta": [_pod(name="b1", request_id="r2", namespace="beta")],
+        "gamma": [_pod(name="g1", request_id="r3", namespace="gamma")],
+    }
+    reconciler, cache, core_v1 = _make_reconciler(
+        config=cfg,
+        pods_by_namespace=ns_pods,
+        known=["r1", "r2", "r3"],
+    )
+
+    report = await reconciler.run_async()
+
+    assert report.completed is True
+    assert report.pods_seen == 3
+    assert report.pods_adopted == 3
+    # All three namespaces were queried (order-independent).
+    called_namespaces = {c.kwargs.get("namespace") for c in core_v1.list_namespaced_pod.mock_calls}
+    assert called_namespaces == {"alpha", "beta", "gamma"}
+    # Cache warmed for all three requests.
+    assert cache.get("r1") is not None
+    assert cache.get("r2") is not None
+    assert cache.get("r3") is not None
+
+
+@pytest.mark.asyncio
+async def test_run_async_namespace_exception_skipped_others_continue() -> None:
+    """A failing namespace in run_async is logged; the other namespaces are still reconciled."""
+    cfg = K8sProviderConfig(namespace="orb", namespaces=["good1", "bad", "good2"])
+
+    def _list_ns(namespace: str, **_kw: Any) -> Any:
+        if namespace == "bad":
+            raise RuntimeError("namespace exploded")
+        return SimpleNamespace(
+            items=[_pod(name=f"pod-{namespace}", request_id=f"r-{namespace}", namespace=namespace)]
+        )
+
+    cache = __import__(
+        "orb.providers.k8s.watch.pod_state_cache", fromlist=["PodStateCache"]
+    ).PodStateCache()
+    client = MagicMock()
+    core_v1 = MagicMock()
+    client.core_v1 = core_v1
+    core_v1.list_namespaced_pod.side_effect = _list_ns
+
+    from orb.providers.k8s.reconciliation.startup_reconciler import StartupReconciler
+
+    reconciler = StartupReconciler(
+        kubernetes_client=client,
+        config=cfg,
+        cache=cache,
+        logger=MagicMock(),
+        known_request_ids=lambda: ["r-good1", "r-good2"],
+    )
+
+    report = await reconciler.run_async()
+
+    assert report.completed is True
+    # Two healthy namespaces contributed pods.
+    assert report.pods_adopted == 2
+    # The bad namespace did not halt the other reconciles — cache warmed.
+    assert cache.get("r-good1") is not None
+    assert cache.get("r-good2") is not None
+
+
+@pytest.mark.asyncio
+async def test_run_async_returns_report_consistent_with_run() -> None:
+    """run_async report structure matches that of the sync run() for single namespace."""
+    pods = [
+        _pod(name="pod-a", request_id="req-1"),
+        _pod(name="pod-b", request_id="req-1"),
+    ]
+    reconciler, cache, _ = _make_reconciler(pods=pods, known=["req-1"])
+
+    report = await reconciler.run_async()
+
+    assert report.completed is True
+    assert report.pods_seen == 2
+    assert report.pods_adopted == 2
+    assert report.requests_warmed == 1
+    assert report.orphan_count == 0
+    assert cache.get("req-1") is not None
+
+
+@pytest.mark.asyncio
+async def test_run_async_fans_out_namespaces_in_parallel() -> None:
+    """run_async must actually run namespace lists concurrently.
+
+    A serial regression that wraps a synchronous for-loop in
+    ``asyncio.gather`` would pass the "all three namespaces called"
+    assertion — because they would all still be called eventually.
+    Prove parallelism by having each list handler block on a shared
+    ``threading.Barrier``: if the fan-out is truly parallel every list
+    call reaches the barrier at the same time and it releases; if the
+    fan-out serialises, only one caller reaches the barrier at a time
+    and the test hits its 10-second timeout.
+    """
+    import threading
+
+    cfg = K8sProviderConfig(namespace="orb", namespaces=["alpha", "beta", "gamma"])
+    barrier = threading.Barrier(parties=3, timeout=5)
+
+    def _blocking_list(namespace: str, **_kw: Any) -> Any:
+        # Block until all three namespace lists have reached this line
+        # concurrently.  BrokenBarrierError on timeout will bubble up
+        # and fail the test — that is the failure signal for the serial
+        # regression.
+        barrier.wait()
+        return SimpleNamespace(
+            items=[_pod(name=f"pod-{namespace}", request_id=f"r-{namespace}", namespace=namespace)]
+        )
+
+    cache = __import__(
+        "orb.providers.k8s.watch.pod_state_cache", fromlist=["PodStateCache"]
+    ).PodStateCache()
+    client = MagicMock()
+    client.core_v1.list_namespaced_pod.side_effect = _blocking_list
+    client.core_v1.list_pod_for_all_namespaces.side_effect = _blocking_list
+
+    from orb.providers.k8s.reconciliation.startup_reconciler import (
+        StartupReconciler,
+    )
+
+    reconciler = StartupReconciler(
+        kubernetes_client=client,
+        config=cfg,
+        cache=cache,
+        logger=MagicMock(),
+        known_request_ids=lambda: ["r-alpha", "r-beta", "r-gamma"],
+    )
+
+    report = await asyncio.wait_for(reconciler.run_async(), timeout=10.0)
+    assert report.completed is True
+    # The barrier only releases if all three list callers reached it in
+    # parallel; if they had serialised, the barrier would have timed out
+    # and raised BrokenBarrierError.
+    assert report.pods_adopted == 3

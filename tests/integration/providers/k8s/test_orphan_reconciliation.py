@@ -57,6 +57,8 @@ def _orphan_pod(*, name: str, namespace: str = "orb-it") -> SimpleNamespace:
 
 def test_startup_reconciler_partitions_adopted_and_orphans() -> None:
     """Adopted pods land in the cache; orphans are reported but not deleted."""
+    import asyncio
+
     known_request_id = "req-11111111-1111-1111-1111-111111111111"
 
     pods = [
@@ -74,9 +76,10 @@ def test_startup_reconciler_partitions_adopted_and_orphans() -> None:
         known_request_ids=lambda: [known_request_id],
     )
 
-    # The reconciler runs in start_daemon_services; trigger it directly for
-    # this synchronous test so the report is populated before we assert on it.
-    strategy._run_startup_reconciler()  # type: ignore[attr-defined]
+    # The reconciler runs in start_daemon_services (async) via the
+    # run_async fan-out; drive it directly here so the report is
+    # populated before we assert on it.
+    asyncio.run(strategy._run_startup_reconciler())  # type: ignore[attr-defined]
 
     report = strategy.last_reconciliation_report
     assert report is not None

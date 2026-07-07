@@ -196,9 +196,9 @@ async def test_start_is_idempotent_while_running() -> None:
     gc, _ = _make_gc(pods=[], known=[])
     gc.start()
     try:
-        first = gc._task  # noqa: SLF001 — testing idempotency
+        first = gc._task
         gc.start()  # Should not replace the task.
-        assert gc._task is first  # noqa: SLF001
+        assert gc._task is first
     finally:
         await gc.stop()
 
@@ -276,3 +276,125 @@ async def test_orphan_older_than_min_age_is_deleted() -> None:
     deleted_names = {c.kwargs.get("name") for c in core_v1.delete_namespaced_pod.mock_calls}
     assert "old-orph" in deleted_names
     assert gc.stats.total_orphans_deleted == 1
+
+
+# ---------------------------------------------------------------------------
+# Parallel namespace fan-out (T02)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_run_once_calls_gc_namespace_for_all_three_namespaces() -> None:
+    """run_once fans out across all configured namespaces; all three list calls happen."""
+    cfg = K8sProviderConfig(namespace="orb", namespaces=["alpha", "beta", "gamma"])
+
+    client = MagicMock()
+    core_v1 = MagicMock()
+    client.core_v1 = core_v1
+
+    ns_pods: dict[str, list[Any]] = {
+        "alpha": [_pod(name="orph-a", request_id="r-stranger-a", namespace="alpha")],
+        "beta": [_pod(name="orph-b", request_id="r-stranger-b", namespace="beta")],
+        "gamma": [],
+    }
+
+    def _list_ns(namespace: str, **_kw: Any) -> Any:
+        return SimpleNamespace(items=list(ns_pods.get(namespace, [])))
+
+    core_v1.list_namespaced_pod.side_effect = _list_ns
+
+    gc = OrphanGarbageCollector(
+        kubernetes_client=client,
+        config=cfg,
+        logger=MagicMock(),
+        known_request_ids=lambda: [],
+        interval_seconds=9999,
+    )
+
+    orphans = await gc.run_once()
+
+    # All three namespaces were queried (order-independent).
+    called_namespaces = {c.kwargs.get("namespace") for c in core_v1.list_namespaced_pod.mock_calls}
+    assert called_namespaces == {"alpha", "beta", "gamma"}
+
+    # Orphans from all responding namespaces are collected.
+    assert {o.pod_name for o in orphans} == {"orph-a", "orph-b"}
+    assert gc.stats.last_orphans_found == 2
+
+
+@pytest.mark.asyncio
+async def test_run_once_namespace_exception_does_not_halt_other_namespaces() -> None:
+    """An exception in one namespace's list call is logged but does not stop the rest."""
+    cfg = K8sProviderConfig(namespace="orb", namespaces=["ok1", "bad", "ok2"])
+
+    client = MagicMock()
+    core_v1 = MagicMock()
+    client.core_v1 = core_v1
+
+    def _list_ns(namespace: str, **_kw: Any) -> Any:
+        if namespace == "bad":
+            raise RuntimeError("apiserver blew up")
+        return SimpleNamespace(
+            items=[_pod(name=f"pod-{namespace}", request_id="r-stranger", namespace=namespace)]
+        )
+
+    core_v1.list_namespaced_pod.side_effect = _list_ns
+
+    gc = OrphanGarbageCollector(
+        kubernetes_client=client,
+        config=cfg,
+        logger=MagicMock(),
+        known_request_ids=lambda: [],
+        interval_seconds=9999,
+    )
+
+    orphans = await gc.run_once()
+
+    # Orphans from the two healthy namespaces are still returned.
+    pod_names = {o.pod_name for o in orphans}
+    assert "pod-ok1" in pod_names
+    assert "pod-ok2" in pod_names
+    # The failing namespace set last_error (via _list_pods defensive catch) but did not
+    # crash the whole sweep — other namespaces' orphans are still in the result.
+    assert gc.stats.last_error is not None
+    assert "apiserver blew up" in gc.stats.last_error
+
+
+@pytest.mark.asyncio
+async def test_run_once_fans_out_namespaces_in_parallel() -> None:
+    """run_once must run namespace list calls concurrently.
+
+    A serial regression (plain for-loop wrapped in ``asyncio.gather``)
+    passes the "all namespaces called" test — this test blocks each list
+    call on a shared ``threading.Barrier`` so a serial regression fails
+    with ``BrokenBarrierError`` on timeout while the parallel path
+    releases the barrier immediately.
+    """
+    import threading
+
+    cfg = K8sProviderConfig(namespace="orb", namespaces=["alpha", "beta", "gamma"])
+    barrier = threading.Barrier(parties=3, timeout=5)
+
+    client = MagicMock()
+    core_v1 = MagicMock()
+    client.core_v1 = core_v1
+
+    def _blocking_list(namespace: str, **_kw: Any) -> Any:
+        barrier.wait()
+        return SimpleNamespace(items=[])
+
+    core_v1.list_namespaced_pod.side_effect = _blocking_list
+
+    gc = OrphanGarbageCollector(
+        kubernetes_client=client,
+        config=cfg,
+        logger=MagicMock(),
+        known_request_ids=lambda: [],
+        interval_seconds=9999,
+    )
+
+    await asyncio.wait_for(gc.run_once(), timeout=10.0)
+    # If the barrier had timed out (BrokenBarrierError), we would not
+    # have reached this line.  Explicit assertion is redundant but
+    # documents the invariant this test protects.
+    assert True

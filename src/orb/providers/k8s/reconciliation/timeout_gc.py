@@ -165,7 +165,7 @@ async def delete_timed_out_pod_async(
 
     def _delete() -> None:
         try:
-            from kubernetes.client import V1DeleteOptions as _V1DeleteOptions  # noqa: PLC0415
+            from kubernetes.client import V1DeleteOptions as _V1DeleteOptions
         except ImportError:  # pragma: no cover — extra not installed
             logger.warning(
                 "kubernetes SDK not installed; cannot delete timed-out pod %s/%s",
@@ -186,7 +186,7 @@ async def delete_timed_out_pod_async(
                 name,
                 reason,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             # 404 — pod was already removed by another path; not an error.
             status = getattr(exc, "status", None)
             if status == 404:
