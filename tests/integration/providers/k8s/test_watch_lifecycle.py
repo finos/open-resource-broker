@@ -192,11 +192,26 @@ async def test_watch_steady_state_event_translation() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.timeout(15)
-async def test_watch_410_gone_reconnects_without_resource_version() -> None:
-    """A 410 mid-stream resets the resource_version and continues."""
+async def test_watch_410_gone_reconnects_from_relist_resource_version() -> None:
+    """A 410 mid-stream triggers a fresh LIST and resumes from the LIST's rv.
+
+    rv=0 or rv=None would allow the apiserver to skip events between the
+    stale rv and its cache start, leaving the pod cache out of sync.  The
+    correct recovery is a full LIST (consistent snapshot) followed by a
+    watch resumed from the resourceVersion the LIST returned.
+    """
     cache = PodStateCache()
     client = _client_mock()
     request_id = "req-88888888-8888-8888-8888-888888888888"
+
+    # Configure the re-LIST response so it returns a known rv the watch
+    # must resume from, plus one pod so we can prove the LIST populates
+    # the cache alongside the two watch sessions.
+    relist_pod = _synthetic_pod(name="orb-b-relist", request_id=request_id)
+    relist_response = MagicMock()
+    relist_response.metadata = MagicMock(resource_version="54321")
+    relist_response.items = [relist_pod]
+    client.core_v1.list_namespaced_pod.return_value = relist_response
 
     first = _StubWatch(
         iter(
@@ -238,13 +253,20 @@ async def test_watch_410_gone_reconnects_without_resource_version() -> None:
     )
     watcher.start()
     assert await _await_predicate(
-        lambda: (cache.get(request_id) or []) and len(cache.get(request_id) or []) >= 2
+        lambda: (cache.get(request_id) or []) and len(cache.get(request_id) or []) >= 3
     )
     await watcher.stop()
 
-    # Second session must NOT have carried a resource_version because
-    # the 410 handler drops it before reconnecting.
-    assert "resource_version" not in second.last_kwargs
+    # The re-LIST must have been called with label_selector and WITHOUT
+    # a stale resource_version — that is what makes it a fresh snapshot.
+    assert client.core_v1.list_namespaced_pod.called
+    relist_kwargs = client.core_v1.list_namespaced_pod.call_args.kwargs
+    assert "label_selector" in relist_kwargs
+    assert relist_kwargs.get("resource_version") in (None, "")
+    # Second watch session must resume from the LIST's rv, NOT rv='0'
+    # (which would silently skip events) and NOT rv=None (which would
+    # rewind to whatever the apiserver picks).
+    assert second.last_kwargs.get("resource_version") == "54321"
     # The 410 must not increment the consecutive-failure counter.
     assert watcher.last_error is None
 

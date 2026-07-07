@@ -182,10 +182,22 @@ async def test_deleted_event_evicts_cache_entry() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.timeout(10)
-async def test_410_gone_resets_resource_version() -> None:
-    """A 410 ApiException causes the watcher to retry without rv."""
+async def test_410_gone_relists_and_resumes_from_new_resource_version() -> None:
+    """A 410 ApiException triggers a fresh LIST; the watch resumes from the LIST rv.
+
+    rv=0 or rv=None would allow the apiserver to skip events between the
+    stale rv and its cache start, leaving the pod cache out of sync.  The
+    correct recovery is a full LIST (consistent snapshot) followed by a
+    watch resumed from the resourceVersion the LIST returned.
+    """
     cache = PodStateCache()
     client = _make_kubernetes_client_mock()
+
+    relist_pod = _pod(name="orb-relist")
+    relist_response = MagicMock()
+    relist_response.metadata = MagicMock(resource_version="12345")
+    relist_response.items = [relist_pod]
+    client.core_v1.list_namespaced_pod.return_value = relist_response
 
     first = _StubWatch(
         iter([{"type": "ADDED", "object": _pod(name="orb-0001")}]),
@@ -209,9 +221,9 @@ async def test_410_gone_resets_resource_version() -> None:
         watch_timeout_seconds=1,
     )
     watcher.start()
-    for _ in range(100):
+    for _ in range(200):
         states = cache.get("req-1")
-        if states is not None and len(states) >= 2:
+        if states is not None and len(states) >= 3:
             break
         await asyncio.sleep(0.01)
     await watcher.stop()
@@ -219,12 +231,18 @@ async def test_410_gone_resets_resource_version() -> None:
     states = cache.get("req-1")
     assert states is not None
     pod_names = {s.pod_name for s in states}
-    assert {"orb-0001", "orb-0002"} <= pod_names
-    # Second session was called without resource_version (the 410
-    # handler dropped it).  The factory hands stubs out in order so
-    # ``second.last_kwargs`` is the kwargs handed to stream() the
-    # second time.
-    assert "resource_version" not in second.last_kwargs
+    # LIST populated the cache with the relist snapshot, and both watch
+    # sessions contributed their own events.
+    assert {"orb-0001", "orb-relist", "orb-0002"} <= pod_names
+    # The re-list must have been called with label_selector but WITHOUT
+    # a stale resource_version.
+    assert client.core_v1.list_namespaced_pod.called
+    relist_kwargs = client.core_v1.list_namespaced_pod.call_args.kwargs
+    assert "label_selector" in relist_kwargs
+    assert relist_kwargs.get("resource_version") in (None, "")
+    # Second watch session must resume from the rv the LIST returned,
+    # NOT rv="0" (would skip events) and NOT rv=None (would rewind).
+    assert second.last_kwargs.get("resource_version") == "12345"
     # consecutive_failures must NOT have ticked up for a 410.
     assert watcher.last_error is None
 
@@ -445,7 +463,7 @@ async def test_stop_sets_threading_event() -> None:
         cache=PodStateCache(),
         logger=MagicMock(),
         namespace="ns",
-        watch_factory=lambda: _BlockingWatch(),
+        watch_factory=_BlockingWatch,
         watch_timeout_seconds=1,
     )
     stop_event_ref: list[Any] = [watcher._stop_thread_event]
@@ -457,3 +475,62 @@ async def test_stop_sets_threading_event() -> None:
     assert watcher._stop_thread_event.is_set(), (
         "stop() must set the threading.Event so the worker thread exits"
     )
+
+
+# ---------------------------------------------------------------------------
+# T01 — resource_version="0" fast LIST fallback on 410-Gone
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(10)
+async def test_410_gone_never_resumes_with_rv_zero() -> None:
+    """After a 410-Gone the watcher must NEVER pass rv='0' to the next watch.
+
+    rv='0' allows the apiserver to serve events from an arbitrary point
+    in its cache and skip mutations that happened between the stale
+    resource_version and the cache start.  The correct recovery is a
+    fresh LIST followed by a watch resumed from the LIST's rv — never
+    rv='0'.  This test locks in the invariant.
+    """
+    cache = PodStateCache()
+    client = _make_kubernetes_client_mock()
+
+    relist_response = MagicMock()
+    relist_response.metadata = MagicMock(resource_version="99")
+    relist_response.items = []
+    client.core_v1.list_namespaced_pod.return_value = relist_response
+
+    first = _StubWatch(
+        iter([]),
+        raise_after=ApiException(status=410, reason="Gone"),
+    )
+    second = _StubWatch(iter([{"type": "ADDED", "object": _pod(name="orb-post-410")}]))
+    stubs = iter([first, second])
+
+    def factory() -> _StubWatch:
+        try:
+            return next(stubs)
+        except StopIteration:
+            return _StubWatch(iter([]))
+
+    watcher = K8sWatcher(
+        kubernetes_client=client,
+        cache=cache,
+        logger=MagicMock(),
+        namespace="ns",
+        watch_factory=factory,
+        watch_timeout_seconds=1,
+    )
+    watcher.start()
+    for _ in range(100):
+        if cache.size() >= 1:
+            break
+        await asyncio.sleep(0.01)
+    await watcher.stop()
+
+    assert second.last_kwargs.get("resource_version") != "0", (
+        "410-Gone handler must NOT resume watch with rv='0' — that would "
+        "silently drop events between the stale rv and the apiserver cache start"
+    )
+    assert second.last_kwargs.get("resource_version") == "99"

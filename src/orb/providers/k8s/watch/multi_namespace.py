@@ -21,7 +21,7 @@ Three operating modes — driven by
 from __future__ import annotations
 
 import asyncio
-from typing import Optional
+from typing import Any, Optional
 
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
@@ -58,15 +58,23 @@ class MultiNamespaceWatcher:
         *,
         cache: Optional[PodStateCache] = None,
         watch_factory: Optional[WatchFactory] = None,
+        metrics: Optional[Any] = None,
     ) -> None:
         self._client = kubernetes_client
         self._config = config
         self._logger = logger
         self._cache = cache or PodStateCache()
         self._watch_factory = watch_factory
+        self._metrics = metrics
 
         self._watchers: list[K8sWatcher] = []
         self._started = False
+        # Set to True by :meth:`mark_first_sync_complete` once the initial
+        # LIST (startup reconciliation) finishes without exception.  Until
+        # then :meth:`is_healthy` returns False so callers fall back to the
+        # on-demand list path rather than consulting a cache that may be
+        # empty not because there are no pods but because sync hasn't run.
+        self._first_sync_complete: bool = False
 
     # ------------------------------------------------------------------
     # Public surface
@@ -85,15 +93,33 @@ class MultiNamespaceWatcher:
         return self._started
 
     def is_healthy(self) -> bool:
-        """Return ``True`` iff every child watcher reports ``is_running``.
+        """Return ``True`` iff every child watcher reports ``is_running`` *and*
+        the first full sync has completed.
 
-        A multi-watcher fleet is only safe to consult the cache for when
-        every namespace is being observed — otherwise one dead watcher
-        produces stale entries indistinguishable from running pods.
+        Two conditions must hold before the cache is safe to consult:
+
+        1. Every namespace watcher is alive (no dead watcher producing stale
+           entries indistinguishable from running pods).
+        2. The initial startup LIST (reconciliation) has completed at least
+           once without exception — :meth:`mark_first_sync_complete` must
+           have been called.  Before that point the cache is empty not
+           because there are no pods but because no sync has yet run, so
+           callers must fall back to the on-demand list path.
         """
         if not self._started or not self._watchers:
             return False
+        if not self._first_sync_complete:
+            return False
         return all(w.is_running() for w in self._watchers)
+
+    def mark_first_sync_complete(self) -> None:
+        """Signal that the initial LIST/reconciliation succeeded.
+
+        Call this once from the provider strategy after
+        :meth:`StartupReconciler.run` returns a successful report.
+        """
+        self._first_sync_complete = True
+        self._logger.debug("MultiNamespaceWatcher: first sync marked complete")
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -128,13 +154,30 @@ class MultiNamespaceWatcher:
         )
 
     async def stop(self) -> None:
-        """Stop every child watcher and clear the watcher list."""
+        """Stop every child watcher and clear the watcher list.
+
+        Each child stop() is attempted independently so a failure on one
+        namespace does not prevent the remaining watchers from stopping.
+        Errors are logged at WARNING level and execution continues.
+        """
         if not self._started:
             return
-        # Stop in parallel so a slow shutdown for one namespace does
-        # not block the rest.
+
+        async def _stop_one(watcher: K8sWatcher) -> None:
+            try:
+                await watcher.stop()
+            except Exception as exc:
+                self._logger.warning(
+                    "Error stopping watcher for namespace=%s (ignored): %s",
+                    watcher.namespace if watcher.namespace is not None else "*",
+                    exc,
+                    exc_info=True,
+                )
+
+        # Stop in parallel so a slow/failed shutdown for one namespace
+        # does not block the rest.
         await asyncio.gather(
-            *(w.stop() for w in self._watchers),
+            *(_stop_one(w) for w in self._watchers),
             return_exceptions=False,
         )
         self._watchers.clear()
@@ -170,6 +213,8 @@ class MultiNamespaceWatcher:
         }
         if self._watch_factory is not None:
             kwargs["watch_factory"] = self._watch_factory
+        if self._metrics is not None:
+            kwargs["metrics"] = self._metrics
         return K8sWatcher(**kwargs)  # type: ignore[arg-type]
 
 

@@ -50,6 +50,22 @@ if TYPE_CHECKING:  # pragma: no cover — type-checking only
 # normal end-of-stream and the outer loop simply re-enters.
 _DEFAULT_WATCH_TIMEOUT_SECONDS = 300
 
+
+def _classify_reconnect_reason(exc: BaseException) -> str:
+    """Bucket a watch-loop exception into an allowed metric reason.
+
+    Falls back to ``"unknown"`` for anything the classifier does not
+    recognise; the metrics module further coerces unknown values to
+    ``"unknown"`` so cardinality stays bounded.
+    """
+    name = type(exc).__name__.lower()
+    if "timeout" in name:
+        return "timeout"
+    if isinstance(exc, (ConnectionError, OSError)):
+        return "network"
+    return "unknown"
+
+
 # Initial / cap on the exponential-backoff schedule for non-410 errors.
 _DEFAULT_BASE_BACKOFF_SECONDS = 1.0
 _DEFAULT_MAX_BACKOFF_SECONDS = 60.0
@@ -60,9 +76,9 @@ _DEFAULT_MAX_BACKOFF_SECONDS = 60.0
 WatchFactory = Callable[[], "Watch"]
 
 
-def _default_watch_factory() -> "Watch":
+def _default_watch_factory() -> Watch:
     """Default factory: returns a fresh ``kubernetes.watch.Watch``."""
-    from kubernetes.watch import Watch as _Watch  # noqa: PLC0415
+    from kubernetes.watch import Watch as _Watch
 
     return _Watch()
 
@@ -117,6 +133,7 @@ class K8sWatcher:
         base_backoff_seconds: float = _DEFAULT_BASE_BACKOFF_SECONDS,
         max_backoff_seconds: float = _DEFAULT_MAX_BACKOFF_SECONDS,
         watch_factory: WatchFactory = _default_watch_factory,
+        metrics: Any = None,
     ) -> None:
         self._client = kubernetes_client
         self._cache = cache
@@ -129,6 +146,7 @@ class K8sWatcher:
         self._base_backoff_seconds = base_backoff_seconds
         self._max_backoff_seconds = max_backoff_seconds
         self._watch_factory = watch_factory
+        self._metrics = metrics
 
         self._task: Optional[asyncio.Task[None]] = None
         self._stop_event = asyncio.Event()
@@ -140,7 +158,7 @@ class K8sWatcher:
         # the general case).  _stop_thread_event is set whenever _stop_event
         # is set so both surfaces stay in sync.
         self._stop_thread_event = threading.Event()
-        self._active_watch: "Optional[Watch]" = None
+        self._active_watch: Optional[Watch] = None
         # Tracked for diagnostics / liveness checks.  Updated each time
         # a watch session ends (cleanly or with error) so external
         # callers can tell "stream produced at least one event" from
@@ -243,12 +261,38 @@ class K8sWatcher:
                 self._last_error = None
                 continue
             except _ResourceTooOld:
-                # 410 Gone — drop resource_version and re-LIST.
+                # 410 Gone — the resource_version is too old for the
+                # apiserver's watch cache.  Correct recovery is a fresh
+                # LIST to obtain a consistent snapshot, then resume the
+                # watch from the resourceVersion returned by that LIST.
+                # Continuing with the stale rv (or rv="0") would allow
+                # the apiserver to serve events from any point in its
+                # cache and silently skip mutations that occurred in
+                # the gap between the last observed rv and the cache
+                # start — leaving our cache out of sync.
                 self._logger.info(
-                    "Kubernetes watch returned 410 Gone (namespace=%s); restarting from rv=None",
+                    "Kubernetes watch returned 410 Gone (namespace=%s); "
+                    "re-listing for a consistent snapshot",
                     self._namespace,
                 )
-                resource_version = None
+                self._record_reconnect("resource_too_old")
+                try:
+                    new_rv = await asyncio.to_thread(self._relist_snapshot)
+                    resource_version = new_rv or None
+                except Exception as exc:
+                    self._consecutive_failures += 1
+                    self._last_error = str(exc)
+                    backoff = self._backoff_for_attempt(self._consecutive_failures)
+                    self._logger.warning(
+                        "Re-list after 410 failed (namespace=%s, attempt=%s); backing off %ss: %s",
+                        self._namespace,
+                        self._consecutive_failures,
+                        f"{backoff:.1f}",
+                        exc,
+                    )
+                    if await self._sleep_or_stop(backoff):
+                        break
+                    continue
                 self._consecutive_failures = 0
                 self._last_error = None
                 continue
@@ -257,6 +301,7 @@ class K8sWatcher:
             except Exception as exc:
                 self._consecutive_failures += 1
                 self._last_error = str(exc)
+                self._record_reconnect(_classify_reconnect_reason(exc))
                 backoff = self._backoff_for_attempt(self._consecutive_failures)
                 self._logger.warning(
                     "Kubernetes watch failed (namespace=%s, attempt=%s); backing off %ss: %s",
@@ -269,6 +314,22 @@ class K8sWatcher:
                     break
                 continue
         self._logger.debug("Kubernetes watch loop exited (namespace=%s)", self._namespace)
+
+    def _record_reconnect(self, reason: str) -> None:
+        """Increment ``orb_k8s_watch_reconnects_total`` when metrics are wired."""
+        if self._metrics is not None:
+            self._metrics.record_watch_reconnect(
+                namespace=self._namespace or "*",
+                reason=reason,
+            )
+
+    def _record_event(self, event_type: str) -> None:
+        """Increment ``orb_k8s_watch_events_total`` when metrics are wired."""
+        if self._metrics is not None:
+            self._metrics.record_watch_event(
+                namespace=self._namespace or "*",
+                event_type=event_type,
+            )
 
     async def _sleep_or_stop(self, seconds: float) -> bool:
         """Sleep for ``seconds`` but wake up early if :meth:`stop` was called.
@@ -353,6 +414,48 @@ class K8sWatcher:
             return core_v1.list_pod_for_all_namespaces, kwargs
         return core_v1.list_namespaced_pod, {"namespace": self._namespace, **kwargs}
 
+    def _relist_snapshot(self) -> Optional[str]:
+        """Perform a full LIST and rebuild cache from the response.
+
+        Called after a 410-Gone response to obtain a consistent snapshot
+        of pods matching the label selector.  Returns the
+        ``resourceVersion`` of the LIST so the next watch session resumes
+        from a known-good point.  Cache is upserted with every observed
+        pod and any request rows not present in the snapshot are
+        implicitly stale (subsequent watch DELETE events will evict
+        them; the mark-stale sweeper handles longer gaps).
+
+        Runs in a worker thread via :func:`asyncio.to_thread`.
+        """
+        core_v1 = self._client.core_v1
+        kwargs: dict[str, Any] = {"label_selector": self._label_selector}
+        if self._namespace is None:
+            pod_list = core_v1.list_pod_for_all_namespaces(**kwargs)
+        else:
+            pod_list = core_v1.list_namespaced_pod(namespace=self._namespace, **kwargs)
+        for pod in getattr(pod_list, "items", []) or []:
+            metadata = getattr(pod, "metadata", None)
+            if metadata is None:
+                continue
+            pod_name = getattr(metadata, "name", None)
+            if not pod_name:
+                continue
+            labels = dict(getattr(metadata, "labels", None) or {})
+            request_id = labels.get(self._request_id_label)
+            if not request_id:
+                continue
+            namespace = getattr(metadata, "namespace", None) or self._namespace or ""
+            state = self._pod_to_state(pod, request_id, namespace, deleted=False)
+            self._cache.upsert(state)
+        metadata = getattr(pod_list, "metadata", None)
+        resource_version = getattr(metadata, "resource_version", None)
+        if not resource_version:
+            # Fallback: an empty rv would drop us straight back into a 410
+            # loop.  Return ``None`` so the next session starts a fresh
+            # watch and observes whatever the apiserver offers.
+            return None
+        return resource_version
+
     @staticmethod
     def _is_resource_version_too_old(exc: BaseException) -> bool:
         """Return ``True`` when ``exc`` is a 410 ``ApiException``.
@@ -362,7 +465,7 @@ class K8sWatcher:
         worker thread where the SDK is already required.
         """
         try:
-            from kubernetes.client.exceptions import ApiException  # noqa: PLC0415
+            from kubernetes.client.exceptions import ApiException
         except ImportError:  # pragma: no cover — extra not installed
             return False
         if not isinstance(exc, ApiException):
@@ -377,6 +480,8 @@ class K8sWatcher:
         """Translate a single watch event into a cache mutation."""
         self._last_event_at = time.monotonic()
         event_type = event.get("type")
+        if isinstance(event_type, str):
+            self._record_event(event_type)
         pod = event.get("object")
         if pod is None:
             return
@@ -413,7 +518,7 @@ class K8sWatcher:
 
     def _pod_to_state(
         self,
-        pod: "V1Pod",
+        pod: V1Pod,
         request_id: str,
         namespace: str,
         *,

@@ -92,6 +92,7 @@ async def test_is_healthy_requires_every_watcher_alive() -> None:
     manager = _build_manager(K8sProviderConfig(namespace="orb", namespaces=["alpha", "beta"]))
     manager.start()
     try:
+        manager.mark_first_sync_complete()
         # All watchers were just started — every one must report alive.
         assert manager.is_healthy() is True
         # Stop one watcher manually; aggregate health flips to False.
@@ -121,3 +122,95 @@ async def test_stop_clears_watchers_and_resets_state() -> None:
     await manager.stop()
     assert manager.is_started() is False
     assert manager.watchers == ()
+
+
+# ---------------------------------------------------------------------------
+# T08 — MultiNamespaceWatcher.stop() exception handling
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_stop_continues_after_watcher_raises() -> None:
+    """A watcher whose stop() raises must not prevent remaining watchers stopping.
+
+    Injects a two-namespace manager where the first watcher's stop()
+    raises; the second watcher must still be stopped.
+    """
+
+    MagicMock()
+    manager = _build_manager(K8sProviderConfig(namespace="orb", namespaces=["ns1", "ns2"]))
+    manager.start()
+
+    # Replace the two child watchers with mocks so we control stop() behaviour.
+    stopped: list[str] = []
+
+    async def stop_raises() -> None:
+        raise RuntimeError("simulated stop failure")
+
+    async def stop_ok() -> None:
+        stopped.append("ns2")
+
+    watcher1 = manager.watchers[0]
+    watcher2 = manager.watchers[1]
+    watcher1.stop = stop_raises  # type: ignore[method-assign]
+    watcher2.stop = stop_ok  # type: ignore[method-assign]
+
+    # stop() must not propagate the exception from watcher1.
+    await manager.stop()
+
+    # watcher2 must have been stopped despite watcher1 raising.
+    assert "ns2" in stopped, "stop() must continue to remaining watchers after one raises"
+    # manager must still reach the cleaned-up state.
+    assert manager.is_started() is False
+    assert manager.watchers == ()
+
+
+# ---------------------------------------------------------------------------
+# T09 — is_healthy cold-start gap
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_is_healthy_false_before_first_sync() -> None:
+    """is_healthy() must return False until mark_first_sync_complete() is called."""
+    manager = _build_manager(K8sProviderConfig(namespace="orb"))
+    manager.start()
+    try:
+        # Watchers are running but the first sync has not been signalled yet.
+        assert manager.is_healthy() is False, (
+            "is_healthy() must be False before mark_first_sync_complete()"
+        )
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_is_healthy_true_after_first_sync() -> None:
+    """is_healthy() must return True once mark_first_sync_complete() is called and watchers run."""
+    manager = _build_manager(K8sProviderConfig(namespace="orb"))
+    manager.start()
+    try:
+        # Signal first sync complete.
+        manager.mark_first_sync_complete()
+        assert manager.is_healthy() is True, (
+            "is_healthy() must be True after mark_first_sync_complete() with watchers running"
+        )
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_is_healthy_false_if_watcher_stops_after_sync() -> None:
+    """is_healthy() must return False when a watcher dies even after first sync."""
+    manager = _build_manager(K8sProviderConfig(namespace="orb", namespaces=["a", "b"]))
+    manager.start()
+    try:
+        manager.mark_first_sync_complete()
+        assert manager.is_healthy() is True
+        # Manually stop one watcher to simulate it dying.
+        await manager.watchers[0].stop()
+        assert manager.is_healthy() is False, (
+            "is_healthy() must be False when a child watcher is no longer running"
+        )
+    finally:
+        await manager.stop()
