@@ -517,6 +517,45 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         except (ValueError, KeyError):
             return None
 
+    def list_all_provider_apis(self) -> list[str]:
+        """Return a deduplicated list of all provider API names from registered strategies.
+
+        Collects the ``get_supported_apis()`` result from each registered
+        provider strategy class.  The list is sorted for stable output so
+        callers do not depend on registration order.
+
+        Used by the dashboard summary orchestrator to seed the
+        ``by_provider_api`` zero-count keys without hard-coding provider names
+        or API identifiers.
+        """
+        apis: list[str] = []
+        for provider_type in self.get_registered_types():
+            try:
+                registration = self._get_type_registration(provider_type)
+                strategy_class = getattr(registration, "strategy_class", None)
+                if strategy_class is not None and hasattr(strategy_class, "get_supported_apis"):
+                    # get_supported_apis may be an instance or classmethod depending
+                    # on the provider — call it on a minimal stub when it is not a classmethod.
+                    try:
+                        supported = strategy_class.get_supported_apis(strategy_class)  # type: ignore[call-arg]
+                    except TypeError:
+                        supported = strategy_class.get_supported_apis()  # type: ignore[call-arg]
+                    apis.extend(supported)
+                elif hasattr(registration, "default_api") and getattr(
+                    registration, "default_api", None
+                ):
+                    apis.append(getattr(registration, "default_api"))  # type: ignore[arg-type]
+                else:
+                    # Fall back to the provider type name itself as a minimal key.
+                    apis.append(provider_type)
+            except Exception:
+                # A single provider failing to expose its APIs must not
+                # block the caller: skip and continue collecting from the
+                # remaining providers.
+                continue
+        seen: set[str] = set()
+        return [a for a in sorted(apis) if not (a in seen or seen.add(a))]  # type: ignore[func-returns-value]
+
     def get_provider_instance_registration(
         self, instance_name: str
     ) -> Optional[ProviderRegistration]:

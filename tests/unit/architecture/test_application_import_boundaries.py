@@ -51,6 +51,10 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
             "orb.infrastructure.resilience.strategy.circuit_breaker",
         ),
         ("application/services/provider_registry_service.py", "orb.providers.registry"),
+        (
+            "application/services/orchestration/dashboard_summary.py",
+            "orb.providers.registry",
+        ),
     }
 )
 

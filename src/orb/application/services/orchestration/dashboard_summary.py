@@ -31,7 +31,23 @@ _REQUEST_STATUS_KEYS = [
     "cancelled",
     "timeout",
 ]
-_TEMPLATE_PROVIDER_API_KEYS = ["aws", "EC2Fleet", "SpotFleet", "RunInstances", "ASG"]
+
+
+def _get_template_provider_api_keys() -> list[str]:
+    """Return the list of known provider API names from the registry.
+
+    Queries the global provider registry at call time so the dashboard
+    summary includes keys for every registered provider and API, not just
+    the hard-coded AWS set.  Falls back to an empty list on any error;
+    the ``setdefault`` loop in the orchestrator will then simply produce
+    no zero-count entries for APIs absent from the data.
+    """
+    try:
+        from orb.providers.registry import get_provider_registry
+
+        return get_provider_registry().list_all_provider_apis()
+    except Exception:
+        return []
 
 
 def _to_iso(value: Any) -> Optional[str]:
@@ -143,7 +159,7 @@ class DashboardSummaryOrchestrator(OrchestratorBase[DashboardSummaryInput, Dashb
                 )
                 provider_api_counts = {}
             templates_total = sum(provider_api_counts.values())
-            for key in _TEMPLATE_PROVIDER_API_KEYS:
+            for key in _get_template_provider_api_keys():
                 provider_api_counts.setdefault(key, 0)
             templates_section: dict[str, Any] = {
                 "total": templates_total,

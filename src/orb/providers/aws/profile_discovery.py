@@ -49,14 +49,30 @@ def get_available_profiles() -> List[Dict[str, str]]:
                 logger.debug(f"Failed to parse AWS config file: {e}")
 
     for profile_name in sorted(profile_names):
-        profiles.append({"name": profile_name, "description": f"Profile: {profile_name}"})
+        profiles.append(
+            {
+                "name": profile_name,
+                "description": f"Profile: {profile_name}",
+                "config_delta": {"profile": profile_name},
+            }
+        )
 
     # Probe for instance profile / environment credentials (no ~/.aws/config needed)
     if probe_instance_profile_credentials():
         profiles.append(
-            {"name": None, "description": "Environment / Instance Profile (auto-discovered)"}
+            {
+                "name": None,
+                "description": "Environment / Instance Profile (auto-discovered)",
+                "config_delta": {},
+            }
         )
     else:
-        profiles.append({"name": None, "description": "Auto-discover credentials"})
+        profiles.append(
+            {
+                "name": None,
+                "description": "Auto-discover credentials",
+                "config_delta": {},
+            }
+        )
 
     return profiles

@@ -580,25 +580,25 @@ def register_aws_services_with_di(container) -> None:
         container.register_singleton(TemplateAdapterPort, create_aws_template_adapter)
         logger.debug("AWS Template Adapter registered with DI container")
 
-        # Register TemplateExampleGeneratorPort backed by AWSHandlerFactory.
-        # The factory is constructed with no AWS client because generate_example_templates
-        # only calls handler classmethods — no live AWS connection is needed.
-        from orb.domain.base.ports.template_example_generator_port import (
-            TemplateExampleGeneratorPort,
+        # Register the AWS template example generator into the per-provider registry.
+        # The handler factory is constructed with no AWS client because
+        # generate_example_templates only calls handler classmethods — no live
+        # AWS connection is needed.
+        from orb.infrastructure.registry.template_example_generator_registry import (
+            TemplateExampleGeneratorRegistry,
         )
         from orb.providers.aws.adapters.template_example_generator_adapter import (
             AWSTemplateExampleGeneratorAdapter,
         )
         from orb.providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
 
-        def create_template_example_generator(c):
-            factory = AWSHandlerFactory(aws_client=None, logger=c.get(LoggingPort))  # type: ignore[arg-type]
-            return AWSTemplateExampleGeneratorAdapter(aws_handler_factory=factory)
-
-        container.register_singleton(
-            TemplateExampleGeneratorPort, create_template_example_generator
+        aws_handler_factory = AWSHandlerFactory(aws_client=None, logger=logger)  # type: ignore[arg-type]
+        TemplateExampleGeneratorRegistry.register(
+            "aws", AWSTemplateExampleGeneratorAdapter(aws_handler_factory=aws_handler_factory)
         )
-        logger.debug("TemplateExampleGeneratorPort registered with DI container")
+        logger.debug(
+            "AWS TemplateExampleGeneratorAdapter registered in TemplateExampleGeneratorRegistry"
+        )
 
         logger.debug("AWS utility services registered with DI container")
 

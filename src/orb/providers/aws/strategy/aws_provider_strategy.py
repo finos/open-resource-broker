@@ -123,6 +123,15 @@ class AWSProviderStrategy(ProviderStrategy):
         AWSProviderConfig(**provider_config)  # raises ValidationError if invalid
         return raw
 
+    @classmethod
+    def is_image_resolution_needed(cls) -> bool:
+        """AWS uses SSM Parameter Store paths as AMI specifications.
+
+        The TemplateConfigurationManager must resolve those paths to
+        concrete AMI IDs before submitting a fleet request to EC2.
+        """
+        return True
+
     def resolve_api_alias(self, raw_api: str) -> str:
         """Resolve AWS-specific API name aliases to canonical registry keys."""
         return self._API_ALIASES.get(raw_api, raw_api)
@@ -740,6 +749,30 @@ class AWSProviderStrategy(ProviderStrategy):
     def get_default_region(cls) -> str:
         """Return the default AWS region for CLI prompts."""
         return "us-east-1"
+
+    @classmethod
+    def get_operational_param_choices(cls, param: str) -> list[tuple[str, str]]:
+        """Return picker choices for an operational parameter, if any.
+
+        The generic ``orb init`` operational-params prompt consults this hook
+        to render a numbered picker for a parameter.  When the returned list
+        is empty the prompt falls back to free-text input.
+        """
+        if param == "region":
+            return cls.get_available_regions()
+        return []
+
+    @classmethod
+    def get_operational_param_default(cls, param: str) -> str:
+        """Return the default value for an operational parameter.
+
+        Consulted by the ``orb init`` operational-params prompt to pre-select
+        a picker entry (or pre-fill a free-text field) when the operator does
+        not choose explicitly.
+        """
+        if param == "region":
+            return cls.get_default_region()
+        return ""
 
     @classmethod
     def get_cli_extra_config_keys(cls) -> set[str]:

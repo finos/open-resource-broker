@@ -212,8 +212,11 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         if not fleet_role and self.config_port is not None:
             provider_config = self.config_port.get_provider_config()
             if provider_config is not None:
+                active_override = self.config_port.get_active_provider_name_override()
                 providers = getattr(provider_config, "providers", [])
                 for p in providers:
+                    if active_override and getattr(p, "name", None) != active_override:
+                        continue
                     fleet_role = (p.config or {}).get("fleet_role")
                     if fleet_role:
                         break

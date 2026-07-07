@@ -31,6 +31,21 @@ class BaseProviderStrategy(ProviderPort, ABC):
     def get_defaults_config(cls) -> dict:
         return {}
 
+    @classmethod
+    def is_image_resolution_needed(cls) -> bool:
+        """Return True when this provider requires SSM / image-ID resolution.
+
+        The default is ``False``.  Override to ``True`` on providers that use
+        AWS SSM Parameter Store paths (``/aws/service/…``) as image
+        specifications and need the TemplateConfigurationManager to resolve
+        those paths to concrete AMI IDs before submitting to the cloud API.
+
+        Only the AWS provider currently needs this; all other providers
+        (k8s, GCP, Azure, …) use container image references that do not
+        require pre-flight resolution.
+        """
+        return False
+
     # ------------------------------------------------------------------
     # Typed provisioning interface — returns OperationOutcome
     # ------------------------------------------------------------------

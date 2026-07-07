@@ -159,6 +159,22 @@ class ConfigurationPort(ProviderConfigPort):
         """
         return {}
 
+    @abstractmethod
+    def get_active_provider_name_override(self) -> str | None:
+        """Get current provider name override from CLI (exact instance name)."""
+
+    @abstractmethod
+    def get_active_provider_type_override(self) -> str | None:
+        """Get current provider type override from CLI (type filter)."""
+
+    @abstractmethod
+    def override_provider_name(self, provider_name: str) -> None:
+        """Override the active provider by exact instance name."""
+
+    @abstractmethod
+    def override_provider_type(self, provider_type: str) -> None:
+        """Restrict selection to a provider type."""
+
     @property
     def app_config(self) -> Any:
         """Get the full application configuration."""

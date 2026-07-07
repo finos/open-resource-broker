@@ -47,8 +47,47 @@ REGION = "eu-west-2"
 
 
 # ---------------------------------------------------------------------------
+# Fake AWS credentials — provider-owned, non-live only
+# ---------------------------------------------------------------------------
+
+
+def _is_aws_live_run(request: pytest.FixtureRequest) -> bool:
+    """True when either --live or --run-aws is passed at collection time."""
+    return bool(
+        request.config.getoption("--live", default=False)
+        or request.config.getoption("--run-aws", default=False)
+    )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _aws_fake_credentials(request: pytest.FixtureRequest):
+    """Inject fake AWS credentials for the entire AWS test subtree.
+
+    Provider-owned: the root conftest never sets cloud credentials, so live
+    suites for any provider run in the operator's real environment.  This
+    fixture is scoped to the AWS subtree so only AWS tests get the fake
+    creds.  It short-circuits when a live-mode flag is passed so the AWS
+    live suite (``tests/providers/aws/live/``) also inherits the real env.
+
+    ``setdefault`` is deliberate: if the operator has already exported real
+    creds we don't clobber them (moto still intercepts calls, but
+    downstream env-driven config reading e.g. ``AWS_DEFAULT_REGION``
+    behaves predictably).
+    """
+    if _is_aws_live_run(request):
+        yield
+        return
+    os.environ.setdefault("AWS_ACCESS_KEY_ID", "testing")
+    os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "testing")  # nosec B105
+    os.environ.setdefault("AWS_SECURITY_TOKEN", "testing")  # nosec B105
+    os.environ.setdefault("AWS_SESSION_TOKEN", "testing")  # nosec B105
+    os.environ.setdefault("AWS_DEFAULT_REGION", REGION)
+    yield
+
+
+# ---------------------------------------------------------------------------
 # Moto compatibility patches (applied to all moto/ tests via autouse=True
-# in tests/providers/aws/moto/conftest.py)
+# in tests/providers/aws/mocked/conftest.py)
 # ---------------------------------------------------------------------------
 
 
@@ -114,12 +153,12 @@ def make_patch_moto_compat():
 
 @pytest.fixture(scope="function")
 def moto_aws():
-    """Start moto mock_aws context for the duration of each test."""
-    os.environ.setdefault("AWS_ACCESS_KEY_ID", "testing")
-    os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "testing")  # nosec B105
-    os.environ.setdefault("AWS_SECURITY_TOKEN", "testing")  # nosec B105
-    os.environ.setdefault("AWS_SESSION_TOKEN", "testing")  # nosec B105
-    os.environ.setdefault("AWS_DEFAULT_REGION", REGION)
+    """Start moto mock_aws context for the duration of each test.
+
+    Fake AWS credentials are supplied session-scoped by
+    ``_aws_fake_credentials`` above so botocore is already primed by the
+    time this fixture runs.
+    """
     with mock_aws():
         yield
 

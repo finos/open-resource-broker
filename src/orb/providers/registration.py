@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # Central provider list – the single line to edit when adding a new provider.
 # ---------------------------------------------------------------------------
-_REGISTERED_PROVIDERS: list[str] = ["aws"]
+_REGISTERED_PROVIDERS: list[str] = ["aws", "k8s"]
 
 # Entry-point group used by third-party plugins to register provider
 # extensions.  See ``discover_provider_plugins`` and
@@ -114,7 +114,9 @@ def register_all_providers(container: DIContainer | None = None) -> None:
        so that optional provider extras are handled gracefully).
     2. Calls ``register_<n>_provider(registry)`` to register the strategy and
        supporting factories with the global provider registry.
-    3. If *container* is given, calls ``initialize_<n>_provider(container)``
+    3. If *container* is given, resolves ``template_factory`` and ``logger``
+       from the container and calls
+       ``initialize_<n>_provider(template_factory=…, logger=…)``
        when that function exists in the module.
 
     Args:
@@ -144,7 +146,22 @@ def register_all_providers(container: DIContainer | None = None) -> None:
         if container is not None:
             init_fn = getattr(mod, f"initialize_{name}_provider", None)
             if init_fn is not None:
-                init_fn(container)
+                # Resolve template_factory and logger from the container so
+                # each provider's initialize function receives the correct
+                # typed arguments instead of the container object.
+                from orb.domain.base.ports.logging_port import LoggingPort
+                from orb.domain.template.factory import TemplateFactory
+
+                try:
+                    template_factory = container.get(TemplateFactory)
+                except Exception:
+                    template_factory = None
+                try:
+                    logger_port = container.get(LoggingPort)
+                except Exception:
+                    logger_port = None
+
+                init_fn(template_factory=template_factory, logger=logger_port)
 
     # Third-party provider plugins are discovered after the built-in
     # providers register so plugins can rely on the built-in registries

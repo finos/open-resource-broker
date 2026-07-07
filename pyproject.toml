@@ -81,6 +81,14 @@ aws = [
     "botocore>=1.42.21",
 ]
 
+# Modern Kubernetes provider — explicit opt-in extra.  Install with:
+#   pip install orb-py[k8s]
+# Only the SDK client is required here; everything else (jinja2, watchdog,
+# alembic etc.) is legacy-plugin baggage and stays in the [k8s-legacy] extra.
+k8s = [
+    "kubernetes",
+]
+
 # Placeholder entries for future providers (add when provider is implemented)
 # azure = [
 #     "azure-mgmt-compute>=30.0.0",
@@ -95,6 +103,7 @@ aws = [
 # Meta-extra: all currently implemented providers
 all-providers = [
     "orb-py[aws]",
+    "orb-py[k8s]",
 ]
 
 # Legacy k8s HostFactory plugin — heavy deps gated behind optional extra.
@@ -172,6 +181,14 @@ test-aws = [
     "requests-mock>=1.11.0,<2.0.0",
 ]
 
+# Kubernetes test dependencies — kmock is an in-process HTTP-level K8s API mock.
+# Tests point the real kubernetes SDK client at the kmock URL so the full
+# client stack is exercised without a live cluster.
+test-k8s = [
+    "orb-py[k8s]",
+    "kmock>=0.7",
+]
+
 # ---------------------------------------------------------------------------
 # pip compatibility shims for [dependency-groups] (PEP 735)
 #
@@ -220,6 +237,7 @@ ci = [
     # Essential Type Stubs
     "types-PyYAML>=6.0.12.12,<7.0.0",
     "types-python-dateutil>=2.8.19.14,<3.0.0",
+    "kubernetes-stubs-elephant-fork>=36.0.2,<37.0.0",
     # Build Tools
     "tomli>=2.0.0,<3.0.0",
     # Security Scanning
@@ -315,9 +333,13 @@ ci = [
     "prometheus-client>=0.17.0",
     "alembic>=1.13",
 
+    # k8s HTTP-level mock server (test-only, not shipped with the package)
+    "kmock>=0.7",
+
     # Essential Type Stubs
     "types-PyYAML>=6.0.12.12,<7.0.0",
     "types-python-dateutil>=2.8.19.14,<3.0.0",
+    "kubernetes-stubs-elephant-fork>=36.0.2,<37.0.0",
 
     # Build Tools
     "tomli>=2.0.0,<3.0.0",  # For pyproject.toml parsing in dev scripts (Python < 3.11)
@@ -471,13 +493,11 @@ markers = [
     "security: marks security tests",
     "serial: forces serial execution (use ``-n0`` or filter with ``-m 'not serial'`` under xdist)",
 ]
-env = [
-    "AWS_DEFAULT_REGION=us-east-1",
-    "AWS_ACCESS_KEY_ID=testing",
-    "AWS_SECRET_ACCESS_KEY=testing",
-    "AWS_SECURITY_TOKEN=testing",
-    "AWS_SESSION_TOKEN=testing",
-]
+# Provider-specific fake credentials live in
+# tests/providers/<name>/mocked/conftest.py.  The global pytest-env block
+# intentionally does not set cloud credentials so live suites (any
+# provider, any auth mechanism) inherit the operator's real environment.
+env = []
 
 [tool.coverage.run]
 source = ["src/orb"]

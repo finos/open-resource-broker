@@ -57,13 +57,8 @@ def reset_singletons():
 
 @pytest.fixture
 def moto_aws():
-    import os
-
-    os.environ.setdefault("AWS_ACCESS_KEY_ID", "testing")
-    os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "testing")  # nosec B105
-    os.environ.setdefault("AWS_SECURITY_TOKEN", "testing")  # nosec B105
-    os.environ.setdefault("AWS_SESSION_TOKEN", "testing")  # nosec B105
-    os.environ.setdefault("AWS_DEFAULT_REGION", REGION)
+    # Fake AWS credentials come from tests/providers/aws/conftest.py's
+    # session-scoped _aws_fake_credentials fixture (autouse).
     with mock_aws():
         yield
 

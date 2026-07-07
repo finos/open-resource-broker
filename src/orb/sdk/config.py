@@ -31,7 +31,10 @@ class SDKConfig:
     """
 
     # Provider configuration
-    provider: str = "aws"
+    # The default of "aws" is deprecated; a future major release will require
+    # the caller to pass provider explicitly.  Use SDKConfig(provider="aws")
+    # to silence the deprecation warning and express the intent clearly.
+    provider: Optional[str] = "aws"
     provider_type: Optional[str] = None
     provider_name: Optional[str] = None
     provider_config: dict[str, Any] = field(default_factory=dict)

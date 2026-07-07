@@ -49,7 +49,10 @@ def _register_template_services(container: DIContainer):
 
     container.register_singleton(TemplateDefaultsPort, create_template_defaults_service)
 
-    # Register template generation service
+    # Register template generation service.
+    # The service depends on TemplateExampleGeneratorResolverPort; the
+    # TemplateExampleGeneratorRegistry satisfies that protocol structurally so
+    # it is passed directly — no separate adapter class is needed.
     def create_template_generation_service(c):
         """Create template generation service with injected dependencies."""
         from orb.application.ports.scheduler_port import SchedulerPort
@@ -58,8 +61,8 @@ def _register_template_services(container: DIContainer):
             TemplateGenerationService,
         )
         from orb.domain.base.ports.path_resolution_port import PathResolutionPort
-        from orb.domain.base.ports.template_example_generator_port import (
-            TemplateExampleGeneratorPort,
+        from orb.infrastructure.registry.template_example_generator_registry import (
+            TemplateExampleGeneratorRegistry,
         )
 
         return TemplateGenerationService(
@@ -67,7 +70,7 @@ def _register_template_services(container: DIContainer):
             scheduler_strategy=c.get(SchedulerPort),
             logger=c.get(LoggingPort),
             provider_registry_service=c.get(ProviderRegistryService),
-            template_example_generator=c.get(TemplateExampleGeneratorPort),
+            generator_resolver=TemplateExampleGeneratorRegistry,
             path_resolver=c.get(PathResolutionPort),
         )
 
@@ -85,6 +88,25 @@ def _register_template_services(container: DIContainer):
 
         factory = TemplateFactory(logger=c.get(LoggingPort))
         logger_port = c.get(LoggingPort)
+
+        # Register Kubernetes template extensions so K8sTemplateDTOConfig is
+        # available for round-trip serialisation before per-provider template
+        # classes are registered below.  Guarded by ImportError so the factory
+        # builds cleanly when the k8s extra is not installed.
+        try:
+            from orb.providers.k8s.registration import (  # noqa: PLC0415
+                register_k8s_extensions,
+                register_k8s_template_factory,
+            )
+
+            register_k8s_extensions(logger_port)
+            register_k8s_template_factory(factory, logger_port)
+        except ImportError:
+            # K8s is an optional extra; when the k8s package or its
+            # dependencies are not installed the caller proceeds without
+            # k8s support.  This is expected in minimal installs.
+            pass
+
         for _name in _REGISTERED_PROVIDERS:
             _mod_path = f"orb.providers.{_name}.registration"
             if importlib.util.find_spec(_mod_path) is None:

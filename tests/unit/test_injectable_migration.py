@@ -96,6 +96,20 @@ class MockConfigurationPort(ConfigurationPort):
         """Get metrics configuration."""
         return self._config.get("metrics", {})
 
+    def get_active_provider_name_override(self) -> str | None:
+        """Get current provider name override from CLI."""
+        return None
+
+    def get_active_provider_type_override(self) -> str | None:
+        """Get current provider type override from CLI."""
+        return None
+
+    def override_provider_name(self, provider_name: str) -> None:
+        """Override the active provider by exact instance name."""
+
+    def override_provider_type(self, provider_type: str) -> None:
+        """Restrict selection to a provider type."""
+
     def override_provider_region(self, region: str) -> None:
         """Override the provider region for this session."""
 

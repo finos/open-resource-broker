@@ -18,7 +18,7 @@
       "name": "EC2 Fleet Instant On-Demand",
       "providerApi": "EC2Fleet",
       "providerType": "aws",
-      "createdAt": "2026-06-24T12:58:15.944146"
+      "createdAt": "2026-07-06T22:07:11.806716"
     },
     {
       "templateId": "EC2Fleet-Instant-Spot",
@@ -38,7 +38,7 @@
       "name": "EC2 Fleet Instant Spot",
       "providerApi": "EC2Fleet",
       "providerType": "aws",
-      "createdAt": "2026-06-24T12:58:15.944377"
+      "createdAt": "2026-07-06T22:07:11.806807"
     },
     {
       "templateId": "EC2Fleet-Instant-Mixed",
@@ -58,7 +58,7 @@
       "name": "EC2 Fleet Instant Mixed",
       "providerApi": "EC2Fleet",
       "providerType": "aws",
-      "createdAt": "2026-06-24T12:58:15.944400",
+      "createdAt": "2026-07-06T22:07:11.806823",
       "percentOnDemand": 30
     },
     {
@@ -78,7 +78,7 @@
       "name": "EC2 Fleet Request On-Demand",
       "providerApi": "EC2Fleet",
       "providerType": "aws",
-      "createdAt": "2026-06-24T12:58:15.944411"
+      "createdAt": "2026-07-06T22:07:11.806831"
     },
     {
       "templateId": "EC2Fleet-Request-Spot",
@@ -98,7 +98,7 @@
       "name": "EC2 Fleet Request Spot",
       "providerApi": "EC2Fleet",
       "providerType": "aws",
-      "createdAt": "2026-06-24T12:58:15.944421"
+      "createdAt": "2026-07-06T22:07:11.806839"
     },
     {
       "templateId": "EC2Fleet-Request-Mixed",
@@ -119,7 +119,7 @@
       "name": "EC2 Fleet Request Mixed",
       "providerApi": "EC2Fleet",
       "providerType": "aws",
-      "createdAt": "2026-06-24T12:58:15.944431",
+      "createdAt": "2026-07-06T22:07:11.806849",
       "percentOnDemand": 40,
       "allocationStrategyOnDemand": "lowestPrice"
     },
@@ -140,7 +140,7 @@
       "name": "EC2 Fleet Maintain On-Demand",
       "providerApi": "EC2Fleet",
       "providerType": "aws",
-      "createdAt": "2026-06-24T12:58:15.944439"
+      "createdAt": "2026-07-06T22:07:11.806857"
     },
     {
       "templateId": "EC2Fleet-Maintain-Spot",
@@ -160,7 +160,7 @@
       "name": "EC2 Fleet Maintain Spot",
       "providerApi": "EC2Fleet",
       "providerType": "aws",
-      "createdAt": "2026-06-24T12:58:15.944454"
+      "createdAt": "2026-07-06T22:07:11.806864"
     },
     {
       "templateId": "EC2Fleet-Maintain-Mixed",
@@ -181,7 +181,7 @@
       "name": "EC2 Fleet Maintain Mixed",
       "providerApi": "EC2Fleet",
       "providerType": "aws",
-      "createdAt": "2026-06-24T12:58:15.944463",
+      "createdAt": "2026-07-06T22:07:11.806870",
       "percentOnDemand": 50,
       "allocationStrategyOnDemand": "prioritized"
     },
@@ -204,7 +204,7 @@
       "name": "Spot Fleet Request - Lowest Price",
       "providerApi": "SpotFleet",
       "providerType": "aws",
-      "createdAt": "2026-06-24T12:58:15.944477"
+      "createdAt": "2026-07-06T22:07:11.806881"
     },
     {
       "templateId": "SpotFleet-Request-Diversified",
@@ -225,7 +225,7 @@
       "name": "Spot Fleet Request - Diversified",
       "providerApi": "SpotFleet",
       "providerType": "aws",
-      "createdAt": "2026-06-24T12:58:15.944484"
+      "createdAt": "2026-07-06T22:07:11.806887"
     },
     {
       "templateId": "SpotFleet-Request-CapacityOptimized",
@@ -246,7 +246,7 @@
       "name": "Spot Fleet Request - Capacity Optimized",
       "providerApi": "SpotFleet",
       "providerType": "aws",
-      "createdAt": "2026-06-24T12:58:15.944490"
+      "createdAt": "2026-07-06T22:07:11.806894"
     },
     {
       "templateId": "SpotFleet-Maintain-LowestPrice",
@@ -267,7 +267,7 @@
       "name": "Spot Fleet Maintain - Lowest Price",
       "providerApi": "SpotFleet",
       "providerType": "aws",
-      "createdAt": "2026-06-24T12:58:15.944496"
+      "createdAt": "2026-07-06T22:07:11.806899"
     },
     {
       "templateId": "SpotFleet-Maintain-Diversified",
@@ -288,7 +288,7 @@
       "name": "Spot Fleet Maintain - Diversified",
       "providerApi": "SpotFleet",
       "providerType": "aws",
-      "createdAt": "2026-06-24T12:58:15.944502"
+      "createdAt": "2026-07-06T22:07:11.806905"
     },
     {
       "templateId": "SpotFleet-Maintain-CapacityOptimized",
@@ -309,7 +309,7 @@
       "name": "Spot Fleet Maintain - Capacity Optimized",
       "providerApi": "SpotFleet",
       "providerType": "aws",
-      "createdAt": "2026-06-24T12:58:15.944508"
+      "createdAt": "2026-07-06T22:07:11.806910"
     },
     {
       "templateId": "ASG-OnDemand",
@@ -327,7 +327,7 @@
       "name": "Auto Scaling Group On-Demand",
       "providerApi": "ASG",
       "providerType": "aws",
-      "createdAt": "2026-06-24T12:58:15.944518"
+      "createdAt": "2026-07-06T22:07:11.806920"
     },
     {
       "templateId": "ASG-Spot",
@@ -346,7 +346,7 @@
       "name": "Auto Scaling Group Spot",
       "providerApi": "ASG",
       "providerType": "aws",
-      "createdAt": "2026-06-24T12:58:15.944532"
+      "createdAt": "2026-07-06T22:07:11.806929"
     },
     {
       "templateId": "ASG-Mixed",
@@ -365,7 +365,7 @@
       "name": "Auto Scaling Group Mixed",
       "providerApi": "ASG",
       "providerType": "aws",
-      "createdAt": "2026-06-24T12:58:15.944541",
+      "createdAt": "2026-07-06T22:07:11.806937",
       "percentOnDemand": 30
     },
     {
@@ -383,7 +383,7 @@
       "name": "Run Instances On-Demand",
       "providerApi": "RunInstances",
       "providerType": "aws",
-      "createdAt": "2026-06-24T12:58:15.944549"
+      "createdAt": "2026-07-06T22:07:11.806944"
     },
     {
       "templateId": "RunInstances-Spot",
@@ -401,7 +401,7 @@
       "name": "Run Instances Spot",
       "providerApi": "RunInstances",
       "providerType": "aws",
-      "createdAt": "2026-06-24T12:58:15.944556"
+      "createdAt": "2026-07-06T22:07:11.806955"
     }
   ]
 }

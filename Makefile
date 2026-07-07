@@ -6,6 +6,7 @@
 # Include all modular makefiles
 include makefiles/common.mk
 include makefiles/dev.mk
+include makefiles/providers.mk
 include makefiles/quality.mk
 include makefiles/ci.mk
 include makefiles/deploy.mk

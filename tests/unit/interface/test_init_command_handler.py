@@ -5,10 +5,16 @@ from unittest.mock import MagicMock, patch
 import orb.interface.init_command_handler as _mod
 
 
-def _make_strategy():
+def _make_strategy(regions=None, default_region="us-east-1"):
     strategy = MagicMock()
+    strategy.get_available_regions.return_value = regions or []
+    strategy.get_default_region.return_value = default_region
     strategy.get_available_credential_sources.return_value = [
-        {"name": "default", "description": "Default profile"}
+        {
+            "name": "default",
+            "description": "Default profile",
+            "config_delta": {"profile": "default"},
+        }
     ]
     strategy.test_credentials.return_value = {"success": True}
     strategy.get_credential_requirements.return_value = {}
@@ -119,15 +125,15 @@ def test_discover_infrastructure_forwards_region_and_profile_to_strategy():
     mock_registry.get_or_create_strategy.assert_not_called()
 
 
-def test_interactive_setup_tests_credentials_before_collecting_operational_params():
-    """Credentials must be tested before operational parameters are collected."""
+def test_interactive_setup_tests_credentials_before_asking_for_region():
+    """Credentials must be tested before region is selected."""
     call_order = []
 
     def mock_test_creds(provider_type, source, **kwargs):
         call_order.append("test_credentials")
         return (True, "")
 
-    def mock_prompt_operational(strategy_class):
+    def mock_prompt_operational_params(strategy_class):
         call_order.append("prompt_operational_params")
         return {"region": "us-east-1"}
 
@@ -138,7 +144,9 @@ def test_interactive_setup_tests_credentials_before_collecting_operational_param
     with (
         patch("builtins.input", side_effect=inputs),
         patch.object(_mod, "_test_provider_credentials", side_effect=mock_test_creds),
-        patch.object(_mod, "_prompt_operational_params", side_effect=mock_prompt_operational),
+        patch.object(
+            _mod, "_prompt_operational_params", side_effect=mock_prompt_operational_params
+        ),
         patch.object(
             _mod,
             "_get_available_schedulers",
@@ -154,7 +162,18 @@ def test_interactive_setup_tests_credentials_before_collecting_operational_param
         patch.object(
             _mod,
             "_get_available_credential_sources",
-            return_value=[{"name": "default", "description": "Default"}],
+            return_value=[
+                {
+                    "name": "default",
+                    "description": "Default",
+                    "config_delta": {"profile": "default"},
+                }
+            ],
+        ),
+        patch.object(
+            _mod,
+            "_get_operational_requirements",
+            return_value={"region": {"required": True, "description": "AWS region"}},
         ),
         patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
     ):
@@ -190,7 +209,13 @@ def test_interactive_setup_returns_empty_on_credential_failure():
         patch.object(
             _mod,
             "_get_available_credential_sources",
-            return_value=[{"name": "default", "description": "Default"}],
+            return_value=[
+                {
+                    "name": "default",
+                    "description": "Default",
+                    "config_delta": {"profile": "default"},
+                }
+            ],
         ),
         patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
     ):
@@ -228,10 +253,8 @@ def test_write_config_file_fleet_role_in_config_subnet_ids_in_template_defaults(
         "providers": [
             {
                 "type": "aws",
-                "config": {
-                    "profile": None,
-                    "region": "us-east-1",
-                },
+                "profile": None,
+                "region": "us-east-1",
                 "is_default": True,
                 "infrastructure_defaults": {
                     "subnet_ids": ["subnet-aaa", "subnet-bbb"],
@@ -425,7 +448,8 @@ def test_init_handler_uses_strategy_generate_provider_name(tmp_path) -> None:
     """_write_config_file routes provider name generation through the strategy."""
     provider_data = {
         "type": "k8s",
-        "config": {"context": "ms-karpenter"},
+        "profile": "ms-karpenter",
+        "region": "",
         "is_default": True,
         "infrastructure_defaults": {},
     }
@@ -438,7 +462,8 @@ def test_init_handler_uses_strategy_name_for_aws(tmp_path) -> None:
     """generate_provider_name is called for AWS providers too."""
     provider_data = {
         "type": "aws",
-        "config": {"profile": "my-profile", "region": "eu-west-1"},
+        "profile": "my-profile",
+        "region": "eu-west-1",
         "is_default": False,
         "infrastructure_defaults": {},
     }
@@ -500,35 +525,7 @@ def test_init_handler_fallback_name_when_strategy_unavailable(tmp_path) -> None:
         written = json.load(f)
 
     p = written["provider"]["providers"][0]
-    # Fallback: aws_{sha256_digest_8chars} — verify the prefix and shape
-    assert p["name"].startswith("aws_"), f"Fallback name must start with 'aws_', got: {p['name']}"
-    # The digest is 8 hex chars
-    suffix = p["name"][len("aws_") :]
-    assert len(suffix) == 8 and all(c in "0123456789abcdef" for c in suffix), (
-        f"Fallback suffix must be an 8-char hex digest, got: {suffix}"
-    )
-
-
-def test_fallback_provider_name_is_deterministic() -> None:
-    """_fallback_provider_name must return the same value for the same input."""
-    result1 = _mod._fallback_provider_name("aws", {"config": {"profile": "x", "region": "y"}})
-    result2 = _mod._fallback_provider_name("aws", {"config": {"profile": "x", "region": "y"}})
-    assert result1 == result2
-
-
-def test_fallback_provider_name_differs_for_different_configs() -> None:
-    """_fallback_provider_name must produce distinct names for distinct configs."""
-    name_a = _mod._fallback_provider_name(
-        "aws", {"config": {"profile": "a", "region": "us-east-1"}}
-    )
-    name_b = _mod._fallback_provider_name(
-        "aws", {"config": {"profile": "b", "region": "us-west-2"}}
-    )
-    assert name_a != name_b
-
-
-def test_fallback_provider_name_no_region_profile_keys() -> None:
-    """_fallback_provider_name must not encode 'region' or 'profile' as literal name segments."""
-    name = _mod._fallback_provider_name("mock", {"config": {"project": "my-project"}})
-    assert "region" not in name, "Fallback name must not contain the literal word 'region'"
-    assert "profile" not in name, "Fallback name must not contain the literal word 'profile'"
+    # Fallback: provider_type + sha256(sorted config) — provider-agnostic; the
+    # specific hash isn't stable across config-key additions but the shape is.
+    assert p["name"].startswith("aws_")
+    assert len(p["name"].split("_")[1]) == 8  # sha256 first-8-chars

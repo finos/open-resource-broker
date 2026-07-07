@@ -210,8 +210,11 @@ class TestDashboardSummaryOrchestrator:
             "timeout",
         ):
             assert key in result.requests["by_status"]
-        for key in ("aws", "EC2Fleet", "SpotFleet", "RunInstances", "ASG"):
-            assert key in result.templates["by_provider_api"]
+        # The dynamic key list is sourced from the live provider registry.
+        # In the test context no providers are registered, so the only key
+        # present is the one explicitly returned by count_by_provider_api.
+        assert "aws" in result.templates["by_provider_api"]
+        assert result.templates["by_provider_api"]["aws"] == 1
 
     @pytest.mark.asyncio
     async def test_empty_data_all_zero_counts_empty_recent_activity(self):

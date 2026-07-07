@@ -67,7 +67,11 @@ async def handle_get_machine_status(
                 filter_expressions=getattr(args, "filter", None) or [],
             )
         )
-        return formatter.format_machine_list(result.machines)
+        return formatter.format_machine_list(
+            result.machines,
+            total_count=result.total_count,
+            next_cursor=result.next_cursor,
+        )
 
     if not machine_ids_from_args:
         return InterfaceResponse(
@@ -123,7 +127,11 @@ async def handle_list_machines(
             filter_expressions=getattr(args, "filter", None) or [],
         )
     )
-    return formatter.format_machine_list(result.machines)
+    return formatter.format_machine_list(
+        result.machines,
+        total_count=result.total_count,
+        next_cursor=result.next_cursor,
+    )
 
 
 @handle_interface_exceptions(context="stop_machines", interface_type="cli")

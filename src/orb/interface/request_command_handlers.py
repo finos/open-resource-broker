@@ -274,7 +274,11 @@ async def handle_list_requests(
             filter_expressions=getattr(args, "filter", None) or [],
         )
     )
-    return formatter.format_request_status(result.requests)
+    return formatter.format_request_status(
+        result.requests,
+        total_count=result.total_count,
+        next_cursor=result.next_cursor,
+    )
 
 
 @handle_interface_exceptions(context="cancel_request", interface_type="cli")

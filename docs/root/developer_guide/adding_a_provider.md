@@ -570,7 +570,7 @@ def pytest_collection_modifyitems(config, items):
 The AWS provider tests are the reference layout:
 
 - Unit tests: `tests/providers/aws/unit/`
-- Mocked integration tests: `tests/providers/aws/moto/`
+- Mocked integration tests: `tests/providers/aws/mocked/`
 - Real-AWS tests: `tests/providers/aws/live/`
 - Contract tests: `tests/providers/aws/contract/`
 

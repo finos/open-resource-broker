@@ -344,17 +344,27 @@ class TemplateConfigurationManager:
             return template_dicts
 
     def _is_image_resolution_enabled(self) -> bool:
-        """Check if image resolution is enabled."""
+        """Return True when the active provider requires SSM / image-ID resolution.
+
+        Delegates to the active provider strategy's
+        :meth:`~orb.providers.base.strategy.base_provider_strategy.BaseProviderStrategy.is_image_resolution_needed`
+        classmethod so the decision is provider-owned and does not require the
+        configuration manager to hard-code AWS-specific knowledge.
+
+        Falls back to ``True`` (i.e. attempt resolution) when the active
+        provider cannot be determined — better to attempt resolution than to
+        skip it silently on a provider that needs it.
+        """
         try:
-            provider_config = self.config_manager.get_provider_config()
-            if provider_config is not None and (
-                hasattr(provider_config, "provider_defaults")
-                and "aws" in provider_config.provider_defaults
-            ):
-                aws_defaults = provider_config.provider_defaults["aws"]
-                if hasattr(aws_defaults, "extensions"):
-                    return getattr(aws_defaults.extensions, "ami_resolution_enabled", True)
-            return True
+            if not self.provider_registry_service:
+                return True
+            provider_name = self._resolve_active_provider_once()
+            if not provider_name:
+                return True
+            strategy = self.provider_registry_service.get_or_create_strategy(provider_name)
+            if strategy is None:
+                return True
+            return bool(type(strategy).is_image_resolution_needed())
         except Exception:
             return True
 

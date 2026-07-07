@@ -71,7 +71,11 @@ async def handle_list_templates(
         console.info("")
         print_getting_started_help()
 
-    return formatter.format_template_list(result.templates)
+    return formatter.format_template_list(
+        result.templates,
+        total_count=result.total_count,
+        next_cursor=result.next_cursor,
+    )
 
 
 @handle_interface_exceptions(context="get_template", interface_type="cli")

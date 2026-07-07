@@ -175,6 +175,69 @@ async def get_provider_schema(
 
 
 @router.get(
+    "/",
+    summary="List Providers",
+    description=(
+        "Returns all configured provider instances with name, type, enabled flag, "
+        "and a provider-specific config object.  Does not perform live connectivity "
+        "probes; use GET /providers/health for live status."
+    ),
+)
+@handle_rest_exceptions(endpoint="/api/v1/providers", method="GET")
+async def list_providers(
+    config_manager=CONFIG_MANAGER,
+    _user=Depends(require_role("viewer")),
+) -> JSONResponse:
+    """Return all configured provider instances.
+
+    Each entry includes:
+
+    * ``name``    – the unique provider instance identifier
+    * ``type``    – the provider type (e.g. ``"aws"``, ``"k8s"``)
+    * ``enabled`` – whether the instance is active
+    * ``config``  – provider-specific configuration keys (nested object)
+
+    AWS-specific top-level keys such as ``"profile"`` are intentionally
+    absent; they are nested inside ``config`` when present.
+    """
+    providers_list: list[dict[str, Any]] = []
+
+    try:
+        provider_config: Any = cast(Any, config_manager.get_provider_config())
+
+        if provider_config:
+            try:
+                active_providers = provider_config.get_active_providers()
+            except Exception as exc:
+                logger.warning("Failed to retrieve active providers: %s", exc, exc_info=True)
+                active_providers = []
+
+            for provider_instance in active_providers:
+                name: str = getattr(provider_instance, "name", "")
+                ptype: str = getattr(provider_instance, "type", "unknown")
+                enabled: bool = bool(getattr(provider_instance, "enabled", True))
+                instance_config: dict[str, Any] = getattr(provider_instance, "config", {}) or {}
+
+                providers_list.append(
+                    {
+                        "name": name,
+                        "type": ptype,
+                        "enabled": enabled,
+                        "config": instance_config,
+                    }
+                )
+
+    except Exception as exc:
+        logger.warning("Unhandled error building providers list response: %s", exc, exc_info=True)
+        providers_list = []
+
+    return JSONResponse(
+        content={"providers": providers_list, "total_count": len(providers_list)},
+        status_code=200,
+    )
+
+
+@router.get(
     "/health",
     summary="Provider Health",
     description=(

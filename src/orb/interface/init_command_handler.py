@@ -243,8 +243,13 @@ def _interactive_setup() -> Dict[str, Any]:
         )
         if success:
             console.success("Credentials verified successfully")
-            if selected_source:
-                provider_config["profile"] = selected_source
+            if selected_source is not None:
+                source_entry = next(
+                    (s for s in credential_sources if s["name"] == selected_source),
+                    None,
+                )
+                if source_entry is not None:
+                    provider_config.update(source_entry["config_delta"])
         else:
             console.error("[bold red]ERROR[/bold red] Authentication failed:")
             console.error(f"        {error_msg}")
@@ -265,10 +270,10 @@ def _interactive_setup() -> Dict[str, Any]:
         console.info("  Discover infrastructure for template defaults?")
         console.info("  This will help create generic templates that work across provider setups.")
         console.info("")
-        discover_choice = input("  Discover infrastructure? (y/N): ").strip().lower()
+        discover_choice = input("  Discover infrastructure? (Y/n): ").strip().lower()
 
         infrastructure_defaults = {}
-        if discover_choice in ["y", "yes"]:
+        if discover_choice in ["", "y", "yes"]:
             registry = get_container().get(ProviderRegistryPort)
             infrastructure_defaults = _discover_infrastructure(
                 provider_type, provider_config, registry
@@ -398,8 +403,13 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
         )
         if success:
             console.success("Credentials verified successfully")
-            if selected_source:
-                provider_config["profile"] = selected_source
+            if selected_source is not None:
+                source_entry = next(
+                    (s for s in credential_sources if s["name"] == selected_source),
+                    None,
+                )
+                if source_entry is not None:
+                    provider_config.update(source_entry["config_delta"])
         else:
             console.error(f"Authentication failed: {error_msg}")
             return None
@@ -413,10 +423,10 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
         console.info("")
         console.info("Infrastructure Discovery")
         console.separator(char="-", color="cyan")
-        discover_choice = input("  Discover infrastructure? (y/N): ").strip().lower()
+        discover_choice = input("  Discover infrastructure? (Y/n): ").strip().lower()
 
         infrastructure_defaults = {}
-        if discover_choice in ["y", "yes"]:
+        if discover_choice in ["", "y", "yes"]:
             registry = get_container().get(ProviderRegistryPort)
             infrastructure_defaults = _discover_infrastructure(
                 provider_type, provider_config, registry
@@ -602,7 +612,11 @@ def _discover_infrastructure(
     Args:
         provider_type: The provider type identifier (e.g. ``"aws"``).
         provider_config: Dict of provider config key/value pairs already
-            collected from the operator (e.g. ``{"region": ..., "profile": ...}``).
+            collected from the operator.  The shape is provider-specific
+            (e.g. ``{"context": ..., "namespace": ...}`` for Kubernetes or
+            ``{"region": ...}`` for AWS); all collected keys are forwarded
+            together and each provider's strategy picks up the fields it
+            understands.
         registry: Live provider registry used to construct the strategy.
     """
     console = get_container().get(ConsolePort)
@@ -724,7 +738,7 @@ def _write_config_file(
         # AWS-style shape when no strategy class is available.
         if strategy_class is not None:
             try:
-                provider_name = strategy_class.generate_provider_name(provider_data)
+                provider_name = strategy_class.generate_provider_name(provider_config)
             except Exception:
                 provider_name = _fallback_provider_name(provider_type, provider_data)
         else:

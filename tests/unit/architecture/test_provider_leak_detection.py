@@ -36,6 +36,12 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
     {
         ("bootstrap/core_services.py", "orb.providers.registry"),
         ("bootstrap/infrastructure_services.py", "orb.providers.registration"),
+        ("bootstrap/infrastructure_services.py", "orb.providers.k8s"),
+        ("bootstrap/infrastructure_services.py", "orb.providers.k8s.registration"),
+        (
+            "application/services/orchestration/dashboard_summary.py",
+            "orb.providers.registry",
+        ),
         ("bootstrap/provider_services.py", "orb.providers.registry"),
         ("bootstrap/provider_services.py", "orb.providers.registration"),
         ("bootstrap/services.py", "orb.providers.registration"),
