@@ -132,15 +132,20 @@ def column_picker(
 
     return rx.popover.root(
         rx.popover.trigger(
-            rx.tooltip(
-                rx.icon_button(
-                    rx.icon("columns-3", size=16, aria_hidden="true"),
-                    variant="ghost",
-                    size="2",
-                    color_scheme="gray",
-                    aria_label="Toggle columns",
-                ),
-                content="Toggle columns",
+            # NOTE: ``rx.tooltip`` inserts an extra wrapper element that
+            # breaks Radix Popover's ``asChild`` slot semantics — the
+            # trigger button then never registers a click on the
+            # underlying popover state, so the popover appears not to
+            # open at all.  Keep the icon-button as the direct child of
+            # the trigger; the ``title`` prop provides an accessible
+            # hover-hint without the extra wrapper.
+            rx.icon_button(
+                rx.icon("columns-3", size=16, aria_hidden="true"),
+                variant="ghost",
+                size="2",
+                color_scheme="gray",
+                aria_label="Toggle columns",
+                title="Toggle columns",
             ),
         ),
         rx.popover.content(

@@ -459,7 +459,7 @@ _TAB_TO_STATUS: dict[str, str | None] = {
 # ---------------------------------------------------------------------------
 
 
-class RequestsState(rx.State):
+class RequestsState(AppState):
     """State for the Requests page."""
 
     # Raw list loaded from the API — always the full response for the
@@ -553,16 +553,12 @@ class RequestsState(rx.State):
     def dynamic_columns(self) -> list[ColumnDef]:
         """Provider-declared column definitions merged from backend schemas.
 
-        Reads from AppState.provider_schemas (single HTTP fetch, shared across pages).
+        Reads ``self.provider_schemas`` — inherited from ``AppState`` via
+        Reflex's substate mechanism, so a single HTTP fetch on page mount
+        populates every list-page's dynamic columns.
         """
-        try:
-            schemas: dict[str, list[dict[str, Any]]] = self._get_state_from_cache(
-                AppState
-            ).provider_schemas  # type: ignore[union-attr]
-        except Exception:
-            schemas = {}
         return build_provider_columns(
-            schemas,
+            self.provider_schemas,
             "requests",
             self.provider_filter,
         )
@@ -976,13 +972,8 @@ class RequestsState(rx.State):
         All dict/list fields are pre-serialised to strings so Reflex column
         formatters receive typed scalars at compile time.
         """
-        # Fetch provider schemas once (from AppState — single HTTP call, shared).
-        try:
-            _req_schemas: dict[str, list[dict[str, Any]]] = self._get_state_from_cache(
-                AppState
-            ).provider_schemas  # type: ignore[union-attr]
-        except Exception:
-            _req_schemas = {}
+        # Provider schemas inherited from AppState via substate.
+        _req_schemas = self.provider_schemas
 
         # Apply client-side search filter
         source = self.requests

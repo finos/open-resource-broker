@@ -393,7 +393,7 @@ def _template_to_form(t: dict[str, Any]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-class TemplatesState(rx.State):
+class TemplatesState(AppState):
     """State for the Templates page."""
 
     # ── Data ────────────────────────────────────────────────────────────────
@@ -486,16 +486,12 @@ class TemplatesState(rx.State):
     def dynamic_columns(self) -> list[ColumnDef]:
         """Provider-declared column definitions merged from backend schemas.
 
-        Reads from AppState.provider_schemas (single HTTP fetch, shared across pages).
+        Reads ``self.provider_schemas`` — inherited from ``AppState`` via
+        Reflex's substate mechanism, so a single HTTP fetch on page mount
+        populates every list-page's dynamic columns from the same source.
         """
-        try:
-            schemas: dict[str, list[dict[str, Any]]] = self._get_state_from_cache(
-                AppState
-            ).provider_schemas  # type: ignore[union-attr]
-        except Exception:
-            schemas = {}
         return build_provider_columns(
-            schemas,
+            self.provider_schemas,
             "templates",
             self.provider_filter,
         )
@@ -508,13 +504,8 @@ class TemplatesState(rx.State):
         All dict/list fields are pre-serialised to strings here so that
         Reflex column formatters receive typed scalars at compile time.
         """
-        # Fetch provider schemas once (from AppState — single HTTP call, shared).
-        try:
-            _tmpl_schemas: dict[str, list[dict[str, Any]]] = self._get_state_from_cache(
-                AppState
-            ).provider_schemas  # type: ignore[union-attr]
-        except Exception:
-            _tmpl_schemas = {}
+        # Provider schemas inherited from AppState via substate.
+        _tmpl_schemas = self.provider_schemas
 
         rows: list[dict[str, Any]] = []
         for t in self.filtered_templates:

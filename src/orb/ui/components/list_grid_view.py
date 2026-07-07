@@ -120,6 +120,9 @@ def _cell_content(col: ColumnDef, row: rx.Var) -> rx.Component:
     return rx.text(row[col.key], size="2")  # type: ignore[index]
 
 
+_ALIGN_TO_TEXT_ALIGN = {"start": "left", "center": "center", "end": "right"}
+
+
 def _header_cell(
     col: ColumnDef,
     sort_key: rx.Var,
@@ -127,10 +130,16 @@ def _header_cell(
     on_sort,
 ) -> rx.Component:
     """Build a header cell (custom / sortable / plain)."""
+    # Align passthrough — column-level ``align`` (start/center/end) maps to
+    # CSS text-align on the <th>.  Applied to every branch below.
+    align = getattr(col, "align", "start") or "start"
+    align_kw: dict[str, Any] = {}
+    if align != "start":
+        align_kw["text_align"] = _ALIGN_TO_TEXT_ALIGN.get(align, "left")
     # Custom header renderer takes priority — used by selection columns to
     # render a "select all visible" checkbox in the header.
     if col.header_renderer is not None:
-        header_kwargs: dict[str, Any] = {}
+        header_kwargs: dict[str, Any] = {**align_kw}
         if col.width:
             header_kwargs["width"] = col.width
         return rx.table.column_header_cell(col.header_renderer(), **header_kwargs)
@@ -168,7 +177,7 @@ def _header_cell(
                 width=col.width,
             )
         return inner
-    header_kwargs: dict[str, Any] = {}
+    header_kwargs: dict[str, Any] = {**align_kw}
     if col.width:
         header_kwargs["width"] = col.width
     return rx.table.column_header_cell(col.title, **header_kwargs)
@@ -179,6 +188,14 @@ def _data_cell(col: ColumnDef, row: rx.Var) -> rx.Component:
     cell_kwargs: dict[str, Any] = {"vertical_align": "middle"}
     if col.width:
         cell_kwargs["width"] = col.width
+    # ``ColumnDef.align`` uses flex tokens ("start"/"center"/"end").
+    # ``rx.table.cell`` is a real ``<td>`` — needs CSS ``text-align`` for
+    # inline content (badges, text) and ``justify_content`` for flex
+    # children.  Set both so button clusters (e.g. row actions) end up
+    # right-aligned when ``align="end"``.
+    align = getattr(col, "align", "start") or "start"
+    if align != "start":
+        cell_kwargs["text_align"] = _ALIGN_TO_TEXT_ALIGN.get(align, "left")
     return rx.table.cell(
         _cell_content(col, row),
         **cell_kwargs,

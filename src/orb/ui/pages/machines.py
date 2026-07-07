@@ -313,7 +313,7 @@ _MACHINE_VISIBLE_DEFAULT = (
 # ---------------------------------------------------------------------------
 
 
-class MachinesState(rx.State):
+class MachinesState(AppState):
     """All client-side state for the Machines page."""
 
     # Raw data from API
@@ -457,13 +457,8 @@ class MachinesState(rx.State):
         All dict/list fields are pre-serialised to strings so Reflex
         column formatters receive typed scalars at compile time.
         """
-        # Fetch provider schemas once (from AppState — single HTTP call, shared).
-        try:
-            _mach_schemas: dict[str, list[dict[str, Any]]] = self._get_state_from_cache(
-                AppState
-            ).provider_schemas  # type: ignore[union-attr]
-        except Exception:
-            _mach_schemas = {}
+        # Provider schemas inherited from AppState via substate.
+        _mach_schemas = self.provider_schemas
 
         rows: list[dict[str, Any]] = []
         for m in self.filtered_machines:
@@ -554,18 +549,12 @@ class MachinesState(rx.State):
     def dynamic_columns(self) -> list[ColumnDef]:
         """Provider-declared column definitions merged from backend schemas.
 
-        Returns columns from all providers when ``provider_filter`` is ``"All"``,
-        or only the active provider's columns when a specific provider is selected.
-        Reads from AppState.provider_schemas (single HTTP fetch, shared across pages).
+        Reads ``self.provider_schemas`` — inherited from ``AppState`` via
+        Reflex's substate mechanism, so a single HTTP fetch on page mount
+        populates every list-page's dynamic columns.
         """
-        try:
-            schemas: dict[str, list[dict[str, Any]]] = self._get_state_from_cache(
-                AppState
-            ).provider_schemas  # type: ignore[union-attr]
-        except Exception:
-            schemas = {}
         return build_provider_columns(
-            schemas,
+            self.provider_schemas,
             "machines",
             self.provider_filter,
         )
