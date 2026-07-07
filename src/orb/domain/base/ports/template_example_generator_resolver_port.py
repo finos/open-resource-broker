@@ -14,6 +14,6 @@ class TemplateExampleGeneratorResolverPort(Protocol):
     references an infrastructure class directly.
     """
 
-    def get(self, provider_type: str) -> Optional[TemplateExampleGeneratorPort]:
+    def get(self, provider_type: str) -> Optional[TemplateExampleGeneratorPort]:  # type: ignore[return]
         """Return the generator for *provider_type*, or ``None`` if not registered."""
-        ...  # type: ignore[return]
+        pass

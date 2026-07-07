@@ -102,6 +102,9 @@ def _register_template_services(container: DIContainer):
             register_k8s_extensions(logger_port)
             register_k8s_template_factory(factory, logger_port)
         except ImportError:
+            # K8s is an optional extra; when the k8s package or its
+            # dependencies are not installed the caller proceeds without
+            # k8s support.  This is expected in minimal installs.
             pass
 
         for _name in _REGISTERED_PROVIDERS:

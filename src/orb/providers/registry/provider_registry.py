@@ -549,7 +549,10 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
                     # Fall back to the provider type name itself as a minimal key.
                     apis.append(provider_type)
             except Exception:
-                pass
+                # A single provider failing to expose its APIs must not
+                # block the caller: skip and continue collecting from the
+                # remaining providers.
+                continue
         seen: set[str] = set()
         return [a for a in sorted(apis) if not (a in seen or seen.add(a))]  # type: ignore[func-returns-value]
 

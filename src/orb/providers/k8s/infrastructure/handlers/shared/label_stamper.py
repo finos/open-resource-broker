@@ -20,10 +20,7 @@ status resolver can find the pods.
 from __future__ import annotations
 
 import copy
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:  # pragma: no cover — type-checking only
-    from orb.domain.request.aggregate import Request
+from typing import Any
 
 
 def stamp_native_workload_body(
@@ -32,7 +29,7 @@ def stamp_native_workload_body(
     workload_name: str,
     namespace: str,
     replicas: int,
-    request: "Request",
+    request: Any,
     label_prefix: str,
 ) -> dict[str, Any]:
     """Stamp per-request identity onto a rendered native workload body.

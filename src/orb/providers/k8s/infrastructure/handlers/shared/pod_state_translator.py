@@ -16,7 +16,7 @@ translation — they can call these functions directly.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, Optional
 
 from orb.providers.k8s.utilities.pod_state import (
     extract_status_reason,
@@ -25,17 +25,13 @@ from orb.providers.k8s.utilities.pod_state import (
     pod_status_string,
 )
 
-if TYPE_CHECKING:  # pragma: no cover — type-checking only
-    from orb.providers.k8s.watch.node_state_cache import K8sNodeStateCache
-    from orb.providers.k8s.watch.pod_state_cache import PodState
-
 
 def instance_dict_for_pod(
     pod: Any,
     namespace: str,
     *,
     provider_api: str,
-    node_state_cache: Optional["K8sNodeStateCache"] = None,
+    node_state_cache: Optional[Any] = None,
     logger: Optional[Any] = None,
 ) -> dict[str, Any]:
     """Convert a ``V1Pod`` SDK object to the per-instance dict shape ORB expects.
@@ -145,10 +141,10 @@ def instance_dict_for_pod(
 
 
 def instance_dict_for_state(
-    state: "PodState",
+    state: Any,
     *,
     provider_api: str,
-    node_state_cache: Optional["K8sNodeStateCache"] = None,
+    node_state_cache: Optional[Any] = None,
 ) -> dict[str, Any]:
     """Convert a cached :class:`PodState` into the instance-dict shape.
 

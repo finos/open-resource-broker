@@ -202,7 +202,7 @@ class K8sClient:
 
         try:
             return fn(*args, **kwargs)
-        except BaseException as exc:
+        except Exception as exc:
             if not _is_401(exc):
                 raise
             self._logger.warning(
