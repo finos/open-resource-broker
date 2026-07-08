@@ -51,13 +51,26 @@ def _make_config(namespace: str = "orb-contract") -> K8sProviderConfig:
     return K8sProviderConfig(namespace=namespace, audit_high_risk_pod_fields=False)  # type: ignore[call-arg]
 
 
-def _make_pod_object(name: str, namespace: str = "orb-contract") -> SimpleNamespace:
-    """Return a minimal V1Pod-shaped namespace that handlers can read."""
+def _make_pod_object(
+    name: str,
+    namespace: str = "orb-contract",
+    *,
+    request_id: str | None = None,
+) -> SimpleNamespace:
+    """Return a minimal V1Pod-shaped namespace that handlers can read.
+
+    When *request_id* is supplied the ``orb.io/request-id`` label is
+    stamped on the pod so that ``_list_namespaced_pod`` can filter by
+    label rather than by name-prefix (B1 fix).
+    """
+    labels: dict[str, str] = {"orb.io/managed": "true"}
+    if request_id is not None:
+        labels["orb.io/request-id"] = request_id
     return SimpleNamespace(
         metadata=SimpleNamespace(
             name=name,
             namespace=namespace,
-            labels={"orb.io/managed": "true"},
+            labels=labels,
         ),
         spec=SimpleNamespace(node_name=None),
         status=SimpleNamespace(
@@ -91,36 +104,88 @@ def _make_request(
 def _make_core_v1_mock(request_id: str = "contract-req-001") -> Any:
     """Build a CoreV1Api mock whose create/list/delete methods are pre-wired.
 
-    The mock tracks which pods have been deleted so that list_namespaced_pod
-    returns an empty items list after the pods are released.  This lets
-    test_status_after_release_reflects_termination pass vacuously (empty
-    list satisfies the ``for entry in result.instances`` loop) rather than
-    failing because the fake pods still report ``Running``.  The same
-    vacuous-pass semantics apply to AWS moto's ASG handler (the test carries
-    a ``simulator_limitation`` marker for that reason).
+    Pod lifecycle semantics
+    -----------------------
+    * ``create_namespaced_pod`` registers a fake pod object keyed by its name.
+      The pod name is read from ``body.metadata.name`` (the real apiserver
+      registers exactly what it receives).  The ``orb.io/request-id`` label
+      is extracted from ``body.metadata.labels`` and stamped on the stored
+      pod object so that the list filter can match by label (not by name
+      prefix).
+    * ``list_namespaced_pod`` filters by ``label_selector`` when present.
+      The selector has the form ``<prefix>/request-id=<request_id>``; the
+      mock extracts the request_id value and returns only pods whose
+      ``orb.io/request-id`` label matches — using the real label, not a
+      re-derived name prefix (B1 fix).  Pods that have been deleted are
+      excluded.
+    * ``delete_namespaced_pod`` removes a pod by name; only that specific pod
+      is removed — pods belonging to a different request remain visible.
+
+    This correctly models real apiserver behaviour where each list call is an
+    independent API call with no shared mutable state across requests.  Two
+    sequential acquire calls on the *same* mock see only their own pods,
+    regardless of whether earlier acquires have been released.
     """
     core_v1 = MagicMock()
 
-    # create_namespaced_pod — returns a plain SimpleNamespace; the handler
-    # does not read the return value beyond logging it so a bare stub is fine.
-    core_v1.create_namespaced_pod.return_value = SimpleNamespace()
-
-    safe = request_id.replace("-", "")[:20]
-    pod_name = f"orb-{safe}-0000"
-    fake_pod = _make_pod_object(pod_name)
+    # Maps pod-name → fake pod object for every pod ever created on this mock.
+    created_pods: dict[str, Any] = {}
+    # Names of pods that have been deleted.
     deleted_pods: set[str] = set()
 
+    def _create_namespaced_pod(namespace: str, body: Any, **kwargs: Any) -> Any:
+        # Extract pod name from body — V1Pod uses .metadata.name; SimpleNamespace
+        # and MagicMock bodies also expose this attribute path.
+        try:
+            name = body.metadata.name
+        except AttributeError:
+            name = str(body.get("metadata", {}).get("name", "unknown"))
+        # Extract the request-id label so the list filter can match by label.
+        try:
+            body_labels: dict[str, str] = dict(body.metadata.labels or {})
+        except AttributeError:
+            body_labels = {}
+        rid = body_labels.get("orb.io/request-id")
+        created_pods[name] = _make_pod_object(name, namespace, request_id=rid)
+        return SimpleNamespace()
+
     def _list_namespaced_pod(**kwargs: Any) -> Any:
-        # Return an empty list once any pod has been deleted, mirroring the
-        # real cluster behaviour where deleted pods disappear from list results.
-        if deleted_pods:
-            return SimpleNamespace(items=[])
-        return SimpleNamespace(items=[fake_pod])
+        """Return pods matching the label_selector, excluding deleted ones.
+
+        The label_selector is ``<prefix>/request-id=<request_id>``; the mock
+        extracts the request_id value and returns only pods whose
+        ``orb.io/request-id`` label matches exactly.  This keeps the mock
+        coupled to the real label the production code stamps on pods, not to
+        any name-prefix derivation (B1 fix).  When no selector is provided
+        every non-deleted pod is returned (reconciler / broad-list semantics).
+        """
+        selector: str = kwargs.get("label_selector", "") or ""
+        request_id_value: str | None = None
+        for part in selector.split(","):
+            if "/request-id=" in part:
+                request_id_value = part.split("=", 1)[1].strip()
+                break
+
+        items: list[Any] = []
+        for name, pod in created_pods.items():
+            if name in deleted_pods:
+                continue
+            if request_id_value is not None:
+                # Match by the label stored on the pod object — not by name prefix.
+                pod_labels: dict[str, str] = dict(
+                    getattr(getattr(pod, "metadata", None), "labels", None) or {}
+                )
+                if pod_labels.get("orb.io/request-id") != request_id_value:
+                    continue
+            items.append(pod)
+        return SimpleNamespace(items=items)
 
     def _delete_namespaced_pod(name: str, namespace: str, **kwargs: Any) -> Any:
+        # Only mark the named pod as deleted; pods for other requests are unaffected.
         deleted_pods.add(name)
         return SimpleNamespace()
 
+    core_v1.create_namespaced_pod.side_effect = _create_namespaced_pod
     core_v1.list_namespaced_pod.side_effect = _list_namespaced_pod
     core_v1.delete_namespaced_pod.side_effect = _delete_namespaced_pod
 
