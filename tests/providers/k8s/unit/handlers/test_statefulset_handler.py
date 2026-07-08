@@ -31,7 +31,6 @@ from orb.domain.request.aggregate import Request
 from orb.domain.request.value_objects import RequestId, RequestType
 from orb.domain.template.template_aggregate import Template
 from orb.providers.k8s.configuration.config import K8sProviderConfig
-from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
 from orb.providers.k8s.infrastructure.handlers.statefulset_handler import K8sStatefulSetHandler
 
 # ---------------------------------------------------------------------------
@@ -247,15 +246,19 @@ async def test_release_hosts_selective_highest_ordinal_no_warning() -> None:
 
 
 @pytest.mark.asyncio
-async def test_release_hosts_selective_non_highest_ordinal_refused() -> None:
-    """When the victims are not the top-of-stack ordinals, the handler
-    raises K8sError and issues no scale patch.
+async def test_release_hosts_selective_non_highest_ordinal_raises_and_does_not_scale() -> None:
+    """When the victims include non-highest ordinals, the handler refuses
+    the request with ``K8sError`` and does NOT patch the StatefulSet.
 
-    Commit b4a77b1a deliberately changed this behaviour: silently evicting
-    different pods (the controller always picks the highest-ordinal set)
-    would cause data loss, so the handler refuses the request and tells
-    the caller which victims to supply instead.
+    The controller only supports scale-down from the top of the ordinal
+    stack; the previous warn-and-scale behaviour silently mutated a
+    different pod than the caller asked for, so the current
+    implementation raises instead — see the sibling test module
+    ``test_statefulset_release_reject.py`` for the guard function's own
+    unit coverage.
     """
+    from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
+
     core_v1 = MagicMock()
     apps_v1 = MagicMock()
     apps_v1.read_namespaced_stateful_set.return_value = _make_statefulset_status(spec_replicas=5)
@@ -271,30 +274,22 @@ async def test_release_hosts_selective_non_highest_ordinal_refused() -> None:
     )
 
     # current=5, victims=[ordinal-1, ordinal-2] — non-highest ordinals.
-    # The controller would evict ordinals 3 and 4 instead, so the handler
-    # refuses rather than silently releasing the wrong pods.
-    with pytest.raises(K8sError) as exc_info:
+    with pytest.raises(K8sError, match="selective release refused"):
         await handler.release_hosts(["orb-deadbeef-1", "orb-deadbeef-2"], request.provider_data)
 
-    # The error message must mention the correct top-of-stack victims.
-    assert "orb-deadbeef-3" in str(exc_info.value) or "orb-deadbeef-4" in str(exc_info.value)
-
-    # Refusal happens before any scale patch — the StatefulSet must be
-    # left untouched.
+    # Nothing was mutated — neither a scale patch nor a pod deletion.
     apps_v1.patch_namespaced_stateful_set_scale.assert_not_called()
-
-    # Pods are NEVER deleted directly.
     core_v1.delete_namespaced_pod.assert_not_called()
     apps_v1.delete_namespaced_stateful_set.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_release_hosts_selective_unparseable_victim_names_refused() -> None:
+async def test_release_hosts_selective_unparseable_victim_names_raises() -> None:
     """Victim names that do not parse as ``<statefulset>-<ordinal>`` are
-    refused with K8sError — an unparseable name cannot be the top-of-
-    stack ordinal, so honouring the request would silently evict the
-    wrong pods.
-    """
+    treated as non-top-of-stack and therefore refused, since the
+    controller cannot guarantee they will be the ones evicted."""
+    from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
+
     core_v1 = MagicMock()
     apps_v1 = MagicMock()
     apps_v1.read_namespaced_stateful_set.return_value = _make_statefulset_status(spec_replicas=3)
@@ -309,15 +304,10 @@ async def test_release_hosts_selective_unparseable_victim_names_refused() -> Non
         namespace="orb-test",
     )
 
-    # Victim name does not match the StatefulSet's name prefix — its
-    # ordinal cannot be parsed, so the handler refuses rather than
-    # silently releasing the wrong pod.
-    with pytest.raises(K8sError):
+    with pytest.raises(K8sError, match="selective release refused"):
         await handler.release_hosts(["some-other-pod"], request.provider_data)
 
-    # Refusal happens before any scale patch.
     apps_v1.patch_namespaced_stateful_set_scale.assert_not_called()
-    # Pods are NEVER deleted directly.
     core_v1.delete_namespaced_pod.assert_not_called()
     apps_v1.delete_namespaced_stateful_set.assert_not_called()
 

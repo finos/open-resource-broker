@@ -3,18 +3,17 @@
 Mirrors :class:`orb.providers.aws.domain.template.aws_template_aggregate.AWSTemplate`
 for the kubernetes provider.  ``K8sTemplate`` is a strongly-typed
 ``Template`` subclass: kubernetes-specific operator-supplied fields live as
-flat first-class attributes rather than as opaque entries under
-``Template.provider_data['k8s']``.
+flat first-class attributes on the subclass.
 
 Generic provisioning concepts continue to be expressed on the parent
 ``Template``:
 
-* ``image_id``         — container image string consumed by the spec builders.
-* ``tags``             — operator tags; merged into the pod ``metadata.labels``
+* ``image_id``       — container image string consumed by the spec builders.
+* ``tags``           — operator tags; merged into the pod ``metadata.labels``
   surface at spec-build time.
-* ``max_instances``    — quota cap; the per-request replica count comes from
+* ``max_instances``  — quota cap; the per-request replica count comes from
   ``request.requested_count``.
-* ``instance_profile`` — falls back as the ``serviceAccountName`` when
+* ``machine_role``   — falls back as the ``serviceAccountName`` when
   :attr:`K8sTemplate.service_account` is not set.
 
 Upcasting an arbitrary ``Template`` to a ``K8sTemplate`` is safe via
@@ -561,11 +560,10 @@ class K8sTemplate(Template):
            backwards compatibility with operators who set kubernetes fields
            via the DTO surface rather than via the typed template
            directly.
-        2. Fall back to :attr:`Template.instance_profile` for
+        2. Fall back to :attr:`Template.machine_role` for
            :attr:`service_account` when the latter is unset.  This honours
-           the documented mapping of the generic ``instance_profile``
-           field (see :class:`Template` line 57) onto the kubernetes
-           ``serviceAccountName`` concept.
+           the documented mapping of the generic ``machine_role``
+           field onto the kubernetes ``serviceAccountName`` concept.
         """
         # Promote provider_config dict entries onto typed fields.
         pc = getattr(self, "provider_config", None)
@@ -632,9 +630,9 @@ class K8sTemplate(Template):
             if self.volumes is None and pc.get("volumes") is not None:
                 object.__setattr__(self, "volumes", _coerce_volumes(pc.get("volumes")))
 
-        # Service-account fallback to the generic instance_profile.
-        if self.service_account is None and self.instance_profile:
-            object.__setattr__(self, "service_account", self.instance_profile)
+        # Service-account fallback to the generic machine_role.
+        if self.service_account is None and self.machine_role:
+            object.__setattr__(self, "service_account", self.machine_role)
 
         return self
 

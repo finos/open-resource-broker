@@ -109,11 +109,11 @@ class TestAddProviderTypeArg:
         """Simulates a new provider type being registered before build time."""
         from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
 
-        original_specs = dict(CLISpecRegistry._specs)
+        original_specs = dict(CLISpecRegistry._store)
         try:
             # Install a fake spec so the registry returns an extra type.
             fake_spec = object()
-            CLISpecRegistry._specs["fake-provider"] = fake_spec  # type: ignore[assignment]
+            CLISpecRegistry._store["fake-provider"] = fake_spec  # type: ignore[assignment]
 
             parser = _fresh_parser()
             add_provider_type_arg(parser)
@@ -124,15 +124,15 @@ class TestAddProviderTypeArg:
             assert action.choices is not None
             assert "fake-provider" in action.choices
         finally:
-            CLISpecRegistry._specs = original_specs
+            CLISpecRegistry._store = original_specs
 
     def test_no_choices_without_registry_entries(self):
         """When the registry is empty, choices is None (open-ended)."""
         from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
 
-        original_specs = dict(CLISpecRegistry._specs)
+        original_specs = dict(CLISpecRegistry._store)
         try:
-            CLISpecRegistry._specs = {}
+            CLISpecRegistry._store = {}
 
             parser = _fresh_parser()
             add_provider_type_arg(parser)
@@ -142,7 +142,7 @@ class TestAddProviderTypeArg:
             )
             assert action.choices is None
         finally:
-            CLISpecRegistry._specs = original_specs
+            CLISpecRegistry._store = original_specs
 
     def test_extra_help_is_appended(self):
         parser = _fresh_parser()
@@ -265,10 +265,10 @@ class TestRegisteredProviderTypes:
     def test_tolerates_empty_registry(self):
         from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
 
-        original = dict(CLISpecRegistry._specs)
+        original = dict(CLISpecRegistry._store)
         try:
-            CLISpecRegistry._specs = {}
+            CLISpecRegistry._store = {}
             result = _registered_provider_types()
             assert result == []
         finally:
-            CLISpecRegistry._specs = original
+            CLISpecRegistry._store = original

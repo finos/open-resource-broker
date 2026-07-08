@@ -31,7 +31,7 @@ class AWSTemplateExtensionConfig(BaseModel):
     fleet_role: Optional[str] = Field(None, description="IAM role for Spot Fleet")
     key_name: Optional[str] = Field(None, description="Default key name")
     user_data_script: Optional[str] = Field(None, description="User data script")
-    instance_profile: Optional[str] = Field(None, description="Instance profile")
+    machine_role: Optional[str] = Field(None, description="IAM instance profile / machine role")
 
     # AWS pricing and allocation defaults
     max_spot_price: Optional[float] = Field(None, description="Maximum price for Spot instances")

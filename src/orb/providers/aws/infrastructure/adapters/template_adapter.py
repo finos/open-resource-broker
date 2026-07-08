@@ -133,22 +133,6 @@ class AWSTemplateAdapter(TemplateAdapterPort):
         if not template.provider_api:
             template.provider_api = self._determine_provider_api(template)
 
-        # Extend with AWS-specific provider data
-        if not template.provider_data:
-            template.provider_data = {}
-
-        if "aws" not in template.provider_data:
-            template.provider_data["aws"] = {}
-
-        # Add AWS-specific provider data
-        template.provider_data["aws"].update(
-            {
-                "fleet_type": getattr(template, "fleet_type", None),
-                "supported_fields": self._AWS_SUPPORTED_FIELDS,
-                "validation_enabled": True,
-            }
-        )
-
         return template
 
     def resolve_template_references(self, template: Template) -> Template:

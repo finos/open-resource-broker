@@ -28,10 +28,17 @@ def pytest_collection_modifyitems(config, items):
     ``pytestmark`` only works at module-level — conftest-level constants
     are not picked up by pytest's marker discovery. The collection hook
     is the canonical place to bulk-apply markers across a directory.
+
+    ``items`` is the FULL collected list across the pytest session, not
+    just this subtree — filter to items whose path lives under this
+    conftest's directory so we do NOT accidentally mark tests outside
+    this live subtree as serial.
     """
+    subtree = str(Path(__file__).resolve().parent)
     marker = pytest.mark.serial
     for item in items:
-        item.add_marker(marker)
+        if str(item.path).startswith(subtree):
+            item.add_marker(marker)
 
 
 def _find_repo_root(start: Path) -> Path:

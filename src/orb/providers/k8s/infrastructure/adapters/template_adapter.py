@@ -124,13 +124,11 @@ class K8sTemplateAdapter(TemplateAdapterPort):
         return errors
 
     def extend_template_fields(self, template: Template) -> Template:
-        """Attach kubernetes-specific provider data to *template* in place.
+        """Set kubernetes-specific defaults on *template*.
 
-        With the typed :class:`K8sTemplate` aggregate in place, the
-        kubernetes provider does not need to mirror operator-supplied
-        fields into ``template.provider_data["k8s"]`` — handlers read
-        the typed fields directly.  We still default ``provider_api``
-        to ``"Pod"`` when the template arrives without one.
+        With the typed :class:`K8sTemplate` aggregate in place, handlers read
+        typed fields directly.  We default ``provider_api`` to ``"Pod"``
+        when the template arrives without one.
         """
         if not template.provider_api:
             template.provider_api = self.get_provider_api()

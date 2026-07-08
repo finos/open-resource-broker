@@ -12,8 +12,8 @@ Scenarios tested (one section per gap):
    circuit in Wave 2; a smoke assertion confirms the test file exists.
 5. native_spec list-replacement — operator's ``spec.containers`` list
    fully replaces the default; the default container is dropped.
-6. service_account fallback to instance_profile — ``build_pod_spec``
-   puts ``serviceAccountName`` from ``instance_profile`` when
+6. service_account fallback to machine_role — ``build_pod_spec``
+   puts ``serviceAccountName`` from ``machine_role`` when
    ``service_account`` is not set.
 7. check_health with kubernetes extra absent — ``sys.modules`` patched to
    simulate missing ``kubernetes``; strategy returns unhealthy with a
@@ -359,7 +359,7 @@ def test_native_spec_containers_list_replaces_default() -> None:
 
 
 # ===========================================================================
-# 6. service_account fallback to instance_profile
+# 6. service_account fallback to machine_role
 # ===========================================================================
 
 
@@ -386,10 +386,10 @@ def test_build_pod_spec_uses_service_account_when_set() -> None:
     assert pod.spec.service_account_name == "explicit-sa"
 
 
-def test_build_pod_spec_falls_back_to_instance_profile() -> None:
-    """When service_account is absent, instance_profile is used as serviceAccountName.
+def test_build_pod_spec_falls_back_to_machine_role() -> None:
+    """When service_account is absent, machine_role is used as serviceAccountName.
 
-    ``K8sTemplate``'s model validator copies ``instance_profile`` into
+    ``K8sTemplate``'s model validator copies ``machine_role`` into
     ``service_account`` when the latter is not set; ``build_pod_spec``
     then writes it as ``spec.service_account_name``.
     """
@@ -401,7 +401,7 @@ def test_build_pod_spec_falls_back_to_instance_profile() -> None:
         image_id="busybox:latest",
         namespace="orb-test",
         max_instances=2,
-        instance_profile="fallback-sa",
+        machine_role="fallback-sa",
         # service_account is intentionally absent.
     )
     request = _make_request()
@@ -412,12 +412,12 @@ def test_build_pod_spec_falls_back_to_instance_profile() -> None:
         machine_id="orb-test-0001",
         namespace="orb-test",
     )
-    # The model validator promotes instance_profile -> service_account.
+    # The model validator promotes machine_role -> service_account.
     assert pod.spec.service_account_name == "fallback-sa"
 
 
 def test_build_pod_spec_no_service_account_when_both_absent() -> None:
-    """When neither service_account nor instance_profile is set, no serviceAccountName."""
+    """When neither service_account nor machine_role is set, no serviceAccountName."""
     from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
     from orb.providers.k8s.utilities.pod_spec import build_pod_spec
 
@@ -487,18 +487,18 @@ def test_check_health_returns_unhealthy_when_kubernetes_package_absent(
 
 
 @pytest.mark.asyncio
-async def test_job_release_logs_selective_release_not_supported() -> None:
-    """release_hosts with a partial machine_ids list must raise K8sError when
-    parallelism is known, refusing the subset release.
+async def test_job_release_refuses_selective_release() -> None:
+    """release_hosts with a partial machine_ids list must refuse.
 
-    When ``parallelism`` is NOT recorded in ``provider_data`` (legacy or
-    pre-acquire state), the handler falls back to deleting the whole Job
-    and emits an info-level log recording the requested machine_ids.
-
-    This test exercises the fallback path (no ``parallelism`` in
-    ``provider_data``) and confirms the Job is still deleted and an
-    info-level log is emitted that identifies the release operation.
+    A Job's atomic unit is the whole Job — deleting the Job takes down
+    every pod it spawned.  A caller asking to release only a subset of
+    pods is semantically incoherent; the handler raises ``K8sError``
+    instead of silently deleting the whole Job (the previous
+    log-and-continue behaviour was misleading).  See the sibling test
+    module ``test_job_release_reject.py`` for direct guard-function
+    coverage.
     """
+    from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
     from orb.providers.k8s.infrastructure.handlers.job_handler import K8sJobHandler
 
     batch_v1 = MagicMock()
@@ -517,31 +517,22 @@ async def test_job_release_logs_selective_release_not_supported() -> None:
         requested_count=1,
         provider_api="Job",
     )
-    # Job release deletes the whole Job (selective release is unsupported).
-    # provider_data records parallelism=1 (as acquire_hosts stamps it), and the
-    # caller releases the single pod that covers the whole Job — a full release,
-    # which is honoured (a strict subset would be refused).
+    # Override provider_data with a stable job_name so we don't need to
+    # call acquire first.  ``parallelism`` records how many pods the Job
+    # was created with — the handler compares that against the length
+    # of ``machine_ids`` to detect a partial-release attempt.
     object.__setattr__(
         request,
         "provider_data",
-        {"namespace": "orb-test", "job_name": "orb-testreq1", "parallelism": 1},
+        {"namespace": "orb-test", "job_name": "orb-testreq1", "parallelism": 3},
     )
 
-    # Full release: the one machine_id covers the whole (parallelism=1) Job,
-    # so the handler deletes the entire Job.
-    await handler.release_hosts(["orb-testreq1-pod0"], request.provider_data)
+    # Selective release: caller only passes one of the three pods.
+    with pytest.raises(K8sError, match="selective release"):
+        await handler.release_hosts(["orb-testreq1-pod0"], request.provider_data)
 
-    # The whole Job must have been deleted.
-    batch_v1.delete_namespaced_job.assert_called_once()
-
-    # An info-level message must record the job release operation with the
-    # requested machine_ids (the log reads "deleting whole Job").
-    info_calls = logger.info.call_args_list
-    release_log = any("job release" in str(call).lower() for call in info_calls)
-    assert release_log, (
-        "Expected an info-level log message about the job release operation; "
-        f"info calls: {info_calls}"
-    )
+    # The Job must NOT have been deleted (guard refuses upfront).
+    batch_v1.delete_namespaced_job.assert_not_called()
 
 
 # ===========================================================================

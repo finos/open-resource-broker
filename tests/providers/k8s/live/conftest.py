@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from pathlib import Path
 from typing import Generator
 
 import pytest
@@ -40,13 +41,17 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     ``pytestmark`` at module level is not picked up by conftest-level
     discovery; the collection hook is the canonical place to bulk-apply
     markers across a directory subtree.
-    """
-    import pathlib
 
-    live_dir = str(pathlib.Path(__file__).parent)
+    ``items`` is the FULL collected list across the pytest session, not
+    just this subtree — filter to items whose path lives under this
+    conftest's directory so we do NOT accidentally mark
+    unit/mocked/contract tests as serial when the parent
+    ``tests/providers/k8s`` directory is collected as a whole.
+    """
+    subtree = str(Path(__file__).resolve().parent)
     marker = pytest.mark.serial
     for item in items:
-        if str(item.fspath).startswith(live_dir):
+        if str(item.path).startswith(subtree):
             item.add_marker(marker)
 
 
