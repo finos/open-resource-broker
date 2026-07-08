@@ -6,7 +6,6 @@ from orb.providers.azure.configuration.config import AzureProviderConfig
 from orb.providers.azure.infrastructure.adapters.azure_validation_adapter import (
     AzureValidationAdapter,
 )
-from orb.providers.azure.registration import create_azure_validator
 
 
 def test_validate_template_configuration_uses_azure_rules():

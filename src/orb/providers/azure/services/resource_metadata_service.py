@@ -140,7 +140,7 @@ class AzureResourceMetadataService:
         )
 
         per_resource_capacity: dict[str, VmssCapacitySnapshot] = {}
-        for vmss_name, snapshot in zip(vmss_names, snapshots):
+        for vmss_name, snapshot in zip(vmss_names, snapshots, strict=True):
             if snapshot is not None:
                 per_resource_capacity[vmss_name] = snapshot
         return per_resource_capacity
