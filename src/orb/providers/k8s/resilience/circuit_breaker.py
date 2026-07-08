@@ -21,9 +21,22 @@ constant fallback).
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
-from orb.infrastructure.resilience.strategy.circuit_breaker import CircuitBreakerStrategy
+from orb.infrastructure.resilience.strategy.circuit_breaker import (
+    CircuitBreakerStrategy,
+    CircuitState,
+)
+
+if TYPE_CHECKING:  # pragma: no cover — type-checking only
+    pass
+
+# Map CircuitState enum → integer gauge value (0=closed 1=open 2=half_open).
+_STATE_TO_GAUGE: dict[CircuitState, int] = {
+    CircuitState.CLOSED: 0,
+    CircuitState.OPEN: 1,
+    CircuitState.HALF_OPEN: 2,
+}
 
 
 class K8sCircuitBreaker(CircuitBreakerStrategy):
@@ -38,6 +51,11 @@ class K8sCircuitBreaker(CircuitBreakerStrategy):
         ``None``, the integer ``failure_threshold`` passed to the
         constructor is used as a constant fallback — behaviour is
         identical to the base class.
+    metrics:
+        Optional :class:`~orb.providers.k8s.infrastructure.services.metrics.K8sMetrics`
+        instance.  When supplied, the ``orb_k8s_circuit_breaker_state`` gauge
+        is updated whenever the circuit state changes.  ``None`` disables
+        metric emission (default) — no-op path.
 
     All other parameters are forwarded unchanged to
     :class:`~orb.infrastructure.resilience.strategy.circuit_breaker.CircuitBreakerStrategy`.
@@ -55,6 +73,7 @@ class K8sCircuitBreaker(CircuitBreakerStrategy):
         jitter: bool = True,
         *,
         threshold_provider: Optional[Callable[[], int]] = None,
+        metrics: Any = None,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -69,6 +88,49 @@ class K8sCircuitBreaker(CircuitBreakerStrategy):
             **kwargs,
         )
         self._threshold_provider = threshold_provider
+        self._metrics = metrics
+        # Emit the initial CLOSED state so the gauge is always present.
+        self._emit_circuit_state(CircuitState.CLOSED)
+
+    # ------------------------------------------------------------------
+    # Metrics helpers
+    # ------------------------------------------------------------------
+
+    def _emit_circuit_state(self, state: CircuitState) -> None:
+        """Set the ``orb_k8s_circuit_breaker_state`` gauge when metrics are wired."""
+        if self._metrics is None:
+            return
+        try:
+            self._metrics.set_circuit_breaker_state(
+                name=self.service_name,
+                state=_STATE_TO_GAUGE.get(state, 0),
+            )
+        except Exception:  # pragma: no cover — defensive against misconfigured metrics
+            pass
+
+    # ------------------------------------------------------------------
+    # State transition overrides — emit gauge on every state change
+    # ------------------------------------------------------------------
+
+    def record_failure(self, current_time: float) -> None:
+        """Record a failure, update circuit state, and emit the state gauge."""
+        state_before = self._circuit_states[self.service_name]["state"]
+        super().record_failure(current_time)
+        state_after = self._circuit_states[self.service_name]["state"]
+        if state_after != state_before:
+            self._emit_circuit_state(state_after)
+
+    def record_success(self) -> None:
+        """Record a success, update circuit state, and emit the state gauge."""
+        state_before = self._circuit_states[self.service_name]["state"]
+        super().record_success()
+        state_after = self._circuit_states[self.service_name]["state"]
+        if state_after != state_before:
+            self._emit_circuit_state(state_after)
+
+    # ------------------------------------------------------------------
+    # Live-threshold hook
+    # ------------------------------------------------------------------
 
     def _get_failure_threshold(self) -> int:
         """Return the live failure threshold.

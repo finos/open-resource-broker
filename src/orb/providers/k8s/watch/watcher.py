@@ -27,7 +27,8 @@ from __future__ import annotations
 import asyncio
 import threading
 import time
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Any, Callable, Generator, Optional
 
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
@@ -331,6 +332,30 @@ class K8sWatcher:
                 event_type=event_type,
             )
 
+    @contextmanager
+    def _timed_list(self, operation: str) -> Generator[None, None, None]:
+        """Context manager that observes apiserver LIST latency when metrics are wired."""
+        if self._metrics is None:
+            yield
+            return
+        t0 = time.monotonic()
+        try:
+            yield
+        finally:
+            elapsed = time.monotonic() - t0
+            self._metrics.record_apiserver_latency(operation=operation, seconds=elapsed)
+
+    def _update_cache_gauges(self) -> None:
+        """Refresh active_pods / active_requests gauges from the current cache contents."""
+        if self._metrics is None:
+            return
+        ns = self._namespace or "*"
+        states = self._cache.all_states()
+        pod_count = sum(1 for s in states if not s.deleted)
+        request_ids = {s.request_id for s in states if not s.deleted}
+        self._metrics.set_active_pods(namespace=ns, count=pod_count)
+        self._metrics.set_active_requests(namespace=ns, count=len(request_ids))
+
     async def _sleep_or_stop(self, seconds: float) -> bool:
         """Sleep for ``seconds`` but wake up early if :meth:`stop` was called.
 
@@ -429,10 +454,11 @@ class K8sWatcher:
         """
         core_v1 = self._client.core_v1
         kwargs: dict[str, Any] = {"label_selector": self._label_selector}
-        if self._namespace is None:
-            pod_list = core_v1.list_pod_for_all_namespaces(**kwargs)
-        else:
-            pod_list = core_v1.list_namespaced_pod(namespace=self._namespace, **kwargs)
+        with self._timed_list("list_pods"):
+            if self._namespace is None:
+                pod_list = core_v1.list_pod_for_all_namespaces(**kwargs)
+            else:
+                pod_list = core_v1.list_namespaced_pod(namespace=self._namespace, **kwargs)
         for pod in getattr(pod_list, "items", []) or []:
             metadata = getattr(pod, "metadata", None)
             if metadata is None:
@@ -511,10 +537,12 @@ class K8sWatcher:
             state = self._pod_to_state(pod, request_id, namespace, deleted=True)
             self._cache.upsert(state)
             self._cache.delete(request_id, pod_name)
+            self._update_cache_gauges()
             return
 
         state = self._pod_to_state(pod, request_id, namespace, deleted=False)
         self._cache.upsert(state)
+        self._update_cache_gauges()
 
     def _pod_to_state(
         self,
