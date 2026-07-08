@@ -27,6 +27,7 @@ class AzureValidationAdapter(BaseProviderValidationAdapter):
     so validation can use Azure-native capability metadata without
     constructing the full provider strategy.
     """
+
     def __init__(self, config: AzureProviderConfig, logger: LoggingPort) -> None:
         """
         Initialize Azure validation adapter.

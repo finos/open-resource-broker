@@ -27,6 +27,8 @@ AZURE_VM_STATE_MAP: dict[str, str] = {
     "ProvisioningState/failed": "failed",
     "ProvisioningState/deleting": "shutting-down",
 }
+
+
 def resolve_power_state(statuses: list[AzureStatusWithCodeProtocol]) -> str:
     """Extract the ORB domain status from a list of Azure InstanceViewStatus objects.
 

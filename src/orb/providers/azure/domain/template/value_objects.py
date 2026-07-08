@@ -199,9 +199,7 @@ class AzureStringValue(ValueObject, ABC):
 class AzureResourceGroupName(AzureStringValue):
     """Azure resource-group name."""
 
-    _RESOURCE_GROUP_RE: ClassVar[re.Pattern[str]] = re.compile(
-        r"^[a-zA-Z0-9_\-.()\[\]]+$"
-    )
+    _RESOURCE_GROUP_RE: ClassVar[re.Pattern[str]] = re.compile(r"^[a-zA-Z0-9_\-.()\[\]]+$")
 
     @classmethod
     def _validate_normalised(cls, value: str) -> None:
@@ -241,13 +239,9 @@ class AzureArmResourceId(AzureStringValue):
         if "/providers/" not in casefolded_value:
             raise ValueError(f"{cls.__name__} must include an Azure provider segment")
 
-        expected_segment = (
-            cls.expected_segment.casefold() if cls.expected_segment else None
-        )
+        expected_segment = cls.expected_segment.casefold() if cls.expected_segment else None
         if expected_segment and expected_segment not in casefolded_value:
-            raise ValueError(
-                f"{cls.__name__} must reference '{cls.expected_segment}'"
-            )
+            raise ValueError(f"{cls.__name__} must reference '{cls.expected_segment}'")
 
 
 class AzureProximityPlacementGroupId(AzureArmResourceId):
@@ -412,9 +406,7 @@ class AzureOSDiskConfig(ValueObject):
 
     @field_validator("ephemeral_placement", mode="before")
     @classmethod
-    def _apply_ephemeral_defaults(
-        cls, value: Optional[str], info: ValidationInfo
-    ) -> Optional[str]:
+    def _apply_ephemeral_defaults(cls, value: Optional[str], info: ValidationInfo) -> Optional[str]:
         if value is None and info.data.get("ephemeral_os_disk"):
             return "CacheDisk"
         return value

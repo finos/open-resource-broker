@@ -21,6 +21,7 @@ from orb.providers.azure.infrastructure.cyclecloud_session import (
     CycleCloudSessionSettings,
 )
 
+
 class CycleCloudSessionBuilder:
     """Resolve CycleCloud credential and transport settings before session creation."""
 
@@ -78,7 +79,7 @@ class CycleCloudSessionBuilder:
 
     @staticmethod
     def _resolve_cascaded_value(
-            *sources: object,
+        *sources: object,
         default: object = None,
     ) -> object:
         """Return the first configured value from the resolution cascade."""
@@ -174,9 +175,7 @@ class CycleCloudSessionBuilder:
 
         parsed = urlparse(base_url)
         host_scope = (
-            f"{parsed.scheme}://{parsed.netloc}/.default"
-            if parsed.scheme and parsed.netloc
-            else ""
+            f"{parsed.scheme}://{parsed.netloc}/.default" if parsed.scheme and parsed.netloc else ""
         )
         scopes = [str(aad_scope)] if aad_scope else []
         scopes.extend([host_scope, "https://management.azure.com/.default"])

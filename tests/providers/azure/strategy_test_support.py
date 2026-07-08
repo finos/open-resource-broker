@@ -89,10 +89,10 @@ def make_azure_template(
         ),
         "image": (
             {
-            "publisher": "Canonical",
-            "offer": "0001-com-ubuntu-server-jammy",
-            "sku": "22_04-lts-gen2",
-            "version": "latest",
+                "publisher": "Canonical",
+                "offer": "0001-com-ubuntu-server-jammy",
+                "sku": "22_04-lts-gen2",
+                "version": "latest",
             }
             if image is _UNSET
             else image
@@ -125,9 +125,7 @@ def make_single_vm_azure_client() -> MagicMock:
     async_resource.resources.begin_create_or_update = AsyncMock(
         side_effect=azure_client.resource_client.resources.begin_create_or_update
     )
-    async_resource.resources.get = AsyncMock(
-        side_effect=azure_client.resource_client.resources.get
-    )
+    async_resource.resources.get = AsyncMock(side_effect=azure_client.resource_client.resources.get)
 
     azure_client.get_async_compute_client = AsyncMock(return_value=async_compute)
     azure_client.get_async_resource_client = AsyncMock(return_value=async_resource)

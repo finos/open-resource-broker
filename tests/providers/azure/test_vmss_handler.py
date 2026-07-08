@@ -26,6 +26,7 @@ def _deleted_vm_names(azure_client: MagicMock) -> list[str]:
         for call in azure_client.compute_client.virtual_machines.begin_delete.call_args_list
     ]
 
+
 def _make_template(**overrides):
     return make_azure_template(
         template_id="azure-vmss-test",
@@ -110,7 +111,9 @@ def test_acquire_hosts_does_not_mutate_template_when_network_config_is_derived_f
 
     assert result["success"] is True
     assert template.network_config is None
-    create_call = azure_client.compute_client.virtual_machine_scale_sets.begin_create_or_update.call_args
+    create_call = (
+        azure_client.compute_client.virtual_machine_scale_sets.begin_create_or_update.call_args
+    )
     subnet_id = create_call.kwargs["parameters"]["properties"]["virtualMachineProfile"][
         "networkProfile"
     ]["networkInterfaceConfigurations"][0]["properties"]["ipConfigurations"][0]["properties"][
@@ -168,7 +171,9 @@ def test_acquire_hosts_prefers_network_config_over_legacy_subnet_ids():
     result = run_operation(handler.acquire_hosts_async(request, template))
 
     assert result["success"] is True
-    create_call = azure_client.compute_client.virtual_machine_scale_sets.begin_create_or_update.call_args
+    create_call = (
+        azure_client.compute_client.virtual_machine_scale_sets.begin_create_or_update.call_args
+    )
     subnet_id = create_call.kwargs["parameters"]["properties"]["virtualMachineProfile"][
         "networkProfile"
     ]["networkInterfaceConfigurations"][0]["properties"]["ipConfigurations"][0]["properties"][
@@ -451,9 +456,7 @@ async def test_release_hosts_async_raises_on_partial_flexible_vmss_delete_failur
 
     exc = exc_info.value
     assert exc.resource_ids == ["vm-b"]
-    assert exc.details["submitted_deletions"] == [
-        {"requested_id": "vm-a", "vm_name": "vm-a"}
-    ]
+    assert exc.details["submitted_deletions"] == [{"requested_id": "vm-a", "vm_name": "vm-a"}]
     assert exc.details["failed_deletions"] == [
         {"requested_id": "vm-b", "vm_name": "vm-b", "error": "delete failed"}
     ]
@@ -516,7 +519,9 @@ def test_vmss_status_raises_when_explicit_status_errors_are_fatal():
     logger = MagicMock()
     handler = VMSSHandler(azure_client=azure_client, logger=logger)
 
-    azure_client.compute_client.virtual_machine_scale_sets.get.side_effect = Exception("transient ARM failure")
+    azure_client.compute_client.virtual_machine_scale_sets.get.side_effect = Exception(
+        "transient ARM failure"
+    )
 
     request = MagicMock()
     request.resource_ids = ["vmss-azure-test"]
@@ -618,18 +623,18 @@ def test_vmss_status_populates_network_identity():
     member_vm.network_profile.network_interfaces = [nic_ref]
     azure_client.resolve_network_identity_from_vm_async = AsyncMock(
         return_value={
-        "private_ip": "10.0.0.7",
-        "public_ip": None,
-        "subnet_id": (
-            "/subscriptions/sub/resourceGroups/test-rg/providers/"
-            "Microsoft.Network/virtualNetworks/test-vnet/subnets/default"
-        ),
-        "vnet_id": (
-            "/subscriptions/sub/resourceGroups/test-rg/providers/"
-            "Microsoft.Network/virtualNetworks/test-vnet"
-        ),
-        "nic_id": nic_ref.id,
-        "nic_name": "nic-vmss-1",
+            "private_ip": "10.0.0.7",
+            "public_ip": None,
+            "subnet_id": (
+                "/subscriptions/sub/resourceGroups/test-rg/providers/"
+                "Microsoft.Network/virtualNetworks/test-vnet/subnets/default"
+            ),
+            "vnet_id": (
+                "/subscriptions/sub/resourceGroups/test-rg/providers/"
+                "Microsoft.Network/virtualNetworks/test-vnet"
+            ),
+            "nic_id": nic_ref.id,
+            "nic_name": "nic-vmss-1",
         }
     )
 
@@ -748,9 +753,7 @@ def test_vmss_release_deletes_only_requested_uniform_instances():
         )
     )
 
-    delete_call = (
-        azure_client.compute_client.virtual_machine_scale_sets.begin_delete_instances.call_args.kwargs
-    )
+    delete_call = azure_client.compute_client.virtual_machine_scale_sets.begin_delete_instances.call_args.kwargs
     assert delete_call["resource_group_name"] == "test-rg"
     assert delete_call["vm_scale_set_name"] == "vmss-azure-test"
     delete_ids = delete_call["vm_instance_i_ds"]
@@ -800,9 +803,7 @@ def test_vmss_release_marks_flexible_vmss_for_cleanup_when_last_instance_is_retu
     azure_client = _make_azure_client()
     logger = MagicMock()
     handler = VMSSHandler(azure_client=azure_client, logger=logger)
-    handler._list_vmss_instances_async = AsyncMock(
-        return_value=[{"instance_id": "vm-a"}]
-    )
+    handler._list_vmss_instances_async = AsyncMock(return_value=[{"instance_id": "vm-a"}])
 
     vmss = MagicMock()
     vmss.orchestration_mode = OrchestrationMode.FLEXIBLE
@@ -949,9 +950,7 @@ def test_vmss_release_marks_uniform_vmss_for_cleanup_when_last_instance_is_retur
     logger = MagicMock()
     handler = VMSSHandler(azure_client=azure_client, logger=logger)
     handler._resolve_vmss_instance_ids_async = AsyncMock(return_value=["3"])
-    handler._list_vmss_instances_async = AsyncMock(
-        return_value=[{"instance_id": "3"}]
-    )
+    handler._list_vmss_instances_async = AsyncMock(return_value=[{"instance_id": "3"}])
 
     vmss = MagicMock()
     vmss.orchestration_mode = OrchestrationMode.UNIFORM
@@ -969,9 +968,7 @@ def test_vmss_release_marks_uniform_vmss_for_cleanup_when_last_instance_is_retur
         )
     )
 
-    delete_call = (
-        azure_client.compute_client.virtual_machine_scale_sets.begin_delete_instances.call_args.kwargs
-    )
+    delete_call = azure_client.compute_client.virtual_machine_scale_sets.begin_delete_instances.call_args.kwargs
     delete_ids = delete_call["vm_instance_i_ds"]
     if hasattr(delete_ids, "instance_ids"):
         assert delete_ids.instance_ids == ["3"]
@@ -996,9 +993,7 @@ def test_vmss_release_surfaces_retry_pending_when_immediate_empty_vmss_delete_fa
     azure_client = _make_azure_client()
     logger = MagicMock()
     handler = VMSSHandler(azure_client=azure_client, logger=logger)
-    handler._list_vmss_instances_async = AsyncMock(
-        return_value=[{"instance_id": "vm-a"}]
-    )
+    handler._list_vmss_instances_async = AsyncMock(return_value=[{"instance_id": "vm-a"}])
 
     vmss = MagicMock()
     vmss.orchestration_mode = OrchestrationMode.FLEXIBLE

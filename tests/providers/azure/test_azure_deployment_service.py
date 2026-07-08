@@ -24,10 +24,13 @@ def test_build_deployment_name_normalizes_and_truncates_deterministically():
 
 
 def test_resource_id_expression_targets_sibling_resource():
-    assert AzureDeploymentService.resource_id_expression(
-        "Microsoft.Network/networkInterfaces",
-        "nic-vm-1",
-    ) == "[resourceId('Microsoft.Network/networkInterfaces', 'nic-vm-1')]"
+    assert (
+        AzureDeploymentService.resource_id_expression(
+            "Microsoft.Network/networkInterfaces",
+            "nic-vm-1",
+        )
+        == "[resourceId('Microsoft.Network/networkInterfaces', 'nic-vm-1')]"
+    )
 
 
 @pytest.mark.asyncio

@@ -52,24 +52,14 @@ class AzureTemplateExtensionConfig(BaseModel):
     single_placement_group: Optional[bool] = Field(
         None, description="Restrict VMSS to a single placement group"
     )
-    image: Optional[AzureImageReference] = Field(
-        None, description="Azure VM image reference"
-    )
-    eviction_policy: Optional[AzureEvictionPolicy] = Field(
-        None, description="Spot eviction policy"
-    )
-    billing_profile_max_price: Optional[float] = Field(
-        None, description="Maximum Spot VM price"
-    )
-    spot_percentage: Optional[int] = Field(
-        None, description="Desired percentage of Spot VMs"
-    )
+    image: Optional[AzureImageReference] = Field(None, description="Azure VM image reference")
+    eviction_policy: Optional[AzureEvictionPolicy] = Field(None, description="Spot eviction policy")
+    billing_profile_max_price: Optional[float] = Field(None, description="Maximum Spot VM price")
+    spot_percentage: Optional[int] = Field(None, description="Desired percentage of Spot VMs")
     base_regular_priority_count: Optional[int] = Field(
         None, description="Base regular-priority VM count for priority mix"
     )
-    spot_restore_enabled: Optional[bool] = Field(
-        None, description="Enable Spot Try-Restore"
-    )
+    spot_restore_enabled: Optional[bool] = Field(None, description="Enable Spot Try-Restore")
     spot_restore_timeout: Optional[str] = Field(
         None, description="ISO 8601 Spot Try-Restore timeout"
     )
@@ -101,25 +91,15 @@ class AzureTemplateExtensionConfig(BaseModel):
     network_config: Optional[AzureNetworkConfig] = Field(
         None, description="Azure networking config"
     )
-    security_type: Optional[AzureSecurityType] = Field(
-        None, description="VM security type"
-    )
-    secure_boot_enabled: Optional[bool] = Field(
-        None, description="Enable UEFI Secure Boot"
-    )
+    security_type: Optional[AzureSecurityType] = Field(None, description="VM security type")
+    secure_boot_enabled: Optional[bool] = Field(None, description="Enable UEFI Secure Boot")
     vtpm_enabled: Optional[bool] = Field(None, description="Enable vTPM")
-    encryption_at_host: Optional[bool] = Field(
-        None, description="Enable host-based encryption"
-    )
+    encryption_at_host: Optional[bool] = Field(None, description="Enable host-based encryption")
     disk_encryption_set_id: Optional[AzureDiskEncryptionSetId] = Field(
         None, description="Disk encryption set ARM resource ID"
     )
-    ssh_key_name: Optional[str] = Field(
-        None, description="Azure SSH Public Key resource name"
-    )
-    ssh_public_keys: Optional[list[str]] = Field(
-        None, description="Inline SSH public keys"
-    )
+    ssh_key_name: Optional[str] = Field(None, description="Azure SSH Public Key resource name")
+    ssh_public_keys: Optional[list[str]] = Field(None, description="Inline SSH public keys")
     user_assigned_identity_ids: Optional[list[str]] = Field(
         None, description="User-assigned managed identity ARM resource IDs"
     )
@@ -130,9 +110,7 @@ class AzureTemplateExtensionConfig(BaseModel):
     extension_profile: Optional[list[dict[str, Any]]] = Field(
         None, description="VMSS extension definitions"
     )
-    overprovision: Optional[bool] = Field(
-        None, description="Enable VMSS overprovisioning"
-    )
+    overprovision: Optional[bool] = Field(None, description="Enable VMSS overprovisioning")
     upgrade_policy_mode: Optional[AzureUpgradePolicyMode] = Field(
         None, description="VMSS upgrade policy mode"
     )
@@ -151,15 +129,9 @@ class AzureTemplateExtensionConfig(BaseModel):
     cyclecloud_verify_ssl: Optional[bool] = Field(
         None, description="CycleCloud SSL verification setting"
     )
-    cyclecloud_auth_mode: Optional[str] = Field(
-        None, description="CycleCloud auth mode override"
-    )
-    cyclecloud_aad_scope: Optional[str] = Field(
-        None, description="CycleCloud AAD scope"
-    )
-    provider_api: Optional[AzureProviderApi] = Field(
-        None, description="Azure provider API"
-    )
+    cyclecloud_auth_mode: Optional[str] = Field(None, description="CycleCloud auth mode override")
+    cyclecloud_aad_scope: Optional[str] = Field(None, description="CycleCloud AAD scope")
+    provider_api: Optional[AzureProviderApi] = Field(None, description="Azure provider API")
 
     # VM configuration
     vm_size: Optional[str] = Field(

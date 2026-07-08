@@ -42,19 +42,21 @@ def _make_builder(*, provider_cfg=None, template=None, request_context=None, cre
 
 
 def test_cyclecloud_request_context_round_trips_metadata():
-    context = CycleCloudRequestContext.from_mapping({
-        "cluster_name": "my-cluster",
-        "node_array": "execute",
-        "node_ids": ["node-1", "node-2"],
-        "operation_id": "op-123",
-        "operation_location": "https://cc.example.com/operations/op-123",
-        "added_count": "2",
-        "cyclecloud_url": "https://cc.example.com",
-        "cyclecloud_credential_path": "config/cc.json",
-        "cyclecloud_verify_ssl": False,
-        "cyclecloud_auth_mode": "bearer",
-        "cyclecloud_aad_scope": "https://cc.example.com/.default",
-    })
+    context = CycleCloudRequestContext.from_mapping(
+        {
+            "cluster_name": "my-cluster",
+            "node_array": "execute",
+            "node_ids": ["node-1", "node-2"],
+            "operation_id": "op-123",
+            "operation_location": "https://cc.example.com/operations/op-123",
+            "added_count": "2",
+            "cyclecloud_url": "https://cc.example.com",
+            "cyclecloud_credential_path": "config/cc.json",
+            "cyclecloud_verify_ssl": False,
+            "cyclecloud_auth_mode": "bearer",
+            "cyclecloud_aad_scope": "https://cc.example.com/.default",
+        }
+    )
 
     assert context.added_count == 2
     assert context.node_ids == ("node-1", "node-2")
@@ -78,9 +80,7 @@ def test_build_settings_returns_bearer_mode_when_no_token_provider_is_available(
         cc_url="https://cc.example.com",
         verify_ssl=False,
         template=None,
-        request_context=CycleCloudRequestContext.from_mapping(
-            {"cyclecloud_auth_mode": "bearer"}
-        ),
+        request_context=CycleCloudRequestContext.from_mapping({"cyclecloud_auth_mode": "bearer"}),
         provider_cfg=None,
     )
 
@@ -132,9 +132,7 @@ async def test_resolve_async_auth_propagates_unexpected_token_errors():
         cc_url="https://cc.example.com",
         verify_ssl=False,
         template=None,
-        request_context=CycleCloudRequestContext.from_mapping(
-            {"cyclecloud_auth_mode": "bearer"}
-        ),
+        request_context=CycleCloudRequestContext.from_mapping({"cyclecloud_auth_mode": "bearer"}),
         provider_cfg=None,
         async_token_provider=MagicMock(
             get_access_token=AsyncMock(side_effect=lambda scope: credential.get_token(scope).token),
@@ -191,9 +189,7 @@ async def test_resolve_async_auth_rejects_ssh_mode():
         cc_url="https://cc.example.com",
         verify_ssl=False,
         template=None,
-        request_context=CycleCloudRequestContext.from_mapping(
-            {"cyclecloud_auth_mode": "ssh"}
-        ),
+        request_context=CycleCloudRequestContext.from_mapping({"cyclecloud_auth_mode": "ssh"}),
         provider_cfg=None,
     )
 
@@ -216,9 +212,7 @@ async def test_resolve_async_auth_errors_when_bearer_requested_but_unavailable()
         cc_url="https://cc.example.com",
         verify_ssl=False,
         template=None,
-        request_context=CycleCloudRequestContext.from_mapping(
-            {"cyclecloud_auth_mode": "bearer"}
-        ),
+        request_context=CycleCloudRequestContext.from_mapping({"cyclecloud_auth_mode": "bearer"}),
         provider_cfg=None,
         async_token_provider=async_token_provider,
     )

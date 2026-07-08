@@ -155,8 +155,7 @@ class TestAzureTemplateConstruction:
             ),
         )
         assert (
-            str(t.disk_encryption_set_id)
-            == "/SUBSCRIPTIONS/sub/RESOURCEGROUPS/rg/PROVIDERS/"
+            str(t.disk_encryption_set_id) == "/SUBSCRIPTIONS/sub/RESOURCEGROUPS/rg/PROVIDERS/"
             "MICROSOFT.COMPUTE/DISKENCRYPTIONSETS/des-1"
         )
 
@@ -397,7 +396,9 @@ class TestArmPayload:
             {"name": "Standard_D16s_v5"},
         ]
         assert arm["properties"]["skuProfile"]["allocationStrategy"] == "CapacityOptimized"
-        assert "vmSizeProperties" not in arm["properties"]["virtualMachineProfile"]["hardwareProfile"]
+        assert (
+            "vmSizeProperties" not in arm["properties"]["virtualMachineProfile"]["hardwareProfile"]
+        )
 
     def test_vmss_prioritized_mix_includes_ranks(self):
         t = AzureTemplate(
@@ -579,9 +580,7 @@ class TestValueObjects:
         assert arm["properties"]["deleteOption"] == "Delete"
         assert arm["properties"]["primary"] is True
         ip_config = arm["properties"]["ipConfigurations"][0]["properties"]
-        assert ip_config["subnet"]["id"] == (
-            "/subscriptions/.../subnets/default"
-        )
+        assert ip_config["subnet"]["id"] == ("/subscriptions/.../subnets/default")
         assert ip_config["publicIPAddressConfiguration"]["properties"]["deleteOption"] == "Delete"
         assert ip_config["loadBalancerBackendAddressPools"][0]["id"].endswith("/pool-a")
         assert ip_config["loadBalancerInboundNatPools"][0]["id"].endswith("/nat-a")

@@ -264,9 +264,13 @@ def _termination_result(
     dispatch_result: _TerminationDispatchResult,
 ) -> ProviderResult:
     """Build the final termination result from handler responses."""
-    provider_data = {
-        "termination_requests": dispatch_result.provider_data,
-    } if dispatch_result.provider_data else {}
+    provider_data = (
+        {
+            "termination_requests": dispatch_result.provider_data,
+        }
+        if dispatch_result.provider_data
+        else {}
+    )
 
     if dispatch_result.failures:
         failed_instances = [

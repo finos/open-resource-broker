@@ -197,7 +197,9 @@ class VMSSHandler(AzureHandler):
                         error_code="InvalidParameter",
                     )
 
-            from orb.providers.azure.infrastructure.services.arm_payload_mapper import ArmPayloadMapper
+            from orb.providers.azure.infrastructure.services.arm_payload_mapper import (
+                ArmPayloadMapper,
+            )
             from orb.providers.azure.infrastructure.services.ssh_key_resolver import (
                 AzureComputeSshKeyClientProtocol,
                 resolve_ssh_keys_async,
@@ -205,11 +207,13 @@ class VMSSHandler(AzureHandler):
 
             arm_payload = ArmPayloadMapper.vmss_payload(resolved_template)
             if self.azure_native_spec_service:
-                merged_payload = self.azure_native_spec_service.process_provider_api_spec_with_merge(
-                    template=resolved_template,
-                    request=request,
-                    default_payload=arm_payload,
-                    extra_context={"vmss_name": vmss_name},
+                merged_payload = (
+                    self.azure_native_spec_service.process_provider_api_spec_with_merge(
+                        template=resolved_template,
+                        request=request,
+                        default_payload=arm_payload,
+                        extra_context={"vmss_name": vmss_name},
+                    )
                 )
                 if merged_payload:
                     arm_payload = merged_payload
@@ -298,7 +302,9 @@ class VMSSHandler(AzureHandler):
         status_errors: list[str] = []
         raise_on_status_error = azure_raise_on_status_error(request)
 
-        resource_group = (request.metadata or {}).get("resource_group") or self.azure_client.resource_group
+        resource_group = (request.metadata or {}).get(
+            "resource_group"
+        ) or self.azure_client.resource_group
         for vmss_name in resource_ids:
             if not resource_group:
                 error_message = f"Cannot resolve resource_group for VMSS '{vmss_name}'"
@@ -357,10 +363,12 @@ class VMSSHandler(AzureHandler):
                             resource_group_name=resource_group,
                             vm_name=str(vm_name),
                         )
-                        submitted_deletions.append({
-                            "requested_id": str(requested_id),
-                            "vm_name": str(vm_name),
-                        })
+                        submitted_deletions.append(
+                            {
+                                "requested_id": str(requested_id),
+                                "vm_name": str(vm_name),
+                            }
+                        )
                     except Exception as exc:
                         self._logger.error(
                             "Failed to delete VMSS flexible member '%s' from '%s': %s",
@@ -368,11 +376,13 @@ class VMSSHandler(AzureHandler):
                             vmss_name,
                             exc,
                         )
-                        failed_deletions.append({
-                            "requested_id": str(requested_id),
-                            "vm_name": str(vm_name),
-                            "error": str(exc),
-                        })
+                        failed_deletions.append(
+                            {
+                                "requested_id": str(requested_id),
+                                "vm_name": str(vm_name),
+                                "error": str(exc),
+                            }
+                        )
                 self._raise_flexible_release_failures(
                     machine_ids=machine_ids,
                     resource_group=resource_group,
@@ -725,7 +735,9 @@ class VMSSHandler(AzureHandler):
         for member in current_members:
             provider_data = member.get("provider_data") or {}
 
-            vm_name = provider_data.get("vm_name") or member.get("name") or member.get("instance_id")
+            vm_name = (
+                provider_data.get("vm_name") or member.get("name") or member.get("instance_id")
+            )
             if not vm_name:
                 continue
             resolved_vm_name = str(vm_name)
@@ -741,9 +753,7 @@ class VMSSHandler(AzureHandler):
                     lookup[str(candidate)] = resolved_vm_name
 
         unresolved_ids = [
-            str(machine_id)
-            for machine_id in machine_ids
-            if str(machine_id) not in lookup
+            str(machine_id) for machine_id in machine_ids if str(machine_id) not in lookup
         ]
         if unresolved_ids:
             raise TerminationError(
@@ -795,9 +805,7 @@ class VMSSHandler(AzureHandler):
                 lookup[str(vm_name)] = vmss_instance_id
 
         unresolved_ids = [
-            str(machine_id)
-            for machine_id in machine_ids
-            if str(machine_id) not in lookup
+            str(machine_id) for machine_id in machine_ids if str(machine_id) not in lookup
         ]
         if unresolved_ids:
             raise TerminationError(
@@ -923,14 +931,16 @@ class VMSSHandler(AzureHandler):
         )
 
         if provisioning_state.lower() == "failed" and not errors:
-            errors.append({
-                "error_code": "ProvisioningStateFailed",
-                "error_message": f"VMSS '{vmss_name}' provisioning failed",
-                "instance_id": vmss_name,
-                "resource_id": vmss_name,
-                "status_code": "ProvisioningState/failed",
-                "status_level": "Error",
-            })
+            errors.append(
+                {
+                    "error_code": "ProvisioningStateFailed",
+                    "error_message": f"VMSS '{vmss_name}' provisioning failed",
+                    "instance_id": vmss_name,
+                    "resource_id": vmss_name,
+                    "status_code": "ProvisioningState/failed",
+                    "status_level": "Error",
+                }
+            )
 
         return errors
 
@@ -1156,13 +1166,17 @@ class VMSSHandler(AzureHandler):
             message = _status_attr(status, "message")
             display_status = _status_attr(status, "display_status")
 
-            is_failure = code.lower().startswith("provisioningstate/failed") or level.lower() == "error"
+            is_failure = (
+                code.lower().startswith("provisioningstate/failed") or level.lower() == "error"
+            )
             if not is_failure:
                 continue
 
             vm_error: ProviderErrorEntry = {
                 "error_code": "ProvisioningStateFailed",
-                "error_message": str(message or display_status or code or "Azure provisioning failed"),
+                "error_message": str(
+                    message or display_status or code or "Azure provisioning failed"
+                ),
                 "instance_id": instance_id,
                 "resource_id": vmss_name,
                 "status_code": code,

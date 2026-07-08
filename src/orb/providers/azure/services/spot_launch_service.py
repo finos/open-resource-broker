@@ -30,6 +30,7 @@ from orb.providers.azure.infrastructure.services.spot_placement_score_adapter im
 from orb.domain.request.aggregate import Request
 from orb.providers.base.strategy import ProviderOperation, ProviderResult
 
+
 class SpotPlacementExecutionPort(Protocol):
     """Structural subset of SpotPlacementExecutionService used by Azure spot launches."""
 
@@ -139,9 +140,7 @@ class AzureSpotLaunchService:
         count: int,
     ) -> list[PlacementPlanEntry]:
         """Build a deterministic fallback plan when live scoring cannot run."""
-        self._logger.warning(
-            "Azure client not available; falling back to template candidate order"
-        )
+        self._logger.warning("Azure client not available; falling back to template candidate order")
         return self.build_fallback_spot_placement_plan(
             self._build_approximate_template_scores(template_view),
             count,
@@ -222,10 +221,7 @@ class AzureSpotLaunchService:
         ]
         return [
             PlacementPlanEntry(score=fallback_scores[0], planned_count=requested_count),
-            *[
-                PlacementPlanEntry(score=score, planned_count=0)
-                for score in fallback_scores[1:]
-            ],
+            *[PlacementPlanEntry(score=score, planned_count=0) for score in fallback_scores[1:]],
         ]
 
     @staticmethod
@@ -255,9 +251,7 @@ class AzureSpotLaunchService:
         cloned_data["vm_size_preferences"] = []
         cloned_data.pop("allocation_strategy", None)
         cloned_data["spot_placement_score_enabled"] = False
-        cloned_data["location"] = (
-            plan_entry.score.candidate.region or azure_template.location.value
-        )
+        cloned_data["location"] = plan_entry.score.candidate.region or azure_template.location.value
         cloned_data["zones"] = (
             [plan_entry.score.candidate.zone] if plan_entry.score.candidate.zone else []
         )
@@ -283,9 +277,7 @@ class AzureSpotLaunchService:
         if provider_api_key == "CycleCloud":
             provider_data = result.get("provider_data")
             added_count = (
-                provider_data.get("added_count")
-                if isinstance(provider_data, Mapping)
-                else None
+                provider_data.get("added_count") if isinstance(provider_data, Mapping) else None
             )
             result["fulfilled_count"] = int(added_count or 0)
             return result

@@ -57,12 +57,8 @@ class AzureResourceManager:
                 "provisioned_instance_count": provisioned_instance_count or 0,
             }
         except Exception as exc:
-            self._logger.error(
-                "Failed to get VMSS capacity for %s: %s", vmss_name, exc
-            )
-            raise AzureInfrastructureError(
-                f"Failed to get VMSS capacity: {exc}"
-            ) from exc
+            self._logger.error("Failed to get VMSS capacity for %s: %s", vmss_name, exc)
+            raise AzureInfrastructureError(f"Failed to get VMSS capacity: {exc}") from exc
 
     async def get_vmss_member_count_async(
         self,
@@ -99,7 +95,9 @@ class AzureResourceManager:
                 async for vm in pager:
                     vmss_ref = vm.virtual_machine_scale_set
                     vmss_id = vmss_ref.id if vmss_ref else ""
-                    if vmss_id and vmss_id.rstrip("/").endswith(f"/virtualMachineScaleSets/{vmss_name}"):
+                    if vmss_id and vmss_id.rstrip("/").endswith(
+                        f"/virtualMachineScaleSets/{vmss_name}"
+                    ):
                         count += 1
                 return count
 
@@ -112,9 +110,7 @@ class AzureResourceManager:
                 count += 1
             return count
         except Exception as exc:
-            self._logger.warning(
-                "Failed to count VMSS instances for %s: %s", vmss_name, exc
-            )
+            self._logger.warning("Failed to count VMSS instances for %s: %s", vmss_name, exc)
             return None
 
     @staticmethod
@@ -145,7 +141,5 @@ class AzureResourceManager:
             if self._vmss_lookup_not_found(exc):
                 return False
 
-            self._logger.warning(
-                "Failed to determine whether VMSS %s exists: %s", vmss_name, exc
-            )
+            self._logger.warning("Failed to determine whether VMSS %s exists: %s", vmss_name, exc)
             return None

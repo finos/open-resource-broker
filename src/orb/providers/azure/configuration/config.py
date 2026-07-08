@@ -7,6 +7,7 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 from orb.infrastructure.interfaces.provider import BaseProviderConfig
 
+
 class CycleCloudConfig(BaseModel):
     """CycleCloud connection configuration."""
 
@@ -62,6 +63,7 @@ class CycleCloudConfig(BaseModel):
 # Root provider config
 # ---------------------------------------------------------------------------
 
+
 class AzureProviderConfig(BaseProviderConfig):
     """Configuration for the Azure provider (VMSS / Compute Fleet).
 
@@ -86,9 +88,7 @@ class AzureProviderConfig(BaseProviderConfig):
     # ------------------------------------------------------------------
     # Azure subscription & resource targeting
     # ------------------------------------------------------------------
-    subscription_id: Optional[str] = Field(
-        None, description="Azure subscription ID (UUID)"
-    )
+    subscription_id: Optional[str] = Field(None, description="Azure subscription ID (UUID)")
     resource_group: Optional[str] = Field(
         None,
         description="Default resource group for created resources (1-90 chars)",
@@ -105,15 +105,11 @@ class AzureProviderConfig(BaseProviderConfig):
     # ------------------------------------------------------------------
     # Retry / timeout
     # ------------------------------------------------------------------
-    max_retries: int = Field(
-        3, ge=0, description="Maximum SDK retry attempts for transient errors"
-    )
+    max_retries: int = Field(3, ge=0, description="Maximum SDK retry attempts for transient errors")
     connect_timeout: int = Field(
         30, ge=1, description="Connection timeout for ARM API calls in seconds"
     )
-    read_timeout: int = Field(
-        60, ge=1, description="Read timeout for ARM API calls in seconds"
-    )
+    read_timeout: int = Field(60, ge=1, description="Read timeout for ARM API calls in seconds")
 
     # ------------------------------------------------------------------
     # CycleCloud
@@ -137,11 +133,7 @@ class AzureProviderConfig(BaseProviderConfig):
         location = data.get("location")
         region = data.get("region")
 
-        if (
-            location not in (None, "")
-            and region not in (None, "")
-            and location != region
-        ):
+        if location not in (None, "") and region not in (None, "") and location != region:
             raise ValueError(
                 "Azure provider config received conflicting 'location' and 'region' values"
             )
@@ -179,8 +171,7 @@ class AzureProviderConfig(BaseProviderConfig):
             v,
         ):
             raise ValueError(
-                "subscription_id must be a valid UUID "
-                "(xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)"
+                "subscription_id must be a valid UUID (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)"
             )
         return v
 

@@ -14,8 +14,7 @@ class AzureDeploymentService:
     """Build and submit Azure ARM deployments for provider-owned resources."""
 
     _TEMPLATE_SCHEMA = (
-        "https://schema.management.azure.com/schemas/2019-04-01/"
-        "deploymentTemplate.json#"
+        "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#"
     )
     _DEPLOYMENT_API_VERSION = "2025-04-01"
     _DEPLOYMENT_PROVIDER_NAMESPACE = "Microsoft.Resources"
@@ -149,17 +148,19 @@ class AzureDeploymentService:
                     "Microsoft.Network/publicIPAddresses",
                     public_ip_name,
                 )
-                resources.append({
-                    "type": "Microsoft.Network/publicIPAddresses",
-                    "apiVersion": self._NETWORK_API_VERSION,
-                    "name": public_ip_name,
-                    "location": location,
-                    "sku": {"name": "Standard"},
-                    "properties": {
-                        "publicIPAllocationMethod": "Static",
-                        "deleteOption": "Delete",
-                    },
-                })
+                resources.append(
+                    {
+                        "type": "Microsoft.Network/publicIPAddresses",
+                        "apiVersion": self._NETWORK_API_VERSION,
+                        "name": public_ip_name,
+                        "location": location,
+                        "sku": {"name": "Standard"},
+                        "properties": {
+                            "publicIPAllocationMethod": "Static",
+                            "deleteOption": "Delete",
+                        },
+                    }
+                )
                 nic_depends_on.append(public_ip_id)
                 ip_config_properties["publicIPAddress"] = {
                     "id": public_ip_id,

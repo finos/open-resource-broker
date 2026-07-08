@@ -101,7 +101,10 @@ class AzureRuntimeDependencies:
         """Resolve and cache AzureDeploymentService on first access."""
         with self._lock:
             azure_client = self.azure_client
-            if self._deployment_service is None and self._azure_deployment_service_resolver is not None:
+            if (
+                self._deployment_service is None
+                and self._azure_deployment_service_resolver is not None
+            ):
                 try:
                     self._deployment_service = self._azure_deployment_service_resolver()
                 except Exception as exc:

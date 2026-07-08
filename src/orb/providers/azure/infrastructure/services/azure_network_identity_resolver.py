@@ -177,9 +177,7 @@ class AzureNetworkIdentityResolver:
         if not nic_id:
             return None
 
-        nic_lookup = self._arm_resource_id_parser.extract_resource_group_and_name(
-            str(nic_id)
-        )
+        nic_lookup = self._arm_resource_id_parser.extract_resource_group_and_name(str(nic_id))
         if not nic_lookup:
             return None
 

@@ -33,8 +33,7 @@ class ParsedArmResourceId:
         return (
             f"/subscriptions/{self.subscription_id}"
             f"/resourceGroups/{self.resource_group}"
-            f"/providers/{self.provider_namespace}/"
-            + "/".join(self.resource_path_segments[:-2])
+            f"/providers/{self.provider_namespace}/" + "/".join(self.resource_path_segments[:-2])
         )
 
 

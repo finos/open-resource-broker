@@ -47,7 +47,6 @@ from orb.providers.azure.domain.template.value_objects import (
 from orb.providers.azure.services.spot_placement_planner import PlacementSplitStrategy
 
 
-
 class AzureTemplate(Template):
     """Azure VMSS-specific template with full Azure compute extensions.
 
@@ -111,9 +110,7 @@ class AzureTemplate(Template):
         ge=1,
         le=5,
         description="Fault domain count for Flexible orchestration.",
-        validation_alias=AliasChoices(
-            "platform_fault_domain_count", "platformFaultDomainCount"
-        ),
+        validation_alias=AliasChoices("platform_fault_domain_count", "platformFaultDomainCount"),
     )
     single_placement_group: bool = Field(
         default=False,
@@ -184,9 +181,7 @@ class AzureTemplate(Template):
         description=(
             "Minimum number of regular-priority VMs to keep when using Spot Priority Mix."
         ),
-        validation_alias=AliasChoices(
-            "base_regular_priority_count", "baseRegularPriorityCount"
-        ),
+        validation_alias=AliasChoices("base_regular_priority_count", "baseRegularPriorityCount"),
     )
     vmss_allocation_strategy: Optional[AzureAllocationStrategy] = Field(
         default=None,
@@ -209,9 +204,7 @@ class AzureTemplate(Template):
     spot_placement_score_enabled: bool = Field(
         default=False,
         description="Enable Azure Spot Placement Score planning before launch.",
-        validation_alias=AliasChoices(
-            "spot_placement_score_enabled", "spotPlacementScoreEnabled"
-        ),
+        validation_alias=AliasChoices("spot_placement_score_enabled", "spotPlacementScoreEnabled"),
     )
     placement_split_strategy: PlacementSplitStrategy = Field(
         default=PlacementSplitStrategy.HYBRID,
@@ -253,9 +246,7 @@ class AzureTemplate(Template):
     proximity_placement_group_id: Optional[AzureProximityPlacementGroupId] = Field(
         default=None,
         description="ARM resource ID of a proximity placement group.",
-        validation_alias=AliasChoices(
-            "proximity_placement_group_id", "proximityPlacementGroupId"
-        ),
+        validation_alias=AliasChoices("proximity_placement_group_id", "proximityPlacementGroupId"),
     )
     capacity_reservation_group_id: Optional[AzureCapacityReservationGroupId] = Field(
         default=None,
@@ -345,9 +336,7 @@ class AzureTemplate(Template):
     user_assigned_identity_ids: list[str] = Field(
         default_factory=list,
         description="ARM resource IDs of user-assigned managed identities.",
-        validation_alias=AliasChoices(
-            "user_assigned_identity_ids", "userAssignedIdentityIds"
-        ),
+        validation_alias=AliasChoices("user_assigned_identity_ids", "userAssignedIdentityIds"),
     )
     system_assigned_identity: bool = Field(
         default=False,
@@ -500,14 +489,8 @@ class AzureTemplate(Template):
 
         location = data.get("location")
         region = data.get("region")
-        if (
-            location not in (None, "")
-            and region not in (None, "")
-            and location != region
-        ):
-            raise ValueError(
-                "Azure templates received conflicting 'location' and 'region' values"
-            )
+        if location not in (None, "") and region not in (None, "") and location != region:
+            raise ValueError("Azure templates received conflicting 'location' and 'region' values")
         if location in (None, "") and region not in (None, ""):
             data["location"] = region
         data.pop("region", None)
@@ -554,9 +537,7 @@ class AzureTemplate(Template):
 
         if self.provider_api == AzureProviderApi.VMSS_UNIFORM:
             if self.orchestration_mode != AzureVMSSOrchestrationMode.UNIFORM:
-                raise ValueError(
-                    "provider_api 'VMSSUniform' requires orchestration_mode 'Uniform'"
-                )
+                raise ValueError("provider_api 'VMSSUniform' requires orchestration_mode 'Uniform'")
 
         if self.spot_placement_score_enabled:
             candidate_sizes = self.candidate_vm_sizes
@@ -584,9 +565,7 @@ class AzureTemplate(Template):
         ]
 
         if self.vm_size in preference_names:
-            raise ValueError(
-                "vm_size_preferences must not repeat the primary vm_size"
-            )
+            raise ValueError("vm_size_preferences must not repeat the primary vm_size")
 
         if len(preference_names) != len(set(preference_names)):
             raise ValueError("vm_size_preferences must contain unique VM sizes")
@@ -616,7 +595,9 @@ class AzureTemplate(Template):
 
         if self.vmss_allocation_strategy == AzureAllocationStrategy.PRIORITIZED:
             if any(rank == 0 for rank in explicit_ranks):
-                raise ValueError("vm_size_preferences ranks must start at 1; primary vm_size is rank 0")
+                raise ValueError(
+                    "vm_size_preferences ranks must start at 1; primary vm_size is rank 0"
+                )
             if len(explicit_ranks) != len(set(explicit_ranks)):
                 raise ValueError("vm_size_preferences ranks must be unique")
 
@@ -625,13 +606,9 @@ class AzureTemplate(Template):
                 AzureProviderApi.VMSS,
                 AzureProviderApi.VMSS_UNIFORM,
             ):
-                raise ValueError(
-                    "spot_percentage is only supported for VMSS-based Azure templates"
-                )
+                raise ValueError("spot_percentage is only supported for VMSS-based Azure templates")
             if self.orchestration_mode != AzureVMSSOrchestrationMode.FLEXIBLE:
-                raise ValueError(
-                    "spot_percentage requires Flexible orchestration mode"
-                )
+                raise ValueError("spot_percentage requires Flexible orchestration mode")
             if self.single_placement_group:
                 raise ValueError(
                     "spot_percentage is not supported when single_placement_group is enabled"
@@ -642,40 +619,26 @@ class AzureTemplate(Template):
                     "spot_percentage is not compatible with Low priority VMs; use Spot"
                 )
             if self.priority != AzurePriority.SPOT:
-                raise ValueError(
-                    "spot_percentage requires priority='Spot'"
-                )
+                raise ValueError("spot_percentage requires priority='Spot'")
 
         # Spot VMs require an eviction policy.
         if self.priority == AzurePriority.SPOT:
             if self.eviction_policy is None:
-                raise ValueError(
-                    "eviction_policy is required for Spot priority VMs"
-                )
+                raise ValueError("eviction_policy is required for Spot priority VMs")
 
         # Non-spot VMs should not have spot-specific settings
         if self.priority == AzurePriority.REGULAR and self.eviction_policy is not None:
             raise ValueError("eviction_policy is only valid for Spot or Low priority VMs")
-        if (
-            self.priority != AzurePriority.SPOT
-            and self.billing_profile_max_price is not None
-        ):
-            raise ValueError(
-                "billing_profile_max_price is only valid for Spot priority VMs"
-            )
+        if self.priority != AzurePriority.SPOT and self.billing_profile_max_price is not None:
+            raise ValueError("billing_profile_max_price is only valid for Spot priority VMs")
 
         # Zone balance requires zones
         if self.zone_balance and not self.zones:
             raise ValueError("zone_balance requires at least one availability zone")
 
         # overprovision is only valid for Uniform orchestration
-        if (
-            self.overprovision
-            and self.orchestration_mode != AzureVMSSOrchestrationMode.UNIFORM
-        ):
-            raise ValueError(
-                "overprovision is only valid for Uniform orchestration mode"
-            )
+        if self.overprovision and self.orchestration_mode != AzureVMSSOrchestrationMode.UNIFORM:
+            raise ValueError("overprovision is only valid for Uniform orchestration mode")
 
         # Trusted Launch validation
         if self.security_type == AzureSecurityType.TRUSTED_LAUNCH:
@@ -684,15 +647,11 @@ class AzureTemplate(Template):
                     "secure_boot_enabled is required when security_type is TrustedLaunch"
                 )
             if self.vtpm_enabled is None:
-                raise ValueError(
-                    "vtpm_enabled is required when security_type is TrustedLaunch"
-                )
+                raise ValueError("vtpm_enabled is required when security_type is TrustedLaunch")
 
         # Capacity reservation and Spot are mutually exclusive
         if self.capacity_reservation_group_id and self.priority == AzurePriority.SPOT:
-            raise ValueError(
-                "Capacity reservations cannot be used with Spot priority VMs"
-            )
+            raise ValueError("Capacity reservations cannot be used with Spot priority VMs")
 
         # SSH access is required for Linux VMs — never fall back to
         # generating a random admin password.  Callers must provide either
@@ -738,9 +697,7 @@ class AzureTemplate(Template):
         if not self.uses_vm_size_mix:
             return []
 
-        is_prioritized = (
-            self.vmss_allocation_strategy == AzureAllocationStrategy.PRIORITIZED
-        )
+        is_prioritized = self.vmss_allocation_strategy == AzureAllocationStrategy.PRIORITIZED
 
         if self.vm_sizes:
             return [{"name": vm_size} for vm_size in [self.vm_size, *self.vm_sizes]]

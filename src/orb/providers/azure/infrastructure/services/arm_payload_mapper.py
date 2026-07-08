@@ -119,9 +119,7 @@ class ArmPayloadMapper:
         if template.uses_vm_size_mix:
             sku_profile: dict[str, Any] = {"vmSizes": template.build_vm_size_profile()}
             if template.vmss_allocation_strategy:
-                sku_profile["allocationStrategy"] = (
-                    template.vmss_allocation_strategy.to_arm_value()
-                )
+                sku_profile["allocationStrategy"] = template.vmss_allocation_strategy.to_arm_value()
             properties["skuProfile"] = sku_profile
 
         if template.zones:
@@ -189,8 +187,8 @@ class ArmPayloadMapper:
 
         # SSH keys
         if template.ssh_public_keys:
-            params["properties"]["osProfile"]["linuxConfiguration"] = (
-                _build_linux_ssh_config(template)
+            params["properties"]["osProfile"]["linuxConfiguration"] = _build_linux_ssh_config(
+                template
             )
 
         # Custom data
@@ -224,6 +222,7 @@ class ArmPayloadMapper:
 # ------------------------------------------------------------------
 # Shared helpers
 # ------------------------------------------------------------------
+
 
 def _build_storage_profile(
     template: AzureTemplate,
@@ -333,17 +332,13 @@ def _build_identity(template: AzureTemplate) -> dict[str, Any] | None:
     if template.system_assigned_identity and template.user_assigned_identity_ids:
         return {
             "type": "SystemAssigned, UserAssigned",
-            "userAssignedIdentities": {
-                uid: {} for uid in template.user_assigned_identity_ids
-            },
+            "userAssignedIdentities": {uid: {} for uid in template.user_assigned_identity_ids},
         }
     if template.system_assigned_identity:
         return {"type": "SystemAssigned"}
     if template.user_assigned_identity_ids:
         return {
             "type": "UserAssigned",
-            "userAssignedIdentities": {
-                uid: {} for uid in template.user_assigned_identity_ids
-            },
+            "userAssignedIdentities": {uid: {} for uid in template.user_assigned_identity_ids},
         }
     return None

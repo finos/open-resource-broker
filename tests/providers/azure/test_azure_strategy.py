@@ -21,6 +21,7 @@ from orb.providers.base.strategy import (
 )
 from tests.providers.azure.strategy_test_support import run_operation
 
+
 class TestInitialization:
     def test_requires_azure_config(self, logger):
         with pytest.raises(ValueError, match="AzureProviderConfig"):
@@ -31,7 +32,9 @@ class TestInitialization:
             )
 
     def test_not_initialized_returns_error(self, azure_config, logger):
-        s = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
+        s = AzureProviderStrategy(
+            config=azure_config, logger=logger, provider_instance_name="azure-default"
+        )
         # Do NOT call s.initialize()
         op = ProviderOperation(
             operation_type=ProviderOperationType.HEALTH_CHECK,
@@ -80,19 +83,23 @@ class TestCapacityMetadata:
         strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status_async = AsyncMock(return_value=[])
-        handler.get_vmss_resource_errors_async = AsyncMock(return_value=[
-            {
-                "error_code": "ProvisioningStateFailed",
-                "error_message": "VMSS provisioning failed",
-            }
-        ])
+        handler.get_vmss_resource_errors_async = AsyncMock(
+            return_value=[
+                {
+                    "error_code": "ProvisioningStateFailed",
+                    "error_message": "VMSS provisioning failed",
+                }
+            ]
+        )
         strategy_harness.handlers["VMSS"] = handler
         resource_manager = MagicMock()
-        resource_manager.get_vmss_capacity_async = AsyncMock(return_value={
-            "capacity": 3,
-            "provisioned_instance_count": 0,
-            "provisioning_state": "Failed",
-        })
+        resource_manager.get_vmss_capacity_async = AsyncMock(
+            return_value={
+                "capacity": 3,
+                "provisioned_instance_count": 0,
+                "provisioning_state": "Failed",
+            }
+        )
         strategy_harness.resource_manager = resource_manager
 
         op = ProviderOperation(
@@ -118,11 +125,13 @@ class TestCapacityMetadata:
         handler.check_hosts_status_async = AsyncMock(return_value=[])
         strategy_harness.handlers["SingleVM"] = handler
         deployment_service = MagicMock()
-        deployment_service.get_deployment_status_async = AsyncMock(return_value={
-            "provisioning_state": "Failed",
-            "error_code": "DeploymentFailed",
-            "error_message": "Deployment failed during validation",
-        })
+        deployment_service.get_deployment_status_async = AsyncMock(
+            return_value={
+                "provisioning_state": "Failed",
+                "error_code": "DeploymentFailed",
+                "error_message": "Deployment failed during validation",
+            }
+        )
         strategy_harness.deployment_service = deployment_service
 
         op = ProviderOperation(
@@ -148,25 +157,29 @@ class TestCapacityMetadata:
     def test_describe_resource_instances_returns_canonical_machine_shape(self, strategy_harness):
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.check_hosts_status_async = AsyncMock(return_value=[
-            {
-                "instance_id": "vmss-demo_000001",
-                "status": "running",
-                "private_ip": "10.0.0.4",
-                "public_ip": None,
-                "instance_type": "Standard_B1s",
-                "subnet_id": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet/subnets/default",
-                "vpc_id": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet",
-                "provider_data": {"vmss_name": "vmss-demo"},
-            }
-        ])
+        handler.check_hosts_status_async = AsyncMock(
+            return_value=[
+                {
+                    "instance_id": "vmss-demo_000001",
+                    "status": "running",
+                    "private_ip": "10.0.0.4",
+                    "public_ip": None,
+                    "instance_type": "Standard_B1s",
+                    "subnet_id": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet/subnets/default",
+                    "vpc_id": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet",
+                    "provider_data": {"vmss_name": "vmss-demo"},
+                }
+            ]
+        )
         strategy_harness.handlers["VMSS"] = handler
         resource_manager = MagicMock()
-        resource_manager.get_vmss_capacity_async = AsyncMock(return_value={
-            "capacity": 1,
-            "provisioned_instance_count": 1,
-            "provisioning_state": "Succeeded",
-        })
+        resource_manager.get_vmss_capacity_async = AsyncMock(
+            return_value={
+                "capacity": 1,
+                "provisioned_instance_count": 1,
+                "provisioning_state": "Succeeded",
+            }
+        )
         strategy_harness.resource_manager = resource_manager
 
         op = ProviderOperation(
@@ -238,33 +251,37 @@ class TestCapacityMetadata:
     def test_describe_resource_instances_adds_shortfall_summary(self, strategy_harness):
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.check_hosts_status_async = AsyncMock(return_value=[
-            {
-                "instance_id": "vm-1",
-                "status": "running",
-                "private_ip": None,
-                "public_ip": None,
-                "launch_time": None,
-                "instance_type": "Standard_D4s_v5",
-                "subnet_id": None,
-                "vpc_id": None,
-                "provider_data": {
-                    "fleet_errors": [
-                        {
-                            "error_code": "AllocationFailed",
-                            "error_message": "No capacity in selected zone",
-                        }
-                    ]
-                },
-            }
-        ])
+        handler.check_hosts_status_async = AsyncMock(
+            return_value=[
+                {
+                    "instance_id": "vm-1",
+                    "status": "running",
+                    "private_ip": None,
+                    "public_ip": None,
+                    "launch_time": None,
+                    "instance_type": "Standard_D4s_v5",
+                    "subnet_id": None,
+                    "vpc_id": None,
+                    "provider_data": {
+                        "fleet_errors": [
+                            {
+                                "error_code": "AllocationFailed",
+                                "error_message": "No capacity in selected zone",
+                            }
+                        ]
+                    },
+                }
+            ]
+        )
         strategy_harness.handlers["VMSS"] = handler
         resource_manager = MagicMock()
-        resource_manager.get_vmss_capacity_async = AsyncMock(return_value={
-            "capacity": 3,
-            "provisioned_instance_count": 1,
-            "provisioning_state": "Updating",
-        })
+        resource_manager.get_vmss_capacity_async = AsyncMock(
+            return_value={
+                "capacity": 3,
+                "provisioned_instance_count": 1,
+                "provisioning_state": "Updating",
+            }
+        )
         strategy_harness.resource_manager = resource_manager
 
         op = ProviderOperation(
@@ -292,11 +309,13 @@ class TestCapacityMetadata:
         handler.get_vmss_resource_errors_async = AsyncMock(return_value=[])
         strategy_harness.handlers["VMSS"] = handler
         resource_manager = MagicMock()
-        resource_manager.get_vmss_capacity_async = AsyncMock(return_value={
-            "capacity": 2,
-            "provisioned_instance_count": 0,
-            "provisioning_state": "Updating",
-        })
+        resource_manager.get_vmss_capacity_async = AsyncMock(
+            return_value={
+                "capacity": 2,
+                "provisioned_instance_count": 0,
+                "provisioning_state": "Updating",
+            }
+        )
         strategy_harness.resource_manager = resource_manager
 
         op = ProviderOperation(
@@ -326,11 +345,13 @@ class TestCapacityMetadata:
         handler.get_vmss_resource_errors_async = AsyncMock(return_value=[])
         strategy_harness.handlers["VMSS"] = handler
         resource_manager = MagicMock()
-        resource_manager.get_vmss_capacity_async = AsyncMock(return_value={
-            "capacity": 2,
-            "provisioned_instance_count": 0,
-            "provisioning_state": "Updating",
-        })
+        resource_manager.get_vmss_capacity_async = AsyncMock(
+            return_value={
+                "capacity": 2,
+                "provisioned_instance_count": 0,
+                "provisioning_state": "Updating",
+            }
+        )
         strategy_harness.resource_manager = resource_manager
 
         op = ProviderOperation(
@@ -360,18 +381,20 @@ class TestCapacityMetadata:
         handler.get_vmss_resource_errors_async = AsyncMock(return_value=[])
         strategy_harness.handlers["VMSS"] = handler
         resource_manager = MagicMock()
-        resource_manager.get_vmss_capacity_async = AsyncMock(side_effect=[
-            {
-                "capacity": 4,
-                "provisioned_instance_count": 2,
-                "provisioning_state": "Updating",
-            },
-            {
-                "capacity": 3,
-                "provisioned_instance_count": 1,
-                "provisioning_state": "Updating",
-            },
-        ])
+        resource_manager.get_vmss_capacity_async = AsyncMock(
+            side_effect=[
+                {
+                    "capacity": 4,
+                    "provisioned_instance_count": 2,
+                    "provisioning_state": "Updating",
+                },
+                {
+                    "capacity": 3,
+                    "provisioned_instance_count": 1,
+                    "provisioning_state": "Updating",
+                },
+            ]
+        )
         strategy_harness.resource_manager = resource_manager
 
         op = ProviderOperation(
@@ -478,6 +501,7 @@ class TestGetAvailableTemplates:
     def test_fallback_templates_validate_as_azure_templates(self, strategy):
         for template in strategy._template_catalog_service.get_fallback_templates():
             AzureTemplate.model_validate(template)
+
 
 # ---------------------------------------------------------------------------
 # UNSUPPORTED_OPERATION
@@ -621,9 +645,7 @@ class TestSpotPlacementScoreAdapter:
         assert scores[0].normalized_score == 1.0
         assert scores[0].metadata["is_quota_available"] is True
         azure_client.get_async_credential.assert_awaited_once_with()
-        credential.get_token.assert_awaited_once_with(
-            "https://management.azure.com/.default"
-        )
+        credential.get_token.assert_awaited_once_with("https://management.azure.com/.default")
         assert posted_requests == [
             {
                 "url": (
@@ -712,13 +734,14 @@ class TestSpotPlacementScoreAdapter:
 # ---------------------------------------------------------------------------
 
 
-
 class TestProviderNaming:
     def test_generate_provider_name(self, strategy):
-        name = strategy.generate_provider_name({
-            "subscription_id": "12345678-abcd",
-            "region": "westeurope",
-        })
+        name = strategy.generate_provider_name(
+            {
+                "subscription_id": "12345678-abcd",
+                "region": "westeurope",
+            }
+        )
         assert name == "azure_12345678-abcd_westeurope"
 
     def test_parse_provider_name(self, strategy):
@@ -935,7 +958,9 @@ class TestCleanup:
             parameters={},
         )
 
-        operation_thread = threading.Thread(target=lambda: run_operation(strategy.execute_operation(op)))
+        operation_thread = threading.Thread(
+            target=lambda: run_operation(strategy.execute_operation(op))
+        )
         operation_thread.start()
         assert operation_started.wait(timeout=1)
 

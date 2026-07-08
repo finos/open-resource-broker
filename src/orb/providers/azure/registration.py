@@ -155,7 +155,7 @@ def create_azure_config(data: ProviderInstanceConfig | Mapping[str, Any]) -> "Az
 
 
 def create_azure_validator(
-    provider_config: "AzureProviderConfig | Mapping[str, Any] | None" = None
+    provider_config: "AzureProviderConfig | Mapping[str, Any] | None" = None,
 ) -> Optional["AzureValidationAdapter"]:
     """Create an Azure template validator."""
     from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
@@ -178,6 +178,7 @@ def create_azure_validator(
         return AzureValidationAdapter(config=azure_config, logger=LoggingAdapter())
     except Exception as exc:
         raise RuntimeError(f"Failed to create Azure validator: {exc!s}")
+
 
 # ------------------------------------------------------------------
 # Provider registration
@@ -415,7 +416,9 @@ def _create_azure_strategy_with_di(
         logger=logger,
         provider_instance_name=instance_name,
         azure_client_resolver=lambda: container.get(f"AzureClient_{instance_name}"),
-        azure_handler_factory_resolver=lambda: container.get(f"AzureHandlerFactory_{instance_name}"),
+        azure_handler_factory_resolver=lambda: container.get(
+            f"AzureHandlerFactory_{instance_name}"
+        ),
         azure_native_spec_service=container.get_optional(AzureNativeSpecService),
     )
 
@@ -560,7 +563,9 @@ def register_azure_services_with_di(container) -> None:
             container.register_factory(AzureNativeSpecService, create_azure_native_spec_service)
             logger.debug("Azure Native Spec Service registered with DI container")
     except Exception as exc:
-        logger.warning("Failed to register Azure services with DI container: %s", exc, exc_info=True)
+        logger.warning(
+            "Failed to register Azure services with DI container: %s", exc, exc_info=True
+        )
 
 
 # ------------------------------------------------------------------

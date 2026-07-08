@@ -41,10 +41,12 @@ def _normalise_error_details(details: Any) -> list[dict[str, Any]]:
         message = getattr(item, "message", None)
         if code is None and message is None:
             continue
-        normalised.append({
-            "code": str(code) if code not in (None, "") else None,
-            "message": str(message) if message not in (None, "") else None,
-        })
+        normalised.append(
+            {
+                "code": str(code) if code not in (None, "") else None,
+                "message": str(message) if message not in (None, "") else None,
+            }
+        )
     return normalised
 
 
@@ -67,9 +69,7 @@ def extract_azure_error_details(exc: Exception) -> dict[str, Any]:
         or getattr(error, "code", None)
         or getattr(exc, "code", None)
         or (
-            exception_details.get("raw_error_code")
-            if isinstance(exception_details, dict)
-            else None
+            exception_details.get("raw_error_code") if isinstance(exception_details, dict) else None
         )
         or (response_error.get("code") if isinstance(response_error, dict) else None)
     )
@@ -82,11 +82,7 @@ def extract_azure_error_details(exc: Exception) -> dict[str, Any]:
     message = (
         getattr(error, "message", None)
         or getattr(exc, "message", None)
-        or (
-            exception_details.get("error_message")
-            if isinstance(exception_details, dict)
-            else None
-        )
+        or (exception_details.get("error_message") if isinstance(exception_details, dict) else None)
         or (response_error.get("message") if isinstance(response_error, dict) else None)
         or str(exc)
     )

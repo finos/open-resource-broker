@@ -72,10 +72,12 @@ class TestAzureProviderConfig:
 
     def test_create_azure_config_rejects_invalid_subscription(self):
         with pytest.raises(RuntimeError, match="subscription_id"):
-            create_azure_config({
-                "provider_type": "azure",
-                "subscription_id": "not-a-uuid",
-            })
+            create_azure_config(
+                {
+                    "provider_type": "azure",
+                    "subscription_id": "not-a-uuid",
+                }
+            )
 
     def test_unknown_top_level_provider_fields_are_rejected(self):
         with pytest.raises(ValueError, match="Extra inputs are not permitted"):
@@ -141,49 +143,57 @@ class TestAzureProviderConfig:
 
 class TestTemplateValidation:
     def test_region_alias_is_accepted_for_location(self):
-        result = validate_azure_template({
-            "template_id": "t1",
-            "vm_size": "Standard_D4s_v5",
-            "resource_group": "rg",
-            "region": "eastus2",
-            "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
-            "image": {"publisher": "C", "offer": "o", "sku": "s"},
-        })
+        result = validate_azure_template(
+            {
+                "template_id": "t1",
+                "vm_size": "Standard_D4s_v5",
+                "resource_group": "rg",
+                "region": "eastus2",
+                "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
+                "image": {"publisher": "C", "offer": "o", "sku": "s"},
+            }
+        )
         assert result["valid"] is True
 
     def test_conflicting_location_and_region_is_invalid(self):
-        result = validate_azure_template({
-            "template_id": "t1",
-            "vm_size": "Standard_D4s_v5",
-            "resource_group": "rg",
-            "location": "eastus2",
-            "region": "westeurope",
-            "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
-            "image": {"publisher": "C", "offer": "o", "sku": "s"},
-        })
+        result = validate_azure_template(
+            {
+                "template_id": "t1",
+                "vm_size": "Standard_D4s_v5",
+                "resource_group": "rg",
+                "location": "eastus2",
+                "region": "westeurope",
+                "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
+                "image": {"publisher": "C", "offer": "o", "sku": "s"},
+            }
+        )
 
         assert result["valid"] is False
         assert any("conflicting 'location' and 'region'" in e for e in result["errors"])
 
     def test_valid_template(self):
-        result = validate_azure_template({
-            "template_id": "t1",
-            "vm_size": "Standard_D4s_v5",
-            "resource_group": "rg",
-            "location": "eastus2",
-            "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
-            "image": {"publisher": "C", "offer": "o", "sku": "s"},
-        })
+        result = validate_azure_template(
+            {
+                "template_id": "t1",
+                "vm_size": "Standard_D4s_v5",
+                "resource_group": "rg",
+                "location": "eastus2",
+                "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
+                "image": {"publisher": "C", "offer": "o", "sku": "s"},
+            }
+        )
         assert result["valid"] is True
 
     def test_missing_image_source_is_invalid(self):
-        result = validate_azure_template({
-            "template_id": "t1",
-            "vm_size": "Standard_D4s_v5",
-            "resource_group": "rg",
-            "location": "eastus2",
-            "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
-        })
+        result = validate_azure_template(
+            {
+                "template_id": "t1",
+                "vm_size": "Standard_D4s_v5",
+                "resource_group": "rg",
+                "location": "eastus2",
+                "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
+            }
+        )
         assert result["valid"] is False
         assert any("image source is required" in e for e in result["errors"])
 
@@ -195,26 +205,30 @@ class TestTemplateValidation:
         assert any("location" in e for e in result["errors"])
 
     def test_uncommon_vm_size_warning(self):
-        result = validate_azure_template({
-            "template_id": "t1",
-            "vm_size": "custom_vm_size",
-            "resource_group": "rg",
-            "location": "eastus2",
-            "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
-            "image": {"publisher": "C", "offer": "o", "sku": "s"},
-        })
+        result = validate_azure_template(
+            {
+                "template_id": "t1",
+                "vm_size": "custom_vm_size",
+                "resource_group": "rg",
+                "location": "eastus2",
+                "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
+                "image": {"publisher": "C", "offer": "o", "sku": "s"},
+            }
+        )
         assert result["valid"] is True
         assert any("Uncommon" in w for w in result["warnings"])
 
     def test_spot_regular_conflict(self):
-        result = validate_azure_template({
-            "vm_size": "Standard_D4s_v5",
-            "resource_group": "rg",
-            "location": "eastus2",
-            "image": {"publisher": "C", "offer": "o", "sku": "s"},
-            "priority": "Regular",
-            "eviction_policy": "Delete",
-        })
+        result = validate_azure_template(
+            {
+                "vm_size": "Standard_D4s_v5",
+                "resource_group": "rg",
+                "location": "eastus2",
+                "image": {"publisher": "C", "offer": "o", "sku": "s"},
+                "priority": "Regular",
+                "eviction_policy": "Delete",
+            }
+        )
         assert result["valid"] is False
 
 
@@ -245,31 +259,31 @@ class TestAzureHandlerFactory:
         register_infrastructure_services(container)
 
         factory = container.get(TemplateFactory)
-        template = factory.create_template({
-            "template_id": "azure-cheapest-vmss",
-            "provider_type": "azure",
-            "provider_api": "VMSS",
-            "vm_size": "Standard_B1s",
-            "resource_group": "orb-test-rg",
-            "location": "eastus2",
-            "image": {
-                "publisher": "Canonical",
-                "offer": "0001-com-ubuntu-server-jammy",
-                "sku": "22_04-lts-gen2",
-                "version": "latest",
-            },
-            "admin_username": "azureuser",
-            "ssh_public_keys": [
-                "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"
-            ],
-            "network_config": {
-                "subnet_id": (
-                    "/subscriptions/a6eb5b32-65bb-47c0-a2b8-34fa90400a4b/"
-                    "resourceGroups/orb-test-rg/providers/Microsoft.Network/"
-                    "virtualNetworks/orb-test-vnet/subnets/default"
-                )
-            },
-        })
+        template = factory.create_template(
+            {
+                "template_id": "azure-cheapest-vmss",
+                "provider_type": "azure",
+                "provider_api": "VMSS",
+                "vm_size": "Standard_B1s",
+                "resource_group": "orb-test-rg",
+                "location": "eastus2",
+                "image": {
+                    "publisher": "Canonical",
+                    "offer": "0001-com-ubuntu-server-jammy",
+                    "sku": "22_04-lts-gen2",
+                    "version": "latest",
+                },
+                "admin_username": "azureuser",
+                "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
+                "network_config": {
+                    "subnet_id": (
+                        "/subscriptions/a6eb5b32-65bb-47c0-a2b8-34fa90400a4b/"
+                        "resourceGroups/orb-test-rg/providers/Microsoft.Network/"
+                        "virtualNetworks/orb-test-vnet/subnets/default"
+                    )
+                },
+            }
+        )
 
         assert template.image.publisher == "Canonical"
 
@@ -283,8 +297,8 @@ class TestAzureHandlerFactory:
             caching={"request_status": {"enabled": False, "ttl_seconds": 17}},
         )
         config_port = MagicMock()
-        config_port.get_typed.side_effect = (
-            lambda config_type: perf_config if config_type is PerformanceConfig else None
+        config_port.get_typed.side_effect = lambda config_type: (
+            perf_config if config_type is PerformanceConfig else None
         )
         register_azure_provider(registry=registry, config_port=config_port)
 
@@ -504,8 +518,8 @@ class TestAzureRegistration:
             caching={"request_status": {"enabled": False, "ttl_seconds": 21}},
         )
         fallback_config = Mock()
-        fallback_config.get_typed.side_effect = (
-            lambda config_type: perf_config if config_type is PerformanceConfig else None
+        fallback_config.get_typed.side_effect = lambda config_type: (
+            perf_config if config_type is PerformanceConfig else None
         )
 
         runtime_config = _build_azure_client_runtime_config(

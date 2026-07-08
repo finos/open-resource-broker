@@ -58,6 +58,7 @@ if TYPE_CHECKING:
     )
     from azure.mgmt.resource.subscriptions.aio import SubscriptionClient as AsyncSubscriptionClient
 
+
 @dataclass(frozen=True)
 class AzureClientRuntimeConfig:
     """Infrastructure-owned config resolved before AzureClient construction."""
@@ -153,9 +154,7 @@ class AzureClient:
         if metrics:
             logger.info("Azure API metrics collection enabled")
         else:
-            logger.debug(
-                "Azure API metrics collection disabled - no MetricsCollector provided"
-            )
+            logger.debug("Azure API metrics collection disabled - no MetricsCollector provided")
 
         self._logger.info(
             "Azure client initialised: region=%s, subscription=%s, resource_group=%s, "
@@ -186,7 +185,7 @@ class AzureClient:
 
     @staticmethod
     def _resolve_int_config_value(
-            *,
+        *,
         field_name: str,
         raw_value: Optional[int],
         default: int,
@@ -712,9 +711,7 @@ class AzureClient:
         nic_refs: list[Any],
     ) -> AzureNetworkIdentity:
         """Async variant of NIC-ref network identity resolution."""
-        return await self._get_network_identity_resolver().resolve_from_nic_refs_async(
-            nic_refs
-        )
+        return await self._get_network_identity_resolver().resolve_from_nic_refs_async(nic_refs)
 
     # ------------------------------------------------------------------
     # Metrics / observability

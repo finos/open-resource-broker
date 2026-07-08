@@ -9,7 +9,9 @@ from orb.application.services.native_spec_service import NativeSpecService
 from orb.config.schemas.provider_strategy_schema import ProviderConfig
 from orb.domain.request.aggregate import Request
 from orb.domain.request.request_types import RequestType
-from orb.providers.azure.infrastructure.services.azure_native_spec_service import AzureNativeSpecService
+from orb.providers.azure.infrastructure.services.azure_native_spec_service import (
+    AzureNativeSpecService,
+)
 from tests.providers.azure.strategy_test_support import make_azure_template
 
 
@@ -45,7 +47,9 @@ def _make_provider_config(*, azure_extensions=None):
             "azure": {
                 "extensions": azure_extensions,
             }
-        } if azure_extensions is not None else {},
+        }
+        if azure_extensions is not None
+        else {},
     )
 
 

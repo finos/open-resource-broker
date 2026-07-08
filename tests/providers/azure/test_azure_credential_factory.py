@@ -96,9 +96,7 @@ def test_create_default_azure_credential_async_preserves_nested_import_error():
 @pytest.mark.asyncio
 async def test_async_azure_credential_access_token_provider_adapts_existing_credential():
     credential = MagicMock()
-    credential.get_token = AsyncMock(
-        return_value=types.SimpleNamespace(token="access-token")
-    )
+    credential.get_token = AsyncMock(return_value=types.SimpleNamespace(token="access-token"))
 
     provider = AsyncAzureCredentialAccessTokenProvider(credential)
 
@@ -156,9 +154,7 @@ def test_default_azure_access_token_provider_closes_short_lived_credential():
 async def test_async_default_azure_access_token_provider_closes_short_lived_credential():
     fake_identity_aio = types.ModuleType("azure.identity.aio")
     fake_credential = MagicMock()
-    fake_credential.get_token = AsyncMock(
-        return_value=types.SimpleNamespace(token="access-token")
-    )
+    fake_credential.get_token = AsyncMock(return_value=types.SimpleNamespace(token="access-token"))
     fake_credential.close = AsyncMock()
     fake_ctor = MagicMock(return_value=fake_credential)
     fake_identity_aio.DefaultAzureCredential = fake_ctor
@@ -175,9 +171,7 @@ async def test_async_default_azure_access_token_provider_closes_short_lived_cred
             logger=MagicMock(),
             client_id=None,
         )
-        token = await provider.get_access_token(
-            "https://management.azure.com/.default"
-        )
+        token = await provider.get_access_token("https://management.azure.com/.default")
 
     assert token == "access-token"
     fake_credential.close.assert_awaited_once_with()

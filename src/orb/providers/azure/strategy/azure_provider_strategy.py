@@ -655,9 +655,7 @@ class AzureProviderStrategy(ProviderStrategy):
     # Internal operation dispatch
     # ------------------------------------------------------------------
 
-    async def _execute_operation_internal(
-        self, operation: ProviderOperation
-    ) -> ProviderResult:
+    async def _execute_operation_internal(self, operation: ProviderOperation) -> ProviderResult:
         if operation.operation_type == ProviderOperationType.CREATE_INSTANCES:
             return await self._handle_create_instances(operation)
         elif operation.operation_type == ProviderOperationType.TERMINATE_INSTANCES:
@@ -682,9 +680,7 @@ class AzureProviderStrategy(ProviderStrategy):
     # CREATE_INSTANCES
     # ------------------------------------------------------------------
 
-    async def _handle_create_instances(
-        self, operation: ProviderOperation
-    ) -> ProviderResult:
+    async def _handle_create_instances(self, operation: ProviderOperation) -> ProviderResult:
         template_config: dict[str, Any] = {}
         provider_api_key: Optional[str] = None
         try:
@@ -707,7 +703,9 @@ class AzureProviderStrategy(ProviderStrategy):
                     create_context.azure_template,
                     create_context.count,
                 )
-                plan_override = await plan_result if inspect.isawaitable(plan_result) else plan_result
+                plan_override = (
+                    await plan_result if inspect.isawaitable(plan_result) else plan_result
+                )
                 return await self._spot_launch_service.execute_planned_spot_launches_async(
                     azure_template=create_context.azure_template,
                     provider_api=create_context.provider_api,
@@ -753,7 +751,8 @@ class AzureProviderStrategy(ProviderStrategy):
             }
             return self._error_result(
                 f"Failed to create instances: {exc!s}",
-                "CREATE_INSTANCES_ERROR", exc,
+                "CREATE_INSTANCES_ERROR",
+                exc,
                 metadata={
                     "operation": "create_instances",
                     "template_config": template_config,
@@ -766,9 +765,7 @@ class AzureProviderStrategy(ProviderStrategy):
     # TERMINATE_INSTANCES
     # ------------------------------------------------------------------
 
-    async def _handle_terminate_instances(
-        self, operation: ProviderOperation
-    ) -> ProviderResult:
+    async def _handle_terminate_instances(self, operation: ProviderOperation) -> ProviderResult:
         self._logger.debug("_handle_terminate_instances")
         try:
             operation = self._resolve_cyclecloud_operation(operation)
@@ -788,7 +785,8 @@ class AzureProviderStrategy(ProviderStrategy):
         except Exception as exc:
             return self._error_result(
                 f"Failed to terminate instances: {exc!s}",
-                "TERMINATE_INSTANCES_ERROR", exc,
+                "TERMINATE_INSTANCES_ERROR",
+                exc,
             )
 
     def _resolve_cyclecloud_operation(self, operation: ProviderOperation) -> ProviderOperation:
@@ -810,9 +808,7 @@ class AzureProviderStrategy(ProviderStrategy):
     # GET_INSTANCE_STATUS
     # ------------------------------------------------------------------
 
-    async def _handle_get_instance_status(
-        self, operation: ProviderOperation
-    ) -> ProviderResult:
+    async def _handle_get_instance_status(self, operation: ProviderOperation) -> ProviderResult:
         try:
             operation = self._resolve_cyclecloud_operation(operation)
             read_context = build_read_operation_context(
@@ -837,7 +833,8 @@ class AzureProviderStrategy(ProviderStrategy):
         except Exception as exc:
             return self._error_result(
                 f"Failed to get instance status: {exc!s}",
-                "GET_INSTANCE_STATUS_ERROR", exc,
+                "GET_INSTANCE_STATUS_ERROR",
+                exc,
             )
 
     async def _current_vmss_member_count_async(
@@ -910,7 +907,8 @@ class AzureProviderStrategy(ProviderStrategy):
         except Exception as exc:
             return self._error_result(
                 f"Failed to describe resource instances: {exc!s}",
-                "DESCRIBE_RESOURCE_INSTANCES_ERROR", exc,
+                "DESCRIBE_RESOURCE_INSTANCES_ERROR",
+                exc,
             )
 
     def _dry_run_instance_status_result(self, instance_ids: list[str]) -> ProviderResult:
@@ -969,9 +967,7 @@ class AzureProviderStrategy(ProviderStrategy):
     # VALIDATE_TEMPLATE
     # ------------------------------------------------------------------
 
-    async def _handle_validate_template(
-        self, operation: ProviderOperation
-    ) -> ProviderResult:
+    async def _handle_validate_template(self, operation: ProviderOperation) -> ProviderResult:
         try:
             template_config = operation.parameters.get("template_config", {})
             if not template_config:
@@ -989,7 +985,8 @@ class AzureProviderStrategy(ProviderStrategy):
         except Exception as exc:
             return self._error_result(
                 f"Failed to validate template: {exc!s}",
-                "VALIDATE_TEMPLATE_ERROR", exc,
+                "VALIDATE_TEMPLATE_ERROR",
+                exc,
             )
 
     # ------------------------------------------------------------------
@@ -1013,9 +1010,7 @@ class AzureProviderStrategy(ProviderStrategy):
     # HEALTH_CHECK
     # ------------------------------------------------------------------
 
-    async def _handle_health_check(
-        self, operation: ProviderOperation
-    ) -> ProviderResult:
+    async def _handle_health_check(self, operation: ProviderOperation) -> ProviderResult:
         _ = operation
         health_status = await self._health_check_service.check_health_async()
         return ProviderResult.success_result(

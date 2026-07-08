@@ -219,7 +219,9 @@ class SpotPlacementExecutionService:
         provider_data = result.get("provider_data") or {}
         raw_fulfilled_count = result.get("fulfilled_count")
         if success:
-            fulfilled_count = requested_count if raw_fulfilled_count is None else int(raw_fulfilled_count)
+            fulfilled_count = (
+                requested_count if raw_fulfilled_count is None else int(raw_fulfilled_count)
+            )
         else:
             fulfilled_count = 0 if raw_fulfilled_count is None else int(raw_fulfilled_count)
         fulfilled_count = min(max(fulfilled_count, 0), requested_count)

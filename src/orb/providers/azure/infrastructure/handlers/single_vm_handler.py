@@ -203,12 +203,30 @@ class SingleVMHandler(AzureHandler):
                 template_id=template.template_id,
             )
 
-        nsg_id = template.network_config.network_security_group_id if template.network_config else None
-        accel_net = bool(template.network_config.accelerated_networking if template.network_config else False)
-        backend_pool_ids = template.network_config.load_balancer_backend_pool_ids if template.network_config else []
-        inbound_nat_pool_ids = template.network_config.load_balancer_inbound_nat_pool_ids if template.network_config else []
-        app_gateway_pool_ids = template.network_config.application_gateway_backend_pool_ids if template.network_config else []
-        public_ip_enabled = bool(template.network_config.public_ip_enabled if template.network_config else False)
+        nsg_id = (
+            template.network_config.network_security_group_id if template.network_config else None
+        )
+        accel_net = bool(
+            template.network_config.accelerated_networking if template.network_config else False
+        )
+        backend_pool_ids = (
+            template.network_config.load_balancer_backend_pool_ids
+            if template.network_config
+            else []
+        )
+        inbound_nat_pool_ids = (
+            template.network_config.load_balancer_inbound_nat_pool_ids
+            if template.network_config
+            else []
+        )
+        app_gateway_pool_ids = (
+            template.network_config.application_gateway_backend_pool_ids
+            if template.network_config
+            else []
+        )
+        public_ip_enabled = bool(
+            template.network_config.public_ip_enabled if template.network_config else False
+        )
 
         resolved_ssh_keys = list(template.ssh_public_keys)
         if template.ssh_key_name and not resolved_ssh_keys:
@@ -238,11 +256,13 @@ class SingleVMHandler(AzureHandler):
         vm_definitions: list[dict[str, Any]] = []
         for _ in range(count):
             vm_name = f"vm-{template.template_id}-{uuid.uuid4().hex[:8]}"
-            vm_definitions.append({
-                "vm_name": vm_name,
-                "nic_name": f"nic-{vm_name}",
-                "public_ip_name": f"pip-{vm_name}" if public_ip_enabled else None,
-            })
+            vm_definitions.append(
+                {
+                    "vm_name": vm_name,
+                    "nic_name": f"nic-{vm_name}",
+                    "public_ip_name": f"pip-{vm_name}" if public_ip_enabled else None,
+                }
+            )
 
         selected_vm_size: Optional[str] = None
         submitted_deployment_name: Optional[str] = None
@@ -288,20 +308,24 @@ class SingleVMHandler(AzureHandler):
                     template.template_id,
                     candidate_vm_size,
                 )
-                deployment_template = self.azure_deployment_service.build_single_vm_deployment_template(
-                    location=location,
-                    subnet_id=subnet_id,
-                    vm_definitions=resolved_vm_definitions,
-                    enable_accelerated_networking=accel_net,
-                    nsg_id=nsg_id,
-                    load_balancer_backend_pool_ids=backend_pool_ids,
-                    load_balancer_inbound_nat_pool_ids=inbound_nat_pool_ids,
-                    application_gateway_backend_pool_ids=app_gateway_pool_ids,
+                deployment_template = (
+                    self.azure_deployment_service.build_single_vm_deployment_template(
+                        location=location,
+                        subnet_id=subnet_id,
+                        vm_definitions=resolved_vm_definitions,
+                        enable_accelerated_networking=accel_net,
+                        nsg_id=nsg_id,
+                        load_balancer_backend_pool_ids=backend_pool_ids,
+                        load_balancer_inbound_nat_pool_ids=inbound_nat_pool_ids,
+                        application_gateway_backend_pool_ids=app_gateway_pool_ids,
+                    )
                 )
-                submitted_deployment_name = await self.azure_deployment_service.submit_template_deployment_async(
-                    resource_group=resource_group,
-                    deployment_name=deployment_name,
-                    template=deployment_template,
+                submitted_deployment_name = (
+                    await self.azure_deployment_service.submit_template_deployment_async(
+                        resource_group=resource_group,
+                        deployment_name=deployment_name,
+                        template=deployment_template,
+                    )
                 )
                 selected_vm_size = candidate_vm_size
                 break
@@ -364,7 +388,9 @@ class SingleVMHandler(AzureHandler):
         """Async status query for individual VM IDs using the Azure async Compute SDK."""
         resource_ids: list[str] = request.resource_ids or []
         raise_on_status_error = azure_raise_on_status_error(request)
-        resource_group = (request.metadata or {}).get("resource_group") or self.azure_client.resource_group
+        resource_group = (request.metadata or {}).get(
+            "resource_group"
+        ) or self.azure_client.resource_group
         if not resource_group:
             message = "Cannot resolve resource_group for status check"
             self._logger.error(message)
@@ -398,9 +424,7 @@ class SingleVMHandler(AzureHandler):
                         vm=cast(AzureVmRuntimeStatusProtocol, vm),
                         resource_group=resource_group,
                         status=(
-                            resolve_power_state(statuses)
-                            if statuses is not None
-                            else "unknown"
+                            resolve_power_state(statuses) if statuses is not None else "unknown"
                         ),
                         network_identity=network_identity,
                     )
@@ -432,10 +456,7 @@ class SingleVMHandler(AzureHandler):
             if (requested_id := deletion.get("requested_id")) is not None
         ]
         raise TerminationError(
-            (
-                f"Failed to submit deletion for {len(failed_deletions)} of "
-                f"{len(machine_ids)} VM(s)"
-            ),
+            (f"Failed to submit deletion for {len(failed_deletions)} of {len(machine_ids)} VM(s)"),
             resource_ids=failed_requested_ids,
             details={
                 "resource_group": resource_group,
@@ -520,7 +541,9 @@ class SingleVMHandler(AzureHandler):
             )
         return ordered_resolved
 
-    async def _resolve_vm_names_async(self, resource_group: str, machine_ids: list[str]) -> list[str]:
+    async def _resolve_vm_names_async(
+        self, resource_group: str, machine_ids: list[str]
+    ) -> list[str]:
         """Resolve a list of mixed identifiers to canonical Azure VM names.
 
         Each input is treated as a vm_name first and looked up via a direct

@@ -54,9 +54,7 @@ async def test_resolve_ssh_keys_async_requires_name_or_inline_key_data():
 @pytest.mark.asyncio
 async def test_resolve_ssh_keys_async_rejects_missing_ssh_key_resource():
     compute_client = MagicMock()
-    compute_client.ssh_public_keys.get = AsyncMock(
-        side_effect=ResourceNotFoundError("missing")
-    )
+    compute_client.ssh_public_keys.get = AsyncMock(side_effect=ResourceNotFoundError("missing"))
 
     with pytest.raises(ValueError, match="was not found"):
         await resolve_ssh_keys_async(

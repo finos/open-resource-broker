@@ -103,7 +103,15 @@ def test_canonical_azure_error_code_prefers_raw_error_code():
 
 
 def test_canonical_azure_error_code_maps_status_codes_and_messages():
-    assert canonical_azure_error_code(SimpleNamespace(status_code=429, error=None, response=None)) == "TooManyRequests"
+    assert (
+        canonical_azure_error_code(SimpleNamespace(status_code=429, error=None, response=None))
+        == "TooManyRequests"
+    )
     assert canonical_azure_error_code(Exception("quota exceeded for region")) == "QuotaExceeded"
-    assert canonical_azure_error_code(Exception("insufficient capacity to allocate")) == "AllocationFailed"
-    assert canonical_azure_error_code(Exception("validation failed for parameter")) == "InvalidRequest"
+    assert (
+        canonical_azure_error_code(Exception("insufficient capacity to allocate"))
+        == "AllocationFailed"
+    )
+    assert (
+        canonical_azure_error_code(Exception("validation failed for parameter")) == "InvalidRequest"
+    )

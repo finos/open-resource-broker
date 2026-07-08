@@ -3,6 +3,7 @@
 All Azure infrastructure handlers extend this ABC and expose the native async
 create, status, and release operations used by Azure services.
 """
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, NotRequired, Optional, TypeAlias, TypedDict
@@ -89,10 +90,7 @@ def azure_raise_on_status_error(request: Request) -> bool:
     if isinstance(value, bool):
         return value
     raise AzureValidationError(
-        (
-            f"Azure status metadata '{RAISE_ON_STATUS_ERROR_METADATA_KEY}' "
-            "must be a boolean"
-        ),
+        (f"Azure status metadata '{RAISE_ON_STATUS_ERROR_METADATA_KEY}' must be a boolean"),
         error_code="InvalidParameter",
     )
 
@@ -238,9 +236,7 @@ class AzureHandler(ABC):
         """Provision resources without blocking the event loop."""
 
     @abstractmethod
-    async def check_hosts_status_async(
-        self, request: Request
-    ) -> list[AzureHandlerStatusResult]:
+    async def check_hosts_status_async(self, request: Request) -> list[AzureHandlerStatusResult]:
         """Return instance details without blocking the event loop."""
 
     @abstractmethod

@@ -61,9 +61,7 @@ def test_load_strategy_defaults_includes_azure_handler_capabilities_without_prov
         config={},
     )
 
-    handlers = provider_instance.get_effective_handlers(
-        provider_config.provider_defaults["azure"]
-    )
+    handlers = provider_instance.get_effective_handlers(provider_config.provider_defaults["azure"])
 
     assert set(handlers) == {"VMSS", "VMSSUniform", "SingleVM", "CycleCloud"}
     assert handlers["VMSS"].model_dump()["supports_spot"] is True

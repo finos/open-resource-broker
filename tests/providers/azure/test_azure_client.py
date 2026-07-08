@@ -415,9 +415,7 @@ class TestAzureClientOperationalBehavior:
         client.get_async_credential = AsyncMock(return_value=async_credential)
 
         assert await AzureClient.validate_credentials_async(client) is True
-        async_credential.get_token.assert_awaited_once_with(
-            "https://management.azure.com/.default"
-        )
+        async_credential.get_token.assert_awaited_once_with("https://management.azure.com/.default")
         assert client._credentials_validated is True
 
     @pytest.mark.asyncio
@@ -438,9 +436,7 @@ class TestAzureClientOperationalBehavior:
     async def test_validate_credentials_async_returns_false_for_authentication_error(self):
         client = self._build_partial_client()
         async_credential = MagicMock()
-        async_credential.get_token = AsyncMock(
-            side_effect=AuthenticationError("bad credential")
-        )
+        async_credential.get_token = AsyncMock(side_effect=AuthenticationError("bad credential"))
         client.get_async_credential = AsyncMock(return_value=async_credential)
 
         assert await AzureClient.validate_credentials_async(client) is False

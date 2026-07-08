@@ -10,9 +10,11 @@ from typing import Mapping, Optional, Protocol, SupportsInt, TypeAlias, Any, cas
 
 class _VmssCleanupLogger(Protocol):
     """Protocol for logging warnings in the VMSS cleanup coordinator."""
+
     def warning(self, message: str, *args: object) -> None:
         """A minimal logger protocol for the VMSS cleanup coordinator, focused on warning messages."""
         ...
+
 
 GetVmssMemberCount: TypeAlias = Callable[..., Awaitable[Optional[int]]]
 VmssExists: TypeAlias = Callable[..., Awaitable[Optional[bool]]]
@@ -127,9 +129,7 @@ class PendingVmssCleanup:
             delete_retry_pending=delete_retry_pending,
             delete_retry_count=max(0, int(delete_retry_count)),
             delete_retry_exhausted=delete_retry_exhausted,
-            last_delete_error=(
-                None if last_delete_error in (None, "") else str(last_delete_error)
-            ),
+            last_delete_error=(None if last_delete_error in (None, "") else str(last_delete_error)),
         )
 
     def combine_for_same_vmss(self, other: PendingVmssCleanup) -> PendingVmssCleanup:
@@ -152,9 +152,8 @@ class PendingVmssCleanup:
             delete_vmss_when_empty=self.delete_vmss_when_empty or other.delete_vmss_when_empty,
             member_delete_submitted=self.member_delete_submitted or other.member_delete_submitted,
             delete_submitted=self.delete_submitted or other.delete_submitted,
-            delete_retry_pending=(
-                self.delete_retry_pending or other.delete_retry_pending
-            ) and not (self.delete_retry_exhausted or other.delete_retry_exhausted),
+            delete_retry_pending=(self.delete_retry_pending or other.delete_retry_pending)
+            and not (self.delete_retry_exhausted or other.delete_retry_exhausted),
             delete_retry_count=max(self.delete_retry_count, other.delete_retry_count),
             delete_retry_exhausted=self.delete_retry_exhausted or other.delete_retry_exhausted,
             last_delete_error=other.last_delete_error or self.last_delete_error,

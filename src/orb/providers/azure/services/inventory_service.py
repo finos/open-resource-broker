@@ -323,6 +323,7 @@ def build_read_handler_request(
 # Read-side orchestrator
 # ---------------------------------------------------------------------------
 
+
 @runtime_checkable
 class VmssResourceErrorReader(Protocol):
     """Capability interface for VMSS-level fleet error inspection."""
@@ -359,9 +360,7 @@ class AzureInventoryService:
         read_context: AzureReadOperationContext,
     ) -> ProviderResult:
         """Resolve instance status through the async Azure handler contract."""
-        self._vmss_cleanup_coordinator.restore_from_request_metadata(
-            read_context.request_metadata
-        )
+        self._vmss_cleanup_coordinator.restore_from_request_metadata(read_context.request_metadata)
         handler_machines = await self._get_instance_status_via_handlers_async(read_context)
         if handler_machines is not None:
             return await self._build_instance_status_result(
@@ -561,15 +560,10 @@ class AzureInventoryService:
             AzureProviderApi.VMSS,
             AzureProviderApi.VMSS_UNIFORM,
         )
-        self._vmss_cleanup_coordinator.restore_from_request_metadata(
-            read_context.request_metadata
-        )
-        read_context.raise_on_status_error = (
-            is_vmss
-            and self._vmss_cleanup_coordinator.has_pending(
-                resource_group=read_context.resource_group,
-                resource_ids=read_context.resource_ids,
-            )
+        self._vmss_cleanup_coordinator.restore_from_request_metadata(read_context.request_metadata)
+        read_context.raise_on_status_error = is_vmss and self._vmss_cleanup_coordinator.has_pending(
+            resource_group=read_context.resource_group,
+            resource_ids=read_context.resource_ids,
         )
         return is_vmss
 
@@ -584,9 +578,7 @@ class AzureInventoryService:
             deployment_name = read_context.request_metadata.get("deployment_name")
             if deployment_name not in (None, ""):
                 extra_metadata["deployment_name"] = str(deployment_name)
-        extra_metadata[RAISE_ON_STATUS_ERROR_METADATA_KEY] = (
-            read_context.raise_on_status_error
-        )
+        extra_metadata[RAISE_ON_STATUS_ERROR_METADATA_KEY] = read_context.raise_on_status_error
         return build_read_handler_request(
             read_context=read_context,
             provider_name=self._provider_instance_name,
@@ -670,7 +662,9 @@ class AzureInventoryService:
         return provider_api, handler
 
     @staticmethod
-    def _collect_instance_fleet_errors(instance_details: list[AzureHandlerStatusResult]) -> list[dict[str, Any]]:
+    def _collect_instance_fleet_errors(
+        instance_details: list[AzureHandlerStatusResult],
+    ) -> list[dict[str, Any]]:
         """Collect distinct fleet errors embedded in handler provider data."""
         fleet_errors: list[dict[str, Any]] = []
         for inst in instance_details:
@@ -758,9 +752,7 @@ class AzureInventoryService:
                 metadata,
                 instances=[],
                 target_units=(
-                    len(resource_ids)
-                    if provider_api == AzureProviderApi.SINGLE_VM
-                    else None
+                    len(resource_ids) if provider_api == AzureProviderApi.SINGLE_VM else None
                 ),
             )
             return ProviderResult.success_result(
@@ -784,9 +776,7 @@ class AzureInventoryService:
             metadata,
             instances=instance_details,
             target_units=(
-                len(resource_ids)
-                if provider_api == AzureProviderApi.SINGLE_VM
-                else None
+                len(resource_ids) if provider_api == AzureProviderApi.SINGLE_VM else None
             ),
         )
         return ProviderResult.success_result(

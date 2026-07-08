@@ -242,8 +242,7 @@ class AzureResourceMetadataService:
             metadata["fleet_errors"] = [
                 {
                     "error_code": error_code or "DeploymentFailed",
-                    "error_message": error_message
-                    or f"ARM deployment '{deployment_name}' failed",
+                    "error_message": error_message or f"ARM deployment '{deployment_name}' failed",
                     "resource_group": str(resource_group),
                     "instance_id": str(deployment_name),
                 }
@@ -396,8 +395,4 @@ def _count_statuses(
     instances: Sequence[Mapping[str, Any]],
     statuses: frozenset[str],
 ) -> int:
-    return sum(
-        1
-        for instance in instances
-        if str(instance.get("status") or "").lower() in statuses
-    )
+    return sum(1 for instance in instances if str(instance.get("status") or "").lower() in statuses)

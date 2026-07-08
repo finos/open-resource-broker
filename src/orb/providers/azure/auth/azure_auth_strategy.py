@@ -73,9 +73,7 @@ class AzureAuthStrategy(AuthPort):
                 error_message="Azure auth strategy disabled",
             )
         try:
-            token = await self._get_access_token(
-                "https://management.azure.com/.default"
-            )
+            token = await self._get_access_token("https://management.azure.com/.default")
 
             return AuthResult(
                 status=AuthStatus.SUCCESS,
@@ -104,9 +102,7 @@ class AzureAuthStrategy(AuthPort):
     async def refresh_token(self, refresh_token: str) -> AuthResult:
         """DefaultAzureCredential handles token refresh automatically."""
         try:
-            token = await self._get_access_token(
-                "https://management.azure.com/.default"
-            )
+            token = await self._get_access_token("https://management.azure.com/.default")
             return AuthResult(
                 status=AuthStatus.SUCCESS,
                 token=token,

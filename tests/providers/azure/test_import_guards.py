@@ -25,7 +25,9 @@ _MISSING_AZURE_MODULES = {
 @contextmanager
 def _isolated_azure_provider_import():
     """Re-import Azure provider modules with Azure SDK packages hidden."""
-    saved_orb_modules = {k: v for k, v in sys.modules.items() if k.startswith("orb.providers.azure")}
+    saved_orb_modules = {
+        k: v for k, v in sys.modules.items() if k.startswith("orb.providers.azure")
+    }
     saved_azure_modules = {k: sys.modules[k] for k in _MISSING_AZURE_MODULES if k in sys.modules}
 
     for key in list(sys.modules):

@@ -23,19 +23,19 @@ from tests.providers.azure.strategy_test_support import (
 
 
 def test_format_azure_error_message_includes_nested_details():
-    message = _format_azure_error_message({
-        "message": "Deployment validation failed",
-        "details": [
-            {
-                "code": "InvalidParameter",
-                "message": "The supplied VM size is not available in this location.",
-            }
-        ],
-    })
-
-    assert message == (
-        "InvalidParameter: The supplied VM size is not available in this location."
+    message = _format_azure_error_message(
+        {
+            "message": "Deployment validation failed",
+            "details": [
+                {
+                    "code": "InvalidParameter",
+                    "message": "The supplied VM size is not available in this location.",
+                }
+            ],
+        }
     )
+
+    assert message == ("InvalidParameter: The supplied VM size is not available in this location.")
 
 
 def test_format_azure_error_message_falls_back_to_primary_message():
@@ -58,6 +58,7 @@ def _deleted_vm_names(azure_client: MagicMock) -> list[str]:
         str(call.kwargs["vm_name"])
         for call in azure_client.compute_client.virtual_machines.begin_delete.call_args_list
     ]
+
 
 def _make_template(**overrides):
     return make_azure_template(
@@ -113,9 +114,11 @@ def test_acquire_hosts_creates_public_ips_when_enabled():
     )
 
     assert result["success"] is True
-    deployment_template = azure_client.resource_client.resources.begin_create_or_update.call_args.kwargs[
-        "parameters"
-    ]["properties"]["template"]
+    deployment_template = (
+        azure_client.resource_client.resources.begin_create_or_update.call_args.kwargs[
+            "parameters"
+        ]["properties"]["template"]
+    )
     public_ip_resources = [
         resource
         for resource in deployment_template["resources"]
@@ -128,7 +131,9 @@ def test_acquire_hosts_creates_public_ips_when_enabled():
     ]
     assert len(public_ip_resources) == 2
     assert len(nic_resources) == 2
-    public_ip_ref = nic_resources[0]["properties"]["ipConfigurations"][0]["properties"]["publicIPAddress"]
+    public_ip_ref = nic_resources[0]["properties"]["ipConfigurations"][0]["properties"][
+        "publicIPAddress"
+    ]
     assert public_ip_resources[0]["name"].startswith("pip-vm-")
     assert "Microsoft.Network/publicIPAddresses" in public_ip_ref["id"]
     assert public_ip_ref["deleteOption"] == "Delete"
@@ -210,7 +215,9 @@ def test_acquire_hosts_classifies_quota_runtime_error():
 
     with pytest.raises(LaunchError) as exc_info:
         run_operation(
-            handler.acquire_hosts_async(_make_request(count=1, request_id="req-quota"), _make_template())
+            handler.acquire_hosts_async(
+                _make_request(count=1, request_id="req-quota"), _make_template()
+            )
         )
 
     assert exc_info.value.error_code == "QuotaExceeded"
@@ -230,9 +237,7 @@ def test_acquire_hosts_does_not_misclassify_resource_name_containing_quota():
 
     exc = HttpResponseError(response=response)
     exc.error = fake_error
-    handler.azure_deployment_service.submit_template_deployment_async = AsyncMock(
-        side_effect=exc
-    )
+    handler.azure_deployment_service.submit_template_deployment_async = AsyncMock(side_effect=exc)
 
     with pytest.raises(LaunchError) as exc_info:
         run_operation(
@@ -307,12 +312,12 @@ def test_status_populates_network_identity():
     vm.network_profile.network_interfaces = [nic_ref]
     azure_client.resolve_network_identity_from_vm_async = AsyncMock(
         return_value={
-        "private_ip": "10.0.0.4",
-        "public_ip": "52.1.2.3",
-        "subnet_id": "/subscriptions/sub/.../subnets/default",
-        "vnet_id": "/subscriptions/sub/.../virtualNetworks/test-vnet",
-        "nic_id": nic_ref.id,
-        "nic_name": "nic-vm-1",
+            "private_ip": "10.0.0.4",
+            "public_ip": "52.1.2.3",
+            "subnet_id": "/subscriptions/sub/.../subnets/default",
+            "vnet_id": "/subscriptions/sub/.../virtualNetworks/test-vnet",
+            "nic_id": nic_ref.id,
+            "nic_name": "nic-vm-1",
         }
     )
     azure_client.compute_client.virtual_machines.get.return_value = vm
@@ -532,12 +537,12 @@ def test_status_uses_direct_vm_name_lookup_without_listing_resource_group():
     vm.zones = ["1"]
     azure_client.resolve_network_identity_from_vm_async = AsyncMock(
         return_value={
-        "private_ip": "10.0.0.4",
-        "public_ip": None,
-        "subnet_id": "/subscriptions/sub/.../subnets/default",
-        "vnet_id": "/subscriptions/sub/.../virtualNetworks/test-vnet",
-        "nic_id": "nic-id",
-        "nic_name": "nic-vm-1",
+            "private_ip": "10.0.0.4",
+            "public_ip": None,
+            "subnet_id": "/subscriptions/sub/.../subnets/default",
+            "vnet_id": "/subscriptions/sub/.../virtualNetworks/test-vnet",
+            "nic_id": "nic-id",
+            "nic_name": "nic-vm-1",
         }
     )
     azure_client.compute_client.virtual_machines.get.return_value = vm
@@ -663,9 +668,7 @@ async def test_resolve_vm_names_async_maps_vm_ids_via_resource_group_listing():
 
     async_compute = MagicMock()
     azure_client.get_async_compute_client = AsyncMock(return_value=async_compute)
-    async_compute.virtual_machines.get = AsyncMock(
-        side_effect=ResourceNotFoundError("NotFound")
-    )
+    async_compute.virtual_machines.get = AsyncMock(side_effect=ResourceNotFoundError("NotFound"))
 
     async_compute.virtual_machines.list.return_value = AsyncPager([vm_1])
 
@@ -717,9 +720,7 @@ async def test_resolve_vm_names_async_maps_vm_ids_via_resource_group_listing_aga
     vm_1.vm_id = "11111111-1111-1111-1111-111111111111"
 
     async_compute = MagicMock()
-    async_compute.virtual_machines.get = AsyncMock(
-        side_effect=ResourceNotFoundError("NotFound")
-    )
+    async_compute.virtual_machines.get = AsyncMock(side_effect=ResourceNotFoundError("NotFound"))
 
     async_compute.virtual_machines.list.return_value = AsyncPager([vm_1])
     azure_client.get_async_compute_client = AsyncMock(return_value=async_compute)

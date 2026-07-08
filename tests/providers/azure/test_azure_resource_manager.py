@@ -64,7 +64,9 @@ async def test_get_vmss_capacity_async_raises_infrastructure_error_when_lookup_f
     manager, azure_client, _ = _make_manager()
     async_compute_client = MagicMock()
     azure_client.get_async_compute_client = AsyncMock(return_value=async_compute_client)
-    async_compute_client.virtual_machine_scale_sets.get = AsyncMock(side_effect=RuntimeError("boom"))
+    async_compute_client.virtual_machine_scale_sets.get = AsyncMock(
+        side_effect=RuntimeError("boom")
+    )
 
     with pytest.raises(AzureInfrastructureError, match="Failed to get VMSS capacity"):
         await manager.get_vmss_capacity_async("test-rg", "vmss-1")
@@ -84,9 +86,7 @@ async def test_get_vmss_member_count_async_counts_uniform_instances():
     async_compute_client.virtual_machine_scale_set_vms.list.return_value = _vm_iter()
 
     assert (
-        await manager.get_vmss_member_count_async(
-            "test-rg", "vmss-1", orchestration_mode="Uniform"
-        )
+        await manager.get_vmss_member_count_async("test-rg", "vmss-1", orchestration_mode="Uniform")
         == 3
     )
 
@@ -99,9 +99,7 @@ async def test_get_vmss_member_count_async_tolerates_count_errors_and_returns_no
     async_compute_client.virtual_machine_scale_set_vms.list.side_effect = RuntimeError("boom")
 
     assert (
-        await manager.get_vmss_member_count_async(
-            "test-rg", "vmss-1", orchestration_mode="Uniform"
-        )
+        await manager.get_vmss_member_count_async("test-rg", "vmss-1", orchestration_mode="Uniform")
         is None
     )
     logger.warning.assert_called_once()
@@ -124,7 +122,9 @@ async def test_vmss_exists_async_returns_none_for_unknown_lookup_error():
     manager, azure_client, logger = _make_manager()
     async_compute_client = MagicMock()
     azure_client.get_async_compute_client = AsyncMock(return_value=async_compute_client)
-    async_compute_client.virtual_machine_scale_sets.get = AsyncMock(side_effect=RuntimeError("boom"))
+    async_compute_client.virtual_machine_scale_sets.get = AsyncMock(
+        side_effect=RuntimeError("boom")
+    )
 
     assert await manager.vmss_exists_async("test-rg", "vmss-1") is None
     logger.warning.assert_called_once()

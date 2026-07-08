@@ -1,4 +1,5 @@
 """Focused tests for Azure strategy status and discovery flows."""
+
 from unittest.mock import AsyncMock, MagicMock
 
 from orb.providers.azure.configuration.config import AzureProviderConfig
@@ -7,6 +8,7 @@ from orb.providers.azure.exceptions.azure_exceptions import CycleCloudConnection
 from orb.providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
 from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
 from tests.providers.azure.strategy_test_support import build_strategy_harness, run_operation
+
 
 class TestGetInstanceStatus:
     def test_missing_instance_ids_returns_error(self, strategy):
@@ -43,23 +45,25 @@ class TestGetInstanceStatus:
     def test_get_instance_status_uses_request_metadata_resource_group(self, strategy_harness):
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.check_hosts_status_async = AsyncMock(return_value=[
-            {
-                "instance_id": "vm-1",
-                "status": "running",
-                "private_ip": "10.0.0.4",
-                "public_ip": None,
-                "launch_time": None,
-                "instance_type": "Standard_D4s_v5",
-                "subnet_id": "subnet-1",
-                "vpc_id": "vnet-1",
-                "provider_type": "azure",
-                "provider_data": {
-                    "resource_group": "context-rg",
-                    "vm_name": "vm-1",
-                },
-            }
-        ])
+        handler.check_hosts_status_async = AsyncMock(
+            return_value=[
+                {
+                    "instance_id": "vm-1",
+                    "status": "running",
+                    "private_ip": "10.0.0.4",
+                    "public_ip": None,
+                    "launch_time": None,
+                    "instance_type": "Standard_D4s_v5",
+                    "subnet_id": "subnet-1",
+                    "vpc_id": "vnet-1",
+                    "provider_type": "azure",
+                    "provider_data": {
+                        "resource_group": "context-rg",
+                        "vm_name": "vm-1",
+                    },
+                }
+            ]
+        )
         strategy_harness.handlers["SingleVM"] = handler
 
         op = ProviderOperation(
@@ -78,8 +82,11 @@ class TestGetInstanceStatus:
         assert result.metadata["provider_fulfilment"].state == "fulfilled"
         assert result.metadata["provider_fulfilment"].target_units == 1
         handler.check_hosts_status_async.assert_awaited_once()
+
     def test_dry_run_short_circuits_status_lookup(self, azure_config, logger):
-        strategy = AzureProviderStrategy(config=azure_config, logger=logger, provider_instance_name="azure-default")
+        strategy = AzureProviderStrategy(
+            config=azure_config, logger=logger, provider_instance_name="azure-default"
+        )
         strategy.initialize()
 
         op = ProviderOperation(
@@ -100,20 +107,22 @@ class TestGetInstanceStatus:
         strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.check_hosts_status_async = AsyncMock(return_value=[
-            {
-                "instance_id": "vm-1",
-                "status": "running",
-                "private_ip": "10.0.0.4",
-                "public_ip": None,
-                "launch_time": None,
-                "instance_type": "Standard_D4s_v5",
-                "subnet_id": "/subscriptions/.../subnets/default",
-                "vpc_id": "/subscriptions/.../virtualNetworks/test-vnet",
-                "provider_type": "azure",
-                "provider_data": {"vm_name": "vm-1"},
-            }
-        ])
+        handler.check_hosts_status_async = AsyncMock(
+            return_value=[
+                {
+                    "instance_id": "vm-1",
+                    "status": "running",
+                    "private_ip": "10.0.0.4",
+                    "public_ip": None,
+                    "launch_time": None,
+                    "instance_type": "Standard_D4s_v5",
+                    "subnet_id": "/subscriptions/.../subnets/default",
+                    "vpc_id": "/subscriptions/.../virtualNetworks/test-vnet",
+                    "provider_type": "azure",
+                    "provider_data": {"vm_name": "vm-1"},
+                }
+            ]
+        )
         strategy_harness.handlers["SingleVM"] = handler
 
         op = ProviderOperation(
@@ -132,42 +141,46 @@ class TestGetInstanceStatus:
         handler.check_hosts_status_async.assert_awaited_once()
         assert result.data["instances"][0]["instance_id"] == "vm-1"
 
-    def test_vmss_provider_api_routes_status_via_handler_with_resource_mapping(self, azure_config, logger):
+    def test_vmss_provider_api_routes_status_via_handler_with_resource_mapping(
+        self, azure_config, logger
+    ):
         strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.check_hosts_status_async = AsyncMock(return_value=[
-            {
-                "instance_id": "3",
-                "status": "running",
-                "private_ip": "10.0.0.7",
-                "public_ip": None,
-                "launch_time": None,
-                "instance_type": "Standard_D4s_v5",
-                "subnet_id": "/subscriptions/.../subnets/default",
-                "vpc_id": "/subscriptions/.../virtualNetworks/test-vnet",
-                "provider_type": "azure",
-                "provider_data": {
-                    "vmss_instance_id": "3",
-                    "vm_id": "vm-guid-3",
+        handler.check_hosts_status_async = AsyncMock(
+            return_value=[
+                {
+                    "instance_id": "3",
+                    "status": "running",
+                    "private_ip": "10.0.0.7",
+                    "public_ip": None,
+                    "launch_time": None,
+                    "instance_type": "Standard_D4s_v5",
+                    "subnet_id": "/subscriptions/.../subnets/default",
+                    "vpc_id": "/subscriptions/.../virtualNetworks/test-vnet",
+                    "provider_type": "azure",
+                    "provider_data": {
+                        "vmss_instance_id": "3",
+                        "vm_id": "vm-guid-3",
+                    },
                 },
-            },
-            {
-                "instance_id": "9",
-                "status": "running",
-                "private_ip": "10.0.0.9",
-                "public_ip": None,
-                "launch_time": None,
-                "instance_type": "Standard_D4s_v5",
-                "subnet_id": "/subscriptions/.../subnets/default",
-                "vpc_id": "/subscriptions/.../virtualNetworks/test-vnet",
-                "provider_type": "azure",
-                "provider_data": {
-                    "vmss_instance_id": "9",
-                    "vm_id": "vm-guid-9",
+                {
+                    "instance_id": "9",
+                    "status": "running",
+                    "private_ip": "10.0.0.9",
+                    "public_ip": None,
+                    "launch_time": None,
+                    "instance_type": "Standard_D4s_v5",
+                    "subnet_id": "/subscriptions/.../subnets/default",
+                    "vpc_id": "/subscriptions/.../virtualNetworks/test-vnet",
+                    "provider_type": "azure",
+                    "provider_data": {
+                        "vmss_instance_id": "9",
+                        "vm_id": "vm-guid-9",
+                    },
                 },
-            },
-        ])
+            ]
+        )
         strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
@@ -187,27 +200,31 @@ class TestGetInstanceStatus:
         handler.check_hosts_status_async.assert_awaited_once()
         assert [m["instance_id"] for m in result.data["instances"]] == ["3"]
 
-    def test_vmss_resource_mapping_routes_status_via_handler_with_provider_api(self, azure_config, logger):
+    def test_vmss_resource_mapping_routes_status_via_handler_with_provider_api(
+        self, azure_config, logger
+    ):
         strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.check_hosts_status_async = AsyncMock(return_value=[
-            {
-                "instance_id": "3",
-                "status": "running",
-                "private_ip": "10.0.0.7",
-                "public_ip": None,
-                "launch_time": None,
-                "instance_type": "Standard_D4s_v5",
-                "subnet_id": "/subscriptions/.../subnets/default",
-                "vpc_id": "/subscriptions/.../virtualNetworks/test-vnet",
-                "provider_type": "azure",
-                "provider_data": {
-                    "vmss_instance_id": "3",
-                    "vm_id": "vm-guid-3",
-                },
-            }
-        ])
+        handler.check_hosts_status_async = AsyncMock(
+            return_value=[
+                {
+                    "instance_id": "3",
+                    "status": "running",
+                    "private_ip": "10.0.0.7",
+                    "public_ip": None,
+                    "launch_time": None,
+                    "instance_type": "Standard_D4s_v5",
+                    "subnet_id": "/subscriptions/.../subnets/default",
+                    "vpc_id": "/subscriptions/.../virtualNetworks/test-vnet",
+                    "provider_type": "azure",
+                    "provider_data": {
+                        "vmss_instance_id": "3",
+                        "vm_id": "vm-guid-3",
+                    },
+                }
+            ]
+        )
         strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
@@ -231,10 +248,12 @@ class TestGetInstanceStatus:
         strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.check_hosts_status_async = AsyncMock(side_effect=CycleCloudConnectionError(
-            "cyclecloud auth failed",
-            url="https://cc.example.com",
-        ))
+        handler.check_hosts_status_async = AsyncMock(
+            side_effect=CycleCloudConnectionError(
+                "cyclecloud auth failed",
+                url="https://cc.example.com",
+            )
+        )
         strategy_harness.handlers["CycleCloud"] = handler
 
         op = ProviderOperation(
@@ -260,25 +279,27 @@ class TestGetInstanceStatus:
     def test_status_preserves_handler_identity_fields(self, strategy_harness):
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.check_hosts_status_async = AsyncMock(return_value=[
-            {
-                "instance_id": "vm-1",
-                "status": "running",
-                "private_ip": "10.0.0.4",
-                "public_ip": None,
-                "instance_type": "Standard_D4s_v5",
-                "subnet_id": (
-                    "/subscriptions/sub/resourceGroups/test-rg/providers/"
-                    "Microsoft.Network/virtualNetworks/test-vnet/subnets/default"
-                ),
-                "vpc_id": (
-                    "/subscriptions/sub/resourceGroups/test-rg/providers/"
-                    "Microsoft.Network/virtualNetworks/test-vnet"
-                ),
-                "provider_type": "azure",
-                "provider_data": {"vm_name": "vm-1"},
-            }
-        ])
+        handler.check_hosts_status_async = AsyncMock(
+            return_value=[
+                {
+                    "instance_id": "vm-1",
+                    "status": "running",
+                    "private_ip": "10.0.0.4",
+                    "public_ip": None,
+                    "instance_type": "Standard_D4s_v5",
+                    "subnet_id": (
+                        "/subscriptions/sub/resourceGroups/test-rg/providers/"
+                        "Microsoft.Network/virtualNetworks/test-vnet/subnets/default"
+                    ),
+                    "vpc_id": (
+                        "/subscriptions/sub/resourceGroups/test-rg/providers/"
+                        "Microsoft.Network/virtualNetworks/test-vnet"
+                    ),
+                    "provider_type": "azure",
+                    "provider_data": {"vm_name": "vm-1"},
+                }
+            ]
+        )
         strategy_harness.handlers["SingleVM"] = handler
 
         op = ProviderOperation(
@@ -322,14 +343,16 @@ class TestGetInstanceStatus:
         strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.check_hosts_status_async = AsyncMock(return_value=[
-            {
-                "instance_id": "3",
-                "status": "running",
-                "provider_type": "azure",
-                "provider_data": {"vmss_instance_id": "3"},
-            }
-        ])
+        handler.check_hosts_status_async = AsyncMock(
+            return_value=[
+                {
+                    "instance_id": "3",
+                    "status": "running",
+                    "provider_type": "azure",
+                    "provider_data": {"vmss_instance_id": "3"},
+                }
+            ]
+        )
         strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
@@ -487,9 +510,11 @@ class TestDescribeResourceInstances:
     ):
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.check_hosts_status_async = AsyncMock(side_effect=RuntimeError(
-            "Failed to list instances for VMSS 'vmss-demo': transient ARM failure"
-        ))
+        handler.check_hosts_status_async = AsyncMock(
+            side_effect=RuntimeError(
+                "Failed to list instances for VMSS 'vmss-demo': transient ARM failure"
+            )
+        )
         strategy_harness.handlers["VMSS"] = handler
         strategy_harness.resource_manager = MagicMock()
 
@@ -792,27 +817,28 @@ class TestDescribeResourceInstances:
         assert forwarded_request.metadata["cyclecloud_url"] == "https://cc.example.com"
         assert forwarded_request.metadata["cyclecloud_auth_mode"] == "bearer"
         assert (
-            forwarded_request.metadata["cyclecloud_aad_scope"]
-            == "https://cc.example.com/.default"
+            forwarded_request.metadata["cyclecloud_aad_scope"] == "https://cc.example.com/.default"
         )
         assert forwarded_request.metadata["cyclecloud_verify_ssl"] is False
 
     def test_get_instance_status_matches_cyclecloud_node_name_alias(self, strategy_harness):
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.check_hosts_status_async = AsyncMock(return_value=[
-            {
-                "instance_id": "6ecc44d4-417d-41e4-a729-3d504d651fd3",
-                "name": "dynamic-1",
-                "status": "running",
-                "provider_type": "azure",
-                "provider_data": {
-                    "cluster_name": "contoso-slurm-lab-cluster",
-                    "node_id": "6ecc44d4-417d-41e4-a729-3d504d651fd3",
-                    "node_name": "dynamic-1",
-                },
-            }
-        ])
+        handler.check_hosts_status_async = AsyncMock(
+            return_value=[
+                {
+                    "instance_id": "6ecc44d4-417d-41e4-a729-3d504d651fd3",
+                    "name": "dynamic-1",
+                    "status": "running",
+                    "provider_type": "azure",
+                    "provider_data": {
+                        "cluster_name": "contoso-slurm-lab-cluster",
+                        "node_id": "6ecc44d4-417d-41e4-a729-3d504d651fd3",
+                        "node_name": "dynamic-1",
+                    },
+                }
+            ]
+        )
         strategy_harness.handlers["CycleCloud"] = handler
 
         op = ProviderOperation(

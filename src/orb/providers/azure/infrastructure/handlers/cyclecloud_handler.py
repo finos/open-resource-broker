@@ -274,15 +274,12 @@ def _extract_cyclecloud_node_errors(
     """Extract structured node errors from CycleCloud node payloads."""
     parsed_node = _parse_cyclecloud_node(node)
     if parsed_node.state == "Unknown" and (
-        node.get("status") not in (None, "")
-        or node.get("id") not in (None, "")
+        node.get("status") not in (None, "") or node.get("id") not in (None, "")
     ):
         parsed_node = _parse_cyclecloud_node_result(node)
 
     message = parsed_node.error_message
-    error_code = parsed_node.error_code or (
-        "NodeFailed" if parsed_node.state == "Failed" else None
-    )
+    error_code = parsed_node.error_code or ("NodeFailed" if parsed_node.state == "Failed" else None)
 
     if not error_code and not message:
         return []
@@ -291,9 +288,7 @@ def _extract_cyclecloud_node_errors(
 
     node_error: ProviderErrorEntry = {
         "error_code": str(error_code or "CycleCloudNodeError"),
-        "error_message": str(
-            message or f"CycleCloud node entered state {parsed_node.state}"
-        ),
+        "error_message": str(message or f"CycleCloud node entered state {parsed_node.state}"),
         "resource_id": cluster_name,
         "node_array": node_array,
         "cc_state": parsed_node.state,
@@ -777,9 +772,7 @@ class CycleCloudHandler(AzureHandler):
             )
 
         if not cyclecloud_request_id:
-            message = (
-                f"CycleCloud request identity is required for status check in cluster '{cluster_name}'"
-            )
+            message = f"CycleCloud request identity is required for status check in cluster '{cluster_name}'"
             self._logger.error(message)
             raise CycleCloudConnectionError(
                 message,
@@ -885,8 +878,7 @@ class CycleCloudHandler(AzureHandler):
             )
         except CycleCloudConnectionError as exc:
             raise TerminationError(
-                f"Failed to terminate nodes from CycleCloud cluster "
-                f"'{cluster_name}': {exc}",
+                f"Failed to terminate nodes from CycleCloud cluster '{cluster_name}': {exc}",
                 resource_ids=machine_ids,
             ) from exc
 
@@ -897,8 +889,7 @@ class CycleCloudHandler(AzureHandler):
         acquire_request = self._prepare_acquire_request(request=request, template=template)
 
         self._logger.info(
-            "Adding %d node(s) to CycleCloud cluster '%s' node array '%s' "
-            "(vm_size=%s)",
+            "Adding %d node(s) to CycleCloud cluster '%s' node array '%s' (vm_size=%s)",
             acquire_request.count,
             acquire_request.cluster_name,
             acquire_request.node_array,

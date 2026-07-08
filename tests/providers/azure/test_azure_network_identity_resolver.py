@@ -18,10 +18,7 @@ class TestArmResourceIdParser:
     def test_extract_resource_group_and_name_rejects_incomplete_ids(self):
         parser = ArmResourceIdParser()
 
-        assert (
-            parser.extract_resource_group_and_name("/subscriptions/sub/resourceGroups")
-            is None
-        )
+        assert parser.extract_resource_group_and_name("/subscriptions/sub/resourceGroups") is None
 
     def test_extract_resource_group_and_name_rejects_malformed_ids(self):
         parser = ArmResourceIdParser()

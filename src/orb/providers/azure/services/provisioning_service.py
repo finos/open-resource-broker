@@ -15,9 +15,11 @@ from orb.providers.azure.infrastructure.handlers.azure_handler import (
 )
 from orb.providers.base.strategy import ProviderOperation, ProviderResult
 
+
 @dataclass
 class CreateOperationContext:
     """Context object encapsulating all necessary information for handling a create operation."""
+
     template_config: dict[str, Any]
     count: int
     provider_api: AzureProviderApi
@@ -30,9 +32,11 @@ def get_create_template_config(operation: ProviderOperation) -> dict[str, Any]:
     """Extract the template configuration from the provider operation."""
     return dict(operation.parameters.get("template_config") or {})
 
+
 def get_create_count(operation: ProviderOperation) -> int:
     """Extract the instance count from the provider operation."""
     return operation.parameters.get("count", 1)
+
 
 def validate_create_template_config(
     template_config: dict[str, Any],
@@ -45,9 +49,11 @@ def validate_create_template_config(
         error_code="MISSING_TEMPLATE_CONFIG",
     )
 
+
 def provider_api_key(provider_api: AzureProviderApi) -> str:
     """Get the string key for the provider API value."""
     return provider_api.value
+
 
 def resolve_create_provider_api(
     template_config: dict[str, Any],
@@ -68,6 +74,7 @@ def resolve_create_provider_api(
         f"Invalid Azure provider_api: {provider_api!r}",
         error_code="INVALID_PROVIDER_API",
     )
+
 
 def create_instances_dry_run_result(
     create_context: CreateOperationContext,

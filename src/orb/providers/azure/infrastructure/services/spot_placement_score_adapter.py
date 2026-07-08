@@ -93,9 +93,7 @@ class AzureSpotPlacementScoreAdapter(SpotPlacementScoreAdapter):
     ) -> tuple[list[str], list[str], list[str], list[PlacementCandidate]]:
         """Build spot-placement API inputs and matching planner candidates."""
         vm_sizes = template.candidate_vm_sizes
-        regions = template.placement_regions or [
-            template.location.value or self._base_location
-        ]
+        regions = template.placement_regions or [template.location.value or self._base_location]
         zones = template.placement_zones or template.zones or []
         candidates = [
             PlacementCandidate(
@@ -152,9 +150,7 @@ class AzureSpotPlacementScoreAdapter(SpotPlacementScoreAdapter):
                 response.raise_for_status()
                 response_payload = response.json()
         except Exception as exc:
-            self._logger.warning(
-                "Azure spot placement score lookup failed: %s", exc, exc_info=True
-            )
+            self._logger.warning("Azure spot placement score lookup failed: %s", exc, exc_info=True)
             return {}
 
         placement_scores = response_payload.get("placementScores", [])

@@ -24,6 +24,7 @@ from orb.providers.azure.infrastructure.services.spot_placement_score_adapter im
 from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
 from tests.providers.azure.strategy_test_support import build_strategy_harness, run_operation
 
+
 class TestCreateInstances:
     def test_missing_template_config_returns_error(self, strategy):
         op = ProviderOperation(
@@ -44,9 +45,7 @@ class TestCreateInstances:
                     "vm_size": "Standard_D4s_v5",
                     "resource_group": "test-rg",
                     "location": "eastus2",
-                    "ssh_public_keys": [
-                        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"
-                    ],
+                    "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
                     "image": {
                         "publisher": "Canonical",
                         "offer": "0001-com-ubuntu-server-jammy",
@@ -79,9 +78,7 @@ class TestCreateInstances:
                     "vm_size": "Standard_D4s_v5",
                     "resource_group": "test-rg",
                     "location": "eastus2",
-                    "ssh_public_keys": [
-                        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"
-                    ],
+                    "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
                     "image": {
                         "publisher": "Canonical",
                         "offer": "0001-com-ubuntu-server-jammy",
@@ -113,12 +110,14 @@ class TestCreateInstances:
         )
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.acquire_hosts_async = AsyncMock(return_value={
-            "success": True,
-            "resource_ids": ["vmss-demo"],
-            "instances": [],
-            "provider_data": {"resource_group": "test-rg"},
-        })
+        handler.acquire_hosts_async = AsyncMock(
+            return_value={
+                "success": True,
+                "resource_ids": ["vmss-demo"],
+                "instances": [],
+                "provider_data": {"resource_group": "test-rg"},
+            }
+        )
         strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
@@ -130,9 +129,7 @@ class TestCreateInstances:
                     "vm_size": "Standard_D4s_v5",
                     "resource_group": "test-rg",
                     "location": "eastus2",
-                    "ssh_public_keys": [
-                        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"
-                    ],
+                    "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
                     "image": {
                         "publisher": "Canonical",
                         "offer": "0001-com-ubuntu-server-jammy",
@@ -151,18 +148,18 @@ class TestCreateInstances:
         assert result.data["resource_ids"] == ["vmss-demo"]
 
     @pytest.mark.parametrize("provider_api", ["VMSS", "SingleVM"])
-    def test_create_instances_rejects_missing_vm_size(
-        self, azure_config, logger, provider_api
-    ):
+    def test_create_instances_rejects_missing_vm_size(self, azure_config, logger, provider_api):
         strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.acquire_hosts_async = AsyncMock(return_value={
-            "success": True,
-            "resource_ids": ["azure-resource"],
-            "instances": [],
-            "provider_data": {"resource_group": "test-rg"},
-        })
+        handler.acquire_hosts_async = AsyncMock(
+            return_value={
+                "success": True,
+                "resource_ids": ["azure-resource"],
+                "instances": [],
+                "provider_data": {"resource_group": "test-rg"},
+            }
+        )
         strategy_harness.handlers[provider_api] = handler
 
         op = ProviderOperation(
@@ -171,9 +168,7 @@ class TestCreateInstances:
                 "template_config": {
                     "template_id": "azure-minimal-test",
                     "provider_api": provider_api,
-                    "ssh_public_keys": [
-                        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"
-                    ],
+                    "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
                     "image": {
                         "publisher": "Canonical",
                         "offer": "0001-com-ubuntu-server-jammy",
@@ -197,11 +192,13 @@ class TestCreateInstances:
         strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.acquire_hosts_async = AsyncMock(return_value={
-            "success": True,
-            "resource_ids": ["azure-resource"],
-            "instances": [],
-        })
+        handler.acquire_hosts_async = AsyncMock(
+            return_value={
+                "success": True,
+                "resource_ids": ["azure-resource"],
+                "instances": [],
+            }
+        )
         strategy_harness.handlers["VMSS"] = handler
 
         azure_template = AzureTemplate(
@@ -239,11 +236,13 @@ class TestCreateInstances:
         strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.acquire_hosts_async = AsyncMock(return_value={
-            "success": True,
-            "resource_ids": ["azure-resource"],
-            "instances": [],
-        })
+        handler.acquire_hosts_async = AsyncMock(
+            return_value={
+                "success": True,
+                "resource_ids": ["azure-resource"],
+                "instances": [],
+            }
+        )
         strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
@@ -258,9 +257,7 @@ class TestCreateInstances:
                         "resource_group": "template-rg",
                         "location": "westus2",
                         "vm_size": "Standard_B1s",
-                        "ssh_public_keys": [
-                            "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCu"
-                        ],
+                        "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCu"],
                         "node_attributes": {},
                     },
                 },
@@ -280,11 +277,13 @@ class TestCreateInstances:
         strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.acquire_hosts_async = AsyncMock(return_value={
-            "success": True,
-            "resource_ids": ["azure-resource"],
-            "instances": [],
-        })
+        handler.acquire_hosts_async = AsyncMock(
+            return_value={
+                "success": True,
+                "resource_ids": ["azure-resource"],
+                "instances": [],
+            }
+        )
         strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
@@ -313,11 +312,13 @@ class TestCreateInstances:
         strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.acquire_hosts_async = AsyncMock(return_value={
-            "success": True,
-            "resource_ids": ["vmss-demo"],
-            "instances": [],
-        })
+        handler.acquire_hosts_async = AsyncMock(
+            return_value={
+                "success": True,
+                "resource_ids": ["vmss-demo"],
+                "instances": [],
+            }
+        )
         strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
@@ -329,9 +330,7 @@ class TestCreateInstances:
                     "vm_size": "Standard_D4s_v5",
                     "resource_group": "test-rg",
                     "location": "eastus2",
-                    "ssh_public_keys": [
-                        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"
-                    ],
+                    "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
                     "image": {
                         "publisher": "Canonical",
                         "offer": "0001-com-ubuntu-server-jammy",
@@ -351,10 +350,12 @@ class TestCreateInstances:
     def test_create_instances_preserves_azure_validation_failures(self, strategy_harness):
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.acquire_hosts_async = AsyncMock(side_effect=AzureValidationError(
-            "VM size is not available in this region",
-            error_code="SkuNotAvailable",
-        ))
+        handler.acquire_hosts_async = AsyncMock(
+            side_effect=AzureValidationError(
+                "VM size is not available in this region",
+                error_code="SkuNotAvailable",
+            )
+        )
         strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
@@ -366,9 +367,7 @@ class TestCreateInstances:
                     "vm_size": "Standard_D4s_v5",
                     "resource_group": "test-rg",
                     "location": "eastus2",
-                    "ssh_public_keys": [
-                        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"
-                    ],
+                    "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
                     "image": {
                         "publisher": "Canonical",
                         "offer": "0001-com-ubuntu-server-jammy",
@@ -408,9 +407,7 @@ class TestCreateInstances:
                     "location": "eastus2",
                     "network_config": None,
                     "subnet_ids": [],
-                    "ssh_public_keys": [
-                        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"
-                    ],
+                    "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
                     "image": {
                         "publisher": "Canonical",
                         "offer": "0001-com-ubuntu-server-jammy",
@@ -537,19 +534,21 @@ class TestTerminateInstances:
         strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.release_hosts_async = AsyncMock(return_value={
-            "provider_data": {
-                "pending_resource_cleanup": {
-                    "resource_group": "test-rg",
-                    "vmss_name": "vmss-prod-b",
-                    "machine_ids": ["orb-1"],
-                    "delete_vmss_when_empty": False,
-                    "member_delete_submitted": True,
-                    "delete_submitted": False,
-                    "delete_retry_pending": False,
+        handler.release_hosts_async = AsyncMock(
+            return_value={
+                "provider_data": {
+                    "pending_resource_cleanup": {
+                        "resource_group": "test-rg",
+                        "vmss_name": "vmss-prod-b",
+                        "machine_ids": ["orb-1"],
+                        "delete_vmss_when_empty": False,
+                        "member_delete_submitted": True,
+                        "delete_submitted": False,
+                        "delete_retry_pending": False,
+                    }
                 }
             }
-        })
+        )
         strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
@@ -586,34 +585,36 @@ class TestTerminateInstances:
         strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.release_hosts_async = AsyncMock(side_effect=[
-            {
-                "provider_data": {
-                    "pending_resource_cleanup": {
-                        "resource_group": "test-rg",
-                        "vmss_name": "vmss-prod-b",
-                        "machine_ids": ["orb-1"],
-                        "delete_vmss_when_empty": False,
-                        "member_delete_submitted": True,
-                        "delete_submitted": False,
-                        "delete_retry_pending": False,
+        handler.release_hosts_async = AsyncMock(
+            side_effect=[
+                {
+                    "provider_data": {
+                        "pending_resource_cleanup": {
+                            "resource_group": "test-rg",
+                            "vmss_name": "vmss-prod-b",
+                            "machine_ids": ["orb-1"],
+                            "delete_vmss_when_empty": False,
+                            "member_delete_submitted": True,
+                            "delete_submitted": False,
+                            "delete_retry_pending": False,
+                        }
                     }
-                }
-            },
-            {
-                "provider_data": {
-                    "pending_resource_cleanup": {
-                        "resource_group": "test-rg",
-                        "vmss_name": "vmss-prod-b",
-                        "machine_ids": ["orb-2"],
-                        "delete_vmss_when_empty": False,
-                        "member_delete_submitted": True,
-                        "delete_submitted": False,
-                        "delete_retry_pending": False,
+                },
+                {
+                    "provider_data": {
+                        "pending_resource_cleanup": {
+                            "resource_group": "test-rg",
+                            "vmss_name": "vmss-prod-b",
+                            "machine_ids": ["orb-2"],
+                            "delete_vmss_when_empty": False,
+                            "member_delete_submitted": True,
+                            "delete_submitted": False,
+                            "delete_retry_pending": False,
+                        }
                     }
-                }
-            },
-        ])
+                },
+            ]
+        )
         strategy_harness.handlers["VMSS"] = handler
 
         first_op = ProviderOperation(
@@ -672,10 +673,12 @@ class TestTerminateInstances:
     def test_terminate_instances_preserves_provider_failures(self, strategy_harness):
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.release_hosts_async = AsyncMock(side_effect=TerminationError(
-            "Azure rejected the delete request",
-            resource_ids=["vmss-prod-b"],
-        ))
+        handler.release_hosts_async = AsyncMock(
+            side_effect=TerminationError(
+                "Azure rejected the delete request",
+                resource_ids=["vmss-prod-b"],
+            )
+        )
         strategy_harness.handlers["VMSS"] = handler
 
         op = ProviderOperation(
@@ -747,7 +750,9 @@ class TestTerminateInstances:
         )
         assert result.metadata["termination_follow_up_pending"] is True
 
-    def test_terminate_instances_forwards_cyclecloud_secret_reference_request_metadata(self, azure_config, logger):
+    def test_terminate_instances_forwards_cyclecloud_secret_reference_request_metadata(
+        self, azure_config, logger
+    ):
         strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
         strategy = strategy_harness.strategy
         handler = MagicMock()
@@ -790,7 +795,9 @@ class TestTerminateInstances:
             ),
         )
 
-    def test_terminate_instances_uses_cyclecloud_context_from_request_metadata(self, azure_config, logger):
+    def test_terminate_instances_uses_cyclecloud_context_from_request_metadata(
+        self, azure_config, logger
+    ):
         strategy_harness = build_strategy_harness(
             config=azure_config,
             logger=logger,
@@ -873,11 +880,13 @@ class TestSpotPlacementPlanning:
     ):
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.acquire_hosts_async = AsyncMock(return_value={
-            "success": False,
-            "error_message": "AllocationFailed: No capacity in selected zone",
-            "provider_data": {"error_codes": ["AllocationFailed"]},
-        })
+        handler.acquire_hosts_async = AsyncMock(
+            return_value={
+                "success": False,
+                "error_message": "AllocationFailed: No capacity in selected zone",
+                "provider_data": {"error_codes": ["AllocationFailed"]},
+            }
+        )
         strategy_harness.handlers["VMSS"] = handler
 
         monkeypatch.setattr(
@@ -992,11 +1001,13 @@ class TestSpotPlacementPlanning:
     ):
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.acquire_hosts_async = AsyncMock(return_value={
-            "success": False,
-            "error_message": "insufficient capacity",
-            "provider_data": {"error_codes": ["OtherFailure"]},
-        })
+        handler.acquire_hosts_async = AsyncMock(
+            return_value={
+                "success": False,
+                "error_message": "insufficient capacity",
+                "provider_data": {"error_codes": ["OtherFailure"]},
+            }
+        )
         strategy_harness.handlers["VMSS"] = handler
 
         monkeypatch.setattr(
@@ -1057,14 +1068,16 @@ class TestSpotPlacementPlanning:
     def test_create_instances_uses_planned_handler_path(self, strategy_harness, monkeypatch):
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.acquire_hosts_async = AsyncMock(side_effect=[
-            {
-                "success": False,
-                "error_message": "AllocationFailed: No capacity in selected zone",
-                "provider_data": {"error_codes": ["AllocationFailed"]},
-            },
-            {"success": True, "resource_ids": ["vmss-b"], "instances": []},
-        ])
+        handler.acquire_hosts_async = AsyncMock(
+            side_effect=[
+                {
+                    "success": False,
+                    "error_message": "AllocationFailed: No capacity in selected zone",
+                    "provider_data": {"error_codes": ["AllocationFailed"]},
+                },
+                {"success": True, "resource_ids": ["vmss-b"], "instances": []},
+            ]
+        )
         strategy_harness.handlers["VMSS"] = handler
 
         monkeypatch.setattr(
@@ -1130,16 +1143,16 @@ class TestSpotPlacementPlanning:
         assert result.metadata["method"] == "planned_handler"
         assert result.metadata["provider_data"]["unfulfilled_count"] == 0
 
-    def test_create_instances_falls_back_when_scores_are_stale(
-        self, strategy_harness, monkeypatch
-    ):
+    def test_create_instances_falls_back_when_scores_are_stale(self, strategy_harness, monkeypatch):
         strategy = strategy_harness.strategy
         handler = MagicMock()
-        handler.acquire_hosts_async = AsyncMock(return_value={
-            "success": True,
-            "resource_ids": ["vmss-fallback"],
-            "instances": [],
-        })
+        handler.acquire_hosts_async = AsyncMock(
+            return_value={
+                "success": True,
+                "resource_ids": ["vmss-fallback"],
+                "instances": [],
+            }
+        )
         strategy_harness.handlers["VMSS"] = handler
 
         monkeypatch.setattr(

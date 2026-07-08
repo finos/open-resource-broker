@@ -261,7 +261,10 @@ class TestCycleCloudHandlerAcquire:
         assert result["resource_ids"] == ["req-12345678-1234-1234-1234-123456789012"]
         assert result["provider_data"]["cluster_name"] == "my-cluster"
         assert result["provider_data"]["operation_id"] == "op-123"
-        assert result["provider_data"]["operation_location"] == "https://cc.example.com/operations/op-123"
+        assert (
+            result["provider_data"]["operation_location"]
+            == "https://cc.example.com/operations/op-123"
+        )
         assert result["provider_data"]["added_count"] == 2
         assert result["provider_data"]["submitted_count"] == 2
         assert result["provider_data"]["operation_status"] == "submitted"
@@ -288,7 +291,9 @@ class TestCycleCloudHandlerAcquire:
                 {
                     "body": {
                         "operationId": "op-123",
-                        "sets": [{"added": 2, "nodes": [{"name": "node-1", "status": "Acquiring"}]}],
+                        "sets": [
+                            {"added": 2, "nodes": [{"name": "node-1", "status": "Acquiring"}]}
+                        ],
                     },
                     "headers": {"Location": "https://cc.example.com/operations/op-123"},
                 },
@@ -415,7 +420,9 @@ class TestCycleCloudHandlerStatus:
         handler = _make_handler()
         _wire_async_cyclecloud_calls(
             handler,
-            responses=[CycleCloudConnectionError("Cannot connect to CycleCloud at x: boom", url="x")],
+            responses=[
+                CycleCloudConnectionError("Cannot connect to CycleCloud at x: boom", url="x")
+            ],
         )
         handler._cc_request_async.side_effect = CycleCloudConnectionError(
             "Cannot connect to CycleCloud at https://cc.example.com: boom",
@@ -445,7 +452,9 @@ class TestCycleCloudHandlerStatus:
         session_context = MagicMock()
         session_context.client = object()
         session_context.base_url = "https://cc.example.com"
-        handler._async_cc_session_scope = MagicMock(return_value=_AsyncContextManager(session_context))
+        handler._async_cc_session_scope = MagicMock(
+            return_value=_AsyncContextManager(session_context)
+        )
         handler._cc_request_async = AsyncMock(
             return_value={
                 "nodes": [
@@ -530,10 +539,10 @@ class TestCycleCloudHandlerRelease:
         session_context = MagicMock()
         session_context.client = object()
         session_context.base_url = "https://cc.example.com"
-        handler._async_cc_session_scope = MagicMock(return_value=_AsyncContextManager(session_context))
-        handler._resolve_release_node_targets_async = AsyncMock(
-            return_value={"names": ["node-1"]}
+        handler._async_cc_session_scope = MagicMock(
+            return_value=_AsyncContextManager(session_context)
         )
+        handler._resolve_release_node_targets_async = AsyncMock(return_value={"names": ["node-1"]})
         handler._cc_request_async = AsyncMock(
             return_value={
                 "body": {"operationId": "op-release"},
@@ -648,9 +657,7 @@ class TestCycleCloudAuthModes:
         session_context = await handler._build_async_cc_session(
             cc_url="https://cc.example.com",
             verify_ssl=True,
-            request_context=_make_cc_request_context(
-                cyclecloud_auth_mode="bearer"
-            ),
+            request_context=_make_cc_request_context(cyclecloud_auth_mode="bearer"),
         )
 
         assert session_context.base_url == "https://cc.example.com"
@@ -692,9 +699,7 @@ class TestCycleCloudAuthModes:
                 await handler._build_async_cc_session(
                     cc_url="https://cc.example.com",
                     verify_ssl=True,
-                    request_context=_make_cc_request_context(
-                        cyclecloud_auth_mode="bearer"
-                    ),
+                    request_context=_make_cc_request_context(cyclecloud_auth_mode="bearer"),
                 )
 
     @pytest.mark.asyncio
@@ -716,9 +721,7 @@ class TestCycleCloudAuthModes:
                 await handler._build_async_cc_session(
                     cc_url="https://cc.example.com",
                     verify_ssl=True,
-                    request_context=_make_cc_request_context(
-                        cyclecloud_auth_mode="none"
-                    ),
+                    request_context=_make_cc_request_context(cyclecloud_auth_mode="none"),
                 )
 
     @pytest.mark.asyncio
@@ -733,9 +736,7 @@ class TestCycleCloudAuthModes:
             async with handler._async_cc_session_scope(
                 cc_url="https://cc.example.com",
                 verify_ssl=True,
-                request_context=_make_cc_request_context(
-                    cyclecloud_auth_mode="none"
-                ),
+                request_context=_make_cc_request_context(cyclecloud_auth_mode="none"),
             ) as session_context:
                 assert session_context.base_url == "https://cc.example.com"
                 client = session_context.client

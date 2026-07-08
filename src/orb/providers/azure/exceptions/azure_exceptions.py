@@ -32,6 +32,7 @@ class AzureError(InfrastructureError):
 # Validation
 # ---------------------------------------------------------------------------
 
+
 class AzureValidationError(AzureError):
     """Raised when Azure resource validation fails."""
 
@@ -64,6 +65,7 @@ class ImageValidationError(AzureValidationError):
 # Entity not found
 # ---------------------------------------------------------------------------
 
+
 class AzureEntityNotFoundError(AzureError):
     """Raised when an Azure resource is not found."""
 
@@ -87,6 +89,7 @@ class VMSSNotFoundError(AzureEntityNotFoundError):
 # ---------------------------------------------------------------------------
 # Quotas & capacity
 # ---------------------------------------------------------------------------
+
 
 class QuotaExceededError(AzureError):
     """Raised when Azure service quotas would be exceeded."""
@@ -124,6 +127,7 @@ class ServiceQuotaError(QuotaExceededError):
 # Resource state
 # ---------------------------------------------------------------------------
 
+
 class ResourceInUseError(AzureError):
     """Raised when an Azure resource is already in use."""
 
@@ -157,6 +161,7 @@ class ResourceStateError(AzureError):
 # Authentication & authorization
 # ---------------------------------------------------------------------------
 
+
 class AuthenticationError(AzureError):
     """Raised when Azure authentication fails."""
 
@@ -187,6 +192,7 @@ class RBACError(AuthorizationError):
 # Network & rate limiting
 # ---------------------------------------------------------------------------
 
+
 class RateLimitError(AzureError):
     """Raised when Azure API rate limits are exceeded."""
 
@@ -199,6 +205,7 @@ class NetworkError(AzureError):
 # Infrastructure & configuration
 # ---------------------------------------------------------------------------
 
+
 class AzureInfrastructureError(AzureError):
     """Raised for general Azure infrastructure errors."""
 
@@ -210,6 +217,7 @@ class AzureConfigurationError(AzureError):
 # ---------------------------------------------------------------------------
 # Provisioning
 # ---------------------------------------------------------------------------
+
 
 class LaunchError(AzureError):
     """Instance / VMSS launch failed."""
@@ -316,6 +324,7 @@ class TaggingError(AzureError):
 # ---------------------------------------------------------------------------
 # CycleCloud
 # ---------------------------------------------------------------------------
+
 
 class CycleCloudError(AzureError):
     """Base class for CycleCloud-related errors."""
