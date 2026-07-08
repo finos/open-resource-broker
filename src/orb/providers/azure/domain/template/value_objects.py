@@ -14,7 +14,7 @@ from pydantic import (
     model_serializer,
 )
 
-from orb.domain.base.value_objects import AllocationStrategy, PriceType, ValueObject
+from orb.domain.base.value_objects import PriceType, ValueObject
 
 
 # ---------------------------------------------------------------------------
@@ -87,18 +87,6 @@ class AzureAllocationStrategy(str, Enum):
     LOWEST_PRICE = "LowestPrice"
     CAPACITY_OPTIMIZED = "CapacityOptimized"
     PRIORITIZED = "Prioritized"
-
-    @classmethod
-    def from_core(cls, strategy: AllocationStrategy) -> "AzureAllocationStrategy":
-        """Map a core AllocationStrategy to Azure-specific value."""
-        mapping = {
-            AllocationStrategy.LOWEST_PRICE: cls.LOWEST_PRICE,
-            AllocationStrategy.CAPACITY_OPTIMIZED: cls.CAPACITY_OPTIMIZED,
-            AllocationStrategy.CAPACITY_OPTIMIZED_PRIORITIZED: cls.PRIORITIZED,
-            AllocationStrategy.PRICE_CAPACITY_OPTIMIZED: cls.CAPACITY_OPTIMIZED,
-            AllocationStrategy.DIVERSIFIED: cls.LOWEST_PRICE,
-        }
-        return mapping.get(strategy, cls.LOWEST_PRICE)
 
     def to_arm_value(self) -> str:
         """Return the value expected by the ARM / REST API."""

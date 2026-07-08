@@ -54,7 +54,7 @@ from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureStatusProviderData,
     AzureReleaseHostsResult,
 )
-from orb.providers.infrastructure.error_codes import (
+from orb.providers.azure.infrastructure.error_codes import (
     ProviderErrorEntry,
     collect_provider_error_codes,
 )

@@ -10,13 +10,39 @@ from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureReleaseContext,
     RAISE_ON_STATUS_ERROR_METADATA_KEY,
 )
-from orb.providers.azure.infrastructure.handlers.single_vm_handler import SingleVMHandler
+from orb.providers.azure.infrastructure.handlers.single_vm_handler import (
+    SingleVMHandler,
+    _format_azure_error_message,
+)
 from tests.providers.azure.strategy_test_support import (
     AsyncPager,
     make_azure_template,
     make_single_vm_azure_client,
     run_operation,
 )
+
+
+def test_format_azure_error_message_includes_nested_details():
+    message = _format_azure_error_message({
+        "message": "Deployment validation failed",
+        "details": [
+            {
+                "code": "InvalidParameter",
+                "message": "The supplied VM size is not available in this location.",
+            }
+        ],
+    })
+
+    assert message == (
+        "InvalidParameter: The supplied VM size is not available in this location."
+    )
+
+
+def test_format_azure_error_message_falls_back_to_primary_message():
+    assert (
+        _format_azure_error_message({"error_message": "template is invalid"})
+        == "template is invalid"
+    )
 
 
 def _make_request(*, count: int = 1, request_id: str = "req-1", metadata=None):

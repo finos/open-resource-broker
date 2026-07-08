@@ -36,7 +36,7 @@ from orb.providers.azure.services.resource_metadata_service import (
     AzureResourceMetadataService,
 )
 from orb.providers.base.strategy import ProviderOperation, ProviderResult
-from orb.providers.infrastructure.error_codes import ProviderErrorEntry
+from orb.providers.azure.infrastructure.error_codes import ProviderErrorEntry
 
 if TYPE_CHECKING:
     from orb.providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy

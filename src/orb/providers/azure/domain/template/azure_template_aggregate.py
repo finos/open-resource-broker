@@ -22,10 +22,9 @@ See: https://learn.microsoft.com/en-us/azure/virtual-machine-scale-sets/overview
 
 from typing import Any, Optional
 
-from pydantic import AliasChoices, ConfigDict, Field, model_validator
+from pydantic import AliasChoices, ConfigDict, Field, field_validator, model_validator
 
 from orb.domain.template.template_aggregate import Template
-from orb.domain.base.value_objects import AllocationStrategy
 from orb.providers.azure.domain.template.value_objects import (
     AzureAllocationStrategy,
     AzureCapacityReservationGroupId,
@@ -45,6 +44,7 @@ from orb.providers.azure.domain.template.value_objects import (
     AzureVmSizePreference,
     AzureVMSSOrchestrationMode,
 )
+from orb.providers.azure.services.spot_placement_planner import PlacementSplitStrategy
 
 
 
@@ -129,6 +129,11 @@ class AzureTemplate(Template):
         description="Primary Azure VM size, e.g. 'Standard_D4s_v5'.",
         validation_alias=AliasChoices("vm_size", "vmSize"),
     )
+    vm_sizes: list[str] = Field(
+        default_factory=list,
+        description="Additional unranked Azure VM size candidates.",
+        validation_alias=AliasChoices("vm_sizes", "vmSizes"),
+    )
     vm_size_preferences: list[AzureVmSizePreference] = Field(
         default_factory=list,
         description=(
@@ -200,6 +205,37 @@ class AzureTemplate(Template):
         default=None,
         description="ISO 8601 duration for spot restore timeout, e.g. 'PT1H'.",
         validation_alias=AliasChoices("spot_restore_timeout", "spotRestoreTimeout"),
+    )
+    spot_placement_score_enabled: bool = Field(
+        default=False,
+        description="Enable Azure Spot Placement Score planning before launch.",
+        validation_alias=AliasChoices(
+            "spot_placement_score_enabled", "spotPlacementScoreEnabled"
+        ),
+    )
+    placement_split_strategy: PlacementSplitStrategy = Field(
+        default=PlacementSplitStrategy.HYBRID,
+        description="How spot placement score launches split capacity across candidates.",
+        validation_alias=AliasChoices("placement_split_strategy", "placementSplitStrategy"),
+    )
+    placement_primary_share_percent: int = Field(
+        default=80,
+        ge=0,
+        le=100,
+        description="Capacity percentage assigned to the top spot placement candidate.",
+        validation_alias=AliasChoices(
+            "placement_primary_share_percent", "placementPrimarySharePercent"
+        ),
+    )
+    placement_regions: list[str] = Field(
+        default_factory=list,
+        description="Azure regions considered for spot placement score planning.",
+        validation_alias=AliasChoices("placement_regions", "placementRegions"),
+    )
+    placement_zones: list[str] = Field(
+        default_factory=list,
+        description="Azure zones considered for spot placement score planning.",
+        validation_alias=AliasChoices("placement_zones", "placementZones"),
     )
 
     # ------------------------------------------------------------------
@@ -404,6 +440,10 @@ class AzureTemplate(Template):
         description="AAD scope used to resolve a bearer token for CycleCloud.",
         validation_alias=AliasChoices("cyclecloud_aad_scope", "cyclecloudAadScope"),
     )
+    version: Optional[str] = Field(
+        default=None,
+        description="Template catalog or DTO version metadata.",
+    )
 
     # ------------------------------------------------------------------
     # Initialisation
@@ -417,6 +457,14 @@ class AzureTemplate(Template):
     # ------------------------------------------------------------------
     # Validators
     # ------------------------------------------------------------------
+
+    @field_validator("vm_sizes", mode="before")
+    @classmethod
+    def normalize_vm_sizes(cls, value: Any) -> Any:
+        """Accept HostFactory ``vmTypes`` dictionaries as Azure VM size lists."""
+        if isinstance(value, dict):
+            return [str(vm_size) for vm_size in value.keys()]
+        return value
 
     @model_validator(mode="before")
     @classmethod
@@ -438,6 +486,17 @@ class AzureTemplate(Template):
             return data
 
         data = dict(data)
+        raw_provider_config = data.pop("provider_config", None)
+        if raw_provider_config is not None:
+            if hasattr(raw_provider_config, "model_dump"):
+                provider_config = raw_provider_config.model_dump(mode="json")
+            elif isinstance(raw_provider_config, dict):
+                provider_config = dict(raw_provider_config)
+            else:
+                provider_config = {}
+            for key, value in provider_config.items():
+                if value is not None and data.get(key) in (None, ""):
+                    data[key] = value
 
         location = data.get("location")
         region = data.get("region")
@@ -458,12 +517,16 @@ class AzureTemplate(Template):
                 data["max_instances"] = data["max_number"]
             data.pop("max_number", None)
 
-        if data.get("allocation_strategy") in (None, ""):
-            data["allocation_strategy"] = (
-                AllocationStrategy.PRICE_CAPACITY_OPTIMIZED.value
-                if data.get("price_type") == "spot"
-                else AllocationStrategy.LOWEST_PRICE.value
+        if data.get("allocation_strategy") not in (None, ""):
+            raise ValueError(
+                "Azure templates do not support allocation_strategy; use "
+                "vmss_allocation_strategy for Azure VMSS instance mix or "
+                "spot_placement_score_enabled for Spot Placement Score planning"
             )
+        # The shared Template base still owns an AWS-shaped allocation_strategy
+        # field and mutates it when absent. Azure does not use that contract, so
+        # set an inert value here after rejecting explicit non-empty input.
+        data["allocation_strategy"] = ""
 
         if data.get("spot_percentage") is not None and data.get("priority") in (
             None,
@@ -495,11 +558,11 @@ class AzureTemplate(Template):
                     "provider_api 'VMSSUniform' requires orchestration_mode 'Uniform'"
                 )
 
-        if self.allocation_strategy == AllocationStrategy.SPOT_PLACEMENT_SCORE.value:
+        if self.spot_placement_score_enabled:
             candidate_sizes = self.candidate_vm_sizes
             if len(candidate_sizes) < 2:
                 raise ValueError(
-                    "spotPlacementScore allocation strategy requires at least two candidate vm sizes"
+                    "spot_placement_score_enabled requires at least two candidate vm sizes"
                 )
 
         if self.vm_sizes and self.vm_size_preferences:

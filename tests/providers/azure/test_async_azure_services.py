@@ -102,6 +102,9 @@ def resource_metadata_service() -> MagicMock:
     service = MagicMock()
     service.augment_vmss_capacity_metadata_async = AsyncMock()
     service.augment_single_vm_deployment_metadata_async = AsyncMock()
+    service.attach_provider_fulfilment.side_effect = (
+        lambda _metadata, *, instances, target_units=None: SimpleNamespace(instances=instances)
+    )
     return service
 
 

@@ -7,7 +7,7 @@ from typing import Any, Protocol
 
 import httpx
 
-from orb.application.services.spot_placement_planner import (
+from orb.providers.azure.services.spot_placement_planner import (
     PlacementCandidate,
     PlacementScore,
     SpotPlacementScoreAdapter,

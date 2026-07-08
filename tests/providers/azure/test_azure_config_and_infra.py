@@ -1,5 +1,7 @@
 """Tests for Azure configuration and registration behavior."""
 
+import json
+from pathlib import Path
 import pytest
 from unittest.mock import MagicMock, Mock, patch
 
@@ -8,6 +10,7 @@ from orb.config import PerformanceConfig
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.template.factory import TemplateFactory
 from orb.infrastructure.di.container import DIContainer
+from orb.infrastructure.template.dtos import TemplateDTO
 from orb.providers.azure.configuration.config import AzureProviderConfig
 from orb.providers.azure.configuration.validator import (
     validate_azure_config,
@@ -22,6 +25,7 @@ from orb.providers.azure.registration import (
     create_azure_config,
     create_azure_strategy,
     register_azure_provider,
+    register_azure_template_factory,
 )
 from orb.providers.registry import ProviderRegistry
 
@@ -394,11 +398,54 @@ class TestAzureHandlerFactory:
 
 
 class TestTemplateExtension:
-    def test_defaults_include_vm_size(self):
+    def test_defaults_do_not_include_vm_size_without_explicit_config(self):
         ext = AzureTemplateExtensionConfig()
         defaults = ext.to_template_defaults()
-        assert "vm_size" in defaults
-        assert defaults["vm_size"] == "Standard_D4s_v5"
+        assert "vm_size" not in defaults
+
+    def test_defaults_include_explicit_vm_size(self):
+        ext = AzureTemplateExtensionConfig(vm_size="Standard_B1s")
+        defaults = ext.to_template_defaults()
+        assert defaults["vm_size"] == "Standard_B1s"
+
+    def test_defaults_preserve_spot_placement_score_fields(self):
+        ext = AzureTemplateExtensionConfig(
+            spot_placement_score_enabled=True,
+            placement_split_strategy="hybrid",
+            placement_primary_share_percent=80,
+            placement_regions=["eastus2"],
+            placement_zones=["1", "2", "3"],
+        )
+
+        defaults = ext.to_template_defaults()
+
+        assert defaults["spot_placement_score_enabled"] is True
+        assert defaults["placement_split_strategy"] == "hybrid"
+        assert defaults["placement_primary_share_percent"] == 80
+        assert defaults["placement_regions"] == ["eastus2"]
+        assert defaults["placement_zones"] == ["1", "2", "3"]
+
+    def test_template_dto_roundtrip_preserves_spot_placement_score_fields(self):
+        factory = TemplateFactory()
+        register_azure_template_factory(factory)
+        templates_path = Path(__file__).parents[3] / "config" / "templates.json"
+        raw_template = next(
+            template
+            for template in json.loads(templates_path.read_text())["templates"]
+            if template.get("template_id") == "azure-spot-placement-score-vmss"
+        )
+
+        initial_dto = TemplateDTO.from_domain(factory.create_template(raw_template))
+        roundtripped_dto = TemplateDTO.from_domain(
+            factory.create_template(initial_dto.model_dump())
+        )
+        provider_config = roundtripped_dto.to_dict()["provider_config"]
+
+        assert provider_config["spot_placement_score_enabled"] is True
+        assert provider_config["placement_split_strategy"] == "hybrid"
+        assert provider_config["placement_primary_share_percent"] == 80
+        assert provider_config["placement_regions"] == ["eastus2"]
+        assert provider_config["placement_zones"] == ["1", "2", "3"]
 
 
 class TestAzureRegistration:

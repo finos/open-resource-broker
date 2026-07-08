@@ -44,7 +44,7 @@ from orb.providers.azure.infrastructure.handlers._network_identity import (
     resolve_network_identity_or_empty_async,
 )
 from orb.providers.azure.infrastructure.vmss_cleanup import PendingVmssCleanup
-from orb.providers.infrastructure.error_codes import ProviderErrorEntry
+from orb.providers.azure.infrastructure.error_codes import ProviderErrorEntry
 from orb.providers.azure.infrastructure.handlers.azure_status import resolve_power_state
 from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureAcquireHostsResult,

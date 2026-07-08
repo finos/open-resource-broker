@@ -40,6 +40,36 @@ def test_load_strategy_defaults_includes_azure_defaults_without_provider_bootstr
     assert "azure" in defaults["provider"]["provider_defaults"]
 
 
+def test_load_strategy_defaults_includes_azure_handler_capabilities_without_provider_bootstrap():
+    """Config-based template validation must see Azure provider APIs from defaults."""
+    from orb.config.loader import ConfigurationLoader
+    from orb.config.schemas.provider_strategy_schema import ProviderConfig, ProviderInstanceConfig
+
+    with (
+        patch("orb.providers.registration.register_all_provider_types") as register_all,
+        patch("orb.providers.registry.get_provider_registry") as get_provider_registry,
+    ):
+        defaults = ConfigurationLoader._load_strategy_defaults()
+
+    register_all.assert_not_called()
+    get_provider_registry.assert_not_called()
+    provider_config = ProviderConfig.model_validate(defaults["provider"])
+    provider_instance = ProviderInstanceConfig(
+        name="azure-default",
+        type="azure",
+        enabled=True,
+        config={},
+    )
+
+    handlers = provider_instance.get_effective_handlers(
+        provider_config.provider_defaults["azure"]
+    )
+
+    assert set(handlers) == {"VMSS", "VMSSUniform", "SingleVM", "CycleCloud"}
+    assert handlers["VMSS"].model_dump()["supports_spot"] is True
+    assert handlers["CycleCloud"].model_dump()["supports_spot"] is False
+
+
 def test_register_all_provider_types_includes_azure():
     """Canonical provider bootstrap must register Azure."""
     from orb.providers.registration import register_all_provider_types

@@ -5,6 +5,49 @@ from __future__ import annotations
 from typing import Any
 
 
+def _json_response_body(response: Any) -> dict[str, Any] | None:
+    """Best-effort response JSON extraction for heterogeneous SDK responses.
+
+    Uses getattr because Azure SDK response objects do not share a typed protocol
+    for optional JSON bodies across sync and async transports.
+    """
+    if response is None:
+        return None
+    json_method = getattr(response, "json", None)
+    if not callable(json_method):
+        return None
+    try:
+        body = json_method()
+    except Exception:
+        return None
+    return body if isinstance(body, dict) else None
+
+
+def _normalise_error_details(details: Any) -> list[dict[str, Any]]:
+    """Normalise Azure nested error details from dicts or SDK error objects.
+
+    Uses getattr because nested Azure error items may be plain dictionaries or
+    SDK model instances depending on where the exception was raised.
+    """
+    if not isinstance(details, list):
+        return []
+
+    normalised: list[dict[str, Any]] = []
+    for item in details:
+        if isinstance(item, dict):
+            normalised.append(item)
+            continue
+        code = getattr(item, "code", None)
+        message = getattr(item, "message", None)
+        if code is None and message is None:
+            continue
+        normalised.append({
+            "code": str(code) if code not in (None, "") else None,
+            "message": str(message) if message not in (None, "") else None,
+        })
+    return normalised
+
+
 def extract_azure_error_details(exc: Exception) -> dict[str, Any]:
     """Extract Azure SDK error details from common exception shapes.
 
@@ -15,26 +58,49 @@ def extract_azure_error_details(exc: Exception) -> dict[str, Any]:
     """
     error = getattr(exc, "error", None)
     response = getattr(exc, "response", None)
+    exception_details = getattr(exc, "details", None)
+    response_body = _json_response_body(response)
+    response_error = response_body.get("error") if isinstance(response_body, dict) else None
 
     raw_error_code = (
         getattr(exc, "error_code", None)
         or getattr(error, "code", None)
         or getattr(exc, "code", None)
+        or (
+            exception_details.get("raw_error_code")
+            if isinstance(exception_details, dict)
+            else None
+        )
+        or (response_error.get("code") if isinstance(response_error, dict) else None)
     )
     status_code = getattr(exc, "status_code", None)
     if status_code is None and response is not None:
         status_code = getattr(response, "status_code", None)
+    if status_code is None and isinstance(exception_details, dict):
+        status_code = exception_details.get("status_code")
 
     message = (
         getattr(error, "message", None)
         or getattr(exc, "message", None)
+        or (
+            exception_details.get("error_message")
+            if isinstance(exception_details, dict)
+            else None
+        )
+        or (response_error.get("message") if isinstance(response_error, dict) else None)
         or str(exc)
     )
+    details = _normalise_error_details(getattr(error, "details", None))
+    if not details and isinstance(exception_details, dict):
+        details = _normalise_error_details(exception_details.get("details"))
+    if not details and isinstance(response_error, dict):
+        details = _normalise_error_details(response_error.get("details"))
 
     return {
         "raw_error_code": str(raw_error_code) if raw_error_code not in (None, "") else None,
         "status_code": status_code,
         "message": str(message),
+        "details": details,
     }
 
 

@@ -22,6 +22,7 @@ from orb.providers.azure.domain.template.value_objects import (
     AzureVmSizePreference,
     AzureVMSSOrchestrationMode,
 )
+from orb.providers.azure.services.spot_placement_planner import PlacementSplitStrategy
 
 
 class AzureTemplateExtensionConfig(BaseModel):
@@ -71,6 +72,21 @@ class AzureTemplateExtensionConfig(BaseModel):
     )
     spot_restore_timeout: Optional[str] = Field(
         None, description="ISO 8601 Spot Try-Restore timeout"
+    )
+    spot_placement_score_enabled: Optional[bool] = Field(
+        None, description="Enable Azure Spot Placement Score planning before launch"
+    )
+    placement_split_strategy: Optional[PlacementSplitStrategy] = Field(
+        None, description="How Spot Placement Score launches split capacity"
+    )
+    placement_primary_share_percent: Optional[int] = Field(
+        None, description="Capacity percentage assigned to the top placement candidate"
+    )
+    placement_regions: Optional[list[str]] = Field(
+        None, description="Azure regions considered for Spot Placement Score planning"
+    )
+    placement_zones: Optional[list[str]] = Field(
+        None, description="Azure zones considered for Spot Placement Score planning"
     )
     zones: Optional[list[str]] = Field(None, description="Availability zones")
     zone_balance: Optional[bool] = Field(None, description="Enable zone balancing")
@@ -146,9 +162,9 @@ class AzureTemplateExtensionConfig(BaseModel):
     )
 
     # VM configuration
-    vm_size: str = Field(
-        "Standard_D4s_v5",
-        description="Default Azure VM size",
+    vm_size: Optional[str] = Field(
+        default=None,
+        description="Explicit Azure VM size default",
     )
     vm_sizes: Optional[list[str]] = Field(
         default=None,
@@ -184,17 +200,28 @@ class AzureTemplateExtensionConfig(BaseModel):
     def to_template_defaults(self) -> dict[str, Any]:
         """Convert extension to a dict of default values for template creation."""
         defaults: dict[str, Any] = {
-            "vm_size": self.vm_size,
             "priority": self.priority,
             "admin_username": self.admin_username,
             "node_attributes": self.node_attributes,
         }
+        if self.vm_size:
+            defaults["vm_size"] = self.vm_size
         if self.vm_sizes:
             defaults["vm_sizes"] = self.vm_sizes
         if self.vm_size_preferences:
             defaults["vm_size_preferences"] = self.vm_size_preferences
         if self.vmss_allocation_strategy:
             defaults["vmss_allocation_strategy"] = self.vmss_allocation_strategy
+        if self.spot_placement_score_enabled is not None:
+            defaults["spot_placement_score_enabled"] = self.spot_placement_score_enabled
+        if self.placement_split_strategy:
+            defaults["placement_split_strategy"] = self.placement_split_strategy
+        if self.placement_primary_share_percent is not None:
+            defaults["placement_primary_share_percent"] = self.placement_primary_share_percent
+        if self.placement_regions:
+            defaults["placement_regions"] = self.placement_regions
+        if self.placement_zones:
+            defaults["placement_zones"] = self.placement_zones
         if self.os_disk_size_gb is not None:
             defaults["os_disk"] = {
                 "storage_account_type": self.os_disk_type or "Premium_LRS",

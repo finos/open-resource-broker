@@ -21,6 +21,7 @@ def test_extract_azure_error_details_reads_common_exception_shapes():
         "raw_error_code": "AllocationFailed",
         "status_code": 409,
         "message": "allocation failed in zone 1",
+        "details": [],
     }
 
 
@@ -34,6 +35,64 @@ def test_extract_azure_error_details_falls_back_to_nested_error_and_response():
         "raw_error_code": "QuotaExceeded",
         "status_code": 429,
         "message": "quota exceeded",
+        "details": [],
+    }
+
+
+def test_extract_azure_error_details_preserves_nested_arm_details():
+    exc = SimpleNamespace(
+        error=SimpleNamespace(
+            code="InvalidTemplateDeployment",
+            message="Deployment validation failed",
+            details=[
+                {
+                    "code": "InvalidParameter",
+                    "message": "The supplied VM size is not available in this location.",
+                }
+            ],
+        ),
+        response=SimpleNamespace(status_code=400),
+    )
+
+    assert extract_azure_error_details(exc) == {
+        "raw_error_code": "InvalidTemplateDeployment",
+        "status_code": 400,
+        "message": "Deployment validation failed",
+        "details": [
+            {
+                "code": "InvalidParameter",
+                "message": "The supplied VM size is not available in this location.",
+            }
+        ],
+    }
+
+
+def test_extract_azure_error_details_reads_wrapped_launch_error_details():
+    exc = SimpleNamespace(
+        error_code="InvalidRequest",
+        message="Deployment validation failed",
+        details={
+            "raw_error_code": "InvalidTemplateDeployment",
+            "status_code": 400,
+            "details": [
+                {
+                    "code": "InvalidSubnet",
+                    "message": "The subnet resource ID is invalid.",
+                }
+            ],
+        },
+    )
+
+    assert extract_azure_error_details(exc) == {
+        "raw_error_code": "InvalidRequest",
+        "status_code": 400,
+        "message": "Deployment validation failed",
+        "details": [
+            {
+                "code": "InvalidSubnet",
+                "message": "The subnet resource ID is invalid.",
+            }
+        ],
     }
 
 
