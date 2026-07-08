@@ -26,8 +26,8 @@ if TYPE_CHECKING:
     from orb.providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
     from orb.providers.registry import ProviderRegistry
 
-from orb.domain.template.extensions import TemplateExtensionRegistry
 from orb.domain.template.factory import TemplateFactory
+from orb.infrastructure.registry.template_extension_registry import TemplateExtensionRegistry
 from orb.providers.azure.configuration.template_extension import AzureTemplateExtensionConfig
 
 T = TypeVar("T")
@@ -473,7 +473,7 @@ def register_azure_provider_settings() -> None:
 def register_azure_cli_spec() -> None:
     """Register Azure CLI spec for provider add/update commands."""
     try:
-        from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
+        from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
         from orb.providers.azure.cli.azure_cli_spec import AzureCLISpec
 
         CLISpecRegistry.register("azure", AzureCLISpec())
