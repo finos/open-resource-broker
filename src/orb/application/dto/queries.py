@@ -27,11 +27,17 @@ class ListActiveRequestsQuery(Query, BaseModel):
     model_config = ConfigDict(frozen=True)
 
     provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
     status: Optional[str] = None
+    template_id: Optional[str] = None
     filter_expressions: list[str] = []
     all_resources: bool = False
     limit: Optional[int] = 50  # Default: 50, Max: 1000
     offset: Optional[int] = 0
+    # Server-side filter/sort — applied BEFORE the limit/offset slice so
+    # pagination is honest (a q-match on row 9000 is still reachable).
+    q: Optional[str] = None
+    sort: Optional[str] = None  # "+field" / "-field"; prefix optional, "-" = desc
 
 
 class ListReturnRequestsQuery(Query, BaseModel):
@@ -40,12 +46,15 @@ class ListReturnRequestsQuery(Query, BaseModel):
     model_config = ConfigDict(frozen=True)
 
     provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
     status: Optional[str] = None
     requester_id: Optional[str] = None
     machine_names: list[str] = []
     filter_expressions: list[str] = []
     limit: Optional[int] = 50  # Default: 50, Max: 1000
     offset: Optional[int] = 0
+    q: Optional[str] = None
+    sort: Optional[str] = None
 
 
 class GetTemplateQuery(Query, BaseModel):
@@ -63,11 +72,14 @@ class ListTemplatesQuery(Query, BaseModel):
     model_config = ConfigDict(frozen=True)
 
     provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
     provider_api: Optional[str] = None
     active_only: bool = True
     filter_expressions: list[str] = []
     limit: Optional[int] = 50  # Default: 50, Max: 1000
     offset: Optional[int] = 0
+    q: Optional[str] = None
+    sort: Optional[str] = None
 
 
 class ValidateTemplateQuery(Query, BaseModel):
@@ -94,6 +106,7 @@ class ListMachinesQuery(Query, BaseModel):
     model_config = ConfigDict(frozen=True)
 
     provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
     request_id: Optional[str] = None
     status: Optional[str] = None
     active_only: bool = False
@@ -102,6 +115,13 @@ class ListMachinesQuery(Query, BaseModel):
     timestamp_format: Optional[str] = None
     limit: Optional[int] = 50  # Default: 50, Max: 1000
     offset: Optional[int] = 0
+    q: Optional[str] = None
+    sort: Optional[str] = None
+    # When True, refresh each machine on the returned page from the
+    # provider (one DescribeInstances per row). Off by default so list
+    # endpoints stay cheap; callers that need authoritative state should
+    # use the per-machine /status endpoint instead.
+    sync: bool = False
 
 
 class GetActiveMachineCountQuery(Query, BaseModel):
@@ -172,3 +192,25 @@ class GetTemplateValidationResultQuery(Query, BaseModel):
     model_config = ConfigDict(frozen=True)
 
     template_id: str
+
+
+# Dashboard aggregate count queries — return {value: count} dicts via a single
+# storage-layer GROUP BY instead of listing all rows into Python.
+
+
+class CountMachinesByStatusQuery(Query, BaseModel):
+    """Query to count machines grouped by status."""
+
+    model_config = ConfigDict(frozen=True)
+
+
+class CountRequestsByStatusQuery(Query, BaseModel):
+    """Query to count requests grouped by status."""
+
+    model_config = ConfigDict(frozen=True)
+
+
+class CountTemplatesByProviderApiQuery(Query, BaseModel):
+    """Query to count templates grouped by provider_api."""
+
+    model_config = ConfigDict(frozen=True)

@@ -25,6 +25,7 @@ def _make_request() -> Request:
         machine_count=1,
         provider_type="aws",
         provider_name="aws-us-east-1",
+        provider_api="ec2fleet",
     )
 
 

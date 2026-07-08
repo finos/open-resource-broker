@@ -8,8 +8,12 @@ class HealthCheckPort(ABC):
     """Abstract port for health check monitoring."""
 
     @abstractmethod
-    def register_check(self, name: str, check_fn: Any) -> None:
-        """Register a named health check function."""
+    def register_check(self, name: str, check_fn: Any, *, force: bool = False) -> None:
+        """Register a named health check function.
+
+        ``force=True`` overwrites an existing registration. Without it,
+        re-registering the same name is a no-op.
+        """
         pass
 
     @abstractmethod

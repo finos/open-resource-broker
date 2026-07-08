@@ -150,6 +150,14 @@ class PerformanceConfig(BaseModel):
         default_factory=lambda: AdaptiveBatchSizingConfig()  # type: ignore[call-arg]
     )
     caching: CachingConfig = Field(default_factory=lambda: CachingConfig())  # type: ignore[call-arg]
+    sync_timeout_seconds: float = Field(
+        30.0,
+        description=(
+            "Per-request AWS sync timeout in seconds for concurrent read-through sync "
+            "(ListActiveRequests). A timed-out sync returns last known stored state "
+            "without failing the whole page load."
+        ),
+    )
 
     @field_validator("max_workers")
     @classmethod
@@ -157,6 +165,14 @@ class PerformanceConfig(BaseModel):
         """Validate max workers."""
         if v < 1:
             raise ValueError("Maximum workers must be at least 1")
+        return v
+
+    @field_validator("sync_timeout_seconds")
+    @classmethod
+    def validate_sync_timeout(cls, v: float) -> float:
+        """Validate sync timeout."""
+        if v <= 0:
+            raise ValueError("sync_timeout_seconds must be positive")
         return v
 
 

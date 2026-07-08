@@ -167,6 +167,10 @@ async def handle_get_return_requests(
         ListReturnRequestsInput(
             status=getattr(args, "status", None),
             limit=getattr(args, "limit", 50),
+            offset=getattr(args, "offset", None) or 0,
+            provider_name=getattr(args, "provider_name", None),
+            provider_type=getattr(args, "provider_type", None),
+            filter_expressions=getattr(args, "filter", None) or [],
         )
     )
     return formatter.format_return_requests(result.requests)
@@ -229,6 +233,8 @@ async def handle_request_return_machines(
             force=getattr(args, "force", False),
             wait=getattr(args, "wait", False),
             timeout_seconds=getattr(args, "timeout", 300),
+            provider_name=getattr(args, "provider_name", None) or None,
+            provider_type=getattr(args, "provider_type", None) or None,
         )
     )
 
@@ -263,9 +269,16 @@ async def handle_list_requests(
             offset=getattr(args, "offset", None) or 0,
             template_id=getattr(args, "template_id", None),
             request_type=getattr(args, "request_type", None),
+            provider_name=getattr(args, "provider_name", None),
+            provider_type=getattr(args, "provider_type", None),
+            filter_expressions=getattr(args, "filter", None) or [],
         )
     )
-    return formatter.format_request_status(result.requests)
+    return formatter.format_request_status(
+        result.requests,
+        total_count=result.total_count,
+        next_cursor=result.next_cursor,
+    )
 
 
 @handle_interface_exceptions(context="cancel_request", interface_type="cli")

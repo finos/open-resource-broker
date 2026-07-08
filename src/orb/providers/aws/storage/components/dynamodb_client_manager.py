@@ -41,8 +41,8 @@ class DynamoDBClientManager(ResourceManager):
         # Use provided client or create new one
         if aws_client:
             self.aws_client: Any = aws_client
-            self.dynamodb: Any = aws_client.get_client("dynamodb")
-            self.dynamodb_resource: Any = aws_client.get_resource("dynamodb")
+            self.dynamodb: Any = aws_client.dynamodb_client
+            self.dynamodb_resource: Any = aws_client.dynamodb_resource
             self._initialized = True
         else:
             self.aws_client: Any = None

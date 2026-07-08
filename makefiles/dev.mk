@@ -2,9 +2,15 @@
 
 # @SECTION Setup & Installation
 install: venv-setup  ## Install dependencies (auto-detects UV/pip, environment-aware)
+	@# The ``ui`` extra (reflex>=0.9 → click>=8.2) conflicts with the
+	@# ``ci`` and ``dev`` groups (semgrep → click<8.2), which uv rejects
+	@# under ``--all-extras --all-groups``.  UI-specific jobs (see
+	@# dev-tools/ci/run_ui_smoke.sh) install the ``[ui]`` extra
+	@# separately after this baseline sync; every other CI job is
+	@# UI-agnostic so leaving the extra out of the shared env is safe.
 	@if [ -n "$$CI" ]; then \
 		echo "CI detected: using frozen UV sync"; \
-		uv sync --frozen --all-groups --all-extras --quiet; \
+		uv sync --frozen --all-groups --quiet; \
 	elif command -v uv >/dev/null 2>&1; then \
 		echo "UV available"; \
 		if echo "$(MAKECMDGOALS)" | grep -q "_dev"; then \
@@ -53,8 +59,8 @@ test: dev-install  ## Run tests (usage: make test [unit|integration|e2e|coverage
 test-report: dev-install  ## Generate comprehensive test report (PRESERVE: used by ci.yml)
 	./dev-tools/testing/run_tests.py --all --coverage --junit-xml=test-results-combined.xml --cov-xml=coverage-combined.xml --html-coverage --maxfail=1 --timeout=60
 
-system-tests: dev-install  ## Run system integration tests
-	@uv run python -m pytest tests/onaws/test_onaws.py -v -m manual_aws --no-cov --tb=long
+system-tests: dev-install  ## Run system integration tests (real AWS)
+	@uv run python -m pytest tests/providers/aws/live/test_onaws.py -v -m manual_aws --no-cov --tb=long
 
 # Backward compatibility aliases (direct calls to avoid loops)
 test-unit: dev-install
@@ -92,6 +98,25 @@ test-html: dev-install
 
 test-docker: dev-install  ## Run Docker containerization tests
 	@./dev-tools/testing/test-docker.sh
+
+# Provider-aware test targets
+# Parallel worker count for pytest. Capped at half the available CPU cores so
+# parallel test runs (especially live-AWS, which spawn ORB server subprocesses,
+# boto3 sessions, and long polls per worker) don't exhaust system memory or
+# saturate the network. Override per-invocation: make test-providers-aws-live PYTEST_WORKERS=4
+# Use $(shell ...) so the math runs once when make starts, not on every recipe.
+_HALF_CPU := $(shell python3 -c 'import os; print(max(1, (os.cpu_count() or 2) // 2))')
+PYTEST_WORKERS ?= $(_HALF_CPU)
+
+test-no-live: dev-install  ## Run all tests except live cloud suites (pre-PR check)
+	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) --ignore=tests/providers/aws/live
+
+test-providers: dev-install  ## Run all provider tests except live
+	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/providers --ignore=tests/providers/aws/live
+
+
+test-architecture: dev-install  ## Run architecture compliance tests
+	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/unit/architecture tests/unit/test_architectural_compliance.py
 
 # Dummy targets removed (consolidated in quality.mk)
 

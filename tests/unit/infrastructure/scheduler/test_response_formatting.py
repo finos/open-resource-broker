@@ -25,7 +25,7 @@ from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
     HostFactorySchedulerStrategy,
 )
 from orb.infrastructure.template.dtos import TemplateDTO
-from tests.onaws.plugin_io_schemas import (
+from tests.providers.aws.live.plugin_io_schemas import (
     expected_get_available_templates_schema_default,
     expected_get_available_templates_schema_hostfactory,
     expected_request_status_schema_default,

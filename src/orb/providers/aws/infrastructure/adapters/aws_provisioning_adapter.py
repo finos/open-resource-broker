@@ -178,6 +178,19 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             # Acquire hosts using the handler — raises typed exception on failure
             result: dict[str, Any] = handler.acquire_hosts(request, aws_template)  # type: ignore[arg-type]
 
+            # Some handler paths swallow exceptions and return a failure dict
+            # (``{"success": False, "error_message": ...}``) instead of raising.
+            # Without this guard, the failure flows through unchecked and
+            # ``instance_operation_service`` wraps it in ``ProviderResult.success_result``,
+            # so the orchestrator sees ``success=True`` with ``resource_ids=[]`` and the
+            # request lands on ``FAILED`` with the misleading "No instances provisioned
+            # and no cloud resources created" message.  Re-raise here so the real error
+            # makes it to ``_handle_provisioning_failure``.
+            if not result.get("success", True):
+                raise InfrastructureError(
+                    result.get("error_message", "Provider handler returned failure")
+                )
+
             resource_ids = result.get("resource_ids", [])
             self._logger.info("Successfully provisioned resources with IDs %s", resource_ids)
             return result

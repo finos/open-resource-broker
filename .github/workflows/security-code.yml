@@ -87,12 +87,12 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       with:
         fetch-depth: 0
 
     - name: Check for secrets with TruffleHog
-      uses: trufflesecurity/trufflehog@d411fff7b8879a62509f3fa98c07f247ac089a51  # v3.95.5
+      uses: trufflesecurity/trufflehog@00155c9dc586f34d189adc83d3ac2698c2ec551f  # v3.95.8
       with:
         path: ./
         base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
@@ -106,7 +106,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
     - name: Dependency Review
       uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294  # v4
@@ -118,12 +118,23 @@ jobs:
         # in their PyPI METADATA. The compound string is treated as a single
         # non-allowlisted license. Each exemption below has been verified by reading
         # the package's METADATA license / License-Expression directly:
-        #   werkzeug         BSD-3-Clause AND LicenseRef-scancode-unknown-license-reference -> BSD-3-Clause
-        #   lark             MIT AND MPL-2.0                                                -> MIT (METADATA: License: MIT)
-        #   mcp              MIT AND Python-2.0                                             -> MIT (METADATA: License: MIT)
-        #   rfc3987-syntax   Apache-2.0 AND GPL-1.0-or-later AND MIT                        -> MIT (METADATA: License-Expression: MIT)
-        #   wcwidth          MIT AND HPND-Markus-Kuhn                                       -> MIT (METADATA: License-Expression: MIT)
-        allow-dependencies-licenses: 'pkg:pypi/werkzeug, pkg:githubactions/trufflesecurity/trufflehog, pkg:pypi/lark, pkg:pypi/mcp, pkg:pypi/rfc3987-syntax, pkg:pypi/wcwidth'
+        #   werkzeug                BSD-3-Clause AND LicenseRef-scancode-unknown-license-reference -> BSD-3-Clause
+        #   lark                    MIT AND MPL-2.0                                                -> MIT (METADATA: License: MIT)
+        #   mcp                     MIT AND Python-2.0                                             -> MIT (METADATA: License: MIT)
+        #   rfc3987-syntax          Apache-2.0 AND GPL-1.0-or-later AND MIT                        -> MIT (METADATA: License-Expression: MIT)
+        #   wcwidth                 MIT AND HPND-Markus-Kuhn                                       -> MIT (METADATA: License-Expression: MIT)
+        #   lxml                    BSD-3-Clause AND GPL-1.0-or-later                              -> BSD-3-Clause (METADATA: License: BSD-3-Clause; GPL applies to a single legacy source file)
+        #   protobuf                BSD-3-Clause AND LicenseRef-scancode-protobuf                  -> 3-Clause BSD (METADATA License text)
+        #   pywin32                 PSF-2.0                                                        -> PSF-2.0 (permissive, equivalent to BSD)
+        #   cyclonedx-python-lib    no detected license                                            -> Apache-2.0 (METADATA: License: Apache-2.0)
+        #   fastapi                 no detected license                                            -> MIT (METADATA: License-Expression: MIT)
+        #   aiohappyeyeballs        0BSD AND BSD-3-Clause AND GPL-1.0-or-later AND PSF-2.0 AND Python-2.0  -> PSF-2.0 (METADATA: License-Expression: PSF-2.0; permissive)
+        #   aiohttp                 no detected license                                            -> Apache-2.0 (METADATA: License-Expression: Apache-2.0 AND MIT; dual permissive)
+        #   docutils                BSD-2-Clause AND BSD-3-Clause AND CC-PDDC AND GPL-1.0-or-later AND GPL-3.0-only AND GPL-3.0-or-later AND ...  -> public-domain + BSD-2-Clause (METADATA: License: public domain, Python, 2-Clause BSD; GPL applies to a few isolated source files in the docutils source tree)
+        #   scramp                  no detected license                                            -> MIT-0 (METADATA: License-Expression: MIT No Attribution; permissive)
+        #   bidict                  MPL-2.0                                                        -> MPL-2.0 file-level copyleft; used unmodified as a runtime dependency, permitted under Apache-2.0 combined works (pulled in transitively via reflex[ui] extra)
+        #   semgrep                 LGPL-2.0-only AND LGPL-2.1                                    -> LGPL-2.1 (PyPI classifier: LGPLv2; CLI-only scanner, not imported or linked into orb-py; LGPL permits this use)
+        allow-dependencies-licenses: 'pkg:pypi/werkzeug, pkg:githubactions/trufflesecurity/trufflehog, pkg:pypi/lark, pkg:pypi/mcp, pkg:pypi/rfc3987-syntax, pkg:pypi/wcwidth, pkg:pypi/lxml, pkg:pypi/protobuf, pkg:pypi/pywin32, pkg:pypi/cyclonedx-python-lib, pkg:pypi/fastapi, pkg:pypi/aiohappyeyeballs, pkg:pypi/aiohttp, pkg:pypi/docutils, pkg:pypi/scramp, pkg:pypi/bidict, pkg:pypi/semgrep'
 
   codeql-analysis:
     name: CodeQL Analysis

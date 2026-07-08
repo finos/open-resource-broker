@@ -121,6 +121,20 @@ class DevToolsInstaller:
                     "generic": self._show_docker_manual_install,
                 },
             },
+            "bun": {
+                "description": "JavaScript runtime + package manager (required by `make ui-build` for Reflex frontend compile)",
+                "check_cmd": ["bun", "--version"],
+                "install": {
+                    "darwin": self._install_bun_generic,
+                    "windows": ["powershell", "-c", "irm bun.sh/install.ps1 | iex"],
+                    "ubuntu": self._install_bun_generic,
+                    "debian": self._install_bun_generic,
+                    "rhel": self._install_bun_generic,
+                    "centos": self._install_bun_generic,
+                    "fedora": self._install_bun_generic,
+                    "generic": self._install_bun_generic,
+                },
+            },
             "uv": {
                 "description": "Python package manager",
                 "check_cmd": ["uv", "--version"],
@@ -361,6 +375,10 @@ class DevToolsInstaller:
         """Install uv using their install script."""
         return self._run_command(["curl", "-LsSf", "https://astral.sh/uv/install.sh", "|", "sh"])
 
+    def _install_bun_generic(self):
+        """Install bun via the official install script (~/.bun/bin/bun)."""
+        return self._run_command("curl -fsSL https://bun.sh/install | bash", shell=True)
+
     def _install_actionlint_generic(self):
         """Install actionlint using official download script."""
         return self._run_command(
@@ -559,7 +577,7 @@ class DevToolsInstaller:
         # Required tools (needed for basic functionality)
         required_tools = ["yq", "uv", "docker"]
 
-        # Optional tools (for security/quality checks)
+        # Optional tools (for security/quality checks + UI build)
         optional_tools = [
             "hadolint",
             "trivy",
@@ -569,6 +587,7 @@ class DevToolsInstaller:
             "actionlint",
             "shellcheck",
             "act",
+            "bun",  # required by `make ui-build` — installs to ~/.bun/bin/bun
         ]
 
         tools_to_install = required_tools

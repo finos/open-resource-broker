@@ -27,19 +27,27 @@ class MachineGroupingService:
         self.uow_factory = uow_factory
         self.logger = logger
 
-    def group_by_provider(self, machine_ids: list[str]) -> dict[tuple[str, str], list[str]]:
-        """Group machines by (provider_type, provider_name).
+    def group_by_provider(self, machine_ids: list[str]) -> dict[tuple[str, str, str], list[str]]:
+        """Group machines by (provider_type, provider_name, provider_api).
+
+        provider_api MUST be part of the key — machines from different APIs
+        (EC2Fleet, ASG, SpotFleet, RunInstances) require different
+        deprovisioning routes even when sharing the same provider+account.
+        Lumping them into one bucket produces a return request that can
+        carry only one provider_api value, leaving the rest unroutable.
 
         Args:
             machine_ids: List of machine IDs to group
 
         Returns:
-            Dictionary mapping (provider_type, provider_name) to list of machine IDs
+            Dictionary mapping (provider_type, provider_name, provider_api)
+            to list of machine IDs
 
         Raises:
             EntityNotFoundError: If a machine is not found
+            ValueError: If a machine has no provider_api (invariant violation)
         """
-        provider_groups: dict[tuple[str, str], list[str]] = defaultdict(list)
+        provider_groups: dict[tuple[str, str, str], list[str]] = defaultdict(list)
 
         with self.uow_factory.create_unit_of_work() as uow:
             for machine_id in machine_ids:
@@ -47,11 +55,25 @@ class MachineGroupingService:
                 if not machine:
                     raise EntityNotFoundError("Machine", machine_id)
 
-                provider_key = (machine.provider_type, machine.provider_name)
+                if not machine.provider_api:
+                    # Domain invariant violation: every machine MUST know
+                    # which provider API produced it. Raise loudly so the
+                    # caller cannot silently route it to a default handler.
+                    raise ValueError(
+                        f"Machine {machine_id} has no provider_api — "
+                        "cannot determine deprovisioning route. This is a "
+                        "persistence/migration bug, not a runtime condition."
+                    )
+
+                provider_key = (
+                    machine.provider_type,
+                    machine.provider_name,
+                    machine.provider_api,
+                )
                 provider_groups[provider_key].append(machine_id)
 
         self.logger.debug(
-            "Grouped %d machines into %d provider groups",
+            "Grouped %d machines into %d provider groups (type, name, api)",
             len(machine_ids),
             len(provider_groups),
         )

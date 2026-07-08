@@ -7,7 +7,7 @@ reflect current behaviour and include TODO markers where the violation exists.
 
 import argparse
 import json
-from typing import Any, Union
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -18,7 +18,7 @@ from orb.application.dto.interface_response import InterfaceResponse
 @pytest.fixture(autouse=True)
 def register_aws_cli_spec():
     """Register AWS CLI spec for all tests in this module."""
-    from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
+    from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
     from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec
 
     CLISpecRegistry.register("aws", AWSCLISpec())
@@ -27,7 +27,7 @@ def register_aws_cli_spec():
     CLISpecRegistry._specs.clear()
 
 
-def exit_code(result: Union[dict[str, Any], InterfaceResponse]) -> int:
+def exit_code(result: dict[str, Any] | InterfaceResponse) -> int:
     """Extract exit_code from either a dict or InterfaceResponse."""
     if isinstance(result, InterfaceResponse):
         return result.exit_code
@@ -212,6 +212,22 @@ class TestHandleProviderAdd:
                 name="aws-bad",
                 discover=False,
             )
+            result = await handle_provider_add(args)
+
+        assert result.get("error") is True and result.get("exit_code") == 1
+
+    @pytest.mark.asyncio
+    async def test_missing_provider_type_returns_1(self, tmp_path):
+        """No provider_type attribute on args must return an error, not default to 'aws'."""
+        from orb.interface.provider_config_handler import handle_provider_add
+
+        _write_config(tmp_path, _base_config())
+        with patch(
+            "orb.interface.provider_config_handler.get_config_location",
+            return_value=tmp_path,
+        ):
+            # args has no provider_type attribute at all
+            args = _ns(aws_profile="default", aws_region="us-east-1", name=None, discover=False)
             result = await handle_provider_add(args)
 
         assert result.get("error") is True and result.get("exit_code") == 1

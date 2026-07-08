@@ -35,7 +35,8 @@ class AuthRegistry(BaseRegistry):
 
         Args:
             strategy_name: Name of the strategy (e.g., 'none', 'bearer_token', 'oauth')
-            strategy_factory: Factory function that creates the strategy instance
+            strategy_factory: Factory callable that creates the strategy instance.
+                Must expose a ``from_auth_config(auth_config)`` classmethod.
         """
 
         # Create a simple config factory that passes through kwargs
@@ -44,13 +45,16 @@ class AuthRegistry(BaseRegistry):
 
         self.register_type(strategy_name, strategy_factory, config_factory)
 
-    def get_strategy(self, strategy_name: str, **kwargs) -> AuthPort:
+    def get_strategy(self, strategy_name: str, auth_config: Any) -> AuthPort:
         """
-        Get an authentication strategy instance.
+        Get an authentication strategy instance built from *auth_config*.
+
+        Internally delegates to ``strategy_factory.from_auth_config(auth_config)``
+        so that each strategy class owns its own config-extraction logic.
 
         Args:
-            strategy_name: Name of the strategy
-            **kwargs: Arguments to pass to the strategy factory
+            strategy_name: Name of the registered strategy
+            auth_config: AuthConfig instance passed to ``from_auth_config``
 
         Returns:
             Authentication strategy instance
@@ -59,7 +63,7 @@ class AuthRegistry(BaseRegistry):
             ValueError: If strategy is not registered
         """
         registration = self._get_type_registration(strategy_name)
-        return registration.strategy_factory(**kwargs)
+        return registration.strategy_factory.from_auth_config(auth_config)  # type: ignore[union-attr]
 
     def list_strategies(self) -> list[str]:
         """
@@ -98,3 +102,8 @@ def _register_default_strategies(registry: AuthRegistry) -> None:  # type: ignor
         from .strategy.bearer_token_strategy import BearerTokenStrategy
 
         registry.register_strategy("bearer_token", BearerTokenStrategy)
+
+        # Register enhanced bearer token strategy
+        from .strategy.bearer_token_strategy_enhanced import EnhancedBearerTokenStrategy
+
+        registry.register_strategy("bearer_token_enhanced", EnhancedBearerTokenStrategy)

@@ -25,8 +25,18 @@ class ProviderRegistryPort(ABC):
         pass
 
     @abstractmethod
-    def select_active_provider(self, logger: Optional[Any] = None) -> ProviderSelectionResult:
-        """Select the currently active provider."""
+    def select_active_provider(
+        self,
+        logger: Optional[Any] = None,
+        *,
+        provider_name: Optional[str] = None,
+        provider_type: Optional[str] = None,
+    ) -> ProviderSelectionResult:
+        """Select the currently active provider.
+
+        provider_name: when provided, selects the exact named instance.
+        provider_type: when provided, filters to instances of that type.
+        """
         pass
 
     @abstractmethod
@@ -82,4 +92,12 @@ class ProviderRegistryPort(ABC):
     @abstractmethod
     def create_validator(self, provider_type: str, config: Any = None) -> Optional[Any]:
         """Create a template validator using provider config data for the given provider type."""
+        pass  # type: ignore[return]
+
+    @abstractmethod
+    def get_default_api(self, provider_type: str) -> Optional[str]:
+        """Return the default API name contributed by the given provider type's registration.
+
+        Returns None if the provider type is not registered or has no default API.
+        """
         pass  # type: ignore[return]

@@ -53,8 +53,18 @@ class TestOrchestratorInitialization:
         assert o._command_bus is self.command_bus
 
     def test_cancel_request_orchestrator_init(self):
-        o = self._make(CancelRequestOrchestrator)
+        # CancelRequestOrchestrator takes an additional return_orchestrator
+        # dependency so it can dispatch a Return for any machines allocated
+        # to the request before flipping the status to CANCELLED.
+        return_orch = MagicMock(spec=ReturnMachinesOrchestrator)
+        o = CancelRequestOrchestrator(
+            command_bus=self.command_bus,
+            query_bus=self.query_bus,
+            return_orchestrator=return_orch,
+            logger=self.logger,
+        )
         assert o._command_bus is self.command_bus
+        assert o._return_orchestrator is return_orch
 
     def test_list_machines_orchestrator_init(self):
         o = self._make(ListMachinesOrchestrator)

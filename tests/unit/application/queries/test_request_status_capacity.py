@@ -6,6 +6,7 @@ from unittest.mock import Mock
 import pytest
 
 from orb.application.services.request_status_service import RequestStatusService
+from orb.domain.base.provider_fulfilment import ProviderFulfilment
 from orb.domain.base.value_objects import InstanceType
 from orb.domain.machine.aggregate import Machine
 from orb.domain.machine.machine_identifiers import MachineId
@@ -44,6 +45,7 @@ def _machines(*statuses: MachineStatus) -> list[Machine]:
             status=s,
             provider_type="aws",
             provider_name="aws-primary",
+            provider_api="ec2fleet",
             template_id="tpl-test",
             instance_type=InstanceType(value="t3.micro"),
             image_id="ami-00000000",
@@ -63,8 +65,17 @@ def test_fleet_capacity_completed_even_with_few_instances():
     service = _make_service()
     request = _request(RequestType.ACQUIRE, RequestStatus.IN_PROGRESS, requested_count=10)
     machines = _machines(MachineStatus.RUNNING, MachineStatus.RUNNING)
-
-    new_status, _ = service.determine_status_from_machines([], machines, request, {})
+    # 2 running out of 10 requested — provider reports in_progress
+    fulfilment = ProviderFulfilment(
+        state="in_progress",
+        message="2 of 10 running, still provisioning",
+        target_units=10,
+        fulfilled_units=2,
+        running_count=2,
+    )
+    new_status, _ = service.determine_status_from_machines(
+        [], machines, request, {"provider_fulfilment": fulfilment}
+    )
     # 2 running out of 10 requested — partial or in-progress, not completed
     assert new_status in (
         RequestStatus.IN_PROGRESS.value,
@@ -79,8 +90,16 @@ def test_fleet_capacity_in_progress_when_under_target():
     request = _request(RequestType.ACQUIRE, RequestStatus.IN_PROGRESS, requested_count=10)
     # All pending — running=0, failed=0, so returns IN_PROGRESS
     machines = _machines(MachineStatus.PENDING, MachineStatus.PENDING)
-
-    new_status, _ = service.determine_status_from_machines([], machines, request, {})
+    fulfilment = ProviderFulfilment(
+        state="in_progress",
+        message="2 of 10 pending",
+        target_units=10,
+        fulfilled_units=0,
+        pending_count=2,
+    )
+    new_status, _ = service.determine_status_from_machines(
+        [], machines, request, {"provider_fulfilment": fulfilment}
+    )
     assert new_status == RequestStatus.IN_PROGRESS.value
 
 
@@ -95,8 +114,17 @@ def test_fleet_capacity_partial_with_failures():
         MachineStatus.FAILED,
         MachineStatus.FAILED,
     )
-
-    new_status, _ = service.determine_status_from_machines([], machines, request, {})
+    fulfilment = ProviderFulfilment(
+        state="partial",
+        message="2 running, 3 failed — partial fulfilment",
+        target_units=5,
+        fulfilled_units=2,
+        running_count=2,
+        failed_count=3,
+    )
+    new_status, _ = service.determine_status_from_machines(
+        [], machines, request, {"provider_fulfilment": fulfilment}
+    )
     assert new_status == RequestStatus.PARTIAL.value
 
 
@@ -110,8 +138,16 @@ def test_fleet_capacity_all_failed():
         MachineStatus.FAILED,
         MachineStatus.FAILED,
     )
-
-    new_status, _ = service.determine_status_from_machines([], machines, request, {})
+    fulfilment = ProviderFulfilment(
+        state="failed",
+        message="All 4 instances failed",
+        target_units=4,
+        fulfilled_units=0,
+        failed_count=4,
+    )
+    new_status, _ = service.determine_status_from_machines(
+        [], machines, request, {"provider_fulfilment": fulfilment}
+    )
     assert new_status == RequestStatus.FAILED.value
 
 
@@ -120,8 +156,16 @@ def test_asg_capacity_completed():
     service = _make_service()
     request = _request(RequestType.ACQUIRE, RequestStatus.IN_PROGRESS, requested_count=1)
     machines = _machines(MachineStatus.RUNNING)
-
-    new_status, _ = service.determine_status_from_machines([], machines, request, {})
+    fulfilment = ProviderFulfilment(
+        state="fulfilled",
+        message="1 of 1 running",
+        target_units=1,
+        fulfilled_units=1,
+        running_count=1,
+    )
+    new_status, _ = service.determine_status_from_machines(
+        [], machines, request, {"provider_fulfilment": fulfilment}
+    )
     assert new_status == RequestStatus.COMPLETED.value
 
 
@@ -131,8 +175,16 @@ def test_asg_capacity_in_progress():
     request = _request(RequestType.ACQUIRE, RequestStatus.IN_PROGRESS, requested_count=6)
     # All pending — running=0, failed=0, so returns IN_PROGRESS
     machines = _machines(MachineStatus.PENDING, MachineStatus.PENDING)
-
-    new_status, _ = service.determine_status_from_machines([], machines, request, {})
+    fulfilment = ProviderFulfilment(
+        state="in_progress",
+        message="2 pending, waiting for target of 6",
+        target_units=6,
+        fulfilled_units=0,
+        pending_count=2,
+    )
+    new_status, _ = service.determine_status_from_machines(
+        [], machines, request, {"provider_fulfilment": fulfilment}
+    )
     assert new_status == RequestStatus.IN_PROGRESS.value
 
 
@@ -141,8 +193,16 @@ def test_runinstances_completed_without_capacity_metadata():
     service = _make_service()
     request = _request(RequestType.ACQUIRE, RequestStatus.IN_PROGRESS, requested_count=2)
     machines = _machines(MachineStatus.RUNNING, MachineStatus.RUNNING)
-
-    new_status, msg = service.determine_status_from_machines([], machines, request, {})
+    fulfilment = ProviderFulfilment(
+        state="fulfilled",
+        message="2 of 2 running",
+        target_units=2,
+        fulfilled_units=2,
+        running_count=2,
+    )
+    new_status, msg = service.determine_status_from_machines(
+        [], machines, request, {"provider_fulfilment": fulfilment}
+    )
     assert new_status == RequestStatus.COMPLETED.value
     assert msg is not None
     assert "running" in msg.lower()
@@ -155,8 +215,16 @@ def test_runinstances_timeout_when_no_instances_after_long_time():
     request = _request(
         RequestType.ACQUIRE, RequestStatus.IN_PROGRESS, requested_count=1, created_at=old_time
     )
-
-    new_status, msg = service.determine_status_from_machines([], [], request, {})
+    # No machines yet — provider still reports in_progress (keep polling)
+    fulfilment = ProviderFulfilment(
+        state="in_progress",
+        message="No instances yet after 31 minutes",
+        target_units=1,
+        fulfilled_units=0,
+    )
+    new_status, _msg = service.determine_status_from_machines(
+        [], [], request, {"provider_fulfilment": fulfilment}
+    )
     # No machines yet — service returns IN_PROGRESS (keep polling)
     assert new_status == RequestStatus.IN_PROGRESS.value
 
@@ -164,7 +232,8 @@ def test_runinstances_timeout_when_no_instances_after_long_time():
 @pytest.mark.unit
 def test_return_request_completed_when_all_terminated():
     service = _make_service()
-    request = _request(RequestType.RETURN, RequestStatus.IN_PROGRESS, requested_count=3)
+    # requested_count matches the number of terminated machines provided
+    request = _request(RequestType.RETURN, RequestStatus.IN_PROGRESS, requested_count=2)
     machines = _machines(MachineStatus.TERMINATED, MachineStatus.TERMINATED)
 
     new_status, _ = service.determine_status_from_machines([], machines, request, {})
@@ -193,9 +262,17 @@ def test_provisioning_failure_metadata_forces_failed():
             "error_message": "Failed to create EC2 fleet",
         },
     )
-
+    # Provider still reports in_progress — application polls until provider says failed
+    fulfilment = ProviderFulfilment(
+        state="in_progress",
+        message="Provisioning in progress",
+        target_units=3,
+        fulfilled_units=0,
+    )
     # No machines, no provider machines — service returns IN_PROGRESS (keep polling)
-    new_status, _ = service.determine_status_from_machines([], [], request, {})
+    new_status, _ = service.determine_status_from_machines(
+        [], [], request, {"provider_fulfilment": fulfilment}
+    )
     assert new_status == RequestStatus.IN_PROGRESS.value
 
 

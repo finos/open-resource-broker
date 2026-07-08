@@ -23,7 +23,10 @@ class GetProviderHealthOrchestrator(
 
     async def execute(self, input: GetProviderHealthInput) -> GetProviderHealthOutput:  # type: ignore[return]
         self._logger.info("GetProviderHealthOrchestrator: provider_name=%s", input.provider_name)
-        query = GetProviderHealthQuery(provider_name=input.provider_name)
+        query = GetProviderHealthQuery(
+            provider_name=input.provider_name,
+            provider_type=input.provider_type,
+        )
         health = await self._query_bus.execute(query)
         return GetProviderHealthOutput(
             health=health if isinstance(health, dict) else {},

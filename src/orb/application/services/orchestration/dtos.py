@@ -2,10 +2,67 @@
 
 from __future__ import annotations
 
+import base64
 import dataclasses
-from typing import Any, Optional
+import json
+from typing import Any, Generic, Optional, TypeVar
 
 from orb.application.machine.dto import MachineDTO
+
+T = TypeVar("T")
+
+
+# ---------------------------------------------------------------------------
+# Pagination envelope
+# ---------------------------------------------------------------------------
+
+
+@dataclasses.dataclass(frozen=True)
+class Paginated(Generic[T]):
+    """Return shape for query handlers that slice an in-memory dataset.
+
+    items                 — the page that satisfies (offset, limit) AFTER
+                            any filter/sort has been applied.
+    total_count           — total rows AFTER filters (the denominator the
+                            client expects for "showing N of M").
+    total_unfiltered      — total rows in the raw dataset before filters.
+                            Optional; useful for UIs that want to show
+                            "1 of 10000 templates match this filter".
+    """
+
+    items: list[T]
+    total_count: int
+    total_unfiltered: Optional[int] = None
+
+
+# ---------------------------------------------------------------------------
+# Cursor helpers
+# ---------------------------------------------------------------------------
+
+
+def encode_cursor(offset: int) -> str:
+    """Encode an offset into an opaque, URL-safe base64 cursor string.
+
+    Format: base64url({"offset": <int>})
+    """
+    payload = json.dumps({"offset": offset})
+    return base64.urlsafe_b64encode(payload.encode()).decode()
+
+
+def decode_cursor(cursor: Optional[str]) -> int:
+    """Decode an opaque cursor string back to an integer offset.
+
+    Returns 0 if *cursor* is None or cannot be decoded, so callers can always
+    treat the return value as a valid offset.
+    """
+    if cursor is None:
+        return 0
+    try:
+        payload = base64.urlsafe_b64decode(cursor.encode()).decode()
+        data = json.loads(payload)
+        return int(data.get("offset", 0))
+    except Exception:
+        return 0
 
 
 @dataclasses.dataclass(frozen=True)
@@ -50,12 +107,21 @@ class ListRequestsInput:
     offset: int = 0
     template_id: Optional[str] = None
     request_type: Optional[str] = None
+    provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
+    filter_expressions: list[str] = dataclasses.field(default_factory=list)
+    # Server-side filtering / sorting / cursor pagination
+    q: Optional[str] = None
+    sort: Optional[str] = None
+    cursor: Optional[str] = None
 
 
 @dataclasses.dataclass(frozen=True)
 class ListRequestsOutput:
     requests: list[dict[str, Any]] = dataclasses.field(default_factory=list)
     count: int = 0
+    next_cursor: Optional[str] = None
+    total_count: Optional[int] = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -65,6 +131,8 @@ class ReturnMachinesInput:
     force: bool = False
     wait: bool = False
     timeout_seconds: int = 300
+    provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -73,6 +141,7 @@ class ReturnMachinesOutput:
     status: str
     message: str = ""
     skipped_machines: list[str] = dataclasses.field(default_factory=list)
+    machine_ids: list[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -93,16 +162,28 @@ class CancelRequestOutput:
 class ListMachinesInput:
     status: Optional[str] = None
     provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
     request_id: Optional[str] = None
     limit: int = 100
     offset: int = 0
     timestamp_format: Optional[str] = None
+    filter_expressions: list[str] = dataclasses.field(default_factory=list)
+    # Server-side filtering / sorting / cursor pagination
+    q: Optional[str] = None
+    sort: Optional[str] = None
+    cursor: Optional[str] = None
+    # When True, refresh every machine on the returned page from the
+    # provider. Off by default; the per-machine /status endpoint is the
+    # preferred refresh path for the drawer.
+    sync: bool = False
 
 
 @dataclasses.dataclass(frozen=True)
 class ListMachinesOutput:
     machines: list[MachineDTO] = dataclasses.field(default_factory=list)
     count: int = 0
+    next_cursor: Optional[str] = None
+    total_count: Optional[int] = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -116,29 +197,68 @@ class GetMachineOutput:
 
 
 @dataclasses.dataclass(frozen=True)
+class SyncMachineInput:
+    """Refresh a single machine's state from the provider before returning."""
+
+    machine_id: str
+
+
+@dataclasses.dataclass(frozen=True)
+class SyncMachineOutput:
+    """Result of a per-machine provider sync.
+
+    ``synced`` is False when the machine exists in storage but the
+    provider call failed or returned nothing; ``machine`` still holds
+    the last-known state from storage in that case.
+    """
+
+    machine: Optional[MachineDTO]
+    synced: bool
+    error: Optional[str] = None
+
+
+@dataclasses.dataclass(frozen=True)
 class ListTemplatesInput:
     active_only: bool = True
     provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
     provider_api: Optional[str] = None
     limit: int = 50
     offset: int = 0
+    filter_expressions: list[str] = dataclasses.field(default_factory=list)
+    # Server-side filtering / sorting / cursor pagination
+    q: Optional[str] = None
+    sort: Optional[str] = None
+    cursor: Optional[str] = None
 
 
 @dataclasses.dataclass(frozen=True)
 class ListTemplatesOutput:
     templates: list[Any] = dataclasses.field(default_factory=list)
     count: int = 0
+    next_cursor: Optional[str] = None
+    total_count: Optional[int] = None
 
 
 @dataclasses.dataclass(frozen=True)
 class ListReturnRequestsInput:
     status: Optional[str] = None
     limit: int = 50
+    offset: int = 0
+    provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
+    filter_expressions: list[str] = dataclasses.field(default_factory=list)
+    # Server-side filtering / sorting / cursor pagination
+    q: Optional[str] = None
+    sort: Optional[str] = None
+    cursor: Optional[str] = None
 
 
 @dataclasses.dataclass(frozen=True)
 class ListReturnRequestsOutput:
     requests: list[dict[str, Any]] = dataclasses.field(default_factory=list)
+    next_cursor: Optional[str] = None
+    total_count: Optional[int] = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -155,8 +275,8 @@ class GetTemplateOutput:
 @dataclasses.dataclass(frozen=True)
 class CreateTemplateInput:
     template_id: str
-    provider_api: str
     image_id: str
+    provider_api: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
     instance_type: Optional[str] = None
@@ -228,6 +348,9 @@ class StopMachinesInput:
     machine_ids: list[str] = dataclasses.field(default_factory=list)
     all_machines: bool = False
     force: bool = False
+    provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
+    filter_expressions: list[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -242,6 +365,9 @@ class StopMachinesOutput:
 class StartMachinesInput:
     machine_ids: list[str] = dataclasses.field(default_factory=list)
     all_machines: bool = False
+    provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
+    filter_expressions: list[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -255,6 +381,7 @@ class StartMachinesOutput:
 @dataclasses.dataclass(frozen=True)
 class GetProviderHealthInput:
     provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -289,6 +416,8 @@ class GetProviderMetricsOutput:
 @dataclasses.dataclass(frozen=True)
 class ListProvidersInput:
     provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
+    filter_expressions: list[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -369,3 +498,32 @@ class WatchRequestStatusOutput:
     az_stats: dict[str, dict[str, int]] = dataclasses.field(default_factory=dict)
     created_at: Optional[str] = None
     error: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Dashboard summary
+# ---------------------------------------------------------------------------
+
+
+@dataclasses.dataclass(frozen=True)
+class DashboardSummaryInput:
+    """Input for the dashboard summary orchestrator. Reserved for future filters."""
+
+
+@dataclasses.dataclass(frozen=True)
+class RecentActivityItem:
+    request_id: str
+    status: str
+    request_type: str
+    template_id: str
+    created_at: str  # ISO-8601
+    successful_count: int
+    requested_count: int
+
+
+@dataclasses.dataclass(frozen=True)
+class DashboardSummaryOutput:
+    machines: dict[str, Any] = dataclasses.field(default_factory=dict)
+    requests: dict[str, Any] = dataclasses.field(default_factory=dict)
+    templates: dict[str, Any] = dataclasses.field(default_factory=dict)
+    recent_activity: list[Any] = dataclasses.field(default_factory=list)

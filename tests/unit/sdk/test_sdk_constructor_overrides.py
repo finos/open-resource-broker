@@ -34,8 +34,6 @@ class TestSDKConfigScheduler:
 def _make_initialize_mocks():
     """Return (mock_app, mock_container, mock_config_port, mock_cm) wired for initialize()."""
     mock_config_port = MagicMock()
-    mock_config_port.override_provider_region = MagicMock()
-    mock_config_port.override_provider_profile = MagicMock()
 
     mock_cm = MagicMock()
     mock_cm.override_scheduler_strategy = MagicMock()
@@ -94,11 +92,6 @@ class TestORBClientSchedulerOverride:
         mock_cm.override_scheduler_strategy.assert_not_called()
         mock_container.register_instance.assert_not_called()
         mock_cm_cls.assert_not_called()
-
-    async def test_region_override_still_called(self):
-        """Regression: existing region override must still work."""
-        mock_config_port, _, _, _ = await self._init_client({"region": "us-east-2"})
-        mock_config_port.override_provider_region.assert_called_once_with("us-east-2")
 
     async def test_scheduler_kwarg_calls_override(self):
         """Top-level scheduler= kwarg must reach override_scheduler_strategy."""

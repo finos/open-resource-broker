@@ -53,11 +53,13 @@ class GetProviderHealthHandler(BaseQueryHandler[GetProviderHealthQuery, dict[str
         self.logger.info("Getting health for provider: %s", query.provider_name)
 
         try:
-            # If no provider specified, get the active provider
+            # If no provider specified, resolve via provider_type or active provider
             provider_name = query.provider_name
             if not provider_name:
                 try:
-                    selection_result = self._provider_registry_service.select_active_provider()
+                    selection_result = self._provider_registry_service.select_active_provider(
+                        provider_type=query.provider_type,
+                    )
                     provider_name = selection_result.provider_name
                     self.logger.debug("Using active provider: %s", provider_name)
                 except Exception as e:
@@ -66,7 +68,11 @@ class GetProviderHealthHandler(BaseQueryHandler[GetProviderHealthQuery, dict[str
                         "provider_name": None,
                         "status": "not_found",
                         "health": "unknown",
-                        "message": "No active provider found",
+                        "message": (
+                            f"No active provider of type '{query.provider_type}' found"
+                            if query.provider_type
+                            else "No active provider found"
+                        ),
                     }
 
             # Get health information from registry service
@@ -161,6 +167,10 @@ class ListAvailableProvidersHandler(BaseQueryHandler[ListAvailableProvidersQuery
                         "message": f"Provider '{query.provider_name}' not found in configuration",
                     }
 
+            # Filter by provider type if specified
+            if query.provider_type:
+                active_providers = [p for p in active_providers if p.type == query.provider_type]
+
             providers_info = []
             for provider_instance in active_providers:
                 # Get effective handlers using inheritance
@@ -172,7 +182,6 @@ class ListAvailableProvidersHandler(BaseQueryHandler[ListAvailableProvidersQuery
                     {
                         "name": provider_instance.name,
                         "type": provider_instance.type,
-                        "region": provider_instance.config.get("region", "unknown"),
                         "status": "active" if provider_instance.enabled else "disabled",
                         "capabilities": handler_names,  # Real handler names from inheritance
                         "weight": provider_instance.weight,

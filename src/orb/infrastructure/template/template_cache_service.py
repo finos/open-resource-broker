@@ -3,14 +3,14 @@
 import threading
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from typing import Awaitable, Callable, Optional, Union
+from typing import Awaitable, Callable, Optional
 
 from orb.domain.base.ports import LoggingPort
 
 from .dtos import TemplateDTO
 
 # loader_func may return either a plain list or a coroutine
-LoaderFunc = Callable[[], Union[list[TemplateDTO], Awaitable[list[TemplateDTO]]]]
+LoaderFunc = Callable[[], list[TemplateDTO] | Awaitable[list[TemplateDTO]]]
 
 
 class TemplateCacheService(ABC):

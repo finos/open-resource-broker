@@ -122,7 +122,7 @@ export ORB_AWS_REGION=us-east-1
 export ORB_AWS_PROFILE=development
 
 # Start with defaults
-orb system serve
+orb server start --foreground
 ```
 
 #### Staging Environment
@@ -150,7 +150,7 @@ export ORB_REQUEST_TIMEOUT=300
 export ORB_AWS_MAX_RETRIES=3
 
 # Use configuration file for complex settings
-orb system serve --config config/staging.json
+orb server start --foreground --config config/staging.json
 ```
 
 #### Production Environment
@@ -168,7 +168,7 @@ export ORB_ENVIRONMENT=production
 export ORB_AWS_ROLE_ARN=arn:aws:iam::123456789012:role/OrbitProductionRole
 
 # All other configuration in secure configuration file
-orb system serve --config /etc/orb/production.json
+orb server start --foreground --config /etc/orb/production.json
 ```
 
 ### Configuration File Structure
@@ -258,7 +258,7 @@ orb system serve --config /etc/orb/production.json
 ls -la config/config.json ~/.orb/config.json
 
 # Specify explicit path
-orb system serve --config /path/to/config.json
+orb server start --foreground --config /path/to/config.json
 ```
 
 **Environment variable not taking effect:**
@@ -285,7 +285,7 @@ Enable debug logging to see configuration loading process:
 
 ```bash
 export ORB_LOG_LEVEL=DEBUG
-orb system serve --config config.json
+orb server start --foreground --config config.json
 ```
 
 This will show:
@@ -313,7 +313,7 @@ This will show:
   },
   "logging": {
     "level": "INFO",
-    "file_path": "logs/app.log",
+    "file_path": "logs/orb.log",
     "console_enabled": true,
     "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     "max_size": 10485760,
@@ -475,7 +475,7 @@ Comprehensive logging system with multiple outputs.
 {
   "logging": {
     "level": "INFO",
-    "file_path": "logs/app.log",
+    "file_path": "logs/orb.log",
     "console_enabled": true,
     "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     "max_size": 10485760,
@@ -812,6 +812,72 @@ ORB_LOG_LEVEL=DEBUG orb system health
 ORB_AWS_REGION=us-west-2 orb providers test aws
 ```
 
+## `allow_destructive_admin`
+
+The `allow_destructive_admin` flag controls access to administrative endpoints
+that perform irreversible, bulk-state operations.
+
+### Default and location
+
+```json
+{
+  "allow_destructive_admin": false
+}
+```
+
+Default: **`false`**.  The field lives at the top level of the application
+config (same level as `environment`, `provider`, etc.).
+
+### What it gates
+
+When `allow_destructive_admin` is `false` (or absent), the following endpoints
+return **HTTP 403** unconditionally:
+
+| Endpoint | Description |
+|---|---|
+| `POST /api/v1/admin/database/wipe` | Truncates all ORB data tables (machines, requests, templates) |
+| `POST /api/v1/admin/database/cleanup` | Removes stale or orphaned records that no longer match known templates |
+| `POST /api/v1/admin/init` | Re-initialises default config and data directories from a wiped state |
+
+> **Note:** `POST /api/v1/admin/reload-config` is **not** gated by this flag —
+> reloading config is non-destructive and requires only the `admin` role.
+
+### Second guard: environment check
+
+Even when `allow_destructive_admin` is `true`, the endpoints add a second
+runtime check: the active `environment` value must **not** be `production`.
+If the environment is `production`, the endpoints return HTTP 403 regardless
+of the flag.  This prevents accidental data loss if the flag is mistakenly
+left enabled after a maintenance window.
+
+### Production posture
+
+```json
+{
+  "environment": "production",
+  "allow_destructive_admin": false
+}
+```
+
+`allow_destructive_admin` **must be `false` in production**.  Set it to `true`
+only during a controlled maintenance window (e.g. a post-migration data wipe),
+and revert it immediately afterwards.  Never commit `allow_destructive_admin:
+true` to a production config file.
+
+### Enabling for maintenance
+
+```json
+{
+  "environment": "staging",
+  "allow_destructive_admin": true
+}
+```
+
+The wipe endpoint additionally requires the caller to include `"confirm":
+"WIPE"` in the request body, and the init endpoint requires `"confirm":
+"INIT"`.  These confirmation tokens prevent accidents from HTTP replays or
+misconfigured automation.
+
 ## Configuration Validation
 
 ### Automatic Validation
@@ -1012,7 +1078,7 @@ Enable debug logging to see configuration loading:
 
 ```bash
 export ORB_LOG_LEVEL=DEBUG
-orb system serve --config config.json
+orb server start --foreground --config config.json
 ```
 
 This will show:

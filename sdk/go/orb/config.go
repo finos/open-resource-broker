@@ -9,7 +9,8 @@ import (
 type ProcessConfig struct {
 	// Binary is the path to the orb executable (default: "orb").
 	Binary string
-	// Args are extra arguments passed after "system serve" (e.g. ["--port", "18080"]).
+	// Args are extra arguments passed after "server start --foreground --api-only"
+	// (e.g. ["--port", "18080"]).
 	Args []string
 	// Env sets additional environment variables for the subprocess.
 	Env []string

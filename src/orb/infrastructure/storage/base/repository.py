@@ -175,18 +175,33 @@ class StrategyBasedRepository(Repository[T], Generic[T]):
 
                 # Handle both new EventBus (async publish) and legacy publisher (sync)
                 if hasattr(event_bus, "publish") and asyncio.iscoroutinefunction(event_bus.publish):
-                    for event in events:
-                        try:
-                            asyncio.get_running_loop()
-                            _ = asyncio.create_task(event_bus.publish(event))
-                        except RuntimeError:
-                            asyncio.run(event_bus.publish(event))
-                        except Exception as publish_error:
-                            self.logger.error(
-                                "Failed to publish event %s: %s",
-                                event.__class__.__name__,
-                                publish_error,
-                            )
+                    try:
+                        loop = asyncio.get_running_loop()
+                    except RuntimeError:
+                        loop = None
+
+                    if loop is None:
+                        # save() was called from a synchronous context with no running
+                        # event loop.  Creating a throwaway loop via asyncio.run() would
+                        # bind the published events to a different loop than the one used
+                        # by SSE subscriber queues, causing RuntimeError in those queues.
+                        # Skipping is the safe choice: a missed SSE event is recoverable;
+                        # a corrupted subscriber queue is not.
+                        self.logger.warning(
+                            "event publish skipped: save() called outside an event loop; "
+                            "SSE subscribers will not see this event. "
+                            "Move the call inside the running loop or use a bus-aware sync API."
+                        )
+                    else:
+                        for event in events:
+                            try:
+                                _ = loop.create_task(event_bus.publish(event))
+                            except Exception as publish_error:
+                                self.logger.error(
+                                    "Failed to publish event %s: %s",
+                                    event.__class__.__name__,
+                                    publish_error,
+                                )
                 else:
                     # Legacy publisher (sync)
                     for event in events:

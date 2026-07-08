@@ -29,6 +29,7 @@ def _make_machine(
         request_id="request-001",
         provider_type="aws",
         provider_name="aws-us-east-1",
+        provider_api="ec2fleet",
         instance_type=InstanceType(value="t2.micro"),
         image_id="ami-12345678",
         status=status,
@@ -176,6 +177,7 @@ class TestMachineAggregate:
             request_id="request-002",
             provider_type="aws",
             provider_name="aws-us-west-2",
+            provider_api="ec2fleet",
             instance_type=InstanceType(value="t2.small"),
             image_id="ami-87654321",
             status=MachineStatus.STOPPED,
@@ -198,6 +200,7 @@ class TestMachineAggregate:
             request_id="request-different",
             provider_type="aws",
             provider_name="aws-us-west-2",
+            provider_api="ec2fleet",
             instance_type=InstanceType(value="t2.large"),
             image_id="ami-different",
             status=MachineStatus.STOPPED,
@@ -227,6 +230,7 @@ class TestMachineAggregate:
             "request_id": "request-001",
             "provider_type": "aws",
             "provider_name": "aws-us-east-1",
+            "provider_api": "ec2fleet",
             "instance_type": InstanceType(value="t2.micro"),
             "image_id": "ami-12345678",
             "status": MachineStatus.RUNNING,
@@ -336,6 +340,105 @@ class TestMachineAggregate:
         events = machine.get_domain_events()
         provisioned = [e for e in events if isinstance(e, MachineProvisionedEvent)]
         assert len(provisioned) == 0
+
+
+@pytest.mark.unit
+class TestMachineProviderApiValidation:
+    """provider_api must be a non-empty string at the domain boundary."""
+
+    def test_empty_provider_api_raises_validation_error(self):
+        """Machine.model_validate with provider_api='' must raise ValidationError."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            Machine.model_validate(
+                {
+                    "machine_id": "i-1234567890abcdef0",
+                    "template_id": "template-001",
+                    "provider_type": "aws",
+                    "provider_name": "aws-us-east-1",
+                    "provider_api": "",
+                    "instance_type": "t2.micro",
+                    "image_id": "ami-12345678",
+                }
+            )
+
+    def test_missing_provider_api_raises_validation_error(self):
+        """Machine.model_validate without provider_api must raise ValidationError."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            Machine.model_validate(
+                {
+                    "machine_id": "i-1234567890abcdef0",
+                    "template_id": "template-001",
+                    "provider_type": "aws",
+                    "provider_name": "aws-us-east-1",
+                    "instance_type": "t2.micro",
+                    "image_id": "ami-12345678",
+                }
+            )
+
+    def test_nonempty_provider_api_accepted(self):
+        """Machine.model_validate with a non-empty provider_api must succeed."""
+        machine = _make_machine(provider_api="EC2Fleet")
+        assert machine.provider_api == "EC2Fleet"
+
+
+@pytest.mark.unit
+class TestMachineFromProviderFormat:
+    """from_provider_format correctly maps provider_api and rejects missing values."""
+
+    def _base_data(self) -> dict:
+        return {
+            "instance_id": "i-aabbccddeeff0011",
+            "template_id": "template-001",
+            "provider_name": "aws-us-east-1",
+            "instance_type": "t3.medium",
+            "image_id": "ami-deadbeef",
+            "status": "running",
+        }
+
+    def test_from_provider_format_with_snake_case_provider_api(self):
+        """from_provider_format with snake_case provider_api returns a valid Machine."""
+        data = {**self._base_data(), "provider_api": "EC2Fleet"}
+        machine = Machine.from_provider_format(data, provider_type="aws")
+        assert machine.provider_api == "EC2Fleet"
+        assert str(machine.machine_id) == "i-aabbccddeeff0011"
+
+    def test_from_provider_format_with_camel_case_provider_api(self):
+        """from_provider_format with camelCase providerApi returns a valid Machine."""
+        data = {**self._base_data(), "providerApi": "RunInstances"}
+        machine = Machine.from_provider_format(data, provider_type="aws")
+        assert machine.provider_api == "RunInstances"
+
+    def test_from_provider_format_without_provider_api_raises_value_error(self):
+        """from_provider_format with neither provider_api nor providerApi raises ValueError."""
+        data = self._base_data()  # no provider_api key at all
+        with pytest.raises(ValueError, match="provider_api"):
+            Machine.from_provider_format(data, provider_type="aws")
+
+    def test_from_provider_format_with_camel_case_provider_name(self):
+        """from_provider_format with camelCase providerName returns a valid Machine."""
+        data = {**self._base_data(), "provider_api": "EC2Fleet"}
+        del data["provider_name"]
+        data["providerName"] = "aws-eu-west-2"
+        machine = Machine.from_provider_format(data, provider_type="aws")
+        assert machine.provider_name == "aws-eu-west-2"
+
+    def test_from_provider_format_without_provider_name_raises_value_error(self):
+        """from_provider_format with neither provider_name nor providerName raises ValueError."""
+        data = self._base_data()
+        del data["provider_name"]
+        data["provider_api"] = "EC2Fleet"
+        with pytest.raises(ValueError, match="provider_name"):
+            Machine.from_provider_format(data, provider_type="aws")
+
+    def test_from_provider_format_with_empty_provider_name_raises_value_error(self):
+        """from_provider_format with empty provider_name raises ValueError."""
+        data = {**self._base_data(), "provider_api": "EC2Fleet", "provider_name": ""}
+        with pytest.raises(ValueError, match="provider_name"):
+            Machine.from_provider_format(data, provider_type="aws")
 
 
 @pytest.mark.unit

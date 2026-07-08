@@ -1,20 +1,27 @@
-"""Enhanced bearer token authentication strategy with blacklist and rate limiting."""
+"""Enhanced bearer token authentication strategy with denylist and rate limiting."""
+
+from __future__ import annotations
 
 import base64
 import json
 import time
 from collections import defaultdict
+from typing import TYPE_CHECKING, Any
 
 import jwt
 
+from orb.domain.base.exceptions import ConfigurationError
 from orb.infrastructure.adapters.ports.auth import (
     AuthContext,
     AuthPort,
     AuthResult,
     AuthStatus,
 )
-from orb.infrastructure.auth.token_blacklist import TokenBlacklistPort
+from orb.infrastructure.auth.token_denylist import TokenDenylistPort
 from orb.infrastructure.logging.logger import get_logger
+
+if TYPE_CHECKING:
+    pass
 
 
 class RateLimiter:
@@ -68,12 +75,12 @@ class RateLimiter:
 
 
 class EnhancedBearerTokenStrategy(AuthPort):
-    """Enhanced authentication strategy with JWT blacklist and rate limiting."""
+    """Enhanced authentication strategy with JWT denylist and rate limiting."""
 
     def __init__(
         self,
         secret_key: str,
-        blacklist: TokenBlacklistPort,
+        denylist: TokenDenylistPort,
         algorithm: str = "HS256",
         token_expiry: int = 3600,
         enabled: bool = True,
@@ -86,7 +93,7 @@ class EnhancedBearerTokenStrategy(AuthPort):
 
         Args:
             secret_key: Secret key for JWT signing/verification
-            blacklist: Token blacklist implementation
+            denylist: Token denylist implementation
             algorithm: JWT algorithm to use
             token_expiry: Token expiry time in seconds
             enabled: Whether this strategy is enabled
@@ -95,7 +102,7 @@ class EnhancedBearerTokenStrategy(AuthPort):
             rate_window: Rate limit window in seconds
         """
         self.secret_key = secret_key
-        self.blacklist = blacklist
+        self.denylist = denylist
         self.algorithm = algorithm
         self.token_expiry = token_expiry
         self.enabled = enabled
@@ -105,8 +112,8 @@ class EnhancedBearerTokenStrategy(AuthPort):
 
         # Validate secret key strength (minimum 256 bits = 32 bytes)
         if len(secret_key.encode()) < 32:
-            self.logger.warning(
-                "Secret key is weak (< 256 bits). Use a stronger key for production."
+            raise ConfigurationError(
+                "Bearer token secret_key must be at least 32 bytes for security."
             )
 
     async def authenticate(self, context: AuthContext) -> AuthResult:
@@ -157,7 +164,7 @@ class EnhancedBearerTokenStrategy(AuthPort):
 
     async def validate_token(self, token: str) -> AuthResult:
         """
-        Validate JWT token with blacklist check.
+        Validate JWT token with denylist check.
 
         Args:
             token: JWT token to validate
@@ -166,8 +173,8 @@ class EnhancedBearerTokenStrategy(AuthPort):
             Authentication result with user information
         """
         try:
-            # Check blacklist first (fail fast)
-            if await self.blacklist.is_blacklisted(token):
+            # Check denylist first (fail fast)
+            if await self.denylist.is_denylisted(token):
                 self.logger.warning("Attempted use of revoked JWT")
                 return AuthResult(
                     status=AuthStatus.INVALID,
@@ -233,8 +240,8 @@ class EnhancedBearerTokenStrategy(AuthPort):
             New authentication result with fresh token
         """
         try:
-            # Check blacklist
-            if await self.blacklist.is_blacklisted(refresh_token):
+            # Check denylist
+            if await self.denylist.is_denylisted(refresh_token):
                 return AuthResult(
                     status=AuthStatus.INVALID,
                     error_message="Refresh token has been revoked",
@@ -281,7 +288,7 @@ class EnhancedBearerTokenStrategy(AuthPort):
 
     async def revoke_token(self, token: str) -> bool:
         """
-        Revoke token by adding to blacklist.
+        Revoke token by adding to denylist.
 
         Args:
             token: Token to revoke
@@ -291,7 +298,7 @@ class EnhancedBearerTokenStrategy(AuthPort):
         """
         try:
             # Extract expiration from JWT payload without verification
-            # (token is being revoked, we only need exp for blacklist TTL)
+            # (token is being revoked, we only need exp for denylist TTL)
             try:
                 payload_part = token.split(".")[1]
                 # Add padding if needed
@@ -303,19 +310,67 @@ class EnhancedBearerTokenStrategy(AuthPort):
             except Exception:
                 expires_at = None
 
-            # Add to blacklist
-            success = await self.blacklist.add_token(token, expires_at)
+            # Add to denylist
+            success = await self.denylist.add_token(token, expires_at)
 
             if success:
-                self.logger.info("JWT revoked and added to blacklist")
+                self.logger.info("JWT revoked and added to denylist")
             else:
-                self.logger.error("Failed to add JWT to blacklist")
+                self.logger.error("Failed to add JWT to denylist")
 
             return success
 
         except Exception as e:
             self.logger.error("Auth revocation error: %s", e)
             return False
+
+    @classmethod
+    def from_auth_config(cls, auth_config: Any) -> EnhancedBearerTokenStrategy:
+        """
+        Build strategy instance from AuthConfig.
+
+        Extracts the bearer_token sub-config and wires an InMemoryTokenDenylist.
+
+        Args:
+            auth_config: AuthConfig instance with typed bearer_token sub-config
+
+        Returns:
+            Configured EnhancedBearerTokenStrategy
+
+        Raises:
+            ConfigurationError: If required fields are missing or invalid
+        """
+        from orb.infrastructure.auth.token_denylist.in_memory_denylist import (
+            InMemoryTokenDenylist,
+        )
+
+        bearer_cfg = getattr(auth_config, "bearer_token", None)
+        if bearer_cfg is None:
+            raise ConfigurationError(
+                "Enhanced bearer token authentication requires auth.bearer_token configuration."
+            )
+        raw_secret = getattr(bearer_cfg, "secret_key", None)
+        if raw_secret is None:
+            raise ConfigurationError(
+                "Enhanced bearer token authentication requires a secret_key in auth.bearer_token config."
+            )
+        # SecretStr — call .get_secret_value() to obtain the plain string for JWT ops.
+        secret_key: str = (
+            raw_secret.get_secret_value()
+            if hasattr(raw_secret, "get_secret_value")
+            else str(raw_secret)
+        )
+        if not secret_key:
+            raise ConfigurationError(
+                "Enhanced bearer token authentication requires a secret_key in auth.bearer_token config."
+            )
+        return cls(
+            secret_key=secret_key,
+            denylist=InMemoryTokenDenylist(),
+            algorithm=getattr(bearer_cfg, "algorithm", "HS256"),
+            token_expiry=getattr(bearer_cfg, "token_expiry", 3600),
+            enabled=True,
+        )
 
     def get_strategy_name(self) -> str:
         """Get strategy name."""

@@ -1,6 +1,6 @@
 # Provider Override Functionality
 
-The `--provider` flag allows you to override the selected provider instance for any command, similar to how `--scheduler` overrides the scheduler strategy.
+The `--provider-name` flag allows you to override the selected provider instance for any command, similar to how `--scheduler` overrides the scheduler strategy.
 
 ## Overview
 
@@ -15,7 +15,7 @@ Provider override enables you to:
 ### Basic Syntax
 
 ```bash
-orb --provider PROVIDER_INSTANCE_NAME [command] [args...]
+orb --provider-name PROVIDER_INSTANCE_NAME [command] [args...]
 ```
 
 ### Provider Instance Names
@@ -40,50 +40,50 @@ You can use any naming convention in your configuration:
 
 ```bash
 # List templates using production provider
-orb --provider aws-prod templates list
+orb --provider-name aws-prod templates list
 
 # Generate templates for development provider
-orb --provider aws-dev templates generate
+orb --provider-name aws-dev templates generate
 
 # Show template with specific provider context
-orb --provider aws-staging templates show aws-basic
+orb --provider-name aws-staging templates show aws-basic
 ```
 
 ### Machine Requests
 
 ```bash
 # Request machines from production provider
-orb --provider aws-prod machines request aws-basic 5
+orb --provider-name aws-prod machines request aws-basic 5
 
 # Request from development provider with different scheduler
-orb --scheduler hostfactory --provider aws-dev machines request template-id 3
+orb --scheduler hostfactory --provider-name aws-dev machines request template-id 3
 
 # Check machine status with specific provider
-orb --provider aws-prod machines status i-1234567890abcdef0
+orb --provider-name aws-prod machines status i-1234567890abcdef0
 ```
 
 ### Request Management
 
 ```bash
 # Check request status with production provider
-orb --provider aws-prod requests status req-123
+orb --provider-name aws-prod requests status req-123
 
 # List requests from development environment
-orb --provider aws-dev requests list --status pending
+orb --provider-name aws-dev requests list --status pending
 
 # Cancel request with specific provider context
-orb --provider aws-staging requests cancel req-456
+orb --provider-name aws-staging requests cancel req-456
 ```
 
 ### Provider Health Checks
 
 ```bash
 # Check specific provider health
-orb --provider aws-prod providers health
+orb --provider-name aws-prod providers health
 
 # Compare health across providers
-orb --provider aws-prod providers health --format table
-orb --provider aws-dev providers health --format table
+orb --provider-name aws-prod providers health --format table
+orb --provider-name aws-dev providers health --format table
 ```
 
 ## Configuration Requirements
@@ -142,7 +142,7 @@ The system validates provider overrides:
 ### Provider Not Found
 
 ```bash
-$ orb --provider nonexistent-provider templates list
+$ orb --provider-name nonexistent-provider templates list
 Error: Provider instance 'nonexistent-provider' not found
 Available providers: aws-prod, aws-dev, aws-staging
 ```
@@ -150,14 +150,14 @@ Available providers: aws-prod, aws-dev, aws-staging
 ### Provider Disabled
 
 ```bash
-$ orb --provider disabled-provider machines request template-id 1
+$ orb --provider-name disabled-provider machines request template-id 1
 Error: Provider instance 'disabled-provider' is disabled
 ```
 
 ### Configuration Issues
 
 ```bash
-$ orb --provider aws-misconfigured providers health
+$ orb --provider-name aws-misconfigured providers health
 Error: Provider 'aws-misconfigured' configuration invalid: missing required field 'region'
 ```
 
@@ -165,7 +165,7 @@ Error: Provider 'aws-misconfigured' configuration invalid: missing required fiel
 
 When multiple provider selection methods are used:
 
-1. **CLI Override** (`--provider`) - Highest precedence
+1. **CLI Override** (`--provider-name`) - Highest precedence
 2. **Template Setting** (`provider_name` in template) - Medium precedence  
 3. **Configuration Default** - Lowest precedence
 
@@ -182,7 +182,7 @@ When multiple provider selection methods are used:
 
 ```bash
 # CLI override wins over template setting
-orb --provider aws-prod machines request aws-basic 1
+orb --provider-name aws-prod machines request aws-basic 1
 # Uses aws-prod, not aws-dev from template
 ```
 
@@ -194,10 +194,10 @@ Provider override works with template generation:
 
 ```bash
 # Generate templates for production provider only
-orb --provider aws-prod templates generate
+orb --provider-name aws-prod templates generate
 
 # Generate with specific API for development
-orb --provider aws-dev templates generate --provider-api EC2Fleet
+orb --provider-name aws-dev templates generate --provider-api EC2Fleet
 ```
 
 ### Provider-Aware Template Files
@@ -217,13 +217,13 @@ Provider and scheduler overrides work together:
 
 ```bash
 # Use HostFactory scheduler with production provider
-orb --scheduler hostfactory --provider aws-prod machines request template-id 5
+orb --scheduler hostfactory --provider-name aws-prod machines request template-id 5
 
 # Use default scheduler with development provider
-orb --scheduler default --provider aws-dev templates list --format table
+orb --scheduler default --provider-name aws-dev templates list --format table
 
 # Test configuration with specific scheduler and provider
-orb --scheduler hf --provider aws-staging system health --detailed
+orb --scheduler hf --provider-name aws-staging system health --detailed
 ```
 
 ## Best Practices
@@ -232,40 +232,40 @@ orb --scheduler hf --provider aws-staging system health --detailed
 
 ```bash
 # Development commands
-orb --provider aws-dev templates generate
-orb --provider aws-dev machines request test-template 1
+orb --provider-name aws-dev templates generate
+orb --provider-name aws-dev machines request test-template 1
 
 # Staging validation
-orb --provider aws-staging machines request prod-template 1 --dry-run
+orb --provider-name aws-staging machines request prod-template 1 --dry-run
 
 # Production deployment
-orb --provider aws-prod machines request prod-template 10
+orb --provider-name aws-prod machines request prod-template 10
 ```
 
 ### Environment Testing
 
 ```bash
 # Test same template across environments
-orb --provider aws-dev machines request aws-basic 1
-orb --provider aws-staging machines request aws-basic 1  
-orb --provider aws-prod machines request aws-basic 1
+orb --provider-name aws-dev machines request aws-basic 1
+orb --provider-name aws-staging machines request aws-basic 1  
+orb --provider-name aws-prod machines request aws-basic 1
 
 # Compare provider health
-orb --provider aws-dev providers health --format table
-orb --provider aws-prod providers health --format table
+orb --provider-name aws-dev providers health --format table
+orb --provider-name aws-prod providers health --format table
 ```
 
 ### Configuration Validation
 
 ```bash
 # Validate each provider configuration
-orb --provider aws-dev config validate
-orb --provider aws-staging config validate
-orb --provider aws-prod config validate
+orb --provider-name aws-dev config validate
+orb --provider-name aws-staging config validate
+orb --provider-name aws-prod config validate
 
 # Test connectivity
-orb --provider aws-dev providers health
-orb --provider aws-prod providers health
+orb --provider-name aws-dev providers health
+orb --provider-name aws-prod providers health
 ```
 
 ## Troubleshooting
@@ -284,20 +284,20 @@ orb providers list --detailed --format yaml
 
 ```bash
 # Show specific provider configuration
-orb --provider aws-prod providers show --format yaml
+orb --provider-name aws-prod providers show --format yaml
 
 # Check provider health
-orb --provider aws-prod providers health --detailed
+orb --provider-name aws-prod providers health --detailed
 ```
 
 ### Debug Provider Selection
 
 ```bash
 # Use verbose output to see provider selection
-orb --verbose --provider aws-dev machines request template-id 1
+orb --verbose --provider-name aws-dev machines request template-id 1
 
 # Check what provider would be selected
-orb --dry-run --provider aws-prod machines request template-id 1
+orb --dry-run --provider-name aws-prod machines request template-id 1
 ```
 
 ## Integration with Other Features
@@ -308,24 +308,24 @@ Provider override works with MCP server:
 
 ```bash
 # Start MCP server with specific provider context
-orb --provider aws-prod mcp serve --stdio
+orb --provider-name aws-prod mcp serve --stdio
 ```
 
 ### API Server Mode
 
 ```bash
 # Start API server with provider override
-orb --provider aws-dev system serve --port 8000
+orb --provider-name aws-dev system serve --port 8000
 ```
 
 ### Batch Operations
 
 ```bash
 # Process multiple requests with same provider
-orb --provider aws-prod requests status req-123 req-456 req-789
+orb --provider-name aws-prod requests status req-123 req-456 req-789
 
 # Return multiple machines from specific provider
-orb --provider aws-prod machines return i-123 i-456 i-789
+orb --provider-name aws-prod machines return i-123 i-456 i-789
 ```
 
 ## See Also

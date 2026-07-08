@@ -12,6 +12,7 @@ from .provider_config_port import ProviderConfigPort
 from .provider_discovery_port import ProviderDiscoveryPort
 from .provider_port import ProviderPort
 from .provider_selection_port import ProviderSelectionPort
+from .retry_classifier_port import RetryClassifierPort
 from .storage_port import StoragePort
 from .template_configuration_port import TemplateConfigurationPort
 
@@ -28,6 +29,7 @@ __all__: list[str] = [
     "ProviderDiscoveryPort",
     "ProviderPort",
     "ProviderSelectionPort",
+    "RetryClassifierPort",
     "StoragePort",
     "TemplateConfigurationPort",
 ]

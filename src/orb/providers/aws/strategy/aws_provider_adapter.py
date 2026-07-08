@@ -12,7 +12,6 @@ from orb.domain.base.provider_interfaces import (
     ProviderResourceTag,
     ProviderResourceValidator,
     ProviderStateMapper,
-    ProviderType,
 )
 
 
@@ -120,9 +119,9 @@ class AWSProviderAdapter:
         self._logger = logger
 
     @property
-    def provider_type(self) -> ProviderType:
+    def provider_type(self) -> str:
         """Get the provider type."""
-        return ProviderType.AWS
+        return "aws"
 
     @property
     def state_mapper(self) -> ProviderStateMapper:
@@ -143,7 +142,7 @@ class AWSProviderAdapter:
             raise ValueError(f"Invalid AWS {resource_type} identifier: {identifier}")
 
         return ProviderResourceIdentifier(
-            provider_type=ProviderType.AWS,
+            provider_type="aws",
             resource_type=resource_type,
             identifier=identifier,
             region=region,

@@ -106,6 +106,11 @@ class AWSInstanceOperationService:
             adapter_result = await self._provisioning_adapter.provision_resources(
                 request, aws_template
             )
+            # Flatten adapter provider_data directly into metadata — no nested
+            # {method, provider_data: {...}} envelope.  Consumers read from a
+            # flat dict; the "method" key is recorded for telemetry only.
+            adapter_pd: dict = adapter_result.get("provider_data") or {}
+            flat_metadata: dict = {"method": "provisioning_adapter", **adapter_pd}
             return ProviderResult.success_result(
                 {
                     "resource_ids": adapter_result.get("resource_ids", []),
@@ -114,10 +119,7 @@ class AWSInstanceOperationService:
                     "count": count,
                     "template_id": aws_template.template_id,
                 },
-                {
-                    "method": "provisioning_adapter",
-                    "provider_data": adapter_result.get("provider_data", {}),
-                },
+                flat_metadata,
             )
 
         except Exception as e:

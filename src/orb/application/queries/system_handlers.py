@@ -102,8 +102,6 @@ class GetProviderConfigHandler(BaseQueryHandler[GetProviderConfigQuery, Provider
         super().__init__(logger, error_handler)
         self.container = container
         self.timestamp_service = timestamp_service
-        super().__init__(logger, error_handler)
-        self.container = container
 
     async def execute_query(self, query: GetProviderConfigQuery) -> ProviderConfigDTO:
         """Execute provider configuration query."""
@@ -490,8 +488,11 @@ class GetSystemConfigHandler(BaseQueryHandler[GetSystemConfigQuery, SystemConfig
                     break
 
             template_search_paths = all_paths
-        except Exception:  # noqa: BLE001 — template path resolution is best-effort; fall back to None
-            pass
+        except Exception as exc:
+            # Best-effort template-path resolution; fall back to None so
+            # the response still renders without a scheduler port. Log
+            # the failure so a misconfigured scheduler is observable.
+            self.logger.debug("template path resolution failed: %s", exc)
 
         paths = PathsSectionDTO(
             root_dir=cfg.get_root_dir() if hasattr(cfg, "get_root_dir") else "",
@@ -583,7 +584,7 @@ class GetSystemConfigHandler(BaseQueryHandler[GetSystemConfigQuery, SystemConfig
                     failure_threshold=cb.failure_threshold,
                     recovery_timeout=cb.recovery_timeout,
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 cb_cfg = cfg.get("circuit_breaker", {})
                 if isinstance(cb_cfg, dict):
                     circuit_breaker = CircuitBreakerSectionDTO(

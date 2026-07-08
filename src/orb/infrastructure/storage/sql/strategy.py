@@ -3,8 +3,9 @@
 from contextlib import contextmanager
 from typing import Any, Optional
 
-from sqlalchemy import text
+from sqlalchemy import MetaData, Table, column as sa_column, func, select, text
 
+from orb.application.ports.exceptions import RepositoryQueryError
 from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.storage.base.strategy import BaseStorageStrategy
 
@@ -52,6 +53,33 @@ class SQLStorageStrategy(BaseStorageStrategy):
 
         self.logger.debug("Initialized SQL storage strategy for table %s", table_name)
 
+    def is_healthy(self) -> tuple[bool, dict[str, Any]]:
+        """Probe SQL: confirm connection works AND the configured table exists.
+
+        Two cheap calls:
+          - ``SELECT 1`` via the connection manager
+          - ``table_exists(self.table_name)`` to catch schema-not-deployed
+        """
+        info = self.connection_manager.get_connection_info()
+        details: dict[str, Any] = {
+            "type": "sql",
+            "database_type": info.get("database_type", "unknown"),
+            "table": self.table_name,
+        }
+        if not info.get("healthy", False):
+            details["reason"] = "connection manager reports unhealthy"
+            return False, details
+        try:
+            table_present = self.connection_manager.table_exists(self.table_name)
+        except Exception as exc:
+            details["error"] = f"table_exists check failed: {exc}"
+            return False, details
+        details["table_exists"] = table_present
+        if not table_present:
+            details["reason"] = "configured table does not exist"
+            return False, details
+        return True, details
+
     def _get_id_column(self) -> str:
         """Get the primary key column name."""
         for column_name, column_type in self.columns.items():
@@ -60,15 +88,181 @@ class SQLStorageStrategy(BaseStorageStrategy):
         return "id"  # Default fallback
 
     def _initialize_table(self) -> None:
-        """Initialize database table if it doesn't exist."""
+        """Initialize database tables.
+
+        For tables that are defined in the ORM (requests, machines, templates)
+        ``Base.metadata.create_all`` is used — this is the authoritative DDL path.
+
+        Pre-existing SQL installs (tables present but no ``alembic_version``
+        row) are auto-stamped at head so Alembic knows the current schema
+        position without re-running migrations.  This only fires once on first
+        boot after the upgrade; subsequent starts find the version row and skip
+        the stamp.
+
+        For any other table name (e.g. ad-hoc tables used in tests or generic
+        storage) the legacy column-dict driven ``build_create_table`` path is
+        used as a fallback so existing behaviour is preserved.
+        """
         try:
-            if not self.connection_manager.table_exists(self.table_name):
+            from orb.infrastructure.storage.sql.models import Base
+
+            engine = self.connection_manager.get_engine()
+            orm_tables = set(Base.metadata.tables.keys())
+
+            if self.table_name in orm_tables:
+                # Check before create_all whether this is a pre-existing install
+                # without Alembic version tracking so we can stamp it afterwards.
+                alembic_version_exists = self.connection_manager.table_exists("alembic_version")
+                tables_already_exist = self.connection_manager.table_exists(self.table_name)
+
+                Base.metadata.create_all(engine)
+                self.logger.debug(
+                    "Applied Base.metadata.create_all for ORM table %s", self.table_name
+                )
+
+                # Auto-stamp head for pre-existing installs that have real data
+                # tables but have never been managed by Alembic.  Do NOT stamp
+                # when alembic_version already exists — that would overwrite a
+                # legitimate mid-migration state.
+                if tables_already_exist and not alembic_version_exists:
+                    self._auto_stamp_head(engine)
+
+            # Fallback: build CREATE TABLE from the column dict (legacy path).
+            elif not self.connection_manager.table_exists(self.table_name):
                 create_table_sql = self.query_builder.build_create_table()
                 self.connection_manager.execute_query(create_table_sql)
-                self.logger.info("Created table: %s", self.table_name)
+                self.logger.info("Created non-ORM table via column-dict DDL: %s", self.table_name)
         except Exception as e:
             self.logger.error("Failed to initialize table %s: %s", self.table_name, e)
             raise
+
+    def _auto_stamp_head(self, engine: Any) -> None:
+        """Stamp the Alembic revision table at head for pre-existing installs.
+
+        Called only when the application tables already exist but no
+        ``alembic_version`` row is present — i.e. the database was created by
+        a previous ``Base.metadata.create_all`` call that predates Alembic
+        management.  Stamping records the current head revision without
+        re-running any DDL, so subsequent ``alembic upgrade head`` runs are
+        no-ops rather than failures.
+
+        Race-safety: concurrent workers may all detect the missing
+        ``alembic_version`` row and arrive here simultaneously.  To ensure
+        exactly one worker inserts the revision row this method wraps the
+        detection + insert in a serialised transaction:
+
+        * SQLite — ``BEGIN IMMEDIATE`` acquires a RESERVED lock before the
+                   SELECT, preventing any other writer from inserting between
+                   the check and the INSERT.
+        * PostgreSQL — the connection is set to ``SERIALIZABLE`` isolation so
+                       a concurrent phantom insert is detected and the loser
+                       rolls back and logs at INFO (not a failure).
+        * Other dialects — best-effort: try the inline INSERT; let the
+                           caller's exception handler catch duplicates.
+        """
+        try:
+            import os
+
+            import alembic.config
+            import alembic.script
+
+            # Resolve the head revision from the script directory so the
+            # stamped value is always the current migration head — never a
+            # hard-coded string that could go stale.
+            alembic_ini = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "migrations",
+                "alembic.ini",
+            )
+            cfg = alembic.config.Config(alembic_ini)
+            cfg.set_main_option("sqlalchemy.url", str(engine.url))
+            script_dir = alembic.script.ScriptDirectory.from_config(cfg)
+            head_revision = script_dir.get_current_head()
+            if head_revision is None:
+                self.logger.warning(
+                    "Cannot resolve Alembic head revision; skipping auto-stamp for table %s.",
+                    self.table_name,
+                )
+                return
+
+            dialect = engine.dialect.name.lower()
+
+            # Use a fresh DBAPI connection for the stamp so we control the
+            # transaction isolation level independently of the pooled
+            # application connections.
+            raw_conn = engine.raw_connection()
+            try:
+                raw_cursor = raw_conn.cursor()
+
+                # Acquire a write-intent lock BEFORE the IF-NOT-EXISTS check so
+                # that no other concurrent worker can insert between our check and
+                # our INSERT.
+                #
+                # SQLite:     BEGIN IMMEDIATE upgrades to RESERVED lock so only
+                #             one writer proceeds; others queue or get BUSY.
+                # PostgreSQL: Set SERIALIZABLE isolation; a concurrent phantom
+                #             INSERT will cause the loser's transaction to abort.
+                # Other:      No explicit lock — best-effort serialisation via
+                #             the database's default isolation.
+                if dialect == "sqlite":
+                    raw_cursor.execute("BEGIN IMMEDIATE")
+                elif dialect in ("postgresql", "postgres"):
+                    raw_conn.set_isolation_level(
+                        # psycopg2 SERIALIZABLE constant
+                        getattr(raw_conn, "ISOLATION_LEVEL_SERIALIZABLE", 4)
+                    )
+                    raw_cursor.execute("BEGIN")
+
+                # Ensure alembic_version table exists (may be absent on very
+                # old installs that pre-date even the table creation).
+                raw_cursor.execute(
+                    "CREATE TABLE IF NOT EXISTS alembic_version "
+                    "(version_num VARCHAR(32) NOT NULL, "
+                    "CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num))"
+                )
+
+                # Re-check inside the lock: another worker may have already stamped.
+                raw_cursor.execute("SELECT version_num FROM alembic_version LIMIT 1")
+                existing = raw_cursor.fetchone()
+
+                if existing is not None:
+                    self.logger.info(
+                        "Auto-stamp skipped for table %s: alembic_version already contains %s "
+                        "(another worker stamped first).",
+                        self.table_name,
+                        existing[0],
+                    )
+                    raw_conn.rollback()
+                    return
+
+                raw_cursor.execute(
+                    "INSERT INTO alembic_version (version_num) VALUES (?)"
+                    if dialect == "sqlite"
+                    else "INSERT INTO alembic_version (version_num) VALUES (%s)",
+                    (head_revision,),
+                )
+                raw_conn.commit()
+                raw_cursor.close()
+            except Exception:
+                raw_conn.rollback()
+                raise
+            finally:
+                raw_conn.close()
+
+            self.logger.info(
+                "Auto-stamped Alembic revision %s at head for pre-existing install "
+                "(tables existed without alembic_version row). "
+                "Run 'orb storage migrate current' to verify.",
+                head_revision,
+            )
+        except Exception as exc:
+            # Stamping is best-effort: log the failure but do not abort startup.
+            self.logger.warning(
+                "Could not auto-stamp Alembic head for table %s: %s. "
+                "Run 'orb storage migrate stamp head' manually.",
+                self.table_name,
+                exc,
+            )
 
     def save(self, entity_id: str, data: dict[str, Any]) -> None:
         """
@@ -296,6 +490,54 @@ class SQLStorageStrategy(BaseStorageStrategy):
             except Exception as e:
                 self.logger.error("Failed to delete batch: %s", e)
                 raise StorageError(f"Failed to delete batch: {e}")
+
+    def count_by_column(self, column: str) -> dict[str, int]:
+        """Return ``{column_value: count}`` via a single SQL GROUP BY query.
+
+        Used by the dashboard to get per-status (or per-provider-api) counts
+        without loading every row into Python first.
+
+        Falls back to an empty dict on any error so callers can degrade
+        gracefully to the list-and-count slow path if needed.
+        """
+        # Validate the column against the strategy's registered columns dict
+        # before building the query.  This is the only place untrusted strings
+        # could ever enter the SQL build; rejecting unknown columns keeps the
+        # query construction below restricted to identifiers we registered at
+        # construction time.
+        if column not in self.columns:
+            raise StorageError(
+                f"count_by_column: column {column!r} is not in the registered "
+                f"schema for table {self.table_name!r}"
+            )
+        # Build the SELECT via SQLAlchemy Core constructs — no raw SQL string
+        # interpolation.  The column object is created by name (validated
+        # above) and the Table is reflected from MetaData by name (also
+        # validated since self.table_name is a constructor-time constant).
+        bucket = sa_column(column)
+        table = Table(self.table_name, MetaData())
+        stmt = (
+            select(bucket.label("bucket"), func.count().label("cnt"))
+            .select_from(table)
+            .group_by(bucket)
+        )
+        with self.lock_manager.read_lock():
+            try:
+                with self.connection_manager.get_session() as session:
+                    result = session.execute(stmt)
+                    rows = result.fetchall()
+                counts: dict[str, int] = {}
+                for row in rows:
+                    row_dict = dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
+                    key = str(row_dict.get("bucket") or "unknown")
+                    counts[key] = int(row_dict.get("cnt", 0))
+                return counts
+            except Exception as exc:
+                from sqlalchemy.exc import SQLAlchemyError
+
+                if isinstance(exc, SQLAlchemyError):
+                    raise RepositoryQueryError(str(exc)) from exc
+                raise
 
     def begin_transaction(self) -> None:
         """Begin transaction (handled by session)."""

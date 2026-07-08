@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from types import TracebackType
-from typing import Any, Generic, Optional, TypeVar, Union
+from typing import Any, Generic, Optional, TypeVar
 
 from orb.domain.base.ports.storage_port import StoragePort
 from orb.infrastructure.logging.logger import get_logger
@@ -84,7 +84,7 @@ class StorageStrategy(StoragePort[T], ABC, Generic[T]):
         """
 
     @abstractmethod
-    def find_all(self) -> Union[list[dict[str, Any]], dict[str, dict[str, Any]]]:  # type: ignore[override]
+    def find_all(self) -> list[dict[str, Any]] | dict[str, dict[str, Any]]:  # type: ignore[override]
         """
         Find all entities.
 
@@ -190,6 +190,18 @@ class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
         self._transaction_snapshot = None
         self.logger = get_logger(__name__)
         self._is_closed = False
+
+    def is_healthy(self) -> tuple[bool, dict[str, Any]]:
+        """Probe the backend with a cheap read-only call.
+
+        Returns ``(healthy, details)`` where ``details`` is a small dict the
+        ``/health`` endpoint embeds verbatim. Subclasses should override to
+        delegate to their connection/client manager (see
+        ``ResourceManager.is_healthy``). The default keeps the historical
+        ``unknown`` behaviour so a strategy without an override doesn't
+        get silently misclassified.
+        """
+        return False, {"reason": "is_healthy not implemented for this strategy"}
 
     def cleanup(self) -> None:
         """

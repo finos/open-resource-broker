@@ -4,7 +4,6 @@ from abc import ABC, abstractmethod
 from typing import Any, Optional, Protocol
 
 from orb.domain.base.ports.logging_port import LoggingPort
-from orb.domain.template.extensions import TemplateExtensionRegistry
 from orb.domain.template.template_aggregate import Template
 
 
@@ -49,16 +48,16 @@ class TemplateFactory(BaseTemplateFactory):
 
     def __init__(
         self,
-        extension_registry: Optional[TemplateExtensionRegistry] = None,
+        extension_registry: Optional[Any] = None,
         logger: Optional[LoggingPort] = None,
     ) -> None:
         """Initialize template factory.
 
         Args:
-            extension_registry: Registry for provider extensions (defaults to global registry)
+            extension_registry: Registry for provider extensions (injected by infrastructure layer)
             logger: Logger port for logging factory operations
         """
-        self._extension_registry = extension_registry or TemplateExtensionRegistry
+        self._extension_registry = extension_registry
         self._logger = logger
 
         # Registry of provider-specific template classes
@@ -193,7 +192,11 @@ class TemplateFactory(BaseTemplateFactory):
             merged_data = template_data.copy()
 
         # Apply extension defaults from registry
-        if provider_type and self._extension_registry.has_extension(provider_type):
+        if (
+            provider_type
+            and self._extension_registry is not None
+            and self._extension_registry.has_extension(provider_type)
+        ):
             extension_defaults = self._extension_registry.get_extension_defaults(
                 provider_type, extension_data
             )

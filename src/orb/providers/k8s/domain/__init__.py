@@ -1,0 +1,1 @@
+"""Kubernetes-specific domain extensions."""

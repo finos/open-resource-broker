@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+mkdir -p /run/k8s-env
+
+if [[ "${MY_POD_NAME:?}" =~ "master" || ! "${MY_POD_NAME:?}" =~ "ssm" ]]; then
+  k8s_service="${KUBERNETES_SERVICE_HOST:?}"
+  echo "$k8s_service"                                                > /run/k8s-env/KUBERNETES_SERVICE_HOST
+  echo "${MY_POD_IP:?}"                                              > /run/k8s-env/MY_POD_IP
+  echo "${MY_POD_NAME:?}"                                            > /run/k8s-env/MY_POD_NAME
+  echo "${MY_POD_NAMESPACE:?}"                                       > /run/k8s-env/MY_POD_NAMESPACE
+  echo 443                                                           > /run/k8s-env/KUBERNETES_SERVICE_PORT_HTTPS
+  echo 443                                                           > /run/k8s-env/KUBERNETES_SERVICE_PORT
+  echo tcp://"$k8s_service":443                                      > /run/k8s-env/KUBERNETES_PORT_443_TCP
+  echo tcp                                                           > /run/k8s-env/KUBERNETES_PORT_443_TCP_PROTO
+  echo "$k8s_service"                                                > /run/k8s-env/KUBERNETES_PORT_443_TCP_ADDR
+  echo tcp://"$k8s_service":443                                      > /run/k8s-env/KUBERNETES_PORT
+  echo 443                                                           > /run/k8s-env/KUBERNETES_PORT_443_TCP_PORT
+  echo "${SYMPHONY_SVC_VCPU:?}"                                      > /run/k8s-env/SYMPHONY_SVC_VCPU
+  echo "${SYMPHONY_SVC_MEMORY:?}"                                    > /run/k8s-env/SYMPHONY_SVC_MEMORY
+  echo "${SYMPHONY_SVC_WORKER_LABEL:-}"                              > /run/k8s-env/SYMPHONY_SVC_WORKER_LABEL
+  echo "${HF_K8S_PROVIDER_CONFDIR:-?}"                               > /run/k8s-env/HF_K8S_PROVIDER_CONFDIR
+  echo "${HF_K8S_LOG_FILE:-?}"                                       > /run/k8s-env/HF_K8S_LOG_FILE
+  echo "${HF_INIT_TAKS_DURATION:-?}"                                 > /run/k8s-env/HF_INIT_TAKS_DURATION
+  echo "${HF_RETURN_IDLE_DURATION_SECONDS:-?}"                       > /run/k8s-env/HF_RETURN_IDLE_DURATION_SECONDS
+  echo "${EGO_IGNORE_CPU_CGROUP_SETTING_IN_CONTAINER:?}"             > /run/k8s-env/EGO_IGNORE_CPU_CGROUP_SETTING_IN_CONTAINER
+  echo "${EGO_LIM_IS_IN_CONTAINER:?}"                                > /run/k8s-env/EGO_LIM_IS_IN_CONTAINER
+fi
+
+if [[ ! "${MY_POD_NAME:?}" =~ "ssm" && ! "${MY_POD_NAME:?}" =~ "master" ]]; then
+  echo "${PODMAN_CERT_DIR:-}"                 > /run/k8s-env/PODMAN_CERT_DIR
+  echo "${AWS_WEB_IDENTITY_TOKEN_FILE:-}"     > /run/k8s-env/AWS_WEB_IDENTITY_TOKEN_FILE
+  echo "${AWS_ROLE_ARN:-}"                    > /run/k8s-env/AWS_ROLE_ARN
+  echo "${AWS_REGION:-}"                      > /run/k8s-env/AWS_REGION
+  echo "${AWS_STS_REGIONAL_ENDPOINTS:-}"      > /run/k8s-env/AWS_STS_REGIONAL_ENDPOINTS
+fi

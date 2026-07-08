@@ -1,0 +1,90 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# Require HOME to be set by the environment
+: "${HOME:?HOME environment variable must be set}"
+
+platform="${SYMPHONY_K8S_PLATFORM:?}"
+registry="${SYMPHONY_K8S_IMAGE_REGISTRY:?}"
+authfile="${PODMAN_AUTH_FILE:-/run/podman/auth.json}"
+certdir="${PODMAN_CERT_DIR:-/var/spool/certs}"
+kubesecret="${SYMPHONY_K8S_REGISTRY_SECRET:-registry-auth}"
+sleep_time_minutes="${SYMPHONY_K8S_REGISTRY_SYNC_INTERVAL_MINUTES:-45}"
+
+
+log() {
+  # Log messages with timestamp
+  local log_level="$1"
+  shift
+  echo "$(date +"%Y-%m-%d %H:%M:%S") [$log_level] $*"
+}
+
+
+function podman_login() {
+    # Login to the container registry using Podman
+    local username="$1"
+    local token="$2"
+    podman login                \
+    --cert-dir "$certdir"       \
+    --username "$username"      \
+    --authfile "$authfile"      \
+    --password "$token"         \
+    "$registry"
+}
+
+function registry_login() {
+    # Login to the container registry based on the platform
+    case "$platform" in
+        eks)
+            log INFO "Logging in to AWS ECR registry: $registry"
+            local region
+            region="$(cut -d"." -f4 <<<"$registry")"
+            token="$(aws ecr get-login-password --region "$region")"
+            podman_login "AWS" "$token"
+            ;;
+        aks)
+            log WARN "Registry login not implemented for $platform !!"
+            return 1
+            ;;
+        gke)
+            log INFO "Logging in to GCP Container Registry: $registry"
+            local service_account="${GCLOUD_SYMPHONY_SERVICE_ACCOUNT:?}"
+            token="$(gcloud auth print-access-token \
+                --impersonate-service-account="$service_account")"
+            podman_login "oauth2accesstoken" "$token"
+            ;;
+        *)
+            log ERROR "Unknown platform: $platform"
+            exit 1
+            ;;
+    esac
+}
+
+
+function create_secret() {
+    # Create a Kubernetes secret for the registry credentials
+    if kubectl create secret generic "$kubesecret" \
+        --from-file="$authfile"    \
+        --save-config              \
+        --dry-run=client -o yaml | \
+        kubectl apply -f -; then
+        log INFO "Secret created successfully."
+    else
+        log ERROR "Error configuring registry creds for $platform !!"
+        exit 1
+    fi
+}
+
+
+while true; do
+    log INFO "Syncing registry credentials for platform: $platform"
+    if registry_login; then
+        log INFO "Registry login successful. Creating Kubernetes secret."
+        create_secret
+    else
+        log WARN "Skipping secret creation due to failed registry login."
+    fi
+    log INFO "Sleeping for $sleep_time_minutes minutes before next sync."
+    sleep "$sleep_time_minutes"m
+done

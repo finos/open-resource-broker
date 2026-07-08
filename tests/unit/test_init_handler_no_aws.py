@@ -70,24 +70,6 @@ def test_no_hostfactory_config_root_hardcoding():
     )
 
 
-def test_provider_strategy_has_get_available_regions():
-    """Base ProviderStrategy must have get_available_regions method."""
-    from orb.providers.base.strategy.provider_strategy import ProviderStrategy
-
-    assert hasattr(ProviderStrategy, "get_available_regions"), (
-        "get_available_regions not on ProviderStrategy"
-    )
-
-
-def test_provider_strategy_has_get_default_region():
-    """Base ProviderStrategy must have get_default_region method."""
-    from orb.providers.base.strategy.provider_strategy import ProviderStrategy
-
-    assert hasattr(ProviderStrategy, "get_default_region"), (
-        "get_default_region not on ProviderStrategy"
-    )
-
-
 def test_provider_strategy_has_get_cli_extra_config_keys():
     """Base ProviderStrategy must have get_cli_extra_config_keys method."""
     from orb.providers.base.strategy.provider_strategy import ProviderStrategy
@@ -154,10 +136,10 @@ def test_provider_strategy_base_defaults():
     config = MagicMock()
     strategy = _ConcreteStrategy(config)
 
-    assert strategy.get_default_region() == ""
     assert strategy.get_cli_extra_config_keys() == set()
     assert strategy.get_cli_provider_config(MagicMock()) == {}
     assert strategy.get_cli_infrastructure_defaults(MagicMock()) == {}
+    assert strategy.get_cli_provider_config(MagicMock()) == {}
 
 
 def _make_aws_strategy():
@@ -298,13 +280,13 @@ def test_interactive_setup_raises_when_no_providers_registered():
 
 
 def test_get_default_config_raises_when_no_providers_and_no_provider_arg():
-    """_get_default_config raises ValueError when registry is empty and args.provider is None."""
+    """_get_default_config raises ValueError when registry is empty and args.provider_type is None."""
     from unittest.mock import MagicMock, patch
 
     from orb.interface.init_command_handler import _get_default_config
 
     args = MagicMock()
-    args.provider = None
+    args.provider_type = None
 
     with patch(
         "orb.interface.init_command_handler._get_available_providers",

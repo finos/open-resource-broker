@@ -62,7 +62,8 @@ async def main() -> None:
             raise
 
         # Setup environment after arg parse — skip for init (it calls get_config_location() directly)
-        if args.resource != "init":
+        # and skip for k8s-legacy (handled entirely by the legacy package itself)
+        if args.resource not in ("init", "k8s-legacy"):
             from orb.run import setup_environment
 
             setup_environment()
@@ -124,38 +125,27 @@ async def main() -> None:
             except Exception as e:
                 logger.warning("Failed to override scheduler strategy: %s", e, exc_info=True)
 
-        if hasattr(args, "provider") and args.provider:
+        if hasattr(args, "provider_name") and args.provider_name:
             try:
                 from orb.domain.base.ports.configuration_port import ConfigurationPort
                 from orb.infrastructure.di.container import get_container
 
                 container = get_container()
                 config = container.get(ConfigurationPort)
-                config.override_provider_instance(args.provider)
+                config.override_provider_name(args.provider_name)
             except Exception as e:
-                logger.warning("Failed to override provider instance: %s", e, exc_info=True)
+                logger.warning("Failed to override provider name: %s", e, exc_info=True)
 
-        if hasattr(args, "region") and args.region:
+        if hasattr(args, "provider_type") and args.provider_type:
             try:
                 from orb.domain.base.ports.configuration_port import ConfigurationPort
                 from orb.infrastructure.di.container import get_container
 
                 container = get_container()
                 config = container.get(ConfigurationPort)
-                config.override_provider_region(args.region)
+                config.override_provider_type(args.provider_type)
             except Exception as e:
-                logger.warning("Failed to override region: %s", e, exc_info=True)
-
-        if hasattr(args, "profile") and args.profile:
-            try:
-                from orb.domain.base.ports.configuration_port import ConfigurationPort
-                from orb.infrastructure.di.container import get_container
-
-                container = get_container()
-                config = container.get(ConfigurationPort)
-                config.override_provider_profile(args.profile)
-            except Exception as e:
-                logger.warning("Failed to override profile: %s", e, exc_info=True)
+                logger.warning("Failed to override provider type: %s", e, exc_info=True)
 
         # Skip application initialization for init command
         if args.resource == "init":
@@ -163,6 +153,15 @@ async def main() -> None:
 
             result = await handle_init(args)
             sys.exit(result)
+
+        # k8s-legacy: bypass application init, delegate straight to legacy click groups.
+        # handle_k8s_legacy() always calls sys.exit() and never returns.
+        if args.resource == "k8s-legacy":
+            from orb.interface.cli.k8s_legacy import handle_k8s_legacy
+
+            handle_k8s_legacy(args)
+            # unreachable — handle_k8s_legacy always exits
+            sys.exit(0)  # pragma: no cover
 
         if args.resource in ["templates", "template"] and args.action == "generate":
             from orb.interface.templates_generate_handler import handle_templates_generate

@@ -1,4 +1,9 @@
-"""Orchestrator for listing requests."""
+"""Orchestrator for listing requests.
+
+Forwards filter, sort, search, and pagination parameters to the query
+handler and encodes the next cursor from the handler's reported
+``total_count``.
+"""
 
 from __future__ import annotations
 
@@ -7,8 +12,17 @@ from orb.application.ports.command_bus_port import CommandBusPort
 from orb.application.ports.query_bus_port import QueryBusPort
 from orb.application.request.queries import ListRequestsQuery
 from orb.application.services.orchestration.base import OrchestratorBase
-from orb.application.services.orchestration.dtos import ListRequestsInput, ListRequestsOutput
+from orb.application.services.orchestration.dtos import (
+    ListRequestsInput,
+    ListRequestsOutput,
+    Paginated,
+    decode_cursor,
+    encode_cursor,
+)
+from orb.domain.base.exceptions import ValidationError
 from orb.domain.base.ports.logging_port import LoggingPort
+
+_DEFAULT_SORT = "-created_at"
 
 
 class ListRequestsOrchestrator(OrchestratorBase[ListRequestsInput, ListRequestsOutput]):
@@ -29,18 +43,59 @@ class ListRequestsOrchestrator(OrchestratorBase[ListRequestsInput, ListRequestsO
             input.sync,
         )
 
+        if input.sync and (input.q or input.sort):
+            raise ValidationError("q and sort are not supported with sync=true")
+
+        offset = decode_cursor(input.cursor) if input.cursor else input.offset
+        sort = input.sort if input.sort else _DEFAULT_SORT
+
         if input.sync:
+            # ListActiveRequestsQuery doesn't support q/sort (handler slices
+            # before sync for perf — see handler docstring). Pagination
+            # metadata still flows through Paginated.
             query = ListActiveRequestsQuery(
-                limit=input.limit, offset=input.offset, all_resources=True, status=input.status
+                limit=input.limit,
+                offset=offset,
+                all_resources=True,
+                status=input.status,
+                template_id=input.template_id,
+                provider_name=input.provider_name,
+                provider_type=input.provider_type,
+                filter_expressions=input.filter_expressions,
             )
         else:
-            query = ListRequestsQuery(status=input.status, limit=input.limit, offset=input.offset)  # type: ignore[assignment]
+            query = ListRequestsQuery(  # type: ignore[assignment]
+                status=input.status,
+                limit=input.limit,
+                offset=offset,
+                template_id=input.template_id,
+                request_type=input.request_type,
+                provider_name=input.provider_name,
+                provider_type=input.provider_type,
+                filter_expressions=input.filter_expressions,
+                q=input.q,
+                sort=sort,
+            )
 
-        results = await self._query_bus.execute(query)
-        requests = [self._to_dict(r) for r in (results or [])]
-        if input.template_id:
-            requests = [r for r in requests if r.get("template_id") == input.template_id]
-        return ListRequestsOutput(requests=requests, count=len(requests))
+        result = await self._query_bus.execute(query)
+        if isinstance(result, Paginated):
+            items = [self._to_dict(r) for r in result.items]
+            total_count = result.total_count
+        else:
+            items = [self._to_dict(r) for r in (result or [])]
+            total_count = len(items)
+
+        next_cursor: str | None = None
+        effective_limit = input.limit if input.limit is not None else total_count
+        if effective_limit and total_count > offset + effective_limit:
+            next_cursor = encode_cursor(offset + effective_limit)
+
+        return ListRequestsOutput(
+            requests=items,
+            count=len(items),
+            next_cursor=next_cursor,
+            total_count=total_count,
+        )
 
     @staticmethod
     def _to_dict(obj: object) -> dict:

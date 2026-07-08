@@ -33,7 +33,7 @@ jobs:
       pypi-name: ${{ steps.config.outputs.pypi-name }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
     - name: Get project configuration
       id: config
@@ -58,15 +58,15 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5  # v4
+      uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c  # v4
       with:
         platforms: linux/amd64,linux/arm64
 
     - name: Log in to Container Registry
-      uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee  # v4
+      uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0  # v4
       with:
         registry: ${{ needs.config.outputs.container-registry }}
         username: ${{ github.actor }}
@@ -77,6 +77,14 @@ jobs:
       with:
         cache-key: prod-${{ needs.config.outputs.package-version }}-py${{ matrix.python-version }}
         fail-on-cache-miss: false
+
+    - name: Setup Bun (for UI static bundle)
+      uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f4b11  # v2
+      with:
+        bun-version: latest
+
+    - name: Build UI static bundle
+      run: make ui-build
 
     - name: Build package wheel
       run: make build
@@ -111,10 +119,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
     - name: Log in to Container Registry
-      uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee  # v4
+      uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0  # v4
       with:
         registry: ${{ needs.config.outputs.container-registry }}
         username: ${{ github.actor }}
@@ -165,13 +173,21 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
       with:
         cache-key: prod-pypi-${{ needs.config.outputs.package-version }}
         fail-on-cache-miss: false
+
+    - name: Setup Bun (for UI static bundle)
+      uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f4b11  # v2
+      with:
+        bun-version: latest
+
+    - name: Build UI static bundle
+      run: make ui-build
 
     - name: Build package
       run: make build
@@ -196,7 +212,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
@@ -243,13 +259,21 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
       with:
         cache-key: prod-assets-${{ needs.config.outputs.package-version }}
         fail-on-cache-miss: false
+
+    - name: Setup Bun (for UI static bundle)
+      uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f4b11  # v2
+      with:
+        bun-version: latest
+
+    - name: Build UI static bundle
+      run: make ui-build
 
     - name: Build package
       run: make build

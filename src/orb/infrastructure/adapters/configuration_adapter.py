@@ -20,8 +20,13 @@ class ConfigurationAdapter(ConfigurationPort):
         self._logger = logger
 
     def get_app_config(self) -> dict[str, Any]:
-        """Get structured application configuration."""
-        return self._config_manager.app_config.model_dump()
+        """Get structured application configuration.
+
+        Uses ``mode="json"`` so pydantic types like ``SecretStr`` serialise to
+        masked strings instead of opaque Python objects — keeps the result
+        JSON-serialisable for REST callers (e.g. the Config UI).
+        """
+        return self._config_manager.app_config.model_dump(mode="json")
 
     @property
     def app_config(self) -> "AppConfig":
@@ -124,6 +129,11 @@ class ConfigurationAdapter(ConfigurationPort):
             self._logger.warning("Failed to get template config: %s", e)
             return {}
 
+    def get_raw_config(self) -> dict[str, Any]:
+        """Return the raw on-disk configuration dict before Pydantic hydration."""
+        raw = self._config_manager._ensure_raw_config()
+        return dict(raw) if isinstance(raw, dict) else {}
+
     def get_metrics_config(self) -> dict[str, Any]:
         """Get metrics configuration."""
 
@@ -146,7 +156,7 @@ class ConfigurationAdapter(ConfigurationPort):
 
         try:
             # Get metrics section from raw config
-            raw = self._config_manager._ensure_raw_config()  # type: ignore[attr-defined]
+            raw = self.get_raw_config()
             metrics_config = raw.get("metrics", {}) if isinstance(raw, dict) else {}
 
             result: dict[str, Any] = defaults.copy()
@@ -172,6 +182,22 @@ class ConfigurationAdapter(ConfigurationPort):
     def get_loaded_config_file(self) -> str | None:
         """Get the path of the loaded configuration file."""
         return self._config_manager.get_loaded_config_file()
+
+    def save_config(self, path: str | None = None) -> str:
+        """Persist the in-memory raw config to disk.
+
+        If ``path`` is None, writes to the currently-loaded config file.
+        Returns the resolved path that was written. Raises if no path can
+        be resolved (e.g. config came from env only, no file backing).
+        """
+        target = path or self._config_manager.get_loaded_config_file()
+        if not target:
+            raise ValueError(
+                "No config file path resolved — config was not loaded from a file. "
+                "Pass an explicit path to save_config()."
+            )
+        self._config_manager.save(target)
+        return target
 
     def get_root_dir(self) -> str:
         """Get the root directory path."""
@@ -354,25 +380,21 @@ class ConfigurationAdapter(ConfigurationPort):
         """Override scheduler strategy - delegate to ConfigurationManager."""
         self._config_manager.override_scheduler_strategy(strategy)
 
-    def override_provider_instance(self, provider_name: str) -> None:
-        """Override provider instance - delegate to ConfigurationManager."""
-        self._config_manager.override_provider_instance(provider_name)
+    def override_provider_name(self, provider_name: str) -> None:
+        """Override provider instance by exact name - delegate to ConfigurationManager."""
+        self._config_manager.override_provider_name(provider_name)
 
-    def override_provider_region(self, region: str) -> None:
-        """Override provider region - delegate to ConfigurationManager."""
-        self._config_manager.override_provider_region(region)
+    def override_provider_type(self, provider_type: str) -> None:
+        """Restrict selection to a provider type - delegate to ConfigurationManager."""
+        self._config_manager.override_provider_type(provider_type)
 
-    def override_provider_profile(self, profile: str) -> None:
-        """Override provider credential profile - delegate to ConfigurationManager."""
-        self._config_manager.override_provider_profile(profile)
+    def get_active_provider_name_override(self) -> str | None:
+        """Get current provider name override from CLI."""
+        return self._config_manager.get_active_provider_name_override()
 
-    def get_effective_region(self, default_region: str = "") -> str:
-        """Get effective provider region - delegate to ConfigurationManager."""
-        return self._config_manager.get_effective_region(default_region)
-
-    def get_effective_profile(self, default_profile: str = "") -> str:
-        """Get effective provider credential profile - delegate to ConfigurationManager."""
-        return self._config_manager.get_effective_profile(default_profile)
+    def get_active_provider_type_override(self) -> str | None:
+        """Get current provider type override from CLI."""
+        return self._config_manager.get_active_provider_type_override()
 
     def get_resource_prefix(self, resource_type: str) -> str:
         """Get resource naming prefix for the given resource type."""
@@ -386,10 +408,6 @@ class ConfigurationAdapter(ConfigurationPort):
                 "Failed to get resource prefix for '%s', using empty prefix: %s", resource_type, e
             )
             return ""
-
-    def get_active_provider_override(self) -> str | None:
-        """Get current provider override from CLI."""
-        return self._config_manager.get_active_provider_override()
 
     def get_configuration_value(self, key: str, default: Any = None) -> Any:
         """Get configuration value."""

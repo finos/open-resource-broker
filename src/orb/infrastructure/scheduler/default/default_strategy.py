@@ -266,35 +266,28 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
         return d
 
     def format_machine_details_response(self, machine_data: dict) -> dict:
-        """Format machine details with default fields, including provider_data fields."""
+        """Format machine details for the API detail endpoint.
+
+        Returns every field on the source dict so adding a domain field to
+        ``Machine`` automatically surfaces in the detail payload — no
+        formatter update needed. ``id`` is kept as a legacy alias for
+        ``machine_id``; ``provider`` is hard-stamped because the default
+        strategy is the bound provider.
+        """
         provider_data: dict[str, Any] = machine_data.get("provider_data") or {}
+        machine_id = machine_data.get("machine_id") or machine_data.get("id")
 
-        result: dict[str, Any] = {
-            "id": machine_data.get("id"),
-            "name": machine_data.get("name"),
-            "status": machine_data.get("status"),
-            "provider": "default",
-            "instance_type": machine_data.get("instance_type"),
-            "image_id": machine_data.get("image_id"),
-            "private_ip": machine_data.get("private_ip"),
-            "public_ip": machine_data.get("public_ip"),
-            "subnet_id": machine_data.get("subnet_id"),
-            "security_group_ids": machine_data.get("security_group_ids"),
-            "status_reason": machine_data.get("status_reason"),
-            "launch_time": machine_data.get("launch_time"),
-            "termination_time": machine_data.get("termination_time"),
-            "tags": machine_data.get("tags"),
-        }
+        result: dict[str, Any] = {**machine_data}
+        result["id"] = machine_id
+        result["machine_id"] = machine_id
+        result["provider"] = "default"
+        result["provider_data"] = provider_data or None
 
-        # Provider_data fields — prefer top-level if already present, else pull from provider_data
+        # Promote selected provider_data sub-fields to the top level when the
+        # source dict did not already carry them — matches list endpoint shape.
         for key in ("region", "availability_zone", "vcpus", "health_checks"):
-            val = (
-                machine_data.get(key)
-                if machine_data.get(key) is not None
-                else provider_data.get(key)
-            )
-            if val is not None:
-                result[key] = val
+            if result.get(key) is None and provider_data.get(key) is not None:
+                result[key] = provider_data[key]
 
         cloud_host_id = machine_data.get("cloud_host_id") or provider_data.get("cloud_host_id")
         if cloud_host_id is not None:

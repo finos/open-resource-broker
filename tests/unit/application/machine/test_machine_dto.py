@@ -21,6 +21,7 @@ def _make_machine(**overrides) -> Machine:
         "instance_type": InstanceType(value="t3.medium"),
         "provider_name": "aws-us-east-1",
         "provider_type": "aws",
+        "provider_api": "ec2fleet",
         "template_id": "tmpl-001",
         "image_id": "ami-abc123",
     }

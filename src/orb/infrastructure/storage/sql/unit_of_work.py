@@ -1,4 +1,8 @@
-"""SQL Unit of Work implementation using simplified repositories."""
+"""SQL Unit of Work implementation using simplified repositories.
+
+Schema authority: orb.infrastructure.storage.sql.models (ORM declarative models).
+Use ``alembic upgrade head`` to apply schema migrations.
+"""
 
 from typing import Any, Optional
 
@@ -43,23 +47,37 @@ class SQLUnitOfWork(BaseUnitOfWork):
         db_type = engine.url.get_dialect().name  # e.g. "sqlite", "postgresql"
         db_config: dict[str, Any] = {"type": db_type, "url": str(engine.url)}
 
+        # Column dicts are derived from ORM models so SQLQueryBuilder has
+        # enough column metadata for parameterised SELECT/INSERT/UPDATE/DELETE.
+        # The actual DDL is handled by Base.metadata.create_all inside
+        # SQLStorageStrategy._initialize_table — these dicts are NOT the
+        # schema authority; models.py is.
+        from orb.infrastructure.storage.sql.models import MachineModel, RequestModel, TemplateModel
+
+        def _cols(model_cls):
+            """Extract {column_name: 'TEXT'} dict from an ORM model class."""
+            return {
+                col.key: "TEXT"
+                for col in model_cls.__table__.columns  # type: ignore[attr-defined]
+            }
+
         # Create storage strategies for each repository
         machine_strategy = SQLStorageStrategy(
             config=db_config,
             table_name="machines",
-            columns=self._get_machine_columns(),
+            columns=_cols(MachineModel),
         )
 
         request_strategy = SQLStorageStrategy(
             config=db_config,
             table_name="requests",
-            columns=self._get_request_columns(),
+            columns=_cols(RequestModel),
         )
 
         template_strategy = SQLStorageStrategy(
             config=db_config,
             table_name="templates",
-            columns=self._get_template_columns(),
+            columns=_cols(TemplateModel),
         )
 
         # Create repositories using simplified implementations
@@ -88,64 +106,6 @@ class SQLUnitOfWork(BaseUnitOfWork):
     def templates(self):
         """Get template repository."""
         return self.template_repository
-
-    def _get_machine_columns(self) -> dict[str, str]:
-        """Get machine table column definitions."""
-        return {
-            "machine_id": "VARCHAR(255) PRIMARY KEY",
-            "template_id": "VARCHAR(255)",
-            "request_id": "VARCHAR(255)",
-            "return_request_id": "VARCHAR(255)",
-            "status": "VARCHAR(50)",
-            "instance_type": "VARCHAR(50)",
-            "availability_zone": "VARCHAR(50)",
-            "private_ip": "VARCHAR(45)",
-            "public_ip": "VARCHAR(45)",
-            "launch_time": "TIMESTAMP",
-            "termination_time": "TIMESTAMP",
-            "tags": "TEXT",
-            "metadata": "TEXT",
-            "created_at": "TIMESTAMP",
-            "updated_at": "TIMESTAMP",
-        }
-
-    def _get_request_columns(self) -> dict[str, str]:
-        """Get request table column definitions."""
-        return {
-            "request_id": "VARCHAR(255) PRIMARY KEY",
-            "template_id": "VARCHAR(255)",
-            "machine_count": "INTEGER",
-            "request_type": "VARCHAR(50)",
-            "status": "VARCHAR(50)",
-            "machine_ids": "TEXT",
-            "timeout": "INTEGER",
-            "tags": "TEXT",
-            "metadata": "TEXT",
-            "error_message": "TEXT",
-            "created_at": "TIMESTAMP",
-            "updated_at": "TIMESTAMP",
-            "completed_at": "TIMESTAMP",
-        }
-
-    def _get_template_columns(self) -> dict[str, str]:
-        """Get template table column definitions."""
-        return {
-            "template_id": "VARCHAR(255) PRIMARY KEY",
-            "name": "VARCHAR(255)",
-            "description": "TEXT",
-            "image_id": "VARCHAR(255)",
-            "instance_type": "VARCHAR(50)",
-            "key_name": "VARCHAR(255)",
-            "security_group_ids": "TEXT",
-            "subnet_ids": "TEXT",
-            "user_data": "TEXT",
-            "tags": "TEXT",
-            "metadata": "TEXT",
-            "provider_api": "VARCHAR(255)",
-            "is_active": "BOOLEAN",
-            "created_at": "TIMESTAMP",
-            "updated_at": "TIMESTAMP",
-        }
 
     def _begin_transaction(self) -> None:
         """Begin SQL transaction."""

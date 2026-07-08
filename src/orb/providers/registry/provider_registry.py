@@ -1,8 +1,15 @@
 """Provider Registry - Registry pattern for provider strategy factories."""
 
 import importlib
+import re
 import threading
 from typing import Any, Callable, List, Optional
+
+# Only allow simple snake_case identifiers as provider types to prevent
+# module-injection via crafted provider_type strings (e.g. containing dots
+# or path-traversal sequences) that would be interpolated directly into the
+# dynamic importlib.import_module() call.
+_VALID_PROVIDER_TYPE_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 from orb.domain.base.exceptions import ConfigurationError
 from orb.domain.base.ports.configuration_port import ConfigurationPort
@@ -107,9 +114,38 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
                         )
 
             strategy = self.create_strategy_by_instance(provider_identifier, config)
-        # Fall back to type creation
+        # Fall back to type creation when the identifier itself is the type.
         elif self.is_provider_registered(provider_identifier):
             strategy = self.create_strategy_by_type(provider_identifier, config)
+        # Fall back to type creation when the identifier is an instance name
+        # whose configured instance has been removed from config (e.g. terminating
+        # leftover AWS machines after the operator switched the active provider
+        # to k8s).  The provider type is still known, so the strategy can boot
+        # with provider-side defaults (boto3 reads ~/.aws/credentials, etc.).
+        else:
+            provider_type = extract_provider_type(provider_identifier)
+            if provider_type != provider_identifier and self.is_provider_registered(provider_type):
+                if self._logger:
+                    self._logger.info(
+                        "Provider instance %r not registered; falling back to "
+                        "%r type strategy with provider-side defaults so historical "
+                        "machines for this instance can still be queried/terminated.",
+                        provider_identifier,
+                        provider_type,
+                    )
+                try:
+                    strategy = self.create_strategy_by_type(provider_type, config)
+                except Exception as fallback_exc:
+                    if self._logger:
+                        self._logger.warning(
+                            "Type-level fallback strategy for instance %r (type %r) could not "
+                            "be created; the instance will be treated as not found. "
+                            "Reason: %s",
+                            provider_identifier,
+                            provider_type,
+                            fallback_exc,
+                        )
+                    strategy = None
 
         if strategy:
             # Initialize strategy
@@ -143,6 +179,9 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
             return True
 
         # Try to dynamically import and register
+        if not _VALID_PROVIDER_TYPE_RE.match(provider_type):
+            raise ValueError(f"Invalid provider type: {provider_type!r}")
+
         module_name = f"orb.providers.{provider_type}.registration"
         try:
             if self._logger:
@@ -208,6 +247,9 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         try:
             provider_type = provider_instance.type
 
+            if not _VALID_PROVIDER_TYPE_RE.match(provider_type):
+                raise ValueError(f"Invalid provider type: {provider_type!r}")
+
             if self._logger:
                 self._logger.debug("Registering provider instance: %s", provider_instance.name)
 
@@ -238,6 +280,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         resolver_factory: Optional[Callable] = None,
         validator_factory: Optional[Callable] = None,
         strategy_class: Optional[type] = None,
+        default_api: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
         """Register provider type - implements abstract method."""
@@ -249,9 +292,27 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
                 resolver_factory=resolver_factory,
                 validator_factory=validator_factory,
                 strategy_class=strategy_class,
+                default_api=default_api,
             )
         except ValueError as e:
             raise ConfigurationError(str(e))
+
+    def get_default_api(self, provider_type: str) -> Optional[str]:
+        """Return the default API name for the given provider type, or None if not set.
+
+        Args:
+            provider_type: Type identifier for the provider (e.g., 'aws')
+
+        Returns:
+            Default API string from registration, or None if not registered / not set.
+        """
+        try:
+            registration = self._get_type_registration(provider_type)
+            if isinstance(registration, ProviderRegistration):
+                return registration.default_api
+        except (ValueError, KeyError):
+            pass
+        return None
 
     def register_provider(
         self,
@@ -261,6 +322,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         resolver_factory: Optional[Callable] = None,
         validator_factory: Optional[Callable] = None,
         strategy_class: Optional[type] = None,
+        default_api: Optional[str] = None,
     ) -> None:
         """
         Register a provider with its factory functions - backward compatibility method.
@@ -271,6 +333,8 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
             config_factory: Factory function to create provider configuration
             resolver_factory: Optional factory for template resolver
             validator_factory: Optional factory for template validator
+            strategy_class: Optional provider strategy class
+            default_api: Optional default API name contributed by this provider
 
         Raises:
             ValueError: If provider_type is already registered
@@ -282,6 +346,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
             resolver_factory,
             validator_factory,
             strategy_class=strategy_class,
+            default_api=default_api,
         )
 
     def register_provider_instance(
@@ -453,6 +518,45 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         except (ValueError, KeyError):
             return None
 
+    def list_all_provider_apis(self) -> list[str]:
+        """Return a deduplicated list of all provider API names from registered strategies.
+
+        Collects the ``get_supported_apis()`` result from each registered
+        provider strategy class.  The list is sorted for stable output so
+        callers do not depend on registration order.
+
+        Used by the dashboard summary orchestrator to seed the
+        ``by_provider_api`` zero-count keys without hard-coding provider names
+        or API identifiers.
+        """
+        apis: list[str] = []
+        for provider_type in self.get_registered_types():
+            try:
+                registration = self._get_type_registration(provider_type)
+                strategy_class = getattr(registration, "strategy_class", None)
+                if strategy_class is not None and hasattr(strategy_class, "get_supported_apis"):
+                    # get_supported_apis may be an instance or classmethod depending
+                    # on the provider — call it on a minimal stub when it is not a classmethod.
+                    try:
+                        supported = strategy_class.get_supported_apis(strategy_class)  # type: ignore[call-arg]
+                    except TypeError:
+                        supported = strategy_class.get_supported_apis()  # type: ignore[call-arg]
+                    apis.extend(supported)
+                elif hasattr(registration, "default_api") and getattr(
+                    registration, "default_api", None
+                ):
+                    apis.append(getattr(registration, "default_api"))  # type: ignore[arg-type]
+                else:
+                    # Fall back to the provider type name itself as a minimal key.
+                    apis.append(provider_type)
+            except Exception:
+                # A single provider failing to expose its APIs must not
+                # block the caller: skip and continue collecting from the
+                # remaining providers.
+                continue
+        seen: set[str] = set()
+        return [a for a in sorted(apis) if not (a in seen or seen.add(a))]  # type: ignore[func-returns-value]
+
     def get_provider_instance_registration(
         self, instance_name: str
     ) -> Optional[ProviderRegistration]:
@@ -506,7 +610,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         """Select provider instance for template requirements.
 
         Selection hierarchy:
-        1. CLI override (--provider flag)
+        1. CLI override (--provider-name flag)
         2. Explicit provider instance (template.provider_name)
         3. Provider type with load balancing (template.provider_type)
         4. Auto-selection based on API capabilities (template.provider_api)
@@ -541,10 +645,41 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         # Strategy 5: Fallback to default
         return self._select_default_provider(template, logger)
 
-    def select_active_provider(self, logger: Optional[Any] = None) -> ProviderSelectionResult:
-        """Select active provider instance from configuration."""
+    def select_active_provider(
+        self,
+        logger: Optional[Any] = None,
+        *,
+        provider_name: Optional[str] = None,
+        provider_type: Optional[str] = None,
+    ) -> ProviderSelectionResult:
+        """Select active provider instance from configuration.
+
+        Precedence:
+        1. provider_name argument — exact instance lookup.
+        2. provider_type argument — filter active instances by type,
+           then apply load-balancing over the filtered set.
+        3. Default behaviour — load-balance across all active instances.
+        """
         if logger:
             logger.debug("Selecting active provider using selection policy")
+
+        name_override = provider_name
+        type_override = provider_type
+
+        if name_override:
+            provider_instance = self._get_provider_instance_config(name_override)
+            if not provider_instance:
+                raise ValueError(f"Provider instance '{name_override}' not found in configuration")
+            if not provider_instance.enabled:
+                raise ValueError(f"Provider instance '{name_override}' is disabled")
+            if logger:
+                logger.info("Selected provider by name override: %s", name_override)
+            return ProviderSelectionResult(
+                provider_type=provider_instance.type,
+                provider_name=name_override,
+                selection_reason="CLI name override (--provider-name)",
+                confidence=1.0,
+            )
 
         provider_config = self._get_provider_config()
         if not provider_config:
@@ -553,6 +688,33 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         active_providers = provider_config.get_active_providers()
         if not active_providers:
             raise ValueError("No active providers found in configuration")
+
+        if type_override:
+            filtered = [p for p in active_providers if p.type == type_override]
+            if not filtered:
+                raise ValueError(f"No active providers of type '{type_override}'")
+            if len(filtered) == 1:
+                selected = filtered[0]
+                reason = f"CLI type override (--provider-type {type_override}) single_active_match"
+            else:
+                selected = self._apply_load_balancing_strategy(
+                    filtered, provider_config.selection_policy
+                )
+                reason = (
+                    f"CLI type override (--provider-type {type_override}) "
+                    f"load_balanced_{provider_config.selection_policy.lower()}"
+                )
+            if logger:
+                logger.info(
+                    "Selected provider by type override '%s': %s", type_override, selected.name
+                )
+            return ProviderSelectionResult(
+                provider_type=selected.type,
+                provider_name=selected.name,
+                selection_reason=reason,
+                confidence=1.0,
+                alternatives=[p.name for p in filtered if p.name != selected.name],
+            )
 
         if len(active_providers) == 1:
             selected = active_providers[0]
@@ -589,7 +751,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         return ProviderSelectionResult(
             provider_type=provider_instance.type,
             provider_name=provider_name,
-            selection_reason=f"CLI override (--provider {provider_name})",
+            selection_reason=f"CLI name override (--provider-name {provider_name})",
             confidence=1.0,
         )
 
@@ -854,6 +1016,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
             additional_factories.get("resolver_factory"),
             additional_factories.get("validator_factory"),
             strategy_class=additional_factories.get("strategy_class"),
+            default_api=additional_factories.get("default_api"),
         )
 
     @staticmethod

@@ -1,0 +1,245 @@
+# Docker Compose — Split UI mode
+#
+# Two-service deployment:
+#   orb-api  — uvicorn with ORB's FastAPI on port 8000 (API-only, no SPA)
+#   orb-ui   — Reflex production backend on port 8001 (SPA + WebSocket state)
+#
+# The UI container's httpx client reaches the API over the shared Docker
+# network via http://orb-api:8000 (controlled by ORB_BASE_URL).
+# A reverse proxy (nginx/traefik) in front of the stack must route:
+#   /_event  →  orb-ui:8001  (WebSocket upgrade required)
+#   /        →  orb-ui:8001
+#   /orb/*   →  orb-api:8000
+#
+# See the nginx snippet at the bottom of this file for a ready-to-use example.
+#
+# Requirements:
+#   - Both images need the [ui] extra installed (`pip install orb-py[ui]`)
+#     so the `reflex` binary is present. The pre-compiled SPA bundle shipped
+#     in the wheel is served by the orb-ui backend.
+#   - config/config.json (mounted into orb-api) must set `ui.mode = "split"`
+#     OR set ORB_UI_MODE=split via environment.
+#   - The SPA JS bundle must have been compiled with the correct backend_port
+#     (default 8001). If you change ORB_UI_PORT, rebuild first:
+#       ORB_UI_BACKEND_PORT=<port> make ui-build
+#
+# Usage:
+#   docker compose -f deployment/docker/docker-compose.split.yml up -d
+#
+# To add an nginx TLS-terminating proxy as a third service, uncomment the
+# `proxy` service block at the bottom of this file.
+
+services:
+  # -----------------------------------------------------------------------
+  # Process A — ORB REST API only (no Reflex, no SPA)
+  # CLI flag --api-only forces split/API-only mode regardless of config.
+  # -----------------------------------------------------------------------
+  orb-api:
+    image: orb-api:${VERSION:-latest}
+    container_name: orb-api-split
+    restart: unless-stopped
+    command: ["cli", "server", "start", "--foreground", "--api-only"]
+
+    environment:
+      HF_SERVER_HOST: 0.0.0.0
+      HF_SERVER_PORT: ${ORB_API_PORT:-8000}
+
+      # Provider / AWS credentials
+      HF_PROVIDER_TYPE: ${HF_PROVIDER_TYPE:-aws}
+      HF_PROVIDER_AWS_REGION: ${HF_PROVIDER_AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+
+      # Authentication
+      HF_AUTH_ENABLED: ${HF_AUTH_ENABLED:-false}
+      HF_AUTH_STRATEGY: ${HF_AUTH_STRATEGY:-none}
+      HF_AUTH_BEARER_SECRET_KEY: ${HF_AUTH_BEARER_SECRET_KEY:-}
+
+      # Logging
+      HF_LOGGING_LEVEL: ${HF_LOGGING_LEVEL:-INFO}
+      HF_LOGGING_CONSOLE_ENABLED: "true"
+      HF_DEBUG: ${HF_DEBUG:-false}
+
+    ports:
+      - "${ORB_API_PORT:-8000}:${ORB_API_PORT:-8000}"
+
+    volumes:
+      - ${ORB_CONFIG_FILE:-./config/config.json}:/app/config/config.json:ro
+      - orb-work:/app/data
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${ORB_API_PORT:-8000}/orb/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - orb-net
+
+  # -----------------------------------------------------------------------
+  # Process B — Reflex frontend/WebSocket backend (no ORB API routes)
+  # ORB_MODE=remote disables api_transformer so Reflex does not try to mount
+  # FastAPI itself. ORB_BASE_URL points the UI's httpx client at orb-api
+  # over the shared Docker network.
+  # -----------------------------------------------------------------------
+  orb-ui:
+    image: orb-api:${VERSION:-latest}
+    container_name: orb-ui-split
+    restart: unless-stopped
+    # Bootstrap: resolve the orb/ui package directory at runtime so the
+    # working_dir is correct for any supported Python version (3.10-3.14).
+    # Using the ORB package path rather than a hardcoded site-packages path
+    # ensures the container keeps working when the Python version changes.
+    entrypoint:
+      - "sh"
+      - "-c"
+      - >
+        cd $(python -c 'import orb.ui, pathlib; print(pathlib.Path(orb.ui.__file__).parent)') &&
+        exec reflex run --env prod --backend-only
+        --backend-port ${ORB_UI_PORT:-8001}
+        --backend-host 0.0.0.0
+
+    environment:
+      ORB_MODE: remote
+      ORB_UI_BACKEND_PORT: ${ORB_UI_PORT:-8001}
+      # Point the UI's httpx client at the API service on the Docker network
+      ORB_BASE_URL: http://orb-api:${ORB_API_PORT:-8000}
+      # Mount the compiled SPA from the Reflex backend (no separate static server)
+      REFLEX_MOUNT_FRONTEND_COMPILED_APP: "1"
+
+      # Pass through auth token env if operators use it
+      HF_AUTH_BEARER_SECRET_KEY: ${HF_AUTH_BEARER_SECRET_KEY:-}
+
+      # Logging
+      HF_LOGGING_LEVEL: ${HF_LOGGING_LEVEL:-INFO}
+      HF_DEBUG: ${HF_DEBUG:-false}
+
+    ports:
+      - "${ORB_UI_PORT:-8001}:${ORB_UI_PORT:-8001}"
+
+    # Mount the shared work volume so the UI container can read the loopback
+    # auth token written by orb-api to /app/data/server/orb-server.token.
+    # Without this mount the UI falls back to unauthenticated (viewer) mode
+    # even when the operator has enabled bearer-token auth on the API.
+    volumes:
+      - orb-work:/app/data:ro
+
+    depends_on:
+      orb-api:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${ORB_UI_PORT:-8001}/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - orb-net
+
+  # -----------------------------------------------------------------------
+  # Optional: nginx TLS-terminating reverse proxy
+  #
+  # Uncomment this service to add TLS termination and unified routing.
+  # Place your certificates in deployment/docker/ssl/ and supply an nginx
+  # config at deployment/docker/nginx-split.conf (see template below).
+  #
+  # nginx-split.conf template:
+  #
+  #   server {
+  #       listen 443 ssl http2;
+  #       server_name orb.example.com;
+  #       ssl_certificate     /etc/nginx/ssl/fullchain.pem;
+  #       ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+  #
+  #       # Reflex WebSocket — MUST upgrade before any other location
+  #       location /_event {
+  #           proxy_pass http://orb-ui:8001;
+  #           proxy_http_version 1.1;
+  #           proxy_set_header Upgrade $http_upgrade;
+  #           proxy_set_header Connection "upgrade";
+  #           proxy_set_header Host $host;
+  #           proxy_read_timeout 86400s;
+  #       }
+  #
+  #       # SPA + static assets
+  #       location / {
+  #           proxy_pass http://orb-ui:8001;
+  #           proxy_set_header Host $host;
+  #           proxy_set_header X-Real-IP $remote_addr;
+  #           proxy_set_header X-Forwarded-Proto https;
+  #       }
+  #
+  #       # ORB REST API
+  #       location /orb/ {
+  #           proxy_pass http://orb-api:8000/orb/;
+  #           proxy_set_header Host $host;
+  #           proxy_set_header X-Real-IP $remote_addr;
+  #           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  #           proxy_set_header X-Forwarded-Proto https;
+  #       }
+  #   }
+  #
+  #   server {
+  #       listen 80;
+  #       server_name orb.example.com;
+  #       return 301 https://$host$request_uri;
+  #   }
+  # -----------------------------------------------------------------------
+  # proxy:
+  #   image: nginx:alpine
+  #   container_name: orb-proxy-split
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx-split.conf:/etc/nginx/conf.d/orb.conf:ro
+  #     - ./ssl:/etc/nginx/ssl:ro
+  #   depends_on:
+  #     - orb-api
+  #     - orb-ui
+  #   networks:
+  #     - orb-net
+
+volumes:
+  orb-work:
+    driver: local
+
+networks:
+  orb-net:
+    driver: bridge

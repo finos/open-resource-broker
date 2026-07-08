@@ -1,2 +1,6 @@
 recursive-include config *.json
 recursive-include scripts *.sh *.bat
+include src/orb/ui/rxconfig.py
+graft src/orb/ui/assets
+graft src/orb/ui/_static
+graft assets

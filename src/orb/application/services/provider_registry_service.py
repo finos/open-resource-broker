@@ -27,8 +27,15 @@ class ProviderRegistryService:
     ) -> ProviderSelectionResult:
         return self._registry.select_provider_for_template(template, provider_name, self._logger)
 
-    def select_active_provider(self) -> ProviderSelectionResult:
-        return self._registry.select_active_provider(self._logger)
+    def select_active_provider(
+        self,
+        *,
+        provider_name: str | None = None,
+        provider_type: str | None = None,
+    ) -> ProviderSelectionResult:
+        return self._registry.select_active_provider(
+            self._logger, provider_name=provider_name, provider_type=provider_type
+        )
 
     def validate_template_requirements(
         self, template: Template, provider_instance: str

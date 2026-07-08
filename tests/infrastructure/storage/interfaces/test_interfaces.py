@@ -1,6 +1,6 @@
 """Tests for segregated storage interfaces."""
 
-from typing import Any, Optional, Union
+from typing import Any, Optional
 from unittest.mock import Mock
 
 import pytest
@@ -40,7 +40,7 @@ class MockStorageStrategy(BaseStorageStrategy):
         """Find entity by ID."""
         return self._data.get(entity_id)
 
-    def find_all(self) -> Union[list[dict[str, Any]], dict[str, dict[str, Any]]]:
+    def find_all(self) -> list[dict[str, Any]] | dict[str, dict[str, Any]]:
         """Find all entities."""
         return self._data.copy()
 

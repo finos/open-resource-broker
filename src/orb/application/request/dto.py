@@ -7,6 +7,7 @@ from pydantic import Field
 
 from orb.application.dto.base import BaseDTO
 from orb.application.machine.result_mapping import map_machine_status_to_result
+from orb.domain.base.provider_fulfilment import ProviderFulfilment
 from orb.domain.machine.aggregate import Machine
 from orb.domain.request.aggregate import Request
 from orb.domain.request.request_types import RequestType
@@ -19,7 +20,7 @@ class MachineReferenceDTO(BaseDTO):
     name: str = ""
     result: str  # 'executing', 'fail', or 'succeed'
     status: str
-    private_ip_address: str = ""
+    private_ip_address: Optional[str] = None
     public_ip_address: Optional[str] = None  # Already using the expected API field name
     instance_type: Optional[str] = None
     price_type: Optional[str] = None
@@ -54,7 +55,7 @@ class MachineReferenceDTO(BaseDTO):
             name=machine.display_name,
             result=map_machine_status_to_result(status, request_type=rt_str),
             status=status,
-            private_ip_address=machine.private_ip or "",
+            private_ip_address=machine.private_ip or None,
             public_ip_address=machine.public_ip,
             instance_type=str(machine.instance_type) if machine.instance_type else None,
             price_type=machine.price_type,
@@ -115,6 +116,17 @@ class RequestDTO(BaseDTO):
     provider_data: dict[str, Any] = Field(default_factory=dict)
     version: int = 0
     resource_ids: list[str] = Field(default_factory=list)
+    # Structured error block surfaced when status is failed or partial.
+    # Populated from error_details["provider_error"] (or legacy "aws_error") when
+    # an AWS API error was captured.
+    error: Optional[dict[str, Any]] = None
+    # Capacity fields from ProviderFulfilment — present when the provider emits them.
+    # For weighted fleets target_units and fulfilled_units reflect capacity units;
+    # for RunInstances they reflect instance count (1 unit = 1 instance).
+    target_units: Optional[int] = None
+    fulfilled_units: Optional[int] = None
+    running_count: Optional[int] = None
+    pending_count: Optional[int] = None
 
     @classmethod
     def from_domain(
@@ -122,6 +134,7 @@ class RequestDTO(BaseDTO):
         request: Request,
         verbose: bool = False,
         machine_references: Optional[list["MachineReferenceDTO"]] = None,
+        fulfilment: Optional[ProviderFulfilment] = None,
     ) -> "RequestDTO":
         """
         Create DTO from domain object.
@@ -145,6 +158,59 @@ class RequestDTO(BaseDTO):
                 machine_refs = [
                     MachineReferenceDTO.from_machine(m, request.request_type) for m in domain_refs
                 ]
+
+        # Resolve the ProviderFulfilment to use for capacity fields.
+        # Priority: explicit arg > metadata["last_fulfilment"] > provider_data top-level
+        # (initial CreateFleet response captures target_units/fulfilled_units there
+        # so the UI shows units immediately without waiting for check_hosts_status).
+        resolved_fulfilment: Optional[ProviderFulfilment] = fulfilment
+        if resolved_fulfilment is None and request.metadata:
+            cached = request.metadata.get("last_fulfilment")
+            if isinstance(cached, dict):
+                try:
+                    resolved_fulfilment = ProviderFulfilment(**cached)
+                except (TypeError, KeyError):
+                    resolved_fulfilment = None
+        if resolved_fulfilment is None and request.provider_data:
+            # ``provider_data`` is a canonical flat dict: the orchestration layer
+            # merges handler-level keys (target_units, fulfilled_units, etc.) into
+            # the top level before persistence.  Read capacity fields directly from
+            # the flat dict.
+            # TODO: if a legacy record still carries the old wrapper shape
+            # ({method, provider_data: {...}}) target_units/fulfilled_units will be
+            # absent at the top level and resolved_fulfilment stays None — the UI
+            # will fall back to instance-count fields, which is safe.
+            pd_top = request.provider_data
+            if isinstance(pd_top, dict):
+                tu = pd_top.get("target_units")
+                fu = pd_top.get("fulfilled_units")
+                if tu is not None or fu is not None:
+                    try:
+                        resolved_fulfilment = ProviderFulfilment(
+                            state="fulfilled" if (fu or 0) >= (tu or 0) else "in_progress",
+                            message="",
+                            target_units=int(float(tu or 0)),
+                            fulfilled_units=int(float(fu or 0)),
+                            running_count=int(float(pd_top.get("running_count") or 0)),
+                            pending_count=int(float(pd_top.get("pending_count") or 0)),
+                        )
+                    except (TypeError, ValueError) as exc:
+                        import logging as _logging
+
+                        _logging.getLogger(__name__).debug(
+                            "ProviderFulfilment parse failed (%s); falling back to legacy view",
+                            exc,
+                        )
+                        resolved_fulfilment = None
+
+        # Build structured error block from error_details when available.
+        # Accept both "provider_error" (new) and legacy "aws_error" so that
+        # records persisted before this deploy continue to surface the error block.
+        error_block: Optional[dict[str, Any]] = None
+        if request.error_details:
+            error_block = request.error_details.get("provider_error") or request.error_details.get(
+                "aws_error"
+            )
 
         # Create the DTO with all available fields
         return cls(
@@ -177,15 +243,28 @@ class RequestDTO(BaseDTO):
             provider_data=request.provider_data,
             version=request.version,
             resource_ids=request.resource_ids,
+            error=error_block,
+            # Capacity fields — populated from resolved ProviderFulfilment when available.
+            # Falls back to metadata["last_fulfilment"] when no explicit arg is supplied.
+            target_units=resolved_fulfilment.target_units if resolved_fulfilment else None,
+            fulfilled_units=resolved_fulfilment.fulfilled_units if resolved_fulfilment else None,
+            running_count=resolved_fulfilment.running_count if resolved_fulfilment else None,
+            pending_count=resolved_fulfilment.pending_count if resolved_fulfilment else None,
         )
 
-    def to_dict(self, verbose: bool = False) -> dict[str, Any]:
+    def to_dict(self, verbose: bool = False, include_timing: bool = False) -> dict[str, Any]:
         """
         Convert to dictionary format - returns snake_case for internal use.
         External format conversion should be handled at scheduler strategy level.
 
         Args:
-            verbose: Whether to include detailed information.
+            verbose: Whether to include detailed information (metadata,
+                launch_template_*, status_check timestamps).
+            include_timing: When True, surface ``first_status_check`` /
+                ``last_status_check`` on the non-verbose payload too. The
+                UI list view passes this so it can render the Timing
+                stepper from list-row data; CLI / SDK consumers default to
+                False so the wire payload stays lean.
 
         Returns:
             Dictionary representation with snake_case keys
@@ -203,13 +282,24 @@ class RequestDTO(BaseDTO):
         # Remove machine_references field as it's replaced by machines
         result.pop("machine_references", None)
 
-        # Remove fields based on detail level
+        # Include error block only when present (failed / partial requests).
+        if self.error:
+            result["error"] = self.error
+        else:
+            result.pop("error", None)
+
+        # Include capacity fields only when populated (fleet/weighted-capacity requests).
+        for cap_field in ("target_units", "fulfilled_units", "running_count", "pending_count"):
+            if result.get(cap_field) is None:
+                result.pop(cap_field, None)
+
         if not include_details:
             result.pop("metadata", None)
-            result.pop("first_status_check", None)
-            result.pop("last_status_check", None)
             result.pop("launch_template_id", None)
             result.pop("launch_template_version", None)
+            if not include_timing:
+                result.pop("first_status_check", None)
+                result.pop("last_status_check", None)
 
         return result
 

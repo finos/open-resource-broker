@@ -3,8 +3,8 @@
 //
 // Prerequisites:
 //
-//	orb init          # one-time setup
-//	orb system serve  # ORB must be running before this example
+//	orb init                            # one-time setup
+//	orb server start --foreground       # ORB must be running before this example
 //
 // Usage:
 //

@@ -168,6 +168,11 @@ class TemplateConfigurationManager:
                     self.logger.error("Failed to load templates from %s: %s", template_path, e)
                     continue
 
+            # Drop templates whose declared provider_type is not in the active set.
+            # This prevents inactive-provider templates loaded from a shared
+            # templates.json from appearing in the listing.
+            all_template_dicts = self._filter_templates_by_active_providers(all_template_dicts)
+
             # Apply batch image resolution before converting to DTOs
             resolved_template_dicts = await self._batch_resolve_images(all_template_dicts)
 
@@ -211,6 +216,62 @@ class TemplateConfigurationManager:
 
         # Convert domain → DTO using existing method
         return TemplateDTO.from_domain(template_domain)
+
+    def _get_active_provider_types(self) -> set[str]:
+        """Return the set of active provider type strings, or an empty set on failure."""
+        try:
+            provider_config = self.config_manager.get_provider_config()
+            if provider_config is None:
+                return set()
+            active = provider_config.get_active_providers()
+            return {t for p in active if (t := getattr(p, "type", None)) is not None}
+        except Exception as e:
+            self.logger.debug("Could not read active provider types for template filter: %s", e)
+            return set()
+
+    def _filter_templates_by_active_providers(
+        self, template_dicts: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """Remove templates whose provider_type is not in the active-provider set.
+
+        Templates with no provider_type field are kept so that legacy or
+        un-typed templates continue to load without disruption.
+        When the active-provider set cannot be determined the full list is
+        returned unchanged.
+        """
+        active_types = self._get_active_provider_types()
+        if not active_types:
+            # Cannot determine active types — keep everything to avoid silent data loss.
+            # Log a WARNING so operators can see there are no active providers; templates
+            # belonging to broken/uninitialised providers will be visible in listings.
+            self.logger.warning(
+                "No active provider types found; returning all %d templates unfiltered. "
+                "Templates for broken or uninitialised providers may appear in listings.",
+                len(template_dicts),
+            )
+            return template_dicts
+
+        kept: list[dict[str, Any]] = []
+        for tpl in template_dicts:
+            declared_type = tpl.get("provider_type")
+            tpl_name = tpl.get("template_id") or tpl.get("templateId", "<unknown>")
+            if not declared_type:
+                # Retain templates with no provider_type or with an empty-string provider_type.
+                if declared_type is None:
+                    self.logger.debug("Retaining template '%s': legacy no provider_type", tpl_name)
+                else:
+                    self.logger.debug("Retaining template '%s': empty provider_type", tpl_name)
+                kept.append(tpl)
+            elif declared_type in active_types:
+                kept.append(tpl)
+            else:
+                self.logger.debug(
+                    "Dropping template '%s' with provider_type='%s' (active types: %s)",
+                    tpl_name,
+                    declared_type,
+                    sorted(active_types),
+                )
+        return kept
 
     def _resolve_active_provider_once(self) -> Optional[str]:
         """Resolve the active provider name from configuration exactly once.
@@ -283,17 +344,27 @@ class TemplateConfigurationManager:
             return template_dicts
 
     def _is_image_resolution_enabled(self) -> bool:
-        """Check if image resolution is enabled."""
+        """Return True when the active provider requires SSM / image-ID resolution.
+
+        Delegates to the active provider strategy's
+        :meth:`~orb.providers.base.strategy.base_provider_strategy.BaseProviderStrategy.is_image_resolution_needed`
+        classmethod so the decision is provider-owned and does not require the
+        configuration manager to hard-code AWS-specific knowledge.
+
+        Falls back to ``True`` (i.e. attempt resolution) when the active
+        provider cannot be determined — better to attempt resolution than to
+        skip it silently on a provider that needs it.
+        """
         try:
-            provider_config = self.config_manager.get_provider_config()
-            if provider_config is not None and (
-                hasattr(provider_config, "provider_defaults")
-                and "aws" in provider_config.provider_defaults
-            ):
-                aws_defaults = provider_config.provider_defaults["aws"]
-                if hasattr(aws_defaults, "extensions"):
-                    return getattr(aws_defaults.extensions, "ami_resolution_enabled", True)
-            return True
+            if not self.provider_registry_service:
+                return True
+            provider_name = self._resolve_active_provider_once()
+            if not provider_name:
+                return True
+            strategy = self.provider_registry_service.get_or_create_strategy(provider_name)
+            if strategy is None:
+                return True
+            return bool(type(strategy).is_image_resolution_needed())
         except Exception:
             return True
 

@@ -20,6 +20,7 @@ def _make_minimal_machine() -> Machine:
         template_id="template-001",
         request_id="request-001",
         provider_type="aws",
+        provider_api="ec2fleet",
         provider_name="aws-us-east-1",
         instance_type=InstanceType(value="t2.micro"),
         image_id="ami-12345678",

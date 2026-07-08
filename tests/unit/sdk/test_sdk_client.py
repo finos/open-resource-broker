@@ -79,6 +79,32 @@ class TestOpenResourceBrokerConstruction:
         assert "not initialized" in repr(sdk)
         assert "aws" in repr(sdk)
 
+    # F3 — SDKConfig instance accepted directly in constructor
+    def test_config_as_sdk_config_instance_used_directly(self):
+        """ORBClient(config=SDKConfig(...)) must not raise AttributeError.
+
+        Regression: when config was an SDKConfig instance, the constructor
+        called SDKConfig.from_dict(config) which expects a dict, causing an
+        AttributeError deep in from_dict's iteration over config.items().
+        """
+        sdk_config = SDKConfig(provider="aws", timeout=120)
+        sdk = OpenResourceBroker(config=sdk_config)
+        assert sdk.config is sdk_config
+        assert sdk.config.provider == "aws"
+        assert sdk.config.timeout == 120
+
+    def test_config_as_dict_still_works(self):
+        """Passing a dict for config must still produce a valid SDKConfig."""
+        sdk = OpenResourceBroker(config={"provider": "aws", "timeout": 60})
+        assert sdk.config.provider == "aws"
+        assert sdk.config.timeout == 60
+
+    def test_config_as_sdk_config_instance_respects_explicit_provider_kwarg(self):
+        """Explicit provider= kwarg must override the value in the SDKConfig instance."""
+        sdk_config = SDKConfig(provider="aws")
+        sdk = OpenResourceBroker(config=sdk_config, provider="mock")
+        assert sdk.config.provider == "mock"
+
 
 # ---------------------------------------------------------------------------
 # initialize() / context manager
@@ -239,94 +265,6 @@ class TestOpenResourceBrokerIntrospection:
 
 
 # ---------------------------------------------------------------------------
-# Region / profile override wiring
-# ---------------------------------------------------------------------------
-
-
-class TestRegionProfileOverrides:
-    def _make_init_mocks(self):
-        mock_app = MagicMock()
-        mock_app.initialize = AsyncMock(return_value=True)
-        mock_app.get_query_bus.return_value = AsyncMock()
-        mock_app.get_command_bus.return_value = AsyncMock()
-        mock_disc = MagicMock()
-        mock_disc.discover_cqrs_methods = AsyncMock(return_value={})
-        return mock_app, mock_disc
-
-    @pytest.mark.asyncio
-    async def test_region_override_applied_after_initialize(self):
-        sdk = OpenResourceBroker(config={"provider": "aws", "region": "us-east-1"})
-        mock_app, mock_disc = self._make_init_mocks()
-        mock_config_port = MagicMock()
-        mock_container = MagicMock()
-        mock_container.get.return_value = mock_config_port
-
-        with (
-            patch("orb.sdk.client.Application", return_value=mock_app),
-            patch("orb.sdk.client.SDKMethodDiscovery", return_value=mock_disc),
-            patch("orb.sdk.client.create_container", return_value=mock_container),
-        ):
-            await sdk.initialize()
-
-        mock_config_port.override_provider_region.assert_called_once_with("us-east-1")
-        mock_config_port.override_provider_profile.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_profile_override_applied_after_initialize(self):
-        sdk = OpenResourceBroker(config={"provider": "aws", "profile": "prod"})
-        mock_app, mock_disc = self._make_init_mocks()
-        mock_config_port = MagicMock()
-        mock_container = MagicMock()
-        mock_container.get.return_value = mock_config_port
-
-        with (
-            patch("orb.sdk.client.Application", return_value=mock_app),
-            patch("orb.sdk.client.SDKMethodDiscovery", return_value=mock_disc),
-            patch("orb.sdk.client.create_container", return_value=mock_container),
-        ):
-            await sdk.initialize()
-
-        mock_config_port.override_provider_profile.assert_called_once_with("prod")
-        mock_config_port.override_provider_region.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_region_and_profile_both_applied(self):
-        sdk = OpenResourceBroker(
-            config={"provider": "aws", "region": "eu-west-1", "profile": "staging"}
-        )
-        mock_app, mock_disc = self._make_init_mocks()
-        mock_config_port = MagicMock()
-        mock_container = MagicMock()
-        mock_container.get.return_value = mock_config_port
-
-        with (
-            patch("orb.sdk.client.Application", return_value=mock_app),
-            patch("orb.sdk.client.SDKMethodDiscovery", return_value=mock_disc),
-            patch("orb.sdk.client.create_container", return_value=mock_container),
-        ):
-            await sdk.initialize()
-
-        mock_config_port.override_provider_region.assert_called_once_with("eu-west-1")
-        mock_config_port.override_provider_profile.assert_called_once_with("staging")
-
-    @pytest.mark.asyncio
-    async def test_no_overrides_when_region_and_profile_absent(self):
-        sdk = OpenResourceBroker(config={"provider": "aws"})
-        mock_app, mock_disc = self._make_init_mocks()
-        mock_container = MagicMock()
-
-        with (
-            patch("orb.sdk.client.Application", return_value=mock_app),
-            patch("orb.sdk.client.SDKMethodDiscovery", return_value=mock_disc),
-            patch("orb.sdk.client.create_container", return_value=mock_container),
-        ):
-            await sdk.initialize()
-
-        # container.get should never be called when no region/profile configured
-        mock_container.get.assert_not_called()
-
-
-# ---------------------------------------------------------------------------
 # Convenience methods
 # ---------------------------------------------------------------------------
 
@@ -437,3 +375,48 @@ class TestInitializeMissingConfigSafety:
         with patch("orb.sdk.client.Application", side_effect=SystemExit(1)):
             with pytest.raises(ConfigurationError, match="exit code 1"):
                 await sdk.initialize()
+
+
+# ---------------------------------------------------------------------------
+# Deprecated region / profile constructor kwargs
+# ---------------------------------------------------------------------------
+
+
+class TestDeprecatedRegionProfile:
+    """Backward-compatibility shims for the removed region / profile constructor surface."""
+
+    def test_region_kwarg_warns_and_populates_provider_config(self):
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            sdk = OpenResourceBroker(config={"provider": "aws"}, region="us-east-1")
+        assert sdk.config.provider_config.get("region") == "us-east-1"
+
+    def test_profile_kwarg_warns_and_populates_provider_config(self):
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            sdk = OpenResourceBroker(config={"provider": "aws"}, profile="my-profile")
+        assert sdk.config.provider_config.get("profile") == "my-profile"
+
+    def test_region_and_profile_together_warn_once_and_both_set(self):
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            sdk = OpenResourceBroker(
+                config={"provider": "aws"}, region="eu-west-1", profile="staging"
+            )
+        assert sdk.config.provider_config.get("region") == "eu-west-1"
+        assert sdk.config.provider_config.get("profile") == "staging"
+
+    def test_deprecated_region_does_not_override_explicit_provider_config(self):
+        # provider_config takes precedence over the deprecated kwarg (setdefault semantics).
+        with pytest.warns(DeprecationWarning):
+            sdk = OpenResourceBroker(
+                config={"provider": "aws"},
+                provider_config={"region": "eu-central-1"},
+                region="us-east-1",
+            )
+        assert sdk.config.provider_config.get("region") == "eu-central-1"
+
+    def test_no_warning_when_neither_region_nor_profile_passed(self):
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            # Must not raise.
+            OpenResourceBroker(config={"provider": "aws"})

@@ -401,6 +401,44 @@ docker run -it --rm \
   orb-api:latest bash
 ```
 
+## Compose Files Reference
+
+Three Compose configurations are provided under `deployment/docker/`:
+
+| File | Mode | Description |
+|---|---|---|
+| `docker-compose.yml` | API-only | Development / test setup — REST API without the web UI |
+| `docker-compose.prod.yml` | API-only (production) | Hardened API-only deployment with nginx, Prometheus, and log rotation |
+| `docker-compose.embedded.yml` | **Embedded UI** | Single container: REST API + SPA + WebSocket on one port (recommended for production with UI) |
+| `docker-compose.split.yml` | **Split UI** | Two containers: `orb-api` on port 8000, `orb-ui` on port 8001, for independent scaling |
+
+### Embedded UI (single-process, recommended)
+
+```bash
+docker compose -f deployment/docker/docker-compose.embedded.yml up -d
+```
+
+A single container runs `orb server start --foreground` in embedded mode.
+Port 8000 serves the SPA, Reflex WebSocket (`/_event`), and all REST API
+routes (`/orb/api/v1/*`). No Node/Bun required at runtime.
+
+See [Embedded UI Deployment](./embedded-ui.md) for the full three-mode guide,
+environment-variable reference, and troubleshooting steps.
+
+### Split UI (independent API + UI containers)
+
+```bash
+docker compose -f deployment/docker/docker-compose.split.yml up -d
+```
+
+`orb-api` runs `orb server start --api-only` and `orb-ui` runs the Reflex
+production backend with `ORB_MODE=remote`. A reverse proxy (nginx template
+included in the file as a commented service block) routes `/_event` and `/` to
+`orb-ui` and `/orb/*` to `orb-api`.
+
+Use this when you need to scale the API and UI tiers independently or place a
+CDN in front of static assets.
+
 ## Best Practices
 
 ### Production Deployment

@@ -73,28 +73,36 @@ class TestImportGuards:
 
     def test_api_server_without_fastapi(self):
         """Test API server gracefully fails without FastAPI."""
-        with patch.dict(
-            sys.modules,
-            {
-                "fastapi": None,
-                "fastapi.middleware": None,
-                "fastapi.middleware.cors": None,
-                "fastapi.middleware.trustedhost": None,
-                "fastapi.responses": None,
-            },
-        ):
-            # Force reimport to test guard
-            if "orb.api.server" in sys.modules:
-                del sys.modules["orb.api.server"]
+        _orig_server_mod = sys.modules.get("orb.api.server")
+        try:
+            with patch.dict(
+                sys.modules,
+                {
+                    "fastapi": None,
+                    "fastapi.middleware": None,
+                    "fastapi.middleware.cors": None,
+                    "fastapi.middleware.trustedhost": None,
+                    "fastapi.responses": None,
+                },
+            ):
+                # Force reimport to test guard
+                if "orb.api.server" in sys.modules:
+                    del sys.modules["orb.api.server"]
 
-            from orb.api.server import create_fastapi_app
+                from orb.api.server import create_fastapi_app
 
-            with pytest.raises(ImportError) as exc_info:
-                create_fastapi_app(None)
+                with pytest.raises(ImportError) as exc_info:
+                    create_fastapi_app(None)
 
-            error_msg = str(exc_info.value)
-            assert "FastAPI not installed" in error_msg
-            assert "pip install orb-py[api]" in error_msg
+                error_msg = str(exc_info.value)
+                assert "FastAPI not installed" in error_msg
+                assert "pip install orb-py[api]" in error_msg
+        finally:
+            if _orig_server_mod is not None:
+                import orb.api
+
+                setattr(orb.api, "server", _orig_server_mod)
+                sys.modules["orb.api.server"] = _orig_server_mod
 
     def test_monitoring_without_optional_deps(self):
         """Test monitoring works without optional dependencies."""
@@ -209,18 +217,26 @@ class TestErrorMessages:
 
     def test_api_error_message_helpful(self):
         """Test API error message tells user how to install."""
-        with patch.dict(sys.modules, {"fastapi": None}):
-            if "orb.api.server" in sys.modules:
-                del sys.modules["orb.api.server"]
+        _orig_server_mod = sys.modules.get("orb.api.server")
+        try:
+            with patch.dict(sys.modules, {"fastapi": None}):
+                if "orb.api.server" in sys.modules:
+                    del sys.modules["orb.api.server"]
 
-            from orb.api.server import create_fastapi_app
+                from orb.api.server import create_fastapi_app
 
-            with pytest.raises(ImportError) as exc_info:
-                create_fastapi_app(None)
+                with pytest.raises(ImportError) as exc_info:
+                    create_fastapi_app(None)
 
-            error_msg = str(exc_info.value)
-            assert "FastAPI not installed" in error_msg
-            assert "pip install orb-py[api]" in error_msg
+                error_msg = str(exc_info.value)
+                assert "FastAPI not installed" in error_msg
+                assert "pip install orb-py[api]" in error_msg
+        finally:
+            if _orig_server_mod is not None:
+                import orb.api
+
+                setattr(orb.api, "server", _orig_server_mod)
+                sys.modules["orb.api.server"] = _orig_server_mod
 
     def test_serve_command_error_message(self):
         """Test serve command error message is helpful."""

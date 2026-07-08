@@ -118,11 +118,6 @@ class TestSDKConfigFromEnv:
         cfg = SDKConfig.from_env()
         assert cfg.provider == "mock"
 
-    def test_from_env_reads_region(self, monkeypatch):
-        monkeypatch.setenv("ORB_REGION", "us-west-2")
-        cfg = SDKConfig.from_env()
-        assert cfg.region == "us-west-2"
-
     def test_from_env_reads_timeout(self, monkeypatch):
         monkeypatch.setenv("ORB_TIMEOUT", "120")
         cfg = SDKConfig.from_env()
@@ -134,11 +129,10 @@ class TestSDKConfigFromEnv:
         assert cfg.log_level == "DEBUG"
 
     def test_from_env_defaults_when_vars_absent(self, monkeypatch):
-        for var in ("ORB_PROVIDER", "ORB_REGION", "ORB_TIMEOUT", "ORB_LOG_LEVEL"):
+        for var in ("ORB_PROVIDER", "ORB_TIMEOUT", "ORB_LOG_LEVEL"):
             monkeypatch.delenv(var, raising=False)
         cfg = SDKConfig.from_env()
         assert cfg.provider == "aws"
-        assert cfg.region is None
         assert cfg.timeout == 300
         assert cfg.log_level == "INFO"
 

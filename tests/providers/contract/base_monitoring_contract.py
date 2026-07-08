@@ -10,6 +10,8 @@ Required fixtures (implement in provider conftest.py):
 
 import pytest
 
+from orb.domain.base.provider_fulfilment import CheckHostsStatusResult
+
 
 class BaseMonitoringContract:
     """Provider-agnostic monitoring contract scenarios."""
@@ -23,10 +25,13 @@ class BaseMonitoringContract:
 
     @pytest.mark.provider_contract
     def test_status_returns_list(self, provisioned_resource_ids):
-        """check_hosts_status must return a list."""
+        """check_hosts_status must return a CheckHostsStatusResult with an instances list."""
         handler, _resource_ids, status_request = provisioned_resource_ids
         result = handler.check_hosts_status(status_request)
-        assert isinstance(result, list), "check_hosts_status must return a list"
+        assert isinstance(result, CheckHostsStatusResult), (
+            "check_hosts_status must return a CheckHostsStatusResult"
+        )
+        assert isinstance(result.instances, list), "CheckHostsStatusResult.instances must be a list"
 
     @pytest.mark.provider_contract
     def test_status_entries_have_required_keys(self, provisioned_resource_ids):
@@ -35,7 +40,7 @@ class BaseMonitoringContract:
         result = handler.check_hosts_status(status_request)
         # moto simulators may return empty list for some provider APIs (e.g. ASG)
         # — the contract only asserts shape when entries are present
-        for entry in result:
+        for entry in result.instances:
             assert "instance_id" in entry, f"status entry missing instance_id: {entry}"
             assert "status" in entry, f"status entry missing status: {entry}"
 
@@ -60,7 +65,7 @@ class BaseMonitoringContract:
         result = handler.check_hosts_status(status_request)
         # Either empty (simulator limitation) or all entries show termination state
         terminal_states = {"terminated", "shutting-down", "stopping", "stopped"}
-        for entry in result:
+        for entry in result.instances:
             assert entry.get("status") in terminal_states, (
                 f"expected terminal state after release, got: {entry}"
             )

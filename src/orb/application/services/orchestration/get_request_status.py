@@ -34,9 +34,18 @@ class GetRequestStatusOrchestrator(OrchestratorBase[GetRequestStatusInput, GetRe
         request_dicts = []
         for request_id in input.request_ids:
             try:
+                # When the caller asks for verbose status (the default for
+                # GET /requests/{id}/status and the explicit batch-sync
+                # endpoint), bypass the read-through cache. The whole point
+                # of those calls is to refresh state from the provider —
+                # serving a cached DTO defeats it and leaves the request
+                # stuck on stale IN_PROGRESS even after a successful sync.
+                # Non-verbose callers (lightweight list rows, etc.) can
+                # still hit the cache for speed.
                 query = GetRequestQuery(  # type: ignore[assignment]
                     request_id=request_id,
                     verbose=input.verbose,
+                    skip_cache=bool(input.verbose),
                 )
                 result = await self._query_bus.execute(query)
                 request_dicts.append(self._to_dict(result))

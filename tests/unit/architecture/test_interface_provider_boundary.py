@@ -41,8 +41,15 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
         ("interface/init_command_handler.py", "orb.providers.factory"),
         ("interface/machine_command_handlers.py", "orb.providers.base.strategy"),
         ("interface/mcp/server/core.py", "orb.providers.registry"),
-        ("api/server.py", "orb.providers.aws.auth.iam_strategy"),
-        ("api/server.py", "orb.providers.aws.auth.cognito_strategy"),
+        # CLI spec bootstrap: build_parser triggers lightweight CLI-spec registration
+        # so that provider flags (e.g. --aws-profile) are available before app init.
+        ("cli/args.py", "orb.providers.registration"),
+        # Provider schema endpoints: the UI column schema is a pure metadata read
+        # with no side effects; the registry is queried read-only to enumerate
+        # registered strategy classes and call get_ui_column_schema() on them.
+        # TODO: extract to an application service when a suitable one exists.
+        ("api/routers/providers.py", "orb.providers.registry.provider_registry"),
+        ("api/routers/providers.py", "orb.providers.registry.types"),
     }
 )
 

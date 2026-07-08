@@ -1,0 +1,104 @@
+# Docker Compose — Embedded UI mode
+#
+# Single-service deployment: one container runs `orb server start --foreground`
+# which spawns `reflex run --env prod --backend-only` as a child process.
+# A single port (8000) serves:
+#   - The SPA and static assets  (/)
+#   - Reflex WebSocket state     (/_event)
+#   - File upload                (/_upload)
+#   - ORB REST API               (/orb/api/v1/*)
+#   - Health endpoint            (/orb/health  or  /_health via Reflex)
+#
+# No Node/Bun required at runtime — the pre-compiled JS bundle ships inside
+# the wheel and is served directly by the Reflex backend.
+#
+# Requirements:
+#   - The orb-api image must have been built with `make ui-build` so the
+#     `[ui]` extra and its _static/ bundle are present in the wheel.
+#   - config/config.json must set `ui.mode = "embedded"` (the default).
+#
+# Usage:
+#   docker compose -f deployment/docker/docker-compose.embedded.yml up -d
+#
+# To rebuild the SPA bundle with a non-default backend port before building
+# the image:
+#   ORB_UI_BACKEND_PORT=8000 make ui-build
+
+services:
+  orb:
+    image: orb-api:${VERSION:-latest}
+    container_name: orb-embedded
+    restart: unless-stopped
+
+    # The entrypoint already calls `orb server start --foreground`; pass the
+    # explicit UI mode so the container works without a config.json override.
+    environment:
+      # Bind address and port (must match the SPA bundle's baked-in backend_port)
+      HF_SERVER_HOST: 0.0.0.0
+      HF_SERVER_PORT: ${ORB_PORT:-8000}
+
+      # UI mode — embedded is the default but we set it explicitly so this
+      # file is self-documenting. Remove the line to rely on the config file.
+      ORB_MODE: embedded
+      ORB_UI_BACKEND_PORT: ${ORB_PORT:-8000}
+
+      # Provider / AWS credentials
+      HF_PROVIDER_TYPE: ${HF_PROVIDER_TYPE:-aws}
+      HF_PROVIDER_AWS_REGION: ${HF_PROVIDER_AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+
+      # Authentication
+      HF_AUTH_ENABLED: ${HF_AUTH_ENABLED:-false}
+      HF_AUTH_STRATEGY: ${HF_AUTH_STRATEGY:-none}
+      HF_AUTH_BEARER_SECRET_KEY: ${HF_AUTH_BEARER_SECRET_KEY:-}
+
+      # Logging
+      HF_LOGGING_LEVEL: ${HF_LOGGING_LEVEL:-INFO}
+      HF_LOGGING_CONSOLE_ENABLED: "true"
+      HF_DEBUG: ${HF_DEBUG:-false}
+
+    ports:
+      - "${ORB_PORT:-8000}:${ORB_PORT:-8000}"
+
+    volumes:
+      # Operator-supplied config file — bind-mount so config changes survive
+      # image rebuilds. Remove or replace with a secrets provider if preferred.
+      - ${ORB_CONFIG_FILE:-./config/config.json}:/app/config/config.json:ro
+      # Named volume for runtime state: PID file, loopback token, logs
+      - orb-work:/app/data
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${ORB_PORT:-8000}/_health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - orb-net
+
+volumes:
+  orb-work:
+    driver: local
+
+networks:
+  orb-net:
+    driver: bridge

@@ -6,7 +6,7 @@ errors, and different output formats with scheduler strategy integration.
 """
 
 import traceback
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from orb.application.dto.base import BaseDTO, BaseResponse
 from orb.cli.formatters import format_output
@@ -39,7 +39,7 @@ class CLIResponseFormatter:
         args: Any = None,
         format_type: Optional[str] = None,
         command_context: Optional[str] = None,
-    ) -> Union[str, tuple[str, int]]:
+    ) -> str | tuple[str, int]:
         """
         Format any response type for CLI output.
 

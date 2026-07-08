@@ -26,3 +26,16 @@ class TemplateRepository(AggregateRepository[Template]):  # type: ignore[type-va
     @abstractmethod
     def search_templates(self, criteria: dict[str, Any]) -> list[Template]:
         """Search templates by criteria."""
+
+    def count_by_provider_api(self) -> dict[str, int]:
+        """Return ``{provider_api: count}`` for all templates.
+
+        Default implementation lists all templates and groups by provider_api.
+        Concrete implementations backed by SQL should override this with a
+        single ``SELECT provider_api, COUNT(*) GROUP BY provider_api`` query.
+        """
+        counts: dict[str, int] = {}
+        for tmpl in self.find_all():
+            key = str(getattr(tmpl, "provider_api", None) or "unknown").strip()
+            counts[key] = counts.get(key, 0) + 1
+        return counts

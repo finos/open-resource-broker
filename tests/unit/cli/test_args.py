@@ -191,17 +191,18 @@ class TestGlobalFlags:
         ns = _parse(["machines", "list", "--no-color"])
         assert ns.no_color is True
 
-    def test_provider_override(self):
-        ns = _parse(["machines", "list", "--provider", "aws-prod"])
-        assert ns.provider == "aws-prod"
+    def test_provider_name_flag(self):
+        ns = _parse(["machines", "list", "--provider-name", "aws-prod"])
+        assert ns.provider_name == "aws-prod"
 
-    def test_region_override(self):
-        ns = _parse(["machines", "list", "--region", "us-east-1"])
-        assert ns.region == "us-east-1"
+    def test_provider_type_flag(self):
+        ns = _parse(["machines", "list", "--provider-type", "k8s"])
+        assert ns.provider_type == "k8s"
 
-    def test_profile_override(self):
-        ns = _parse(["machines", "list", "--profile", "my-profile"])
-        assert ns.profile == "my-profile"
+    def test_provider_name_and_type_are_independent(self):
+        ns = _parse(["machines", "list", "--provider-name", "aws-prod", "--provider-type", "aws"])
+        assert ns.provider_name == "aws-prod"
+        assert ns.provider_type == "aws"
 
     def test_limit_flag(self):
         ns = _parse(["machines", "list", "--limit", "10"])

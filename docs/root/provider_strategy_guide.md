@@ -348,7 +348,7 @@ python run.py executeProviderOperation --data '{"operation_type": "HEALTH_CHECK"
 
 ### **Getting Help:**
 - Check the troubleshooting section above
-- Review provider strategy logs in `logs/app.log`
+- Review provider strategy logs in `logs/orb.log`
 - Use debug mode for detailed information
 - Check provider health and metrics
 

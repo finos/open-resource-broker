@@ -30,7 +30,10 @@ async def handle_provider_health(args) -> dict[str, Any]:
     container = get_container()
     orchestrator = container.get(GetProviderHealthOrchestrator)
     result = await orchestrator.execute(
-        GetProviderHealthInput(provider_name=getattr(args, "provider", None))
+        GetProviderHealthInput(
+            provider_name=getattr(args, "provider_name", None),
+            provider_type=getattr(args, "provider_type", None),
+        )
     )
     return {"health": result.health, "message": result.message}
 
@@ -43,7 +46,13 @@ async def handle_list_providers(args) -> dict[str, Any]:
 
     container = get_container()
     orchestrator = container.get(ListProvidersOrchestrator)
-    result = await orchestrator.execute(ListProvidersInput())
+    result = await orchestrator.execute(
+        ListProvidersInput(
+            provider_name=getattr(args, "provider_name", None),
+            provider_type=getattr(args, "provider_type", None),
+            filter_expressions=getattr(args, "filter", None) or [],
+        )
+    )
     return {
         "providers": result.providers,
         "count": result.count,
@@ -106,7 +115,7 @@ async def handle_provider_metrics(args) -> dict[str, Any]:
     orchestrator = container.get(GetProviderMetricsOrchestrator)
     result = await orchestrator.execute(
         GetProviderMetricsInput(
-            provider_name=getattr(args, "provider", None),
+            provider_name=getattr(args, "provider_name", None),
             timeframe=getattr(args, "timeframe", "24h"),
         )
     )

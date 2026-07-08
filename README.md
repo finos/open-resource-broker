@@ -36,7 +36,8 @@ Built for AWS today (EC2, Auto Scaling Groups, SpotFleet, EC2Fleet), with an ext
 
 **Provider support:**
 - **AWS** — EC2 RunInstances, EC2Fleet, SpotFleet, Auto Scaling Groups
-- **Custom** — extensible via [provider registry](docs/root/developer_guide/architecture.md)
+- **Kubernetes** — Pod, Deployment, StatefulSet, Job (`pip install "orb-py[k8s]"`; see [Kubernetes provider docs](docs/root/providers/k8s/index.md))
+- **Custom** — extensible via [provider registry](docs/root/developer_guide/architecture.md) and the [`orb.providers` entry-point group](docs/root/providers/k8s/plugin-authoring.md)
 
 **Scheduler support:**
 - **HostFactory** — runs as an [IBM Spectrum Symphony provider plugin](#hostfactory-integration)
@@ -83,11 +84,38 @@ Get ORB installed and configured for your environment.
 <details>
 <summary>Installation</summary>
 
-### Standard install
+### Standard install (core only — no provider)
 
 ```bash
 pip install orb-py
 ```
+
+ORB boots cleanly with no provider registered.  Any command that needs a provider
+will return a clear "no provider configured" error rather than an ImportError.
+
+### Per-provider install
+
+```bash
+pip install "orb-py[aws]"          # AWS provider (boto3 + botocore)
+pip install "orb-py[k8s]"   # Kubernetes provider (kubernetes SDK)
+pip install "orb-py[aws,cli]"      # AWS provider + colored CLI output
+pip install "orb-py[aws,api]"      # AWS provider + REST API server
+pip install "orb-py[monitoring-aws]"  # AWS provider + full monitoring stack
+pip install "orb-py[all]"          # All providers + all features
+```
+
+### Provider extras matrix
+
+| Use case | Install command |
+|----------|----------------|
+| Core only (no provider) | `pip install orb-py` |
+| AWS operator | `pip install "orb-py[aws]"` |
+| Kubernetes operator | `pip install "orb-py[k8s]"` |
+| AWS + Kubernetes | `pip install "orb-py[aws,k8s]"` |
+| AWS + colored CLI | `pip install "orb-py[aws,cli]"` |
+| AWS + REST API | `pip install "orb-py[aws,api]"` |
+| AWS + monitoring | `pip install "orb-py[monitoring-aws]"` |
+| Full (all providers + features) | `pip install "orb-py[all]"` |
 
 ### With colored CLI output
 
@@ -205,7 +233,7 @@ See the [CLI Reference](docs/root/cli/cli-reference.md) for the full flag refere
 <details>
 <summary>REST API</summary>
 
-Example API calls. Requires `pip install "orb-py[api]"` and `orb system serve`.
+Example API calls. Requires `pip install "orb-py[api]"` and `orb server start` (add `--foreground` for an in-shell variant).
 
 ```bash
 # Get available templates
@@ -348,6 +376,27 @@ curl http://localhost:8000/health
 ```
 
 </details>
+
+## Symphony HostFactory on Kubernetes (legacy)
+
+The `k8s-legacy` module is a Symphony HostFactory custom provider plugin for Kubernetes, predating the modern multi-cloud ORB architecture.  It is now bundled with `orb-py` as an optional install extra rather than as a separate PyPI package.
+
+Install with:
+
+```bash
+pip install "orb-py[k8s-legacy]"
+```
+
+Confirm the install by listing available templates:
+
+```bash
+orb k8s-legacy get-available-templates
+```
+
+The plugin is in maintenance mode.  A modern Kubernetes provider with native ORB integration is in development; existing deployments remain fully supported.
+
+- **Upgrading from `open-resource-broker`?** See the [migration guide](docs/root/operational/from-open-resource-broker.md).
+- **Deploying the Symphony HF plugin?** See the [k8s-legacy deployment guide](k8s-legacy/README.md).
 
 ## Project
 

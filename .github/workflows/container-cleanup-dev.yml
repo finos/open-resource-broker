@@ -1,0 +1,198 @@
+name: Container Cleanup (Dev Tags)
+
+# Nightly cleanup of dev-tagged container images.  Keeps:
+#   - Floating tags (latest, main, develop, python<X.Y>)
+#   - Production semver tags (e.g. 1.6.2, 1.6.2-python3.14, v1.6.2)
+#   - The newest N dev builds per Python version
+# Deletes:
+#   - Older dev builds beyond the keep-window
+#   - Untagged orphan manifests
+#
+# Production-release-driven cleanup of pre-release dev builds is handled
+# separately in container-cleanup-on-release.yml.
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'List what would be deleted without deleting'
+        required: false
+        default: 'true'
+        type: boolean
+      keep-per-python:
+        description: 'Number of recent dev builds to keep per Python version'
+        required: false
+        default: '5'
+        type: string
+
+permissions:
+  packages: write
+
+concurrency:
+  group: container-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup-dev:
+    name: Prune Dev Container Tags
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cleanup dev container versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          PACKAGE: ${{ github.event.repository.name }}
+          DRY_RUN: ${{ inputs.dry-run || 'false' }}
+          KEEP_PER_PYTHON: ${{ inputs.keep-per-python || '5' }}
+        run: |
+          set -euo pipefail
+
+          # A tag is "dev" when it carries a .dev<digits> segment - matches the
+          # version string semantic-release stamps onto every commit on main.
+          is_dev_tag() {
+            local tag="$1"
+            [[ "$tag" =~ \.dev[0-9]+ ]]
+          }
+
+          # Protected tags are never deleted: floating refs (latest, main, develop,
+          # pythonX.Y) and production semver (no .dev segment).
+          is_protected_tag() {
+            local tag="$1"
+            case "$tag" in
+              latest|main|develop) return 0 ;;
+            esac
+            if [[ "$tag" =~ ^python[0-9]+\.[0-9]+$ ]]; then return 0; fi
+            if [[ "$tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([-.][a-zA-Z0-9]+)*$ ]] && ! is_dev_tag "$tag"; then
+              return 0
+            fi
+            return 1
+          }
+
+          # Paginate every container version on the package.
+          page=1
+          : > /tmp/versions.jsonl
+          while true; do
+            resp=$(gh api "/orgs/${OWNER}/packages/container/${PACKAGE}/versions?per_page=100&page=${page}")
+            count=$(echo "$resp" | jq 'length')
+            if [[ "$count" -eq 0 ]]; then break; fi
+            echo "$resp" | jq -c '.[]' >> /tmp/versions.jsonl
+            if [[ "$count" -lt 100 ]]; then break; fi
+            page=$((page + 1))
+          done
+
+          total=$(wc -l < /tmp/versions.jsonl)
+          echo "Found ${total} container versions"
+
+          : > /tmp/delete.txt
+          : > /tmp/keep_protected.txt
+          : > /tmp/keep_recent_dev.txt
+          : > /tmp/untagged.txt
+          : > /tmp/dev_by_py.tsv
+
+          # Classify each manifest: untagged orphan, protected, dev (bucketed by
+          # python version), or unknown (kept defensively).
+          while IFS= read -r row; do
+            id=$(echo "$row" | jq -r '.id')
+            created_at=$(echo "$row" | jq -r '.created_at')
+            tags=$(echo "$row" | jq -r '.metadata.container.tags // [] | join(",")')
+
+            if [[ -z "$tags" ]]; then
+              echo "$id ($created_at) [untagged]" >> /tmp/untagged.txt
+              continue
+            fi
+
+            protected=false
+            for tag in ${tags//,/ }; do
+              if is_protected_tag "$tag"; then
+                protected=true
+                break
+              fi
+            done
+            if [[ "$protected" == "true" ]]; then
+              echo "$id ($created_at) [tags: ${tags}]" >> /tmp/keep_protected.txt
+              continue
+            fi
+
+            dev=false
+            py_bucket="no-python"
+            for tag in ${tags//,/ }; do
+              if is_dev_tag "$tag"; then
+                dev=true
+                if [[ "$tag" =~ -python([0-9]+\.[0-9]+) ]]; then
+                  py_bucket="${BASH_REMATCH[1]}"
+                fi
+                break
+              fi
+            done
+            if [[ "$dev" == "true" ]]; then
+              printf '%s\t%s\t%s\t%s\n' "$py_bucket" "$created_at" "$id" "$tags" >> /tmp/dev_by_py.tsv
+              continue
+            fi
+
+            # Keep unrecognised tags - operator may have set a custom name.
+            echo "$id ($created_at) [tags: ${tags}] [unknown - keeping]" >> /tmp/keep_protected.txt
+          done < /tmp/versions.jsonl
+
+          # Within each python bucket, keep the most recent KEEP_PER_PYTHON
+          # builds (by created_at) and mark the rest for deletion.
+          if [[ -s /tmp/dev_by_py.tsv ]]; then
+            sort -k1,1 -k2,2r /tmp/dev_by_py.tsv > /tmp/dev_by_py_sorted.tsv
+            current_py=""
+            kept_in_bucket=0
+            while IFS=$'\t' read -r py_bucket created_at id tags; do
+              if [[ "$py_bucket" != "$current_py" ]]; then
+                current_py="$py_bucket"
+                kept_in_bucket=0
+              fi
+              if (( kept_in_bucket < KEEP_PER_PYTHON )); then
+                echo "$id ($created_at) [py: $py_bucket] [tags: ${tags}]" >> /tmp/keep_recent_dev.txt
+                kept_in_bucket=$((kept_in_bucket + 1))
+              else
+                echo "$id ($created_at) [py: $py_bucket] [tags: ${tags}]" >> /tmp/delete.txt
+              fi
+            done < /tmp/dev_by_py_sorted.tsv
+          fi
+
+          echo
+          echo "== Protected (always kept) =="
+          cat /tmp/keep_protected.txt || true
+          echo
+          echo "== Recent dev kept (per-python window of ${KEEP_PER_PYTHON}) =="
+          cat /tmp/keep_recent_dev.txt || true
+          echo
+          echo "== Untagged (will delete) =="
+          cat /tmp/untagged.txt || true
+          echo
+          echo "== Old dev (will delete) =="
+          cat /tmp/delete.txt || true
+          echo
+
+          if [[ "$DRY_RUN" == "true" ]]; then
+            echo "Dry run - no deletions performed."
+            exit 0
+          fi
+
+          deleted=0
+          while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            id=$(echo "$line" | awk '{print $1}')
+            echo "Deleting version ${id}"
+            gh api -X DELETE "/orgs/${OWNER}/packages/container/${PACKAGE}/versions/${id}" || {
+              echo "  failed to delete ${id} (continuing)"
+            }
+            deleted=$((deleted + 1))
+          done < /tmp/untagged.txt
+          while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            id=$(echo "$line" | awk '{print $1}')
+            echo "Deleting version ${id}"
+            gh api -X DELETE "/orgs/${OWNER}/packages/container/${PACKAGE}/versions/${id}" || {
+              echo "  failed to delete ${id} (continuing)"
+            }
+            deleted=$((deleted + 1))
+          done < /tmp/delete.txt
+
+          echo
+          echo "Deleted ${deleted} version(s)."

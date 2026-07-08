@@ -1,0 +1,51 @@
+#!/bin/sh
+# Liveness probe for lim: fails if lim is missing for >10min or has no children for >10min
+
+NO_CHILD_FILE="/tmp/lim_no_child_since"
+NO_LIM_FILE="/tmp/lim_missing_since"
+THRESHOLD=600 # 10 minutes
+
+now=$(date +%s)
+
+# Check if lim process is running
+pid=$(pgrep -x lim)
+if [ -z "$pid" ]; then
+  # lim is not running
+  if [ ! -f "$NO_LIM_FILE" ]; then
+    echo "$now" > "$NO_LIM_FILE"
+    exit 0
+  fi
+  start=$(cat "$NO_LIM_FILE")
+  elapsed=$((now - start))
+  if [ "$elapsed" -ge "$THRESHOLD" ]; then
+    echo "lim missing for $THRESHOLD seconds, failing liveness probe."
+    exit 1
+  else
+    exit 0
+  fi
+fi
+
+# lim is running, clear missing file
+rm -f "$NO_LIM_FILE"
+
+# Now check for children
+if pgrep -P "$pid" > /dev/null; then
+  # Has children: clear state
+  rm -f "$NO_CHILD_FILE"
+  exit 0
+fi
+
+# No children: check or set timestamp
+if [ ! -f "$NO_CHILD_FILE" ]; then
+  echo "$now" > "$NO_CHILD_FILE"
+  exit 0
+fi
+
+start=$(cat "$NO_CHILD_FILE")
+elapsed=$((now - start))
+if [ "$elapsed" -ge "$THRESHOLD" ]; then
+  echo "'lim' has had no children for $THRESHOLD seconds, failing liveness probe."
+  exit 1
+fi
+
+exit 0

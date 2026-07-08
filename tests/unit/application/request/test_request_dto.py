@@ -65,8 +65,24 @@ class TestRequestDTOVerboseField:
         )
         dto = RequestDTO.from_domain(request)
         result = dto.to_dict()
+        # Lean default payload — CLI / SDK consumers should not see
+        # detail fields unless they opt in via verbose or include_timing.
         assert "first_status_check" not in result
         assert "last_status_check" not in result
+        assert "metadata" not in result
+
+    def test_to_dict_with_include_timing_exposes_status_check_fields(self):
+        request = _make_request(
+            first_status_check=datetime(2026, 5, 1, 11, 0, 0, tzinfo=timezone.utc),
+            last_status_check=datetime(2026, 5, 1, 12, 0, 0, tzinfo=timezone.utc),
+        )
+        dto = RequestDTO.from_domain(request)
+        result = dto.to_dict(include_timing=True)
+        # UI list view passes include_timing=True so the Timing stepper
+        # renders from list-row data without an extra detail fetch.
+        assert "first_status_check" in result
+        assert "last_status_check" in result
+        # metadata still requires verbose.
         assert "metadata" not in result
 
     def test_to_dict_verbose_true_includes_detail_fields(self):

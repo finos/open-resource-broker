@@ -8,7 +8,31 @@ def pytest_addoption(parser):
         "--run-aws",
         action="store_true",
         default=False,
-        help="Run tests requiring real AWS credentials",
+        help="Alias for --live (backward compat): run tests requiring real AWS credentials",
+    )
+    parser.addoption(
+        "--live",
+        action="store_true",
+        default=False,
+        help="Enable tests under tests/providers/<name>/live/ (require real credentials)",
+    )
+    parser.addoption(
+        "--run-k8s",
+        action="store_true",
+        default=False,
+        help="Enable live tests under tests/providers/k8s/live/ (require a real Kubernetes cluster)",
+    )
+    parser.addoption(
+        "--no-mocked",
+        action="store_true",
+        default=False,
+        help="Skip mocked/moto tests under tests/providers/<name>/moto/",
+    )
+    parser.addoption(
+        "--provider",
+        action="store",
+        default=None,
+        help="Filter to tests under tests/providers/<name>/ only (e.g. --provider aws)",
     )
     parser.addoption(
         "--keep-logs",
@@ -16,17 +40,101 @@ def pytest_addoption(parser):
         default=False,
         help="Keep per-test run_templates directories after test (for log inspection)",
     )
+    parser.addoption(
+        "--run-slow",
+        action="store_true",
+        default=False,
+        help="Run tests marked ``slow`` (e.g. GC tests with long grace-period waits)",
+    )
+
+
+def _is_live_test(item) -> bool:
+    """Return True when the test lives under a providers/<name>/live/ subtree."""
+    path = str(item.fspath)
+    return "/providers/" in path and "/live/" in path
+
+
+def _is_moto_test(item) -> bool:
+    """Return True when the test lives under a providers/<name>/moto/ subtree."""
+    path = str(item.fspath)
+    return "/providers/" in path and "/moto/" in path
+
+
+def _is_k8s_live_test(item: pytest.Item) -> bool:
+    """Return True when the test lives under tests/providers/k8s/live/."""
+    path = str(item.fspath)
+    return "/providers/k8s/" in path and "/live/" in path
 
 
 def pytest_collection_modifyitems(config, items):
-    if config.getoption("--run-aws"):
-        return
-    if any("onaws" in str(a) for a in config.args):
-        return
-    skip = pytest.mark.skip(reason="requires real AWS credentials — pass --run-aws to run")
+    # Live tests require real AWS credentials and a real account: they must be
+    # opted into explicitly with --live (or --run-aws).  We deliberately do NOT
+    # treat the presence of "live" / "onaws" in the CLI arg path as an implicit
+    # opt-in: pointing pytest at tests/providers/aws/live to collect the suite
+    # (e.g. the providers-serial CI job) would otherwise auto-enable live mode
+    # without credentials and every test would error on the missing config
+    # file.  The path-based shortcut also makes it dangerously easy for an
+    # operator to launch real AWS provisioning by accident.
+    live_enabled = config.getoption("--live") or config.getoption("--run-aws")
+    k8s_live_enabled = config.getoption("--run-k8s", default=False)
+    no_mocked = config.getoption("--no-mocked")
+    provider_filter = config.getoption("--provider")
+
+    skip_live = pytest.mark.skip(
+        reason="requires real credentials — pass --live (or --run-aws) to run"
+    )
+    skip_k8s_live = pytest.mark.skip(
+        reason="requires a real Kubernetes cluster — pass --run-k8s to run"
+    )
+    skip_mocked = pytest.mark.skip(reason="moto tests skipped — remove --no-mocked to run")
+    skip_provider = pytest.mark.skip(reason=f"filtered to --provider {provider_filter}")
+
+    # Auto-skip AWS provider tests when boto3 is not installed
+    try:
+        import boto3 as _boto3  # noqa: F401
+
+        aws_available = True
+    except ImportError:
+        aws_available = False
+
+    skip_no_aws = pytest.mark.skip(reason="[aws] extra not installed — boto3 unavailable")
+
     for item in items:
-        if item.get_closest_marker("aws") and not item.get_closest_marker("provider_contract"):
-            item.add_marker(skip)
+        path = str(item.fspath)
+
+        # Auto-skip AWS provider tests when [aws] extra is not installed
+        if not aws_available and "/providers/aws/" in path:
+            item.add_marker(skip_no_aws)
+
+        # Provider filter
+        if provider_filter and f"/providers/{provider_filter}" not in path:
+            if "/providers/" in path:
+                item.add_marker(skip_provider)
+
+        # k8s live gate — checked before the generic live gate so it gets its
+        # own skip reason and its own opt-in flag.
+        if _is_k8s_live_test(item) and not k8s_live_enabled:
+            item.add_marker(skip_k8s_live)
+            continue
+
+        # Live gate (AWS / generic)
+        if _is_live_test(item) and not _is_k8s_live_test(item) and not live_enabled:
+            item.add_marker(skip_live)
+            continue
+
+        # Moto gate
+        if _is_moto_test(item) and no_mocked:
+            item.add_marker(skip_mocked)
+            continue
+
+        # Legacy marker-based gate (non-provider-tree tests marked @pytest.mark.aws)
+        if (
+            item.get_closest_marker("aws")
+            and not item.get_closest_marker("provider_contract")
+            and not live_enabled
+            and not _is_live_test(item)
+        ):
+            item.add_marker(skip_live)
 
 
 import json
@@ -59,7 +167,12 @@ except ImportError:
         yield
 
 
-import boto3
+try:
+    import boto3
+
+    AWS_AVAILABLE = True
+except ImportError:
+    AWS_AVAILABLE = False
 
 from orb.config.manager import ConfigurationManager
 from orb.config.schemas.app_schema import AppConfig
@@ -81,24 +194,23 @@ from tests.utilities.reset_singletons import reset_all_singletons
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_environment():
-    """Set up test environment variables."""
-    # Set up PYTHONPATH first
+    """Set generic (provider-agnostic) test environment variables.
+
+    Provider-specific fake credentials live under the corresponding
+    ``tests/providers/<name>/mocked/conftest.py`` — each provider owns
+    whatever env its mocked SDK needs.  The root conftest deliberately does
+    not touch cloud-provider env vars so live suites (any provider, any
+    auth mechanism: cloud IAM, kube tokens, OIDC, mTLS, on-prem HTTP
+    basic) run in the operator's real environment untouched.
+    """
     project_root = Path(__file__).parent.parent
     src_path = project_root / "src"
 
-    # Add src to Python path
     if str(src_path) not in sys.path:
         sys.path.insert(0, str(src_path))
 
-    # Set environment variables
     os.environ.update(
         {
-            "AWS_DEFAULT_REGION": "us-east-1",
-            "AWS_ACCESS_KEY_ID": "testing",
-            "AWS_SECRET_ACCESS_KEY": "testing",  # nosec B105
-            "AWS_SECURITY_TOKEN": "testing",  # nosec B105
-            "AWS_SESSION_TOKEN": "testing",  # nosec B105
-            "ENVIRONMENT": "testing",
             "LOG_LEVEL": "DEBUG",
             "TESTING": "true",
             "PYTHONPATH": f"{src_path}:{os.environ.get('PYTHONPATH', '')}",
@@ -223,18 +335,24 @@ def aws_mocks():
 @pytest.fixture
 def ec2_client(aws_mocks):
     """Create a mocked EC2 client."""
+    if not AWS_AVAILABLE:
+        pytest.skip("boto3 not installed — install [aws] extra")
     return boto3.client("ec2", region_name="us-east-1")
 
 
 @pytest.fixture
 def autoscaling_client(aws_mocks):
     """Create a mocked Auto Scaling client."""
+    if not AWS_AVAILABLE:
+        pytest.skip("boto3 not installed — install [aws] extra")
     return boto3.client("autoscaling", region_name="us-east-1")
 
 
 @pytest.fixture
 def ssm_client(aws_mocks):
     """Create a mocked SSM client."""
+    if not AWS_AVAILABLE:
+        pytest.skip("boto3 not installed — install [aws] extra")
     return boto3.client("ssm", region_name="us-east-1")
 
 

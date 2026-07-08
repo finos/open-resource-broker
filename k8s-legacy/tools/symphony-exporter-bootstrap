@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+
+
+wait_for_egocc() {
+  declare egocc_file
+  egocc_file="/tmp/secegocc_$(id -u)"
+
+  while [[ ! -f "${egocc_file}" ]]
+  do
+    sleep 5
+  done
+}
+
+
+is_configured() {
+  declare secrets_file
+  secrets_file="/tmp/.exporter_$(id -u)_secrets"
+  if [[ -f "${secrets_file}" ]]
+  then
+    return 0
+  fi
+  return 1
+}
+
+
+prepare_secrets() (
+  declare secrets_file
+  secrets_file="/tmp/.exporter_$(id -u)_secrets"
+  umask u=rwx,go=
+  echo "EXPORTER_USER='exporter_$(uuidgen | tr -d - | cut -c -16)'" >> "${secrets_file}"
+  echo "EXPORTER_PASS='$(uuidgen | tr -d -)'" >> "${secrets_file}"
+  touch /var/tmp/symphony/kubernetes
+)
+
+
+prepare_role() (
+  declare secrets_file
+  secrets_file="/tmp/.exporter_$(id -u)_secrets"
+  set +eu
+  # shellcheck disable=SC1091
+  source /var/tmp/symphony/profile.platform
+  set -eu
+  # shellcheck disable=SC1090
+  source "${secrets_file}"
+  egosh user add -u "${EXPORTER_USER}" -x "${EXPORTER_PASS}"
+  egosh user assignrole -u "${EXPORTER_USER}" -r CLUSTER_READONLY_ADMIN
+)
+
+
+auth_exporter() (
+  declare egocc_file secrets_file secrets_file
+  egocc_file="/tmp/secegocc_${SYMPHONY_CLUSTER_NAME}_$(whoami)"
+  secrets_file="/tmp/.exporter_$(id -u)_secrets"
+  temp_file="$(mktemp)"
+  set +eu
+  # shellcheck disable=SC1091
+  source /var/tmp/symphony/profile.platform
+  set -eu
+  # shellcheck disable=SC1090
+  source "${secrets_file}"
+  EGOCC_FILE="${temp_file}" egosh user logon -u "${EXPORTER_USER}" -x "${EXPORTER_PASS}"
+  mv "${temp_file}" "${egocc_file}"
+)
+
+
+if ! command -v symphony-exporter &> /dev/null
+then
+  echo "Symphony exporter not found"
+  exit 1
+fi
+
+if ! is_configured
+then
+  wait_for_egocc
+  prepare_secrets
+  prepare_role
+fi
+
+auth_exporter
+cd /
+HEALTH_CHECK_CLUSTER=Y \
+  symphony-exporter \
+  -c /etc/symphony-exporter/symphony-exporter.yaml \
+  &> /tmp/symphony-exporter.log < /dev/null &
+
+while true
+do
+  sleep 3600
+  auth_exporter
+done
+

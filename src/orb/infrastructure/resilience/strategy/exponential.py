@@ -1,6 +1,12 @@
 """Exponential backoff retry strategy."""
 
+from __future__ import annotations
+
 import secrets
+
+from orb.infrastructure.resilience.retry_classifier_registry import (
+    is_non_retryable as _registry_is_non_retryable,
+)
 
 
 class ExponentialBackoffStrategy:
@@ -45,6 +51,13 @@ class ExponentialBackoffStrategy:
         """
         # Check if we've exceeded max attempts
         if attempt >= self.max_attempts:
+            return False
+
+        # Fast-fail when a provider-registered classifier flags the exception
+        # as a permanent client error (e.g. 4xx from a provider SDK).  The
+        # registry is consulted so this layer carries no provider-specific
+        # imports.
+        if _registry_is_non_retryable(exception):
             return False
 
         return True

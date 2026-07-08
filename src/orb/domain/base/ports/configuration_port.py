@@ -71,40 +71,6 @@ class ConfigurationPort(ProviderConfigPort):
     def get_metrics_config(self) -> dict[str, Any]:
         """Get metrics configuration."""
 
-    @abstractmethod
-    def get_active_provider_override(self) -> str | None:
-        """Get current provider override from CLI."""
-
-    @abstractmethod
-    def override_provider_instance(self, provider_name: str) -> None:
-        """Override the active provider instance."""
-
-    def override_provider_region(self, region: str) -> None:  # pyright: ignore[reportUnusedParameter]
-        """Override the provider region for this session.
-
-        Provider-specific concern — concrete adapters override this.
-        """
-
-    def override_provider_profile(self, profile: str) -> None:  # pyright: ignore[reportUnusedParameter]
-        """Override the provider credential profile for this session.
-
-        Provider-specific concern — concrete adapters override this.
-        """
-
-    def get_effective_region(self, default_region: str = "") -> str:
-        """Get effective provider region (override or configured).
-
-        Provider-specific concern — concrete adapters override this.
-        """
-        return default_region
-
-    def get_effective_profile(self, default_profile: str = "") -> str:
-        """Get effective provider credential profile (override or configured).
-
-        Provider-specific concern — concrete adapters override this.
-        """
-        return default_profile
-
     # get_provider_instance_config inherited from ProviderConfigPort
 
     @abstractmethod
@@ -172,6 +138,10 @@ class ConfigurationPort(ProviderConfigPort):
         """Get the path of the loaded configuration file, or None if not loaded from a file."""
         return None
 
+    def save_config(self, path: str | None = None) -> str:
+        """Persist in-memory raw config to disk. Returns the written path."""
+        raise NotImplementedError
+
     def get_root_dir(self) -> str:
         """Get the root directory path."""
         return ""
@@ -179,6 +149,31 @@ class ConfigurationPort(ProviderConfigPort):
     def get_scripts_dir(self) -> str:
         """Get the scripts directory path."""
         return ""
+
+    def get_raw_config(self) -> dict[str, Any]:
+        """Return the raw on-disk configuration dict before Pydantic hydration.
+
+        Concrete adapters should override this to expose the underlying
+        config manager's raw dict.  The default returns an empty dict so
+        callers that only need the public interface don't break.
+        """
+        return {}
+
+    @abstractmethod
+    def get_active_provider_name_override(self) -> str | None:
+        """Get current provider name override from CLI (exact instance name)."""
+
+    @abstractmethod
+    def get_active_provider_type_override(self) -> str | None:
+        """Get current provider type override from CLI (type filter)."""
+
+    @abstractmethod
+    def override_provider_name(self, provider_name: str) -> None:
+        """Override the active provider by exact instance name."""
+
+    @abstractmethod
+    def override_provider_type(self, provider_type: str) -> None:
+        """Restrict selection to a provider type."""
 
     @property
     def app_config(self) -> Any:

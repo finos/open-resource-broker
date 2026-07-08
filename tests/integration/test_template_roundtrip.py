@@ -1,7 +1,5 @@
 """Integration test: template create → get round-trip through the real DI container."""
 
-import os
-
 import pytest
 
 from orb.application.dto.queries import GetTemplateQuery
@@ -13,13 +11,18 @@ from orb.infrastructure.di.container import get_container, reset_container
 
 
 @pytest.fixture(autouse=True)
-def isolated_container(tmp_path):
-    """Reset the DI container and point ORB_CONFIG_DIR at tmp_path for each test."""
+def isolated_container(tmp_path, monkeypatch):
+    """Reset the DI container and point ORB_CONFIG_DIR at tmp_path for each test.
+
+    Uses ``monkeypatch.setenv`` so the env mutation is reverted even if
+    the test body raises before reaching the yield — bare
+    ``os.environ[...]=`` would leak into subsequent tests on the same
+    xdist worker.
+    """
     reset_container()
-    os.environ["ORB_CONFIG_DIR"] = str(tmp_path)
+    monkeypatch.setenv("ORB_CONFIG_DIR", str(tmp_path))
     yield
     reset_container()
-    os.environ.pop("ORB_CONFIG_DIR", None)
 
 
 @pytest.fixture

@@ -1,0 +1,544 @@
+"""SDK-based AWS integration tests for Open Resource Broker.
+
+Exercises the full acquire→return control loop via the Python SDK (src/sdk/),
+calling the CQRS bus directly in-process — no shell scripts, no HTTP server.
+"""
+
+import logging
+import os
+import shutil
+import time
+
+import boto3.session
+import pytest
+
+from tests.providers.aws.live import scenarios
+from tests.providers.aws.live.cleanup_helpers import (
+    cleanup_launch_templates_for_request,
+    get_machine_ids_from_ec2 as _get_machine_ids_from_ec2_helper,
+    wait_for_instances_terminated,
+)
+from tests.providers.aws.live.scenarios import CUSTOM_TEST_CASES
+from tests.providers.aws.live.template_processor import TemplateProcessor
+
+try:
+    from tests.providers.aws.live.scenarios_sdk import (  # type: ignore[import]
+        SDK_RUN_CUSTOM_CASES,
+        SDK_RUN_DEFAULT_COMBINATIONS,
+        SDK_TIMEOUTS,
+    )
+except ImportError:
+    SDK_RUN_DEFAULT_COMBINATIONS = True
+    SDK_RUN_CUSTOM_CASES = False
+    SDK_TIMEOUTS = {"request_completion": 600, "return_completion": 300, "poll_interval": 5}
+
+# Import AWS validation helpers from test_onaws (guarded for env/creds issues)
+try:
+    from tests.providers.aws.live.test_onaws import (
+        _check_all_ec2_hosts_are_being_terminated,
+        get_instance_state,
+    )
+except Exception as exc:  # pragma: no cover
+    pytest.skip(
+        f"Skipping SDK onaws tests because base onaws helpers failed to import: {exc}",
+        allow_module_level=True,
+    )
+
+pytestmark = [
+    pytest.mark.manual_aws,
+    pytest.mark.aws,
+    pytest.mark.sdk,
+]
+
+os.environ["USE_LOCAL_DEV"] = "1"
+os.environ.setdefault("HF_LOGDIR", "./logs")
+os.environ.setdefault("AWS_PROVIDER_LOG_DIR", "./logs")
+os.environ["LOG_DESTINATION"] = "file"
+os.environ.setdefault("AWS_REGION", "eu-west-1")
+
+_ec2_client = None
+
+
+def _get_boto_profile_and_region() -> tuple[str | None, str]:
+    """Read AWS profile and region from ORB_CONFIG_DIR config."""
+    import json as _json
+
+    profile = None
+    region = None
+    config_dir = os.environ.get("ORB_CONFIG_DIR")
+    if config_dir:
+        try:
+            config_path = os.path.join(config_dir, "config.json")
+            with open(config_path) as _f:
+                config = _json.load(_f)
+            providers = config.get("provider", {}).get("providers", [])
+            if providers:
+                provider_cfg = providers[0].get("config", {})
+                profile = provider_cfg.get("profile")
+                region = provider_cfg.get("region")
+        except Exception:
+            pass
+    region = (
+        region
+        or os.environ.get("AWS_REGION")
+        or os.environ.get("AWS_DEFAULT_REGION")
+        or "eu-west-1"
+    )
+    return profile, region
+
+
+def _get_ec2_client():
+    global _ec2_client
+    if _ec2_client is None:
+        _profile, _region = _get_boto_profile_and_region()
+        _ec2_client = boto3.session.Session(profile_name=_profile, region_name=_region).client(
+            "ec2", region_name=_region
+        )
+    return _ec2_client
+
+
+log = logging.getLogger("sdk_test")
+log.setLevel(logging.DEBUG)
+_formatter = logging.Formatter(
+    "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s"
+)
+_console = logging.StreamHandler()
+_console.setLevel(logging.DEBUG)
+_console.setFormatter(_formatter)
+log.addHandler(_console)
+
+from tests.shared.constants import REQUEST_ID_RE
+
+# ---------------------------------------------------------------------------
+# Fixture
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def setup_sdk_test(request, test_session_id):
+    """Generate per-test config dir, set env vars, yield config_path, teardown."""
+    processor = TemplateProcessor()
+    test_name = request.node.name
+
+    overrides = {}
+    if hasattr(request, "param") and isinstance(request.param, dict):
+        overrides = request.param.get("overrides", {})
+    overrides["instanceTags"] = {
+        **overrides.get("instanceTags", {}),
+        "test-session": test_session_id,
+    }
+
+    test_config_dir = processor.run_templates_dir / test_name
+    if test_config_dir.exists():
+        shutil.rmtree(test_config_dir)
+
+    processor.generate_test_templates(test_name, overrides=overrides)
+
+    test_config_dir = processor.run_templates_dir / test_name
+    (test_config_dir / "logs").mkdir(exist_ok=True)
+    (test_config_dir / "work").mkdir(exist_ok=True)
+
+    _env_keys = [
+        "ORB_CONFIG_DIR",
+        "HF_PROVIDER_CONFDIR",
+        "HF_PROVIDER_LOGDIR",
+        "HF_PROVIDER_WORKDIR",
+        "DEFAULT_PROVIDER_WORKDIR",
+        "AWS_PROVIDER_LOG_DIR",
+        "HF_LOGDIR",
+    ]
+    config_dir = test_config_dir / "config"
+    os.environ["ORB_CONFIG_DIR"] = str(config_dir)
+    os.environ["HF_PROVIDER_CONFDIR"] = str(config_dir)
+    os.environ["HF_PROVIDER_LOGDIR"] = str(test_config_dir / "logs")
+    os.environ["HF_PROVIDER_WORKDIR"] = str(test_config_dir / "work")
+    os.environ["DEFAULT_PROVIDER_WORKDIR"] = str(test_config_dir / "work")
+    os.environ["AWS_PROVIDER_LOG_DIR"] = str(test_config_dir / "logs")
+    os.environ["HF_LOGDIR"] = str(test_config_dir / "logs")
+
+    config_path = str(config_dir / "config.json")
+
+    _tracked_request_ids: list[str] = []
+
+    yield config_path, _tracked_request_ids
+
+    # Teardown: best-effort AWS resource cleanup before removing config dir
+    if _tracked_request_ids:
+        log.warning(
+            "Fixture teardown: %d request(s) tracked — attempting AWS cleanup",
+            len(_tracked_request_ids),
+        )
+        try:
+            import asyncio
+
+            from orb.sdk import OpenResourceBroker
+
+            async def _cleanup() -> None:
+                async with OpenResourceBroker(config_path=config_path) as sdk:
+                    for req_id in _tracked_request_ids:
+                        try:
+                            status = await sdk.get_request_status(request_id=req_id)  # type: ignore[attr-defined]
+                            machine_ids = _extract_machine_ids(status)
+                            if machine_ids:
+                                log.warning(
+                                    "Fixture teardown: returning %d machine(s) for request %s",
+                                    len(machine_ids),
+                                    req_id,
+                                )
+                                await sdk.create_return_request(machine_ids=machine_ids)  # type: ignore[attr-defined]
+                        except Exception as exc:
+                            log.warning(
+                                "Fixture teardown: cleanup failed for request %s: %s", req_id, exc
+                            )
+
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    import concurrent.futures
+
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                        future = pool.submit(asyncio.run, _cleanup())
+                        future.result(timeout=120)
+                else:
+                    loop.run_until_complete(_cleanup())
+            except Exception as exc:
+                log.warning("Fixture teardown: async cleanup failed: %s", exc)
+
+        except Exception as exc:
+            log.warning("Fixture teardown: could not import SDK for cleanup: %s", exc)
+
+        try:
+            wait_for_instances_terminated(
+                [
+                    mid
+                    for req_id in _tracked_request_ids
+                    for mid in _get_machine_ids_from_ec2(req_id)
+                ],
+                _get_ec2_client(),
+            )
+        except Exception as exc:
+            log.warning("Fixture teardown: wait_for_instances_terminated failed: %s", exc)
+
+        for req_id in _tracked_request_ids:
+            try:
+                cleanup_launch_templates_for_request(req_id, _get_ec2_client())
+            except Exception as exc:
+                log.warning(
+                    "Fixture teardown: cleanup_launch_templates failed for %s: %s", req_id, exc
+                )
+
+    # Teardown: clean up env vars and reset DI container
+    for key in _env_keys:
+        os.environ.pop(key, None)
+
+    try:
+        from orb.infrastructure.di import reset_container
+
+        reset_container()
+    except Exception:
+        pass
+
+    processor.cleanup_test_templates(test_name)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _get_machine_ids_from_ec2(request_id: str) -> list[str]:
+    return _get_machine_ids_from_ec2_helper(request_id, _get_ec2_client())
+
+
+from tests.shared.response_helpers import (
+    extract_machine_ids as _extract_machine_ids,
+    extract_status as _extract_request_status,
+)
+
+# ---------------------------------------------------------------------------
+# Core test logic (shared by parametrised and single tests)
+# ---------------------------------------------------------------------------
+
+
+async def _run_full_cycle(sdk, test_case: dict, tracked_request_ids: list[str]) -> None:
+    """Full acquire→return cycle via SDK."""
+    template_id = test_case.get("template_id") or scenarios.resolve_template_id(
+        test_case.get("overrides", {})
+    )
+    capacity = test_case.get("capacity_to_request", 1)
+
+    log.info("Requesting %d machines with template %s", capacity, template_id)
+
+    # 1. Request machines
+    request_result = await sdk.request_machines(template_id=template_id, count=capacity)  # type: ignore[attr-defined]
+    log.debug("request_machines result: %s", request_result)
+
+    request_id = (
+        request_result.get("requestId") or request_result.get("request_id")
+        if isinstance(request_result, dict)
+        else getattr(request_result, "request_id", None)
+    )
+    assert request_id, f"No request_id in response: {request_result}"
+    assert REQUEST_ID_RE.match(request_id), (
+        f"request_id {request_id!r} does not match expected format"
+    )
+    tracked_request_ids.append(request_id)
+    log.info("Got request_id: %s", request_id)
+
+    # 1a. Verify request appears in list_requests
+    list_result = await sdk.list_requests()  # type: ignore[attr-defined]
+    listed_ids = []
+    if isinstance(list_result, dict):
+        for req in list_result.get("requests", []):
+            rid = (
+                req.get("requestId") or req.get("request_id")
+                if isinstance(req, dict)
+                else getattr(req, "request_id", None)
+            )
+            if rid:
+                listed_ids.append(rid)
+    elif isinstance(list_result, list):
+        for req in list_result:
+            rid = (
+                req.get("requestId") or req.get("request_id")
+                if isinstance(req, dict)
+                else getattr(req, "request_id", None)
+            )
+            if rid:
+                listed_ids.append(rid)
+    assert request_id in listed_ids, (
+        f"request_id {request_id!r} not found in list_requests: {list_result}"
+    )
+    log.info("list_requests confirmed request_id: %s", request_id)
+
+    # 2. Poll until complete
+    import asyncio
+
+    deadline = time.time() + SDK_TIMEOUTS["request_completion"]
+    terminal = {"complete", "complete_with_error", "partial", "failed", "cancelled", "timeout"}
+    status_response = None
+
+    while True:
+        status_response = await sdk.get_request_status(request_id=request_id)  # type: ignore[attr-defined]
+        log.debug("status: %s", status_response)
+        status = _extract_request_status(status_response)
+        if status in terminal:
+            if status != "complete":
+                # Capacity-aware: accept complete_with_error / partial when
+                # the provider returned some-but-not-all capacity due to an
+                # AWS shortfall.
+                from tests.providers.aws.live._capacity_helpers import assert_terminal_ok
+
+                assert_terminal_ok(status_response, capacity)
+            break
+        if time.time() > deadline:
+            pytest.fail("Timed out waiting for request to complete")
+        await asyncio.sleep(SDK_TIMEOUTS["poll_interval"])
+
+    # 3. Assert ORB status + AWS-side instance state
+    returned_id = (
+        status_response.get("requests", [{}])[0].get("request_id")
+        or status_response.get("requests", [{}])[0].get("requestId")
+        if isinstance(status_response, dict)
+        else None
+    )
+    assert returned_id == request_id, (
+        f"Status response echoed {returned_id!r}, expected {request_id!r}"
+    )
+
+    machine_ids = _extract_machine_ids(status_response)
+
+    # Capacity-unit fulfilment check from provider response fields.
+    # target_units / fulfilled_units reflect capacity units for weighted fleets
+    # and instance count for unweighted templates (1 unit == 1 instance).
+    _req0 = status_response.get("requests", [{}])[0] if isinstance(status_response, dict) else {}
+    target_units = _req0["target_units"] if _req0.get("target_units") is not None else capacity
+    fulfilled_units = (
+        _req0["fulfilled_units"] if _req0.get("fulfilled_units") is not None else len(machine_ids)
+    )
+    _final_status = _req0.get("status")
+    if _final_status == "complete":
+        assert fulfilled_units >= target_units, (
+            f"Fleet not fully fulfilled despite status=complete: "
+            f"fulfilled={fulfilled_units}, target={target_units}"
+        )
+    else:
+        assert fulfilled_units >= 1, (
+            f"status={_final_status!r} with zero fulfilled units: target={target_units}"
+        )
+
+    # Template-aware instance count sanity check.
+    if scenarios.template_uses_weighted_capacity(test_case):
+        assert len(machine_ids) >= 1, (
+            f"Expected at least 1 machine (weighted template), got: {machine_ids}"
+        )
+    elif _final_status == "complete":
+        assert len(machine_ids) == capacity, (
+            f"Expected {capacity} machines (unweighted template, status=complete), "
+            f"got {len(machine_ids)}: {machine_ids}"
+        )
+    else:
+        assert 1 <= len(machine_ids) <= capacity, (
+            f"Expected 1..{capacity} machines (unweighted template, status={_final_status!r}), "
+            f"got {len(machine_ids)}: {machine_ids}"
+        )
+
+    for machine_id in machine_ids:
+        state = get_instance_state(machine_id)
+        assert state["exists"], f"Instance {machine_id} not found in AWS"
+        assert state["state"] in ("running", "pending"), (
+            f"Instance {machine_id} in unexpected state: {state['state']}"
+        )
+    log.info(
+        "Provisioned %d instance(s) for capacity %d: %s",
+        len(machine_ids),
+        capacity,
+        machine_ids,
+    )
+
+    # 4. Return machines
+    return_result = await sdk.create_return_request(machine_ids=machine_ids)  # type: ignore[attr-defined]
+    log.debug("create_return_request result: %s", return_result)
+
+    return_request_id = (
+        return_result.get("requestId") or return_result.get("request_id")
+        if isinstance(return_result, dict)
+        else getattr(return_result, "request_id", None)
+    )
+
+    # 5. Poll return completion via get_request_status(return_request_id).
+    # The HostFactory getReturnRequests wire format flattens per-machine items
+    # without a per-request status, so the right way to ask "is this return
+    # complete?" under any scheduler is get_request_status(return_id).
+    if return_request_id:
+        deadline = time.time() + SDK_TIMEOUTS["return_completion"]
+        terminal = {"complete", "complete_with_error", "failed", "cancelled", "timeout"}
+        while True:
+            status_response = await sdk.get_request_status(request_id=return_request_id)  # type: ignore[attr-defined]
+            status = _extract_request_status(status_response)
+            if status in terminal:
+                if status != "complete":
+                    pytest.fail(f"Return request ended with non-success status: {status}")
+                break
+            if time.time() > deadline:
+                pytest.fail("Timed out waiting for return request to complete")
+            await asyncio.sleep(SDK_TIMEOUTS["poll_interval"])
+
+    # 6. Assert AWS-side termination
+    all_terminated = _check_all_ec2_hosts_are_being_terminated(machine_ids)
+    assert all_terminated, f"Some instances not terminated: {machine_ids}"
+    log.info("All %d instance(s) terminated", len(machine_ids))
+
+
+# ---------------------------------------------------------------------------
+# Parametrised tests
+# ---------------------------------------------------------------------------
+
+
+def _build_default_test_cases():
+    if not SDK_RUN_DEFAULT_COMBINATIONS:
+        return []
+    return scenarios.get_test_cases()
+
+
+def _build_custom_test_cases():
+    if not SDK_RUN_CUSTOM_CASES:
+        return []
+    return CUSTOM_TEST_CASES
+
+
+_DEFAULT_CASES = _build_default_test_cases()
+_CUSTOM_CASES = _build_custom_test_cases()
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    _DEFAULT_CASES,
+    ids=[tc["test_name"] for tc in _DEFAULT_CASES],
+    indirect=False,
+)
+@pytest.mark.asyncio
+async def test_sdk_full_cycle_default(setup_sdk_test, test_case):
+    """Full acquire→return cycle for default scenario combinations."""
+    from orb.sdk import OpenResourceBroker
+
+    config_path, tracked_request_ids = setup_sdk_test
+    async with OpenResourceBroker(config_path=config_path) as sdk:
+        await _run_full_cycle(sdk, test_case, tracked_request_ids)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    _CUSTOM_CASES,
+    ids=[tc["test_name"] for tc in _CUSTOM_CASES],
+    indirect=False,
+)
+@pytest.mark.asyncio
+async def test_sdk_full_cycle_custom(setup_sdk_test, test_case):
+    """Full acquire→return cycle for custom/edge-case scenarios."""
+    from orb.sdk import OpenResourceBroker
+
+    config_path, tracked_request_ids = setup_sdk_test
+    async with OpenResourceBroker(config_path=config_path) as sdk:
+        await _run_full_cycle(sdk, test_case, tracked_request_ids)
+
+
+# ---------------------------------------------------------------------------
+# Smoke test — single scenario, always runs
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_sdk_smoke(setup_sdk_test):
+    """Smoke: SDK initialises, lists templates, requests 1 machine, returns it."""
+    from orb.sdk import OpenResourceBroker
+
+    config_path, tracked_request_ids = setup_sdk_test
+
+    # Pick the simplest scenario: RunInstances ondemand default scheduler
+    test_case = scenarios.get_test_case_by_name("default.RunInstances.ondemand")
+    if not test_case:
+        # Fallback: first available case
+        all_cases = scenarios.get_test_cases()
+        assert all_cases, "No test cases available"
+        test_case = all_cases[0]
+
+    async with OpenResourceBroker(config_path=config_path) as sdk:
+        # Verify SDK initialised and has methods
+        methods = sdk.list_available_methods()
+        assert "create_request" in methods or "request_machines" in methods, (
+            f"Expected CQRS methods not discovered. Available: {methods}"
+        )
+
+        await _run_full_cycle(sdk, test_case, tracked_request_ids)
+
+
+@pytest.mark.asyncio
+async def test_sdk_unknown_template_returns_error(setup_sdk_test):
+    """SDK create_request() with a non-existent template_id returns an error, not a crash."""
+    from orb.sdk import OpenResourceBroker
+
+    config_path, _tracked = setup_sdk_test
+
+    async with OpenResourceBroker(config_path=config_path) as sdk:
+        try:
+            result = await sdk.create_request(  # type: ignore[attr-defined]
+                template_id="NonExistent-Template-XYZ", count=1
+            )
+            is_error = (
+                isinstance(result, dict)
+                and (
+                    result.get("error")
+                    or result.get("status") == "error"
+                    or "not found" in str(result).lower()
+                    or "NonExistent" in str(result)
+                )
+            ) or result is None
+            assert is_error, f"Expected error response for unknown template, got: {result}"
+        except Exception as exc:
+            # Any exception is acceptable — verify it's related to the template lookup
+            assert (
+                "NonExistent" in str(exc)
+                or "not found" in str(exc).lower()
+                or "error" in str(exc).lower()
+            ), f"Unexpected exception type for unknown template: {exc}"

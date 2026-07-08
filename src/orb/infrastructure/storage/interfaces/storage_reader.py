@@ -1,7 +1,7 @@
 """Storage reader interface for read-only operations."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 
 class StorageReader(ABC):
@@ -19,7 +19,7 @@ class StorageReader(ABC):
         """
 
     @abstractmethod
-    def find_all(self) -> Union[list[dict[str, Any]], dict[str, dict[str, Any]]]:
+    def find_all(self) -> list[dict[str, Any]] | dict[str, dict[str, Any]]:
         """Find all entities.
 
         Returns:

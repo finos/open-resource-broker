@@ -58,16 +58,21 @@ class TestProviderPort:
         # Test base configuration
         config = ProviderConfig(provider_type="test")
         assert config.provider_type == "test"
-        assert config.region is None
 
-        # Test with region
-        config_with_region = ProviderConfig(provider_type="test", region="test-region")
-        assert config_with_region.region == "test-region"
+        # Test provider-specific fields flow through the opaque provider_config
+        # dict rather than a typed base-level field.
+        config_with_provider_config = ProviderConfig(
+            provider_type="test",
+            provider_config={"region": "test-region", "profile": "test-profile"},  # type: ignore[call-arg]
+        )
+        assert getattr(config_with_provider_config, "provider_config") == {
+            "region": "test-region",
+            "profile": "test-profile",
+        }
 
         # Test extra fields are allowed
         config_with_extras = ProviderConfig(
             provider_type="test",
-            region="test-region",
             custom_field="custom_value",  # type: ignore[call-arg]
         )
         assert getattr(config_with_extras, "custom_field") == "custom_value"

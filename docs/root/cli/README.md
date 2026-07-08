@@ -5,7 +5,7 @@ Complete documentation for the Open Resource Broker command-line interface.
 ## Quick Reference
 
 - **[CLI Reference](cli-reference.md)** - Complete command and flag reference
-- **[Provider Override](provider-override.md)** - Using `--provider` flag functionality  
+- **[Provider Override](provider-override.md)** - Using `--provider-name` flag functionality  
 - **[Multi-Provider Templates](multi-provider-templates.md)** - Multi-provider template generation
 
 ## Detailed Guides
@@ -17,7 +17,7 @@ Complete documentation for the Open Resource Broker command-line interface.
 
 ### Global Overrides
 - **`--scheduler`** - Override scheduler strategy for any command
-- **`--provider`** - Override provider instance for any command
+- **`--provider-name`** - Override provider instance for any command
 - **`--format`** - Control output format (json, yaml, table, list)
 
 ### Argument Patterns
@@ -27,14 +27,14 @@ Complete documentation for the Open Resource Broker command-line interface.
 
 ### Multi-Provider Support
 - **Default Generation** - `orb templates generate` (all active providers)
-- **Specific Provider** - `orb templates generate --provider aws-prod`
+- **Specific Provider** - `orb templates generate --provider-name aws-prod`
 - **Specific API** - `orb templates generate --provider-api EC2Fleet`
 
 ## Common Commands
 
 ### Setup and Configuration
 ```bash
-orb init --scheduler hostfactory --provider aws --region us-east-1
+orb init --scheduler hostfactory --provider-type aws --region us-east-1
 orb config show --format yaml
 orb system health --detailed
 ```
@@ -56,8 +56,8 @@ orb requests status req-123
 ### Provider Operations
 ```bash
 orb providers list --detailed --format table
-orb --provider aws-prod providers health
-orb --provider aws-dev templates generate
+orb --provider-name aws-prod providers health
+orb --provider-name aws-dev templates generate
 ```
 
 ## Getting Started
@@ -92,12 +92,12 @@ orb --provider aws-dev templates generate
 ### Environment-Specific Operations
 ```bash
 # Development
-orb --provider aws-dev templates generate --provider-api SpotFleet
-orb --provider aws-dev machines request spot-template 5
+orb --provider-name aws-dev templates generate --provider-api SpotFleet
+orb --provider-name aws-dev machines request spot-template 5
 
 # Production  
-orb --provider aws-prod templates generate --provider-api EC2Fleet
-orb --provider aws-prod machines request prod-template 10
+orb --provider-name aws-prod templates generate --provider-api EC2Fleet
+orb --provider-name aws-prod machines request prod-template 10
 ```
 
 ### Scheduler Comparison

@@ -42,7 +42,15 @@ class Machine(AggregateRoot):
     return_request_id: Optional[str] = None
     provider_type: str = Field(default="aws")
     provider_name: str
-    provider_api: Optional[str] = None
+    # provider_api is required at the domain level — every machine MUST
+    # know which provider API produced it (EC2Fleet / ASG / SpotFleet /
+    # RunInstances) so the deprovisioning router can dispatch correctly.
+    # Persistence layers loading legacy rows without it are expected to
+    # backfill from the source request before constructing the aggregate.
+    #
+    # min_length=1 ensures an empty string is rejected at the domain boundary
+    # so machines with a missing provider cannot silently bypass deprovisioning.
+    provider_api: str = Field(..., min_length=1)
     resource_id: Optional[str] = None
 
     # Machine configuration
@@ -315,11 +323,37 @@ class Machine(AggregateRoot):
 
     @classmethod
     def from_provider_format(cls, data: dict[str, Any], provider_type: str) -> "Machine":
-        """Create machine from provider-specific format."""
-        core_data = {
+        """Create machine from provider-specific format.
+
+        The ``data`` dict may use either snake_case or camelCase keys for
+        ``provider_api`` (``"provider_api"`` / ``"providerApi"``) and
+        ``provider_name`` (``"provider_name"`` / ``"providerName"``).  If
+        either required key is absent a ``ValueError`` is raised immediately
+        so callers see a clear diagnostic rather than a cryptic Pydantic
+        ``ValidationError``.
+        """
+        provider_api: str | None = data.get("provider_api") or data.get("providerApi") or None
+        if not provider_api:
+            raise ValueError(
+                "from_provider_format requires 'provider_api' (or camelCase 'providerApi') "
+                "in the data dict.  Supply the provider API identifier (e.g. 'EC2Fleet', "
+                "'RunInstances') so the deprovisioning router can dispatch correctly."
+            )
+
+        provider_name: str | None = data.get("provider_name") or data.get("providerName") or None
+        if not provider_name:
+            raise ValueError(
+                "from_provider_format requires 'provider_name' (or camelCase 'providerName') "
+                "in the data dict.  Supply the provider instance name (e.g. the AWS provider "
+                "identifier) so downstream lookups can route correctly."
+            )
+
+        core_data: dict[str, Any] = {
             "machine_id": MachineId(value=data.get("instance_id") or ""),
             "template_id": data.get("template_id"),
             "provider_type": provider_type,
+            "provider_name": provider_name,
+            "provider_api": provider_api,
             "instance_type": InstanceType(value=data.get("instance_type") or ""),
             "image_id": data.get("image_id"),
             "status": MachineStatus(data.get("status", MachineStatus.UNKNOWN.value)),

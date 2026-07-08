@@ -14,6 +14,7 @@ import sys as _sys
 
 from orb.domain.machine.machine_status import MachineStatus
 from orb.domain.request.value_objects import RequestStatus
+from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
 
 try:
     import rich.console as _rich_console  # type: ignore[import-untyped,import-not-found]
@@ -55,11 +56,17 @@ def add_global_arguments(parser):
         help="Input JSON data string (HostFactory compatibility)",
     )
     parser.add_argument(
-        "--provider",
-        help="Override provider instance (per-command flag, e.g. orb templates list --provider aws-prod)",
+        "--provider-name",
+        dest="provider_name",
+        metavar="NAME",
+        help="Restrict to a specific provider instance by exact name (e.g. aws-prod)",
     )
-    parser.add_argument("--region", help="AWS region override")
-    parser.add_argument("--profile", help="AWS profile override")
+    parser.add_argument(
+        "--provider-type",
+        dest="provider_type",
+        metavar="TYPE",
+        help="Restrict to all active instances of a provider type (e.g. aws, k8s)",
+    )
     parser.add_argument(
         "--scheduler", choices=["default", "hostfactory"], help="Override scheduler strategy"
     )
@@ -72,7 +79,12 @@ def add_global_arguments(parser):
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
     parser.add_argument("--quiet", action="store_true", help="Suppress output")
     parser.add_argument("--no-color", action="store_true", help="Disable colored output")
-    parser.add_argument("--limit", type=int, help="Maximum number of results to return")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Maximum number of results to return (handler-specific default applies when omitted)",
+    )
     parser.add_argument("--offset", type=int, default=0, help="Number of results to skip")
     parser.add_argument(
         "--filter",
@@ -299,11 +311,8 @@ def add_provider_actions(subparsers):
 
     providers_add = subparsers.add_parser("add", help="Add new provider")
     add_global_arguments(providers_add)
-    providers_add.add_argument(
-        "--provider-type", dest="provider_type", required=True, help="Provider type (e.g. aws)"
-    )
-    providers_add.add_argument("--aws-profile", help="AWS profile name")
-    providers_add.add_argument("--aws-region", help="AWS region")
+    for _spec in CLISpecRegistry.all().values():
+        _spec.add_arguments(providers_add)
     providers_add.add_argument("--name", help="Provider instance name")
     providers_add.add_argument("--discover", action="store_true", help="Discover infrastructure")
 
@@ -314,8 +323,8 @@ def add_provider_actions(subparsers):
     providers_update = subparsers.add_parser("update", help="Update provider configuration")
     add_global_arguments(providers_update)
     providers_update.add_argument("provider_name", help="Provider instance name")
-    providers_update.add_argument("--aws-region", help="Update region")
-    providers_update.add_argument("--aws-profile", help="Update profile")
+    for _spec in CLISpecRegistry.all().values():
+        _spec.add_arguments(providers_update)
 
     providers_set_default = subparsers.add_parser("set-default", help="Set default provider")
     add_global_arguments(providers_set_default)
@@ -412,10 +421,6 @@ def add_template_actions(subparsers):
         action="store_true",
         help="Generate templates with hardcoded infrastructure",
     )
-    templates_generate.add_argument(
-        "--generic", action="store_true", help="Generate generic templates"
-    )
-    templates_generate.add_argument("--provider-type", help="Provider type (e.g., aws)")
 
 
 def build_parser() -> tuple[argparse.ArgumentParser, dict]:
@@ -424,6 +429,13 @@ def build_parser() -> tuple[argparse.ArgumentParser, dict]:
     Returns:
         tuple: (parser, resource_parsers_dict)
     """
+    # Ensure CLI specs are registered before iterating the registry.  This is
+    # a lightweight bootstrap (no full provider initialisation) so it is safe
+    # to call before any application context exists.
+    from orb.providers.registration import register_all_provider_cli_specs
+
+    register_all_provider_cli_specs()
+
     from orb._package import DESCRIPTION, DOCS_URL
 
     parser = argparse.ArgumentParser(
@@ -433,12 +445,13 @@ def build_parser() -> tuple[argparse.ArgumentParser, dict]:
         epilog=f"""
 Examples:
   %(prog)s templates list                              # List all templates
-  %(prog)s templates list --provider aws-prod         # Use specific provider
+  %(prog)s templates list --provider-name aws-prod    # Use specific provider instance
   %(prog)s templates generate --all-providers         # Generate for all providers
   %(prog)s machines request template-id 5             # Request 5 machines
   %(prog)s machines list --filter "machine_types~t3"  # Filter machines by type
   %(prog)s requests status req-123                    # Check request status
-  %(prog)s providers health --provider aws-prod       # Check provider health
+  %(prog)s providers health --provider-name aws-prod  # Check provider health
+  %(prog)s machines return --all --provider-type k8s  # Return only k8s machines
 
 For more information, visit: {DOCS_URL}
         """,
@@ -526,19 +539,78 @@ For more information, visit: {DOCS_URL}
     system_reload = system_subparsers.add_parser("reload", help="Reload provider configuration")
     add_global_arguments(system_reload)
 
-    system_serve = system_subparsers.add_parser("serve", help="Start REST API server")
-    add_global_arguments(system_serve)
-    system_serve.add_argument("--host", default="0.0.0.0", help="Server host")  # nosec B104 - intentional default, overridable via CLI flag
-    system_serve.add_argument("--port", type=int, default=8000, help="Server port")
-    system_serve.add_argument("--workers", type=int, default=1, help="Number of workers")
-    system_serve.add_argument("--reload", action="store_true", help="Enable auto-reload")
-    system_serve.add_argument("--server-log-level", default="info", help="Server log level")
-    system_serve.add_argument(
-        "--socket-path",
-        dest="socket_path",
-        default=None,
-        help="Unix domain socket path for IPC (alternative to --host/--port, used by programmatic callers like orb-go)",
+    # Server (process lifecycle — local daemon control)
+    server_parser = subparsers.add_parser(
+        "server",
+        help="ORB server process lifecycle (start/stop/status/restart/logs/reload)",
     )
+    resource_parsers["server"] = server_parser
+    server_subparsers = server_parser.add_subparsers(
+        dest="action", help="Server actions", required=True
+    )
+
+    def _add_server_start_args(p):
+        add_global_arguments(p)
+        # Intentional binding for server deployment.
+        p.add_argument("--host", default=None, help="Server host (overrides config)")  # nosec B104
+        p.add_argument("--port", type=int, default=None, help="Server port (overrides config)")
+        p.add_argument("--workers", type=int, default=None, help="Number of workers")
+        p.add_argument("--reload", action="store_true", help="Enable uvicorn auto-reload (dev)")
+        p.add_argument("--server-log-level", default=None, help="Server log level")
+        p.add_argument(
+            "--socket-path",
+            dest="socket_path",
+            default=None,
+            help="Unix domain socket path for IPC (alternative to --host/--port)",
+        )
+        p.add_argument(
+            "--foreground",
+            "-F",
+            action="store_true",
+            help="Run in the foreground instead of daemonising",
+        )
+        p.add_argument(
+            "--api-only",
+            dest="api_only",
+            action="store_true",
+            help="Skip embedded UI even if ui.enabled=true",
+        )
+
+    server_start = server_subparsers.add_parser(
+        "start", help="Start the ORB server (daemonised by default)"
+    )
+    _add_server_start_args(server_start)
+
+    server_stop = server_subparsers.add_parser("stop", help="Stop the running ORB server")
+    add_global_arguments(server_stop)
+    server_stop.add_argument(
+        "--timeout",
+        type=int,
+        default=None,
+        help="Seconds to wait for graceful shutdown before SIGKILL (defaults to config)",
+    )
+
+    server_status = server_subparsers.add_parser("status", help="Show ORB server status + health")
+    add_global_arguments(server_status)
+
+    server_restart = server_subparsers.add_parser("restart", help="Restart the ORB server")
+    _add_server_start_args(server_restart)
+    server_restart.add_argument(
+        "--restart-timeout",
+        type=int,
+        default=None,
+        dest="timeout",
+        help="Seconds to wait for graceful shutdown before SIGKILL during stop phase",
+    )
+
+    server_logs = server_subparsers.add_parser("logs", help="Tail the ORB server log file")
+    add_global_arguments(server_logs)
+    server_logs.add_argument("-n", "--lines", type=int, default=50, help="Lines to tail")
+
+    server_reload_cmd = server_subparsers.add_parser(
+        "reload", help="Send SIGHUP to the running ORB server"
+    )
+    add_global_arguments(server_reload_cmd)
 
     # Infrastructure
     infrastructure_parser = subparsers.add_parser("infrastructure", help="Infrastructure discovery")
@@ -621,6 +693,17 @@ For more information, visit: {DOCS_URL}
     add_global_arguments(storage_metrics)
     storage_metrics.add_argument("--strategy", help="Show metrics for specific storage strategy")
 
+    storage_migrate = storage_subparsers.add_parser(
+        "migrate",
+        help="Run SQL storage migrations (Alembic). No-op for JSON backend.",
+    )
+    add_global_arguments(storage_migrate)
+    storage_migrate.add_argument(
+        "migrate_subcommand",
+        choices=["up", "down", "current", "history"],
+        help="Alembic action: up (upgrade head), down (downgrade -1), current (show), history (list)",
+    )
+
     # Scheduler
     scheduler_parser = subparsers.add_parser("scheduler", help="Scheduler")
     resource_parsers["scheduler"] = scheduler_parser
@@ -681,6 +764,11 @@ For more information, visit: {DOCS_URL}
         help="Logging level for MCP server",
     )
 
+    # k8s-legacy — optional plugin; lazy-imports orb_k8s_legacy only when invoked
+    from orb.interface.cli.k8s_legacy import add_k8s_legacy_subparser
+
+    add_k8s_legacy_subparser(subparsers)
+
     # Init
     init_parser = subparsers.add_parser("init", help="Initialize ORB configuration")
     add_force_argument(init_parser)
@@ -688,9 +776,12 @@ For more information, visit: {DOCS_URL}
     init_parser.add_argument(
         "--scheduler", choices=["default", "hostfactory"], help="Scheduler type"
     )
-    init_parser.add_argument("--provider", default="aws", help="Provider type")
-    init_parser.add_argument("--region", help="AWS region")
-    init_parser.add_argument("--profile", help="AWS profile")
+    init_parser.add_argument(
+        "--provider-type",
+        dest="provider_type",
+        default="aws",
+        help="Provider type to initialise (e.g. aws, k8s)",
+    )
     init_parser.add_argument("--config-dir", help="Custom configuration directory")
     init_parser.add_argument(
         "--scripts-dir",
@@ -709,6 +800,10 @@ For more information, visit: {DOCS_URL}
         "--fleet-role",
         help="Spot Fleet IAM role ARN or name for template_defaults (non-interactive only)",
     )
+    # Inject per-provider CLI flags (e.g. --aws-profile, --aws-region) so that
+    # _get_default_config can use spec.extract_config() in non-interactive mode.
+    for _spec in CLISpecRegistry.all().values():
+        _spec.add_arguments(init_parser)
 
     return parser, resource_parsers
 

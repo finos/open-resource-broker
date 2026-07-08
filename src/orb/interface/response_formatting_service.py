@@ -16,9 +16,25 @@ class ResponseFormattingService:
         exit_code = self._scheduler.get_exit_code_for_status(status)
         return InterfaceResponse(data=data, exit_code=exit_code)
 
-    def format_request_status(self, requests: list[Any]) -> InterfaceResponse:
-        """Format a list of request status DTOs."""
+    def format_request_status(
+        self,
+        requests: list[Any],
+        *,
+        total_count: int | None = None,
+        next_cursor: str | None = None,
+    ) -> InterfaceResponse:
+        """Format a list of request status DTOs.
+
+        The optional ``total_count`` and ``next_cursor`` keyword arguments
+        are appended to the payload when supplied so the CLI response shape
+        matches ``GET /api/v1/requests/``.
+        """
         data = self._scheduler.format_request_status_response(requests)
+        if isinstance(data, dict):
+            if total_count is not None:
+                data["total_count"] = total_count
+            if next_cursor is not None or "next_cursor" not in data:
+                data["next_cursor"] = next_cursor
         return InterfaceResponse(data=data)
 
     def format_return_requests(self, requests: list[Any]) -> InterfaceResponse:
@@ -27,9 +43,25 @@ class ResponseFormattingService:
         data = self._scheduler.format_return_requests_response(requests)
         return InterfaceResponse(data=data)
 
-    def format_machine_list(self, machines: list[Any]) -> InterfaceResponse:
-        """Format a list of machine DTOs."""
+    def format_machine_list(
+        self,
+        machines: list[Any],
+        *,
+        total_count: int | None = None,
+        next_cursor: str | None = None,
+    ) -> InterfaceResponse:
+        """Format a list of machine DTOs.
+
+        The optional ``total_count`` and ``next_cursor`` keyword arguments
+        are appended to the payload when supplied so the CLI response shape
+        matches ``GET /api/v1/machines/``.
+        """
         data = self._scheduler.format_machine_status_response(machines)
+        if isinstance(data, dict):
+            if total_count is not None:
+                data["total_count"] = total_count
+            if next_cursor is not None or "next_cursor" not in data:
+                data["next_cursor"] = next_cursor
         return InterfaceResponse(data=data)
 
     def format_machine_detail(self, machine: dict[str, Any]) -> InterfaceResponse:
@@ -37,9 +69,25 @@ class ResponseFormattingService:
         data = self._scheduler.format_machine_details_response(machine)
         return InterfaceResponse(data=data)
 
-    def format_template_list(self, templates: list[Any]) -> InterfaceResponse:
-        """Format a list of template DTOs."""
+    def format_template_list(
+        self,
+        templates: list[Any],
+        *,
+        total_count: int | None = None,
+        next_cursor: str | None = None,
+    ) -> InterfaceResponse:
+        """Format a list of template DTOs.
+
+        The optional ``total_count`` and ``next_cursor`` keyword arguments
+        are appended to the payload when supplied so the CLI response shape
+        matches ``GET /api/v1/templates/``.
+        """
         data = self._scheduler.format_templates_response(templates)
+        if isinstance(data, dict):
+            if total_count is not None:
+                data["total_count"] = total_count
+            if next_cursor is not None or "next_cursor" not in data:
+                data["next_cursor"] = next_cursor
         return InterfaceResponse(data=data)
 
     def format_template_mutation(self, raw: dict[str, Any]) -> InterfaceResponse:

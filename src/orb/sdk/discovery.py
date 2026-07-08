@@ -188,6 +188,24 @@ class SDKMethodDiscovery:
         if result is None:
             return None
 
+        # Paginated container: query handlers that support pagination return a
+        # Paginated(items=..., total_count=...) wrapper. Unwrap to the legacy
+        # list-of-DTOs shape the SDK callers expect; total_count is preserved
+        # when callers want it via raw_response=True.
+        from orb.application.services.orchestration.dtos import Paginated
+
+        if isinstance(result, Paginated):
+            items = list(result.items)
+            if items and hasattr(items[0], "to_dict"):
+                serialised = [self._make_json_serializable(item.to_dict()) for item in items]
+                return self._apply_scheduler_format_list(items, serialised)
+            # Plain-list payload (already dicts / primitives) — serialise
+            # element-wise; _make_json_serializable expects a dict, not a list.
+            return [
+                self._make_json_serializable(item) if isinstance(item, dict) else item
+                for item in items
+            ]
+
         # Single DTO with to_dict method
         if hasattr(result, "to_dict"):
             raw = self._make_json_serializable(result.to_dict())

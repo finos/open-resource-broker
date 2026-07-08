@@ -51,13 +51,13 @@ jobs:
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && contains(github.event.workflow_run.head_commit.message, 'release:'))
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup UV
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+        uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3  # v8.3.0
 
       - name: Install dependencies
         run: uv sync
@@ -85,39 +85,55 @@ jobs:
       id-token: write
 
     steps:
-      - name: Generate GitHub App Token
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          fetch-depth: 0
+          # The composite below mints the App token and resets the remote
+          # URL to authenticate as the ORB CICD App.  If actions/checkout
+          # also persists the default GITHUB_TOKEN as an extraheader git
+          # config entry, that header beats the URL-embedded token at push
+          # time and the request lands as github-actions[bot] - which is
+          # not in the main branch protection bypass list and is rejected
+          # with GH006.  Skip the persistence so the composite's remote
+          # URL is the sole credential source.
+          persist-credentials: false
+
+      - name: ORB CICD App token
+        id: cicd
+        uses: ./.github/actions/orb-cicd-app-token
         with:
           app-id: ${{ secrets.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
 
-      - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
-        with:
-          fetch-depth: 0
-          token: ${{ steps.app-token.outputs.token }}
-
       - name: Setup UV
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+        uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3  # v8.3.0
+
+      - name: Setup Bun (for UI static bundle)
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f4b11  # v2
+        with:
+          bun-version: latest
+
+      - name: Build UI static bundle
+        run: make ui-build
 
       # Do NOT `uv sync` here: the next step is a Docker action that mounts
       # the workspace, so a host .venv would be visible inside the container
       # with a dangling interpreter and break `make semantic-release-build`.
       - name: Python Semantic Release
         id: release
-        uses: python-semantic-release/python-semantic-release@350c48fcb3ffcdfd2e0a235206bc2ecea6b69df0  # v10.5.3
+        uses: python-semantic-release/python-semantic-release@37a30a7987cfebb6d49240bf1c4e9cd9817d0673  # v10.6.0
         with:
-          github_token: ${{ steps.app-token.outputs.token }}
-          git_committer_name: "github-actions[bot]"
-          git_committer_email: "github-actions[bot]@users.noreply.github.com"
+          github_token: ${{ steps.cicd.outputs.token }}
+          git_committer_name: ${{ steps.cicd.outputs.committer-name }}
+          git_committer_email: ${{ steps.cicd.outputs.committer-email }}
           force: ${{ inputs.force_level != 'auto' && inputs.force_level || '' }}
 
       - name: Publish to GitHub Release Assets
-        uses: python-semantic-release/publish-action@310a9983a0ae878b29f3aac778d7c77c1db27378  # v10.5.3
+        uses: python-semantic-release/publish-action@4f3c5d7f5caddf6535050c4bcb55f033f000a7dd  # v10.6.0
         if: steps.release.outputs.released == 'true'
         with:
-          github_token: ${{ steps.app-token.outputs.token }}
+          github_token: ${{ steps.cicd.outputs.token }}
           tag: ${{ steps.release.outputs.tag }}
 
       - name: Install ORB
@@ -131,8 +147,8 @@ jobs:
       - name: Update Go SDK version
         if: steps.release.outputs.released == 'true'
         env:
-          GIT_AUTHOR_NAME: github-actions[bot]
-          GIT_AUTHOR_EMAIL: github-actions[bot]@users.noreply.github.com
-          GIT_COMMITTER_NAME: github-actions[bot]
-          GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
+          GIT_AUTHOR_NAME: ${{ steps.cicd.outputs.committer-name }}
+          GIT_AUTHOR_EMAIL: ${{ steps.cicd.outputs.committer-email }}
+          GIT_COMMITTER_NAME: ${{ steps.cicd.outputs.committer-name }}
+          GIT_COMMITTER_EMAIL: ${{ steps.cicd.outputs.committer-email }}
         run: uv run make sdk-go-update-version VERSION=${{ steps.release.outputs.version }}

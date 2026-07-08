@@ -34,7 +34,9 @@ def extract_imports(filepath: Path) -> list[str]:
 
 
 # Paths that are explicitly allowed to cross certain boundaries because they
-# perform DI wiring (registering concrete implementations against ports).
+# perform DI wiring (registering concrete implementations against ports), or
+# because they live in the maintenance-mode k8s-legacy sub-tree which
+# predates the current architecture rules.
 EXCEPTION_PATHS: frozenset[str] = frozenset(
     str(p) for p in collect_python_files(SRC_ORB / "infrastructure" / "di")
-)
+) | frozenset(str(p) for p in collect_python_files(SRC_ORB / "k8s_legacy"))

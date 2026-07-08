@@ -13,8 +13,7 @@ class ParameterMapper:
 
     # Global parameter mappings (apply to all commands/queries)
     GLOBAL_MAPPINGS = {
-        "count": "requested_count",  # CLI --count -> CQRS requested_count
-        "provider": "provider_name",  # CLI --provider -> CQRS provider_name (if supported)
+        "count": "requested_count",
     }
 
     # Command-specific mappings

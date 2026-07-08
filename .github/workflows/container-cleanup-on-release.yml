@@ -1,0 +1,168 @@
+name: Container Cleanup (On Release)
+
+# Triggered when a new production release is published.  Deletes dev-tagged
+# container builds that predate the release, leaving a configurable grace
+# window of the most recent pre-release dev builds intact for rollback.
+#
+# Production-tagged builds (semver, latest, main, python<X.Y>) are never
+# touched here - they're handled by the nightly dev-cleanup workflow's
+# protected list.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release-tag:
+        description: 'Release tag to use as the cutoff (e.g. 1.6.2)'
+        required: true
+        type: string
+      dry-run:
+        description: 'List what would be deleted without deleting'
+        required: false
+        default: 'true'
+        type: boolean
+      grace-window:
+        description: 'Number of recent pre-release dev builds to keep per Python version'
+        required: false
+        default: '5'
+        type: string
+
+permissions:
+  packages: write
+  contents: read
+
+concurrency:
+  group: container-cleanup
+  cancel-in-progress: false
+
+jobs:
+  prune-pre-release-dev:
+    name: Prune Pre-Release Dev Container Tags
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve release timestamp
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release-tag }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$RELEASE_TAG" ]]; then
+            echo "No release tag available" >&2
+            exit 1
+          fi
+          published_at=$(gh api "/repos/${{ github.repository }}/releases/tags/${RELEASE_TAG}" --jq .published_at)
+          echo "tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "published-at=${published_at}" >> "$GITHUB_OUTPUT"
+          echo "Release ${RELEASE_TAG} published at ${published_at}"
+
+      - name: Prune dev container versions older than release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          PACKAGE: ${{ github.event.repository.name }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_TS: ${{ steps.release.outputs.published-at }}
+          GRACE_WINDOW: ${{ inputs.grace-window || '5' }}
+          DRY_RUN: ${{ inputs.dry-run || 'false' }}
+        run: |
+          set -euo pipefail
+
+          is_dev_tag() {
+            local tag="$1"
+            [[ "$tag" =~ \.dev[0-9]+ ]]
+          }
+
+          # Paginate every container version on the package.
+          page=1
+          : > /tmp/versions.jsonl
+          while true; do
+            resp=$(gh api "/orgs/${OWNER}/packages/container/${PACKAGE}/versions?per_page=100&page=${page}")
+            count=$(echo "$resp" | jq 'length')
+            if [[ "$count" -eq 0 ]]; then break; fi
+            echo "$resp" | jq -c '.[]' >> /tmp/versions.jsonl
+            if [[ "$count" -lt 100 ]]; then break; fi
+            page=$((page + 1))
+          done
+
+          # Filter to dev-tagged manifests created before the release, then
+          # bucket by python version so the grace window applies per-Python.
+          : > /tmp/pre_release_dev.tsv
+          while IFS= read -r row; do
+            created_at=$(echo "$row" | jq -r '.created_at')
+            id=$(echo "$row" | jq -r '.id')
+            tags=$(echo "$row" | jq -r '.metadata.container.tags // [] | join(",")')
+            [[ -z "$tags" ]] && continue
+
+            dev=false
+            py_bucket="no-python"
+            for tag in ${tags//,/ }; do
+              if is_dev_tag "$tag"; then
+                dev=true
+                if [[ "$tag" =~ -python([0-9]+\.[0-9]+) ]]; then
+                  py_bucket="${BASH_REMATCH[1]}"
+                fi
+                break
+              fi
+            done
+            [[ "$dev" == "true" ]] || continue
+
+            if [[ "$created_at" < "$RELEASE_TS" ]]; then
+              printf '%s\t%s\t%s\t%s\n' "$py_bucket" "$created_at" "$id" "$tags" >> /tmp/pre_release_dev.tsv
+            fi
+          done < /tmp/versions.jsonl
+
+          if [[ ! -s /tmp/pre_release_dev.tsv ]]; then
+            echo "No pre-release dev versions found before ${RELEASE_TS}.  Nothing to do."
+            exit 0
+          fi
+
+          sort -k1,1 -k2,2r /tmp/pre_release_dev.tsv > /tmp/pre_release_dev_sorted.tsv
+
+          : > /tmp/keep.txt
+          : > /tmp/delete.txt
+          current_py=""
+          kept_in_bucket=0
+          while IFS=$'\t' read -r py_bucket created_at id tags; do
+            if [[ "$py_bucket" != "$current_py" ]]; then
+              current_py="$py_bucket"
+              kept_in_bucket=0
+            fi
+            if (( kept_in_bucket < GRACE_WINDOW )); then
+              echo "$id ($created_at) [py: $py_bucket] [tags: ${tags}]" >> /tmp/keep.txt
+              kept_in_bucket=$((kept_in_bucket + 1))
+            else
+              echo "$id ($created_at) [py: $py_bucket] [tags: ${tags}]" >> /tmp/delete.txt
+            fi
+          done < /tmp/pre_release_dev_sorted.tsv
+
+          echo
+          echo "== Release: ${RELEASE_TAG} (published ${RELEASE_TS}) =="
+          echo "== Grace window: ${GRACE_WINDOW} per Python version =="
+          echo
+          echo "== Kept (recent pre-release dev) =="
+          cat /tmp/keep.txt || true
+          echo
+          echo "== Will delete (older pre-release dev) =="
+          cat /tmp/delete.txt || true
+
+          if [[ "$DRY_RUN" == "true" ]]; then
+            echo
+            echo "Dry run - no deletions performed."
+            exit 0
+          fi
+
+          deleted=0
+          while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            id=$(echo "$line" | awk '{print $1}')
+            echo "Deleting version ${id}"
+            gh api -X DELETE "/orgs/${OWNER}/packages/container/${PACKAGE}/versions/${id}" || {
+              echo "  failed to delete ${id} (continuing)"
+            }
+            deleted=$((deleted + 1))
+          done < /tmp/delete.txt
+
+          echo
+          echo "Deleted ${deleted} pre-release dev version(s)."

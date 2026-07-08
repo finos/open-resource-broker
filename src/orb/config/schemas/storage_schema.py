@@ -122,6 +122,21 @@ class RetryConfig(BaseModel):
         return v
 
 
+def _get_valid_storage_strategies() -> set[str]:
+    """Accepted ``storage.strategy`` values: generic baseline + registered backends."""
+    valid = {"json", "sql"}
+    try:
+        from orb.infrastructure.storage.registry import get_storage_registry
+
+        valid.update(get_storage_registry().get_registered_storage_types())
+    except Exception:
+        # Validator may run before bootstrap registers backends, and storage_schema
+        # must stay importable without orb.infrastructure.storage being initialised.
+        # Fall back to the baseline so config validation never depends on registry health.
+        pass
+    return valid
+
+
 class StorageConfig(BaseModel):
     """Storage configuration."""
 
@@ -133,10 +148,10 @@ class StorageConfig(BaseModel):
     @field_validator("strategy")
     @classmethod
     def validate_strategy(cls, v: str) -> str:
-        """Validate storage strategy."""
-        valid_strategies = ["json", "sql"]
+        """Validate storage strategy against registered backends (provider-agnostic)."""
+        valid_strategies = _get_valid_storage_strategies()
         if v not in valid_strategies:
-            raise ValueError(f"Storage strategy must be one of {valid_strategies}")
+            raise ValueError(f"Storage strategy must be one of {sorted(valid_strategies)}")
         return v
 
     @model_validator(mode="after")

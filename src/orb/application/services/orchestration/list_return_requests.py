@@ -9,11 +9,16 @@ from orb.application.services.orchestration.base import OrchestratorBase
 from orb.application.services.orchestration.dtos import (
     ListReturnRequestsInput,
     ListReturnRequestsOutput,
+    Paginated,
+    decode_cursor,
+    encode_cursor,
 )
 from orb.domain.base.ports.logging_port import LoggingPort
 
 _DEFAULT_GRACE_PERIOD = 300
 _SPOT_GRACE_PERIOD = 120
+
+_DEFAULT_SORT = "-created_at"
 
 
 class ListReturnRequestsOrchestrator(
@@ -35,15 +40,45 @@ class ListReturnRequestsOrchestrator(
 
     async def execute(self, input: ListReturnRequestsInput) -> ListReturnRequestsOutput:  # type: ignore[return]
         self._logger.info(
-            "ListReturnRequestsOrchestrator: status=%s limit=%s",
+            "ListReturnRequestsOrchestrator: status=%s limit=%s provider_name=%s provider_type=%s",
             input.status,
             input.limit,
+            input.provider_name,
+            input.provider_type,
         )
 
-        query = ListReturnRequestsQuery(status=input.status, limit=input.limit)
-        results = await self._query_bus.execute(query)
-        requests = [self._enrich(self._to_dict(r)) for r in (results or [])]
-        return ListReturnRequestsOutput(requests=requests)
+        offset = decode_cursor(input.cursor) if input.cursor else input.offset
+        sort = input.sort if input.sort else _DEFAULT_SORT
+
+        query = ListReturnRequestsQuery(
+            status=input.status,
+            limit=input.limit,
+            offset=offset,
+            q=input.q,
+            sort=sort,
+            provider_name=input.provider_name,
+            provider_type=input.provider_type,
+            filter_expressions=input.filter_expressions,
+        )
+        result = await self._query_bus.execute(query)
+
+        if isinstance(result, Paginated):
+            items = [self._enrich(self._to_dict(r)) for r in result.items]
+            total_count = result.total_count
+        else:
+            items = [self._enrich(self._to_dict(r)) for r in (result or [])]
+            total_count = len(items)
+
+        next_cursor: str | None = None
+        effective_limit = input.limit if input.limit is not None else total_count
+        if effective_limit and total_count > offset + effective_limit:
+            next_cursor = encode_cursor(offset + effective_limit)
+
+        return ListReturnRequestsOutput(
+            requests=items,
+            next_cursor=next_cursor,
+            total_count=total_count,
+        )
 
     def _enrich(self, data: dict) -> dict:
         """Add grace_period to a return request dict.

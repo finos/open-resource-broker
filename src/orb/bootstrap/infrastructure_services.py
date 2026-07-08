@@ -35,17 +35,24 @@ def _register_template_services(container: DIContainer):
         from orb.application.services.template_defaults_service import (
             TemplateDefaultsService,
         )
+        from orb.infrastructure.registry.template_extension_registry import (
+            TemplateExtensionRegistryAdapter,
+        )
 
         return TemplateDefaultsService(
             config_manager=c.get(ConfigurationPort),
             logger=c.get(LoggingPort),
+            extension_registry=TemplateExtensionRegistryAdapter(),
         )
 
     from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
 
     container.register_singleton(TemplateDefaultsPort, create_template_defaults_service)
 
-    # Register template generation service
+    # Register template generation service.
+    # The service depends on TemplateExampleGeneratorResolverPort; the
+    # TemplateExampleGeneratorRegistry satisfies that protocol structurally so
+    # it is passed directly — no separate adapter class is needed.
     def create_template_generation_service(c):
         """Create template generation service with injected dependencies."""
         from orb.application.ports.scheduler_port import SchedulerPort
@@ -54,8 +61,8 @@ def _register_template_services(container: DIContainer):
             TemplateGenerationService,
         )
         from orb.domain.base.ports.path_resolution_port import PathResolutionPort
-        from orb.domain.base.ports.template_example_generator_port import (
-            TemplateExampleGeneratorPort,
+        from orb.infrastructure.registry.template_example_generator_registry import (
+            TemplateExampleGeneratorRegistry,
         )
 
         return TemplateGenerationService(
@@ -63,7 +70,7 @@ def _register_template_services(container: DIContainer):
             scheduler_strategy=c.get(SchedulerPort),
             logger=c.get(LoggingPort),
             provider_registry_service=c.get(ProviderRegistryService),
-            template_example_generator=c.get(TemplateExampleGeneratorPort),
+            generator_resolver=TemplateExampleGeneratorRegistry,
             path_resolver=c.get(PathResolutionPort),
         )
 
@@ -73,18 +80,49 @@ def _register_template_services(container: DIContainer):
 
     # Register TemplateFactory as a singleton so handlers can receive it via DI
     def create_template_factory(c: DIContainer):
+        import importlib
+        import importlib.util
+
         from orb.domain.template.factory import TemplateFactory
+        from orb.providers.registration import _REGISTERED_PROVIDERS
 
         factory = TemplateFactory(logger=c.get(LoggingPort))
-        try:
-            from orb.providers.aws.registration import register_aws_template_factory
+        logger_port = c.get(LoggingPort)
 
-            register_aws_template_factory(factory, c.get(LoggingPort))
-        except ImportError as exc:
-            c.get(LoggingPort).debug(
-                "AWS provider module not available; AWS-specific templates will not be registered: %s",
-                exc,
+        # Register Kubernetes template extensions so K8sTemplateDTOConfig is
+        # available for round-trip serialisation before per-provider template
+        # classes are registered below.  Guarded by ImportError so the factory
+        # builds cleanly when the k8s extra is not installed.
+        try:
+            from orb.providers.k8s.registration import (  # noqa: PLC0415
+                register_k8s_extensions,
+                register_k8s_template_factory,
             )
+
+            register_k8s_extensions(logger_port)
+            register_k8s_template_factory(factory, logger_port)
+        except ImportError:
+            # K8s is an optional extra; when the k8s package or its
+            # dependencies are not installed the caller proceeds without
+            # k8s support.  This is expected in minimal installs.
+            pass
+
+        for _name in _REGISTERED_PROVIDERS:
+            _mod_path = f"orb.providers.{_name}.registration"
+            if importlib.util.find_spec(_mod_path) is None:
+                continue
+            try:
+                _mod = importlib.import_module(_mod_path)
+                _reg_fn = getattr(_mod, f"register_{_name}_template_factory", None)
+                if _reg_fn is not None:
+                    _reg_fn(factory, logger_port)
+            except ImportError as exc:
+                logger_port.debug(
+                    "%s provider module not available; provider-specific templates will not be"
+                    " registered: %s",
+                    _name,
+                    exc,
+                )
         return factory
 
     from orb.domain.template.factory import TemplateFactory, TemplateFactoryPort

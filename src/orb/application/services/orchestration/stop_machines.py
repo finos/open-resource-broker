@@ -35,7 +35,17 @@ class StopMachinesOrchestrator(OrchestratorBase[StopMachinesInput, StopMachinesO
         )
 
         if input.all_machines:
-            machine_dtos = await self._query_bus.execute(ListMachinesQuery(status="running")) or []
+            machine_dtos = (
+                await self._query_bus.execute(
+                    ListMachinesQuery(
+                        status="running",
+                        provider_name=input.provider_name,
+                        provider_type=input.provider_type,
+                        filter_expressions=input.filter_expressions,
+                    )
+                )
+                or []
+            )
             machine_ids = [m.machine_id for m in machine_dtos]
         else:
             machine_ids = list(input.machine_ids)

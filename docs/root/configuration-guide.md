@@ -68,7 +68,7 @@ Generate templates for multiple providers:
 orb templates generate
 
 # Generate for specific provider
-orb templates generate --provider aws_prod_us-east-1
+orb templates generate --provider-name aws_prod_us-east-1
 
 # Generate for specific provider type
 orb templates generate --provider-api EC2Fleet
@@ -125,7 +125,7 @@ The consolidated configuration format provides comprehensive provider management
   },
   "logging": {
     "level": "INFO",
-    "file_path": "logs/app.log",
+    "file_path": "logs/orb.log",
     "console_enabled": true
   },
   "storage": {
@@ -424,7 +424,7 @@ export ORB_CIRCUIT_BREAKER__ENABLED=true
 export ORB_CIRCUIT_BREAKER__FAILURE_THRESHOLD=5
 
 # Start the application
-orb system serve --port 8000
+orb server start --foreground --port 8000
 ```
 
 ### Configuration Validation
@@ -508,7 +508,7 @@ orb providers list
 orb templates list
 
 # Get templates for specific provider
-orb templates list --provider aws-primary
+orb templates list --provider-name aws-primary
 
 # Request machines
 orb machines request basic-template 2

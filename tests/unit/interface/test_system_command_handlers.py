@@ -143,7 +143,7 @@ class TestHandleProviderMetrics:
         container.get.return_value = orchestrator
 
         with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            result = await handle_provider_metrics(_ns(provider="aws"))
+            result = await handle_provider_metrics(_ns(provider_name="aws"))
 
         orchestrator.execute.assert_awaited_once()
         call_input = orchestrator.execute.call_args[0][0]
@@ -372,7 +372,7 @@ class TestHandleSystemMetrics:
 
 
 # ---------------------------------------------------------------------------
-# handle_select_provider_strategy — reads args.provider, no bus
+# handle_select_provider_strategy — reads args.provider_name, no bus
 # ---------------------------------------------------------------------------
 
 

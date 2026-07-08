@@ -132,7 +132,7 @@ class AWSProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
     session_token: Optional[str] = Field(None, description="AWS session token")
 
     # AWS Settings
-    region: str = Field("us-east-1", description="AWS region")  # type: ignore[assignment]
+    region: str = Field("us-east-1", description="AWS region")
     endpoint_url: Optional[str] = Field(None, description="AWS endpoint URL")
     aws_max_retries: int = Field(
         3,

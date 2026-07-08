@@ -145,13 +145,13 @@ class DynamoDBConverter(DataConverter):
         if isinstance(value, datetime):
             return value.isoformat()
 
+        # Handle boolean (must precede int: bool is a subclass of int)
+        if isinstance(value, bool):
+            return value
+
         # Handle numeric types - convert to Decimal for DynamoDB
         if isinstance(value, (int, float)):
             return Decimal(str(value))
-
-        # Handle boolean
-        if isinstance(value, bool):
-            return value
 
         # Handle strings
         if isinstance(value, str):
@@ -193,14 +193,10 @@ class DynamoDBConverter(DataConverter):
             else:
                 return float(value)
 
-        # Handle datetime strings
+        # Return strings (incl. ISO timestamps) as-is; the domain/repository
+        # layer owns datetime parsing, matching the JSON backend. Parsing here
+        # would hand a datetime to consumers that call fromisoformat() on it.
         if isinstance(value, str):
-            # Try to parse as ISO datetime
-            from contextlib import suppress
-
-            with suppress(ValueError, TypeError):
-                if "T" in value and ("Z" in value or "+" in value or value.endswith("00")):
-                    return datetime.fromisoformat(value.replace("Z", "+00:00"))
             return value
 
         # Handle lists

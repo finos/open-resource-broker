@@ -1,5 +1,6 @@
 """JSON storage strategy implementation using componentized architecture."""
 
+import json
 from typing import Any, Optional, cast
 
 from orb.infrastructure.logging.logger import get_logger
@@ -61,6 +62,53 @@ class JSONStorageStrategy(BaseStorageStrategy):
         self._cache_valid = False
 
         self.logger.debug("Initialized JSON storage strategy for %s at %s", entity_type, file_path)
+
+    def is_healthy(self) -> tuple[bool, dict[str, Any]]:
+        """Verify the JSON file is reachable, parses, and has the expected shape.
+
+        Healthy when:
+          - the parent directory exists (writable path)
+          - either the file is absent (fresh install → empty dataset) OR the
+            file parses as a JSON object of ``{entity_id: dict[str, Any]}``
+          - a sampled record validates as a dict (cheap drift check; full
+            pydantic validation belongs in a separate integrity probe, not
+            a health endpoint)
+        """
+        path = self.file_manager.file_path
+        details: dict[str, Any] = {
+            "type": "json",
+            "file_path": str(path),
+            "entity_type": self.entity_type,
+        }
+        try:
+            if not path.parent.exists():
+                details["reason"] = "parent directory does not exist"
+                return False, details
+            if not path.exists():
+                details["state"] = "empty"
+                return True, details
+            with path.open("r", encoding="utf-8") as fh:
+                payload = json.load(fh)
+            if not isinstance(payload, dict):
+                details["reason"] = f"expected JSON object, got {type(payload).__name__}"
+                return False, details
+            details["entity_count"] = len(payload)
+            # Shape sanity: every record should be a dict. Sample the first
+            # one rather than scanning all keys (health probe stays O(1)).
+            if payload:
+                sample_key = next(iter(payload))
+                sample = payload[sample_key]
+                if not isinstance(sample, dict):
+                    details["reason"] = (
+                        f"sampled record {sample_key!r} is {type(sample).__name__}, expected dict"
+                    )
+                    return False, details
+                details["sample_keys"] = sorted(sample.keys())[:8]
+            details["state"] = "ok"
+            return True, details
+        except (OSError, json.JSONDecodeError) as exc:
+            details["error"] = str(exc)
+            return False, details
 
     @instrument_storage(lambda self: cast("JSONStorageStrategy", self)._metrics, "save")
     def save(self, entity_id: str, data: dict[str, Any]) -> None:

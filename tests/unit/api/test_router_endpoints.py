@@ -7,12 +7,15 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from orb.api.dependencies import (
+    CurrentUser,
     get_acquire_machines_orchestrator,
     get_cancel_request_orchestrator,
+    get_current_user,
     get_list_machines_orchestrator,
     get_list_requests_orchestrator,
     get_list_return_requests_orchestrator,
     get_machine_orchestrator,
+    get_request_formatter,
     get_request_status_orchestrator,
     get_response_formatting_service,
     get_return_machines_orchestrator,
@@ -47,6 +50,10 @@ from orb.application.services.orchestration.dtos import (
 def machines_app():
     app = FastAPI()
     app.include_router(machines_router)
+    # Supply an operator identity so role guards on mutation endpoints are satisfied.
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        username="test-operator", role="operator"
+    )
     return app
 
 
@@ -54,6 +61,10 @@ def machines_app():
 def requests_app():
     app = FastAPI()
     app.include_router(requests_router)
+    # Supply an operator identity so role guards on mutation endpoints are satisfied.
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        username="test-operator", role="operator"
+    )
     return app
 
 
@@ -106,6 +117,9 @@ class TestMachinesRouter:
 
     def _set_scheduler(self, app, scheduler=None):
         f = self._make_formatter()
+        # Routers depend on get_request_formatter (header-aware); override
+        # both so scheduler-header and non-header paths use the same mock.
+        app.dependency_overrides[get_request_formatter] = lambda: f
         app.dependency_overrides[get_response_formatting_service] = lambda: f
         return f
 
@@ -289,6 +303,9 @@ class TestRequestsRouter:
 
     def _set_scheduler(self, app, scheduler=None):
         f = self._make_formatter()
+        # Routers depend on get_request_formatter (header-aware); override
+        # both so scheduler-header and non-header paths use the same mock.
+        app.dependency_overrides[get_request_formatter] = lambda: f
         app.dependency_overrides[get_response_formatting_service] = lambda: f
         return f
 

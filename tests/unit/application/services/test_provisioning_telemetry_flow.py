@@ -4,6 +4,7 @@ Verifies the full path:
   strategy returns routing_info → app layer stamps → ProvisioningResult.provider_data has the fields
 """
 
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -86,7 +87,7 @@ async def test_routing_info_from_aws_strategy_reaches_provider_data():
     # Patch scheduler
     scheduler = MagicMock()
     scheduler.format_template_for_provider.return_value = {}
-    svc._container.get.return_value = scheduler
+    cast(MagicMock, svc._container).get.return_value = scheduler
 
     result = await svc._dispatch_single_attempt(
         _make_template(),
@@ -126,7 +127,7 @@ async def test_routing_info_from_fallback_strategy_reaches_provider_data():
 
     scheduler = MagicMock()
     scheduler.format_template_for_provider.return_value = {}
-    svc._container.get.return_value = scheduler
+    cast(MagicMock, svc._container).get.return_value = scheduler
 
     result = await svc._dispatch_single_attempt(
         _make_template(),
@@ -170,7 +171,7 @@ async def test_routing_info_from_composite_strategy_reaches_provider_data():
 
     scheduler = MagicMock()
     scheduler.format_template_for_provider.return_value = {}
-    svc._container.get.return_value = scheduler
+    cast(MagicMock, svc._container).get.return_value = scheduler
 
     result = await svc._dispatch_single_attempt(
         _make_template(),
@@ -205,7 +206,7 @@ async def test_no_routing_info_does_not_break_provider_data():
 
     scheduler = MagicMock()
     scheduler.format_template_for_provider.return_value = {}
-    svc._container.get.return_value = scheduler
+    cast(MagicMock, svc._container).get.return_value = scheduler
 
     result = await svc._dispatch_single_attempt(
         _make_template(),

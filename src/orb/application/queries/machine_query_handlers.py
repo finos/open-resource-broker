@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from orb.application.services.provider_registry_service import ProviderRegistryService
@@ -18,6 +18,7 @@ from orb.application.machine.queries import (
 )
 from orb.application.ports.command_bus_port import CommandBusPort
 from orb.application.services.machine_sync_service import MachineSyncService
+from orb.application.services.orchestration.dtos import Paginated
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.exceptions import EntityNotFoundError
 from orb.domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
@@ -61,7 +62,7 @@ class GetMachineHandler(BaseQueryHandler[GetMachineQuery, MachineDTO]):
 
 
 @query_handler(ListMachinesQuery)
-class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, list[MachineDTO]]):
+class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, Paginated[MachineDTO]]):
     """Handler for listing machines."""
 
     def __init__(
@@ -81,8 +82,17 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, list[MachineDTO]])
         self._generic_filter_service = generic_filter_service
         self._machine_sync_service = machine_sync_service
 
-    async def execute_query(self, query: ListMachinesQuery) -> list[MachineDTO]:
-        """Execute list machines query."""
+    async def execute_query(self, query: ListMachinesQuery) -> Paginated[MachineDTO]:
+        """Execute list machines query.
+
+        Pipeline: load → provider filter → q → sort → total → slice → DTO
+                  → expression filters.
+
+        ``q`` and ``sort`` apply to the full dataset so pagination is
+        consistent across pages. ``filter_expressions`` operate on the
+        DTO form and therefore run after the slice; they should not be
+        relied on for cross-page filtering.
+        """
         self.logger.info("Listing machines")
 
         try:
@@ -99,6 +109,8 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, list[MachineDTO]])
                 else:
                     machines = uow.machines.get_all()
 
+                total_unfiltered = len(machines)
+
                 if query.provider_name:
                     machines = [
                         m
@@ -106,15 +118,67 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, list[MachineDTO]])
                         if m.provider_name and query.provider_name in m.provider_name
                     ]
 
+                if query.provider_type:
+                    machines = [m for m in machines if m.provider_type == query.provider_type]
+
+                # q: substring search over user-visible domain fields
+                if query.q:
+                    needle = query.q.lower()
+                    searchable = ("machine_id", "name", "instance_type", "private_ip", "public_ip")
+                    machines = [
+                        m
+                        for m in machines
+                        if any(needle in str(getattr(m, f, "") or "").lower() for f in searchable)
+                    ]
+
+                # sort: "+field" / "-field"
+                if query.sort:
+                    descending = query.sort.startswith("-")
+                    attr = query.sort.lstrip("-+")
+
+                    def _val(m: Any) -> str:
+                        raw = getattr(m, attr, "")
+                        return "" if raw is None else str(raw)
+
+                    try:
+                        machines = sorted(machines, key=_val, reverse=descending)
+                    except TypeError as exc:
+                        # Mixed-type column under sort. Fall back to
+                        # unsorted results rather than failing the
+                        # request; log so the bad column is observable.
+                        self.logger.warning(
+                            "ListMachines sort failed on attr=%s descending=%s: %s",
+                            attr,
+                            descending,
+                            exc,
+                        )
+
                 total_count = len(machines)
-                limit = min(query.limit or 50, 1000)
+
+                # Slice. None limit → no cap.
                 offset = query.offset or 0
-                machines = machines[offset : offset + limit]
+                if query.limit is None:
+                    machines = machines[offset:]
+                else:
+                    limit = min(query.limit, 1000)
+                    if query.limit > 1000:
+                        self.logger.warning(
+                            "ListMachinesQuery.limit=%d clamped to 1000; "
+                            "total_count=%d. Consumers needing full counts "
+                            "should rely on total_count, not len(machines).",
+                            query.limit,
+                            total_count,
+                        )
+                    machines = machines[offset : offset + limit] if limit > 0 else []
 
                 machine_dtos = []
                 for machine in machines:
-                    # Refresh running machines with live AWS state before building DTOs
-                    if machine.status.value == "running" and machine.request_id:
+                    # Provider refresh is opt-in via ``query.sync`` so list
+                    # endpoints stay cheap. When enabled, every machine on
+                    # the page (not just running ones) gets a single
+                    # DescribeInstances; pending machines that have since
+                    # transitioned will surface correctly.
+                    if query.sync and machine.request_id:
                         try:
                             request = uow.requests.get_by_id(machine.request_id)
                             if request:
@@ -154,13 +218,17 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, list[MachineDTO]])
                     )
 
                 self.logger.info(
-                    "Found %s machines (total: %s, limit: %s, offset: %s)",
+                    "Found %s machines (total: %s, unfiltered: %s, offset: %s)",
                     len(machine_dtos),
                     total_count,
-                    limit,
+                    total_unfiltered,
                     offset,
                 )
-                return machine_dtos
+                return Paginated(
+                    items=machine_dtos,
+                    total_count=total_count,
+                    total_unfiltered=total_unfiltered,
+                )
 
         except Exception as e:
             self.logger.error("Failed to list machines: %s", e)

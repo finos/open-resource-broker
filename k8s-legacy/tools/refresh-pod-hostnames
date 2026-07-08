@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+set -x
+set -euo pipefail
+
+temp="$(mktemp /var/tmp/symphony/kernel/conf/hostsXXXXXXX)"
+if kubectl get pods --no-headers -l "app.kubernetes.io/name=cmp" \
+  -o custom-columns=:status.podIP,:metadata.name > "$temp"
+then
+  mv "$temp" /var/tmp/symphony/kernel/conf/hosts
+else
+  rm -f "$temp"
+fi

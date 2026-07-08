@@ -31,7 +31,7 @@ else
     CONFIG_FLAG=(--config "$SPEC_TMP/config/config.json")
 fi
 
-orb "${CONFIG_FLAG[@]}" system serve --socket-path "$SOCK" &
+orb "${CONFIG_FLAG[@]}" server start --foreground --api-only --socket-path "$SOCK" &
 SERVER_PID=$!
 
 for _ in $(seq 1 30); do

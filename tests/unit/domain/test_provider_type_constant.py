@@ -2,7 +2,7 @@
 
 
 def test_provider_type_aws_importable():
-    from orb.domain.constants import PROVIDER_TYPE_AWS  # noqa: F401
+    from orb.domain.constants import PROVIDER_TYPE_AWS
 
     assert PROVIDER_TYPE_AWS is not None
 

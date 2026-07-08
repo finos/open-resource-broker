@@ -34,6 +34,7 @@ def _return_request(machine_ids):
         machine_ids=machine_ids,
         provider_type="aws",
         provider_name="aws-us-east-1",
+        provider_api="ec2fleet",
     )
 
 
@@ -44,6 +45,7 @@ def _make_machine(machine_id="i-1234567890abcdef0", status=MachineStatus.PENDING
         template_id="template-123",
         request_id="req-001",
         provider_type="aws",
+        provider_api="ec2fleet",
         provider_name="aws-us-east-1",
         instance_type=InstanceType(value="t2.micro"),
         image_id="ami-12345678",

@@ -19,6 +19,7 @@ on:
     branches: [main]
     paths:
       - 'src/**'
+      - 'k8s-legacy/**'
       - 'pyproject.toml'
       - 'requirements*.txt'
       - 'uv.lock'
@@ -49,7 +50,7 @@ jobs:
       pypi-name: ${{ steps.config.outputs.pypi-name }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
     - name: Get project configuration
       id: config
@@ -68,7 +69,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       with:
         ref: ${{ github.sha }}
 
@@ -86,6 +87,14 @@ jobs:
         cache-key: deps-${{ needs.config.outputs.default-python-version }}-${{ hashFiles('.project.yml', 'pyproject.toml', 'requirements*.txt') }}
         fail-on-cache-miss: false
 
+    - name: Setup Bun (for UI static bundle)
+      uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f4b11  # v2
+      with:
+        bun-version: latest
+
+    - name: Build UI static bundle
+      run: make ui-build
+
     - name: Build package
       run: |
         make build-with-version
@@ -100,14 +109,16 @@ jobs:
         repository-url: https://test.pypi.org/legacy/
         verbose: true
         skip-existing: true
+        packages-dir: dist/
 
     - name: Create deployment summary
       run: |
         {
-          echo "## Package Published Successfully"
+          echo "## Packages Published Successfully"
           echo ""
           echo "**Environment:** Test PyPI"
-          echo "**Installation:** \`pip install --index-url https://test.pypi.org/simple/ ${{ needs.config.outputs.pypi-name }}\`"
+          echo "**Installation (orb-py):** \`pip install --index-url https://test.pypi.org/simple/ ${{ needs.config.outputs.pypi-name }}\`"
+          echo "**Installation (k8s-legacy extra):** \`pip install --index-url https://test.pypi.org/simple/ ${{ needs.config.outputs.pypi-name }}[k8s-legacy]\`"
           echo ""
           echo "**Version:** $VERSION"
           echo "**Commands:**"
@@ -126,7 +137,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached

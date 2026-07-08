@@ -9,6 +9,17 @@ import inspect
 from functools import wraps
 from typing import Any, Callable, Optional
 
+try:
+    from fastapi import HTTPException as _FastAPIHTTPException  # type: ignore[assignment]
+
+    _HTTP_EXCEPTION_TYPE: type[BaseException] = _FastAPIHTTPException  # type: ignore[assignment]
+except ImportError:  # FastAPI is optional — define a private sentinel never raised at runtime
+
+    class _FastAPIHTTPException(Exception):  # type: ignore[no-redef]
+        """Placeholder so the except clause is valid when FastAPI is absent."""
+
+    _HTTP_EXCEPTION_TYPE = _FastAPIHTTPException
+
 from orb.infrastructure.error.exception_handler import (
     ExceptionContext,
     ExceptionHandler,
@@ -54,6 +65,8 @@ def handle_exceptions(
             async def async_wrapper(*args, **kwargs):
                 try:
                     return await func(*args, **kwargs)
+                except _HTTP_EXCEPTION_TYPE:
+                    raise
                 except Exception as e:
                     # Get exception handler (use provided or global singleton)
                     exception_handler = handler or get_exception_handler()
@@ -83,6 +96,8 @@ def handle_exceptions(
                 """Synchronous wrapper with error handling."""
                 try:
                     return func(*args, **kwargs)
+                except _HTTP_EXCEPTION_TYPE:
+                    raise
                 except Exception as e:
                     # Get exception handler (use provided or global singleton)
                     exception_handler = handler or get_exception_handler()

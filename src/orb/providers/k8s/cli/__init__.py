@@ -1,0 +1,1 @@
+"""Kubernetes provider CLI specification."""

@@ -1,6 +1,9 @@
 """AWS IAM authentication strategy."""
 
-from typing import Any, Optional
+from __future__ import annotations
+
+import os
+from typing import TYPE_CHECKING, Any, Optional
 
 from botocore.config import Config
 from botocore.exceptions import ClientError, NoCredentialsError
@@ -15,6 +18,9 @@ from orb.infrastructure.adapters.ports.auth import (
 )
 from orb.providers.aws.session_factory import AWSSessionFactory
 
+if TYPE_CHECKING:
+    pass
+
 _DEFAULT_CONFIG = Config(
     connect_timeout=10,
     read_timeout=30,
@@ -27,8 +33,6 @@ class IAMAuthStrategy(AuthPort):
     """Authentication strategy using AWS IAM credentials and policies."""
 
     _DEFAULT_ADMIN_ROLE_PATTERNS: frozenset[str] = frozenset({"Admin", "Administrator", "OrbAdmin"})
-
-    ASSUME_ALL_PERMISSIONS: bool = False
 
     def __init__(
         self,
@@ -62,7 +66,32 @@ class IAMAuthStrategy(AuthPort):
             "ec2:TerminateInstances",
         ]
         self.enabled = enabled
-        self._assume_permissions = assume_permissions
+
+        # assume_permissions is a dev-only escape hatch. It is only honoured when
+        # the operator has explicitly set ORB_IAM_ASSUME_PERMISSIONS_DEV_ONLY=true
+        # in the environment.  Without that env-var the flag is silently disabled
+        # so that a misconfigured production deployment cannot accidentally bypass
+        # real IAM evaluation.
+        _dev_env_var = os.environ.get("ORB_IAM_ASSUME_PERMISSIONS_DEV_ONLY", "").lower()
+        _dev_override_active = _dev_env_var == "true"
+
+        if assume_permissions and not _dev_override_active:
+            self._logger.critical(
+                "IAM assume_permissions=True is set in config but "
+                "ORB_IAM_ASSUME_PERMISSIONS_DEV_ONLY env var is not 'true'. "
+                "Treating as assume_permissions=False to prevent privilege bypass in production. "
+                "Set ORB_IAM_ASSUME_PERMISSIONS_DEV_ONLY=true only in non-production environments."
+            )
+            self._assume_permissions = False
+        else:
+            self._assume_permissions = assume_permissions
+
+        if self._assume_permissions:
+            self._logger.critical(
+                "IAM assume_permissions=True is ACTIVE (ORB_IAM_ASSUME_PERMISSIONS_DEV_ONLY=true). "
+                "All required_actions are granted without AWS evaluation. "
+                "This MUST NOT be used in production."
+            )
 
         if not self._assume_permissions:
             self._logger.error(
@@ -183,6 +212,54 @@ class IAMAuthStrategy(AuthPort):
             Always True (AWS handles session management)
         """
         return True
+
+    @classmethod
+    def from_auth_config(cls, auth_config: Any) -> IAMAuthStrategy:
+        """
+        Build strategy instance from AuthConfig.
+
+        Extracts the provider_auth.iam sub-config and constructs an IAMAuthStrategy.
+        A LoggingPort is obtained from the DI container when available; otherwise a
+        plain logging adapter is used so the classmethod stays self-contained.
+
+        Args:
+            auth_config: AuthConfig instance with optional provider_auth.iam sub-config
+
+        Returns:
+            Configured IAMAuthStrategy
+        """
+        from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
+
+        provider_auth = getattr(auth_config, "provider_auth", None)
+        iam_cfg = getattr(provider_auth, "iam", None) if provider_auth is not None else None
+
+        region: str = (
+            getattr(iam_cfg, "region", "us-east-1") if iam_cfg is not None else "us-east-1"
+        )
+        profile: Optional[str] = getattr(iam_cfg, "profile", None) if iam_cfg is not None else None
+        required_actions: list[str] = (
+            getattr(iam_cfg, "required_actions", []) if iam_cfg is not None else []
+        )
+        assume_permissions: bool = (
+            getattr(iam_cfg, "assume_permissions", False) if iam_cfg is not None else False
+        )
+
+        try:
+            from orb.domain.base.ports import LoggingPort
+            from orb.infrastructure.di.container import get_container
+
+            logger: LoggingPort = get_container().get(LoggingPort)
+        except Exception:
+            logger = LoggingAdapter()  # type: ignore[assignment]
+
+        return cls(
+            logger=logger,
+            region=region,
+            profile=profile,
+            required_actions=required_actions,
+            enabled=True,
+            assume_permissions=assume_permissions,
+        )
 
     def get_strategy_name(self) -> str:
         """

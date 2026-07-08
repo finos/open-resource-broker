@@ -68,7 +68,7 @@ orb init
 
 # Non-interactive — supply all values as flags (useful for CI/scripted setup)
 orb init --non-interactive \
-  --provider aws \
+  --provider-type aws \
   --region us-east-1 \
   --profile default \
   --scheduler hostfactory \
@@ -82,7 +82,7 @@ orb init --non-interactive \
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--non-interactive` | Skip all prompts | false |
-| `--provider` | Provider type | `aws` |
+| `--provider-type` | Provider type | `aws` |
 | `--region` | AWS region | prompted |
 | `--profile` | AWS profile | prompted |
 | `--scheduler` | Scheduler type (`default`, `hostfactory`) | prompted |
@@ -200,7 +200,7 @@ These variables control where ORB stores its files. All are optional — ORB der
 ```bash
 sudo pip install orb-py
 sudo orb init --non-interactive \
-  --provider aws --region us-east-1 \
+  --provider-type aws --region us-east-1 \
   --subnet-ids subnet-aaa111 \
   --security-group-ids sg-11111111
 ```
@@ -224,7 +224,7 @@ Or pin the location explicitly:
 
 ```bash
 export ORB_ROOT_DIR=~/.orb
-orb init --non-interactive --provider aws --region us-east-1 \
+orb init --non-interactive --provider-type aws --region us-east-1 \
   --subnet-ids subnet-aaa111 --security-group-ids sg-11111111
 ```
 
@@ -253,7 +253,7 @@ my-project/
 pip install --prefix /opt/myapp orb-py
 export ORB_ROOT_DIR=/opt/myapp/orb
 export PATH="/opt/myapp/bin:$PATH"
-orb init --non-interactive --provider aws --region us-east-1 \
+orb init --non-interactive --provider-type aws --region us-east-1 \
   --subnet-ids subnet-aaa111 --security-group-ids sg-11111111
 ```
 

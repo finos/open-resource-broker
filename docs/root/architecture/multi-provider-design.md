@@ -347,7 +347,7 @@ orb templates list --provider-name aws-us-east-1
 orb templates show web-server --source-info
 
 # Validate template against provider
-orb templates validate web-server --provider aws-us-east-1
+orb templates validate web-server --provider-name aws-us-east-1
 ```
 
 ## Error Handling and Validation
@@ -429,7 +429,7 @@ orb templates validate web-server --provider aws-us-east-1
 orb templates migrate --from templates.json --to-provider aws-us-east-1
 
 # Validate migrated templates
-orb templates validate --all --provider aws-us-east-1
+orb templates validate --all --provider-name aws-us-east-1
 ```
 
 ## Best Practices

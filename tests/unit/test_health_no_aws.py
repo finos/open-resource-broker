@@ -40,11 +40,11 @@ def test_register_aws_health_checks_callable():
     )
 
 
-# --- task 1719: register_aws_health_checks registers checks on HealthCheck ---
+# --- register_aws_health_checks: conditional DynamoDB registration ---
 
 
-def test_register_aws_health_checks_registers_checks():
-    """register_aws_health_checks must add aws, ec2, and dynamodb checks."""
+def test_register_aws_health_checks_always_registers_aws_and_ec2():
+    """register_aws_health_checks must always add aws and ec2 checks."""
     from unittest.mock import MagicMock
 
     from orb.providers.aws.health import register_aws_health_checks
@@ -52,10 +52,49 @@ def test_register_aws_health_checks_registers_checks():
     health_check = MagicMock()
     aws_client = MagicMock()
 
-    register_aws_health_checks(health_check, aws_client)
+    register_aws_health_checks(health_check, aws_client, storage_strategy="json")
 
     registered_names = {call.args[0] for call in health_check.register_check.call_args_list}
     assert "aws" in registered_names
     assert "ec2" in registered_names
-    assert "dynamodb" in registered_names
-    assert health_check.register_check.call_count == 3
+    assert "dynamodb" not in registered_names
+    assert health_check.register_check.call_count == 2
+
+
+def test_register_aws_health_checks_does_not_register_dynamodb_anymore():
+    """The dynamodb branch was removed: storage health now flows through
+    register_storage_health_checks against the active StoragePort, so
+    register_aws_health_checks no longer registers a 'database' or
+    'dynamodb' check even when storage_strategy='dynamodb'.
+    """
+    from unittest.mock import MagicMock
+
+    from orb.providers.aws.health import register_aws_health_checks
+
+    health_check = MagicMock()
+    aws_client = MagicMock()
+
+    register_aws_health_checks(health_check, aws_client, storage_strategy="dynamodb")
+
+    registered_names = {call.args[0] for call in health_check.register_check.call_args_list}
+    assert "aws" in registered_names
+    assert "ec2" in registered_names
+    assert "dynamodb" not in registered_names
+    assert "database" not in registered_names
+    assert health_check.register_check.call_count == 2
+
+
+def test_register_aws_health_checks_skips_dynamodb_for_sql_storage():
+    """register_aws_health_checks must not add dynamodb check when storage_strategy='sql'."""
+    from unittest.mock import MagicMock
+
+    from orb.providers.aws.health import register_aws_health_checks
+
+    health_check = MagicMock()
+    aws_client = MagicMock()
+
+    register_aws_health_checks(health_check, aws_client, storage_strategy="sql")
+
+    registered_names = {call.args[0] for call in health_check.register_check.call_args_list}
+    assert "dynamodb" not in registered_names
+    assert health_check.register_check.call_count == 2

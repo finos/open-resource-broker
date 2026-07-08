@@ -9,12 +9,16 @@ class ListRequestsQuery(BaseQuery):
     """Query to list requests with optional filtering."""
 
     provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
     status: Optional[str] = None
     template_id: Optional[str] = None
     request_type: Optional[str] = None
     limit: int = 50
     offset: int = 0
     filter_expressions: list[str] = []
+    # Server-side filter/sort — applied BEFORE the limit/offset slice.
+    q: Optional[str] = None
+    sort: Optional[str] = None
 
 
 class GetRequestHistoryQuery(BaseQuery):

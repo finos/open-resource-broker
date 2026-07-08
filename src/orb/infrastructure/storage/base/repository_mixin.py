@@ -23,6 +23,25 @@ class StorageRepositoryMixin:
       - self._deserialize(data): converts a dict to the entity type
     """
 
+    # Per-entity-type count of rows skipped due to deserialization failures.
+    # Exposed via get_skip_counters() so health checks can surface degradation.
+    _skipped_row_count: dict[str, int]
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Ensure each subclass gets its own skip-counter dict."""
+        super().__init_subclass__(**kwargs)
+
+    def _get_skip_counters(self) -> dict[str, int]:
+        """Return per-entity-type counts of rows skipped during deserialization.
+
+        A non-zero value means list operations are returning incomplete results.
+        The health endpoint uses this to surface a ``storage.deserialize``
+        degraded signal so operators can act before data inconsistency escalates.
+        """
+        if not hasattr(self, "_skipped_row_count"):
+            self._skipped_row_count = {}
+        return dict(self._skipped_row_count)
+
     def _get_storage(self) -> Any:
         """Return the storage backend, supporting both attribute names used in the codebase."""
         if hasattr(self, "storage_port"):
@@ -42,23 +61,76 @@ class StorageRepositoryMixin:
         )
 
     def _load_by_id(self, entity_id: str) -> Optional[Any]:
-        """Fetch a single entity by ID and deserialize it, or return None."""
+        """Fetch a single entity by ID and deserialize it, or return None.
+
+        A targeted lookup that fails to deserialize propagates — callers
+        asking for a known-bad id should see the failure, not get None
+        (which would mask the row as 'not found').
+        """
         data = self._get_storage().find_by_id(entity_id)
         if data:
             return self._deserialize(data)
         return None
 
+    def _safe_deserialize_iter(self, items):
+        """Deserialize each row; log + skip rows that fail validation.
+
+        List-path loaders must never let one corrupt row 500 the whole
+        endpoint. We log the offending entity id and continue with the
+        rest so a single bad record doesn't black-hole the dashboard /
+        machines list / requests list.
+
+        Each failure increments the per-entity-type skip counter so the
+        health endpoint can surface degradation without losing any data.
+        """
+        from orb.infrastructure.logging.logger import get_logger as _get_logger
+
+        if not hasattr(self, "_skipped_row_count"):
+            self._skipped_row_count = {}
+
+        log = getattr(self, "logger", None) or _get_logger(__name__)
+        for data in items:
+            try:
+                yield self._deserialize(data)
+            except Exception as exc:
+                entity_id = (
+                    data.get("machine_id")
+                    or data.get("request_id")
+                    or data.get("template_id")
+                    or "<unknown>"
+                )
+                entity_type = (
+                    "machines"
+                    if "machine_id" in data
+                    else "requests"
+                    if "request_id" in data
+                    else "templates"
+                    if "template_id" in data
+                    else "unknown"
+                )
+                self._skipped_row_count[entity_type] = (
+                    self._skipped_row_count.get(entity_type, 0) + 1
+                )
+                log.error(
+                    "Skipping malformed row id=%s entity=%s: %s. "
+                    "This row will be invisible to list operations. "
+                    "Inspect storage and consider a data migration before purging.",
+                    entity_id,
+                    entity_type,
+                    exc,
+                )
+
     def _load_by_criteria(self, criteria: dict[str, Any]) -> list[Any]:
-        """Fetch entities matching criteria and deserialize them."""
+        """Fetch entities matching criteria; skip rows that fail to load."""
         data_list = self._get_storage().find_by_criteria(criteria)
-        return [self._deserialize(data) for data in data_list]
+        return list(self._safe_deserialize_iter(data_list))
 
     def _load_all(self) -> list[Any]:
-        """Fetch all entities and deserialize them."""
+        """Fetch all entities; skip rows that fail to load."""
         all_data = self._get_storage().find_all()
         if isinstance(all_data, dict):
-            return [self._deserialize(data) for data in all_data.values()]
-        return [self._deserialize(data) for data in all_data]
+            return list(self._safe_deserialize_iter(all_data.values()))
+        return list(self._safe_deserialize_iter(all_data))
 
     def _delete_by_id(self, entity_id: str) -> None:
         """Delete an entity by ID from storage."""

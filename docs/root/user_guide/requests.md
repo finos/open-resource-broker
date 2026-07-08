@@ -612,7 +612,7 @@ hostfactory test-provider --verbose
 hostfactory analyze-failures --period 24h
 
 # Check provider status
-hostfactory provider-status --provider aws
+hostfactory provider-status --provider-name aws
 
 # Validate templates
 hostfactory validate-templates

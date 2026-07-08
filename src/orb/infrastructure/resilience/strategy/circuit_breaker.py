@@ -11,6 +11,9 @@ if TYPE_CHECKING:
 from orb.domain.base.exceptions import QuotaError
 from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.resilience.exceptions import CircuitBreakerOpenError
+from orb.infrastructure.resilience.retry_classifier_registry import (
+    is_non_retryable as _registry_is_non_retryable,
+)
 from orb.infrastructure.resilience.strategy.base import RetryStrategy
 
 logger = get_logger(__name__)
@@ -125,6 +128,13 @@ class CircuitBreakerStrategy(RetryStrategy):
         # Quota errors are never retryable — force circuit open immediately
         if isinstance(exception, QuotaError):
             self._force_open(self.service_name)
+            return False
+
+        # Provider-registered classifiers flag permanent client errors (e.g.
+        # 409 Conflict, 403 RBAC denied from a provider SDK) that must not be
+        # retried and must not be counted as circuit failures — they are caller
+        # errors, not service degradation signals.
+        if _registry_is_non_retryable(exception):
             return False
 
         current_time = time.time()

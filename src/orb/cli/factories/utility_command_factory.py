@@ -12,7 +12,6 @@ class InitCommandData:
         self.non_interactive = kwargs.get("non_interactive", False)
         self.scheduler = kwargs.get("scheduler")
         self.provider = kwargs.get("provider")
-        self.region = kwargs.get("region")
         self.config_dir = kwargs.get("config_dir")
         self.force = kwargs.get("force", False)
 
@@ -50,7 +49,6 @@ class InfrastructureCommandData:
     def __init__(self, action: str, **kwargs: Any):
         self.action = action  # discover, show, validate
         self.provider = kwargs.get("provider")
-        self.region = kwargs.get("region")
         self.detailed = kwargs.get("detailed", False)
 
 
@@ -82,16 +80,6 @@ class StorageTestCommandData:
         self.storage_type = kwargs.get("storage_type")
         self.config_path = kwargs.get("config_path")
         self.verbose = kwargs.get("verbose", False)
-
-
-class SystemServeCommandData:
-    """Data structure for system serve command."""
-
-    def __init__(self, **kwargs: Any):
-        self.host = kwargs.get("host", "localhost")
-        self.port = kwargs.get("port", 8000)
-        self.reload = kwargs.get("reload", False)
-        self.log_level = kwargs.get("log_level", "INFO")
 
 
 class UtilityCommandFactory:
@@ -134,7 +122,3 @@ class UtilityCommandFactory:
     def create_storage_test_command_data(self, **kwargs: Any) -> StorageTestCommandData:
         """Create storage test command data structure."""
         return StorageTestCommandData(**kwargs)
-
-    def create_system_serve_command_data(self, **kwargs: Any) -> SystemServeCommandData:
-        """Create system serve command data structure."""
-        return SystemServeCommandData(**kwargs)

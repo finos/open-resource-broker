@@ -17,7 +17,7 @@ async def handle_templates_generate(args) -> Dict[str, Any]:
 
         # Create request DTO from arguments
         request = TemplateGenerationRequest(
-            specific_provider=getattr(args, "provider", None),
+            specific_provider=getattr(args, "provider_name", None),
             all_providers=getattr(args, "all_providers", False),
             provider_api=getattr(args, "provider_api", None),
             provider_specific=getattr(args, "provider_specific", False),

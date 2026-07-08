@@ -8,6 +8,63 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 <!-- insertion marker -->
 ## Unreleased
 
+### BREAKING CHANGES
+
+- **Daemon token file at `<work_dir>/server/orb-server.token`.**
+  When `orb server start` is invoked (daemon or `--foreground` mode), a
+  random bearer token is written to `<work_dir>/server/orb-server.token`
+  with mode `0600`.  The CLI reads this file to authenticate loopback admin
+  requests such as `orb server reload`.  The file is removed when the daemon
+  exits.  Operators who snapshot the work directory should exclude
+  `*.token` from backups.
+
+- **`allow_destructive_admin` config field (default `false`).**
+  Administrative endpoints that can wipe state (purge, bulk-delete, etc.)
+  now require `allow_destructive_admin: true` in the server config.  The
+  field defaults to `false` and must be opted in explicitly.
+
+- **SQL storage strategy applies Alembic migrations on startup.**
+  When `storage.strategy` is `sql`, the server now runs `alembic upgrade
+  head` automatically on startup.  Operators using a managed database
+  (RDS, Aurora) should ensure the database user has DDL privileges, or run
+  migrations out-of-band with `orb db upgrade` before starting the server
+  with `allow_auto_migrate: false`.
+
+### Added
+
+- New `[aws]` extra (alias for AWS deps currently in core). The canonical install
+  command going forward is `pip install orb-py[aws]`. This continues to work
+  unchanged when AWS deps move out of core in a future major version.
+- New `[k8s]` extra: modern first-class Kubernetes provider with Pod, Deployment, StatefulSet, and Job handlers, watch-based ingestion, startup reconciliation, and orphan garbage collection. Install with `pip install "orb-py[k8s]"`. See `docs/root/providers/kubernetes/index.md` for the full reference.
+- New `[all-providers]` meta-extra: pulls in all currently implemented providers.
+- New `[monitoring-aws]` extra: AWS-specific OpenTelemetry boto instrumentation (previously bundled inside `[monitoring]`).
+- New `[test-aws]` extra: moto + response-mocking deps for AWS test suites.
+- Architecture test `test_boto3_leak_detection.py`: asserts boto3/botocore are never imported outside `providers/aws/` except by guarded backward-compat shims.
+- Unit tests `test_no_provider_install.py`: verifies ORB core modules boot cleanly when AWS deps are absent.
+- Third-party provider plugin discovery via the `orb.providers` entry-point group. Plugins are loaded by `discover_provider_plugins()` after the built-in providers register; failures are logged and tolerated so a broken plugin cannot prevent ORB from starting. See `docs/root/providers/kubernetes/plugin-authoring.md` for the plugin contract and a worked Kubeflow MPIJob example.
+- `KubernetesProviderStrategy.register_handler` classmethod: plugin extension point for attaching a new `provider_api` handler to the Kubernetes provider without forking the strategy.
+- Kubernetes provider documentation under `docs/root/providers/kubernetes/`: overview, configuration reference, handlers guide, authentication guide, RBAC example, migration guide from `orb.k8s_legacy`, and plugin-authoring walkthrough.
+
+### Changed
+
+- The legacy Symphony-on-Kubernetes HostFactory plugin is now bundled with `orb-py` as an optional install extra rather than as a separate `open-resource-broker` PyPI package.  Install with `pip install "orb-py[k8s-legacy]"` and invoke via `orb k8s-legacy <command>`.  See `docs/root/operational/from-open-resource-broker.md` for details.  Runtime semantics are unchanged.
+- `[monitoring]` extra no longer includes `opentelemetry-instrumentation-boto` (use `[monitoring-aws]`).
+- `[all]` extra now includes `[all-providers]` so `pip install orb-py[all]` still pulls everything.
+- `[dev]` shim extra now includes `[all-providers]` for full local development.
+- Three module-level import sites guarded with `try/except ImportError` so ORB core boots when AWS extras are absent:
+  `config/schemas/cleanup_schema.py`, `infrastructure/storage/registration.py`,
+  `providers/registration.py` (deprecated shims).
+- `tests/conftest.py`: bare `import boto3` replaced with guarded `AWS_AVAILABLE` flag; AWS provider tests auto-skip when `[aws]` extra is absent.
+
+### Notes
+
+- `boto3` + `botocore` **remain in core** `[project.dependencies]` for now to
+  preserve backward compatibility — `pip install orb-py` still works unchanged.
+- When the second provider (Azure / GCP / OCI) lands, AWS deps will move from
+  core to the `[aws]` extra and a major-version bump will signal the breaking
+  change. Operators who use `pip install orb-py[aws]` today will see no
+  behavior change at that cutover.
+
 <small>[Compare with latest](https://github.com/awslabs/open-resource-broker/compare/v0.1.0rc0...HEAD)</small>
 
 ### Features

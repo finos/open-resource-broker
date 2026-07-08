@@ -92,7 +92,7 @@ class TestHandleInfrastructureDiscover:
                 return_value=mock_container,
             ),
         ):
-            args = _ns(provider="aws-a")
+            args = _ns(provider_name="aws-a")
             result = await handle_infrastructure_discover(args)
 
         assert result["status"] == "success"
@@ -116,7 +116,7 @@ class TestHandleInfrastructureDiscover:
                 return_value=mock_container,
             ),
         ):
-            args = _ns(provider=None, all_providers=True)
+            args = _ns(provider_name=None, all_providers=True)
             result = await handle_infrastructure_discover(args)
 
         assert result["status"] == "success"
@@ -133,7 +133,7 @@ class TestHandleInfrastructureDiscover:
             "orb.interface.infrastructure_command_handler.get_config_location",
             return_value=tmp_path,
         ):
-            args = _ns(provider="nonexistent")
+            args = _ns(provider_name="nonexistent")
             result = await handle_infrastructure_discover(args)
 
         assert result["status"] == "error"
@@ -164,7 +164,7 @@ class TestHandleInfrastructureShow:
                 return_value=mock_container,
             ),
         ):
-            args = _ns(provider="aws-a")
+            args = _ns(provider_name="aws-a")
             result = await handle_infrastructure_show(args)
 
         assert result["status"] == "success"
@@ -187,7 +187,7 @@ class TestHandleInfrastructureShow:
                 return_value=mock_container,
             ),
         ):
-            args = _ns(provider=None, all_providers=True)
+            args = _ns(provider_name=None, all_providers=True)
             result = await handle_infrastructure_show(args)
 
         assert result["status"] == "success"
@@ -203,7 +203,7 @@ class TestHandleInfrastructureShow:
             "orb.interface.infrastructure_command_handler.get_config_location",
             return_value=tmp_path,
         ):
-            args = _ns(provider="nonexistent")
+            args = _ns(provider_name="nonexistent")
             result = await handle_infrastructure_show(args)
 
         assert result["status"] == "error"
@@ -234,7 +234,7 @@ class TestHandleInfrastructureValidate:
                 return_value=mock_container,
             ),
         ):
-            args = _ns(provider="aws-a")
+            args = _ns(provider_name="aws-a")
             result = await handle_infrastructure_validate(args)
 
         assert result["status"] == "success"
@@ -258,7 +258,7 @@ class TestHandleInfrastructureValidate:
                 return_value=mock_container,
             ),
         ):
-            args = _ns(provider=None)
+            args = _ns(provider_name=None)
             result = await handle_infrastructure_validate(args)
 
         assert result["status"] == "success"
@@ -275,7 +275,174 @@ class TestHandleInfrastructureValidate:
             "orb.interface.infrastructure_command_handler.get_config_location",
             return_value=tmp_path,
         ):
-            args = _ns(provider="nonexistent")
+            args = _ns(provider_name="nonexistent")
             result = await handle_infrastructure_validate(args)
 
         assert result["status"] == "error"
+
+
+# ---------------------------------------------------------------------------
+# _get_active_providers — no "aws" hardcoded fallback
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestGetActiveProvidersRegistryFallback:
+    def test_no_config_file_uses_registry_first_type(self, tmp_path):
+        """When no config.json exists, use first registered type (not hardcoded 'aws')."""
+        from unittest.mock import MagicMock, patch
+
+        from orb.interface.infrastructure_command_handler import _get_active_providers
+
+        mock_registry_service = MagicMock()
+        mock_registry_service.get_registered_provider_types.return_value = ["gcp"]
+        mock_container = MagicMock()
+        mock_container.get.return_value = mock_registry_service
+
+        with (
+            patch(
+                "orb.interface.infrastructure_command_handler.get_config_location",
+                return_value=tmp_path,
+            ),
+            patch(
+                "orb.interface.infrastructure_command_handler.get_container",
+                return_value=mock_container,
+            ),
+        ):
+            providers = _get_active_providers()
+
+        assert providers[0]["type"] == "gcp"
+
+    def test_no_config_file_no_registered_types_raises(self, tmp_path):
+        """When no config.json and no registered types, raise RuntimeError."""
+        from unittest.mock import MagicMock, patch
+
+        from orb.interface.infrastructure_command_handler import _get_active_providers
+
+        mock_registry_service = MagicMock()
+        mock_registry_service.get_registered_provider_types.return_value = []
+        mock_container = MagicMock()
+        mock_container.get.return_value = mock_registry_service
+
+        with (
+            patch(
+                "orb.interface.infrastructure_command_handler.get_config_location",
+                return_value=tmp_path,
+            ),
+            patch(
+                "orb.interface.infrastructure_command_handler.get_container",
+                return_value=mock_container,
+            ),
+        ):
+            with pytest.raises(RuntimeError, match="No providers are registered"):
+                _get_active_providers()
+
+    def test_all_providers_disabled_no_registered_types_raises(self, tmp_path):
+        """When all providers disabled and no registered types, raise RuntimeError."""
+        from unittest.mock import MagicMock, patch
+
+        from orb.interface.infrastructure_command_handler import _get_active_providers
+
+        _write_config(
+            tmp_path,
+            {
+                "provider": {
+                    "providers": [
+                        {
+                            "name": "aws-a",
+                            "type": "aws",
+                            "enabled": False,
+                        }
+                    ]
+                }
+            },
+        )
+
+        mock_registry_service = MagicMock()
+        mock_registry_service.get_registered_provider_types.return_value = []
+        mock_container = MagicMock()
+        mock_container.get.return_value = mock_registry_service
+
+        with (
+            patch(
+                "orb.interface.infrastructure_command_handler.get_config_location",
+                return_value=tmp_path,
+            ),
+            patch(
+                "orb.interface.infrastructure_command_handler.get_container",
+                return_value=mock_container,
+            ),
+        ):
+            with pytest.raises(RuntimeError, match="No providers are registered"):
+                _get_active_providers()
+
+
+# ---------------------------------------------------------------------------
+# _show_provider_infrastructure — CLISpecRegistry-driven display
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestShowProviderInfrastructure:
+    def test_known_provider_type_uses_spec_format_display(self):
+        """Known provider types use CLISpecRegistry.format_display for display."""
+        from unittest.mock import MagicMock, patch
+
+        from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
+        from orb.interface.infrastructure_command_handler import _show_provider_infrastructure
+
+        mock_spec = MagicMock()
+        mock_spec.format_display.return_value = [("Zone", "us-central1-a"), ("Project", "my-proj")]
+        mock_console = MagicMock()
+        mock_container = MagicMock()
+        mock_container.get.return_value = mock_console
+
+        provider = {
+            "name": "gcp-main",
+            "type": "gcp",
+            "config": {"zone": "us-central1-a", "project": "my-proj"},
+        }
+
+        with (
+            patch.object(CLISpecRegistry, "get", return_value=mock_spec),
+            patch(
+                "orb.interface.infrastructure_command_handler.get_container",
+                return_value=mock_container,
+            ),
+        ):
+            _show_provider_infrastructure(provider)
+
+        mock_spec.format_display.assert_called_once_with(provider["config"])
+        # Ensure format_display output was written to console
+        info_calls = [call.args[0] for call in mock_console.info.call_args_list]
+        assert any("Zone" in c for c in info_calls)
+        assert any("us-central1-a" in c for c in info_calls)
+
+    def test_unknown_provider_type_falls_back_to_raw_config(self):
+        """Unknown provider types fall back to raw key/value display."""
+        from unittest.mock import MagicMock, patch
+
+        from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
+        from orb.interface.infrastructure_command_handler import _show_provider_infrastructure
+
+        mock_console = MagicMock()
+        mock_container = MagicMock()
+        mock_container.get.return_value = mock_console
+
+        provider = {
+            "name": "unknown-1",
+            "type": "unknown",
+            "config": {"endpoint": "https://example.com"},
+        }
+
+        with (
+            patch.object(CLISpecRegistry, "get", return_value=None),
+            patch(
+                "orb.interface.infrastructure_command_handler.get_container",
+                return_value=mock_container,
+            ),
+        ):
+            _show_provider_infrastructure(provider)
+
+        info_calls = [call.args[0] for call in mock_console.info.call_args_list]
+        assert any("https://example.com" in c for c in info_calls)

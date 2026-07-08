@@ -754,16 +754,16 @@ Fields by Source:
 #### Validate Templates
 ```bash
 # Validate template against provider
-orb templates validate web-server --provider aws-us-east-1
+orb templates validate web-server --provider-name aws-us-east-1
 
 # Validate with strict mode
-orb templates validate web-server --provider aws-us-east-1 --strict
+orb templates validate web-server --provider-name aws-us-east-1 --strict
 
 # Validate against multiple providers
 orb templates validate web-server --providers aws-us-east-1,aws-us-west-2
 
 # Validate all templates
-orb templates validate --all --provider aws-us-east-1
+orb templates validate --all --provider-name aws-us-east-1
 ```
 
 ### Request Management
@@ -771,7 +771,7 @@ orb templates validate --all --provider aws-us-east-1
 #### Create Requests with Provider Selection
 ```bash
 # Create request with explicit provider
-orb requests create --template web-server --count 5 --provider aws-us-east-1
+orb requests create --template web-server --count 5 --provider-name aws-us-east-1
 
 # Create request with provider type (load balanced)
 orb requests create --template web-server --count 5 --provider-type aws

@@ -22,9 +22,16 @@ def register_all_storage_types() -> None:
 
     register_sql_storage()
 
-    from orb.providers.aws.storage.registration import register_dynamodb_storage
+    try:
+        from orb.providers.aws.storage.registration import (
+            register_aurora_storage,
+            register_dynamodb_storage,
+        )
 
-    register_dynamodb_storage()
+        register_dynamodb_storage()
+        register_aurora_storage()
+    except ImportError:
+        pass  # [aws] extra not installed; DynamoDB and Aurora storage unavailable
 
 
 def get_available_storage_types() -> list:
@@ -34,31 +41,19 @@ def get_available_storage_types() -> list:
     Returns:
         List of storage type names that are available for registration
     """
+    from importlib.util import find_spec
+
     available_types = []
 
-    # Check JSON storage availability
-    try:
-        pass
-
+    # Each backend is available when its registration module can be imported.
+    # find_spec probes importability without binding an unused name.
+    if find_spec("orb.infrastructure.storage.json.registration") is not None:
         available_types.append("json")
-    except ImportError:
-        pass
-
-    # Check SQL storage availability
-    try:
-        pass
-
+    if find_spec("orb.infrastructure.storage.sql.registration") is not None:
         available_types.append("sql")
-    except ImportError:
-        pass
-
-    # Check DynamoDB storage availability
-    try:
-        pass
-
+    if find_spec("orb.providers.aws.storage.registration") is not None:
         available_types.append("dynamodb")
-    except ImportError:
-        pass
+        available_types.append("aurora")
 
     return available_types
 

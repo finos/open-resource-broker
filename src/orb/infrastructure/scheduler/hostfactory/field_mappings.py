@@ -6,7 +6,15 @@ from orb.infrastructure.logging.logger import get_logger
 class HostFactoryFieldMappings:
     """Registry of HostFactory-specific field mappings per provider."""
 
-    # Field mappings organized by provider
+    # Field mappings organized by provider.
+    #
+    # NOTE: AWS entries here are kept as a no-bootstrap fallback so static
+    # consumers (e.g. unit tests that exercise the mapper without booting the
+    # AWS provider) keep working. The canonical AWS mapping lives in
+    # ``providers/aws/scheduler/hostfactory_field_mapping.py:AWSFieldMapping``
+    # registered into ``FieldMappingRegistry`` during provider bootstrap.
+    # Adding a new provider should NOT add entries here — register a
+    # ``FieldMappingPort`` adapter instead.
     MAPPINGS = {
         # Generic fields (work with any provider)
         "generic": {
@@ -94,23 +102,6 @@ class HostFactoryFieldMappings:
     def get_supported_providers(cls) -> list[str]:
         """Get list of supported providers for HostFactory."""
         return [key for key in cls.MAPPINGS.keys() if key != "generic"]
-
-    @classmethod
-    def apply_aws_defaults(cls, mapped: dict) -> dict:
-        """
-        Apply AWS-specific setdefault logic that depends on launch_template_id.
-
-        When launch_template_id is set the LT already encodes network config,
-        so subnet_ids and security_group_ids should not be defaulted to empty lists.
-        """
-        mapped.setdefault("max_instances", 1)
-        mapped.setdefault("price_type", "ondemand")
-        mapped.setdefault("allocation_strategy", "lowestPrice")
-        if not mapped.get("launch_template_id"):
-            mapped.setdefault("subnet_ids", [])
-            mapped.setdefault("security_group_ids", [])
-        mapped.setdefault("tags", {})
-        return mapped
 
     @classmethod
     def is_provider_specific_field(cls, provider_type: str, field_name: str) -> bool:

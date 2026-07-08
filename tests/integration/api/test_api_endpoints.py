@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 import orb.api.dependencies as deps
 from orb._package import __version__
 from orb.api.server import create_fastapi_app
-from orb.config.schemas.server_schema import AuthConfig, ServerConfig
+from orb.config.schemas.server_schema import AuthConfig, CORSConfig, ServerConfig
 
 
 class TestAPIEndpoints:
@@ -63,6 +63,7 @@ class TestAPIEndpoints:
                 strategy="bearer_token",
                 bearer_token={"secret_key": "test-secret-key-minimum-32-bytes!"},
             ),
+            cors=CORSConfig(origins=["*"]),  # type: ignore[call-arg]
         )
         with patch("orb.api.server._register_routers") as mock_register:
             mock_register.side_effect = self._install_stub_routes

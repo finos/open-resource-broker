@@ -8,15 +8,19 @@ and clean integration with our DI/CQRS system.
 
 import asyncio
 import json
+import re
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Callable, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar
 
 from botocore.exceptions import ClientError
 
 from orb.application.base.provider_handlers import BaseProviderHandler
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.exceptions import InfrastructureError
+
+if TYPE_CHECKING:
+    from orb.domain.base.provider_fulfilment import CheckHostsStatusResult
 from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.request.aggregate import Request
@@ -165,15 +169,21 @@ class AWSHandler(ABC):
         """
 
     @abstractmethod
-    def check_hosts_status(self, request: Request) -> list[dict[str, Any]]:
-        """
-        Check the status of hosts for a request.
+    def check_hosts_status(self, request: Request) -> "CheckHostsStatusResult":
+        """Check the status of hosts for a request.
+
+        Returns a ``CheckHostsStatusResult`` containing both per-instance
+        detail dicts and the provider's ``ProviderFulfilment`` verdict.
+
+        Every concrete handler MUST emit a ``ProviderFulfilment`` — no
+        fallback to count-based logic is permitted.  The application layer
+        raises ``ProviderContractError`` if fulfilment is absent.
 
         Args:
             request: The request to check
 
         Returns:
-            List of instance details
+            CheckHostsStatusResult with instances and fulfilment verdict.
 
         Raises:
             AWSEntityNotFoundError: If the AWS resource is not found
@@ -183,6 +193,48 @@ class AWSHandler(ABC):
     def _extract_instance_ids(self, api_response: dict[str, Any], extractor: Any) -> list[str]:
         """Extract instance IDs from API response if available."""
         return extractor(api_response)
+
+    def _resolve_provider_api(self, request: Any, aws_template: Any = None) -> str:
+        """Resolve the provider_api value to stamp onto instance data.
+
+        Priority order:
+          1. ``aws_template.provider_api`` — explicit template-level override
+          2. ``request.metadata["provider_api"]`` — per-request metadata
+          3. ``request.provider_api`` — top-level request field
+          4. ``self._default_provider_api()`` — handler-specific default
+
+        Args:
+            request: The ORB request object.
+            aws_template: The AWS template (optional).  When present, its
+                ``provider_api`` attribute takes highest priority.
+
+        Returns:
+            Resolved provider_api string.
+        """
+        if aws_template is not None:
+            value = getattr(aws_template, "provider_api", None)
+            if value:
+                return value.value if hasattr(value, "value") else str(value)
+        metadata = getattr(request, "metadata", None) or {}
+        value = metadata.get("provider_api")
+        if value:
+            return value
+        value = getattr(request, "provider_api", None)
+        if value:
+            return value
+        return self._default_provider_api()
+
+    def _default_provider_api(self) -> str:
+        """Return the default provider_api string for this handler type.
+
+        Subclasses must override this method to return their handler-specific
+        default (e.g. ``"EC2Fleet"``, ``"SpotFleet"``, ``"ASG"``,
+        ``"RunInstances"``).
+
+        Raises:
+            NotImplementedError: If the subclass has not implemented this method.
+        """
+        raise NotImplementedError(f"{type(self).__name__} must implement _default_provider_api()")
 
     def _format_instance_data(
         self,
@@ -443,15 +495,41 @@ class AWSHandler(ABC):
                 "max_delay": 30.0,
             }
 
+    # Pattern matching AWS temporary credential access key prefixes — strip if
+    # accidentally included in an error message.
+    _ACCESS_KEY_RE = re.compile(r"A[KS]IA[A-Z0-9]{16}", re.ASCII)
+
+    @classmethod
+    def _redact_aws_message(cls, message: str) -> str:
+        """Remove access-key-like tokens from an AWS error message."""
+        return cls._ACCESS_KEY_RE.sub("[REDACTED]", message)
+
     def _convert_client_error(
         self, error: ClientError, operation_name: str = "unknown"
     ) -> Exception:
-        """Convert AWS ClientError to domain exception."""
+        """Convert AWS ClientError to domain exception, preserving AWS error details."""
         error_code = error.response["Error"]["Code"]
-        error_message = error.response["Error"]["Message"]
+        raw_message = error.response["Error"]["Message"]
+        error_message = self._redact_aws_message(raw_message)
+
+        # Derive the service name from the handler class for error_source attribution.
+        service_label = self._get_service_name()
+        error_source = f"aws.{service_label}.{operation_name}"
+
+        # Extract the AWS request ID if present (useful for AWS Support cases).
+        response_metadata = error.response.get("ResponseMetadata", {})
+        aws_request_id: str | None = response_metadata.get("RequestId")
+
+        # Common kwargs carried into every domain exception subclass.
+        aws_kwargs: dict[str, Any] = {
+            "aws_error_code": error_code,
+            "aws_error_message": error_message,
+            "aws_request_id": aws_request_id,
+            "error_source": error_source,
+        }
 
         if error_code in ["ValidationError", "InvalidParameterValue"]:
-            return AWSValidationError(error_message)
+            return AWSValidationError(error_message, **aws_kwargs)
         elif error_code in [
             "LimitExceeded",
             "InstanceLimitExceeded",
@@ -460,19 +538,24 @@ class AWSHandler(ABC):
             "ServiceQuotaExceededException",
             "ResourceCountExceeded",
         ]:
-            return QuotaExceededError(error_message)
+            return QuotaExceededError(error_message, **aws_kwargs)
         elif error_code == "ResourceInUse":
-            return ResourceInUseError(error_message)
+            return ResourceInUseError(error_message, **aws_kwargs)
         elif error_code in ["UnauthorizedOperation", "AccessDenied"]:
-            return AuthorizationError(error_message)
+            return AuthorizationError(error_message, **aws_kwargs)
         elif error_code == "RequestLimitExceeded":
-            return RateLimitError(error_message)
+            return RateLimitError(error_message, **aws_kwargs)
         elif error_code in ["ResourceNotFound", "InvalidInstanceID.NotFound"]:
-            return AWSEntityNotFoundError(error_message)
+            return AWSEntityNotFoundError(error_message, **aws_kwargs)
         elif error_code in ["RequestTimeout", "ServiceUnavailable"]:
-            return NetworkError(error_message)
+            return NetworkError(error_message, **aws_kwargs)
         else:
-            return InfrastructureError(f"AWS Error: {error_code} - {error_message}")
+            from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
+
+            return AWSInfrastructureError(
+                f"AWS Error: {error_code} - {error_message}",
+                **aws_kwargs,
+            )
 
     def _paginate(self, client_method: Callable, result_key: str, **kwargs) -> list[dict[str, Any]]:
         """

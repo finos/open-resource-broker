@@ -58,6 +58,12 @@ class TemplateRepositoryImpl(TemplateRepository):
         self._logger.debug("Deleting template: %s", aggregate_id)
         _run_async(self._template_manager.delete_template(aggregate_id))
 
+    def find_all(self) -> list[Template]:
+        """Find all templates — required by ``AggregateRepository``."""
+        self._logger.debug("Finding all templates")
+        dtos = self._template_manager.get_all_templates_sync()
+        return [_dto_to_template(d) for d in dtos]
+
     # Abstract methods from TemplateRepository
     def find_by_template_id(self, template_id: str) -> Optional[Template]:
         """Find template by template ID (required by TemplateRepository)."""

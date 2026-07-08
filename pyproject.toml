@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "orb-py"
-version = "1.6.2"
+version = "1.7.0"
 description = "Open Resource Broker (ORB) — dynamic cloud resource provisioning via CLI and REST API"
 readme = "README.md"
 license = "Apache-2.0"
@@ -42,9 +42,7 @@ classifiers = [
 requires-python = ">=3.10"
 
 dependencies = [
-    # Core dependencies (always needed)
-    "boto3>=1.42.21",
-    "botocore>=1.42.21",
+    # Core dependencies (always needed, never provider-specific)
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
     "sqlalchemy>=2.0.0",
@@ -55,9 +53,90 @@ dependencies = [
     "requests>=2.31.0",
     "PyYAML>=6.0.0", # Exported API (lazy-loaded)
     "jsonschema>=4.17.0",
+    # AWS provider deps — currently in core for backward compatibility.
+    # The canonical install path going forward is `pip install orb-py[aws]`,
+    # which already works today.  When the second provider lands these will
+    # move to the [aws] extra and a major-version bump will signal the
+    # breaking change for operators who installed without extras.
+    "boto3>=1.42.21",
+    "botocore>=1.42.21",
+    "psutil>=5.9.0", # Required by the system health check (CPU/memory)
 ]
 
 [project.optional-dependencies]
+# ── Storage extras ─────────────────────────────────────────────────────────
+# SQL storage strategy — includes Alembic for schema migration support.
+# Install with: pip install orb-py[sql]
+sql = [
+    "alembic>=1.13",
+]
+
+# ── Provider extras ────────────────────────────────────────────────────────
+# AWS provider — explicit opt-in alias for the AWS deps currently in core.
+# Pinning the same versions keeps `pip install orb-py[aws]` resolving identically
+# to the bare install and future-proofs operator install commands for the day
+# AWS deps move out of core.
+aws = [
+    "boto3>=1.42.21",
+    "botocore>=1.42.21",
+]
+
+# Modern Kubernetes provider — explicit opt-in extra.  Install with:
+#   pip install orb-py[k8s]
+# Only the SDK client is required here; everything else (jinja2, watchdog,
+# alembic etc.) is legacy-plugin baggage and stays in the [k8s-legacy] extra.
+k8s = [
+    "kubernetes",
+]
+
+# Placeholder entries for future providers (add when provider is implemented)
+# azure = [
+#     "azure-mgmt-compute>=30.0.0",
+#     "azure-identity>=1.15.0",
+#     "azure-mgmt-network>=25.0.0",
+# ]
+# gcp = [
+#     "google-cloud-compute>=1.14.0",
+#     "google-auth>=2.23.0",
+# ]
+
+# Meta-extra: all currently implemented providers
+all-providers = [
+    "orb-py[aws]",
+    "orb-py[k8s]",
+]
+
+# Legacy k8s HostFactory plugin — heavy deps gated behind optional extra.
+# Install with: pip install orb-py[k8s-legacy]
+k8s-legacy = [
+    "kubernetes",
+    "boto3>=1.42.21",
+    "jinja2>=3.1.0",
+    "typing-extensions",
+    "watchdog",
+    "rich>=13.3.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "tenacity",
+    "prometheus-client>=0.17.0",
+    "sqlalchemy>=2.0.0",
+    "pg8000",
+    "alembic",
+    "fastapi>=0.128.0",
+    "uvicorn>=0.24.0",
+]
+
+# ── Feature extras ─────────────────────────────────────────────────────────
+# Reflex web UI — the wheel ships a pre-built SPA bundle in ``orb/ui/_static/``
+# so end users do NOT need Node/Bun at runtime (only builders running
+# ``dev-tools/package/build_ui.sh`` do).  Pin to 0.9.x: earlier versions
+# lack ``api_transformer`` and the React Router 7 build layout our
+# rxconfig/api-transformer assumes.
+# Install with: pip install orb-py[ui]
+ui = [
+    "reflex>=0.9,<0.10",
+]
+
 # CLI enhancements (colored output)
 cli = [
     "rich>=13.3.0",
@@ -72,20 +151,42 @@ api = [
     "jinja2>=3.1.0",
 ]
 
-# Monitoring & observability (for API/production deployments)
+# Monitoring & observability (provider-neutral — no boto3 instrumentation here)
 monitoring = [
     "opentelemetry-api>=1.20.0",
     "opentelemetry-sdk>=1.20.0",
     "opentelemetry-instrumentation-fastapi>=0.41b0",
-    "opentelemetry-instrumentation-boto>=0.41b0",
     "opentelemetry-instrumentation-sqlalchemy>=0.41b0",
     "prometheus-client>=0.17.0",
     "psutil>=5.9.0",
 ]
 
-# All optional features
+# AWS-specific monitoring (boto3 instrumentation; requires [aws])
+monitoring-aws = [
+    "orb-py[aws,monitoring]",
+    "opentelemetry-instrumentation-boto>=0.41b0",
+]
+
+# All optional features (providers + features)
 all = [
-    "orb-py[cli,api,monitoring]",
+    "orb-py[cli,api,sql,monitoring,all-providers]",
+]
+
+# ── Test extras ────────────────────────────────────────────────────────────
+# AWS test dependencies — moto + response mocking
+test-aws = [
+    "orb-py[aws]",
+    "moto[ec2,iam,ec2instanceconnect,autoscaling,ssm,dynamodb,sts,sqs,sns]>=5.1.19,<6.0.0",
+    "responses>=0.24.0,<1.0.0",
+    "requests-mock>=1.11.0,<2.0.0",
+]
+
+# Kubernetes test dependencies — kmock is an in-process HTTP-level K8s API mock.
+# Tests point the real kubernetes SDK client at the kmock URL so the full
+# client stack is exercised without a live cluster.
+test-k8s = [
+    "orb-py[k8s]",
+    "kmock>=0.7",
 ]
 
 # ---------------------------------------------------------------------------
@@ -125,9 +226,18 @@ ci = [
     "joserfc>=1.6.1",
     "werkzeug>=3.1.6",
     "nltk>=3.9.3",
+    # k8s-legacy extra deps — required for tests/integration/k8s_legacy/
+    "kubernetes",
+    "watchdog",
+    "tenacity",
+    "pg8000",
+    "uvicorn>=0.24.0",
+    "prometheus-client>=0.17.0",
+    "alembic>=1.13",
     # Essential Type Stubs
     "types-PyYAML>=6.0.12.12,<7.0.0",
     "types-python-dateutil>=2.8.19.14,<3.0.0",
+    "kubernetes-stubs-elephant-fork>=36.0.2,<37.0.0",
     # Build Tools
     "tomli>=2.0.0,<3.0.0",
     # Security Scanning
@@ -151,7 +261,7 @@ ci = [
     "wheel>=0.41.3,<1.0.0",
 ]
 dev = [
-    "orb-py[ci]",
+    "orb-py[ci,all-providers]",
     "virtualenv>=20.26.6",
     "pre-commit>=3.5.0,<5.0.0",
     "bump2version>=1.0.1,<2.0.0",
@@ -212,9 +322,25 @@ ci = [
     # Security override for safety's vulnerable nltk dependency (GHSA-7p94-766c-hgjp)
     "nltk>=3.9.3",
 
+    # k8s-legacy extra deps — required for tests/integration/k8s_legacy/
+    # The [k8s-legacy] optional extra gates the shim on `kubernetes`; listing
+    # them here ensures the integration test job installs them via --all-groups
+    # without relying solely on --all-extras (which the cached env may skip).
+    "kubernetes",
+    "watchdog",
+    "tenacity",
+    "pg8000",
+    "uvicorn>=0.24.0",
+    "prometheus-client>=0.17.0",
+    "alembic>=1.13",
+
+    # k8s HTTP-level mock server (test-only, not shipped with the package)
+    "kmock>=0.7",
+
     # Essential Type Stubs
     "types-PyYAML>=6.0.12.12,<7.0.0",
     "types-python-dateutil>=2.8.19.14,<3.0.0",
+    "kubernetes-stubs-elephant-fork>=36.0.2,<37.0.0",
 
     # Build Tools
     "tomli>=2.0.0,<3.0.0",  # For pyproject.toml parsing in dev scripts (Python < 3.11)
@@ -228,6 +354,8 @@ ci = [
     "peewee>=3.18.3",
     # Security override for safety's vulnerable marshmallow dependency (CVE-2025-68480)
     "marshmallow>=4.1.2",
+    # Security override for lxml (CVE-2026-41066) — transitive via cyclonedx-bom + pip-audit
+    "lxml>=6.1.0",
 
     # Documentation
     "mkdocs>=1.5.0,<2.0.0",
@@ -271,6 +399,29 @@ Documentation = "https://finos.github.io/open-resource-broker/"
 Repository = "https://github.com/finos/open-resource-broker"
 "Bug Reports" = "https://github.com/finos/open-resource-broker/issues"
 
+[tool.uv]
+conflicts = [
+    [
+        { group = "ci" },
+        { extra = "ui" },
+    ],
+    [
+        { group = "dev" },
+        { extra = "ui" },
+    ],
+]
+# Overrides pin transitive deps across every resolution split (including
+# the ``ui``-only one that isn't reachable through the ``ci`` group's own
+# ``lxml>=6.1.0`` override).  GHSA-vfmq-68hx-4jfw affects lxml 5.x.
+# cyclonedx-python-lib>=11 switches its jsonschema extra from [format]
+# (which pulls GPL-3.0-only rfc3987) to [format-nongpl] (which uses the
+# Apache-2.0 rfc3987-syntax instead).  Without this override the ui-only
+# conflict split resolves cyclonedx-bom's transitive dep to 9.1.0.
+override-dependencies = [
+    "lxml>=6.1.1",
+    "cyclonedx-python-lib>=11.0.0",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
@@ -284,6 +435,10 @@ include-package-data = true
 "*" = ["py.typed"]
 "orb.config" = ["default_config.json"]
 "orb.providers.aws.config" = ["*.json"]
+"orb.ui" = ["rxconfig.py", "_static/**/*", "_static/*"]
+"orb.k8s_legacy.alembic" = ["alembic.ini", "script.py.mako"]
+"orb.k8s_legacy.alembic.versions" = ["*.py"]
+"orb.k8s_legacy.tests.resources" = ["*.yml", "*.tpl"]
 
 [tool.setuptools.data-files]
 "orb_scripts" = ["src/orb/infrastructure/scheduler/hostfactory/scripts/*.sh", "src/orb/infrastructure/scheduler/hostfactory/scripts/*.bat"]  # keep in sync with .project.yml build.package_root
@@ -291,8 +446,15 @@ include-package-data = true
 
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-norecursedirs = ["tests/onaws"]
+testpaths = ["tests", "src/orb/k8s_legacy/tests"]
+norecursedirs = [
+    "tests/providers/aws/live",
+    # Legacy k8s regression tests require a live cluster + kubeconfig; their
+    # conftest calls `delete_pods_in_namespace()` at collection time, which
+    # crashes in headless CI without a real kube context.  Run them
+    # explicitly with `pytest src/orb/k8s_legacy/tests/regression`.
+    "src/orb/k8s_legacy/tests/regression",
+]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -324,19 +486,19 @@ markers = [
     "simulator_limitation: Assertion weakened due to known simulator gap",
     "requires_real_provider: Skipped unless --run-real-provider flag passed",
     "moto: Tests using moto-mocked AWS (no real credentials required)",
+    "live: Tests requiring real AWS credentials (enabled with --live or --run-aws)",
     "sdk: Tests exercising the ORBClient SDK interface",
     "cli: marks CLI integration tests",
     "benchmark: marks benchmark/performance tests",
     "api: marks API tests",
     "security: marks security tests",
+    "serial: forces serial execution (use ``-n0`` or filter with ``-m 'not serial'`` under xdist)",
 ]
-env = [
-    "AWS_DEFAULT_REGION=us-east-1",
-    "AWS_ACCESS_KEY_ID=testing",
-    "AWS_SECRET_ACCESS_KEY=testing",
-    "AWS_SECURITY_TOKEN=testing",
-    "AWS_SESSION_TOKEN=testing",
-]
+# Provider-specific fake credentials live in
+# tests/providers/<name>/mocked/conftest.py.  The global pytest-env block
+# intentionally does not set cloud credentials so live suites (any
+# provider, any auth mechanism) inherit the operator's real environment.
+env = []
 
 [tool.coverage.run]
 source = ["src/orb"]
@@ -374,7 +536,7 @@ title = "Open Resource Broker Coverage Report"
 output = "coverage.xml"
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 100
 exclude = [
     ".eggs",
@@ -384,6 +546,10 @@ exclude = [
     ".venv",
     "build",
     "dist",
+    # Legacy k8s plugin is in maintenance mode; it predates the root ruff config
+    # and uses mypy/tox for type-checking.  Exclude it from the enforced ruff
+    # scan to avoid spurious CI failures on code that isn't being actively evolved.
+    "src/orb/k8s_legacy",
 ]
 
 [tool.ruff.lint]
@@ -446,7 +612,11 @@ classmethod-decorators = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["PLC0415"]  # Allow conditional imports in tests for optional dependencies
+"tests/**/*.py" = [
+    "PLC0415",  # Allow conditional imports in tests for optional dependencies
+    "N803",     # Allow PascalCase argument names (e.g. StateClass helper)
+    "N806",     # Allow PascalCase local names for dynamically-constructed test subclasses
+]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -464,16 +634,26 @@ max-line-length = 100
 [tool.pyright]
 pythonVersion = "3.12"
 pythonPlatform = "Linux"
-include = ["src/orb", "tests"]
+include = ["src/orb"]
 exclude = [
     ".venv", "build", "dist",
-    # These tests intentionally import non-existent modules to verify deleted code is gone
-    "tests/unit/test_asg_stack_deleted.py",
-    "tests/unit/application/test_application_comprehensive.py",
-    "tests/unit/infrastructure/test_infrastructure_comprehensive.py",
-    "tests/unit/providers/test_providers_comprehensive.py",
+    # Legacy k8s plugin code predates pyright adoption and uses mypy.
+    # The package is in maintenance mode pending the modern k8s provider;
+    # type-checking is gated separately via ruff + the legacy tox config.
+    "src/orb/k8s_legacy",
+    # Reflex uses a symbolic reactive Var[T] system where component props
+    # can accept either raw Python values OR Vars that resolve at render
+    # time.  Reflex's own type stubs are conservative and pyright flags
+    # every legal Var/value union as a mismatch (e.g. `color_scheme=` on
+    # rx.badge, `.contains()` on Var[str]).  Type-safety of the UI is
+    # gated by the Reflex compile step + runtime pytest suite; running
+    # pyright over generated Reflex APIs produces ~50 false positives
+    # per component that do not indicate real bugs.  Exclude the UI
+    # tree; Reflex-agnostic Python (state.py, api.py) is small and
+    # covered by tests.
+    "src/orb/ui",
 ]
-extraPaths = ["."]
+extraPaths = ["src"]
 typeCheckingMode = "basic"
 reportMissingImports = true
 reportMissingTypeStubs = false
