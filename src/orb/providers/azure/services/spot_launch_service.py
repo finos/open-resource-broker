@@ -4,12 +4,12 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Any, Awaitable, Callable, Mapping, Optional, Protocol
 
-from orb.application.services.spot_placement_execution import (
+from orb.providers.azure.services.spot_placement_execution import (
     SpotPlacementExecutionSummary,
     build_planned_execution_metadata,
     create_acquire_request,
 )
-from orb.application.services.spot_placement_planner import (
+from orb.providers.azure.services.spot_placement_planner import (
     PlacementCandidate,
     PlacementPlanEntry,
     PlacementScore,
@@ -76,8 +76,8 @@ class AzureSpotLaunchService:
 
     @staticmethod
     def should_use_spot_placement(template: AzureTemplate) -> bool:
-        """Return whether the template opts into spot-placement-score allocation."""
-        return template.allocation_strategy == "spotPlacementScore"
+        """Return whether the template opts into Spot Placement Score planning."""
+        return template.spot_placement_score_enabled
 
     def build_spot_placement_plan(
         self,
@@ -253,7 +253,8 @@ class AzureSpotLaunchService:
         cloned_data["vm_size"] = selected_vm_size
         cloned_data["vm_sizes"] = []
         cloned_data["vm_size_preferences"] = []
-        cloned_data["allocation_strategy"] = "capacityOptimized"
+        cloned_data.pop("allocation_strategy", None)
+        cloned_data["spot_placement_score_enabled"] = False
         cloned_data["location"] = (
             plan_entry.score.candidate.region or azure_template.location.value
         )

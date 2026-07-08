@@ -61,6 +61,39 @@ def _azure_resource_not_found_error_type() -> type[Exception]:
     return ResourceNotFoundError
 
 
+def _primary_error_message(error_details: dict[str, Any]) -> str:
+    return str(
+        error_details.get("error_message")
+        or error_details.get("message")
+        or "Failed to submit SingleVM deployment"
+    )
+
+
+def _nested_error_messages(error_details: dict[str, Any]) -> list[str]:
+    nested_details = error_details.get("details")
+    if not isinstance(nested_details, list):
+        return []
+
+    messages: list[str] = []
+    for detail in nested_details:
+        if not isinstance(detail, dict):
+            continue
+        message = detail.get("message")
+        if message in (None, ""):
+            continue
+        code = detail.get("code")
+        messages.append(f"{code}: {message}" if code not in (None, "") else str(message))
+    return messages
+
+
+def _format_azure_error_message(error_details: dict[str, Any]) -> str:
+    """Return the most actionable Azure create failure message."""
+    nested_messages = _nested_error_messages(error_details)
+    if nested_messages:
+        return "; ".join(nested_messages)
+    return _primary_error_message(error_details)
+
+
 def _looks_like_uuid(value: str) -> bool:
     try:
         uuid.UUID(str(value))
@@ -281,15 +314,17 @@ class SingleVMHandler(AzureHandler):
                     "instance_type": candidate_vm_size,
                     "status_code": error_details["status_code"],
                     "raw_error_code": error_details["raw_error_code"],
+                    "details": error_details["details"],
                 }
                 if not self._is_capacity_error(exc):
                     break
 
         if submitted_deployment_name is None or selected_vm_size is None:
             raise LaunchError(
-                message=(last_error_details.get("error_message") or "Failed to submit SingleVM deployment"),
+                message=_format_azure_error_message(last_error_details),
                 template_id=template.template_id,
                 error_code=last_error_details.get("error_code"),
+                details=last_error_details,
             )
 
         created_ids = [vm_definition["vm_name"] for vm_definition in vm_definitions]

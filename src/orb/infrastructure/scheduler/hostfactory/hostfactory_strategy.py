@@ -992,36 +992,6 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
 
     def _transform_machine_types_input(self, hf_data: dict) -> dict:
         """Transform HF vmType/vmTypes to internal machine_types."""
-        provider_type = self.field_mapper.provider_type
-
-        if provider_type == "azure":
-            primary_vm_type = hf_data.get("vmType")
-            if "vmTypes" in hf_data:
-                raw_vm_types = hf_data["vmTypes"]
-                candidate_sizes: list[str] = []
-                if isinstance(raw_vm_types, dict):
-                    candidate_sizes = [str(vm_size) for vm_size in raw_vm_types.keys()]
-
-                if candidate_sizes:
-                    if primary_vm_type:
-                        candidate_sizes = [
-                            str(primary_vm_type),
-                            *[
-                                vm_size
-                                for vm_size in candidate_sizes
-                                if vm_size != str(primary_vm_type)
-                            ],
-                        ]
-
-                    primary_vm_size, *fallback_vm_sizes = candidate_sizes
-                    result: dict[str, Any] = {"vm_size": primary_vm_size}
-                    if fallback_vm_sizes:
-                        result["vm_sizes"] = fallback_vm_sizes
-                    return result
-            if primary_vm_type:
-                return {"vm_size": primary_vm_type}
-            return {}
-
         if "vmType" in hf_data:
             return {"machine_types": {hf_data["vmType"]: 1}}
         elif "vmTypes" in hf_data:

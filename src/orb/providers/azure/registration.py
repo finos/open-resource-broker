@@ -9,6 +9,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Optional, Protocol, TypeVar
 
 from orb.config import PerformanceConfig
+from orb.config.schemas.provider_strategy_schema import ProviderInstanceConfig
 
 if TYPE_CHECKING:
     from orb.domain.base.ports import LoggingPort
@@ -114,24 +115,11 @@ def create_azure_strategy(
     """
     from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
     from orb.providers.azure.configuration.config import AzureProviderConfig
-    from orb.providers.azure.services.cyclecloud_request_context_service import (
-        create_cyclecloud_request_lookup,
-    )
     from orb.providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
 
     try:
         azure_config = AzureProviderConfig(**provider_config)
         logger = LoggingAdapter()
-        cyclecloud_request_lookup = None
-        try:
-            from orb.domain.base import UnitOfWorkFactory
-            from orb.infrastructure.di.container import get_container
-
-            cyclecloud_request_lookup = create_cyclecloud_request_lookup(
-                get_container().get(UnitOfWorkFactory)
-            )
-        except Exception as exc:
-            logger.debug("Could not get unit of work factory from DI container: %s", exc)
         runtime_config = _build_azure_client_runtime_config(
             azure_config,
             logger,
@@ -144,7 +132,6 @@ def create_azure_strategy(
             provider_instance_name=provider_instance_name,
             azure_client_resolver=lambda: _create_azure_client(runtime_config, logger),
             azure_native_spec_service=azure_native_spec_service,
-            cyclecloud_request_lookup=cyclecloud_request_lookup,
         )
 
         return strategy
@@ -154,12 +141,13 @@ def create_azure_strategy(
         raise RuntimeError(f"Failed to create Azure strategy: {exc!s}")
 
 
-def create_azure_config(data: Mapping[str, Any]) -> "AzureProviderConfig":
-    """Create an ``AzureProviderConfig`` from a data dict."""
+def create_azure_config(data: ProviderInstanceConfig | Mapping[str, Any]) -> "AzureProviderConfig":
+    """Create an ``AzureProviderConfig`` from registry config input."""
     try:
         from orb.providers.azure.configuration.config import AzureProviderConfig
 
-        return AzureProviderConfig(**data)
+        config_data = data.config if isinstance(data, ProviderInstanceConfig) else data
+        return AzureProviderConfig(**config_data)
     except ImportError as exc:
         raise ImportError(f"Azure configuration not available: {exc!s}")
     except Exception as exc:
@@ -413,14 +401,10 @@ def _create_azure_strategy_with_di(
     container: Any, azure_config: "AzureProviderConfig", instance_name: str
 ) -> "AzureProviderStrategy":
     """Create Azure strategy using DI container."""
-    from orb.domain.base import UnitOfWorkFactory
     from orb.domain.base.ports import LoggingPort
 
     logger = container.get(LoggingPort)
 
-    from orb.providers.azure.services.cyclecloud_request_context_service import (
-        create_cyclecloud_request_lookup,
-    )
     from orb.providers.azure.infrastructure.services.azure_native_spec_service import (
         AzureNativeSpecService,
     )
@@ -433,9 +417,6 @@ def _create_azure_strategy_with_di(
         azure_client_resolver=lambda: container.get(f"AzureClient_{instance_name}"),
         azure_handler_factory_resolver=lambda: container.get(f"AzureHandlerFactory_{instance_name}"),
         azure_native_spec_service=container.get_optional(AzureNativeSpecService),
-        cyclecloud_request_lookup=create_cyclecloud_request_lookup(
-            container.get(UnitOfWorkFactory)
-        ),
     )
 
 
@@ -483,6 +464,23 @@ def register_azure_cli_spec() -> None:
         raise RuntimeError(f"Failed to register Azure CLI spec: {exc!s}")
 
 
+def register_azure_hostfactory_field_mapping() -> None:
+    """Register Azure HostFactory field mapping."""
+    try:
+        from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import (
+            FieldMappingRegistry,
+        )
+        from orb.providers.azure.scheduler.hostfactory_field_mapping import (
+            AzureFieldMapping,
+        )
+
+        FieldMappingRegistry.register("azure", AzureFieldMapping())
+    except ImportError:
+        pass
+    except Exception as exc:
+        raise RuntimeError(f"Failed to register Azure HostFactory field mapping: {exc!s}")
+
+
 def register_azure_template_factory(
     factory: TemplateFactory, logger: Optional["LoggingPort"] = None
 ) -> None:
@@ -504,7 +502,6 @@ def register_azure_template_factory(
 def get_azure_extension_defaults() -> dict[str, Any]:
     """Get default Azure extension configuration."""
     return AzureTemplateExtensionConfig(
-        vm_size="Standard_D4s_v5",
         priority="Regular",
         os_disk_type="Premium_LRS",
         os_disk_size_gb=None,
@@ -521,6 +518,7 @@ def initialize_azure_provider(
         register_azure_extensions(logger)
         register_azure_provider_settings()
         register_azure_cli_spec()
+        register_azure_hostfactory_field_mapping()
         if template_factory:
             register_azure_template_factory(template_factory, logger)
         if logger:
@@ -573,6 +571,7 @@ try:
     register_azure_extensions()
     register_azure_provider_settings()
     register_azure_cli_spec()
+    register_azure_hostfactory_field_mapping()
 except Exception:
     import logging as _logging
 

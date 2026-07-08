@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from orb.application.services.spot_placement_planner import (
+from orb.providers.azure.services.spot_placement_planner import (
     PlacementCandidate,
     PlacementPlanEntry,
     PlacementScore,
@@ -151,7 +151,7 @@ class TestCreateInstances:
         assert result.data["resource_ids"] == ["vmss-demo"]
 
     @pytest.mark.parametrize("provider_api", ["VMSS", "SingleVM"])
-    def test_create_instances_coalesces_azure_defaults_before_validation(
+    def test_create_instances_rejects_missing_vm_size(
         self, azure_config, logger, provider_api
     ):
         strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
@@ -187,8 +187,9 @@ class TestCreateInstances:
 
         result = run_operation(strategy.execute_operation(op))
 
-        assert result.success
-        assert result.data["resource_ids"] == ["azure-resource"]
+        assert not result.success
+        assert "vm_size" in result.error_message
+        handler.acquire_hosts_async.assert_not_called()
 
     def test_create_instances_uses_image_from_template_dto_metadata_roundtrip(
         self, azure_config, logger
@@ -231,6 +232,80 @@ class TestCreateInstances:
 
         assert result.success
         handler.acquire_hosts_async.assert_awaited_once()
+
+    def test_create_instances_accepts_template_dto_provider_config_roundtrip(
+        self, azure_config, logger
+    ):
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
+        handler = MagicMock()
+        handler.acquire_hosts_async = AsyncMock(return_value={
+            "success": True,
+            "resource_ids": ["azure-resource"],
+            "instances": [],
+        })
+        strategy_harness.handlers["VMSS"] = handler
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={
+                "template_config": {
+                    "template_id": "azure-dto-roundtrip-test",
+                    "provider_type": "azure",
+                    "provider_api": "VMSS",
+                    "image_id": "Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest",
+                    "provider_config": {
+                        "resource_group": "template-rg",
+                        "location": "westus2",
+                        "vm_size": "Standard_B1s",
+                        "ssh_public_keys": [
+                            "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCu"
+                        ],
+                        "node_attributes": {},
+                    },
+                },
+                "count": 1,
+            },
+        )
+
+        result = run_operation(strategy.execute_operation(op))
+
+        assert result.success
+        forwarded_template = handler.acquire_hosts_async.await_args.args[1]
+        assert forwarded_template.resource_group.value == "template-rg"
+        assert forwarded_template.location.value == "westus2"
+        assert forwarded_template.vm_size == "Standard_B1s"
+
+    def test_create_instances_rejects_non_mapping_provider_config(self, azure_config, logger):
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        strategy = strategy_harness.strategy
+        handler = MagicMock()
+        handler.acquire_hosts_async = AsyncMock(return_value={
+            "success": True,
+            "resource_ids": ["azure-resource"],
+            "instances": [],
+        })
+        strategy_harness.handlers["VMSS"] = handler
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={
+                "template_config": {
+                    "template_id": "azure-invalid-provider-config",
+                    "provider_type": "azure",
+                    "provider_api": "VMSS",
+                    "provider_config": object(),
+                },
+                "count": 1,
+            },
+        )
+
+        result = run_operation(strategy.execute_operation(op))
+
+        assert not result.success
+        assert result.error_code == "AzureValidationError"
+        assert "Azure provider_config must be a mapping" in result.error_message
+        handler.acquire_hosts_async.assert_not_called()
 
     def test_create_instances_accepts_enum_provider_api_in_template_config(
         self, azure_config, logger
@@ -715,25 +790,11 @@ class TestTerminateInstances:
             ),
         )
 
-    def test_terminate_instances_recovers_cyclecloud_context_from_origin_request(self, azure_config, logger):
-        origin_request = MagicMock()
-        origin_request.provider_data = {
-            "follow_up_context": {
-                "cluster_name": "my-cluster",
-                "cyclecloud_url": "https://cc.example.com",
-                "cyclecloud_credential_path": "config/cc.json",
-                "cyclecloud_verify_ssl": False,
-                "cyclecloud_auth_mode": "bearer",
-                "cyclecloud_aad_scope": "https://cc.example.com/.default",
-            }
-        }
-        lookup = MagicMock(return_value=origin_request)
-
+    def test_terminate_instances_uses_cyclecloud_context_from_request_metadata(self, azure_config, logger):
         strategy_harness = build_strategy_harness(
             config=azure_config,
             logger=logger,
             provider_instance_name="azure-default",
-            cyclecloud_request_lookup=lookup,
         )
         strategy = strategy_harness.strategy
         handler = MagicMock()
@@ -746,6 +807,14 @@ class TestTerminateInstances:
                 "instance_ids": ["node-1"],
                 "provider_api": "CycleCloud",
                 "request_id": "req-11111111-1111-4111-8111-111111111111",
+                "request_metadata": {
+                    "cluster_name": "my-cluster",
+                    "cyclecloud_url": "https://cc.example.com",
+                    "cyclecloud_credential_path": "config/cc.json",
+                    "cyclecloud_verify_ssl": False,
+                    "cyclecloud_auth_mode": "bearer",
+                    "cyclecloud_aad_scope": "https://cc.example.com/.default",
+                },
             },
         )
 
@@ -768,7 +837,6 @@ class TestTerminateInstances:
                 cyclecloud_aad_scope="https://cc.example.com/.default",
             ),
         )
-        lookup.assert_called_once_with("req-11111111-1111-4111-8111-111111111111")
 
     def test_terminate_instances_accepts_enum_provider_api(self, azure_config, logger):
         strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
@@ -849,7 +917,7 @@ class TestSpotPlacementPlanning:
                     "vm_sizes": ["Standard_D8s_v5"],
                     "price_type": "spot",
                     "priority": "Spot",
-                    "allocation_strategy": "spotPlacementScore",
+                    "spot_placement_score_enabled": True,
                     "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCu"],
                 },
             },
@@ -908,7 +976,7 @@ class TestSpotPlacementPlanning:
                     "vm_sizes": ["Standard_D8s_v5"],
                     "price_type": "spot",
                     "priority": "Spot",
-                    "allocation_strategy": "spotPlacementScore",
+                    "spot_placement_score_enabled": True,
                     "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCu"],
                 },
             },
@@ -974,7 +1042,7 @@ class TestSpotPlacementPlanning:
                     "vm_sizes": ["Standard_D8s_v5"],
                     "price_type": "spot",
                     "priority": "Spot",
-                    "allocation_strategy": "spotPlacementScore",
+                    "spot_placement_score_enabled": True,
                     "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCu"],
                 },
             },
@@ -1049,7 +1117,7 @@ class TestSpotPlacementPlanning:
                     "vm_sizes": ["Standard_D8s_v5"],
                     "price_type": "spot",
                     "priority": "Spot",
-                    "allocation_strategy": "spotPlacementScore",
+                    "spot_placement_score_enabled": True,
                     "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCu"],
                 },
             },
@@ -1117,7 +1185,7 @@ class TestSpotPlacementPlanning:
                     "vm_sizes": ["Standard_D8s_v5"],
                     "price_type": "spot",
                     "priority": "Spot",
-                    "allocation_strategy": "spotPlacementScore",
+                    "spot_placement_score_enabled": True,
                     "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCu"],
                 },
             },

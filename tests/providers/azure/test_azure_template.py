@@ -57,6 +57,33 @@ class TestAzureTemplateConstruction:
         assert t.location.value == "eastus2"
         assert t.provider_api == AzureProviderApi.VMSS
 
+    def test_accepts_template_dto_payload_with_provider_config_and_version(self):
+        payload = {
+            "template_id": "test-template",
+            "provider_type": "azure",
+            "provider_api": "SingleVM",
+            "version": "catalog-v1",
+            "provider_config": {
+                "vm_size": "Standard_D4s_v5",
+                "resource_group": "test-rg",
+                "location": "eastus2",
+                "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
+                "image": {
+                    "publisher": "Canonical",
+                    "offer": "0001-com-ubuntu-server-jammy",
+                    "sku": "22_04-lts-gen2",
+                    "version": "latest",
+                },
+            },
+        }
+
+        t = AzureTemplate(**payload)
+
+        assert t.provider_api == AzureProviderApi.SINGLE_VM
+        assert t.version == "catalog-v1"
+        assert t.image is not None
+        assert t.image.publisher == "Canonical"
+
     def test_rejects_missing_ssh_keys(self):
         """SSH access is required — no password fallback (mirrors AWS key_name pattern)."""
         fields = {**_BASE_FIELDS}
@@ -560,11 +587,9 @@ class TestValueObjects:
         assert ip_config["loadBalancerInboundNatPools"][0]["id"].endswith("/nat-a")
         assert ip_config["applicationGatewayBackendAddressPools"][0]["id"].endswith("/appgw-a")
 
-    def test_allocation_strategy_from_core(self):
-        from orb.domain.base.value_objects import AllocationStrategy
-
-        mapped = AzureAllocationStrategy.from_core(AllocationStrategy.LOWEST_PRICE)
-        assert mapped == AzureAllocationStrategy.LOWEST_PRICE
+    def test_rejects_aws_shaped_allocation_strategy(self):
+        with pytest.raises(ValueError, match="Azure templates do not support allocation_strategy"):
+            AzureTemplate(**_BASE_FIELDS, allocation_strategy="spotPlacementScore")
 
     def test_priority_from_price_type(self):
         from orb.domain.base.value_objects import PriceType

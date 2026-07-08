@@ -10,13 +10,14 @@ import argparse
 import asyncio
 import inspect
 import time
+from collections.abc import Mapping
 from threading import Condition, RLock
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
-from orb.application.services.spot_placement_execution import (
+from orb.providers.azure.services.spot_placement_execution import (
     SpotPlacementExecutionService,
 )
-from orb.application.services.spot_placement_planner import (
+from orb.providers.azure.services.spot_placement_planner import (
     PlacementPlanEntry,
     SpotPlacementPlanner,
 )
@@ -38,7 +39,6 @@ from orb.providers.azure.infrastructure.error_utils import (
 from orb.providers.azure.infrastructure.vmss_cleanup import VmssCleanupCoordinator
 from orb.providers.azure.services.health_check_service import AzureHealthCheckService
 from orb.providers.azure.services.cyclecloud_request_context_service import (
-    CycleCloudRequestLookup,
     resolve_cyclecloud_request_metadata,
 )
 from orb.providers.azure.services.inventory_service import (
@@ -80,6 +80,22 @@ if TYPE_CHECKING:
     )
 
 
+def _provider_config_mapping(template_config: dict[str, Any]) -> Mapping[str, Any]:
+    raw_provider_config = template_config.get("provider_config")
+    if raw_provider_config is None:
+        return {}
+    if not isinstance(raw_provider_config, Mapping):
+        raise AzureValidationError("Azure provider_config must be a mapping")
+    return raw_provider_config
+
+
+def _has_provider_config_value(
+    provider_config: Mapping[str, Any],
+    key: str,
+) -> bool:
+    return provider_config.get(key) not in (None, "")
+
+
 @injectable
 class AzureProviderStrategy(ProviderStrategy):
     """Azure implementation of ``ProviderStrategy``.
@@ -103,7 +119,6 @@ class AzureProviderStrategy(ProviderStrategy):
         ] = None,
         azure_native_spec_service: Optional[AzureNativeSpecService] = None,
         vmss_cleanup_coordinator: Optional[VmssCleanupCoordinator] = None,
-        cyclecloud_request_lookup: Optional[CycleCloudRequestLookup] = None,
     ) -> None:
         """Initialise the Azure strategy with config, logger, and optional client resolver."""
         if not isinstance(config, AzureProviderConfig):
@@ -150,7 +165,6 @@ class AzureProviderStrategy(ProviderStrategy):
             vmss_exists=self._vmss_exists_async,
             begin_delete_vmss=self._begin_delete_vmss_async,
         )
-        self._cyclecloud_request_lookup = cyclecloud_request_lookup
         self._termination_service = AzureTerminationService(
             logger=logger,
             handler_provider=self,
@@ -240,6 +254,7 @@ class AzureProviderStrategy(ProviderStrategy):
     def _build_azure_template_config(self, template_config: dict[str, Any]) -> dict[str, Any]:
         """Coalesce provider-owned and Azure-default fields before AzureTemplate validation."""
         enhanced_config = dict(template_config)
+        provider_config = _provider_config_mapping(enhanced_config)
 
         raw_subnet_id = enhanced_config.get("subnet_id")
         if raw_subnet_id and raw_subnet_id != "default-subnet":
@@ -247,22 +262,41 @@ class AzureProviderStrategy(ProviderStrategy):
         elif enhanced_config.get("subnet_ids") == ["default-subnet"]:
             enhanced_config.pop("subnet_ids", None)
 
-        if enhanced_config.get("vm_size") in (None, ""):
-            enhanced_config["vm_size"] = "Standard_D4s_v5"
-        if enhanced_config.get("priority") in (None, ""):
+        if enhanced_config.get("priority") in (
+            None,
+            "",
+        ) and not _has_provider_config_value(provider_config, "priority"):
             enhanced_config["priority"] = AzurePriority.REGULAR
-        if enhanced_config.get("admin_username") in (None, ""):
+        if enhanced_config.get("admin_username") in (
+            None,
+            "",
+        ) and not _has_provider_config_value(provider_config, "admin_username"):
             enhanced_config["admin_username"] = "azureuser"
-        if enhanced_config.get("node_attributes") in (None, ""):
+        if enhanced_config.get("node_attributes") in (
+            None,
+            "",
+        ) and not _has_provider_config_value(provider_config, "node_attributes"):
             enhanced_config["node_attributes"] = {}
 
-        if enhanced_config.get("resource_group") in (None, "") and self._azure_config.resource_group:
+        if (
+            enhanced_config.get("resource_group") in (None, "")
+            and not _has_provider_config_value(provider_config, "resource_group")
+            and self._azure_config.resource_group
+        ):
             enhanced_config["resource_group"] = self._azure_config.resource_group
-        if enhanced_config.get("location") in (None, "") and self._azure_config.region:
+        if (
+            enhanced_config.get("location") in (None, "")
+            and not _has_provider_config_value(provider_config, "location")
+            and self._azure_config.region
+        ):
             # Provider config follows the shared ``region`` interface, but the
             # Azure template model is Azure-native and owns ``location``.
             enhanced_config["location"] = self._azure_config.region
-        if enhanced_config.get("subscription_id") in (None, "") and self._azure_config.subscription_id:
+        if (
+            enhanced_config.get("subscription_id") in (None, "")
+            and not _has_provider_config_value(provider_config, "subscription_id")
+            and self._azure_config.subscription_id
+        ):
             enhanced_config["subscription_id"] = self._azure_config.subscription_id
 
         enhanced_config.setdefault("provider_type", "azure")
@@ -715,6 +749,7 @@ class AzureProviderStrategy(ProviderStrategy):
                 "error_message": error_details["message"],
                 "status_code": error_details["status_code"],
                 "raw_error_code": error_details["raw_error_code"],
+                "details": error_details["details"],
             }
             return self._error_result(
                 f"Failed to create instances: {exc!s}",
@@ -764,7 +799,6 @@ class AzureProviderStrategy(ProviderStrategy):
 
         resolved_request_metadata = resolve_cyclecloud_request_metadata(
             operation=operation,
-            lookup_request_by_id=self._cyclecloud_request_lookup,
         )
         return ProviderOperation(
             operation_type=operation.operation_type,

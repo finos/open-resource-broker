@@ -872,26 +872,13 @@ class TestDescribeResourceInstances:
         forwarded_request = handler.check_hosts_status_async.await_args.args[0]
         assert forwarded_request.resource_ids == ["contoso-slurm-lab-cluster"]
 
-    def test_get_instance_status_recovers_cyclecloud_context_from_origin_request(
+    def test_get_instance_status_uses_cyclecloud_context_from_request_metadata(
         self, azure_config, logger
     ):
-        origin_request = MagicMock()
-        origin_request.provider_data = {
-            "follow_up_context": {
-                "resource_group": "test-rg",
-                "cluster_name": "contoso-slurm-lab-cluster",
-                "cyclecloud_url": "https://cc.example.com",
-                "cyclecloud_auth_mode": "bearer",
-                "cyclecloud_aad_scope": "https://cc.example.com/.default",
-            }
-        }
-        lookup = MagicMock(return_value=origin_request)
-
         strategy_harness = build_strategy_harness(
             config=azure_config,
             logger=logger,
             provider_instance_name="azure-default",
-            cyclecloud_request_lookup=lookup,
         )
         strategy = strategy_harness.strategy
         handler = MagicMock()
@@ -905,6 +892,13 @@ class TestDescribeResourceInstances:
                 "provider_api": "CycleCloud",
                 "template_id": "tmpl-1",
                 "request_id": "req-11111111-1111-4111-8111-111111111111",
+                "request_metadata": {
+                    "resource_group": "test-rg",
+                    "cluster_name": "contoso-slurm-lab-cluster",
+                    "cyclecloud_url": "https://cc.example.com",
+                    "cyclecloud_auth_mode": "bearer",
+                    "cyclecloud_aad_scope": "https://cc.example.com/.default",
+                },
             },
         )
 
@@ -914,7 +908,6 @@ class TestDescribeResourceInstances:
         forwarded_request = handler.check_hosts_status_async.await_args.args[0]
         assert forwarded_request.resource_ids == ["contoso-slurm-lab-cluster"]
         assert forwarded_request.metadata["cluster_name"] == "contoso-slurm-lab-cluster"
-        lookup.assert_called_once_with("req-11111111-1111-4111-8111-111111111111")
 
     def test_dry_run_short_circuits_resource_discovery(self, azure_config, logger):
         strategy_harness = build_strategy_harness(config=azure_config, logger=logger)

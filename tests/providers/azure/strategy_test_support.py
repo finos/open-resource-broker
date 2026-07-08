@@ -186,7 +186,6 @@ def build_strategy_harness(
     config,
     logger,
     provider_instance_name: str = "azure-default",
-    cyclecloud_request_lookup=None,
 ) -> AzureStrategyHarness:
     """Build a strategy plus mutable dependency holders for focused tests."""
     harness = AzureStrategyHarness()
@@ -199,7 +198,6 @@ def build_strategy_harness(
         azure_handler_factory_resolver=lambda: handler_factory,
         azure_resource_manager_resolver=lambda: harness.resource_manager,
         azure_deployment_service_resolver=lambda: harness.deployment_service,
-        cyclecloud_request_lookup=cyclecloud_request_lookup,
     )
     harness.strategy.initialize()
     return harness
