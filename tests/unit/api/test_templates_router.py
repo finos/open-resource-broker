@@ -165,6 +165,90 @@ class TestTemplatesRouter:
         inp = orchestrator.execute.call_args.args[0]
         assert inp.description == "my desc"
 
+    def test_create_template_machine_type_passed_to_orchestrator(self, templates_app):
+        """Sending machine_type in create request propagates it as machine_type on the input DTO."""
+        orchestrator = AsyncMock()
+        orchestrator.execute = AsyncMock(
+            return_value=CreateTemplateOutput(template_id="tpl-mt", created=True)
+        )
+        client = self._make_client(
+            templates_app, {get_create_template_orchestrator: lambda: orchestrator}
+        )
+
+        client.post("/templates/", json={"template_id": "tpl-mt", "machine_type": "m5.large"})
+
+        inp = orchestrator.execute.call_args.args[0]
+        assert inp.machine_type == "m5.large"
+        assert inp.instance_type is None
+
+    def test_create_template_instance_type_used_as_fallback(self, templates_app):
+        """Sending only instance_type (deprecated) still works; machine_type on DTO is None."""
+        orchestrator = AsyncMock()
+        orchestrator.execute = AsyncMock(
+            return_value=CreateTemplateOutput(template_id="tpl-it", created=True)
+        )
+        client = self._make_client(
+            templates_app, {get_create_template_orchestrator: lambda: orchestrator}
+        )
+
+        client.post("/templates/", json={"template_id": "tpl-it", "instance_type": "t3.micro"})
+
+        inp = orchestrator.execute.call_args.args[0]
+        # machine_type should reflect the resolved value (from instance_type fallback in router)
+        assert inp.machine_type == "t3.micro"
+
+    def test_create_template_machine_type_wins_over_instance_type(self, templates_app):
+        """When both machine_type and instance_type are provided, machine_type takes precedence."""
+        orchestrator = AsyncMock()
+        orchestrator.execute = AsyncMock(
+            return_value=CreateTemplateOutput(template_id="tpl-both", created=True)
+        )
+        client = self._make_client(
+            templates_app, {get_create_template_orchestrator: lambda: orchestrator}
+        )
+
+        client.post(
+            "/templates/",
+            json={
+                "template_id": "tpl-both",
+                "machine_type": "m5.xlarge",
+                "instance_type": "t3.micro",
+            },
+        )
+
+        inp = orchestrator.execute.call_args.args[0]
+        assert inp.machine_type == "m5.xlarge"
+
+    def test_update_template_machine_type_passed_to_orchestrator(self, templates_app):
+        """Sending machine_type in update request propagates it to the orchestrator."""
+        orchestrator = AsyncMock()
+        orchestrator.execute = AsyncMock(
+            return_value=UpdateTemplateOutput(template_id="tpl-1", updated=True)
+        )
+        client = self._make_client(
+            templates_app, {get_update_template_orchestrator: lambda: orchestrator}
+        )
+
+        client.put("/templates/tpl-1", json={"machine_type": "c5.2xlarge"})
+
+        inp = orchestrator.execute.call_args.args[0]
+        assert inp.machine_type == "c5.2xlarge"
+
+    def test_update_template_instance_type_used_as_fallback(self, templates_app):
+        """Sending only instance_type (deprecated) in update still resolves to machine_type."""
+        orchestrator = AsyncMock()
+        orchestrator.execute = AsyncMock(
+            return_value=UpdateTemplateOutput(template_id="tpl-1", updated=True)
+        )
+        client = self._make_client(
+            templates_app, {get_update_template_orchestrator: lambda: orchestrator}
+        )
+
+        client.put("/templates/tpl-1", json={"instance_type": "r5.large"})
+
+        inp = orchestrator.execute.call_args.args[0]
+        assert inp.machine_type == "r5.large"
+
     def test_create_template_returns_validation_errors_in_body(self, templates_app):
         orchestrator = AsyncMock()
         orchestrator.execute = AsyncMock(

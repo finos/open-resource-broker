@@ -1,5 +1,6 @@
 """Unit tests for template command handlers — TDD for store-unification fix."""
 
+import logging
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -238,3 +239,86 @@ async def test_update_validation_errors_sets_updated_false() -> None:
     assert command.updated is False
     assert command.validation_errors == ["invalid field"]
     manager.save_template.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Deprecation warning tests — application-layer handler boundary
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_create_handler_warns_on_instance_type(caplog) -> None:
+    """CreateTemplateHandler emits logger.warning when instance_type is used."""
+    manager = _make_manager(existing=None)
+    port = _make_template_port(manager)
+    handler = _make_create_handler(port)
+
+    command = CreateTemplateCommand(
+        template_id="tpl-dep-1",
+        provider_api="EC2Fleet",
+        image_id="ami-000",
+        instance_type="m5.xlarge",
+    )
+
+    with caplog.at_level(logging.WARNING, logger="orb.application.commands.template_handlers"):
+        await handler.handle(command)
+
+    assert command.created is True
+    assert any(
+        "instance_type" in r.message and "deprecated" in r.message for r in caplog.records
+    ), f"Expected deprecation log for instance_type; got: {[r.message for r in caplog.records]}"
+
+    # Value is mapped into machine_types on the saved DTO
+    saved = manager.save_template.call_args[0][0]
+    assert saved.machine_types == {"m5.xlarge": 1}
+
+
+@pytest.mark.asyncio
+async def test_update_handler_warns_on_instance_type(caplog) -> None:
+    """UpdateTemplateHandler emits logger.warning when instance_type is used."""
+    existing = _make_dto()
+    manager = _make_manager(existing=existing)
+    port = _make_template_port(manager)
+    handler = _make_update_handler(port)
+
+    command = UpdateTemplateCommand(
+        template_id="tpl-dep-2",
+        instance_type="c5.2xlarge",
+    )
+
+    with caplog.at_level(logging.WARNING, logger="orb.application.commands.template_handlers"):
+        await handler.handle(command)
+
+    assert command.updated is True
+    assert any(
+        "instance_type" in r.message and "deprecated" in r.message for r in caplog.records
+    ), f"Expected deprecation log for instance_type; got: {[r.message for r in caplog.records]}"
+
+    # Value is mapped into machine_types on the saved DTO
+    saved = manager.save_template.call_args[0][0]
+    assert saved.machine_types == {"c5.2xlarge": 1}
+
+
+@pytest.mark.asyncio
+async def test_create_handler_no_warn_without_instance_type(caplog) -> None:
+    """CreateTemplateHandler does NOT emit a deprecation log when machine_type is used."""
+    manager = _make_manager(existing=None)
+    port = _make_template_port(manager)
+    handler = _make_create_handler(port)
+
+    command = CreateTemplateCommand(
+        template_id="tpl-nodep-1",
+        provider_api="EC2Fleet",
+        image_id="ami-000",
+        machine_type="t3.medium",
+    )
+
+    with caplog.at_level(logging.WARNING, logger="orb.application.commands.template_handlers"):
+        await handler.handle(command)
+
+    deprecation_records = [
+        r for r in caplog.records if "instance_type" in r.message and "deprecated" in r.message
+    ]
+    assert not deprecation_records, (
+        f"Unexpected deprecation log when using machine_type: {[r.message for r in deprecation_records]}"
+    )

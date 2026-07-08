@@ -136,6 +136,7 @@ nav:
       - Performance Optimization: developer_guide/performance-optimization.md
       - Development Setup: developer_guide/development.md
       - BaseSetting Providers: developer_guide/basesettings-providers.md
+      - Deprecating Fields & APIs: developer_guide/deprecation.md
       - Changelog Management: developer_guide/changelog_management.md
       - Releases: developer_guide/releases.md
       - Testing: developer_guide/testing.md

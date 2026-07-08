@@ -777,7 +777,14 @@ class ORBClient:
         from orb.application.services.orchestration.dtos import CreateTemplateInput
 
         # Named kwargs extracted explicitly; everything else goes into configuration
-        _explicit = {"name", "description", "instance_type", "tags", "configuration"}
+        _explicit = {
+            "name",
+            "description",
+            "machine_type",
+            "instance_type",
+            "tags",
+            "configuration",
+        }
         extra = {k: v for k, v in kwargs.items() if k not in _explicit}
         configuration = {**extra, **kwargs.get("configuration", {})}
 
@@ -789,6 +796,7 @@ class ORBClient:
                 image_id=image_id,
                 name=kwargs.get("name"),
                 description=kwargs.get("description"),
+                machine_type=kwargs.get("machine_type"),
                 instance_type=kwargs.get("instance_type"),
                 tags=kwargs.get("tags", {}),
                 configuration=configuration,
@@ -818,7 +826,14 @@ class ORBClient:
         )
 
         # Named kwargs extracted explicitly; everything else goes into configuration
-        _explicit = {"name", "description", "instance_type", "image_id", "configuration"}
+        _explicit = {
+            "name",
+            "description",
+            "machine_type",
+            "instance_type",
+            "image_id",
+            "configuration",
+        }
         extra = {k: v for k, v in kwargs.items() if k not in _explicit}
         configuration = {**extra, **kwargs.get("configuration", {})}
 
@@ -828,6 +843,7 @@ class ORBClient:
                 template_id=template_id,
                 name=kwargs.get("name"),
                 description=kwargs.get("description"),
+                machine_type=kwargs.get("machine_type"),
                 instance_type=kwargs.get("instance_type"),
                 image_id=kwargs.get("image_id"),
                 configuration=configuration,

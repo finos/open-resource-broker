@@ -29,6 +29,7 @@ class CreateTemplateOrchestrator(OrchestratorBase[CreateTemplateInput, CreateTem
             image_id=input.image_id,
             name=input.name,
             description=input.description,
+            machine_type=input.machine_type,
             instance_type=input.instance_type,
             tags=input.tags,
             configuration=input.configuration,

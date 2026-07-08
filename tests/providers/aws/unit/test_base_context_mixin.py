@@ -194,7 +194,7 @@ class TestBaseContextMixin:
         self.template.machine_types = {"t3.medium": 1, "t3.large": 2}
         self.template.key_name = "my-key"
         self.template.user_data = "#!/bin/bash"
-        self.template.instance_profile = "my-profile"
+        self.template.machine_role = "my-profile"
         self.template.ebs_optimized = True
         self.template.monitoring_enabled = False
 

@@ -159,7 +159,7 @@ class TemplateItem(BaseModel):
     # --- Access and security ---
     key_name: Optional[str] = None
     user_data: Optional[str] = None
-    instance_profile: Optional[str] = None
+    machine_role: Optional[str] = None
     launch_template_id: Optional[str] = None
 
     # --- Advanced configuration ---
@@ -168,7 +168,6 @@ class TemplateItem(BaseModel):
     # --- Tags and metadata ---
     tags: Optional[dict[str, Any]] = None
     metadata: Optional[dict[str, Any]] = None
-    provider_data: Optional[dict[str, Any]] = None
 
     # --- Provider configuration ---
     provider_type: Optional[str] = None

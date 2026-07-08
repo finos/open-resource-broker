@@ -279,7 +279,8 @@ class CreateTemplateInput:
     provider_api: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
-    instance_type: Optional[str] = None
+    machine_type: Optional[str] = None
+    instance_type: Optional[str] = None  # deprecated: use machine_type
     tags: dict[str, str] = dataclasses.field(default_factory=dict)
     configuration: dict[str, Any] = dataclasses.field(default_factory=dict)
 
@@ -296,7 +297,8 @@ class UpdateTemplateInput:
     template_id: str
     name: Optional[str] = None
     description: Optional[str] = None
-    instance_type: Optional[str] = None
+    machine_type: Optional[str] = None
+    instance_type: Optional[str] = None  # deprecated: use machine_type
     image_id: Optional[str] = None
     configuration: dict[str, Any] = dataclasses.field(default_factory=dict)
 

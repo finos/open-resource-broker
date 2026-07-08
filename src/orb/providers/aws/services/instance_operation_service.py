@@ -68,7 +68,7 @@ class AWSInstanceOperationService:
                 "iops",
                 "fleet_role",
                 "fleet_type",
-                "instance_profile",
+                "machine_role",
                 "key_name",
                 "user_data",
             ]:

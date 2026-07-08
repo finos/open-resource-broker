@@ -193,7 +193,7 @@ class TestAWSLaunchTemplateManager:
 
     def test_create_launch_template_data_iam_instance_profile(self):
         """Test launch template data creation with IAM instance profile."""
-        self.aws_template.instance_profile = "test-instance-profile"
+        self.aws_template.machine_role = "test-instance-profile"
 
         data = self.manager._create_launch_template_data_legacy(self.aws_template, self.request)
 

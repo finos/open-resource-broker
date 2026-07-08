@@ -550,6 +550,107 @@ class TestTemplateDeprecatedAliases:
 
 
 @pytest.mark.unit
+class TestTemplateDeprecatedAliasesLoggerWarning:
+    """Tests that deprecated field names emit logger.warning on ALL deserialization paths.
+
+    AliasChoices silently accepts old keys via model_validate — these tests
+    assert that operators see a warning in server logs even when using the
+    YAML/JSON deserialization path (not just the Python-kwarg path).
+    """
+
+    def test_model_validate_instance_type_emits_logger_warning(self, caplog):
+        """model_validate with deprecated 'instance_type' emits a logger.warning."""
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="orb.domain.template.template_aggregate"):
+            t = Template.model_validate({"template_id": "lw-1", "instance_type": "m5.large"})
+        assert t.machine_type == "m5.large"
+        assert any(
+            "instance_type" in r.message and "deprecated" in r.message for r in caplog.records
+        ), f"Expected deprecation log for instance_type; got: {[r.message for r in caplog.records]}"
+
+    def test_model_validate_instance_profile_emits_logger_warning(self, caplog):
+        """model_validate with deprecated 'instance_profile' emits a logger.warning."""
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="orb.domain.template.template_aggregate"):
+            t = Template.model_validate(
+                {
+                    "template_id": "lw-2",
+                    "instance_profile": "arn:aws:iam::123456789012:instance-profile/legacy",
+                }
+            )
+        assert t.machine_role == "arn:aws:iam::123456789012:instance-profile/legacy"
+        assert any(
+            "instance_profile" in r.message and "deprecated" in r.message for r in caplog.records
+        ), (
+            f"Expected deprecation log for instance_profile; got: {[r.message for r in caplog.records]}"
+        )
+
+    def test_kwarg_instance_type_emits_logger_warning(self, caplog):
+        """Template(instance_type=...) kwarg path also emits logger.warning (via model_validator)."""
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="orb.domain.template.template_aggregate"):
+            with pytest.warns(DeprecationWarning):
+                t = Template(template_id="lw-3", instance_type="c5.xlarge")
+        assert t.machine_type == "c5.xlarge"
+        assert any(
+            "instance_type" in r.message and "deprecated" in r.message for r in caplog.records
+        ), (
+            f"Expected deprecation log for instance_type kwarg; got: {[r.message for r in caplog.records]}"
+        )
+
+    def test_kwarg_instance_profile_emits_logger_warning(self, caplog):
+        """Template(instance_profile=...) kwarg path also emits logger.warning (via model_validator)."""
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="orb.domain.template.template_aggregate"):
+            with pytest.warns(DeprecationWarning):
+                t = Template(
+                    template_id="lw-4",
+                    instance_profile="arn:aws:iam::123456789012:instance-profile/worker",
+                )
+        assert t.machine_role == "arn:aws:iam::123456789012:instance-profile/worker"
+        assert any(
+            "instance_profile" in r.message and "deprecated" in r.message for r in caplog.records
+        ), (
+            f"Expected deprecation log for instance_profile kwarg; got: {[r.message for r in caplog.records]}"
+        )
+
+    def test_new_field_names_emit_no_logger_warning(self, caplog):
+        """Using machine_type / machine_role directly produces no deprecation log."""
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="orb.domain.template.template_aggregate"):
+            t = Template.model_validate(
+                {
+                    "template_id": "lw-5",
+                    "machine_type": "t3.medium",
+                    "machine_role": "arn:aws:iam::123456789012:instance-profile/new",
+                }
+            )
+        assert t.machine_type == "t3.medium"
+        assert t.machine_role == "arn:aws:iam::123456789012:instance-profile/new"
+        assert not caplog.records, (
+            f"Expected no deprecation log with new field names; got: {[r.message for r in caplog.records]}"
+        )
+
+    def test_model_validate_instance_type_warns_once(self, caplog):
+        """Exactly one warning is emitted per deprecated key per model_validate call."""
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="orb.domain.template.template_aggregate"):
+            Template.model_validate({"template_id": "lw-6", "instance_type": "r5.large"})
+        instance_type_warnings = [
+            r for r in caplog.records if "instance_type" in r.message and "deprecated" in r.message
+        ]
+        assert len(instance_type_warnings) == 1, (
+            f"Expected exactly 1 warning; got {len(instance_type_warnings)}"
+        )
+
+
+@pytest.mark.unit
 class TestTemplateExceptions:
     """Test cases for Template-specific exceptions."""
 

@@ -1,6 +1,9 @@
 """Template management API routes."""
 
+import logging
 from typing import Any, Optional
+
+_logger = logging.getLogger(__name__)
 
 try:
     from fastapi import APIRouter, Body, Depends, Query
@@ -60,6 +63,10 @@ class TemplateCreateRequest(APIRequest):
     """Request model for creating templates.
 
     Accepts both camelCase and snake_case field names.
+
+    ``machine_type`` is the canonical field name; ``instance_type`` is
+    accepted as a deprecated alias for backward compatibility with older
+    clients.  When both are supplied, ``machine_type`` takes precedence.
     """
 
     template_id: str
@@ -67,7 +74,8 @@ class TemplateCreateRequest(APIRequest):
     description: Optional[str] = None
     provider_api: Optional[str] = None
     image_id: Optional[str] = None
-    instance_type: Optional[str] = None
+    machine_type: Optional[str] = None
+    instance_type: Optional[str] = None  # deprecated: use machine_type
     key_name: Optional[str] = None
     security_group_ids: Optional[list[str]] = None
     subnet_ids: Optional[list[str]] = None
@@ -75,24 +83,37 @@ class TemplateCreateRequest(APIRequest):
     tags: Optional[dict[str, str]] = None
     version: Optional[str] = "1.0"
 
+    def resolved_machine_type(self) -> Optional[str]:
+        """Return the effective machine type, preferring machine_type over instance_type."""
+        return self.machine_type or self.instance_type
+
 
 class TemplateUpdateRequest(APIRequest):
     """Request model for updating templates.
 
     Accepts both camelCase and snake_case field names.
+
+    ``machine_type`` is the canonical field name; ``instance_type`` is
+    accepted as a deprecated alias for backward compatibility with older
+    clients.  When both are supplied, ``machine_type`` takes precedence.
     """
 
     name: Optional[str] = None
     description: Optional[str] = None
     provider_api: Optional[str] = None
     image_id: Optional[str] = None
-    instance_type: Optional[str] = None
+    machine_type: Optional[str] = None
+    instance_type: Optional[str] = None  # deprecated: use machine_type
     key_name: Optional[str] = None
     security_group_ids: Optional[list[str]] = None
     subnet_ids: Optional[list[str]] = None
     user_data: Optional[str] = None
     tags: Optional[dict[str, str]] = None
     version: Optional[str] = None
+
+    def resolved_machine_type(self) -> Optional[str]:
+        """Return the effective machine type, preferring machine_type over instance_type."""
+        return self.machine_type or self.instance_type
 
 
 @router.get(
@@ -302,13 +323,20 @@ async def create_template(
     - **template_data**: Template configuration data
     """
     template_dict = template_data.model_dump(exclude_unset=True)
+    # Prefer machine_type; fall back to the deprecated instance_type alias.
+    effective_machine_type = template_data.resolved_machine_type()
+    if template_dict.get("instance_type") and not template_dict.get("machine_type"):
+        _logger.warning(
+            "Template create request used deprecated 'instance_type' field; "
+            "use 'machine_type' instead."
+        )
     result = await orchestrator.execute(
         CreateTemplateInput(
             template_id=template_dict["template_id"],
             name=template_dict.get("name"),
             description=template_dict.get("description"),
             provider_api=template_dict.get("provider_api"),
-            instance_type=template_dict.get("instance_type"),
+            machine_type=effective_machine_type,
             image_id=template_dict.get("image_id") or "",
             tags=template_dict.get("tags") or {},
             configuration=template_dict,
@@ -348,12 +376,19 @@ async def update_template(
     - **template_data**: Updated template configuration data
     """
     template_dict = template_data.model_dump(exclude_unset=True)
+    # Prefer machine_type; fall back to the deprecated instance_type alias.
+    effective_machine_type = template_data.resolved_machine_type()
+    if template_dict.get("instance_type") and not template_dict.get("machine_type"):
+        _logger.warning(
+            "Template update request used deprecated 'instance_type' field; "
+            "use 'machine_type' instead."
+        )
     result = await orchestrator.execute(
         UpdateTemplateInput(
             template_id=template_id,
             name=template_dict.get("name"),
             description=template_dict.get("description"),
-            instance_type=template_dict.get("instance_type"),
+            machine_type=effective_machine_type,
             image_id=template_dict.get("image_id"),
             configuration=template_dict,
         )

@@ -192,7 +192,7 @@ class TestDashboardSummaryOrchestrator:
 
     @pytest.mark.asyncio
     async def test_well_known_keys_present_even_when_count_is_zero(self):
-        """Missing well-known keys must be defaulted to 0."""
+        """Machine and request status keys are zero-padded; template keys come from actual data."""
         orchestrator = _make_orchestrator(
             machine_by_status={"running": 1},
             request_by_status={"pending": 1},

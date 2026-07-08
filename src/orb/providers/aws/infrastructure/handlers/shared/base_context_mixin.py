@@ -105,8 +105,8 @@ class BaseContextMixin:
             # Optional configuration flags
             "has_key_name": hasattr(template, "key_name") and bool(template.key_name),
             "has_user_data": hasattr(template, "user_data") and bool(template.user_data),
-            "has_instance_profile": hasattr(template, "instance_profile")
-            and bool(template.instance_profile),
+            "has_instance_profile": hasattr(template, "machine_role")
+            and bool(template.machine_role),
             "has_ebs_optimized": hasattr(template, "ebs_optimized")
             and template.ebs_optimized is not None,  # type: ignore[attr-defined]
             "has_monitoring": hasattr(template, "monitoring_enabled")

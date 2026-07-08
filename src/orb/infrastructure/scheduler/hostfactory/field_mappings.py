@@ -63,7 +63,7 @@ class HostFactoryFieldMappings:
             "spotFleetRequestExpiry": "spot_fleet_request_expiry",
             "poolsCount": "pools_count",
             # AWS instance configuration
-            "instanceProfile": "instance_profile",
+            "instanceProfile": "machine_role",
             "launchTemplateId": "launch_template_id",
             "userDataScript": "user_data",
         },

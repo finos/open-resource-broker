@@ -89,8 +89,8 @@ def _make_launch_template_manager(aws_client: AWSClient) -> AWSLaunchTemplateMan
             lt_data["UserData"] = base64.b64encode(template.user_data.encode()).decode()
         if template.key_name:
             lt_data["KeyName"] = template.key_name
-        if template.instance_profile:
-            lt_data["IamInstanceProfile"] = {"Arn": template.instance_profile}
+        if template.machine_role:
+            lt_data["IamInstanceProfile"] = {"Arn": template.machine_role}
         try:
             resp = aws_client.ec2_client.create_launch_template(
                 LaunchTemplateName=lt_name,
@@ -287,7 +287,7 @@ class TestRunInstancesGaps:
         verify it is present in the launch template version data instead.
         """
         profile_arn = "arn:aws:iam::123456789012:instance-profile/test-profile"
-        template = _run_instances_template(subnet_id, sg_id, instance_profile=profile_arn)
+        template = _run_instances_template(subnet_id, sg_id, machine_role=profile_arn)
         request = _make_request(request_id="req-iam-001")
 
         result = handler.acquire_hosts(request, template)

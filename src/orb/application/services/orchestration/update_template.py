@@ -27,6 +27,7 @@ class UpdateTemplateOrchestrator(OrchestratorBase[UpdateTemplateInput, UpdateTem
             template_id=input.template_id,
             name=input.name,
             description=input.description,
+            machine_type=input.machine_type,
             instance_type=input.instance_type,
             image_id=input.image_id,
             configuration=input.configuration,

@@ -1,10 +1,13 @@
 """Template configuration value object - core template domain logic."""
 
+import logging
 import warnings
 from datetime import datetime
 from typing import Any, Optional
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
+
+logger = logging.getLogger(__name__)
 
 
 class Template(BaseModel):
@@ -25,6 +28,7 @@ class Template(BaseModel):
     machine_type: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("machine_type", "instance_type"),
+        deprecated="use 'machine_type' instead of 'instance_type'",
     )
     image_id: Optional[str] = None
     max_instances: int = 1
@@ -61,6 +65,7 @@ class Template(BaseModel):
     machine_role: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("machine_role", "instance_profile"),
+        deprecated="use 'machine_role' instead of 'instance_profile'",
     )  # IAM role, service principal, or service account
 
     # Advanced configuration (extensible)
@@ -82,6 +87,42 @@ class Template(BaseModel):
     # Active status flag
     is_active: bool = True
 
+    @model_validator(mode="before")
+    @classmethod
+    def _warn_deprecated_field_names(cls, data: Any) -> Any:
+        """House pattern for operator-facing Pydantic field deprecation.
+
+        This is the canonical way to emit operator-visible deprecation warnings
+        for renamed fields in this codebase.  It runs on the raw input dict
+        before Pydantic applies AliasChoices, so it fires on EVERY entry point:
+        ``model_validate()``, YAML/JSON deserialization, and ``__init__`` kwargs.
+
+        Pattern:
+          1. Keep ``AliasChoices("new_name", "old_name")`` on the new field so
+             old data still deserializes without a hard error.
+          2. Add this ``model_validator(mode="before")`` to emit
+             ``logger.warning(...)`` for each deprecated key present in the raw
+             input.  The logger message appears in server logs where operators
+             can see it, unlike ``warnings.warn`` which is filtered in tests and
+             production by default.
+          3. Mark the new field with ``Field(..., deprecated="...")`` for
+             OpenAPI/JSON-schema visibility (requires Pydantic >= 2.7).
+          4. Keep ``warnings.warn(DeprecationWarning)`` in ``__init__`` as a
+             developer/test signal (visible via ``python -W`` or
+             ``pytest.warns``).
+        """
+        if not isinstance(data, dict):
+            return data
+        if "instance_type" in data and "machine_type" not in data:
+            logger.warning(
+                "Template field 'instance_type' is deprecated; use 'machine_type' instead."
+            )
+        if "instance_profile" in data and "machine_role" not in data:
+            logger.warning(
+                "Template field 'instance_profile' is deprecated; use 'machine_role' instead."
+            )
+        return data
+
     def __init__(self, **data: Any) -> None:
         """Initialize template with default values and validation.
 
@@ -91,30 +132,35 @@ class Template(BaseModel):
         Note:
             Sets default name from template_id if not provided.
             Sets default timestamps if not provided.
-            The deprecated ``instance_type`` keyword argument is accepted and
-            silently promoted to ``machine_type``; a DeprecationWarning is
-            emitted to encourage callers to update.
+            The deprecated ``instance_type`` kwarg is accepted and mapped to
+            ``machine_type`` by Pydantic's AliasChoices; a DeprecationWarning
+            is emitted here as a developer-visible signal (pytest.warns / -W),
+            while the operator-visible logger.warning is emitted by the
+            ``_warn_deprecated_field_names`` model_validator above.
+
+            IMPORTANT: do NOT pop the deprecated key here — popping before
+            calling ``super().__init__`` would hide the key from the
+            model_validator(mode="before"), preventing the logger.warning.
+            AliasChoices handles the field mapping after model_validator fires.
         """
-        # Promote deprecated instance_type kwarg → machine_type.
-        # validation_alias handles model_validate() paths; __init__ kwargs need
-        # explicit handling here because Pydantic v2 validation_alias is not
-        # applied to __init__ keyword arguments.
+        # Emit developer-facing DeprecationWarning for deprecated kwarg names.
+        # Do NOT pop the keys — leave them in data so that model_validator
+        # (mode="before") can see them and emit the operator-visible logger.warning.
+        # AliasChoices will map instance_type → machine_type and
+        # instance_profile → machine_role during Pydantic's validation pass.
         if "instance_type" in data and "machine_type" not in data:
             warnings.warn(
                 "Template field 'instance_type' is deprecated; use 'machine_type' instead.",
                 DeprecationWarning,
                 stacklevel=2,
             )
-            data["machine_type"] = data.pop("instance_type")
 
-        # Promote deprecated instance_profile kwarg → machine_role.
         if "instance_profile" in data and "machine_role" not in data:
             warnings.warn(
                 "Template field 'instance_profile' is deprecated; use 'machine_role' instead.",
                 DeprecationWarning,
                 stacklevel=2,
             )
-            data["machine_role"] = data.pop("instance_profile")
 
         # Set default name if not provided
         if "name" not in data and "template_id" in data:
