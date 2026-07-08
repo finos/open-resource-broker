@@ -12,6 +12,7 @@ import sys
 # Optional: Rich formatting for help text
 import sys as _sys
 
+from orb.cli.parsers.common_args import add_provider_type_arg
 from orb.domain.machine.machine_status import MachineStatus
 from orb.domain.request.value_objects import RequestStatus
 from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
@@ -61,12 +62,7 @@ def add_global_arguments(parser):
         metavar="NAME",
         help="Restrict to a specific provider instance by exact name (e.g. aws-prod)",
     )
-    parser.add_argument(
-        "--provider-type",
-        dest="provider_type",
-        metavar="TYPE",
-        help="Restrict to all active instances of a provider type (e.g. aws, k8s)",
-    )
+    add_provider_type_arg(parser)
     parser.add_argument(
         "--scheduler", choices=["default", "hostfactory"], help="Override scheduler strategy"
     )
@@ -776,11 +772,10 @@ For more information, visit: {DOCS_URL}
     init_parser.add_argument(
         "--scheduler", choices=["default", "hostfactory"], help="Scheduler type"
     )
-    init_parser.add_argument(
-        "--provider-type",
-        dest="provider_type",
+    add_provider_type_arg(
+        init_parser,
         default="aws",
-        help="Provider type to initialise (e.g. aws, k8s)",
+        extra_help="Provider type to initialise.",
     )
     init_parser.add_argument("--config-dir", help="Custom configuration directory")
     init_parser.add_argument(
