@@ -9,7 +9,6 @@ from orb.application.services.spot_placement_planner import (
     PlacementPlanEntry,
     PlacementScore,
 )
-from orb.infrastructure.template.dtos import TemplateDTO
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
 from orb.providers.azure.exceptions.azure_exceptions import (
@@ -218,8 +217,7 @@ class TestCreateInstances:
                 "version": "latest",
             },
         )
-        dto = TemplateDTO.from_domain(azure_template)
-        template_config = dto.to_template_config()
+        template_config = azure_template.model_dump(mode="json", exclude_none=True)
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.CREATE_INSTANCES,
