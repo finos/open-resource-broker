@@ -5,7 +5,7 @@ provider-runtime flows construct the same credential shape.
 """
 
 import asyncio
-from typing import Optional
+from typing import Any, Optional
 
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
@@ -46,6 +46,21 @@ class AzureAuthStrategy(AuthPort):
                 client_id=client_id,
                 logger=logger,
             )
+
+    @classmethod
+    def from_auth_config(cls, auth_config: Any) -> "AzureAuthStrategy":
+        """Build an Azure auth strategy from the shared AuthConfig object."""
+        from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
+
+        provider_auth = getattr(auth_config, "provider_auth", None)
+        azure_cfg = getattr(provider_auth, "azure", None) if provider_auth is not None else None
+        client_id = getattr(azure_cfg, "client_id", None) if azure_cfg is not None else None
+        enabled = bool(getattr(auth_config, "enabled", True))
+        return cls(
+            logger=LoggingAdapter(),
+            client_id=client_id,
+            enabled=enabled,
+        )
 
     def _auth_error_types(self) -> tuple[type[Exception], ...]:
         """Return the active provider's declared auth failure types."""
