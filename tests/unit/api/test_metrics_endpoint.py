@@ -40,8 +40,10 @@ def _make_app() -> FastAPI:
             from prometheus_client import REGISTRY, generate_latest
 
             registry_text = generate_latest(REGISTRY).decode("utf-8")
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 — mirrors the real handler's optional-dep guard
+            # prometheus_client is an optional [monitoring] extra; a minimal
+            # install without it must still serve the homegrown text.
+            registry_text = ""
 
         body = homegrown_text
         if registry_text:

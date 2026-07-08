@@ -507,8 +507,10 @@ def create_fastapi_app(server_config: Any) -> Any:
             from prometheus_client import REGISTRY, generate_latest
 
             registry_text = generate_latest(REGISTRY).decode("utf-8")
-        except Exception:  # ImportError or any prometheus_client internal error
-            pass
+        except Exception:  # noqa: BLE001 — ImportError or prometheus_client internal error
+            # prometheus_client is an optional [monitoring] extra; a minimal
+            # install without it must still serve the homegrown collector text.
+            registry_text = ""
 
         body = homegrown_text
         if registry_text:
