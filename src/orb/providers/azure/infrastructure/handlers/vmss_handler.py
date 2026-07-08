@@ -357,7 +357,11 @@ class VMSSHandler(AzureHandler):
             if release_plan.orchestration_mode == AzureVMSSOrchestrationMode.FLEXIBLE:
                 submitted_deletions: list[AzureSubmittedDeletion] = []
                 failed_deletions: list[AzureSubmittedDeletion] = []
-                for requested_id, vm_name in zip(machine_ids, release_plan.resolved_vm_names):
+                for requested_id, vm_name in zip(
+                    machine_ids,
+                    release_plan.resolved_vm_names,
+                    strict=True,
+                ):
                     try:
                         await compute.virtual_machines.begin_delete(
                             resource_group_name=resource_group,
@@ -1109,7 +1113,7 @@ class VMSSHandler(AzureHandler):
 
     @staticmethod
     def _coerce_vmss_orchestration_mode(
-        raw_mode: Optional["SdkOrchestrationMode"],
+        raw_mode: Optional[SdkOrchestrationMode],
     ) -> AzureVMSSOrchestrationMode:
         """Coerce Azure's orchestration-mode field into the provider enum.
 

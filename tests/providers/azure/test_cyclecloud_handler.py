@@ -1,7 +1,6 @@
 """Tests for the CycleCloud handler and related template/exception additions."""
 
 import json
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

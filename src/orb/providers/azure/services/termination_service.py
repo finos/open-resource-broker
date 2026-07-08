@@ -92,7 +92,9 @@ async def _dispatch_release_groups_async(
         return_exceptions=True,
     )
     for (resource_id, mapped_instance_ids), handler_result in zip(
-        dispatch_group_items, handler_results
+        dispatch_group_items,
+        handler_results,
+        strict=True,
     ):
         if isinstance(handler_result, BaseException):
             # Cancellation and system-level exceptions (CancelledError,

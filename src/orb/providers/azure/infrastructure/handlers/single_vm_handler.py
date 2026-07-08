@@ -493,7 +493,7 @@ class SingleVMHandler(AzureHandler):
         vm_names = await self._resolve_vm_names_async(resource_group, machine_ids)
         submitted_deletions: list[AzureSubmittedDeletion] = []
         failed_deletions: list[AzureSubmittedDeletion] = []
-        for original_id, vm_name in zip(machine_ids, vm_names):
+        for original_id, vm_name in zip(machine_ids, vm_names, strict=True):
             try:
                 self._logger.info("Deleting VM '%s' (requested id='%s')", vm_name, original_id)
                 await compute.virtual_machines.begin_delete(
@@ -530,7 +530,7 @@ class SingleVMHandler(AzureHandler):
         """Apply unresolved lookups, preserve input order, and log any remapping."""
         ordered_resolved = [
             resolved_name if resolved_name is not None else str(machine_id)
-            for machine_id, resolved_name in zip(machine_ids, resolved)
+            for machine_id, resolved_name in zip(machine_ids, resolved, strict=True)
         ]
         if ordered_resolved != [str(mid) for mid in machine_ids]:
             logger.debug(
