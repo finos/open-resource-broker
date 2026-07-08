@@ -801,6 +801,19 @@ class AWSProviderStrategy(ProviderStrategy):
         }
 
     @classmethod
+    def get_resource_id_pattern(cls) -> Optional[str]:
+        """Return the AWS EC2 instance-ID regex pattern.
+
+        AWS instance IDs always follow the ``i-`` prefix convention followed by
+        exactly 8 (legacy) or 17 (modern) lowercase hex characters.  The length
+        bound prevents unbounded backtracking and rejects obviously malformed IDs.
+
+        Returns:
+            Regex pattern string matching AWS EC2 instance IDs.
+        """
+        return r"^i-[a-f0-9]{8,17}$"
+
+    @classmethod
     def get_cli_infrastructure_defaults(cls, args: Any) -> dict[str, Any]:
         """Extract AWS-specific infrastructure defaults from parsed CLI args."""
         result: dict[str, Any] = {}
