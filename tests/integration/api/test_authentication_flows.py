@@ -45,9 +45,10 @@ class TestAuthenticationFlows:
         response = client.get("/info")
         assert response.status_code == 200
         data = response.json()
-        assert data["auth_enabled"] is False
-        # auth_strategy is no longer surfaced in the /info response; verify only
-        # that the key is absent rather than asserting a specific value.
+        # auth_enabled and auth_strategy are no longer surfaced on /info —
+        # they were dropped to avoid disclosing auth configuration to
+        # unauthenticated callers.  Verify absence.
+        assert "auth_enabled" not in data
         assert "auth_strategy" not in data
 
     def test_bearer_token_auth_flow(self):
@@ -190,7 +191,8 @@ class TestAuthenticationFlows:
         assert context.client_ip == "127.0.0.1"
 
     def test_excluded_paths(self):
-        """Test that excluded paths bypass authentication."""
+        """Test that /health bypasses auth and docs endpoints are gated when auth is enabled."""
+
         server_config = ServerConfig(  # type: ignore[call-arg]
             enabled=True,
             auth=AuthConfig(  # type: ignore[call-arg]
@@ -204,13 +206,42 @@ class TestAuthenticationFlows:
         app = create_fastapi_app(server_config)
         client = TestClient(app)
 
-        # Test excluded paths (should work without auth)
-        excluded_paths = ["/health", "/docs", "/redoc", "/openapi.json"]
+        # /health is always public regardless of auth configuration.
+        response = client.get("/health")
+        assert response.status_code != 401, "/health should never require authentication"
 
-        for path in excluded_paths:
+        # When auth is enabled and docs.require_auth=True (default), docs endpoints
+        # are protected.  They should return 401 without credentials.
+        for path in ["/docs", "/redoc", "/openapi.json"]:
             response = client.get(path)
-            # Should not return 401 (may return 404 if endpoint doesn't exist)
-            assert response.status_code != 401, f"Path {path} should be excluded from auth"
+            assert response.status_code == 401, (
+                f"Path {path} should require authentication when auth is enabled "
+                "and docs.require_auth=True (default)"
+            )
+
+    def test_excluded_paths_docs_public_when_require_auth_false(self):
+        """Docs endpoints are public when docs.require_auth=False."""
+        from orb.config.schemas.server_schema import DocsConfig
+
+        server_config = ServerConfig(  # type: ignore[call-arg]
+            enabled=True,
+            auth=AuthConfig(  # type: ignore[call-arg]
+                enabled=True,
+                strategy="bearer_token",
+                bearer_token={"secret_key": "test-secret-key-minimum-32-bytes!"},
+            ),
+            cors=CORSConfig(origins=["*"]),  # type: ignore[call-arg]
+            docs=DocsConfig(require_auth=False),  # type: ignore[call-arg]
+        )
+
+        app = create_fastapi_app(server_config)
+        client = TestClient(app)
+
+        for path in ["/docs", "/redoc", "/openapi.json"]:
+            response = client.get(path)
+            assert response.status_code != 401, (
+                f"Path {path} should be public when docs.require_auth=False"
+            )
 
     def test_cors_headers(self):
         """Test CORS headers are properly set."""

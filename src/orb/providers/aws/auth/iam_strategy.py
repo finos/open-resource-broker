@@ -44,6 +44,7 @@ class IAMAuthStrategy(AuthPort):
         enabled: bool = True,
         assume_permissions: bool = False,
         admin_role_patterns: Optional[frozenset[str]] = None,
+        admin_arns: Optional[list[str]] = None,
     ) -> None:
         """
         Initialize IAM authentication strategy.
@@ -56,9 +57,21 @@ class IAMAuthStrategy(AuthPort):
             enabled: Whether this strategy is enabled
             assume_permissions: If True, grant all required_actions without evaluation.
                 Only use in development/testing. Defaults to False (deny-all).
+            admin_role_patterns: Frozenset of resource-name strings that trigger the
+                admin role (matched by exact set-membership against the last ARN path
+                segment).  Ignored when ``admin_arns`` is non-empty.
+            admin_arns: Explicit allowlist of fully-qualified ARNs that receive the
+                admin role.  Matched by exact equality after lowercasing both sides.
+                When non-empty, ``admin_role_patterns`` is bypassed for admin checks.
         """
         self._logger = logger
         self._admin_role_patterns = admin_role_patterns or self._DEFAULT_ADMIN_ROLE_PATTERNS
+        # Normalise to lowercase frozenset for O(1) exact-match lookup.
+        # The only operation performed is `caller_arn_lower in self._admin_arns`,
+        # which is a set __contains__ check — never a substring search.
+        self._admin_arns: frozenset[str] = (
+            frozenset(a.lower() for a in admin_arns) if admin_arns else frozenset()
+        )
         self.region = region
         self.profile = profile
         # None means "operator did not configure required_actions" → apply defaults.
@@ -241,6 +254,7 @@ class IAMAuthStrategy(AuthPort):
         assume_permissions: bool = (
             getattr(iam_cfg, "assume_permissions", False) if iam_cfg is not None else False
         )
+        admin_arns: list[str] = getattr(iam_cfg, "admin_arns", []) if iam_cfg is not None else []
 
         # Intentional service-locator: from_auth_config is called by the
         # AuthRegistry as ``strategy_factory.from_auth_config(auth_config)``
@@ -264,6 +278,7 @@ class IAMAuthStrategy(AuthPort):
             required_actions=required_actions,
             enabled=True,
             assume_permissions=assume_permissions,
+            admin_arns=admin_arns,
         )
 
     def get_strategy_name(self) -> str:
@@ -411,10 +426,39 @@ class IAMAuthStrategy(AuthPort):
         try:
             arn = identity.get("Arn", "")
 
-            # Check if user is an admin based on ARN patterns
-            resource_name = arn.split("/")[-1] if "/" in arn else ""
-            if arn.endswith(":root") or resource_name in self._admin_role_patterns:
-                roles.append("admin")
+            # Determine admin status.
+            #
+            # When an explicit ARN allowlist is configured, use it exclusively and
+            # require an exact match (case-normalised).  This prevents two classes
+            # of bypass:
+            #   1. Substring bypass — `if admin_arn in caller_arn` would pass for
+            #      any caller whose serialised ARN contains the target as a substring
+            #      (e.g. `arn:aws:iam::EVIL:role/arn:aws:iam::ADMIN:role/OrbAdmin`).
+            #   2. Cross-account bypass — the legacy name-pattern check only inspects
+            #      the resource segment (e.g. "Admin") and does not verify the account
+            #      ID, so a principal named "Admin" in any account would match.
+            #
+            # The frozenset.__contains__ check below is an exact equality test, not
+            # a substring search.  Both sides are lowercased so the comparison is
+            # case-insensitive (IAM ARN account/service fields are case-insensitive;
+            # resource names are case-sensitive but normalising avoids misconfiguration).
+            if self._admin_arns:
+                # Explicit allowlist path — exact match only.
+                # When admin_arns is configured, it is the COMPLETE set of admin
+                # principals.  The unconditional :root grant does NOT apply here;
+                # include the root ARN explicitly in admin_arns if root must have
+                # admin access.  This prevents a cross-account bypass where any
+                # :root credential from any AWS account would otherwise be granted
+                # admin regardless of the configured allowlist.
+                caller_arn_lower = arn.lower()
+                if caller_arn_lower in self._admin_arns:
+                    roles.append("admin")
+            else:
+                # Legacy name-pattern path — kept for backward compatibility when no
+                # explicit admin_arns allowlist is configured.
+                resource_name = arn.split("/")[-1] if "/" in arn else ""
+                if arn.endswith(":root") or resource_name in self._admin_role_patterns:
+                    roles.append("admin")
 
             # Check if it's a service account (role-based)
             if ":role/" in arn:

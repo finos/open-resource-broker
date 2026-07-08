@@ -90,6 +90,15 @@ class IAMAuthSubConfig(BaseModel):
     The IAMAuthStrategy enforces this by requiring the environment variable
     ``ORB_IAM_ASSUME_PERMISSIONS_DEV_ONLY=true`` to be set alongside the config flag;
     without it the flag is ignored and permissions are denied by default.
+
+    **Security note — admin_arns:**
+    ``admin_arns`` is an explicit allowlist of fully-qualified AWS ARNs that are
+    granted the ``admin`` role.  ARNs are compared using **exact equality** after
+    normalising both sides to lowercase.  Do NOT rely on the default
+    ``admin_role_patterns`` mechanism for production deployments — it grants admin to
+    any principal whose resource-name segment matches a short pattern string (e.g.
+    ``"Admin"``), which does not scope to a specific AWS account.  Use ``admin_arns``
+    to bind admin access to specific, account-scoped principals instead.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -102,6 +111,18 @@ class IAMAuthSubConfig(BaseModel):
         description=(
             "DEV/TEST ONLY — grant all required_actions without AWS evaluation. "
             "Has no effect unless ORB_IAM_ASSUME_PERMISSIONS_DEV_ONLY=true is also set."
+        ),
+    )
+    admin_arns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Explicit allowlist of fully-qualified ARNs that receive the admin role. "
+            "Matched by exact equality (case-normalised) against the caller ARN returned "
+            "by sts:GetCallerIdentity.  When non-empty this list is the COMPLETE set of "
+            "admin principals — the unconditional :root grant does NOT apply.  Include "
+            "the root ARN explicitly (e.g. 'arn:aws:iam::123456789012:root') if root "
+            "must have admin access.  When empty, the legacy name-pattern + :root "
+            "fallback is used instead."
         ),
     )
 
@@ -205,7 +226,9 @@ class CORSConfig(BaseModel):
         ["http://localhost:8000"],
         description=(
             "Allowed CORS origins.  Default is single-origin embedded-mode. "
-            "Operators binding to 0.0.0.0 MUST set this to their actual client origins."
+            "Operators binding to 0.0.0.0 MUST set this to the actual client origins "
+            "they trust; leaving the default while network-exposing the server will "
+            "block all cross-origin browser requests from non-loopback clients."
         ),
     )
     methods: list[str] = Field(
@@ -258,6 +281,31 @@ class CORSConfig(BaseModel):
         return self
 
 
+class DocsConfig(BaseModel):
+    """Configuration for the interactive API documentation endpoints.
+
+    When ``require_auth`` is True (the default) and ``server.auth.enabled`` is
+    also True, the ``/docs``, ``/redoc``, and ``/openapi.json`` endpoints are
+    protected by the auth middleware just like any other API endpoint.
+
+    Set ``require_auth=False`` (or keep ``server.auth.enabled=False``) to leave
+    the docs endpoints public — useful for open-source deployments or clusters
+    that are not externally reachable.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    require_auth: bool = Field(
+        True,
+        description=(
+            "Gate /docs, /redoc, and /openapi.json behind authentication when "
+            "auth is enabled.  When False (or when auth is globally disabled) "
+            "these endpoints remain publicly accessible.  Default True so that "
+            "enabling auth does not accidentally expose the full route map."
+        ),
+    )
+
+
 class ServerConfig(BaseModel):
     """REST API server configuration."""
 
@@ -281,6 +329,10 @@ class ServerConfig(BaseModel):
     docs_url: str = Field("/docs", description="Swagger UI URL")
     redoc_url: str = Field("/redoc", description="ReDoc URL")
     openapi_url: str = Field("/openapi.json", description="OpenAPI schema URL")
+    docs: DocsConfig = Field(
+        default_factory=DocsConfig,  # type: ignore[call-arg]
+        description="Documentation endpoint security settings",
+    )
 
     # Authentication and CORS
     #
@@ -299,12 +351,13 @@ class ServerConfig(BaseModel):
     # Security
     require_https: bool = Field(False, description="Require HTTPS for all requests")
     trusted_hosts: list[str] = Field(
-        ["localhost", "127.0.0.1", "testserver", "test"],
+        ["localhost", "127.0.0.1", "::1", "testserver", "test"],
         description=(
-            "Trusted host headers.  Default allows loopback + the "
-            "``testserver`` / ``test`` hostnames used by Starlette's "
-            "TestClient and httpx AsyncClient(base_url=...) fixtures.  "
-            "Operators binding to 0.0.0.0 MUST add their actual public hostname(s) here."
+            "Trusted Host header values.  Default allows loopback (IPv4 and IPv6) "
+            "plus the ``testserver`` / ``test`` hostnames used by Starlette's "
+            "TestClient and httpx AsyncClient(base_url=...) fixtures.  Operators "
+            "binding to 0.0.0.0 MUST add their public hostname(s) here; any "
+            "request whose Host header is not in this list will be rejected with 400."
         ),
     )
     trusted_proxies: list[str] = Field(

@@ -375,10 +375,31 @@ def create_fastapi_app(server_config: Any) -> Any:
         if auth_strategy:
             # Wrap the real strategy so loopback tokens are checked first.
             auth_port: Any = _LoopbackAdminAuthWrapper(auth_strategy)
+
+            # Build the excluded-paths list for auth middleware.
+            # /health is always public (liveness probe, no sensitive detail).
+            # /favicon.ico is static UI chrome, not sensitive.
+            # /docs, /redoc, /openapi.json are excluded ONLY when
+            # docs.require_auth=False — by default they are protected so that
+            # the full route map is not disclosed to unauthenticated callers.
+            _docs_require_auth: bool = getattr(
+                getattr(server_config, "docs", None), "require_auth", True
+            )
+            _excluded: list[str] = ["/health", "/favicon.ico"]
+            if not _docs_require_auth:
+                _excluded.extend(["/docs", "/redoc", "/openapi.json"])
+            else:
+                logger.info(
+                    "API documentation endpoints (/docs, /redoc, /openapi.json) "
+                    "are protected by authentication (docs.require_auth=true). "
+                    "Set docs.require_auth=false to make them public."
+                )
+
             app.add_middleware(
                 AuthMiddleware,
                 auth_port=auth_port,
                 require_auth=True,
+                excluded_paths=_excluded,
                 trusted_proxies=server_config.trusted_proxies,
             )
             logger.info(
@@ -521,12 +542,16 @@ def create_fastapi_app(server_config: Any) -> Any:
     # Add info endpoint
     @app.get("/info", tags=["System"])
     async def info() -> dict[str, Any]:
-        """Service information endpoint."""
+        """Service information endpoint.
+
+        Returns basic service metadata only.  Authentication configuration is
+        intentionally omitted so that unauthenticated callers cannot discover
+        which auth method is in use and tailor attacks accordingly.
+        """
         return {
             "service": "open-resource-broker",
             "version": __version__,
             "description": "REST API for Open Resource Broker",
-            "auth_enabled": server_config.auth.enabled,
         }
 
     # Serve favicon from project logo assets

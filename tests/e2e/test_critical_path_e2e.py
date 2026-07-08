@@ -982,12 +982,21 @@ class TestConfigurationManagement:
         assert "version" in data
 
     def test_info_endpoint_returns_service_info(self, client: TestClient):
-        """GET /info returns service information."""
+        """GET /info returns service metadata without disclosing auth configuration.
+
+        The security-hardened /info endpoint intentionally omits auth_enabled and
+        auth_strategy so that unauthenticated callers cannot discover the active
+        auth method and tailor attacks accordingly (see fix(security) commit bb4b4d27).
+        """
         response = client.get("/info")
         assert response.status_code == 200
         data = response.json()
         assert data["service"] == "open-resource-broker"
-        assert data["auth_enabled"] is False
+        assert "version" in data
+        assert "description" in data
+        # auth_enabled must NOT be disclosed to unauthenticated callers
+        assert "auth_enabled" not in data
+        assert "auth_strategy" not in data
 
     def test_template_refresh_triggers_cache_reload(self, app, client: TestClient):
         """POST /api/v1/templates/refresh reloads template cache."""

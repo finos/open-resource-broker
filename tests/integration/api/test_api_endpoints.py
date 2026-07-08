@@ -101,7 +101,9 @@ class TestAPIEndpoints:
         assert data["service"] == "open-resource-broker"
         assert data["version"] == __version__
         assert "description" in data
-        assert "auth_enabled" in data
+        # auth_enabled deliberately absent — /info does not disclose
+        # auth configuration to unauthenticated callers.
+        assert "auth_enabled" not in data
 
     def test_openapi_schema(self, client):
         """Test OpenAPI schema endpoint."""

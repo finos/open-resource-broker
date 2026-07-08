@@ -116,6 +116,36 @@ def test_auth_config_enabled_true_with_real_strategy_accepted():
 
 
 # ---------------------------------------------------------------------------
+# CORSConfig — secure defaults
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_cors_config_default_origins_is_loopback_only():
+    """Default CORS origins must NOT be the wildcard '*'."""
+    from orb.config.schemas.server_schema import CORSConfig
+
+    cfg = CORSConfig()
+    assert cfg.origins != ["*"], (
+        "Default cors.origins must not be ['*']. "
+        "Operators binding to 0.0.0.0 must set this explicitly."
+    )
+    # Default should allow only loopback.
+    assert all("localhost" in o or "127.0.0.1" in o for o in cfg.origins), (
+        f"Default cors.origins should be loopback-only, got: {cfg.origins}"
+    )
+
+
+@pytest.mark.unit
+def test_cors_config_wildcard_can_be_set_explicitly():
+    """Operators CAN still override origins to ['*'] explicitly when they need it."""
+    from orb.config.schemas.server_schema import CORSConfig
+
+    cfg = CORSConfig(origins=["*"])  # type: ignore[call-arg]
+    assert cfg.origins == ["*"]
+
+
+# ---------------------------------------------------------------------------
 # CORSConfig — credentials + wildcard origin is rejected
 # ---------------------------------------------------------------------------
 
@@ -283,3 +313,77 @@ def test_destructive_admin_blocked_when_auth_disabled(monkeypatch):
 
     assert exc_info.value.status_code == 403
     assert exc_info.value.detail["code"] == "AUTH_DISABLED"
+
+
+# ---------------------------------------------------------------------------
+# ServerConfig — trusted_hosts secure defaults
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_server_config_default_trusted_hosts_is_not_wildcard():
+    """Default trusted_hosts must NOT be the wildcard '*'."""
+    from orb.config.schemas.server_schema import ServerConfig
+
+    cfg = ServerConfig()
+    assert cfg.trusted_hosts != ["*"], (
+        "Default trusted_hosts must not be ['*']. "
+        "Operators binding to 0.0.0.0 must add their hostname explicitly."
+    )
+
+
+@pytest.mark.unit
+def test_server_config_default_trusted_hosts_contains_loopback():
+    """Default trusted_hosts must include loopback addresses for local development."""
+    from orb.config.schemas.server_schema import ServerConfig
+
+    cfg = ServerConfig()
+    assert "localhost" in cfg.trusted_hosts
+    assert "127.0.0.1" in cfg.trusted_hosts
+
+
+@pytest.mark.unit
+def test_server_config_default_trusted_hosts_contains_testserver():
+    """Default trusted_hosts must include 'testserver' for Starlette TestClient."""
+    from orb.config.schemas.server_schema import ServerConfig
+
+    cfg = ServerConfig()
+    assert "testserver" in cfg.trusted_hosts
+
+
+@pytest.mark.unit
+def test_server_config_trusted_hosts_can_be_overridden():
+    """Operators can override trusted_hosts to any list they need."""
+    from orb.config.schemas.server_schema import ServerConfig
+
+    cfg = ServerConfig(trusted_hosts=["myapp.example.com", "localhost"])  # type: ignore[call-arg]
+    # Exact list comparison (not substring membership) — asserts the operator
+    # override is preserved verbatim and avoids CodeQL's URL-substring heuristic.
+    assert cfg.trusted_hosts == ["myapp.example.com", "localhost"]
+
+
+# ---------------------------------------------------------------------------
+# IAMAuthSubConfig — admin_arns field
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_iam_auth_sub_config_admin_arns_defaults_empty():
+    """admin_arns defaults to an empty list when not specified."""
+    from orb.config.schemas.server_schema import IAMAuthSubConfig
+
+    cfg = IAMAuthSubConfig()
+    assert cfg.admin_arns == []
+
+
+@pytest.mark.unit
+def test_iam_auth_sub_config_admin_arns_accepts_full_arns():
+    """admin_arns accepts a list of fully-qualified ARN strings."""
+    from orb.config.schemas.server_schema import IAMAuthSubConfig
+
+    arns = [
+        "arn:aws:iam::123456789012:role/OrbAdmin",
+        "arn:aws:iam::123456789012:user/admin-user",
+    ]
+    cfg = IAMAuthSubConfig(admin_arns=arns)  # type: ignore[call-arg]
+    assert cfg.admin_arns == arns

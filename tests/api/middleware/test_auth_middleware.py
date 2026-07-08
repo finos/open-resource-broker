@@ -184,6 +184,88 @@ class TestAuthMiddlewareTrustedProxy:
         assert result == "10.0.0.1"
 
 
+class TestDocsAuthGating:
+    """When auth is enabled, docs endpoints are gated unless docs.require_auth=False."""
+
+    def _make_app_with_excluded(self, excluded_paths: list) -> FastAPI:
+        """Build a test app with the given excluded_paths and require_auth=True."""
+        app = FastAPI()
+        auth_port = _make_auth_port(authenticated=False)  # always returns INVALID
+        app.add_middleware(
+            AuthMiddleware,
+            auth_port=auth_port,
+            require_auth=True,
+            excluded_paths=excluded_paths,
+        )
+
+        @app.get("/docs")
+        def docs():
+            return {"page": "docs"}
+
+        @app.get("/redoc")
+        def redoc():
+            return {"page": "redoc"}
+
+        @app.get("/openapi.json")
+        def openapi():
+            return {"openapi": "3.0.0"}
+
+        @app.get("/health")
+        def health():
+            return {"status": "ok"}
+
+        return app
+
+    def test_docs_blocked_when_not_excluded_and_auth_enabled(self):
+        """With require_auth=True and docs NOT in excluded_paths, /docs returns 401."""
+        # Simulate docs.require_auth=True: excluded_paths has /health but NOT /docs
+        client = TestClient(
+            self._make_app_with_excluded(["/health", "/favicon.ico"]),
+            raise_server_exceptions=False,
+        )
+        resp = client.get("/docs")
+        assert resp.status_code == 401
+
+    def test_redoc_blocked_when_not_excluded_and_auth_enabled(self):
+        """/redoc returns 401 when auth is enabled and not in excluded_paths."""
+        client = TestClient(
+            self._make_app_with_excluded(["/health", "/favicon.ico"]),
+            raise_server_exceptions=False,
+        )
+        resp = client.get("/redoc")
+        assert resp.status_code == 401
+
+    def test_openapi_json_blocked_when_not_excluded_and_auth_enabled(self):
+        """/openapi.json returns 401 when auth is enabled and not in excluded_paths."""
+        client = TestClient(
+            self._make_app_with_excluded(["/health", "/favicon.ico"]),
+            raise_server_exceptions=False,
+        )
+        resp = client.get("/openapi.json")
+        assert resp.status_code == 401
+
+    def test_docs_public_when_excluded(self):
+        """When docs are explicitly excluded (docs.require_auth=False), /docs is public."""
+        client = TestClient(
+            self._make_app_with_excluded(
+                ["/health", "/favicon.ico", "/docs", "/redoc", "/openapi.json"]
+            ),
+            raise_server_exceptions=False,
+        )
+        # Auth port returns INVALID but /docs is excluded → no auth check → 200
+        resp = client.get("/docs")
+        assert resp.status_code == 200
+
+    def test_health_always_public(self):
+        """/health is in the excluded list and must return 200 regardless of auth."""
+        client = TestClient(
+            self._make_app_with_excluded(["/health", "/favicon.ico"]),
+            raise_server_exceptions=False,
+        )
+        resp = client.get("/health")
+        assert resp.status_code == 200
+
+
 class TestLoopbackTokenNonAscii:
     """Non-ASCII bearer tokens must be denied cleanly without raising UnicodeEncodeError."""
 

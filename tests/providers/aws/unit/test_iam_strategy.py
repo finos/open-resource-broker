@@ -628,6 +628,274 @@ def test_iam_required_actions_none_applies_defaults(monkeypatch):
     assert "ec2:TerminateInstances" in strategy.required_actions
 
 
+# ---------------------------------------------------------------------------
+# admin_arns allowlist — exact-match security tests
+# ---------------------------------------------------------------------------
+
+
+def _make_strategy_with_admin_arns(admin_arns: list[str]) -> Any:
+    """Build IAMAuthStrategy with a specific admin_arns allowlist."""
+    from orb.providers.aws.auth.iam_strategy import IAMAuthStrategy
+
+    logger = _make_logger()
+
+    with patch("orb.providers.aws.auth.iam_strategy.AWSSessionFactory") as mock_factory:
+        mock_session = MagicMock()
+        mock_sts = MagicMock()
+        mock_iam = MagicMock()
+        mock_session.client.side_effect = lambda svc, **kw: mock_sts if svc == "sts" else mock_iam
+        mock_factory.create_session.return_value = mock_session
+
+        strategy = IAMAuthStrategy(
+            logger=logger,
+            region="us-east-1",
+            admin_arns=admin_arns,
+        )
+
+    strategy.sts_client = mock_sts
+    strategy.iam_client = mock_iam
+    return strategy
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_admin_arns_exact_match_grants_admin():
+    """A caller whose ARN exactly matches an admin_arns entry receives the admin role."""
+    admin_arn = "arn:aws:iam::123456789012:role/OrbAdmin"
+    strategy = _make_strategy_with_admin_arns([admin_arn])
+
+    roles = await strategy._determine_roles(
+        {"Arn": admin_arn},
+        [],
+    )
+
+    assert "admin" in roles
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_admin_arns_case_insensitive_match_grants_admin():
+    """Matching is case-insensitive — mixed-case caller ARN still passes."""
+    strategy = _make_strategy_with_admin_arns(["arn:aws:iam::123456789012:role/orbadmin"])
+
+    # Caller ARN uses different casing — should still match after normalisation.
+    roles = await strategy._determine_roles(
+        {"Arn": "arn:aws:iam::123456789012:role/OrbAdmin"},
+        [],
+    )
+
+    assert "admin" in roles
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_admin_arns_substring_bypass_rejected_prefix_attack():
+    """
+    Substring-bypass attempt: caller ARN that STARTS WITH the admin ARN is rejected.
+
+    A naive `if admin_arn in caller_arn` check would pass this because the admin
+    ARN string is a substring of the longer attacker ARN.  The exact-match check
+    must reject it.
+    """
+    admin_arn = "arn:aws:iam::123456789012:role/OrbAdmin"
+    attacker_arn = admin_arn + "_malicious_suffix"
+
+    strategy = _make_strategy_with_admin_arns([admin_arn])
+
+    roles = await strategy._determine_roles(
+        {"Arn": attacker_arn},
+        [],
+    )
+
+    assert "admin" not in roles
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_admin_arns_substring_bypass_rejected_suffix_attack():
+    """
+    Substring-bypass attempt: caller ARN that CONTAINS the admin ARN as a segment
+    is rejected.
+
+    Example: attacker creates a role whose name embeds the admin ARN verbatim.
+    The set membership check (`caller_arn_lower in admin_arns_set`) is an exact
+    equality test and must not treat either string as a substring of the other.
+    """
+    admin_arn = "arn:aws:iam::123456789012:role/OrbAdmin"
+    # Attacker encodes the admin ARN inside their own ARN path segment.
+    attacker_arn = f"arn:aws:iam::999999999999:role/{admin_arn}"
+
+    strategy = _make_strategy_with_admin_arns([admin_arn])
+
+    roles = await strategy._determine_roles(
+        {"Arn": attacker_arn},
+        [],
+    )
+
+    assert "admin" not in roles
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_admin_arns_different_account_rejected():
+    """
+    A principal with the same role name but from a different AWS account is rejected.
+
+    This tests the cross-account bypass that the legacy name-pattern check is
+    vulnerable to (it only inspects the resource segment, not the account ID).
+    """
+    admin_arn = "arn:aws:iam::123456789012:role/OrbAdmin"
+    # Same role name, different account ID.
+    other_account_arn = "arn:aws:iam::999999999999:role/OrbAdmin"
+
+    strategy = _make_strategy_with_admin_arns([admin_arn])
+
+    roles = await strategy._determine_roles(
+        {"Arn": other_account_arn},
+        [],
+    )
+
+    assert "admin" not in roles
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_admin_arns_empty_list_falls_back_to_role_patterns():
+    """
+    When admin_arns is empty, the legacy name-pattern fallback still works.
+
+    This ensures backward compatibility for deployments that have not yet
+    configured an explicit admin_arns allowlist.
+    """
+    strategy = _make_strategy_with_admin_arns([])
+
+    # Legacy pattern: ARN whose resource name is "Admin" matches _DEFAULT_ADMIN_ROLE_PATTERNS.
+    roles = await strategy._determine_roles(
+        {"Arn": "arn:aws:iam::123456789012:user/Admin"},
+        [],
+    )
+
+    assert "admin" in roles
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_admin_arns_non_admin_caller_is_not_elevated():
+    """A caller not in the admin_arns allowlist does not receive the admin role."""
+    admin_arn = "arn:aws:iam::123456789012:role/OrbAdmin"
+    unrelated_arn = "arn:aws:iam::123456789012:role/ReadOnlyRole"
+
+    strategy = _make_strategy_with_admin_arns([admin_arn])
+
+    roles = await strategy._determine_roles(
+        {"Arn": unrelated_arn},
+        [],
+    )
+
+    assert "admin" not in roles
+
+
+@pytest.mark.unit
+def test_admin_arns_stored_as_lowercase_frozenset():
+    """
+    admin_arns are normalised to lowercase at construction time and stored in a
+    frozenset.  This guarantees the runtime lookup is a set __contains__ call
+    (exact equality) rather than any form of substring search.
+    """
+    mixed_case_arn = "arn:aws:IAM::123456789012:role/OrbAdmin"
+    strategy = _make_strategy_with_admin_arns([mixed_case_arn])
+
+    assert isinstance(strategy._admin_arns, frozenset)
+    assert mixed_case_arn.lower() in strategy._admin_arns
+    # The original mixed-case form must NOT appear — only the lowercased one.
+    assert mixed_case_arn not in strategy._admin_arns
+
+
+@pytest.mark.unit
+def test_from_auth_config_passes_admin_arns():
+    """from_auth_config propagates admin_arns from IAMAuthSubConfig."""
+    from orb.config.schemas.server_schema import AuthConfig, IAMAuthSubConfig, ProviderAuthSubConfig
+
+    admin_arn = "arn:aws:iam::123456789012:role/OrbAdmin"
+    auth_config = AuthConfig(  # type: ignore[call-arg]
+        strategy="iam",
+        provider_auth=ProviderAuthSubConfig(  # type: ignore[call-arg]
+            iam=IAMAuthSubConfig(admin_arns=[admin_arn])  # type: ignore[call-arg]
+        ),
+    )
+
+    with patch("orb.providers.aws.auth.iam_strategy.AWSSessionFactory") as mock_factory:
+        mock_session = MagicMock()
+        mock_session.client.return_value = MagicMock()
+        mock_factory.create_session.return_value = mock_session
+
+        from orb.providers.aws.auth.iam_strategy import IAMAuthStrategy
+
+        strategy = IAMAuthStrategy.from_auth_config(auth_config)
+
+    assert admin_arn.lower() in strategy._admin_arns
+
+
+# ---------------------------------------------------------------------------
+# admin_arns allowlist — :root unconditional bypass regression
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_root_arn_does_not_bypass_admin_arns_allowlist():
+    """
+    When admin_arns is non-empty, a :root ARN from any account must NOT receive
+    admin unless it is explicitly listed.
+
+    The old code granted admin unconditionally to any :root credential even when
+    an explicit allowlist was configured, violating the "exact allowlist" contract.
+    """
+    # Only this specific role is in the allowlist — root is deliberately NOT listed.
+    admin_arn = "arn:aws:iam::123456789012:role/DevAdmin"
+    strategy = _make_strategy_with_admin_arns([admin_arn])
+
+    # Attacker presents :root credentials from a different AWS account.
+    root_arn = "arn:aws:iam::999999999999:root"
+
+    roles = await strategy._determine_roles({"Arn": root_arn}, [])
+
+    assert "admin" not in roles, (
+        ":root must not bypass the admin_arns allowlist — "
+        "include the root ARN explicitly if root needs admin access."
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_root_arn_in_admin_arns_allowlist_is_granted_admin():
+    """
+    When the :root ARN is explicitly included in admin_arns it must be granted admin.
+    Operators who need root admin access should list the ARN explicitly.
+    """
+    root_arn = "arn:aws:iam::123456789012:root"
+    strategy = _make_strategy_with_admin_arns([root_arn])
+
+    roles = await strategy._determine_roles({"Arn": root_arn}, [])
+
+    assert "admin" in roles
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_root_arn_legacy_path_still_grants_admin_when_no_allowlist():
+    """
+    When admin_arns is empty (no explicit allowlist), the legacy :root fallback
+    continues to work for backward compatibility.
+    """
+    strategy = _make_strategy_with_admin_arns([])
+
+    root_arn = "arn:aws:iam::123456789012:root"
+    roles = await strategy._determine_roles({"Arn": root_arn}, [])
+
+    assert "admin" in roles
+
+
 @pytest.mark.asyncio
 @pytest.mark.unit
 async def test_iam_check_permissions_empty_required_actions_returns_empty_granted():
