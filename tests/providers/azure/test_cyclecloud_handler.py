@@ -12,20 +12,19 @@ from orb.providers.azure.exceptions.azure_exceptions import (
     CycleCloudNodeError,
     TerminationError,
 )
-from orb.providers.azure.infrastructure.handlers.cyclecloud_handler import (
-    CycleCloudHandler,
-    resolve_cc_state,
-)
 from orb.providers.azure.infrastructure.cyclecloud_session import (
     CycleCloudCredentialData,
     CycleCloudRequestContext,
 )
-from orb.providers.azure.infrastructure.handlers.azure_handler import AzureReleaseContext
 from orb.providers.azure.infrastructure.cyclecloud_session_builder import (
     CycleCloudSessionBuilder,
 )
+from orb.providers.azure.infrastructure.handlers.azure_handler import AzureReleaseContext
+from orb.providers.azure.infrastructure.handlers.cyclecloud_handler import (
+    CycleCloudHandler,
+    resolve_cc_state,
+)
 from tests.providers.azure.strategy_test_support import make_azure_template, run_operation
-
 
 # ---------------------------------------------------------------------------
 # Shared fixtures

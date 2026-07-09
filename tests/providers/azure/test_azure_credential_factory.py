@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from orb.providers.azure.infrastructure.credential_factory import (
-    AsyncDefaultAzureAccessTokenProvider,
     AsyncAzureCredentialAccessTokenProvider,
+    AsyncDefaultAzureAccessTokenProvider,
     AzureCredentialAccessTokenProvider,
     DefaultAzureAccessTokenProvider,
     create_default_azure_credential,

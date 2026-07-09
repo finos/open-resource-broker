@@ -2,8 +2,9 @@
 
 import json
 from pathlib import Path
-import pytest
 from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 from orb.bootstrap.infrastructure_services import register_infrastructure_services
 from orb.config import PerformanceConfig
@@ -12,11 +13,11 @@ from orb.domain.template.factory import TemplateFactory
 from orb.infrastructure.di.container import DIContainer
 from orb.infrastructure.template.dtos import TemplateDTO
 from orb.providers.azure.configuration.config import AzureProviderConfig
+from orb.providers.azure.configuration.template_extension import AzureTemplateExtensionConfig
 from orb.providers.azure.configuration.validator import (
     validate_azure_config,
     validate_azure_template,
 )
-from orb.providers.azure.configuration.template_extension import AzureTemplateExtensionConfig
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
 from orb.providers.azure.infrastructure.azure_client import AzureClient
 from orb.providers.azure.infrastructure.azure_handler_factory import AzureHandlerFactory
@@ -28,7 +29,6 @@ from orb.providers.azure.registration import (
     register_azure_template_factory,
 )
 from orb.providers.registry import ProviderRegistry
-
 
 # ---------------------------------------------------------------------------
 # Configuration

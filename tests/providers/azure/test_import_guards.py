@@ -5,7 +5,6 @@ from __future__ import annotations
 import sys
 from contextlib import contextmanager
 
-
 _MISSING_AZURE_MODULES = {
     "azure": None,
     "azure.core": None,

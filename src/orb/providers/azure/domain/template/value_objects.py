@@ -10,12 +10,11 @@ from pydantic import (
     Field,
     ValidationInfo,
     field_validator,
-    model_validator,
     model_serializer,
+    model_validator,
 )
 
 from orb.domain.base.value_objects import PriceType, ValueObject
-
 
 # ---------------------------------------------------------------------------
 # Enumerations

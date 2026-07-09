@@ -17,12 +17,12 @@ if TYPE_CHECKING:
     from orb.providers.azure.infrastructure.adapters.azure_validation_adapter import (
         AzureValidationAdapter,
     )
-    from orb.providers.azure.infrastructure.services.azure_native_spec_service import (
-        AzureNativeSpecService,
-    )
     from orb.providers.azure.infrastructure.azure_client import (
         AzureClient,
         AzureClientRuntimeConfig,
+    )
+    from orb.providers.azure.infrastructure.services.azure_native_spec_service import (
+        AzureNativeSpecService,
     )
     from orb.providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
     from orb.providers.registry import ProviderRegistry

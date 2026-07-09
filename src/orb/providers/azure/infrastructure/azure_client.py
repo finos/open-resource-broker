@@ -49,7 +49,6 @@ from orb.providers.azure.infrastructure.services.azure_network_identity_resolver
     AzureNetworkIdentityResolver,
 )
 
-
 if TYPE_CHECKING:
     from azure.mgmt.compute.aio import ComputeManagementClient as AsyncComputeManagementClient
     from azure.mgmt.network.aio import NetworkManagementClient as AsyncNetworkManagementClient

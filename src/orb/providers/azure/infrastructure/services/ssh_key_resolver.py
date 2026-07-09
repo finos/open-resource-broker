@@ -7,8 +7,7 @@ the Compute SDK, keeping infrastructure concerns out of the domain model.
 from __future__ import annotations
 
 from collections.abc import Awaitable
-from typing import Any
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class AzureSshPublicKeyResourceProtocol(Protocol):

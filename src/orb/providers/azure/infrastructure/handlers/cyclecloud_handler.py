@@ -17,14 +17,15 @@ Key CycleCloud concepts:
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
-from contextlib import asynccontextmanager
 from collections.abc import Awaitable, Callable
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import Any, Optional
 
 import httpx
-from orb.domain.base.ports import LoggingPort
+
 from orb.domain.base.dependency_injection import injectable
+from orb.domain.base.ports import LoggingPort
 from orb.domain.request.aggregate import Request
 from orb.providers.azure.configuration.config import AzureProviderConfig
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
@@ -36,6 +37,9 @@ from orb.providers.azure.exceptions.azure_exceptions import (
     CycleCloudNodeError,
     TerminationError,
 )
+from orb.providers.azure.infrastructure.credential_factory import (
+    AsyncAzureCredentialAccessTokenProvider,
+)
 from orb.providers.azure.infrastructure.cyclecloud_session import (
     AsyncCycleCloudSessionContext,
     CycleCloudRequestContext,
@@ -43,22 +47,18 @@ from orb.providers.azure.infrastructure.cyclecloud_session import (
 from orb.providers.azure.infrastructure.cyclecloud_session_builder import (
     CycleCloudSessionBuilder,
 )
-from orb.providers.azure.infrastructure.credential_factory import (
-    AsyncAzureCredentialAccessTokenProvider,
-)
-from orb.providers.azure.infrastructure.handlers.azure_handler import (
-    AzureAcquireHostsResult,
-    AzureHandler,
-    AzureReleaseContext,
-    AzureHandlerStatusResult,
-    AzureStatusProviderData,
-    AzureReleaseHostsResult,
-)
 from orb.providers.azure.infrastructure.error_codes import (
     ProviderErrorEntry,
     collect_provider_error_codes,
 )
-
+from orb.providers.azure.infrastructure.handlers.azure_handler import (
+    AzureAcquireHostsResult,
+    AzureHandler,
+    AzureHandlerStatusResult,
+    AzureReleaseContext,
+    AzureReleaseHostsResult,
+    AzureStatusProviderData,
+)
 
 # CycleCloud node state → domain status mapping
 _CC_STATE_MAP: dict[str, str] = {

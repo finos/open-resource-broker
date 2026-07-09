@@ -18,7 +18,6 @@ from orb.providers.azure.domain.template.value_objects import (
 )
 from orb.providers.azure.infrastructure.services.arm_payload_mapper import ArmPayloadMapper
 
-
 # ---------------------------------------------------------------------------
 # Required fields
 # ---------------------------------------------------------------------------

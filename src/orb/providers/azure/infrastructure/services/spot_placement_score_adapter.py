@@ -7,14 +7,14 @@ from typing import Any, Protocol
 
 import httpx
 
+from orb.domain.base.ports import LoggingPort
+from orb.providers.azure.domain.template.value_objects import AzureLocationName
+from orb.providers.azure.infrastructure.azure_client import AzureClient
 from orb.providers.azure.services.spot_placement_planner import (
     PlacementCandidate,
     PlacementScore,
     SpotPlacementScoreAdapter,
 )
-from orb.domain.base.ports import LoggingPort
-from orb.providers.azure.domain.template.value_objects import AzureLocationName
-from orb.providers.azure.infrastructure.azure_client import AzureClient
 
 
 class AzureSpotPlacementTemplate(Protocol):

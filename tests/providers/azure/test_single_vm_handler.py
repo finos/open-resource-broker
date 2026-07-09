@@ -7,8 +7,8 @@ from azure.core.exceptions import HttpResponseError, ResourceNotFoundError
 
 from orb.providers.azure.exceptions.azure_exceptions import LaunchError, TerminationError
 from orb.providers.azure.infrastructure.handlers.azure_handler import (
-    AzureReleaseContext,
     RAISE_ON_STATUS_ERROR_METADATA_KEY,
+    AzureReleaseContext,
 )
 from orb.providers.azure.infrastructure.handlers.single_vm_handler import (
     SingleVMHandler,

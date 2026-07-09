@@ -14,21 +14,14 @@ from collections.abc import Mapping
 from threading import Condition, RLock
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
-from orb.providers.azure.services.spot_placement_execution import (
-    SpotPlacementExecutionService,
-)
-from orb.providers.azure.services.spot_placement_planner import (
-    PlacementPlanEntry,
-    SpotPlacementPlanner,
-)
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
-from orb.providers.azure.configuration.config import AzureProviderConfig
-from orb.providers.azure.configuration.validator import validate_azure_template
 from orb.providers.azure.capabilities import (
     get_supported_api_capabilities,
     get_supported_apis,
 )
+from orb.providers.azure.configuration.config import AzureProviderConfig
+from orb.providers.azure.configuration.validator import validate_azure_template
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.domain.template.value_objects import AzurePriority, AzureProviderApi
 from orb.providers.azure.exceptions import AzureError, AzureValidationError
@@ -37,13 +30,13 @@ from orb.providers.azure.infrastructure.error_utils import (
     extract_azure_error_details,
 )
 from orb.providers.azure.infrastructure.vmss_cleanup import VmssCleanupCoordinator
-from orb.providers.azure.services.health_check_service import AzureHealthCheckService
 from orb.providers.azure.services.cyclecloud_request_context_service import (
     resolve_cyclecloud_request_metadata,
 )
+from orb.providers.azure.services.health_check_service import AzureHealthCheckService
 from orb.providers.azure.services.inventory_service import (
-    AzureReadOperationContext,
     AzureInventoryService,
+    AzureReadOperationContext,
     build_read_operation_context,
 )
 from orb.providers.azure.services.operation_parsing import resolve_operation_provider_api
@@ -56,6 +49,13 @@ from orb.providers.azure.services.resource_metadata_service import (
 )
 from orb.providers.azure.services.runtime_dependencies import AzureRuntimeDependencies
 from orb.providers.azure.services.spot_launch_service import AzureSpotLaunchService
+from orb.providers.azure.services.spot_placement_execution import (
+    SpotPlacementExecutionService,
+)
+from orb.providers.azure.services.spot_placement_planner import (
+    PlacementPlanEntry,
+    SpotPlacementPlanner,
+)
 from orb.providers.azure.services.template_catalog_service import AzureTemplateCatalogService
 from orb.providers.azure.services.termination_service import AzureTerminationService
 from orb.providers.base.strategy import (
@@ -71,13 +71,13 @@ if TYPE_CHECKING:
     from orb.providers.azure.infrastructure.azure_client import AzureClient
     from orb.providers.azure.infrastructure.azure_handler_factory import AzureHandlerFactory
     from orb.providers.azure.infrastructure.handlers.azure_handler import AzureHandler
-    from orb.providers.azure.managers.azure_resource_manager import AzureResourceManager
     from orb.providers.azure.infrastructure.services.azure_deployment_service import (
         AzureDeploymentService,
     )
     from orb.providers.azure.infrastructure.services.azure_native_spec_service import (
         AzureNativeSpecService,
     )
+    from orb.providers.azure.managers.azure_resource_manager import AzureResourceManager
 
 
 def _provider_config_mapping(template_config: dict[str, Any]) -> Mapping[str, Any]:

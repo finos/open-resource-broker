@@ -1,21 +1,12 @@
 """Azure spot-placement planning and execution helpers."""
 
 from __future__ import annotations
+
 from dataclasses import dataclass, replace
 from typing import Any, Awaitable, Callable, Mapping, Optional, Protocol
 
-from orb.providers.azure.services.spot_placement_execution import (
-    SpotPlacementExecutionSummary,
-    build_planned_execution_metadata,
-    create_acquire_request,
-)
-from orb.providers.azure.services.spot_placement_planner import (
-    PlacementCandidate,
-    PlacementPlanEntry,
-    PlacementScore,
-    SpotPlacementPlanner,
-)
 from orb.domain.base.ports import LoggingPort
+from orb.domain.request.aggregate import Request
 from orb.providers.azure.configuration.config import AzureProviderConfig
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.domain.template.value_objects import (
@@ -27,7 +18,17 @@ from orb.providers.azure.infrastructure.handlers.azure_handler import AzureHandl
 from orb.providers.azure.infrastructure.services.spot_placement_score_adapter import (
     AzureSpotPlacementScoreAdapter,
 )
-from orb.domain.request.aggregate import Request
+from orb.providers.azure.services.spot_placement_execution import (
+    SpotPlacementExecutionSummary,
+    build_planned_execution_metadata,
+    create_acquire_request,
+)
+from orb.providers.azure.services.spot_placement_planner import (
+    PlacementCandidate,
+    PlacementPlanEntry,
+    PlacementScore,
+    SpotPlacementPlanner,
+)
 from orb.providers.base.strategy import ProviderOperation, ProviderResult
 
 

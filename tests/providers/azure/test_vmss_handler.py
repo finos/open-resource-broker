@@ -1,15 +1,15 @@
 """Focused tests for VMSS handler behavior."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from azure.mgmt.compute.models import OrchestrationMode
 
 from orb.providers.azure.domain.template.value_objects import AzureVMSSOrchestrationMode
 from orb.providers.azure.exceptions.azure_exceptions import AzureValidationError, TerminationError
 from orb.providers.azure.infrastructure.handlers.azure_handler import (
-    AzureReleaseContext,
     RAISE_ON_STATUS_ERROR_METADATA_KEY,
+    AzureReleaseContext,
 )
 from orb.providers.azure.infrastructure.handlers.vmss_handler import VMSSHandler
 from tests.providers.azure.strategy_test_support import (
