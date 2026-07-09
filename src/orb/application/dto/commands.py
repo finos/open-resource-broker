@@ -89,12 +89,6 @@ class CleanupOldRequestsCommand(BaseCommand):
     request_ids_found: Optional[list[str]] = None
 
 
-class CleanupTerminatedMachinesCommand(Command, BaseModel):
-    """Command to clean up terminated machines."""
-
-    model_config = ConfigDict(frozen=True)
-
-    age_hours: int = 24
 
 
 class CleanupAllResourcesCommand(BaseCommand):

@@ -21,20 +21,6 @@ class ListRequestsQuery(BaseQuery):
     sort: Optional[str] = None
 
 
-class GetRequestHistoryQuery(BaseQuery):
-    """Query to get request history."""
-
-    request_id: str
-    include_events: bool = True
-
-
-class GetActiveRequestsQuery(BaseQuery):
-    """Query to get all active requests."""
-
-    template_id: Optional[str] = None
-    limit: int = 100
-    filter_expressions: list[str] = []
-
 
 class GetRequestMetricsQuery(BaseQuery):
     """Query to get request metrics and statistics."""

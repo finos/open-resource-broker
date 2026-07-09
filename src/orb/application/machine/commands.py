@@ -21,29 +21,6 @@ class CleanupMachineResourcesCommand(BaseCommand):
     metadata: dict[str, Any] = {}
 
 
-class ConvertMachineStatusCommand(BaseCommand):
-    """Command to convert provider-specific status to domain status."""
-
-    provider_state: str
-    provider_type: str
-    metadata: dict[str, Any] = {}
-
-
-class ConvertBatchMachineStatusCommand(BaseCommand):
-    """Command to convert multiple provider states to domain statuses."""
-
-    # List of {'state': str, 'provider_type': str}
-    provider_states: list[dict[str, str]]
-    metadata: dict[str, Any] = {}
-
-
-class ValidateProviderStateCommand(BaseCommand):
-    """Command to validate provider state."""
-
-    provider_state: str
-    provider_type: str
-    metadata: dict[str, Any] = {}
-
 
 class RegisterMachineCommand(BaseCommand):
     """Command to register a new machine."""

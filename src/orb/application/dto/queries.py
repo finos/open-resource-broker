@@ -147,12 +147,6 @@ class GetRequestSummaryQuery(Query, BaseModel):
     request_id: str
 
 
-class GetMachineHealthQuery(Query, BaseModel):
-    """Query to get machine health status."""
-
-    model_config = ConfigDict(frozen=True)
-
-    machine_id: str
 
 
 class ValidateStorageQuery(Query, BaseModel):
@@ -185,32 +179,4 @@ class ListCleanableResourcesQuery(Query, BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
-# Template Result Queries
-class GetTemplateValidationResultQuery(Query, BaseModel):
-    """Query to get template validation results."""
 
-    model_config = ConfigDict(frozen=True)
-
-    template_id: str
-
-
-# Dashboard aggregate count queries — return {value: count} dicts via a single
-# storage-layer GROUP BY instead of listing all rows into Python.
-
-
-class CountMachinesByStatusQuery(Query, BaseModel):
-    """Query to count machines grouped by status."""
-
-    model_config = ConfigDict(frozen=True)
-
-
-class CountRequestsByStatusQuery(Query, BaseModel):
-    """Query to count requests grouped by status."""
-
-    model_config = ConfigDict(frozen=True)
-
-
-class CountTemplatesByProviderApiQuery(Query, BaseModel):
-    """Query to count templates grouped by provider_api."""
-
-    model_config = ConfigDict(frozen=True)
