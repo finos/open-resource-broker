@@ -8,7 +8,11 @@ from orb.application.ports.command_bus_port import CommandBusPort
 from orb.application.ports.query_bus_port import QueryBusPort
 from orb.application.provider.commands import ExecuteProviderOperationCommand
 from orb.application.services.orchestration.base import OrchestratorBase
-from orb.application.services.orchestration.dtos import StopMachinesInput, StopMachinesOutput
+from orb.application.services.orchestration.dtos import (
+    Paginated,
+    StopMachinesInput,
+    StopMachinesOutput,
+)
 from orb.application.services.provider_registry_service import ProviderRegistryService
 from orb.domain.base.operations import (
     Operation as ProviderOperation,
@@ -41,17 +45,15 @@ class StopMachinesOrchestrator(OrchestratorBase[StopMachinesInput, StopMachinesO
         )
 
         if input.all_machines:
-            machine_dtos = (
-                await self._query_bus.execute(
-                    ListMachinesQuery(
-                        status="running",
-                        provider_name=input.provider_name,
-                        provider_type=input.provider_type,
-                        filter_expressions=input.filter_expressions,
-                    )
+            result = await self._query_bus.execute(
+                ListMachinesQuery(
+                    status="running",
+                    provider_name=input.provider_name,
+                    provider_type=input.provider_type,
+                    filter_expressions=input.filter_expressions,
                 )
-                or []
             )
+            machine_dtos = result.items if isinstance(result, Paginated) else (result or [])
             machine_ids = [m.machine_id for m in machine_dtos]
         else:
             machine_ids = list(input.machine_ids)
