@@ -241,7 +241,7 @@ def test_single_vm_and_mig_payloads_share_common_instance_configuration(monkeypa
             "boot_disk_size_gb": 200,
             "labels": {"env": "test"},
             "network_tags": ["orb", "worker"],
-            "provisioning_model": "SPOT",
+            "price_type": "spot",
         }
     )
     single_vm_template = GCPTemplate.model_validate(base_template)

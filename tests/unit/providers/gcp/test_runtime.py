@@ -1181,7 +1181,7 @@ async def test_strategy_create_single_vm_uses_provider_zone_when_template_dto_ha
 
 
 @pytest.mark.asyncio
-async def test_strategy_create_spot_template_derives_gcp_provisioning_model() -> None:
+async def test_strategy_create_spot_template_accepts_neutral_price_type() -> None:
     strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
     assert strategy.initialize() is True
 
@@ -1205,7 +1205,6 @@ async def test_strategy_create_spot_template_derives_gcp_provisioning_model() ->
                     "source_image_project": "debian-cloud",
                     "provider_config": {
                         "provider_api": "MIG",
-                        "provisioning_model": "STANDARD",
                     },
                 },
             },

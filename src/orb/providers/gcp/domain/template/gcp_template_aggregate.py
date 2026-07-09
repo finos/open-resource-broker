@@ -19,7 +19,6 @@ from orb.providers.gcp.domain.template.value_objects import (
     GCPMIGScope,
     GCPProjectId,
     GCPProviderApi,
-    GCPProvisioningModel,
     GCPRegion,
     GCPZone,
 )
@@ -62,7 +61,6 @@ class GCPTemplate(Template):
     )
     labels: dict[str, str] = Field(default_factory=dict)
     network_tags: list[str] = Field(default_factory=list)
-    provisioning_model: GCPProvisioningModel = GCPProvisioningModel.STANDARD
     source_image: Optional[str] = None
     source_image_family: Optional[str] = None
     source_image_project: Optional[str] = None
@@ -128,10 +126,5 @@ class GCPTemplate(Template):
             raise ValueError(
                 "GCP templates require source_image or source_image_family + source_image_project"
             )
-
-        # Spot instances in Compute Engine use provisioningModel=SPOT:
-        # https://cloud.google.com/compute/docs/instances/spot
-        if self.price_type == "spot" and self.provisioning_model != GCPProvisioningModel.SPOT:
-            raise ValueError("spot price_type requires provisioning_model='SPOT'")
 
         return self

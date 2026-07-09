@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -38,9 +38,9 @@ class GCPTemplateExtensionConfig(BaseModel):
     )
     network_tags: list[str] = Field(default_factory=list, description="Default network tags")
     labels: dict[str, str] = Field(default_factory=dict, description="Default instance labels")
-    provisioning_model: str = Field(
-        default="STANDARD",
-        description="Default GCP provisioning model (STANDARD or SPOT)",
+    price_type: Literal["ondemand", "spot"] = Field(
+        default="ondemand",
+        description="Default provider-neutral price type",
     )
     source_image_family: Optional[str] = Field(
         default="debian-12", description="Default source image family"
@@ -63,11 +63,9 @@ class GCPTemplateExtensionConfig(BaseModel):
             "volume_type": self.boot_disk_type,
             "boot_disk_size_gb": self.boot_disk_size_gb,
             "boot_disk_type": self.boot_disk_type,
-            "metadata": {
-                "gcp_provisioning_model": self.provisioning_model,
-            },
             "tags": self.labels,
             "labels": self.labels,
+            "price_type": self.price_type,
         }
         if self.service_account_email:
             defaults["instance_profile"] = self.service_account_email
