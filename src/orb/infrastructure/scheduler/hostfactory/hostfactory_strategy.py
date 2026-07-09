@@ -12,6 +12,11 @@ from orb.application.dto.responses import MachineDTO
 from orb.application.request.dto import RequestDTO
 from orb.infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
 from orb.infrastructure.scheduler.hostfactory.field_mapper import HostFactoryFieldMapper
+from orb.infrastructure.scheduler.hostfactory.formatters.status_mapper import (
+    generate_status_message,
+    map_domain_status_to_hostfactory,
+    map_machine_status_to_result,
+)
 from orb.infrastructure.scheduler.hostfactory.transformations import HostFactoryTransformations
 from orb.infrastructure.template.dtos import TemplateDTO
 from orb.infrastructure.utilities.common.string_utils import extract_provider_type
@@ -936,55 +941,15 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         self, status: str | None, request_type: str | None = None
     ) -> str:
         """Map machine status to HostFactory result field per hf_docs/input-output.md."""
-        # Per docs: "Possible values: 'executing', 'fail', 'succeed'"
-        if request_type == "return":
-            # For return requests: terminated/stopped = success, in-flight = executing
-            if status in ["terminated", "stopped"]:
-                return "succeed"
-            elif status in ["shutting-down", "stopping", "pending", "terminating", "running"]:
-                return "executing"
-            else:
-                return "fail"
-        # For acquire requests, running is success
-        elif status == "running":
-            return "succeed"
-        elif status in ["pending", "launching"]:
-            return "executing"
-        elif status in ["terminated", "failed", "error"]:
-            return "fail"
-        else:
-            return "executing"  # Default for unknown states
+        return map_machine_status_to_result(status, request_type=request_type)
 
     def _map_domain_status_to_hostfactory(self, domain_status: str) -> str:
         """Map domain status to HostFactory status per hf_docs/input-output.md."""
-        # Per docs: "Possible values: 'running', 'complete', 'complete_with_error'"
-        status_mapping = {
-            "pending": "running",
-            "in_progress": "running",
-            "provisioning": "running",
-            "complete": "complete",
-            "completed": "complete",
-            "partial": "complete_with_error",
-            "failed": "complete_with_error",
-            "cancelled": "complete_with_error",
-            "timeout": "complete_with_error",
-            "error": "complete_with_error",
-        }
-
-        return status_mapping.get(domain_status.lower(), "running")
+        return map_domain_status_to_hostfactory(domain_status)
 
     def _generate_status_message(self, status: str, machine_count: int) -> str:
         """Generate appropriate status message."""
-        if status == "completed":
-            return ""  # HostFactory examples show empty message for success
-        elif status == "partial":
-            return f"Partially fulfilled: {machine_count} instances created"
-        elif status == "failed":
-            return "Failed to create instances"
-        elif status in ["pending", "in_progress", "provisioning"]:
-            return ""  # HostFactory examples show empty message for running
-        else:
-            return ""
+        return generate_status_message(status, machine_count)
 
     def format_template_for_display(self, template: TemplateDTO) -> dict[str, Any]:
         """Format TemplateDTO for display using HostFactory field mapper."""
