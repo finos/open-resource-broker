@@ -16,6 +16,7 @@ class ErrorCategory:
 
     # Business rule errors
     BUSINESS_RULE_VIOLATION = "business_rule_violation"
+    DUPLICATE = "duplicate_error"
     INVALID_STATE = "invalid_state"
     OPERATION_NOT_ALLOWED = "operation_not_allowed"
 

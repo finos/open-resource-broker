@@ -157,6 +157,7 @@ class InfrastructureErrorResponse(BaseDTO):
             ErrorCategory.MACHINE_NOT_FOUND: HTTPStatus.NOT_FOUND,
             ErrorCategory.REQUEST_NOT_FOUND: HTTPStatus.NOT_FOUND,
             ErrorCategory.BUSINESS_RULE_VIOLATION: HTTPStatus.UNPROCESSABLE_ENTITY,
+            ErrorCategory.DUPLICATE: HTTPStatus.CONFLICT,
             ErrorCategory.INVALID_STATE: HTTPStatus.CONFLICT,
             ErrorCategory.OPERATION_NOT_ALLOWED: HTTPStatus.FORBIDDEN,
             ErrorCategory.CONFIGURATION: HTTPStatus.INTERNAL_SERVER_ERROR,

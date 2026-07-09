@@ -7,7 +7,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict
 
 from orb.application.request.dto import MachineReferenceDTO
-from orb.infrastructure.error.exception_handler import InfrastructureErrorResponse
+from orb.infrastructure.error.responses import InfrastructureErrorResponse
 
 # ---------------------------------------------------------------------------
 # Pydantic response models (snake_case, default scheduler canonical format)

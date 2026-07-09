@@ -20,11 +20,8 @@ except ImportError:  # FastAPI is optional — define a private sentinel never r
 
     _HTTP_EXCEPTION_TYPE = _FastAPIHTTPException
 
-from orb.infrastructure.error.exception_handler import (
-    ExceptionContext,
-    ExceptionHandler,
-    get_exception_handler,
-)
+from orb.infrastructure.error.context import ExceptionContext
+from orb.infrastructure.error.exception_handler import ExceptionHandler, get_exception_handler
 
 
 def handle_exceptions(

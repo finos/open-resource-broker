@@ -28,7 +28,8 @@ from orb.domain.template.exceptions import (
     TemplateNotFoundError,
     TemplateValidationError,
 )
-from orb.infrastructure.error.exception_handler import ErrorCategory, ErrorCode, ErrorResponse
+from orb.infrastructure.error.categories import ErrorCategory, ErrorCode
+from orb.infrastructure.error.responses import ErrorResponse
 
 
 class HTTPErrorResponseHandler:

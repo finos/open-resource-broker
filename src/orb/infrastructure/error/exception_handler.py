@@ -16,13 +16,8 @@ import json
 import threading
 from datetime import datetime, timezone
 from http import HTTPStatus
+from typing import TYPE_CHECKING, Callable, Optional
 
-# Import for HTTP error handling delegation
-from typing import TYPE_CHECKING, Any, Callable, Optional
-
-from pydantic import Field
-
-from orb.application.dto.base import BaseDTO
 from orb.domain.base.exceptions import (
     BusinessRuleViolationError,
     ConfigurationError,
@@ -47,256 +42,28 @@ from orb.domain.template.exceptions import (
     TemplateNotFoundError,
     TemplateValidationError,
 )
+from orb.infrastructure.error.categories import ErrorCategory, ErrorCode
+from orb.infrastructure.error.context import ExceptionContext
 from orb.infrastructure.error.exception_type_mapper import ExceptionTypeMapper
+from orb.infrastructure.error.responses import ErrorResponse, InfrastructureErrorResponse
 from orb.infrastructure.logging.logger import get_logger
 
 if TYPE_CHECKING:
     from orb.infrastructure.error.http_response_handler import HTTPErrorResponseHandler
 
-
-class ErrorCategory:
-    """Error categories for classification."""
-
-    # Domain errors
-    VALIDATION = "validation_error"
-    BUSINESS_RULE = "business_rule_violation"
-    ENTITY_NOT_FOUND = "entity_not_found"
-
-    # Specific not found errors
-    TEMPLATE_NOT_FOUND = "template_not_found"
-    MACHINE_NOT_FOUND = "machine_not_found"
-    REQUEST_NOT_FOUND = "request_not_found"
-
-    # Business rule errors
-    BUSINESS_RULE_VIOLATION = "business_rule_violation"
-    DUPLICATE = "duplicate_error"
-    INVALID_STATE = "invalid_state"
-    OPERATION_NOT_ALLOWED = "operation_not_allowed"
-
-    # Infrastructure errors
-    CONFIGURATION = "configuration_error"
-    DATABASE_ERROR = "database_error"
-    NETWORK_ERROR = "network_error"
-    EXTERNAL_SERVICE_ERROR = "external_service_error"
-
-    # System errors
-    INTERNAL_ERROR = "internal_error"
-    UNEXPECTED_ERROR = "unexpected_error"
-
-    # Legacy compatibility
-    NOT_FOUND = "not_found_error"
-    INFRASTRUCTURE = "infrastructure_error"
-    EXTERNAL_SERVICE = "external_service_error"
-    UNAUTHORIZED = "unauthorized_error"
-    FORBIDDEN = "forbidden_error"
-    INTERNAL = "internal_error"
-
-
-class ErrorCode:
-    """Specific error codes for detailed error reporting."""
-
-    # Validation errors
-    INVALID_INPUT = "invalid_input"
-    MISSING_FIELD = "missing_field"
-    INVALID_FORMAT = "invalid_format"
-
-    # Not found errors
-    RESOURCE_NOT_FOUND = "resource_not_found"
-    TEMPLATE_NOT_FOUND = "template_not_found"
-    MACHINE_NOT_FOUND = "machine_not_found"
-    REQUEST_NOT_FOUND = "request_not_found"
-
-    # Business rule errors
-    BUSINESS_RULE_VIOLATION = "business_rule_violation"
-    INVALID_STATE = "invalid_state"
-    OPERATION_NOT_ALLOWED = "operation_not_allowed"
-
-    # Infrastructure errors
-    DATABASE_ERROR = "database_error"
-    NETWORK_ERROR = "network_error"
-    EXTERNAL_SERVICE_ERROR = "external_service_error"
-
-    # System errors
-    INTERNAL_ERROR = "internal_error"
-    UNEXPECTED_ERROR = "unexpected_error"
-
-
-class InfrastructureErrorResponse(BaseDTO):
-    """
-    Infrastructure layer error response.
-
-    Wraps domain errors with infrastructure-specific context
-    and provides formatting capabilities for different output formats.
-    """
-
-    error_code: str
-    message: str
-    category: str = ErrorCategory.INTERNAL
-    details: dict[str, Any] = Field(default_factory=dict)
-    http_status: int = HTTPStatus.INTERNAL_SERVER_ERROR
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-    @classmethod
-    def from_domain_error(
-        cls,
-        error_code: str,
-        message: str,
-        category: str = ErrorCategory.INTERNAL,
-        details: Optional[dict[str, Any]] = None,
-        http_status: Optional[int] = None,
-    ) -> "InfrastructureErrorResponse":
-        """Create infrastructure error response from domain error components."""
-        if http_status is None:
-            http_status = cls._determine_http_status(category)
-
-        return cls(
-            error_code=error_code,
-            message=message,
-            category=category,
-            details=details or {},
-            http_status=http_status,
-        )
-
-    @classmethod
-    def from_exception(
-        cls, exception: Exception, context: Optional[str] = None
-    ) -> "InfrastructureErrorResponse":
-        """Create infrastructure error response from exception."""
-        error_code, message, category, details = cls._exception_to_components(exception)
-        http_status = cls._determine_http_status(category)
-
-        if context:
-            details["context"] = context
-
-        return cls(
-            error_code=error_code,
-            message=message,
-            category=category,
-            details=details,
-            http_status=http_status,
-        )
-
-    def to_api_response(self) -> dict[str, Any]:
-        """Convert to API response format."""
-        return {
-            "error": {
-                "code": self.error_code,
-                "message": self.message,
-                "category": self.category,
-                "details": self.details,
-            },
-            "status": "error",
-            "timestamp": self.timestamp.isoformat(),
-        }
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert error response to dictionary."""
-        return {
-            "error": {
-                "code": self.error_code,
-                "message": self.message,
-                "category": self.category,
-                "details": self.details,
-            },
-            "status": self.http_status,
-            "timestamp": self.timestamp.isoformat(),
-        }
-
-    @staticmethod
-    def _exception_to_components(
-        exception: Exception,
-    ) -> tuple[str, str, str, dict[str, Any]]:
-        """Convert exception to error components."""
-        if isinstance(exception, ValidationError):
-            return (
-                "VALIDATION_ERROR",
-                str(exception),
-                ErrorCategory.VALIDATION,
-                getattr(exception, "details", {}),
-            )
-        elif isinstance(exception, EntityNotFoundError):
-            return (
-                "ENTITY_NOT_FOUND",
-                str(exception),
-                ErrorCategory.ENTITY_NOT_FOUND,
-                {"entity_type": getattr(exception, "entity_type", "unknown")},
-            )
-        elif isinstance(exception, BusinessRuleViolationError):
-            return (
-                "BUSINESS_RULE_VIOLATION",
-                str(exception),
-                ErrorCategory.BUSINESS_RULE_VIOLATION,
-                getattr(exception, "details", {}),
-            )
-        elif isinstance(exception, ConfigurationError):
-            return (
-                "CONFIGURATION_ERROR",
-                str(exception),
-                ErrorCategory.CONFIGURATION,
-                getattr(exception, "details", {}),
-            )
-        elif isinstance(exception, InfrastructureError):
-            return (
-                "INFRASTRUCTURE_ERROR",
-                str(exception),
-                ErrorCategory.DATABASE_ERROR,
-                getattr(exception, "details", {}),
-            )
-        else:
-            return (
-                "UNEXPECTED_ERROR",
-                str(exception),
-                ErrorCategory.UNEXPECTED_ERROR,
-                {"exception_type": type(exception).__name__},
-            )
-
-    @staticmethod
-    def _determine_http_status(category: str) -> int:
-        """Determine HTTP status code from error category."""
-        category_to_status = {
-            ErrorCategory.VALIDATION: HTTPStatus.BAD_REQUEST,
-            ErrorCategory.ENTITY_NOT_FOUND: HTTPStatus.NOT_FOUND,
-            ErrorCategory.TEMPLATE_NOT_FOUND: HTTPStatus.NOT_FOUND,
-            ErrorCategory.MACHINE_NOT_FOUND: HTTPStatus.NOT_FOUND,
-            ErrorCategory.REQUEST_NOT_FOUND: HTTPStatus.NOT_FOUND,
-            ErrorCategory.BUSINESS_RULE_VIOLATION: HTTPStatus.UNPROCESSABLE_ENTITY,
-            ErrorCategory.DUPLICATE: HTTPStatus.CONFLICT,
-            ErrorCategory.INVALID_STATE: HTTPStatus.CONFLICT,
-            ErrorCategory.OPERATION_NOT_ALLOWED: HTTPStatus.FORBIDDEN,
-            ErrorCategory.CONFIGURATION: HTTPStatus.INTERNAL_SERVER_ERROR,
-            ErrorCategory.DATABASE_ERROR: HTTPStatus.INTERNAL_SERVER_ERROR,
-            ErrorCategory.NETWORK_ERROR: HTTPStatus.BAD_GATEWAY,
-            ErrorCategory.EXTERNAL_SERVICE_ERROR: HTTPStatus.BAD_GATEWAY,
-            ErrorCategory.INTERNAL_ERROR: HTTPStatus.INTERNAL_SERVER_ERROR,
-            ErrorCategory.UNEXPECTED_ERROR: HTTPStatus.INTERNAL_SERVER_ERROR,
-        }
-        return category_to_status.get(category, HTTPStatus.INTERNAL_SERVER_ERROR)
-
-
-# Backward compatibility alias
-ErrorResponse = InfrastructureErrorResponse
-
-
-class ExceptionContext:
-    """Rich context information for exception handling."""
-
-    def __init__(self, operation: str, layer: str = "application", **additional_context) -> None:
-        """Initialize the instance."""
-        self.operation = operation
-        self.layer = layer
-        self.timestamp = datetime.now(timezone.utc)
-        self.thread_id = threading.get_ident()
-        self.additional_context = additional_context
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert context to dictionary for logging."""
-        return {
-            "operation": self.operation,
-            "layer": self.layer,
-            "timestamp": self.timestamp.isoformat(),
-            "thread_id": self.thread_id,
-            **self.additional_context,
-        }
+# Re-export for backward compatibility — callers that do
+#   from orb.infrastructure.error.exception_handler import ErrorCategory
+# continue to work unchanged.
+__all__ = [
+    "ErrorCategory",
+    "ErrorCode",
+    "ErrorResponse",
+    "ExceptionContext",
+    "ExceptionHandler",
+    "InfrastructureErrorResponse",
+    "get_exception_handler",
+    "reset_exception_handler",
+]
 
 
 class ExceptionHandler:
