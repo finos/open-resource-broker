@@ -150,19 +150,29 @@ class TestMetricsEndpoint:
         # process, but the request must not 500).
 
     def test_k8s_metrics_surface_on_endpoint(self):
-        # The crux fix: k8s provider metrics register on prometheus_client
-        # REGISTRY and must appear on /metrics alongside the homegrown text.
+        # The crux fix: k8s provider metrics are backed by OTel instruments
+        # which flow through the PrometheusMetricReader onto REGISTRY.
+        # We prove this end-to-end by building an isolated OTel meter +
+        # registry pair and asserting generate_latest produces the
+        # orb_k8s_* names — exactly what the /metrics endpoint sees when
+        # configure_telemetry is active.
+        from opentelemetry.exporter.prometheus import PrometheusMetricReader
+        from opentelemetry.sdk.metrics import MeterProvider
         from prometheus_client import CollectorRegistry, generate_latest
 
         from orb.providers.k8s.infrastructure.services.metrics import K8sMetrics
 
-        # Register a k8s metric on an isolated registry and prove the endpoint's
-        # generate_latest wiring would surface it.  We assert against the same
-        # serialiser the endpoint uses rather than mutating the global REGISTRY.
         reg = CollectorRegistry()
-        metrics = K8sMetrics(registry=reg)
-        metrics.acquire_total.labels(namespace="orb", spec_kind="Pod").inc()
+        reader = PrometheusMetricReader(registry=reg)
+        provider = MeterProvider(metric_readers=[reader])
+        meter = provider.get_meter("test")
+
+        metrics = K8sMetrics(meter=meter)
+        metrics._acquire_total.add(1, {"namespace": "orb", "spec_kind": "Pod"})
+
         text = generate_latest(reg).decode("utf-8")
         assert "orb_k8s_acquire_total" in text
         assert 'namespace="orb"' in text
         assert 'spec_kind="Pod"' in text
+
+        provider.shutdown()

@@ -8,7 +8,6 @@ from botocore.exceptions import ClientError
 
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import ConfigurationPort, LoggingPort
-from orb.monitoring.metrics import MetricsCollector
 from orb.providers.aws.exceptions.aws_exceptions import (
     AuthorizationError,
     AWSConfigurationError,
@@ -32,7 +31,6 @@ class AWSClient:
         config: ConfigurationPort,
         logger: LoggingPort,
         provider_name: Optional[str] = None,
-        metrics: Optional[MetricsCollector] = None,
         active_provider_name_resolver: Optional[Any] = None,
     ) -> None:
         """
@@ -42,7 +40,6 @@ class AWSClient:
             config: Configuration port for accessing configuration
             logger: Logger for logging messages
             provider_name: Specific provider instance name (for multi-provider support)
-            metrics: Optional metrics collector for AWS API instrumentation
             active_provider_name_resolver: Optional callable returning the active provider
                 instance name. Replaces the service-locator pattern: when provider_name
                 is None this callable is invoked instead of get_container().
@@ -115,19 +112,16 @@ class AWSClient:
             self._account_id = None
             self._credentials_validated = False
 
-            # Initialize metrics handler if metrics collector is available and AWS metrics are enabled
+            # Initialize metrics handler — BotocoreMetricsHandler now writes
+            # directly to an OTel Meter; no MetricsCollector needed.
             self._metrics_handler: Optional[BotocoreMetricsHandler] = None
-            if metrics and self._should_enable_aws_metrics():
-                aws_metrics_cfg = (
-                    metrics.config.get("provider_metrics", {}) if hasattr(metrics, "config") else {}
-                )
-                self._metrics_handler = BotocoreMetricsHandler(metrics, logger, aws_metrics_cfg)
+            if self._should_enable_aws_metrics():
+                aws_metrics_cfg = self._get_aws_metrics_config()
+                self._metrics_handler = BotocoreMetricsHandler(logger, aws_metrics_cfg)
                 self._metrics_handler.register_events(self.session)
-                logger.info("AWS API metrics collection enabled")
+                logger.info("AWS API metrics collection enabled via OTel Meter")
             else:
-                logger.debug(
-                    "AWS API metrics collection disabled - no MetricsCollector provided or AWS_METRICS_ENABLED=false"
-                )
+                logger.debug("AWS API metrics collection disabled via configuration")
 
             # Single comprehensive INFO log with all important details
             self._logger.info(
@@ -402,16 +396,20 @@ class AWSClient:
             self._dynamodb_resource = self.session.resource("dynamodb", config=self.boto_config)
         return self._dynamodb_resource
 
+    def _get_aws_metrics_config(self) -> dict:
+        """Return the provider_metrics sub-section of the metrics config."""
+        try:
+            metrics_config = self._config_manager.get_metrics_config()
+            if isinstance(metrics_config, dict):
+                return metrics_config.get("provider_metrics", {})
+        except Exception as e:
+            self._logger.debug("Could not load provider_metrics config: %s", e)
+        return {}
+
     def _should_enable_aws_metrics(self) -> bool:
         """Check if AWS metrics should be enabled based on configuration."""
         try:
-            # Get metrics configuration from ConfigurationPort
-            metrics_config = self._config_manager.get_metrics_config()
-            aws_cfg = (
-                metrics_config.get("provider_metrics", {})
-                if isinstance(metrics_config, dict)
-                else {}
-            )
+            aws_cfg = self._get_aws_metrics_config()
             aws_metrics_enabled = aws_cfg.get("provider_metrics_enabled", True)
             self._logger.debug("provider_metrics_enabled flag value: %s", aws_metrics_enabled)
             return aws_metrics_enabled

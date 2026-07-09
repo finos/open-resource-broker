@@ -9,6 +9,7 @@ from orb.application.services.orchestration.base import OrchestratorBase
 from orb.application.services.orchestration.dtos import (
     GetRequestStatusInput,
     GetRequestStatusOutput,
+    Paginated,
 )
 from orb.domain.base.ports.logging_port import LoggingPort
 
@@ -29,7 +30,8 @@ class GetRequestStatusOrchestrator(OrchestratorBase[GetRequestStatusInput, GetRe
         if input.all_requests:
             query = ListActiveRequestsQuery(all_resources=True, limit=None)
             results = await self._query_bus.execute(query)
-            return GetRequestStatusOutput(requests=[self._to_dict(r) for r in (results or [])])
+            items = results.items if isinstance(results, Paginated) else (results or [])
+            return GetRequestStatusOutput(requests=[self._to_dict(r) for r in items])
 
         request_dicts = []
         for request_id in input.request_ids:

@@ -35,6 +35,8 @@ _NON_PROVIDER_FILES = [
 _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
     {
         ("bootstrap/core_services.py", "orb.providers.registry"),
+        # DI wiring — intentional: core services registers ProviderMetricsPort
+        ("bootstrap/core_services.py", "orb.providers.base.metrics"),
         ("bootstrap/infrastructure_services.py", "orb.providers.registration"),
         ("bootstrap/infrastructure_services.py", "orb.providers.k8s"),
         ("bootstrap/infrastructure_services.py", "orb.providers.k8s.registration"),

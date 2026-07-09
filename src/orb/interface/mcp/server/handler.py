@@ -12,6 +12,19 @@ from orb.infrastructure.logging.logger import get_logger
 from .core import OpenResourceBrokerMCPServer
 
 
+def _flush_telemetry_mcp() -> None:
+    """Flush OTel providers when the MCP server shuts down.
+
+    Idempotent and safe when telemetry was never configured.
+    """
+    try:
+        from orb.bootstrap.telemetry import shutdown_telemetry
+
+        shutdown_telemetry()
+    except Exception:
+        pass
+
+
 @handle_interface_exceptions(context="mcp_server", interface_type="cli")
 async def handle_mcp_serve(args) -> dict[str, Any]:
     """
@@ -41,16 +54,21 @@ async def handle_mcp_serve(args) -> dict[str, Any]:
     # Create MCP server instance with the initialized DI container
     mcp_server = OpenResourceBrokerMCPServer(app=get_container())
 
-    if stdio_mode:
-        # Run in stdio mode for direct MCP client communication
-        logger.info("Starting MCP server in stdio mode")
-        await _run_stdio_server(mcp_server)
-        return {"message": "MCP server started in stdio mode"}
-    else:
-        # Run as TCP server (for development/testing)
-        logger.info("Starting MCP server on %s:%s", host, port)
-        await _run_tcp_server(mcp_server, host, port)
-        return {"message": f"MCP server started on {host}:{port}"}
+    try:
+        if stdio_mode:
+            # Run in stdio mode for direct MCP client communication
+            logger.info("Starting MCP server in stdio mode")
+            await _run_stdio_server(mcp_server)
+            return {"message": "MCP server started in stdio mode"}
+        else:
+            # Run as TCP server (for development/testing)
+            logger.info("Starting MCP server on %s:%s", host, port)
+            await _run_tcp_server(mcp_server, host, port)
+            return {"message": f"MCP server started on {host}:{port}"}
+    finally:
+        # Flush OTel providers when the MCP server exits.
+        # shutdown_telemetry() is idempotent so double-calls are harmless.
+        _flush_telemetry_mcp()
 
 
 async def _run_stdio_server(mcp_server: OpenResourceBrokerMCPServer):
@@ -147,3 +165,4 @@ async def _run_tcp_server(mcp_server: OpenResourceBrokerMCPServer, host: str, po
         server.close()
         await server.wait_closed()
         logger.info("MCP server stopped")
+        # _flush_telemetry_mcp() is called in handle_mcp_serve's finally block.

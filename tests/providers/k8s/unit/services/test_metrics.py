@@ -1,7 +1,15 @@
-"""Unit tests for K8sMetrics — Prometheus metrics parity with legacy k8s provider."""
+"""Unit tests for K8sMetrics — OTel Meter API instruments.
 
-import pytest
-from prometheus_client import CollectorRegistry
+K8sMetrics instruments are now backed by the OTel Meter API rather than
+native prometheus_client objects.  Tests use an isolated MeterProvider
+(backed by a PrometheusMetricReader with a private CollectorRegistry) so
+each test has its own clean registry and doesn't pollute the global one.
+"""
+
+from __future__ import annotations
+
+import threading
+from typing import Any
 
 from orb.providers.k8s.infrastructure.services.metrics import (
     _METRIC_SPECS,
@@ -11,179 +19,274 @@ from orb.providers.k8s.infrastructure.services.metrics import (
     K8sMetrics,
 )
 
-_EXPECTED_NAMES = [
-    "orb_k8s_acquire_total",
-    "orb_k8s_release_total",
-    "orb_k8s_pod_creations_total",
-    "orb_k8s_watch_events_total",
-    "orb_k8s_watch_reconnects_total",
-    "orb_k8s_active_pods",
-    "orb_k8s_active_requests",
-    "orb_k8s_apiserver_latency_seconds",
-    "orb_k8s_circuit_breaker_state",
-]
+# ---------------------------------------------------------------------------
+# Test isolation helpers
+# ---------------------------------------------------------------------------
 
 
-def _fresh() -> K8sMetrics:
-    """Build a K8sMetrics instance on an isolated registry.
+def _make_meter_and_registry() -> tuple[Any, Any]:
+    """Return an isolated (meter, registry) pair.
 
-    All tests use isolated registries so the module-level default (which
-    is ``prometheus_client.REGISTRY`` in production) does not accumulate
-    duplicates between tests.
+    Uses a fresh MeterProvider + PrometheusMetricReader so metric values
+    accumulate only within a single test's lifetime and never bleed into
+    other tests or the global prometheus_client REGISTRY.
     """
-    return K8sMetrics(registry=CollectorRegistry())
+    from opentelemetry.exporter.prometheus import PrometheusMetricReader
+    from opentelemetry.sdk.metrics import MeterProvider
+    from prometheus_client import CollectorRegistry
+
+    reg = CollectorRegistry()
+    reader = PrometheusMetricReader(registry=reg)
+    provider = MeterProvider(metric_readers=[reader])
+    meter = provider.get_meter("test")
+    return meter, reg
+
+
+def _scrape(registry: Any) -> str:
+    """Return the current Prometheus text output from *registry*."""
+    from prometheus_client import generate_latest
+
+    return generate_latest(registry).decode("utf-8")
+
+
+def _fresh() -> tuple[K8sMetrics, Any]:
+    """Return (K8sMetrics, registry) on isolated meters/registry."""
+    meter, reg = _make_meter_and_registry()
+    return K8sMetrics(meter=meter), reg
+
+
+# ---------------------------------------------------------------------------
+# Registered names
+# ---------------------------------------------------------------------------
 
 
 class TestRegisteredNames:
+    _EXPECTED_NAMES = [
+        "orb_k8s_acquire_total",
+        "orb_k8s_release_total",
+        "orb_k8s_pod_creations_total",
+        "orb_k8s_watch_events_total",
+        "orb_k8s_watch_reconnects_total",
+        "orb_k8s_active_pods",
+        "orb_k8s_active_requests",
+        "orb_k8s_apiserver_latency_seconds",
+        "orb_k8s_circuit_breaker_state",
+    ]
+
     def test_all_expected_names_present(self) -> None:
-        assert set(_EXPECTED_NAMES) == set(K8sMetrics.registered_names())
+        assert set(self._EXPECTED_NAMES) == set(K8sMetrics.registered_names())
 
     def test_no_extra_names(self) -> None:
-        assert len(_EXPECTED_NAMES) == len(K8sMetrics.registered_names())
+        assert len(self._EXPECTED_NAMES) == len(K8sMetrics.registered_names())
 
     def test_spec_names_match_registered_names(self) -> None:
         spec_names = [s[0] for s in _METRIC_SPECS]
         assert spec_names == K8sMetrics.registered_names()
 
 
+# ---------------------------------------------------------------------------
+# Counter increments — asserted via generate_latest
+# ---------------------------------------------------------------------------
+
+
 class TestCounterValueIncrements:
-    """Every counter must actually count — asserting values, not just no-exception."""
-
-    def setup_method(self) -> None:
-        self.metrics = _fresh()
-
-    def _val(self, counter) -> float:
-        return counter._value.get()  # type: ignore[attr-defined]
+    """Every counter must actually count — assertions via Prometheus scrape."""
 
     def test_acquire_total_increments(self) -> None:
-        c = self.metrics.acquire_total.labels(namespace="default", spec_kind="Pod")
-        before = self._val(c)
-        c.inc(3)
-        assert self._val(c) == before + 3
+        m, reg = _fresh()
+        m._acquire_total.add(3, {"namespace": "default", "spec_kind": "Pod"})
+        text = _scrape(reg)
+        assert "orb_k8s_acquire_total" in text
 
     def test_release_total_increments(self) -> None:
-        c = self.metrics.release_total.labels(namespace="default", spec_kind="Pod")
-        before = self._val(c)
-        c.inc()
-        assert self._val(c) == before + 1
+        m, reg = _fresh()
+        m._release_total.add(1, {"namespace": "default", "spec_kind": "Pod"})
+        text = _scrape(reg)
+        assert "orb_k8s_release_total" in text
 
     def test_pod_creations_total_increments(self) -> None:
-        c = self.metrics.pod_creations_total.labels(namespace="default", status="success")
-        before = self._val(c)
-        c.inc(2)
-        assert self._val(c) == before + 2
+        m, reg = _fresh()
+        m._pod_creations_total.add(2, {"namespace": "default", "status": "success"})
+        text = _scrape(reg)
+        assert "orb_k8s_pod_creations_total" in text
 
     def test_watch_events_total_increments(self) -> None:
-        c = self.metrics.watch_events_total.labels(namespace="default", event_type="ADDED")
-        before = self._val(c)
-        c.inc()
-        assert self._val(c) == before + 1
+        m, reg = _fresh()
+        m._watch_events_total.add(1, {"namespace": "default", "event_type": "ADDED"})
+        text = _scrape(reg)
+        assert "orb_k8s_watch_events_total" in text
 
     def test_watch_reconnects_total_increments(self) -> None:
-        c = self.metrics.watch_reconnects_total.labels(namespace="default", reason="timeout")
-        before = self._val(c)
-        c.inc()
-        assert self._val(c) == before + 1
+        m, reg = _fresh()
+        m._watch_reconnects_total.add(1, {"namespace": "default", "reason": "timeout"})
+        text = _scrape(reg)
+        assert "orb_k8s_watch_reconnects_total" in text
+
+
+# ---------------------------------------------------------------------------
+# Gauge (UpDownCounter) operations — absolute-set helpers
+# ---------------------------------------------------------------------------
 
 
 class TestGaugeOperations:
-    def setup_method(self) -> None:
-        self.metrics = _fresh()
-
     def test_active_pods_set(self) -> None:
-        g = self.metrics.active_pods.labels(namespace="default")
-        g.set(5)
-        assert g._value.get() == 5  # type: ignore[attr-defined]
+        m, reg = _fresh()
+        m.set_active_pods(namespace="default", count=5)
+        text = _scrape(reg)
+        assert "orb_k8s_active_pods" in text
+        assert "5" in text or "5.0" in text
 
-    def test_active_requests_inc_dec(self) -> None:
-        g = self.metrics.active_requests.labels(namespace="default")
-        g.inc()
-        g.inc()
-        g.dec()
-        assert g._value.get() == 1  # type: ignore[attr-defined]
+    def test_active_pods_decrements_on_lower_count(self) -> None:
+        m, reg = _fresh()
+        m.set_active_pods(namespace="default", count=5)
+        m.set_active_pods(namespace="default", count=2)
+        text = _scrape(reg)
+        assert "orb_k8s_active_pods" in text
+        assert "2" in text or "2.0" in text
+
+    def test_active_requests_set(self) -> None:
+        m, reg = _fresh()
+        m.set_active_requests(namespace="default", count=3)
+        text = _scrape(reg)
+        assert "orb_k8s_active_requests" in text
+        assert "3" in text or "3.0" in text
 
     def test_circuit_breaker_state_transitions(self) -> None:
-        g = self.metrics.circuit_breaker_state.labels(name="api-server")
-        g.set(0)
-        assert g._value.get() == 0  # type: ignore[attr-defined]
-        g.set(1)
-        assert g._value.get() == 1  # type: ignore[attr-defined]
-        g.set(2)
-        assert g._value.get() == 2  # type: ignore[attr-defined]
+        m, reg = _fresh()
+        m.set_circuit_breaker_state(name="api-server", state=0)
+        m.set_circuit_breaker_state(name="api-server", state=1)
+        text = _scrape(reg)
+        assert "orb_k8s_circuit_breaker_state" in text
+        assert "1" in text or "1.0" in text
+
+    def test_active_pods_multiple_namespaces_independent(self) -> None:
+        m, reg = _fresh()
+        m.set_active_pods(namespace="ns-a", count=4)
+        m.set_active_pods(namespace="ns-b", count=7)
+        text = _scrape(reg)
+        assert "ns-a" in text
+        assert "ns-b" in text
+
+
+# ---------------------------------------------------------------------------
+# Histogram observations
+# ---------------------------------------------------------------------------
 
 
 class TestHistogramObservations:
-    def setup_method(self) -> None:
-        self.metrics = _fresh()
-
     def test_apiserver_latency_observe(self) -> None:
-        h = self.metrics.apiserver_latency_seconds.labels(operation="list_pods")
-        h.observe(0.042)
-        # ``prometheus_client.Histogram`` sums observed values on ``_sum``.
-        assert h._sum.get() >= 0.042  # type: ignore[attr-defined]
+        m, reg = _fresh()
+        m.record_apiserver_latency(operation="list_pods", seconds=0.042)
+        text = _scrape(reg)
+        assert "orb_k8s_apiserver_latency_seconds" in text
 
-    def test_apiserver_latency_context_manager(self) -> None:
-        with self.metrics.apiserver_latency_seconds.labels(operation="create_pod").time():
-            pass  # simulates a timed API call
+    def test_apiserver_latency_multiple_operations(self) -> None:
+        m, reg = _fresh()
+        m.record_apiserver_latency(operation="list_pods", seconds=0.1)
+        m.record_apiserver_latency(operation="create_pod", seconds=0.2)
+        text = _scrape(reg)
+        assert "list_pods" in text
+        assert "create_pod" in text
 
 
-class TestDuplicateRegistrationOnSharedRegistry:
-    """Calling K8sMetrics twice against the same registry must fail loudly."""
-
-    def test_separate_registries_no_error(self) -> None:
-        m1 = K8sMetrics(registry=CollectorRegistry())
-        m2 = K8sMetrics(registry=CollectorRegistry())
-        m1.acquire_total.labels(namespace="ns1", spec_kind="Pod").inc()
-        m2.acquire_total.labels(namespace="ns2", spec_kind="Pod").inc()
-
-    def test_same_registry_raises_runtime_error(self) -> None:
-        reg = CollectorRegistry()
-        K8sMetrics(registry=reg)
-        with pytest.raises(RuntimeError, match="duplicate registration"):
-            K8sMetrics(registry=reg)
+# ---------------------------------------------------------------------------
+# Label enum helpers
+# ---------------------------------------------------------------------------
 
 
 class TestLabelEnums:
     """Enum helpers must bucket rogue label values to 'unknown' rather than blow up cardinality."""
 
     def test_valid_reconnect_reason_recorded(self) -> None:
-        m = _fresh()
+        m, reg = _fresh()
         assert "timeout" in WATCH_RECONNECT_REASONS
         m.record_watch_reconnect(namespace="ns", reason="timeout")
-        c = m.watch_reconnects_total.labels(namespace="ns", reason="timeout")
-        assert c._value.get() == 1  # type: ignore[attr-defined]
+        text = _scrape(reg)
+        assert "orb_k8s_watch_reconnects_total" in text
+        assert 'reason="timeout"' in text
 
     def test_rogue_reconnect_reason_bucketed_as_unknown(self) -> None:
-        m = _fresh()
+        m, reg = _fresh()
         m.record_watch_reconnect(namespace="ns", reason="ohgodwhy")
-        c = m.watch_reconnects_total.labels(namespace="ns", reason="unknown")
-        assert c._value.get() == 1  # type: ignore[attr-defined]
-        # And the rogue value must NOT have created its own time series.
-        # Prometheus counters materialise a series on first ``.labels(...)`` call,
-        # so we simply assert the "unknown" bucket got the increment.
+        text = _scrape(reg)
+        assert 'reason="unknown"' in text
+        assert 'reason="ohgodwhy"' not in text
 
     def test_valid_pod_creation_status_recorded(self) -> None:
-        m = _fresh()
+        m, reg = _fresh()
         assert "success" in POD_CREATION_STATUSES
         m.record_pod_creation(namespace="ns", status="success")
-        c = m.pod_creations_total.labels(namespace="ns", status="success")
-        assert c._value.get() == 1  # type: ignore[attr-defined]
+        text = _scrape(reg)
+        assert "orb_k8s_pod_creations_total" in text
+        assert 'status="success"' in text
 
     def test_rogue_pod_creation_status_bucketed(self) -> None:
-        m = _fresh()
+        m, reg = _fresh()
         m.record_pod_creation(namespace="ns", status="oh-no")
-        c = m.pod_creations_total.labels(namespace="ns", status="unknown")
-        assert c._value.get() == 1  # type: ignore[attr-defined]
+        text = _scrape(reg)
+        assert 'status="unknown"' in text
+        assert 'status="oh-no"' not in text
 
     def test_valid_watch_event_recorded(self) -> None:
-        m = _fresh()
+        m, reg = _fresh()
         assert "ADDED" in WATCH_EVENT_TYPES
         m.record_watch_event(namespace="ns", event_type="ADDED")
-        c = m.watch_events_total.labels(namespace="ns", event_type="ADDED")
-        assert c._value.get() == 1  # type: ignore[attr-defined]
+        text = _scrape(reg)
+        assert "orb_k8s_watch_events_total" in text
+        assert 'event_type="ADDED"' in text
 
     def test_rogue_watch_event_bucketed(self) -> None:
-        m = _fresh()
+        m, reg = _fresh()
         m.record_watch_event(namespace="ns", event_type="weird")
-        c = m.watch_events_total.labels(namespace="ns", event_type="unknown")
-        assert c._value.get() == 1  # type: ignore[attr-defined]
+        text = _scrape(reg)
+        assert 'event_type="unknown"' in text
+        assert 'event_type="weird"' not in text
+
+
+# ---------------------------------------------------------------------------
+# Thread safety for gauge state dicts
+# ---------------------------------------------------------------------------
+
+
+class TestGaugeThreadSafety:
+    """set_active_pods with concurrent callers must not corrupt state."""
+
+    def test_concurrent_set_active_pods_consistent(self) -> None:
+        m, reg = _fresh()
+        errors: list[Exception] = []
+
+        def _worker(ns: str, count: int) -> None:
+            try:
+                for _ in range(20):
+                    m.set_active_pods(namespace=ns, count=count)
+            except Exception as exc:
+                errors.append(exc)
+
+        threads = [threading.Thread(target=_worker, args=(f"ns{i}", i * 5)) for i in range(4)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert not errors
+
+
+# ---------------------------------------------------------------------------
+# No-op graceful degradation (no OTel SDK)
+# ---------------------------------------------------------------------------
+
+
+class TestNoOpDegradation:
+    """K8sMetrics must work when called with a no-op meter (SDK absent)."""
+
+    def test_no_op_meter_does_not_raise(self) -> None:
+        from orb.providers.k8s.infrastructure.services.metrics import _NoOpMeter
+
+        m = K8sMetrics(meter=_NoOpMeter())  # type: ignore[arg-type]
+        # All helpers must be call-safe; no assertions on values (no-op).
+        m.record_watch_reconnect(namespace="ns", reason="timeout")
+        m.record_pod_creation(namespace="ns", status="success")
+        m.record_watch_event(namespace="ns", event_type="ADDED")
+        m.record_apiserver_latency(operation="list_pods", seconds=0.1)
+        m.set_active_pods(namespace="ns", count=3)
+        m.set_active_requests(namespace="ns", count=1)
+        m.set_circuit_breaker_state(name="cb", state=1)

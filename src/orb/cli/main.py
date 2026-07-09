@@ -21,6 +21,24 @@ from orb.infrastructure.logging.logger import get_logger
 __all__ = ["main", "parse_args", "execute_command"]
 
 
+def _flush_telemetry() -> None:
+    """Flush OTel providers on CLI exit.
+
+    Short-lived CLI commands exit before the PeriodicExportingMetricReader
+    interval fires, silently discarding all recorded metrics.  Calling
+    shutdown_telemetry() force-flushes all readers synchronously so that
+    metrics survive the process exit.
+
+    This is a no-op when telemetry is disabled or the SDK is absent.
+    """
+    try:
+        from orb.bootstrap.telemetry import shutdown_telemetry
+
+        shutdown_telemetry()
+    except Exception:
+        pass  # Telemetry flush must never abort the CLI exit path.
+
+
 async def _show_resource_help(resource):
     """Show help for a resource when no action is provided."""
     import subprocess  # nosec B404
@@ -256,10 +274,17 @@ async def main() -> None:
 
     except KeyboardInterrupt:
         print_warning("\nOperation cancelled by user.")
+        _flush_telemetry()
         sys.exit(130)
     except Exception as e:
         print_error(f"Fatal error: {e}")
+        _flush_telemetry()
         sys.exit(1)
+    finally:
+        # Final flush — covers all normal-exit and sys.exit() paths that
+        # propagate through this frame.  shutdown_telemetry() is idempotent
+        # so the double-call from the except branches above is harmless.
+        _flush_telemetry()
 
 
 if __name__ == "__main__":

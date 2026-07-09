@@ -1,4 +1,25 @@
-"""Base handler implementation."""
+"""Base handler implementation.
+
+Migration note (bead 2512)
+--------------------------
+``with_metrics`` now emits to OTel instruments instead of
+``MetricsCollector``.  The ``metrics`` constructor parameter is kept for
+backward compatibility (existing callers may pass a ``MetricsCollector``),
+but it is no longer used for metric emission.  OTel instruments are
+acquired via ``get_meter(__name__)`` so the path is no-op when the SDK is
+absent.
+
+OTel instruments
+----------------
+- ``orb.handler.{method}.total`` (Counter) — one series per
+  success/error outcome, distinguished by ``outcome`` attribute.
+- ``orb.handler.{method}.duration`` (Histogram, unit ``s``) — latency of
+  each decorated method.
+
+The method name is normalised from the decorated function name so existing
+metric consumers that keyed off ``{method}_success_total`` will need to
+query ``orb.handler.{method}.total{outcome="success"}`` instead.
+"""
 
 import time
 from functools import wraps
@@ -8,6 +29,32 @@ from orb.infrastructure.logging.logger import get_logger
 
 T = TypeVar("T")
 R = TypeVar("R")
+
+
+def _get_meter():
+    """Return an OTel Meter (or a no-op when SDK is absent)."""
+    try:
+        from opentelemetry import metrics as otel_metrics  # type: ignore[import-not-found]
+
+        return otel_metrics.get_meter(__name__)
+    except ImportError:
+        return _NoOpMeter()
+
+
+class _NoOpMeter:
+    def create_counter(self, *a, **kw):
+        return _NoOpInstrument()
+
+    def create_histogram(self, *a, **kw):
+        return _NoOpInstrument()
+
+
+class _NoOpInstrument:
+    def add(self, *a, **kw) -> None:
+        pass
+
+    def record(self, *a, **kw) -> None:
+        pass
 
 
 class BaseHandler:
@@ -24,10 +71,35 @@ class BaseHandler:
 
         Args:
             logger: Optional logger instance
-            metrics: Optional metrics collector
+            metrics: Optional metrics collector (retained for API compat;
+                metric emission now goes to OTel — see module docstring).
         """
         self.logger = logger or get_logger(self.__class__.__name__)
         self.metrics = metrics
+
+        # OTel instrument caches — keyed by method name.
+        self._otel_counters: dict[str, object] = {}
+        self._otel_histograms: dict[str, object] = {}
+
+    def _otel_counter(self, method_name: str) -> object:
+        if method_name not in self._otel_counters:
+            meter = _get_meter()
+            self._otel_counters[method_name] = meter.create_counter(
+                f"orb.handler.{method_name}.total",
+                description=f"Total {method_name} handler invocations.",
+                unit="1",
+            )
+        return self._otel_counters[method_name]
+
+    def _otel_histogram(self, method_name: str) -> object:
+        if method_name not in self._otel_histograms:
+            meter = _get_meter()
+            self._otel_histograms[method_name] = meter.create_histogram(
+                f"orb.handler.{method_name}.duration",
+                description=f"Duration of {method_name} handler invocations.",
+                unit="s",
+            )
+        return self._otel_histograms[method_name]
 
     def log_entry(self, method_name: str, **kwargs) -> None:
         """
@@ -89,30 +161,42 @@ class BaseHandler:
 
     def with_metrics(self, func: Callable[..., T], name: Optional[str] = None) -> Callable[..., T]:
         """
-        Add metrics to methods.
+        Add OTel metrics to methods.
+
+        Emits ``orb.handler.{method}.total`` (Counter) with ``outcome``
+        attribute and ``orb.handler.{method}.duration`` (Histogram).
 
         Args:
             func: Function to decorate
-            name: Optional name for the metric
+            name: Optional override for the method name used in metric names.
 
         Returns:
-            Decorated function with metrics
+            Decorated function with OTel metrics.
         """
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            """Wrapper function for metrics collection."""
-            if not self.metrics:
-                return func(*args, **kwargs)
-
+            """Wrapper function for OTel metrics collection."""
             method_name = name or func.__name__
             start_time = time.time()
             try:
                 result = func(*args, **kwargs)
-                self.metrics.record_success(method_name, time.time() - start_time)
+                duration = time.time() - start_time
+                self._otel_counter(method_name).add(  # type: ignore[union-attr]
+                    1, attributes={"outcome": "success"}
+                )
+                self._otel_histogram(method_name).record(  # type: ignore[union-attr]
+                    duration, attributes={"outcome": "success"}
+                )
                 return result
             except Exception as e:
-                self.metrics.record_error(method_name, time.time() - start_time, error=str(e))
+                duration = time.time() - start_time
+                self._otel_counter(method_name).add(  # type: ignore[union-attr]
+                    1, attributes={"outcome": "error", "error": type(e).__name__}
+                )
+                self._otel_histogram(method_name).record(  # type: ignore[union-attr]
+                    duration, attributes={"outcome": "error"}
+                )
                 raise
 
         return wrapper

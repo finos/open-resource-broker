@@ -12,6 +12,7 @@ from orb.domain.base.ports import (
 from orb.infrastructure.di.buses import CommandBus, QueryBus
 from orb.infrastructure.di.container import DIContainer
 from orb.monitoring.metrics import MetricsCollector
+from orb.providers.base.metrics import NoOpProviderMetrics, OtelProviderMetrics, ProviderMetricsPort
 
 
 def register_core_services(container: DIContainer) -> None:
@@ -34,6 +35,21 @@ def register_core_services(container: DIContainer) -> None:
 
     # Register as singleton so the same collector instance is shared
     container.register_singleton(MetricsCollector, create_metrics_collector)
+
+    # Register ProviderMetricsPort — OtelProviderMetrics when SDK available and
+    # configured; NoOpProviderMetrics otherwise (safe default, no guards needed).
+    def create_provider_metrics_port(c: DIContainer) -> ProviderMetricsPort:
+        import importlib
+
+        try:
+            importlib.import_module("opentelemetry.metrics")
+            # SDK present; return the OTel-backed implementation.
+            # Instruments are acquired lazily so no MeterProvider is required yet.
+            return OtelProviderMetrics()
+        except ImportError:
+            return NoOpProviderMetrics()
+
+    container.register_singleton(ProviderMetricsPort, create_provider_metrics_port)
 
     # Register factories
     from orb.infrastructure.scheduler.factory import SchedulerStrategyFactory
@@ -63,8 +79,7 @@ def register_core_services(container: DIContainer) -> None:
 
     def create_event_bus(c: DIContainer) -> EventBus:
         bus = EventBus(logger=c.get(LoggingPort))
-        collector = c.get(MetricsCollector)
-        handler = MetricsEventHandler(collector=collector, logger=c.get(LoggingPort))
+        handler = MetricsEventHandler(logger=c.get(LoggingPort))
         bus.register_handler("RequestCreatedEvent", handler)
         bus.register_handler("RequestCompletedEvent", handler)
         bus.register_handler("RequestFailedEvent", handler)

@@ -10,6 +10,7 @@ from orb.application.dto.queries import GetRequestQuery, ListActiveRequestsQuery
 from orb.application.services.orchestration.dtos import (
     GetRequestStatusInput,
     GetRequestStatusOutput,
+    Paginated,
 )
 from orb.application.services.orchestration.get_request_status import GetRequestStatusOrchestrator
 
@@ -213,3 +214,24 @@ class TestGetRequestStatusOrchestrator:
         result = await orchestrator.execute(input)
         assert len(result.requests) == 2
         assert all(isinstance(e, dict) for e in result.requests)
+
+    @pytest.mark.asyncio
+    async def test_execute_all_requests_paginated_result_returns_items(
+        self, orchestrator, mock_query_bus
+    ):
+        """Real Paginated return shape must not crash and must surface .items.
+
+        This test FAILS against the pre-fix code (TypeError: 'Paginated' object
+        is not iterable) and PASSES after the isinstance guard is applied.
+        """
+        r1 = MagicMock(spec=["model_dump"])
+        r1.model_dump.return_value = {"request_id": "req-p1", "status": "running"}
+        r2 = MagicMock(spec=["model_dump"])
+        r2.model_dump.return_value = {"request_id": "req-p2", "status": "pending"}
+        mock_query_bus.execute.return_value = Paginated(items=[r1, r2], total_count=2)
+        input = GetRequestStatusInput(all_requests=True)
+        result = await orchestrator.execute(input)
+        assert isinstance(result, GetRequestStatusOutput)
+        assert len(result.requests) == 2
+        assert result.requests[0]["request_id"] == "req-p1"
+        assert result.requests[1]["request_id"] == "req-p2"

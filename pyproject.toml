@@ -61,6 +61,10 @@ dependencies = [
     "boto3>=1.42.21",
     "botocore>=1.42.21",
     "psutil>=5.9.0", # Required by the system health check (CPU/memory)
+    "opentelemetry-instrumentation-click>=0.64b0,<1.0",
+    "opentelemetry-instrumentation-system-metrics>=0.64b0,<1.0",
+    "opentelemetry-instrumentation-logging>=0.64b0,<1.0",
+    "opentelemetry-instrumentation-botocore>=0.64b0,<1.0",
 ]
 
 [project.optional-dependencies]
@@ -164,6 +168,12 @@ monitoring = [
     "opentelemetry-exporter-prometheus>=0.64b0,<1.0",
     "opentelemetry-instrumentation-fastapi>=0.41b0,<1.0",
     "opentelemetry-instrumentation-sqlalchemy>=0.41b0,<1.0",
+    # Click span-per-command instrumentation (programmatic, not CLI-wrapper)
+    "opentelemetry-instrumentation-click>=0.64b0,<1.0",
+    # OS-level CPU/memory/GC/thread gauges (replaces dead memory_usage_bytes/cpu_usage_percent)
+    "opentelemetry-instrumentation-system-metrics>=0.64b0,<1.0",
+    # Log-record trace_id/span_id injection for log-trace correlation
+    "opentelemetry-instrumentation-logging>=0.64b0,<1.0",
     "prometheus-client>=0.17.0",
     "psutil>=5.9.0",
 ]

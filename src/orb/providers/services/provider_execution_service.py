@@ -1,11 +1,26 @@
-"""Provider Execution Service - Registry-based strategy execution."""
+"""Provider Execution Service - Registry-based strategy execution.
+
+Migration note (bead 2512)
+--------------------------
+Metric emission has been moved from ``MetricsCollector`` (name-embedded
+dimensions) to ``ProviderMetricsPort`` (label-based).
+
+Previous: ``provider.{id}.{op}.success_total`` — one metric name per
+provider×operation combination → unbounded key-space.
+
+Now: ``orb.provider.operation.total{provider_id, operation, outcome}`` —
+a single Counter with three label dimensions.  Same data, proper cardinality.
+
+``ProviderMetricsPort`` is injected via constructor and defaults to
+``NoOpProviderMetrics`` so callers without a DI container still work.
+"""
 
 import time
 from typing import Any, Optional
 
 from orb.domain.base.ports import ConfigurationPort, LoggingPort
 from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
-from orb.monitoring.metrics import MetricsCollector
+from orb.providers.base.metrics import NoOpProviderMetrics, ProviderMetricsPort
 from orb.providers.base.strategy import (
     ProviderCapabilities,
     ProviderHealthStatus,
@@ -27,13 +42,23 @@ class ProviderExecutionService:
         logger: LoggingPort,
         config_port: ConfigurationPort,
         registry: ProviderRegistryPort,
-        metrics: Optional[MetricsCollector] = None,
+        metrics: Optional[ProviderMetricsPort] = None,
     ) -> None:
-        """Initialize the provider execution service."""
+        """Initialize the provider execution service.
+
+        Args:
+            logger: Injected logger.
+            config_port: Configuration port for provider config lookups.
+            registry: Provider registry for strategy creation.
+            metrics: Optional ProviderMetricsPort; defaults to NoOpProviderMetrics.
+                Pass ``None`` to use no-op (safe default).
+        """
         self._logger = logger
         self._config_port = config_port
         self._registry = registry
-        self._metrics = metrics or MetricsCollector(config={"METRICS_ENABLED": True})
+        self._metrics: ProviderMetricsPort = (
+            metrics if metrics is not None else NoOpProviderMetrics()
+        )
 
     async def execute_operation(
         self, provider_identifier: str, operation: ProviderOperation
@@ -69,13 +94,14 @@ class ProviderExecutionService:
             # Check if strategy supports the operation
             capabilities = strategy.get_capabilities()
             if not capabilities.supports_operation(operation.operation_type):
-                response_time_ms = (time.time() - start_time) * 1000
-                if self._metrics:
-                    op_base = (
-                        f"provider.{provider_identifier}.{operation.operation_type.name.lower()}"
-                    )
-                    self._metrics.increment_counter(f"{op_base}.error_total")
-                    self._metrics.record_time(f"{op_base}.duration", response_time_ms / 1000.0)
+                duration = time.time() - start_time
+                self._metrics.record_operation(
+                    service=provider_identifier,
+                    operation=operation.operation_type.name.lower(),
+                    duration_seconds=duration,
+                    success=False,
+                    error_code="OPERATION_NOT_SUPPORTED",
+                )
                 return ProviderResult.error_result(
                     f"Strategy {provider_identifier} does not support operation {operation.operation_type}",
                     "OPERATION_NOT_SUPPORTED",
@@ -85,31 +111,34 @@ class ProviderExecutionService:
             result = await strategy.execute_operation(operation)
 
             # Record metrics
-            response_time_ms = (time.time() - start_time) * 1000
-            if self._metrics:
-                op_base = f"provider.{provider_identifier}.{operation.operation_type.name.lower()}"
-                if result.success:
-                    self._metrics.increment_counter(f"{op_base}.success_total")
-                else:
-                    self._metrics.increment_counter(f"{op_base}.error_total")
-                self._metrics.record_time(f"{op_base}.duration", response_time_ms / 1000.0)
+            duration = time.time() - start_time
+            self._metrics.record_operation(
+                service=provider_identifier,
+                operation=operation.operation_type.name.lower(),
+                duration_seconds=duration,
+                success=result.success,
+                error_code=None if result.success else "OPERATION_FAILED",
+            )
 
             self._logger.debug(
                 "Operation %s executed by %s: success=%s, time=%.2fms",
                 operation.operation_type,
                 provider_identifier,
                 result.success,
-                response_time_ms,
+                duration * 1000,
             )
 
             return result
 
         except Exception as e:
-            response_time_ms = (time.time() - start_time) * 1000
-            if self._metrics:
-                op_base = f"provider.{provider_identifier}.{operation.operation_type.name.lower()}"
-                self._metrics.increment_counter(f"{op_base}.error_total")
-                self._metrics.record_time(f"{op_base}.duration", response_time_ms / 1000.0)
+            duration = time.time() - start_time
+            self._metrics.record_operation(
+                service=provider_identifier,
+                operation=operation.operation_type.name.lower(),
+                duration_seconds=duration,
+                success=False,
+                error_code="EXECUTION_ERROR",
+            )
 
             self._logger.error(
                 "Error executing operation %s with %s: %s",
@@ -136,7 +165,11 @@ class ProviderExecutionService:
 
         try:
             health_status = strategy.check_health()
-            self._metrics.increment_counter("provider_strategy_health_checks_total", 1.0)
+            # Record health check counter via port (label-based, not name-embedded)
+            self._metrics.record_counter(
+                "provider.strategy.health_checks.total",
+                labels={"provider_id": provider_identifier},
+            )
             return health_status
         except Exception as e:
             self._logger.error(
