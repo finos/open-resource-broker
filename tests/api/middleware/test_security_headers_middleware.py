@@ -26,7 +26,9 @@ EXPECTED_HEADERS = {
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data:; "
         "font-src 'self'; "
-        "connect-src 'self'; "
+        # ws: and wss: are intentionally included to allow WebSocket connections
+        # from the Reflex UI component; the header is otherwise unchanged.
+        "connect-src 'self' ws: wss:; "
         "frame-ancestors 'none'"
     ),
     "referrer-policy": "strict-origin-when-cross-origin",

@@ -23,12 +23,14 @@ class StartupValidator:
         config_path: Optional[str] = None,
         credentials_checker: Optional[Callable[[list], bool]] = None,
         console: Optional[ConsolePort] = None,
+        scheduler_port: Optional[Any] = None,
     ):
         self.config_path = config_path
         self.config_data: Optional[dict] = None
         self.app_config: Optional[AppConfig] = None
         self._credentials_checker = credentials_checker
         self._console = console or NullConsoleAdapter()
+        self._scheduler_port = scheduler_port
 
     def validate_startup(self) -> None:
         """Validate startup requirements. Exit on critical failures."""
@@ -136,11 +138,20 @@ class StartupValidator:
         if not self.app_config:
             return False
 
-        from orb.application.ports.scheduler_port import SchedulerPort
-        from orb.infrastructure.di.container import get_container
+        scheduler = self._scheduler_port
+        if scheduler is None:
+            # Resolve from the DI container only when no scheduler was
+            # supplied at construction time.  The container factory is
+            # registered on `orb.bootstrap` import so this is safe, but
+            # callers that already hold a container should prefer passing
+            # it in to avoid the service-locator access here.
+            try:
+                from orb.application.ports.scheduler_port import SchedulerPort
+                from orb.infrastructure.di.container import get_container
 
-        container = get_container()
-        scheduler = container.get(SchedulerPort)
+                scheduler = get_container().get(SchedulerPort)
+            except Exception:
+                return False
 
         template_paths = cast(Any, scheduler).get_template_paths()
         return any(Path(path).exists() for path in template_paths)

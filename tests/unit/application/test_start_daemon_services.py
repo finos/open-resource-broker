@@ -174,12 +174,11 @@ async def test_server_initialize_application_calls_start_daemon_services() -> No
     fake_container.get.return_value = fake_config_manager
 
     with (
-        patch("orb.infrastructure.di.container.get_container", return_value=fake_container),
         patch("orb.bootstrap.Application", return_value=fake_app),
     ):
         from orb.interface.server_command_handlers import _initialize_application  # noqa: PLC0415
 
-        await _initialize_application()
+        await _initialize_application(fake_container)
 
     fake_app.start_daemon_services.assert_awaited_once()
 

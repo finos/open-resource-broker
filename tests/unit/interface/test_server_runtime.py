@@ -44,57 +44,26 @@ def _make_ui_config(backend_port=3001, frontend_port=3000):
 @pytest.mark.cli
 class TestReloadConfigFromSignal:
     def test_happy_path_calls_cm_reload(self):
+        """ConfigurationManager.reload() is called when a valid cm is supplied."""
         mock_cm = MagicMock()
-        mock_container = MagicMock()
-        mock_container.get.return_value = mock_cm
         logger = MagicMock()
 
-        with patch("orb.interface.server_runtime.get_logger", return_value=logger):
-            with patch("orb.config.managers.configuration_manager.ConfigurationManager") as _:
-                with patch("orb.interface.server_runtime.get_logger", return_value=logger):
-                    # patch at the function's import site
-                    with patch(
-                        "orb.infrastructure.di.container.get_container",
-                        return_value=mock_container,
-                    ):
-                        from orb.interface.server_runtime import _reload_config_from_signal
+        from orb.interface.server_runtime import _reload_config_from_signal
 
-                        _reload_config_from_signal(logger)
+        _reload_config_from_signal(logger, mock_cm)
 
         mock_cm.reload.assert_called_once()
 
-    def test_container_resolution_failure_logs_error_no_raise(self):
-        logger = MagicMock()
-
-        with patch("orb.interface.server_runtime.get_logger", return_value=logger):
-            with patch(
-                "orb.infrastructure.di.container.get_container",
-                side_effect=RuntimeError("no container"),
-            ):
-                from orb.interface.server_runtime import _reload_config_from_signal
-
-                # Must not raise
-                _reload_config_from_signal(logger)
-
-        logger.error.assert_called_once()
-        assert "cannot resolve" in logger.error.call_args[0][0].lower()
-
     def test_reload_failure_logs_error_no_raise(self):
+        """reload() raising an exception must not propagate; error is logged."""
         mock_cm = MagicMock()
         mock_cm.reload.side_effect = ValueError("bad config")
-        mock_container = MagicMock()
-        mock_container.get.return_value = mock_cm
         logger = MagicMock()
 
-        with patch("orb.interface.server_runtime.get_logger", return_value=logger):
-            with patch(
-                "orb.infrastructure.di.container.get_container",
-                return_value=mock_container,
-            ):
-                from orb.interface.server_runtime import _reload_config_from_signal
+        from orb.interface.server_runtime import _reload_config_from_signal
 
-                # Must not raise
-                _reload_config_from_signal(logger)
+        # Must not raise
+        _reload_config_from_signal(logger, mock_cm)
 
         # At least one error log emitted
         logger.error.assert_called()
@@ -157,7 +126,7 @@ class TestRunApiForeground:
 
     @pytest.mark.asyncio
     async def test_sighup_handler_invokes_reload_config(self):
-        """The SIGHUP handler must call _reload_config_from_signal."""
+        """The SIGHUP handler must call _reload_config_from_signal when cm is available."""
         server_cfg = _make_server_config()
         mock_server = MagicMock()
         mock_server.serve = AsyncMock()
@@ -167,6 +136,10 @@ class TestRunApiForeground:
         def fake_signal(signum, handler):
             handlers[signum] = handler
 
+        mock_cm = MagicMock()
+        mock_container = MagicMock()
+        mock_container.get.return_value = mock_cm
+
         with patch("orb.api.server.create_fastapi_app", return_value=MagicMock()):
             with patch("uvicorn.Config", return_value=MagicMock()):
                 with patch("uvicorn.Server", return_value=mock_server):
@@ -174,15 +147,19 @@ class TestRunApiForeground:
                         with patch(
                             "orb.interface.server_runtime._reload_config_from_signal"
                         ) as mock_reload:
-                            from orb.interface.server_runtime import run_api_foreground
+                            with patch(
+                                "orb.infrastructure.di.container.get_container",
+                                return_value=mock_container,
+                            ):
+                                from orb.interface.server_runtime import run_api_foreground
 
-                            await run_api_foreground(server_cfg)
+                                await run_api_foreground(server_cfg)
 
-                            # Must invoke the handler while the patch is still active
-                            sighup_handler = handlers.get(signal.SIGHUP)
-                            assert sighup_handler is not None, "SIGHUP handler not installed"
-                            sighup_handler(signal.SIGHUP, None)
-                            mock_reload.assert_called_once()
+                                # Must invoke the handler while the patch is still active
+                                sighup_handler = handlers.get(signal.SIGHUP)
+                                assert sighup_handler is not None, "SIGHUP handler not installed"
+                                sighup_handler(signal.SIGHUP, None)
+                                mock_reload.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_sigint_sets_should_exit(self):

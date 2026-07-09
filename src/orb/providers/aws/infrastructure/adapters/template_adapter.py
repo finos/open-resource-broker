@@ -74,6 +74,7 @@ class AWSTemplateAdapter(TemplateAdapterPort):
         template_config_manager: TemplateConfigurationManager,
         aws_client: AWSClient,
         logger: LoggingPort,
+        config_manager: Optional[Any] = None,
     ) -> None:
         """
         Initialize the adapter.
@@ -82,10 +83,14 @@ class AWSTemplateAdapter(TemplateAdapterPort):
             template_config_manager: Template configuration manager
             aws_client: AWS client instance
             logger: Logger for logging messages
+            config_manager: Optional ConfigurationManager for provider-api
+                enumeration.  When supplied, ``get_supported_provider_apis``
+                uses it directly instead of resolving from the DI container.
         """
         self._template_config_manager = template_config_manager
         self._aws_client = aws_client
         self._logger = logger
+        self._config_manager = config_manager
 
     def validate_template(self, template: Template) -> list[str]:  # type: ignore[override]
         """
@@ -261,11 +266,16 @@ class AWSTemplateAdapter(TemplateAdapterPort):
     def get_supported_provider_apis(self) -> list[str]:
         """Get the list of provider APIs supported by this adapter."""
         try:
-            from orb.config.managers.configuration_manager import ConfigurationManager
-            from orb.infrastructure.di.container import get_container
+            config_manager = self._config_manager
+            if config_manager is None:
+                # Fallback: resolve lazily from the DI container only when no
+                # instance was supplied at construction time.  This path is
+                # kept for backwards compatibility with callers that construct
+                # AWSTemplateAdapter directly without a config_manager.
+                from orb.config.managers.configuration_manager import ConfigurationManager
+                from orb.infrastructure.di.container import get_container
 
-            container = get_container()
-            config_manager = container.get(ConfigurationManager)
+                config_manager = get_container().get(ConfigurationManager)
             raw_config = config_manager.get_raw_config()
 
             aws_handlers = (
@@ -500,7 +510,10 @@ class AWSTemplateAdapter(TemplateAdapterPort):
 
 
 def create_aws_template_adapter(
-    aws_client: AWSClient, logger: LoggingPort, config: ConfigurationPort
+    aws_client: AWSClient,
+    logger: LoggingPort,
+    config: ConfigurationPort,
+    config_manager: Optional[Any] = None,
 ) -> AWSTemplateAdapter:
     """
     Create AWS template adapter.
@@ -508,7 +521,10 @@ def create_aws_template_adapter(
     Args:
         aws_client: AWS client instance
         logger: Logger instance
-        config: Configuration instance
+        config: Configuration port instance (kept for API compatibility)
+        config_manager: Optional ConfigurationManager for provider-api
+            enumeration.  When supplied it is forwarded to AWSTemplateAdapter
+            so ``get_supported_provider_apis`` does not call get_container().
 
     Returns:
         AWS template adapter instance
@@ -516,4 +532,4 @@ def create_aws_template_adapter(
     from orb.infrastructure.template.configuration_manager import TemplateConfigurationManager
 
     template_config_manager = TemplateConfigurationManager(aws_client, logger)  # type: ignore[arg-type]
-    return AWSTemplateAdapter(template_config_manager, aws_client, logger)
+    return AWSTemplateAdapter(template_config_manager, aws_client, logger, config_manager)

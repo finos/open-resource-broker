@@ -46,21 +46,19 @@ from typing import Any
 from orb.infrastructure.logging.logger import get_logger
 
 
-def _reload_config_from_signal(logger: Any) -> None:
-    """Invoke ConfigurationManager.reload() on the live DI container.
+def _reload_config_from_signal(logger: Any, cm: Any) -> None:
+    """Invoke ConfigurationManager.reload() using the pre-resolved instance.
 
     Best-effort: any failure is logged but does not abort the running
     server. Called from SIGHUP handlers wired by both API and embedded
     runtimes so ``orb server reload`` works in both modes.
-    """
-    try:
-        from orb.config.managers.configuration_manager import ConfigurationManager
-        from orb.infrastructure.di.container import get_container
 
-        cm = get_container().get(ConfigurationManager)
-    except Exception as exc:
-        logger.error("SIGHUP: cannot resolve ConfigurationManager: %s", exc)
-        return
+    Args:
+        logger: Logger instance.
+        cm: Pre-resolved ConfigurationManager (obtained at server-start time
+            so the SIGHUP handler does not call get_container() at signal
+            delivery time).
+    """
     try:
         cm.reload()
         logger.info("SIGHUP: configuration reloaded from disk")
@@ -120,13 +118,28 @@ async def run_api_foreground(
 
     server = uvicorn.Server(config)
 
+    # Pre-resolve ConfigurationManager once so the SIGHUP handler does not
+    # need to call get_container() at signal-delivery time (service-locator
+    # avoided; the reload() call itself is intentional on the live instance).
+    _cm: Any = None
+    try:
+        from orb.config.managers.configuration_manager import ConfigurationManager
+        from orb.infrastructure.di.container import get_container
+
+        _cm = get_container().get(ConfigurationManager)
+    except Exception as exc:
+        logger.warning("Could not pre-resolve ConfigurationManager for SIGHUP: %s", exc)
+
     def signal_handler(signum, frame) -> None:
         logger.info("Received signal %s, shutting down gracefully...", signum)
         server.should_exit = True
 
     def sighup_handler(signum, frame) -> None:
         logger.info("Received SIGHUP — reloading configuration from disk")
-        _reload_config_from_signal(logger)
+        if _cm is None:
+            logger.error("SIGHUP: ConfigurationManager unavailable; reload skipped")
+            return
+        _reload_config_from_signal(logger, _cm)
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)

@@ -219,7 +219,11 @@ async def _call_cli(
     strategy: Any,
     query_return: Any = None,
 ) -> dict[str, Any]:
-    """Invoke a CLI handler with the DI container wired to *strategy*."""
+    """Invoke a CLI handler with the DI container wired to *strategy*.
+
+    Mirrors the production dispatch in orb.cli.router.execute_command which
+    sets ``args._container = get_container()`` before calling any handler.
+    """
     from orb.application.ports.scheduler_port import SchedulerPort
     from orb.infrastructure.di.buses import CommandBus, QueryBus
     from orb.infrastructure.di.container import get_container, reset_container
@@ -244,6 +248,9 @@ async def _call_cli(
         return original_get(service_type)
 
     container.get = _patched_get  # type: ignore[method-assign]
+    # Mirror the production dispatch boundary: set args._container so handlers
+    # can call args._container.get(...) instead of the service-locator pattern.
+    args._container = container
     try:
         result = await handler_fn(args)
     finally:
@@ -408,8 +415,11 @@ async def test_get_request_status_cli_equals_rest_top_level_keys(scheduler_type:
         return original_get(svc)
 
     container.get = _patched_cli  # type: ignore[method-assign]
+    # Mirror the production dispatch boundary: set args._container before calling.
+    cli_args = _make_args(request_id=req_id)
+    cli_args._container = container
     try:
-        cli_result = await handle_get_request_status(_make_args(request_id=req_id))
+        cli_result = await handle_get_request_status(cli_args)
     finally:
         container.get = original_get  # type: ignore[method-assign]
         reset_container()

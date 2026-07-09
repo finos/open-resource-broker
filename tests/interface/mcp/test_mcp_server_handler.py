@@ -32,10 +32,17 @@ class TestMCPServerHandler:
     @pytest.mark.asyncio
     async def test_handle_mcp_serve_stdio_mode(self, stdio_args, mock_app):
         """Test MCP serve handler in stdio mode."""
+        # The handler constructs Application(), calls initialize(), then
+        # _ensure_container() and reads app._container — patch at that level.
         with (
             patch("orb.interface.mcp.server.handler._run_stdio_server") as mock_stdio,
-            patch("orb.interface.mcp.server.handler.get_container", return_value=mock_app),
+            patch("orb.interface.mcp.server.handler.Application") as MockApplication,
         ):
+            mock_app_instance = Mock()
+            mock_app_instance.initialize = AsyncMock(return_value=True)
+            mock_app_instance._ensure_container = Mock()
+            mock_app_instance._container = mock_app
+            MockApplication.return_value = mock_app_instance
             mock_stdio.return_value = None
 
             result = await handle_mcp_serve(stdio_args)
@@ -46,10 +53,16 @@ class TestMCPServerHandler:
     @pytest.mark.asyncio
     async def test_handle_mcp_serve_tcp_mode(self, tcp_args, mock_app):
         """Test MCP serve handler in TCP mode."""
+        # Same Application patch pattern as the stdio test above.
         with (
             patch("orb.interface.mcp.server.handler._run_tcp_server") as mock_tcp,
-            patch("orb.interface.mcp.server.handler.get_container", return_value=mock_app),
+            patch("orb.interface.mcp.server.handler.Application") as MockApplication,
         ):
+            mock_app_instance = Mock()
+            mock_app_instance.initialize = AsyncMock(return_value=True)
+            mock_app_instance._ensure_container = Mock()
+            mock_app_instance._container = mock_app
+            MockApplication.return_value = mock_app_instance
             mock_tcp.return_value = None
 
             result = await handle_mcp_serve(tcp_args)
@@ -135,8 +148,13 @@ class TestMCPServerHandler:
         """Test error handling in MCP serve handler."""
         with (
             patch("orb.interface.mcp.server.handler._run_stdio_server") as mock_stdio,
-            patch("orb.interface.mcp.server.handler.get_container", return_value=mock_app),
+            patch("orb.interface.mcp.server.handler.Application") as MockApplication,
         ):
+            mock_app_instance = Mock()
+            mock_app_instance.initialize = AsyncMock(return_value=True)
+            mock_app_instance._ensure_container = Mock()
+            mock_app_instance._container = mock_app
+            MockApplication.return_value = mock_app_instance
             mock_stdio.side_effect = Exception("Test error")
 
             # Should raise the exception (not caught in handler)

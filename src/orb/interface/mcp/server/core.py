@@ -563,9 +563,10 @@ Use the available MCP tools to diagnose the issue."""
         default_provider = PROVIDER_TYPE_AWS  # Keep as fallback
         try:
             from orb.application.services.provider_registry_service import ProviderRegistryService
-            from orb.infrastructure.di.container import get_container
 
-            registry_service = get_container().get(ProviderRegistryService)
+            if self.app is None:
+                raise RuntimeError("MCP server has no DI container (app=None)")
+            registry_service = self.app.get(ProviderRegistryService)
             registered_types = registry_service.get_available_strategies()
             if registered_types:
                 default_provider = registered_types[0]

@@ -190,9 +190,13 @@ class TestDashboardSummaryCatchesRepositoryQueryError:
         logger.info = MagicMock()
         logger.warning = MagicMock()
 
+        mock_provider_registry = MagicMock()
+        mock_provider_registry.list_all_provider_apis.return_value = []
+
         orchestrator = DashboardSummaryOrchestrator(
             uow_factory=mock_uow_factory,
             logger=logger,
+            provider_registry=mock_provider_registry,
         )
         return orchestrator, logger
 

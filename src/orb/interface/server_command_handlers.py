@@ -36,10 +36,9 @@ def _resolve_configs(args) -> tuple[Any, Any | None]:
     """Resolve ServerConfig + (optional) UIConfig, applying CLI overrides."""
     from orb.config.schemas.server_schema import ServerConfig
     from orb.domain.base.ports.configuration_port import ConfigurationPort
-    from orb.infrastructure.di.container import get_container
 
     logger = get_logger(__name__)
-    container = get_container()
+    container = args._container
     config_manager = container.get(ConfigurationPort)
 
     try:
@@ -80,21 +79,22 @@ def _resolve_configs(args) -> tuple[Any, Any | None]:
     return server_config, ui_config
 
 
-async def _initialize_application() -> None:
+async def _initialize_application(container: Any) -> None:
     """Initialise the DI container's providers — same as serve handler.
 
     Also starts provider daemon services (watch streams, startup reconcilers,
     orphan GC, etc). Only the REST/daemon path calls this — CLI commands
     explicitly skip it so they stay synchronous and don't issue per-command
     cluster sweeps.
+
+    Args:
+        container: The already-resolved DI container from the CLI dispatch boundary.
     """
     from orb.bootstrap import Application
     from orb.domain.base.ports.configuration_port import ConfigurationPort
-    from orb.infrastructure.di.container import get_container
     from orb.infrastructure.logging.logger import get_logger
 
     logger = get_logger(__name__)
-    container = get_container()
     config_manager = container.get(ConfigurationPort)
     orb_app = Application(
         config_path=getattr(config_manager, "_config_file", None),
@@ -119,6 +119,7 @@ def _build_runtime(args):
     log_level = getattr(args, "server_log_level", None)
     scheduler = getattr(args, "scheduler", None)
     api_only = getattr(args, "api_only", False)
+    _container = args._container
 
     async def runtime() -> dict[str, Any]:
         from orb.interface.server_runtime import (
@@ -126,7 +127,7 @@ def _build_runtime(args):
             run_embedded_foreground,
         )
 
-        await _initialize_application()
+        await _initialize_application(_container)
 
         # --api-only forces split (API-only) mode regardless of config.
         if api_only:

@@ -308,14 +308,16 @@ def _register_aws_template_adapter(logger: "Optional[LoggingPort]" = None) -> No
         # Register AWS template adapter factory
         def aws_template_adapter_factory(container_instance):
             """Create AWS template adapter."""
+            from orb.config.managers.configuration_manager import ConfigurationManager
             from orb.domain.base.ports import ConfigurationPort, LoggingPort
             from orb.providers.aws.infrastructure.aws_client import AWSClient
 
             aws_client = container_instance.get(AWSClient)
             logger_port = container_instance.get(LoggingPort)
             config_port = container_instance.get(ConfigurationPort)
+            config_mgr = container_instance.get(ConfigurationManager)
 
-            return create_aws_template_adapter(aws_client, logger_port, config_port)
+            return create_aws_template_adapter(aws_client, logger_port, config_port, config_mgr)
 
         # Register the adapter with DI container
         container.register_singleton(AWSTemplateAdapter, aws_template_adapter_factory)
