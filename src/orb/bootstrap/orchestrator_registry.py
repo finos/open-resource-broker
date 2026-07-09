@@ -210,21 +210,27 @@ def register_orchestrators(container: DIContainer) -> None:
             ),
         )
     if not container.is_registered(StopMachinesOrchestrator):
+        from orb.application.services.provider_registry_service import ProviderRegistryService
+
         container.register_singleton(
             StopMachinesOrchestrator,
             lambda c: StopMachinesOrchestrator(
                 command_bus=c.get(CommandBus),
                 query_bus=c.get(QueryBus),
                 logger=c.get(LoggingPort),
+                provider_registry_service=c.get(ProviderRegistryService),
             ),
         )
     if not container.is_registered(StartMachinesOrchestrator):
+        from orb.application.services.provider_registry_service import ProviderRegistryService
+
         container.register_singleton(
             StartMachinesOrchestrator,
             lambda c: StartMachinesOrchestrator(
                 command_bus=c.get(CommandBus),
                 query_bus=c.get(QueryBus),
                 logger=c.get(LoggingPort),
+                provider_registry_service=c.get(ProviderRegistryService),
             ),
         )
     if not container.is_registered(GetProviderHealthOrchestrator):

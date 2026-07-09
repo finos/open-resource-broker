@@ -9,6 +9,7 @@ from orb.application.ports.query_bus_port import QueryBusPort
 from orb.application.provider.commands import ExecuteProviderOperationCommand
 from orb.application.services.orchestration.base import OrchestratorBase
 from orb.application.services.orchestration.dtos import StopMachinesInput, StopMachinesOutput
+from orb.application.services.provider_registry_service import ProviderRegistryService
 from orb.domain.base.operations import (
     Operation as ProviderOperation,
     OperationType as ProviderOperationType,
@@ -20,11 +21,16 @@ class StopMachinesOrchestrator(OrchestratorBase[StopMachinesInput, StopMachinesO
     """Orchestrator for stopping machines via the provider layer."""
 
     def __init__(
-        self, command_bus: CommandBusPort, query_bus: QueryBusPort, logger: LoggingPort
+        self,
+        command_bus: CommandBusPort,
+        query_bus: QueryBusPort,
+        logger: LoggingPort,
+        provider_registry_service: ProviderRegistryService,
     ) -> None:
         self._command_bus = command_bus
         self._query_bus = query_bus
         self._logger = logger
+        self._provider_registry_service = provider_registry_service
 
     async def execute(self, input: StopMachinesInput) -> StopMachinesOutput:  # type: ignore[return]
         self._logger.info(
@@ -58,11 +64,35 @@ class StopMachinesOrchestrator(OrchestratorBase[StopMachinesInput, StopMachinesO
                 message="No machines to stop",
             )
 
+        # Resolve the effective provider identifier so the command handler can
+        # route the operation to the correct provider strategy.  Preference
+        # order: explicit name > explicit type > active provider from registry.
+        if input.provider_name:
+            strategy_override = input.provider_name
+        elif input.provider_type:
+            strategy_override = input.provider_type
+        else:
+            try:
+                selection = self._provider_registry_service.select_active_provider()
+                strategy_override = selection.provider_name
+            except Exception as exc:
+                self._logger.error(
+                    "StopMachinesOrchestrator: cannot resolve active provider: %s", exc
+                )
+                return StopMachinesOutput(
+                    stopped_machines=[],
+                    failed_machines=list(machine_ids),
+                    success=False,
+                    message=f"Cannot resolve active provider: {exc}",
+                )
+
         operation = ProviderOperation(
             operation_type=ProviderOperationType.STOP_INSTANCES,
             parameters={"instance_ids": machine_ids},
         )
-        command = ExecuteProviderOperationCommand(operation=operation)
+        command = ExecuteProviderOperationCommand(
+            operation=operation, strategy_override=strategy_override
+        )
         await self._command_bus.execute(command)
 
         if command.result and command.result.get("success"):

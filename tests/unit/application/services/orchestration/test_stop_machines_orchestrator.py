@@ -52,11 +52,27 @@ def mock_logger():
 
 
 @pytest.fixture
-def orchestrator(mock_command_bus, mock_query_bus, mock_logger):
+def mock_provider_registry_service():
+    from orb.application.services.provider_registry_service import ProviderRegistryService
+    from orb.domain.base.results import ProviderSelectionResult
+
+    svc = MagicMock(spec=ProviderRegistryService)
+    svc.select_active_provider.return_value = ProviderSelectionResult(
+        provider_type="aws",
+        provider_name="aws-default",
+        selection_reason="test_fixture",
+        confidence=1.0,
+    )
+    return svc
+
+
+@pytest.fixture
+def orchestrator(mock_command_bus, mock_query_bus, mock_logger, mock_provider_registry_service):
     return StopMachinesOrchestrator(
         command_bus=mock_command_bus,
         query_bus=mock_query_bus,
         logger=mock_logger,
+        provider_registry_service=mock_provider_registry_service,
     )
 
 
