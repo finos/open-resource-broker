@@ -161,13 +161,18 @@ def _register_template_services(container: DIContainer):
     _register_ami_resolver_if_enabled(container)
 
 
-def _register_ami_resolver_if_enabled(_container: DIContainer) -> None:
-    """Register AMI resolver when implemented.
+def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
+    """Register AMICacheService and AWSAMIResolver against ImageResolver."""
+    from orb.domain.template.image_resolver import ImageResolver
+    from orb.infrastructure.caching.ami_cache_service import AMICacheService
+    from orb.providers.aws.domain.services.ami_resolver import AWSAMIResolver
 
-    TODO: CachingAMIResolver is not yet implemented. When ready, check
-    TemplateExtensionRegistry for AWS AMI resolution config and register
-    the resolver against TemplateResolverPort.
-    """
+    container.register_singleton(AMICacheService, lambda _c: AMICacheService())
+
+    container.register_singleton(
+        ImageResolver,
+        lambda c: AWSAMIResolver(cache_service=c.get(AMICacheService)),
+    )
 
 
 def _register_repository_services(container: DIContainer) -> None:

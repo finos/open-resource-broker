@@ -38,6 +38,8 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
         ("bootstrap/infrastructure_services.py", "orb.providers.registration"),
         ("bootstrap/infrastructure_services.py", "orb.providers.k8s"),
         ("bootstrap/infrastructure_services.py", "orb.providers.k8s.registration"),
+        # DI wiring — intentional: AMI resolver registration must wire AWS provider
+        ("bootstrap/infrastructure_services.py", "orb.providers.aws.domain.services.ami_resolver"),
         (
             "application/services/orchestration/dashboard_summary.py",
             "orb.providers.registry",

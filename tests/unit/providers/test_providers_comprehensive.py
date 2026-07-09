@@ -795,55 +795,6 @@ class TestAWSResilienceComprehensive:
 
 @pytest.mark.unit
 @pytest.mark.providers
-class TestAWSTemplateInfrastructureComprehensive:
-    """Comprehensive tests for AWS template infrastructure."""
-
-    def test_ami_cache_exists(self):
-        """Test that AMI cache exists."""
-        try:
-            from orb.providers.aws.infrastructure.template.ami_cache import RuntimeAMICache
-
-            assert RuntimeAMICache is not None
-        except ImportError:
-            pytest.skip("RuntimeAMICache not available")
-
-    def test_template_infrastructure_initialization(self):
-        """Test template infrastructure initialization."""
-        template_classes = [
-            ("ami_cache", "RuntimeAMICache"),
-        ]
-
-        for module_name, class_name in template_classes:
-            try:
-                module = importlib.import_module(
-                    f"orb.providers.aws.infrastructure.template.{module_name}"
-                )
-                template_class = getattr(module, class_name)
-
-                # Try to create instance
-                mock_deps = [Mock() for _ in range(5)]
-                instance = None
-
-                for i in range(len(mock_deps) + 1):
-                    try:
-                        if i == 0:
-                            instance = template_class()
-                        else:
-                            instance = template_class(*mock_deps[:i])
-                        break
-                    except TypeError:
-                        continue
-
-                if instance:
-                    assert instance is not None
-
-            except (ImportError, AttributeError):
-                # Class might not be available
-                pass
-
-
-@pytest.mark.unit
-@pytest.mark.providers
 class TestProviderRegistrationComprehensive:
     """Comprehensive tests for provider registration."""
 
