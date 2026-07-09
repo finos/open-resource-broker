@@ -4,11 +4,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from orb.providers.azure.services.spot_placement_planner import (
-    PlacementCandidate,
-    PlacementPlanEntry,
-    PlacementScore,
-)
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
 from orb.providers.azure.exceptions.azure_exceptions import (
@@ -20,6 +15,11 @@ from orb.providers.azure.infrastructure.handlers.azure_handler import AzureRelea
 from orb.providers.azure.infrastructure.handlers.vmss_handler import VMSSHandler
 from orb.providers.azure.infrastructure.services.spot_placement_score_adapter import (
     AzureSpotPlacementScoreAdapter,
+)
+from orb.providers.azure.services.spot_placement_planner import (
+    PlacementCandidate,
+    PlacementPlanEntry,
+    PlacementScore,
 )
 from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
 from tests.providers.azure.strategy_test_support import build_strategy_harness, run_operation

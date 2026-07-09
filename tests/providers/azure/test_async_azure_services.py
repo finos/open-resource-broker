@@ -13,8 +13,10 @@ from orb.providers.azure.infrastructure.services.azure_deployment_service import
     AzureDeploymentService,
 )
 from orb.providers.azure.services.health_check_service import AzureHealthCheckService
-from orb.providers.azure.services.inventory_service import AzureInventoryService
-from orb.providers.azure.services.inventory_service import AzureReadOperationContext
+from orb.providers.azure.services.inventory_service import (
+    AzureInventoryService,
+    AzureReadOperationContext,
+)
 from orb.providers.azure.services.provisioning_service import (
     AzureProvisioningService,
     CreateOperationContext,

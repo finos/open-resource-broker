@@ -6,6 +6,7 @@ is suitable for long-lived singleton workloads.
 """
 
 from __future__ import annotations
+
 import uuid
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Optional, cast
@@ -22,25 +23,25 @@ from orb.providers.azure.infrastructure.error_utils import (
     canonical_azure_error_code,
     extract_azure_error_details,
 )
+from orb.providers.azure.infrastructure.handlers._network_identity import (
+    resolve_network_identity_or_empty_async,
+)
+from orb.providers.azure.infrastructure.handlers.azure_handler import (
+    AzureAcquireHostsResult,
+    AzureHandler,
+    AzureHandlerStatusResult,
+    AzureReleaseContext,
+    AzureReleaseHostsResult,
+    AzureSingleVmReleaseProviderData,
+    AzureStatusProviderData,
+    AzureSubmittedDeletion,
+    azure_raise_on_status_error,
+)
+from orb.providers.azure.infrastructure.handlers.azure_status import resolve_power_state
 from orb.providers.azure.infrastructure.sdk_shapes import (
     AzureVmRuntimeStatusProtocol,
     AzureVmWithIdentityProtocol,
     instance_view_statuses,
-)
-from orb.providers.azure.infrastructure.handlers._network_identity import (
-    resolve_network_identity_or_empty_async,
-)
-from orb.providers.azure.infrastructure.handlers.azure_status import resolve_power_state
-from orb.providers.azure.infrastructure.handlers.azure_handler import (
-    AzureAcquireHostsResult,
-    AzureHandler,
-    AzureReleaseContext,
-    AzureSubmittedDeletion,
-    AzureHandlerStatusResult,
-    AzureReleaseHostsResult,
-    AzureSingleVmReleaseProviderData,
-    AzureStatusProviderData,
-    azure_raise_on_status_error,
 )
 from orb.providers.azure.infrastructure.services.azure_network_identity_resolver import (
     AzureNetworkIdentity,

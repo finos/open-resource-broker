@@ -24,7 +24,10 @@ from typing import TYPE_CHECKING, Any, Optional, TypedDict, cast
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.request.aggregate import Request
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
-from orb.providers.azure.domain.template.value_objects import AzureProviderApi
+from orb.providers.azure.domain.template.value_objects import (
+    AzureProviderApi,
+    AzureVMSSOrchestrationMode,
+)
 from orb.providers.azure.exceptions.azure_exceptions import (
     AzureValidationError,
     QuotaExceededError,
@@ -32,35 +35,34 @@ from orb.providers.azure.exceptions.azure_exceptions import (
     VMSSCreationError,
     VMSSNotFoundError,
 )
+from orb.providers.azure.infrastructure.error_codes import ProviderErrorEntry
 from orb.providers.azure.infrastructure.error_utils import (
     classify_azure_error,
-)
-from orb.providers.azure.infrastructure.sdk_shapes import (
-    AzureVmWithIdentityProtocol,
-    AzureVmRuntimeStatusProtocol,
-    instance_view_statuses,
 )
 from orb.providers.azure.infrastructure.handlers._network_identity import (
     resolve_network_identity_or_empty_async,
 )
-from orb.providers.azure.infrastructure.vmss_cleanup import PendingVmssCleanup
-from orb.providers.azure.infrastructure.error_codes import ProviderErrorEntry
-from orb.providers.azure.infrastructure.handlers.azure_status import resolve_power_state
 from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureAcquireHostsResult,
     AzureHandler,
-    AzureReleaseContext,
-    AzureSubmittedDeletion,
     AzureHandlerStatusResult,
+    AzureReleaseContext,
     AzureReleaseHostsResult,
     AzureStatusProviderData,
+    AzureSubmittedDeletion,
     AzureVmssReleaseProviderData,
     azure_raise_on_status_error,
+)
+from orb.providers.azure.infrastructure.handlers.azure_status import resolve_power_state
+from orb.providers.azure.infrastructure.sdk_shapes import (
+    AzureVmRuntimeStatusProtocol,
+    AzureVmWithIdentityProtocol,
+    instance_view_statuses,
 )
 from orb.providers.azure.infrastructure.services.azure_network_identity_resolver import (
     AzureNetworkIdentity,
 )
-from orb.providers.azure.domain.template.value_objects import AzureVMSSOrchestrationMode
+from orb.providers.azure.infrastructure.vmss_cleanup import PendingVmssCleanup
 
 if TYPE_CHECKING:
     from azure.mgmt.compute.models import OrchestrationMode as SdkOrchestrationMode

@@ -1,7 +1,6 @@
 """Tests for Azure native spec processing."""
 
-from unittest.mock import Mock
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from pydantic import ValidationError
 

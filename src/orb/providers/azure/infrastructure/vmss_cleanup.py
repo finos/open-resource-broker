@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from threading import RLock
-from typing import Mapping, Optional, Protocol, SupportsInt, TypeAlias, Any, cast
+from typing import Any, Mapping, Optional, Protocol, SupportsInt, TypeAlias, cast
 
 
 class _VmssCleanupLogger(Protocol):
