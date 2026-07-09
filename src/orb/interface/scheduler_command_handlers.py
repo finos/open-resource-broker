@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from orb.application.dto.interface_response import InterfaceResponse
-from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
 from orb.interface.response_formatting_service import ResponseFormattingService
 
@@ -23,7 +22,7 @@ async def handle_list_scheduler_strategies(
         ListSchedulerStrategiesOrchestrator,
     )
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(ListSchedulerStrategiesOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
@@ -43,7 +42,7 @@ async def handle_show_scheduler_config(
         GetSchedulerConfigOrchestrator,
     )
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(GetSchedulerConfigOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
@@ -60,7 +59,7 @@ async def handle_validate_scheduler_config(
     """Handle validate scheduler configuration operations."""
     from orb.infrastructure.di.buses import QueryBus
 
-    container = get_container()
+    container = args._container
     query_bus = container.get(QueryBus)
 
     from orb.application.queries.scheduler import ValidateSchedulerConfigurationQuery

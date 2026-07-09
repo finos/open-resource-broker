@@ -14,7 +14,6 @@ from orb.config.platform_dirs import (
 )
 from orb.domain.base.ports.console_port import ConsolePort
 from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
-from orb.infrastructure.di.container import get_container
 from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
 
@@ -23,7 +22,8 @@ logger = get_logger(__name__)
 
 async def handle_init(args) -> int:
     """Handle orb init command."""
-    console = get_container().get(ConsolePort)
+    container = args._container
+    console = container.get(ConsolePort)
     try:
         # Determine config directory
         if args.config_dir:
@@ -56,9 +56,9 @@ async def handle_init(args) -> int:
 
         # Get configuration
         if args.non_interactive:
-            config = _get_default_config(args)
+            config = _get_default_config(args, container)
         else:
-            config = _interactive_setup()
+            config = _interactive_setup(container)
 
         # Check if configuration was successful
         if not config:
@@ -80,7 +80,7 @@ async def handle_init(args) -> int:
             extra_paths["scripts_dir"] = scripts_dir
 
         # Write config file
-        _write_config_file(config_file, config, extra_paths)
+        _write_config_file(config_file, config, extra_paths, container)
 
         # Copy platform-specific scripts
         _copy_scripts(scripts_dir)
@@ -137,13 +137,16 @@ def _get_available_schedulers() -> list[dict[str, str]]:
     return schedulers
 
 
-def _get_available_providers(registry: Any = None) -> list[dict[str, str]]:
+def _get_available_providers(container: Any = None, registry: Any = None) -> list[dict[str, str]]:
     """Get available providers from provider registry."""
     try:
         if registry is None:
-            from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
+            if container is not None:
+                from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 
-            registry = get_container().get(ProviderRegistryPort)
+                registry = container.get(ProviderRegistryPort)
+        if registry is None:
+            return []
         registered_types = registry.get_registered_providers()
 
         providers = []
@@ -159,9 +162,9 @@ def _get_available_providers(registry: Any = None) -> list[dict[str, str]]:
         return []
 
 
-def _interactive_setup() -> Dict[str, Any]:
+def _interactive_setup(container: Any) -> Dict[str, Any]:
     """Interactive configuration setup."""
-    console = get_container().get(ConsolePort)
+    console = container.get(ConsolePort)
     try:
         console.separator(char="=", color="cyan")
         console.info("  ORB Configuration Setup")
@@ -191,7 +194,7 @@ def _interactive_setup() -> Dict[str, Any]:
         console.info("[2/4] Cloud Provider")
         console.separator(char="-", color="cyan")
 
-        providers = _get_available_providers()
+        providers = _get_available_providers(container)
         if not providers:
             raise ValueError("No providers registered. Install a provider plugin to continue.")
         for i, provider in enumerate(providers, 1):
@@ -256,8 +259,8 @@ def _interactive_setup() -> Dict[str, Any]:
             return {}
 
         # Step 4: operational params (provider-specific, e.g. region, project, namespace)
-        strategy_class = _get_provider_strategy(provider_type)
-        op_params = _prompt_operational_params(strategy_class)
+        strategy_class = _get_provider_strategy(provider_type, container=container)
+        op_params = _prompt_operational_params(strategy_class, container=container)
         provider_config.update(op_params)
 
         console.info("")
@@ -274,9 +277,9 @@ def _interactive_setup() -> Dict[str, Any]:
 
         infrastructure_defaults = {}
         if discover_choice in ["", "y", "yes"]:
-            registry = get_container().get(ProviderRegistryPort)
+            registry = container.get(ProviderRegistryPort)
             infrastructure_defaults = _discover_infrastructure(
-                provider_type, provider_config, registry
+                provider_type, provider_config, registry, container
             )
 
         # Create first provider instance — provider_config is treated as opaque;
@@ -299,7 +302,7 @@ def _interactive_setup() -> Dict[str, Any]:
             if add_another not in ["y", "yes"]:
                 break
 
-            additional_provider = _configure_additional_provider()
+            additional_provider = _configure_additional_provider(container)
             if additional_provider:
                 providers.append(additional_provider)
 
@@ -345,16 +348,16 @@ def _interactive_setup() -> Dict[str, Any]:
         raise
 
 
-def _configure_additional_provider() -> Optional[Dict[str, Any]]:
+def _configure_additional_provider(container: Any) -> Optional[Dict[str, Any]]:
     """Configure an additional provider instance."""
-    console = get_container().get(ConsolePort)
+    console = container.get(ConsolePort)
     try:
         console.info("")
         console.info("Additional Provider Configuration")
         console.separator(char="-", color="cyan")
 
         # Provider type
-        providers = _get_available_providers()
+        providers = _get_available_providers(container)
         if not providers:
             raise ValueError("No providers registered. Install a provider plugin to continue.")
         for i, provider in enumerate(providers, 1):
@@ -415,8 +418,8 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
             return None
 
         # Step 4: operational params (provider-specific, e.g. region, project, namespace)
-        strategy_class = _get_provider_strategy(provider_type)
-        op_params = _prompt_operational_params(strategy_class)
+        strategy_class = _get_provider_strategy(provider_type, container=container)
+        op_params = _prompt_operational_params(strategy_class, container=container)
         provider_config.update(op_params)
 
         # Infrastructure discovery
@@ -427,9 +430,9 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
 
         infrastructure_defaults = {}
         if discover_choice in ["", "y", "yes"]:
-            registry = get_container().get(ProviderRegistryPort)
+            registry = container.get(ProviderRegistryPort)
             infrastructure_defaults = _discover_infrastructure(
-                provider_type, provider_config, registry
+                provider_type, provider_config, registry, container
             )
 
         return {
@@ -446,7 +449,9 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
         return None
 
 
-def _get_provider_strategy(provider_type: str, registry: Any = None) -> Optional[type]:
+def _get_provider_strategy(
+    provider_type: str, registry: Any = None, container: Any = None
+) -> Optional[type]:
     """Return the strategy CLASS for a provider type.
 
     The credential inquiry methods (``get_available_credential_sources``,
@@ -457,10 +462,12 @@ def _get_provider_strategy(provider_type: str, registry: Any = None) -> Optional
     disk.
     """
     try:
-        if registry is None:
+        if registry is None and container is not None:
             from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 
-            registry = get_container().get(ProviderRegistryPort)
+            registry = container.get(ProviderRegistryPort)
+        if registry is None:
+            return None
         # Ensure the provider type is registered so its class is available.
         registry.ensure_provider_type_registered(provider_type)
         reg = registry._get_type_registration(provider_type)
@@ -470,7 +477,9 @@ def _get_provider_strategy(provider_type: str, registry: Any = None) -> Optional
         return None
 
 
-def _prompt_operational_params(strategy_class: Optional[type]) -> dict[str, Any]:
+def _prompt_operational_params(
+    strategy_class: Optional[type], container: Any = None
+) -> dict[str, Any]:
     """Interactively collect operational parameters from the operator.
 
     Calls ``get_operational_requirements()`` on the strategy class to discover
@@ -485,8 +494,10 @@ def _prompt_operational_params(strategy_class: Optional[type]) -> dict[str, Any]
     """
     if strategy_class is None:
         return {}
+    if container is None:
+        return {}
 
-    console = get_container().get(ConsolePort)
+    console = container.get(ConsolePort)
     op_requirements: dict[str, Any] = {}
     try:
         op_requirements = strategy_class.get_operational_requirements()
@@ -598,7 +609,10 @@ def _get_operational_requirements(provider_type: str) -> dict:
 
 
 def _discover_infrastructure(
-    provider_type: str, provider_config: Dict[str, Any], registry: ProviderRegistryPort
+    provider_type: str,
+    provider_config: Dict[str, Any],
+    registry: ProviderRegistryPort,
+    container: Any,
 ) -> Dict[str, Any]:
     """Discover infrastructure interactively using the provider strategy.
 
@@ -618,8 +632,9 @@ def _discover_infrastructure(
             together and each provider's strategy picks up the fields it
             understands.
         registry: Live provider registry used to construct the strategy.
+        container: DI container for resolving console output port.
     """
-    console = get_container().get(ConsolePort)
+    console = container.get(ConsolePort)
     try:
         strategy = registry.create_strategy_by_type(provider_type, provider_config)
         if strategy is None:
@@ -638,16 +653,16 @@ def _discover_infrastructure(
         return {}
 
 
-def _get_default_config(args) -> Dict[str, Any]:
+def _get_default_config(args, container: Any) -> Dict[str, Any]:
     """Get default configuration from args."""
     # Get first available provider as default
-    providers = _get_available_providers()
+    providers = _get_available_providers(container)
     if not providers and not args.provider_type:
         raise ValueError("No providers registered. Install a provider plugin to continue.")
     default_provider = providers[0]["type"] if providers else args.provider_type
 
     provider_type = args.provider_type or default_provider
-    strategy_class = _get_provider_strategy(provider_type)
+    strategy_class = _get_provider_strategy(provider_type, container=container)
     infrastructure_defaults = (
         strategy_class.get_cli_infrastructure_defaults(args) if strategy_class is not None else {}
     )
@@ -709,7 +724,10 @@ def _fallback_provider_name(provider_type: str, provider_data: Dict[str, Any]) -
 
 
 def _write_config_file(
-    config_file: Path, user_config: Dict[str, Any], extra_paths: Optional[Dict[str, Any]] = None
+    config_file: Path,
+    user_config: Dict[str, Any],
+    extra_paths: Optional[Dict[str, Any]] = None,
+    container: Any = None,
 ):
     """Write configuration file with multiple provider support."""
     # Process all providers
@@ -728,8 +746,9 @@ def _write_config_file(
         # provider config on disk, so no scaffolding is needed here.
         strategy_class = None
         try:
-            registry = get_container().get(ProviderRegistryPort)
-            strategy_class = _get_provider_strategy(provider_type, registry=registry)
+            if container is not None:
+                registry = container.get(ProviderRegistryPort)
+                strategy_class = _get_provider_strategy(provider_type, registry=registry)
         except Exception:
             pass  # best-effort; fall back to generic name and all-defaults-in-template
 

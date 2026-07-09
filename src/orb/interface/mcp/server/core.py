@@ -282,8 +282,9 @@ class OpenResourceBrokerMCPServer:
         if tool_name not in self.tools:
             raise ValueError(f"Unknown tool: {tool_name}")
 
-        # Convert arguments to args-like object
+        # Convert arguments to args-like object and inject the container
         args = type("Args", (), arguments)()
+        setattr(args, "_container", self.app)
 
         # Call the tool function
         tool_func = self.tools[tool_name]
@@ -497,29 +498,33 @@ class OpenResourceBrokerMCPServer:
             return result.data  # type: ignore[no-any-return]
         return result  # type: ignore[return-value]
 
+    def _make_args(self, **kwargs) -> Any:
+        """Create an args object with _container pre-injected."""
+        args = type("Args", (), {})()
+        setattr(args, "_container", self.app)
+        for k, v in kwargs.items():
+            setattr(args, k, v)
+        return args
+
     async def _get_templates_resource(self, uri: str) -> dict[str, Any]:
         """Get templates resource data."""
         # Use the list_templates tool to get data
-        args = type("Args", (), {})()
-        result = await self.tools["list_templates"](args)
+        result = await self.tools["list_templates"](self._make_args())
         return self._unwrap_result(result)
 
     async def _get_requests_resource(self, uri: str) -> dict[str, Any]:
         """Get requests resource data."""
-        args = type("Args", (), {})()
-        result = await self.tools["list_requests"](args)
+        result = await self.tools["list_requests"](self._make_args())
         return self._unwrap_result(result)
 
     async def _get_machines_resource(self, uri: str) -> dict[str, Any]:
         """Get machines resource data."""
-        args = type("Args", (), {})()
-        result = await self.tools["list_machines"](args)
+        result = await self.tools["list_machines"](self._make_args())
         return self._unwrap_result(result)
 
     async def _get_providers_resource(self, uri: str) -> dict[str, Any]:
         """Get providers resource data."""
-        args = type("Args", (), {})()
-        result = await self.tools["list_providers"](args)
+        result = await self.tools["list_providers"](self._make_args())
         return result
 
     def _generate_provision_prompt(self, arguments: dict[str, Any]) -> str:

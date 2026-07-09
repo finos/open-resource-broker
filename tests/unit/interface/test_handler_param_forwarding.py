@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 
 def _make_args(**kwargs) -> argparse.Namespace:
@@ -57,8 +57,8 @@ class TestHandleListMachinesForwardsParams:
 
         args = _make_args(status=None, provider=None, request_id=None, limit=5, offset=10)
 
-        with patch("orb.interface.machine_command_handlers.get_container", return_value=container):
-            asyncio.run(handle_list_machines(args))
+        args._container = container
+        asyncio.run(handle_list_machines(args))
 
         mock_orch.execute.assert_called_once()
         call_input: ListMachinesInput = mock_orch.execute.call_args[0][0]
@@ -88,8 +88,8 @@ class TestHandleListTemplatesForwardsParams:
             offset=10,
         )
 
-        with patch("orb.interface.template_command_handlers.get_container", return_value=container):
-            asyncio.run(handle_list_templates(args))
+        args._container = container
+        asyncio.run(handle_list_templates(args))
 
         mock_orch.execute.assert_called_once()
         call_input: ListTemplatesInput = mock_orch.execute.call_args[0][0]
@@ -113,8 +113,8 @@ class TestHandleGetReturnRequestsForwardsParams:
 
         args = _make_args(status="pending", limit=5)
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            asyncio.run(handle_get_return_requests(args))
+        args._container = container
+        asyncio.run(handle_get_return_requests(args))
 
         mock_orch.execute.assert_called_once()
         call_input: ListReturnRequestsInput = mock_orch.execute.call_args[0][0]
@@ -136,8 +136,8 @@ class TestHandleProviderHealthForwardsParams:
 
         args = _make_args(provider_name="aws")
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            asyncio.run(handle_provider_health(args))
+        args._container = container
+        asyncio.run(handle_provider_health(args))
 
         mock_orch.execute.assert_called_once()
         call_input: GetProviderHealthInput = mock_orch.execute.call_args[0][0]
@@ -158,8 +158,8 @@ class TestHandleProviderMetricsForwardsParams:
 
         args = _make_args(provider=None, timeframe="1h")
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            asyncio.run(handle_provider_metrics(args))
+        args._container = container
+        asyncio.run(handle_provider_metrics(args))
 
         mock_orch.execute.assert_called_once()
         call_input: GetProviderMetricsInput = mock_orch.execute.call_args[0][0]
@@ -184,8 +184,8 @@ class TestHandleGetTemplateForwardsParams:
 
         args = _make_args(template_id="t1", flag_template_id=None, provider_name="aws")
 
-        with patch("orb.interface.template_command_handlers.get_container", return_value=container):
-            asyncio.run(handle_get_template(args))
+        args._container = container
+        asyncio.run(handle_get_template(args))
 
         mock_orch.execute.assert_called_once()
         call_input: GetTemplateInput = mock_orch.execute.call_args[0][0]

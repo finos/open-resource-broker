@@ -68,13 +68,13 @@ class TestHandleCreateTemplateValidateOnly:
             file=self._make_template_file(tmp_path),
             validate_only=True,
         )
+        args._container = container
 
-        with patch("orb.interface.template_command_handlers.get_container", return_value=container):
-            with patch(
-                "orb.infrastructure.mocking.dry_run_context.is_dry_run_active",
-                return_value=False,
-            ):
-                result = asyncio.run(handle_create_template(args))
+        with patch(
+            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active",
+            return_value=False,
+        ):
+            result = asyncio.run(handle_create_template(args))
 
         command_bus.execute.assert_not_called()
         assert result["validate_only"] is True
@@ -102,13 +102,13 @@ class TestHandleCreateTemplateValidateOnly:
             file=self._make_template_file(tmp_path),
             validate_only=False,
         )
+        args._container = container
 
-        with patch("orb.interface.template_command_handlers.get_container", return_value=container):
-            with patch(
-                "orb.infrastructure.mocking.dry_run_context.is_dry_run_active",
-                return_value=False,
-            ):
-                result = asyncio.run(handle_create_template(args))
+        with patch(
+            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active",
+            return_value=False,
+        ):
+            result = asyncio.run(handle_create_template(args))
 
         mock_orchestrator.execute.assert_called_once()
         assert result.data["success"] is True

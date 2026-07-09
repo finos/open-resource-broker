@@ -5,7 +5,6 @@ from typing import Any, Dict, List
 
 from orb.config.platform_dirs import get_config_location
 from orb.domain.base.ports.console_port import ConsolePort
-from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
 from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
 
@@ -13,15 +12,16 @@ from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
 @handle_interface_exceptions(context="infrastructure_discover", interface_type="cli")
 async def handle_infrastructure_discover(args) -> Dict[str, Any]:
     """Handle orb infrastructure discover command."""
+    container = args._container
     try:
         if args.provider_name:
-            providers = [_get_provider_config(args.provider_name)]
+            providers = [_get_provider_config(args.provider_name, container)]
         else:
-            providers = _get_active_providers_with_overrides()
+            providers = _get_active_providers_with_overrides(container)
 
         results = []
         for provider in providers:
-            result = await _discover_provider_infrastructure(provider, args)
+            result = await _discover_provider_infrastructure(provider, args, container)
             results.append(result)
 
         return {
@@ -39,15 +39,16 @@ async def handle_infrastructure_discover(args) -> Dict[str, Any]:
 @handle_interface_exceptions(context="infrastructure_show", interface_type="cli")
 async def handle_infrastructure_show(args) -> Dict[str, Any]:
     """Handle orb infrastructure show command."""
+    container = args._container
     try:
         if args.provider_name:
-            providers = [_get_provider_config(args.provider_name)]
+            providers = [_get_provider_config(args.provider_name, container)]
         else:
-            providers = _get_active_providers_with_overrides()
+            providers = _get_active_providers_with_overrides(container)
 
         provider_data = []
         for provider in providers:
-            _show_provider_infrastructure(provider)
+            _show_provider_infrastructure(provider, container)
             provider_data.append(provider)
 
         return {"status": "success", "providers": provider_data}
@@ -62,15 +63,16 @@ async def handle_infrastructure_show(args) -> Dict[str, Any]:
 @handle_interface_exceptions(context="infrastructure_validate", interface_type="cli")
 async def handle_infrastructure_validate(args) -> Dict[str, Any]:
     """Handle orb infrastructure validate command."""
+    container = args._container
     try:
         if args.provider_name:
-            providers = [_get_provider_config(args.provider_name)]
+            providers = [_get_provider_config(args.provider_name, container)]
         else:
-            providers = _get_active_providers_with_overrides()
+            providers = _get_active_providers_with_overrides(container)
 
         results = []
         for provider in providers:
-            result = await _validate_provider_infrastructure(provider)
+            result = await _validate_provider_infrastructure(provider, container)
             results.append(result)
 
         return {
@@ -85,12 +87,13 @@ async def handle_infrastructure_validate(args) -> Dict[str, Any]:
         }
 
 
-async def _discover_provider_infrastructure(provider: Dict[str, Any], args) -> Dict[str, Any]:
+async def _discover_provider_infrastructure(
+    provider: Dict[str, Any], args, container
+) -> Dict[str, Any]:
     """Discover infrastructure for a provider using strategy pattern."""
     try:
         from orb.domain.base.ports.provider_discovery_port import ProviderDiscoveryPort
 
-        container = get_container()
         provider_strategy = container.get(ProviderDiscoveryPort)
 
         # Pass CLI args to the provider strategy
@@ -100,15 +103,15 @@ async def _discover_provider_infrastructure(provider: Dict[str, Any], args) -> D
         return provider_strategy.discover_infrastructure(provider_with_args)
 
     except Exception as e:
-        get_container().get(ConsolePort).error(
+        container.get(ConsolePort).error(
             f"Failed to discover infrastructure for {provider['name']}: {e}"
         )
         return {"provider": provider["name"], "error": str(e)}
 
 
-def _show_provider_infrastructure(provider: Dict[str, Any]) -> None:
+def _show_provider_infrastructure(provider: Dict[str, Any], container) -> None:
     """Show infrastructure configuration for a provider."""
-    console = get_container().get(ConsolePort)
+    console = container.get(ConsolePort)
     console.info(f"\nProvider: {provider['name']}")
     console.info(f"Type: {provider['type']}")
 
@@ -145,19 +148,18 @@ def _show_provider_infrastructure(provider: Dict[str, Any]) -> None:
     console.separator(char="-")
 
 
-async def _validate_provider_infrastructure(provider: Dict[str, Any]) -> Dict[str, Any]:
+async def _validate_provider_infrastructure(provider: Dict[str, Any], container) -> Dict[str, Any]:
     """Validate infrastructure for a provider using strategy pattern."""
     try:
         from orb.domain.base.ports.provider_discovery_port import ProviderDiscoveryPort
 
-        container = get_container()
         provider_strategy = container.get(ProviderDiscoveryPort)
 
         # Check if provider strategy supports infrastructure validation
         if hasattr(provider_strategy, "validate_infrastructure"):
             return provider_strategy.validate_infrastructure(provider)
         else:
-            get_container().get(ConsolePort).info(
+            container.get(ConsolePort).info(
                 f"Infrastructure validation not supported for provider: {provider['name']}"
             )
             return {
@@ -166,13 +168,13 @@ async def _validate_provider_infrastructure(provider: Dict[str, Any]) -> Dict[st
             }
 
     except Exception as e:
-        get_container().get(ConsolePort).error(
+        container.get(ConsolePort).error(
             f"Failed to validate infrastructure for {provider['name']}: {e}"
         )
         return {"provider": provider["name"], "error": str(e)}
 
 
-def _get_active_providers() -> List[Dict[str, Any]]:
+def _get_active_providers(container) -> List[Dict[str, Any]]:
     """Get all active providers from configuration."""
     config_dir = get_config_location()
     config_file = config_dir / "config.json"
@@ -180,7 +182,7 @@ def _get_active_providers() -> List[Dict[str, Any]]:
     if not config_file.exists():
         from orb.application.services.provider_registry_service import ProviderRegistryService
 
-        registry_service = get_container().get(ProviderRegistryService)
+        registry_service = container.get(ProviderRegistryService)
         registered_types = registry_service.get_registered_provider_types()
         if not registered_types:
             raise RuntimeError(
@@ -209,7 +211,7 @@ def _get_active_providers() -> List[Dict[str, Any]]:
     if not active_providers:
         from orb.application.services.provider_registry_service import ProviderRegistryService
 
-        registry_service = get_container().get(ProviderRegistryService)
+        registry_service = container.get(ProviderRegistryService)
         registered_types = registry_service.get_registered_provider_types()
         if not registered_types:
             raise RuntimeError(
@@ -226,7 +228,7 @@ def _get_active_providers() -> List[Dict[str, Any]]:
     return active_providers
 
 
-def _get_active_providers_with_overrides() -> List[Dict[str, Any]]:
+def _get_active_providers_with_overrides(container) -> List[Dict[str, Any]]:
     """Get active providers with provider-name and provider-type overrides applied.
 
     Provider-name and provider-type filtering is a per-operation concern handled
@@ -234,12 +236,12 @@ def _get_active_providers_with_overrides() -> List[Dict[str, Any]]:
     (e.g. AWS region, AWS profile) are not applied here because they are
     provider-scoped and do not belong in the provider-agnostic interface layer.
     """
-    return _get_active_providers()
+    return _get_active_providers(container)
 
 
-def _get_provider_config(provider_name: str) -> Dict[str, Any]:
+def _get_provider_config(provider_name: str, container) -> Dict[str, Any]:
     """Get configuration for specific provider."""
-    active_providers = _get_active_providers()
+    active_providers = _get_active_providers(container)
 
     for provider in active_providers:
         if provider["name"] == provider_name:

@@ -1,7 +1,7 @@
 """Tests for CLI handler execution."""
 
 import argparse
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -26,8 +26,7 @@ class TestCLIHandlerExecution:
     """Test CLI handler execution."""
 
     @pytest.mark.asyncio
-    @patch("orb.interface.template_command_handlers.get_container")
-    async def test_handle_list_templates(self, mock_get_container):
+    async def test_handle_list_templates(self):
         """Test that handle_list_templates executes correctly."""
         container = MagicMock(spec=DIContainer)
         formatter = MagicMock(spec=ResponseFormattingService)
@@ -55,12 +54,11 @@ class TestCLIHandlerExecution:
             ResponseFormattingService: formatter,
         }.get(x)
 
-        mock_get_container.return_value = container
-
         args = argparse.Namespace(
             provider_api=None,
             active_only=True,
         )
+        args._container = container
 
         result = await handle_list_templates(args)
 
@@ -69,8 +67,7 @@ class TestCLIHandlerExecution:
         assert "templates" in result.data
 
     @pytest.mark.asyncio
-    @patch("orb.interface.scheduler_command_handlers.get_container")
-    async def test_handle_list_scheduler_strategies(self, mock_get_container):
+    async def test_handle_list_scheduler_strategies(self):
         """Test that handle_list_scheduler_strategies executes correctly."""
         from orb.application.dto.interface_response import InterfaceResponse
         from orb.application.services.orchestration.dtos import ListSchedulerStrategiesOutput
@@ -93,9 +90,8 @@ class TestCLIHandlerExecution:
             ResponseFormattingService: mock_formatter,
         }.get(x)
 
-        mock_get_container.return_value = container
-
         args = argparse.Namespace()
+        args._container = container
 
         result = await handle_list_scheduler_strategies(args)
 
@@ -104,8 +100,7 @@ class TestCLIHandlerExecution:
         mock_orch.execute.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("orb.interface.storage_command_handlers.get_container")
-    async def test_handle_list_storage_strategies(self, mock_get_container):
+    async def test_handle_list_storage_strategies(self):
         """Test that handle_list_storage_strategies executes correctly."""
         from orb.application.dto.interface_response import InterfaceResponse
         from orb.application.services.orchestration.dtos import ListStorageStrategiesOutput
@@ -128,9 +123,8 @@ class TestCLIHandlerExecution:
             ResponseFormattingService: mock_formatter,
         }.get(x)
 
-        mock_get_container.return_value = container
-
         args = argparse.Namespace()
+        args._container = container
 
         result = await handle_list_storage_strategies(args)
 
@@ -139,8 +133,7 @@ class TestCLIHandlerExecution:
         mock_orch.execute.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("orb.interface.request_command_handlers.get_container")
-    async def test_handle_get_request_status(self, mock_get_container):
+    async def test_handle_get_request_status(self):
         """Test that handle_get_request_status executes correctly."""
         container = MagicMock(spec=DIContainer)
         query_bus = AsyncMock(spec=QueryBus)
@@ -175,14 +168,13 @@ class TestCLIHandlerExecution:
             ResponseFormattingService: formatter,
         }.get(x, MagicMock())
 
-        mock_get_container.return_value = container
-
         args = argparse.Namespace(
             request_id="req-abc123",
             request_ids=[],
             flag_request_ids=[],
             all=False,
         )
+        args._container = container
 
         result = await handle_get_request_status(args)
 
@@ -195,8 +187,7 @@ class TestFormatConversionConsistency:
     """Test format conversion consistency."""
 
     @pytest.mark.asyncio
-    @patch("orb.interface.template_command_handlers.get_container")
-    async def test_format_conversion_in_template_handler(self, mock_get_container):
+    async def test_format_conversion_in_template_handler(self):
         """Test that format conversion is done using ResponseFormattingService in template handlers."""
         container = MagicMock(spec=DIContainer)
         formatter = MagicMock(spec=ResponseFormattingService)
@@ -226,12 +217,11 @@ class TestFormatConversionConsistency:
             ResponseFormattingService: formatter,
         }.get(x)
 
-        mock_get_container.return_value = container
-
         args = argparse.Namespace(
             provider_api=None,
             active_only=True,
         )
+        args._container = container
 
         result = await handle_list_templates(args)
 

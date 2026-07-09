@@ -4,7 +4,6 @@ import asyncio
 from typing import TYPE_CHECKING, Any
 
 from orb.application.dto.interface_response import InterfaceResponse
-from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
 from orb.interface.response_formatting_service import ResponseFormattingService
 
@@ -29,7 +28,7 @@ async def handle_get_machine_status(
     from orb.application.services.orchestration.get_machine import GetMachineOrchestrator
     from orb.application.services.orchestration.list_machines import ListMachinesOrchestrator
 
-    container = get_container()
+    container = args._container
     formatter = container.get(ResponseFormattingService)
 
     has_all = getattr(args, "all", False)
@@ -107,7 +106,7 @@ async def handle_list_machines(
     from orb.application.services.orchestration.dtos import ListMachinesInput
     from orb.application.services.orchestration.list_machines import ListMachinesOrchestrator
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(ListMachinesOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
@@ -186,7 +185,7 @@ async def handle_stop_machines(
     from orb.application.services.orchestration.dtos import StopMachinesInput
     from orb.application.services.orchestration.stop_machines import StopMachinesOrchestrator
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(StopMachinesOrchestrator)
     formatter = container.get(ResponseFormattingService)
     result = await orchestrator.execute(
@@ -249,7 +248,7 @@ async def handle_start_machines(
     from orb.application.services.orchestration.dtos import StartMachinesInput
     from orb.application.services.orchestration.start_machines import StartMachinesOrchestrator
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(StartMachinesOrchestrator)
     formatter = container.get(ResponseFormattingService)
     result = await orchestrator.execute(
@@ -278,7 +277,7 @@ async def handle_get_machine(
     from orb.application.services.orchestration.dtos import GetMachineInput
     from orb.application.services.orchestration.get_machine import GetMachineOrchestrator
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(GetMachineOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
@@ -305,7 +304,7 @@ async def handle_get_multiple_machines(
     from orb.application.dto.bulk_queries import GetMultipleMachinesQuery
     from orb.infrastructure.di.buses import QueryBus
 
-    container = get_container()
+    container = args._container
     machine_ids: list[str] = []
     if hasattr(args, "machine_ids") and args.machine_ids:
         machine_ids.extend(args.machine_ids)

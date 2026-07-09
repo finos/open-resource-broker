@@ -2,7 +2,7 @@
 
 from argparse import Namespace
 from typing import Any
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -54,22 +54,21 @@ class TestProviderConfigHandlers:
         """Test handle_provider_config function - takes only args, no app param."""
         args = Namespace(resource="provider", action="config")
 
-        with patch("orb.interface.system_command_handlers.get_container") as mock_get_container:
-            mock_container = Mock()
-            mock_get_container.return_value = mock_container
+        mock_container = Mock()
 
-            from unittest.mock import MagicMock
+        from unittest.mock import MagicMock
 
-            mock_orchestrator = AsyncMock()
-            mock_orchestrator.execute = AsyncMock(
-                return_value=MagicMock(config={"provider": "aws"}, message="ok")
-            )
-            mock_container.get.return_value = mock_orchestrator
+        mock_orchestrator = AsyncMock()
+        mock_orchestrator.execute = AsyncMock(
+            return_value=MagicMock(config={"provider": "aws"}, message="ok")
+        )
+        mock_container.get.return_value = mock_orchestrator
 
-            # handle_provider_config takes only args (no app parameter)
-            result = await handle_provider_config(args)
+        # handle_provider_config takes only args (no app parameter)
+        args._container = mock_container
+        result = await handle_provider_config(args)
 
-            assert isinstance(result, dict)
+        assert isinstance(result, dict)
 
     @pytest.mark.asyncio
     async def test_handle_validate_provider_config(self):
@@ -107,10 +106,8 @@ class TestProviderConfigHandlers:
             mock_formatter if t is ResponseFormattingService else mock_registry
         )
 
-        with patch(
-            "orb.interface.system_command_handlers.get_container", return_value=mock_container
-        ):
-            result = await handle_reload_provider_config(args)
+        args._container = mock_container
+        result = await handle_reload_provider_config(args)
 
         assert isinstance(result, InterfaceResponse)
 

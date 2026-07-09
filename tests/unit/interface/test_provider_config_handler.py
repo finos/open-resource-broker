@@ -182,6 +182,9 @@ class TestHandleProviderAdd:
                 name="aws-prod",
                 discover=False,
             )
+            from unittest.mock import MagicMock as _MC_add
+
+            args._container = _MC_add()
             result = await handle_provider_add(args)
 
         assert result.get("error") is not True
@@ -228,6 +231,9 @@ class TestHandleProviderAdd:
         ):
             # args has no provider_type attribute at all
             args = _ns(aws_profile="default", aws_region="us-east-1", name=None, discover=False)
+            from unittest.mock import MagicMock as _MC
+
+            args._container = _MC()
             result = await handle_provider_add(args)
 
         assert result.get("error") is True and result.get("exit_code") == 1
@@ -334,6 +340,9 @@ class TestHandleProviderUpdate:
             return_value=tmp_path,
         ):
             args = _ns(provider_name="aws-default", aws_region=None, aws_profile=None)
+            from unittest.mock import MagicMock as _MC
+
+            args._container = _MC()
             result = await handle_provider_update(args)
 
         assert result.get("error") is True and result.get("exit_code") == 1
@@ -349,6 +358,9 @@ class TestHandleProviderUpdate:
             return_value=tmp_path,
         ):
             args = _ns(provider_name="nonexistent", aws_region="eu-west-1", aws_profile=None)
+            from unittest.mock import MagicMock as _MC
+
+            args._container = _MC()
             result = await handle_provider_update(args)
 
         assert result.get("error") is True and result.get("exit_code") == 1
@@ -370,6 +382,9 @@ class TestHandleProviderUpdate:
             ),
         ):
             args = _ns(provider_name="aws-default", aws_region="ap-southeast-1", aws_profile=None)
+            from unittest.mock import MagicMock as _MC
+
+            args._container = _MC()
             result = await handle_provider_update(args)
 
         assert result.get("error") is not True
@@ -473,6 +488,23 @@ class TestHandleProviderGetDefault:
 # ---------------------------------------------------------------------------
 
 
+def _make_show_container(exit_code_ok: int = 0):
+    """Create a mock container for handle_provider_show tests."""
+    from unittest.mock import MagicMock as _MG
+
+    from orb.application.dto.interface_response import InterfaceResponse
+    from orb.interface.response_formatting_service import ResponseFormattingService
+
+    mock_formatter = _MG(spec=ResponseFormattingService)
+    mock_formatter.format_provider_detail.return_value = InterfaceResponse(data={}, exit_code=0)
+    mock_formatter.format_error.return_value = InterfaceResponse(data={}, exit_code=1)
+    mock_container = _MG()
+    mock_container.get.side_effect = lambda t: (
+        mock_formatter if t is ResponseFormattingService else _MG()
+    )
+    return mock_container
+
+
 @pytest.mark.unit
 class TestHandleProviderShow:
     @pytest.mark.asyncio
@@ -485,7 +517,9 @@ class TestHandleProviderShow:
             "orb.interface.provider_config_handler.get_config_location",
             return_value=tmp_path,
         ):
-            result = await handle_provider_show(_ns(provider_name="aws-default"))
+            _show_args = _ns(provider_name="aws-default")
+            _show_args._container = _make_show_container()
+            result = await handle_provider_show(_show_args)
 
         assert exit_code(result) == 0
 
@@ -499,7 +533,9 @@ class TestHandleProviderShow:
             "orb.interface.provider_config_handler.get_config_location",
             return_value=tmp_path,
         ):
-            result = await handle_provider_show(_ns(provider_name="nonexistent"))
+            _show_args2 = _ns(provider_name="nonexistent")
+            _show_args2._container = _make_show_container()
+            result = await handle_provider_show(_show_args2)
 
         assert exit_code(result) == 1
 
@@ -515,7 +551,9 @@ class TestHandleProviderShow:
             "orb.interface.provider_config_handler.get_config_location",
             return_value=tmp_path,
         ):
-            result = await handle_provider_show(_ns(provider_name=None))
+            _show_args = _ns(provider_name=None)
+            _show_args._container = _make_show_container()
+            result = await handle_provider_show(_show_args)
 
         assert exit_code(result) == 0
 
@@ -529,6 +567,8 @@ class TestHandleProviderShow:
             "orb.interface.provider_config_handler.get_config_location",
             return_value=tmp_path,
         ):
-            result = await handle_provider_show(_ns(provider_name=None))
+            _show_args3 = _ns(provider_name=None)
+            _show_args3._container = _make_show_container()
+            result = await handle_provider_show(_show_args3)
 
         assert exit_code(result) == 1

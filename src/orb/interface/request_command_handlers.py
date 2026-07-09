@@ -3,7 +3,6 @@
 from typing import TYPE_CHECKING, Any, Union
 
 from orb.application.ports.scheduler_port import SchedulerPort
-from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
 from orb.interface.response_formatting_service import ResponseFormattingService
 
@@ -23,7 +22,7 @@ async def handle_get_request_status(
         GetRequestStatusOrchestrator,
     )
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(GetRequestStatusOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
@@ -94,7 +93,7 @@ async def handle_request_machines(
     )
     from orb.application.services.orchestration.dtos import AcquireMachinesInput
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(AcquireMachinesOrchestrator)
     formatter = container.get(ResponseFormattingService)
     scheduler = container.get(SchedulerPort)
@@ -159,7 +158,7 @@ async def handle_get_return_requests(
         ListReturnRequestsOrchestrator,
     )
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(ListReturnRequestsOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
@@ -186,7 +185,7 @@ async def handle_request_return_machines(
         ReturnMachinesOrchestrator,
     )
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(ReturnMachinesOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
@@ -257,7 +256,7 @@ async def handle_list_requests(
     from orb.application.services.orchestration.dtos import ListRequestsInput
     from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(ListRequestsOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
@@ -289,7 +288,7 @@ async def handle_cancel_request(
     from orb.application.services.orchestration.cancel_request import CancelRequestOrchestrator
     from orb.application.services.orchestration.dtos import CancelRequestInput
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(CancelRequestOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
@@ -331,7 +330,7 @@ async def handle_watch_request_status(
     )
     from orb.cli.progress_bar import DotPreciseBar, render_az_bars
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(WatchRequestStatusOrchestrator)
 
     request_id = getattr(args, "request_id", None)
@@ -495,7 +494,7 @@ async def handle_get_multiple_requests(
     from orb.application.dto.bulk_queries import GetMultipleRequestsQuery
     from orb.infrastructure.di.buses import QueryBus
 
-    container = get_container()
+    container = args._container
     request_ids: list[str] = []
     if hasattr(args, "request_ids") and args.request_ids:
         request_ids.extend(args.request_ids)

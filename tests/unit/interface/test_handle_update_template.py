@@ -39,7 +39,7 @@ def _mock_command_bus(updated: bool = True) -> MagicMock:
     return orchestrator
 
 
-def _patch_container(bus: MagicMock):
+def _make_container(bus: MagicMock) -> MagicMock:
     from orb.application.services.orchestration.update_template import UpdateTemplateOrchestrator
     from orb.interface.response_formatting_service import ResponseFormattingService
 
@@ -56,10 +56,7 @@ def _patch_container(bus: MagicMock):
         return MagicMock()
 
     container.get.side_effect = _get
-    return patch(
-        "orb.interface.template_command_handlers.get_container",
-        return_value=container,
-    )
+    return container
 
 
 def _patch_dry_run(active: bool = False):
@@ -91,7 +88,8 @@ async def test_update_reads_name_from_file(tmp_path: Path) -> None:
     bus = _mock_command_bus()
     args = _make_args(template_id="tpl-1", file=str(template_file))
 
-    with _patch_container(bus), _patch_dry_run():
+    args._container = _make_container(bus)
+    with _patch_dry_run():
         result = await handle_update_template(args)
 
     assert result["success"] is True
@@ -111,7 +109,8 @@ async def test_update_file_not_found_returns_error() -> None:
     bus = _mock_command_bus()
     args = _make_args(template_id="tpl-1", file="/nonexistent/path/tmpl.json")
 
-    with _patch_container(bus), _patch_dry_run():
+    args._container = _make_container(bus)
+    with _patch_dry_run():
         result = await handle_update_template(args)
 
     assert result.data["success"] is False
@@ -127,7 +126,8 @@ async def test_update_invalid_json_returns_error(tmp_path: Path) -> None:
     bus = _mock_command_bus()
     args = _make_args(template_id="tpl-1", file=str(template_file))
 
-    with _patch_container(bus), _patch_dry_run():
+    args._container = _make_container(bus)
+    with _patch_dry_run():
         result = await handle_update_template(args)
 
     assert result.data["success"] is False
@@ -143,7 +143,8 @@ async def test_update_json_array_returns_error(tmp_path: Path) -> None:
     bus = _mock_command_bus()
     args = _make_args(template_id="tpl-1", file=str(template_file))
 
-    with _patch_container(bus), _patch_dry_run():
+    args._container = _make_container(bus)
+    with _patch_dry_run():
         result = await handle_update_template(args)
 
     assert result.data["success"] is False
@@ -159,7 +160,8 @@ async def test_update_cli_template_id_wins_over_file(tmp_path: Path) -> None:
     bus = _mock_command_bus()
     args = _make_args(template_id="cli-id", file=str(template_file))
 
-    with _patch_container(bus), _patch_dry_run():
+    args._container = _make_container(bus)
+    with _patch_dry_run():
         result = await handle_update_template(args)
 
     assert result["success"] is True
@@ -176,7 +178,8 @@ async def test_update_template_id_from_file_when_no_cli_arg(tmp_path: Path) -> N
     bus = _mock_command_bus()
     args = _make_args(template_id=None, flag_template_id=None, file=str(template_file))
 
-    with _patch_container(bus), _patch_dry_run():
+    args._container = _make_container(bus)
+    with _patch_dry_run():
         result = await handle_update_template(args)
 
     assert result["success"] is True
@@ -201,7 +204,8 @@ async def test_update_unknown_fields_ignored(tmp_path: Path) -> None:
     bus = _mock_command_bus()
     args = _make_args(template_id="tpl-1", file=str(template_file))
 
-    with _patch_container(bus), _patch_dry_run():
+    args._container = _make_container(bus)
+    with _patch_dry_run():
         result = await handle_update_template(args)
 
     assert result["success"] is True
@@ -216,7 +220,8 @@ async def test_update_empty_json_object_sends_nones(tmp_path: Path) -> None:
     bus = _mock_command_bus()
     args = _make_args(template_id="tpl-1", file=str(template_file))
 
-    with _patch_container(bus), _patch_dry_run():
+    args._container = _make_container(bus)
+    with _patch_dry_run():
         result = await handle_update_template(args)
 
     assert result["success"] is True
@@ -246,7 +251,8 @@ async def test_update_flat_file_passes_full_dict_as_configuration(tmp_path: Path
     bus = _mock_command_bus()
     args = _make_args(template_id="tpl-1", file=str(template_file))
 
-    with _patch_container(bus), _patch_dry_run():
+    args._container = _make_container(bus)
+    with _patch_dry_run():
         result = await handle_update_template(args)
 
     assert result["success"] is True
@@ -271,7 +277,8 @@ async def test_update_nested_configuration_key_passes_outer_dict(tmp_path: Path)
     bus = _mock_command_bus()
     args = _make_args(template_id="tpl-1", file=str(template_file))
 
-    with _patch_container(bus), _patch_dry_run():
+    args._container = _make_container(bus)
+    with _patch_dry_run():
         result = await handle_update_template(args)
 
     assert result["success"] is True
@@ -293,7 +300,8 @@ async def test_update_instance_type_wired_from_file(tmp_path: Path) -> None:
     bus = _mock_command_bus()
     args = _make_args(template_id="tpl-1", file=str(template_file))
 
-    with _patch_container(bus), _patch_dry_run():
+    args._container = _make_container(bus)
+    with _patch_dry_run():
         await handle_update_template(args)
 
     call_args = bus.execute.call_args[0][0]
@@ -314,7 +322,8 @@ async def test_update_image_id_wired_from_file(tmp_path: Path) -> None:
     bus = _mock_command_bus()
     args = _make_args(template_id="tpl-1", file=str(template_file))
 
-    with _patch_container(bus), _patch_dry_run():
+    args._container = _make_container(bus)
+    with _patch_dry_run():
         await handle_update_template(args)
 
     call_args = bus.execute.call_args[0][0]
@@ -361,7 +370,8 @@ async def test_update_cli_and_rest_produce_identical_input(tmp_path: Path) -> No
     bus = _mock_command_bus()
     args = _make_args(template_id="tpl-1", file=str(template_file))
 
-    with _patch_container(bus), _patch_dry_run():
+    args._container = _make_container(bus)
+    with _patch_dry_run():
         await handle_update_template(args)
 
     cli_input = bus.execute.call_args[0][0]

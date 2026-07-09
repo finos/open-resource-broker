@@ -5,14 +5,13 @@ from typing import Any, Dict
 from orb.application.dto.template_generation_dto import TemplateGenerationRequest
 from orb.application.services.template_generation_service import TemplateGenerationService
 from orb.domain.base.ports.console_port import ConsolePort
-from orb.infrastructure.di.container import get_container
 
 
 async def handle_templates_generate(args) -> Dict[str, Any]:
     """Handle orb templates generate command with multi-provider support."""
     try:
         # Get template generation service from DI container
-        container = get_container()
+        container = args._container
         template_service = container.get(TemplateGenerationService)
 
         # Create request DTO from arguments
@@ -29,7 +28,7 @@ async def handle_templates_generate(args) -> Dict[str, Any]:
         result = await template_service.generate_templates(request)
 
         # Handle UI output
-        _print_generation_results(result)
+        _print_generation_results(result, container)
 
         # Convert result to dict for CLI compatibility
         return {
@@ -59,12 +58,12 @@ async def handle_templates_generate(args) -> Dict[str, Any]:
         }
 
 
-def _print_generation_results(result) -> None:
+def _print_generation_results(result, container) -> None:
     """Print generation results to console."""
     if result.status == "error":
         return
 
-    console = get_container().get(ConsolePort)
+    console = container.get(ConsolePort)
     skipped_providers = [p for p in result.providers if p.status == "skipped"]
     created_providers = [p for p in result.providers if p.status == "created"]
 

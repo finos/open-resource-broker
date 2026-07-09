@@ -252,31 +252,27 @@ class TestFormatConversionInHandlers:
     async def test_format_conversion_in_cli_handler(self):
         """Test that format conversion is done using ResponseFormattingService in CLI handlers."""
         import argparse
+        from unittest.mock import AsyncMock
 
+        from orb.application.services.orchestration.list_templates import (
+            ListTemplatesOrchestrator,
+        )
         from orb.interface.response_formatting_service import ResponseFormattingService
         from orb.interface.template_command_handlers import handle_list_templates
 
-        with patch("orb.interface.template_command_handlers.get_container") as mock_get_container:
-            from unittest.mock import AsyncMock
+        container = MagicMock()
+        formatter = MagicMock(spec=ResponseFormattingService)
+        orchestrator = MagicMock(spec=ListTemplatesOrchestrator)
+        orchestrator.execute = AsyncMock(return_value=MagicMock(templates=[{"id": "t1"}]))
+        formatter.format_template_list = MagicMock(return_value=MagicMock())
 
-            from orb.application.services.orchestration.list_templates import (
-                ListTemplatesOrchestrator,
-            )
+        container.get.side_effect = lambda x: {
+            ListTemplatesOrchestrator: orchestrator,
+            ResponseFormattingService: formatter,
+        }.get(x, MagicMock())
 
-            container = MagicMock()
-            formatter = MagicMock(spec=ResponseFormattingService)
-            orchestrator = MagicMock(spec=ListTemplatesOrchestrator)
-            orchestrator.execute = AsyncMock(return_value=MagicMock(templates=[{"id": "t1"}]))
-            formatter.format_template_list = MagicMock(return_value=MagicMock())
+        args = argparse.Namespace(provider_api=None, active_only=True, include_config=False)
 
-            container.get.side_effect = lambda x: {
-                ListTemplatesOrchestrator: orchestrator,
-                ResponseFormattingService: formatter,
-            }.get(x, MagicMock())
-
-            mock_get_container.return_value = container
-
-            args = argparse.Namespace(provider_api=None, active_only=True, include_config=False)
-
-            result = await handle_list_templates(args)
-            assert result is not None
+        args._container = container
+        result = await handle_list_templates(args)
+        assert result is not None

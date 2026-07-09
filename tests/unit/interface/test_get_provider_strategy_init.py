@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import orb.interface.init_command_handler as _mod
 
@@ -60,12 +60,10 @@ def test_init_handler_returns_strategy_class_k8s() -> None:
 
 
 def test_init_handler_returns_none_when_registry_not_available() -> None:
-    """_get_provider_strategy returns None when the DI container raises."""
-    with patch(
-        "orb.interface.init_command_handler.get_container",
-        side_effect=RuntimeError("container not ready"),
-    ):
-        result = _mod._get_provider_strategy("aws")
+    """_get_provider_strategy returns None when no container is provided."""
+    # With container=None and no explicit registry, the function cannot resolve
+    # ProviderRegistryPort and should return None gracefully.
+    result = _mod._get_provider_strategy("aws", container=None)
 
     assert result is None
 

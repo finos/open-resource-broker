@@ -8,7 +8,7 @@ formatter.format_request_status or formatter.format_request_operation.
 import argparse
 import importlib
 from functools import partial
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -109,8 +109,9 @@ async def test_handler_delegates_to_scheduler(handler_fn, args_factory, query_re
 
     container, formatter = _mock_container_with_formatter()
 
-    with patch(f"{module_path}.get_container", return_value=container):
-        await handler(args_factory())
+    _args = args_factory()
+    _args._container = container
+    await handler(_args)
 
     formatter.format_request_status.assert_called_once()
 
@@ -118,13 +119,13 @@ async def test_handler_delegates_to_scheduler(handler_fn, args_factory, query_re
 @pytest.mark.asyncio
 async def test_get_return_requests_delegates_to_format_return_requests():
     """handle_get_return_requests must call formatter.format_return_requests (not format_request_status)."""
-    module_path = "orb.interface.request_command_handlers"
     from orb.interface.request_command_handlers import handle_get_return_requests
 
     container, formatter = _mock_container_with_formatter()
 
-    with patch(f"{module_path}.get_container", return_value=container):
-        await handle_get_return_requests(_make_namespace())
+    _ret_args = _make_namespace()
+    _ret_args._container = container
+    await handle_get_return_requests(_ret_args)
 
     formatter.format_return_requests.assert_called_once()
     formatter.format_request_status.assert_not_called()
@@ -156,8 +157,8 @@ async def test_get_request_status_single_id_delegates_to_scheduler():
 
     args = _make_namespace(request_id="req-123", all=False)
 
-    with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-        result = await handle_get_request_status(args)
+    args._container = container
+    result = await handle_get_request_status(args)
 
     formatter.format_request_status.assert_called_once()
     from orb.application.dto.interface_response import InterfaceResponse as IR
@@ -190,8 +191,8 @@ async def test_request_machines_delegates_format_request_response():
 
     args = _make_namespace(template_id="t1", machine_count=1, metadata={})
 
-    with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-        await handle_request_machines(args)
+    args._container = container
+    await handle_request_machines(args)
 
     formatter.format_request_operation.assert_called_once()
 
@@ -214,8 +215,8 @@ async def test_cancel_request_delegates_format_request_response():
 
     args = _make_namespace(request_id="req-123")
 
-    with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-        result = await handle_cancel_request(args)
+    args._container = container
+    result = await handle_cancel_request(args)
 
     formatter.format_request_operation.assert_called_once()
     from orb.application.dto.interface_response import InterfaceResponse as IR
@@ -237,8 +238,8 @@ async def test_scheduler_port_retrieved_from_container():
 
     args = _make_namespace()
 
-    with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-        await handle_get_return_requests(args)
+    args._container = container
+    await handle_get_return_requests(args)
 
     # Verify ResponseFormattingService was requested from the container
     retrieved_types = [call.args[0] for call in container.get.call_args_list]

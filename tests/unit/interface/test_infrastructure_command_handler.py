@@ -87,12 +87,10 @@ class TestHandleInfrastructureDiscover:
                 "orb.interface.infrastructure_command_handler.get_config_location",
                 return_value=tmp_path,
             ),
-            patch(
-                "orb.interface.infrastructure_command_handler.get_container",
-                return_value=mock_container,
-            ),
         ):
             args = _ns(provider_name="aws-a")
+
+            args._container = mock_container
             result = await handle_infrastructure_discover(args)
 
         assert result["status"] == "success"
@@ -111,12 +109,10 @@ class TestHandleInfrastructureDiscover:
                 "orb.interface.infrastructure_command_handler.get_config_location",
                 return_value=tmp_path,
             ),
-            patch(
-                "orb.interface.infrastructure_command_handler.get_container",
-                return_value=mock_container,
-            ),
         ):
             args = _ns(provider_name=None, all_providers=True)
+
+            args._container = mock_container
             result = await handle_infrastructure_discover(args)
 
         assert result["status"] == "success"
@@ -128,12 +124,14 @@ class TestHandleInfrastructureDiscover:
         from orb.interface.infrastructure_command_handler import handle_infrastructure_discover
 
         _two_provider_config(tmp_path)
+        mock_container = _mock_container_with_provider_port()
 
         with patch(
             "orb.interface.infrastructure_command_handler.get_config_location",
             return_value=tmp_path,
         ):
             args = _ns(provider_name="nonexistent")
+            args._container = mock_container
             result = await handle_infrastructure_discover(args)
 
         assert result["status"] == "error"
@@ -159,12 +157,10 @@ class TestHandleInfrastructureShow:
                 "orb.interface.infrastructure_command_handler.get_config_location",
                 return_value=tmp_path,
             ),
-            patch(
-                "orb.interface.infrastructure_command_handler.get_container",
-                return_value=mock_container,
-            ),
         ):
             args = _ns(provider_name="aws-a")
+
+            args._container = mock_container
             result = await handle_infrastructure_show(args)
 
         assert result["status"] == "success"
@@ -182,12 +178,10 @@ class TestHandleInfrastructureShow:
                 "orb.interface.infrastructure_command_handler.get_config_location",
                 return_value=tmp_path,
             ),
-            patch(
-                "orb.interface.infrastructure_command_handler.get_container",
-                return_value=mock_container,
-            ),
         ):
             args = _ns(provider_name=None, all_providers=True)
+
+            args._container = mock_container
             result = await handle_infrastructure_show(args)
 
         assert result["status"] == "success"
@@ -198,12 +192,14 @@ class TestHandleInfrastructureShow:
         from orb.interface.infrastructure_command_handler import handle_infrastructure_show
 
         _two_provider_config(tmp_path)
+        mock_container = _mock_container_with_provider_port()
 
         with patch(
             "orb.interface.infrastructure_command_handler.get_config_location",
             return_value=tmp_path,
         ):
             args = _ns(provider_name="nonexistent")
+            args._container = mock_container
             result = await handle_infrastructure_show(args)
 
         assert result["status"] == "error"
@@ -229,12 +225,10 @@ class TestHandleInfrastructureValidate:
                 "orb.interface.infrastructure_command_handler.get_config_location",
                 return_value=tmp_path,
             ),
-            patch(
-                "orb.interface.infrastructure_command_handler.get_container",
-                return_value=mock_container,
-            ),
         ):
             args = _ns(provider_name="aws-a")
+
+            args._container = mock_container
             result = await handle_infrastructure_validate(args)
 
         assert result["status"] == "success"
@@ -253,12 +247,10 @@ class TestHandleInfrastructureValidate:
                 "orb.interface.infrastructure_command_handler.get_config_location",
                 return_value=tmp_path,
             ),
-            patch(
-                "orb.interface.infrastructure_command_handler.get_container",
-                return_value=mock_container,
-            ),
         ):
             args = _ns(provider_name=None)
+
+            args._container = mock_container
             result = await handle_infrastructure_validate(args)
 
         assert result["status"] == "success"
@@ -270,12 +262,14 @@ class TestHandleInfrastructureValidate:
         from orb.interface.infrastructure_command_handler import handle_infrastructure_validate
 
         _two_provider_config(tmp_path)
+        mock_container = _mock_container_with_provider_port()
 
         with patch(
             "orb.interface.infrastructure_command_handler.get_config_location",
             return_value=tmp_path,
         ):
             args = _ns(provider_name="nonexistent")
+            args._container = mock_container
             result = await handle_infrastructure_validate(args)
 
         assert result["status"] == "error"
@@ -304,12 +298,8 @@ class TestGetActiveProvidersRegistryFallback:
                 "orb.interface.infrastructure_command_handler.get_config_location",
                 return_value=tmp_path,
             ),
-            patch(
-                "orb.interface.infrastructure_command_handler.get_container",
-                return_value=mock_container,
-            ),
         ):
-            providers = _get_active_providers()
+            providers = _get_active_providers(mock_container)
 
         assert providers[0]["type"] == "gcp"
 
@@ -329,13 +319,9 @@ class TestGetActiveProvidersRegistryFallback:
                 "orb.interface.infrastructure_command_handler.get_config_location",
                 return_value=tmp_path,
             ),
-            patch(
-                "orb.interface.infrastructure_command_handler.get_container",
-                return_value=mock_container,
-            ),
         ):
             with pytest.raises(RuntimeError, match="No providers are registered"):
-                _get_active_providers()
+                _get_active_providers(mock_container)
 
     def test_all_providers_disabled_no_registered_types_raises(self, tmp_path):
         """When all providers disabled and no registered types, raise RuntimeError."""
@@ -368,13 +354,9 @@ class TestGetActiveProvidersRegistryFallback:
                 "orb.interface.infrastructure_command_handler.get_config_location",
                 return_value=tmp_path,
             ),
-            patch(
-                "orb.interface.infrastructure_command_handler.get_container",
-                return_value=mock_container,
-            ),
         ):
             with pytest.raises(RuntimeError, match="No providers are registered"):
-                _get_active_providers()
+                _get_active_providers(mock_container)
 
 
 # ---------------------------------------------------------------------------
@@ -405,12 +387,8 @@ class TestShowProviderInfrastructure:
 
         with (
             patch.object(CLISpecRegistry, "get_or_none", return_value=mock_spec),
-            patch(
-                "orb.interface.infrastructure_command_handler.get_container",
-                return_value=mock_container,
-            ),
         ):
-            _show_provider_infrastructure(provider)
+            _show_provider_infrastructure(provider, mock_container)
 
         mock_spec.format_display.assert_called_once_with(provider["config"])
         # Ensure format_display output was written to console
@@ -437,12 +415,8 @@ class TestShowProviderInfrastructure:
 
         with (
             patch.object(CLISpecRegistry, "get_or_none", return_value=None),
-            patch(
-                "orb.interface.infrastructure_command_handler.get_container",
-                return_value=mock_container,
-            ),
         ):
-            _show_provider_infrastructure(provider)
+            _show_provider_infrastructure(provider, mock_container)
 
         info_calls = [call.args[0] for call in mock_console.info.call_args_list]
         assert any("https://example.com" in c for c in info_calls)

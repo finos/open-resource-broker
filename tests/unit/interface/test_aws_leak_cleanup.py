@@ -52,6 +52,11 @@ class TestInfrastructureCommandHandlerNoAWSLeaks:
 
         from orb.interface.infrastructure_command_handler import _get_active_providers
 
+        mock_registry_service = MagicMock()
+        mock_registry_service.get_registered_provider_types.return_value = ["mock"]
+        mock_container = MagicMock()
+        mock_container.get.return_value = mock_registry_service
+
         mock_registry = MagicMock()
         mock_registry.get_registered_providers.return_value = ["mock"]
         with (
@@ -64,7 +69,7 @@ class TestInfrastructureCommandHandlerNoAWSLeaks:
                 return_value=mock_registry,
             ),
         ):
-            providers = _get_active_providers()
+            providers = _get_active_providers(mock_container)
 
         assert len(providers) == 1
         assert "region" not in providers[0].get("config", {}), (

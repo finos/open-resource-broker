@@ -1,7 +1,7 @@
 """Unit tests for request command handlers in the interface layer."""
 
 import argparse
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -111,8 +111,8 @@ class TestHandleRequestMachines:
 
         args = _make_namespace(template_id="t1", machine_count=3, metadata={})
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            result = await handle_request_machines(args)
+        args._container = container
+        result = await handle_request_machines(args)
 
         assert isinstance(result, InterfaceResponse)
         assert result.exit_code == 0
@@ -142,8 +142,8 @@ class TestHandleRequestMachines:
             metadata={},
         )
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            result = await handle_request_machines(args)
+        args._container = container
+        result = await handle_request_machines(args)
 
         scheduler.parse_request_data.assert_called_once_with(
             {"template_id": "t1", "requested_count": 2}
@@ -158,8 +158,8 @@ class TestHandleRequestMachines:
 
         args = _make_namespace(machine_count=3, metadata={})
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            result = await handle_request_machines(args)
+        args._container = container
+        result = await handle_request_machines(args)
 
         assert isinstance(result, dict)
         assert "Template ID is required" in result["error"]
@@ -175,8 +175,8 @@ class TestHandleRequestMachines:
 
         args = _make_namespace(template_id="t1", metadata={})
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            result = await handle_request_machines(args)
+        args._container = container
+        result = await handle_request_machines(args)
 
         assert isinstance(result, dict)
         assert "Machine count is required" in result["error"]
@@ -204,8 +204,8 @@ class TestHandleRequestReturnMachines:
 
         args = _make_namespace(machine_ids=["i-1", "i-2"])
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            result = await handle_request_return_machines(args)
+        args._container = container
+        result = await handle_request_return_machines(args)
 
         return_orch.execute.assert_awaited_once()
         call_input = return_orch.execute.call_args[0][0]
@@ -224,8 +224,8 @@ class TestHandleRequestReturnMachines:
             input_data={"machines": [{"machineId": "i-1"}, {"machineId": "i-2"}]}
         )
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            await handle_request_return_machines(args)
+        args._container = container
+        await handle_request_return_machines(args)
 
         call_input = return_orch.execute.call_args[0][0]
         assert call_input.machine_ids == ["i-1", "i-2"]
@@ -237,8 +237,8 @@ class TestHandleRequestReturnMachines:
 
         args = _make_namespace(machine_ids=[], all=False)
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            result = await handle_request_return_machines(args)
+        args._container = container
+        result = await handle_request_return_machines(args)
 
         assert isinstance(result, dict)
         assert "Machine IDs are required" in result["error"]
@@ -250,8 +250,8 @@ class TestHandleRequestReturnMachines:
 
         args = _make_namespace(all=True, force=False)
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            result = await handle_request_return_machines(args)
+        args._container = container
+        result = await handle_request_return_machines(args)
 
         assert isinstance(result, dict)
         assert "--force" in result["error"]
@@ -266,8 +266,8 @@ class TestHandleRequestReturnMachines:
 
         args = _make_namespace(all=True, force=True)
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            await handle_request_return_machines(args)
+        args._container = container
+        await handle_request_return_machines(args)
 
         call_input = return_orch.execute.call_args[0][0]
         assert call_input.all_machines is True
@@ -297,8 +297,8 @@ class TestHandleCancelRequest:
 
         args = _make_namespace(request_id="req-123")
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            result = await handle_cancel_request(args)
+        args._container = container
+        result = await handle_cancel_request(args)
 
         cancel_orch.execute.assert_awaited_once()
         call_input = cancel_orch.execute.call_args[0][0]
@@ -318,8 +318,8 @@ class TestHandleCancelRequest:
 
         args = _make_namespace(request_id="req-123", reason="done")
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            await handle_cancel_request(args)
+        args._container = container
+        await handle_cancel_request(args)
 
         call_input = cancel_orch.execute.call_args[0][0]
         assert call_input.reason == "done"
@@ -331,8 +331,8 @@ class TestHandleCancelRequest:
 
         args = _make_namespace()
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            result = await handle_cancel_request(args)
+        args._container = container
+        result = await handle_cancel_request(args)
 
         assert isinstance(result, dict)
         assert "Request ID is required" in result["error"]
@@ -357,8 +357,8 @@ class TestHandleGetReturnRequests:
 
         args = _make_namespace()
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            result = await handle_get_return_requests(args)
+        args._container = container
+        result = await handle_get_return_requests(args)
 
         list_ret_orch.execute.assert_awaited_once()
         assert isinstance(result, InterfaceResponse)
@@ -384,8 +384,8 @@ class TestHandleGetRequestStatus:
 
         args = _make_namespace(request_id="req-123", all=False)
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            result = await handle_get_request_status(args)
+        args._container = container
+        result = await handle_get_request_status(args)
 
         status_orch.execute.assert_awaited_once()
         call_input = status_orch.execute.call_args[0][0]
@@ -401,8 +401,8 @@ class TestHandleGetRequestStatus:
 
         args = _make_namespace(all=True)
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            await handle_get_request_status(args)
+        args._container = container
+        await handle_get_request_status(args)
 
         call_input = status_orch.execute.call_args[0][0]
         assert call_input.all_requests is True
@@ -414,8 +414,8 @@ class TestHandleGetRequestStatus:
 
         args = _make_namespace(all=True, request_ids=["req-1"])
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            result = await handle_get_request_status(args)
+        args._container = container
+        result = await handle_get_request_status(args)
 
         assert isinstance(result, dict)
         assert "Cannot use --all with specific request IDs" in result["error"]
@@ -442,8 +442,8 @@ class TestHandleGetRequestStatusDetailed:
 
         args = _make_namespace(request_id="req-001", all=False, verbose=False)
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            result = await handle_get_request_status(args)
+        args._container = container
+        result = await handle_get_request_status(args)
 
         call_input = status_orch.execute.call_args[0][0]
         assert call_input.verbose is False
@@ -458,8 +458,8 @@ class TestHandleGetRequestStatusDetailed:
 
         args = _make_namespace(request_id="req-001", all=False, verbose=True)
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            await handle_get_request_status(args)
+        args._container = container
+        await handle_get_request_status(args)
 
         call_input = status_orch.execute.call_args[0][0]
         assert call_input.verbose is True
@@ -473,8 +473,8 @@ class TestHandleGetRequestStatusDetailed:
 
         args = _make_namespace(all=True, verbose=False)
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            await handle_get_request_status(args)
+        args._container = container
+        await handle_get_request_status(args)
 
         call_input = status_orch.execute.call_args[0][0]
         assert call_input.verbose is False
@@ -488,8 +488,8 @@ class TestHandleGetRequestStatusDetailed:
 
         args = _make_namespace(all=True, verbose=True)
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            await handle_get_request_status(args)
+        args._container = container
+        await handle_get_request_status(args)
 
         call_input = status_orch.execute.call_args[0][0]
         assert call_input.verbose is True
@@ -510,8 +510,8 @@ class TestHandleGetRequestStatusMultiId:
 
         args = _make_namespace(request_ids=["req-1", "req-2"], all=False)
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            result = await handle_get_request_status(args)
+        args._container = container
+        result = await handle_get_request_status(args)
 
         call_input = status_orch.execute.call_args[0][0]
         assert "req-1" in call_input.request_ids
@@ -527,8 +527,8 @@ class TestHandleGetRequestStatusMultiId:
 
         args = _make_namespace(flag_request_ids=["req-3"], all=False)
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            await handle_get_request_status(args)
+        args._container = container
+        await handle_get_request_status(args)
 
         call_input = status_orch.execute.call_args[0][0]
         assert "req-3" in call_input.request_ids
@@ -542,8 +542,8 @@ class TestHandleGetRequestStatusMultiId:
 
         args = _make_namespace(request_id=["req-a", "req-b"], all=False)
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            await handle_get_request_status(args)
+        args._container = container
+        await handle_get_request_status(args)
 
         call_input = status_orch.execute.call_args[0][0]
         assert "req-a" in call_input.request_ids
@@ -558,8 +558,8 @@ class TestHandleGetRequestStatusMultiId:
 
         args = _make_namespace(request_id="req-1", request_ids=["req-2", "req-3"], all=False)
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            await handle_get_request_status(args)
+        args._container = container
+        await handle_get_request_status(args)
 
         call_input = status_orch.execute.call_args[0][0]
         assert set(call_input.request_ids) == {"req-1", "req-2", "req-3"}
@@ -580,8 +580,8 @@ class TestHandleGetRequestStatusMultiId:
             all=False,
         )
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            await handle_get_request_status(args)
+        args._container = container
+        await handle_get_request_status(args)
 
         call_input = status_orch.execute.call_args[0][0]
         assert "req-x" in call_input.request_ids
@@ -594,8 +594,8 @@ class TestHandleGetRequestStatusMultiId:
 
         args = _make_namespace(all=False)
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            result = await handle_get_request_status(args)
+        args._container = container
+        result = await handle_get_request_status(args)
 
         assert isinstance(result, dict)
         assert "error" in result
@@ -611,8 +611,8 @@ class TestHandleGetRequestStatusMultiId:
 
         args = _make_namespace(input_data={"request_id": "req-single"}, all=False)
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            await handle_get_request_status(args)
+        args._container = container
+        await handle_get_request_status(args)
 
         call_input = status_orch.execute.call_args[0][0]
         assert "req-single" in call_input.request_ids
@@ -636,8 +636,8 @@ class TestHandleListRequests:
 
         args = _make_namespace()
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            result = await handle_list_requests(args)
+        args._container = container
+        result = await handle_list_requests(args)
 
         list_req_orch.execute.assert_awaited_once()
         assert isinstance(result, InterfaceResponse)

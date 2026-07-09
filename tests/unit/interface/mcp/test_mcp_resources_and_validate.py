@@ -37,6 +37,7 @@ class TestResourcesReadRequests:
         server = _make_server()
         mock_result = {"requests": [{"request_id": "req-abc"}]}
         server.tools["list_return_requests"] = AsyncMock(return_value=mock_result)
+        server.tools["list_requests"] = AsyncMock(return_value=mock_result)
 
         message = {
             "jsonrpc": "2.0",

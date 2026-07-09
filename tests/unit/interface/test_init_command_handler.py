@@ -46,13 +46,12 @@ def test_discover_infrastructure_uses_create_strategy_by_type():
             "orb.providers.registry.get_provider_registry",
             return_value=mock_registry,
         ),
-        patch(
-            "orb.interface.init_command_handler.get_container",
-            return_value=_mock_container(),
-        ),
     ):
         result = _mod._discover_infrastructure(
-            "aws", {"region": "us-east-1", "profile": "my-profile"}, mock_registry
+            "aws",
+            {"region": "us-east-1", "profile": "my-profile"},
+            mock_registry,
+            _mock_container(),
         )
 
     mock_registry.create_strategy_by_type.assert_called_once_with(
@@ -109,10 +108,12 @@ def test_discover_infrastructure_forwards_region_and_profile_to_strategy():
 
     with (
         patch("orb.providers.registry.get_provider_registry", return_value=mock_registry),
-        patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
     ):
         _mod._discover_infrastructure(
-            "aws", {"region": "eu-west-2", "profile": "my-prod-profile"}, mock_registry
+            "aws",
+            {"region": "eu-west-2", "profile": "my-prod-profile"},
+            mock_registry,
+            _mock_container(),
         )
 
     mock_registry.create_strategy_by_type.assert_called_once_with(
@@ -133,7 +134,7 @@ def test_interactive_setup_tests_credentials_before_asking_for_region():
         call_order.append("test_credentials")
         return (True, "")
 
-    def mock_prompt_operational_params(strategy_class):
+    def mock_prompt_operational_params(strategy_class, **kwargs):
         call_order.append("prompt_operational_params")
         return {"region": "us-east-1"}
 
@@ -175,9 +176,8 @@ def test_interactive_setup_tests_credentials_before_asking_for_region():
             "_get_operational_requirements",
             return_value={"region": {"required": True, "description": "AWS region"}},
         ),
-        patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
     ):
-        _mod._interactive_setup()
+        _mod._interactive_setup(_mock_container())
 
     assert "test_credentials" in call_order
     assert "prompt_operational_params" in call_order
@@ -217,9 +217,8 @@ def test_interactive_setup_returns_empty_on_credential_failure():
                 }
             ],
         ),
-        patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
     ):
-        result = _mod._interactive_setup()
+        result = _mod._interactive_setup(_mock_container())
 
     assert result == {}
 
@@ -236,10 +235,9 @@ def test_interactive_setup_raises_on_no_providers():
         ),
         patch.object(_mod, "_get_available_providers", return_value=[]),
         patch("builtins.input", return_value="1"),
-        patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
     ):
         with pytest.raises(ValueError, match="No providers registered"):
-            _mod._interactive_setup()
+            _mod._interactive_setup(_mock_container())
 
 
 def test_write_config_file_fleet_role_in_config_subnet_ids_in_template_defaults(tmp_path):
@@ -293,14 +291,13 @@ def test_write_config_file_fleet_role_in_config_subnet_ids_in_template_defaults(
             return _FakeResource()
 
     with (
-        patch("orb.interface.init_command_handler.get_container", return_value=mock_container),
         patch(
             "orb.infrastructure.scheduler.registry.get_scheduler_registry",
             return_value=mock_scheduler_registry,
         ),
         patch("importlib.resources.files", return_value=_FakeFiles()),
     ):
-        _mod._write_config_file(config_file, user_config)
+        _mod._write_config_file(config_file, user_config, container=mock_container)
 
     with open(config_file) as f:
         written = json.load(f)
@@ -429,14 +426,13 @@ def _write_config_file_with_strategy(tmp_path, provider_data, strategy_name_retu
             return _FakeResource()
 
     with (
-        patch("orb.interface.init_command_handler.get_container", return_value=mock_container),
         patch(
             "orb.infrastructure.scheduler.registry.get_scheduler_registry",
             return_value=mock_scheduler_registry,
         ),
         patch("importlib.resources.files", return_value=_FakeFiles()),
     ):
-        _mod._write_config_file(config_file, user_config)
+        _mod._write_config_file(config_file, user_config, container=mock_container)
 
     with open(config_file) as f:
         written = json.load(f)
@@ -512,14 +508,13 @@ def test_init_handler_fallback_name_when_strategy_unavailable(tmp_path) -> None:
             return _FakeResource()
 
     with (
-        patch("orb.interface.init_command_handler.get_container", return_value=mock_container),
         patch(
             "orb.infrastructure.scheduler.registry.get_scheduler_registry",
             return_value=mock_scheduler_registry,
         ),
         patch("importlib.resources.files", return_value=_FakeFiles()),
     ):
-        _mod._write_config_file(config_file, user_config)
+        _mod._write_config_file(config_file, user_config, container=mock_container)
 
     with open(config_file) as f:
         written = json.load(f)

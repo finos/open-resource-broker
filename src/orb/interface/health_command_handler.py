@@ -7,7 +7,6 @@ from orb.application.ports.scheduler_port import SchedulerPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.console_port import ConsolePort
 from orb.domain.base.ports.health_check_port import HealthCheckPort
-from orb.infrastructure.di.container import get_container
 
 
 def handle_health_check(args) -> dict[str, Any]:
@@ -16,8 +15,8 @@ def handle_health_check(args) -> dict[str, Any]:
     Returns:
         Response dict with health check results
     """
+    container = args._container
     try:
-        container = get_container()
         scheduler_strategy = container.get(SchedulerPort)
         config_port = container.get(ConfigurationPort)
 
@@ -183,7 +182,7 @@ def handle_health_check(args) -> dict[str, Any]:
             pass
         else:
             # Default mode: show human-readable output
-            console = get_container().get(ConsolePort)
+            console = container.get(ConsolePort)
             console.info("ORB Health Check:")
             for check in checks:
                 status_text = check["status"].upper()
@@ -201,5 +200,5 @@ def handle_health_check(args) -> dict[str, Any]:
         return response
 
     except Exception as e:
-        get_container().get(ConsolePort).error(f"Health check failed: {e}")
+        container.get(ConsolePort).error(f"Health check failed: {e}")
         return {"success": False, "message": str(e), "error": str(e)}

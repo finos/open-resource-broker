@@ -1,7 +1,7 @@
 """Unit tests for --wait behaviour in handle_request_machines."""
 
 import argparse
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -54,10 +54,10 @@ class TestRequestMachinesWait:
 
         args = _make_namespace(template_id="t1", machine_count=1, metadata={}, wait=False)
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            from orb.interface.request_command_handlers import handle_request_machines
+        args._container = container
+        from orb.interface.request_command_handlers import handle_request_machines
 
-            await handle_request_machines(args)
+        await handle_request_machines(args)
 
         call_input = acquire_orch.execute.call_args[0][0]
         assert call_input.wait is False
@@ -72,10 +72,10 @@ class TestRequestMachinesWait:
 
         args = _make_namespace(template_id="t1", machine_count=1, metadata={}, wait=True, timeout=0)
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            from orb.interface.request_command_handlers import handle_request_machines
+        args._container = container
+        from orb.interface.request_command_handlers import handle_request_machines
 
-            await handle_request_machines(args)
+        await handle_request_machines(args)
 
         call_input = acquire_orch.execute.call_args[0][0]
         assert call_input.wait is True
@@ -96,10 +96,10 @@ class TestRequestMachinesWait:
             template_id="t1", machine_count=1, metadata={}, wait=True, timeout=300
         )
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            from orb.interface.request_command_handlers import handle_request_machines
+        args._container = container
+        from orb.interface.request_command_handlers import handle_request_machines
 
-            result = await handle_request_machines(args)
+        result = await handle_request_machines(args)
 
         assert isinstance(result, InterfaceResponse)
         assert result.exit_code == 0
@@ -116,10 +116,10 @@ class TestRequestMachinesWait:
             template_id="t1", machine_count=1, metadata={}, wait=True, timeout=300
         )
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            from orb.interface.request_command_handlers import handle_request_machines
+        args._container = container
+        from orb.interface.request_command_handlers import handle_request_machines
 
-            result = await handle_request_machines(args)
+        result = await handle_request_machines(args)
 
         call_input = acquire_orch.execute.call_args[0][0]
         assert call_input.wait is True
@@ -141,10 +141,10 @@ class TestRequestMachinesWait:
             template_id="t1", machine_count=1, metadata={}, wait=True, timeout=300
         )
 
-        with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-            from orb.interface.request_command_handlers import handle_request_machines
+        args._container = container
+        from orb.interface.request_command_handlers import handle_request_machines
 
-            result = await handle_request_machines(args)
+        result = await handle_request_machines(args)
 
         assert isinstance(result, InterfaceResponse)
         assert result.exit_code == 1

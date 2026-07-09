@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
 from orb.interface.response_formatting_service import ResponseFormattingService
 
@@ -17,7 +16,7 @@ async def handle_get_system_config(args: Any) -> dict[str, Any] | InterfaceRespo
     from orb.cli.factories.cli_command_factory_orchestrator import CLICommandFactoryOrchestrator
     from orb.infrastructure.di.buses import QueryBus
 
-    container = get_container()
+    container = args._container
     formatter = container.get(ResponseFormattingService)
     factory = CLICommandFactoryOrchestrator()
     query = factory.create_get_system_config_query(verbose=getattr(args, "verbose", False))
@@ -35,7 +34,7 @@ async def handle_get_configuration(args: Any) -> dict[str, Any] | InterfaceRespo
     from orb.cli.factories.cli_command_factory_orchestrator import CLICommandFactoryOrchestrator
     from orb.infrastructure.di.buses import QueryBus
 
-    container = get_container()
+    container = args._container
     formatter = container.get(ResponseFormattingService)
     factory = CLICommandFactoryOrchestrator()
     key: str | None = getattr(args, "key", None) or getattr(args, "flag_key", None)
@@ -52,7 +51,7 @@ async def handle_set_configuration(args: Any) -> dict[str, Any] | InterfaceRespo
     from orb.cli.factories.cli_command_factory_orchestrator import CLICommandFactoryOrchestrator
     from orb.infrastructure.di.buses import CommandBus
 
-    container = get_container()
+    container = args._container
     formatter = container.get(ResponseFormattingService)
     factory = CLICommandFactoryOrchestrator()
     key: str | None = getattr(args, "key", None)
@@ -72,7 +71,7 @@ async def handle_validate_provider_config(args: Any) -> dict[str, Any] | Interfa
     from orb.cli.factories.cli_command_factory_orchestrator import CLICommandFactoryOrchestrator
     from orb.infrastructure.di.buses import QueryBus
 
-    container = get_container()
+    container = args._container
     formatter = container.get(ResponseFormattingService)
     factory = CLICommandFactoryOrchestrator()
     query = factory.create_validate_provider_config_query(verbose=getattr(args, "verbose", False))

@@ -5,7 +5,6 @@ from typing import Any, Dict
 
 from orb.application.dto.interface_response import InterfaceResponse
 from orb.config.platform_dirs import get_config_location
-from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
 from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
@@ -51,15 +50,19 @@ async def handle_provider_add(args) -> dict[str, Any]:
 
         provider_config = spec.extract_config(args)
 
+        container = args._container
+
         # Test credentials
-        success, error = _test_provider_credentials(provider_type, provider_config)
+        success, error = _test_provider_credentials(provider_type, provider_config, container)
         if not success:
             return {"error": True, "message": f"Credential test failed: {error}", "exit_code": 1}
 
         # Discover infrastructure if requested
         infrastructure_defaults = {}
         if args.discover:
-            infrastructure_defaults = _discover_infrastructure(provider_type, provider_config)
+            infrastructure_defaults = _discover_infrastructure(
+                provider_type, provider_config, container
+            )
 
         # Generate provider name
         provider_name = args.name or spec.generate_name(args)
@@ -175,7 +178,7 @@ async def handle_provider_update(args) -> dict[str, Any]:
         provider_config.update(partial)
 
         # Test updated credentials
-        success, error = _test_provider_credentials(provider_type, provider_config)
+        success, error = _test_provider_credentials(provider_type, provider_config, args._container)
         if not success:
             return {"error": True, "message": f"Credential test failed: {error}", "exit_code": 1}
 
@@ -281,7 +284,7 @@ async def handle_provider_get(args) -> dict[str, Any]:
 async def handle_provider_show(args) -> dict[str, Any] | InterfaceResponse:
     """Handle orb providers show command."""
     try:
-        container = get_container()
+        container = args._container
         formatter = container.get(ResponseFormattingService)
         config_file = get_config_location() / "config.json"
         if not config_file.exists():
@@ -329,13 +332,14 @@ async def handle_provider_show(args) -> dict[str, Any] | InterfaceResponse:
         return formatter.format_error(f"Failed to show provider: {e}")
 
 
-def _test_provider_credentials(provider_type: str, credential_config: dict) -> tuple[bool, str]:
+def _test_provider_credentials(
+    provider_type: str, credential_config: dict, container: Any
+) -> tuple[bool, str]:
     """Test provider credentials via the provider strategy."""
     try:
         from orb.application.services.provider_registry_service import ProviderRegistryService
-        from orb.infrastructure.di.container import get_container
 
-        registry_service = get_container().get(ProviderRegistryService)
+        registry_service = container.get(ProviderRegistryService)
 
         if not registry_service.ensure_provider_registered(provider_type):
             return False, f"Provider type not supported: {provider_type}"
@@ -353,13 +357,14 @@ def _test_provider_credentials(provider_type: str, credential_config: dict) -> t
         return False, str(e)
 
 
-def _discover_infrastructure(provider_type: str, provider_config: Dict[str, Any]) -> Dict[str, Any]:
+def _discover_infrastructure(
+    provider_type: str, provider_config: Dict[str, Any], container: Any
+) -> Dict[str, Any]:
     """Discover infrastructure using provider strategy."""
     try:
         from orb.application.services.provider_registry_service import ProviderRegistryService
-        from orb.infrastructure.di.container import get_container
 
-        registry_service = get_container().get(ProviderRegistryService)
+        registry_service = container.get(ProviderRegistryService)
 
         if not registry_service.ensure_provider_registered(provider_type):
             logger.warning("Failed to register provider type: %s", provider_type)

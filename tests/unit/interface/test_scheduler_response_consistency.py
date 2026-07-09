@@ -7,7 +7,7 @@ These tests document the expected post-fix behaviour for REST/MCP (ticket 1910).
 
 import argparse
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -107,10 +107,10 @@ async def test_cli_calls_format_request_status_response():
 
     args = _make_namespace(request_id="req-abc", all=False)
 
-    with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-        from orb.interface.request_command_handlers import handle_get_request_status
+    args._container = container
+    from orb.interface.request_command_handlers import handle_get_request_status
 
-        result = await handle_get_request_status(args)
+    result = await handle_get_request_status(args)
 
     formatter.format_request_status.assert_called_once()
     assert isinstance(result, InterfaceResponse)
@@ -124,10 +124,10 @@ async def test_cli_format_receives_list():
 
     args = _make_namespace(request_id="req-abc", all=False)
 
-    with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-        from orb.interface.request_command_handlers import handle_get_request_status
+    args._container = container
+    from orb.interface.request_command_handlers import handle_get_request_status
 
-        await handle_get_request_status(args)
+    await handle_get_request_status(args)
 
     call_args = formatter.format_request_status.call_args[0][0]
     assert isinstance(call_args, list)
@@ -141,10 +141,10 @@ async def test_cli_all_flag_delegates_to_scheduler():
 
     args = _make_namespace(all=True)
 
-    with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-        from orb.interface.request_command_handlers import handle_get_request_status
+    args._container = container
+    from orb.interface.request_command_handlers import handle_get_request_status
 
-        result = await handle_get_request_status(args)
+    result = await handle_get_request_status(args)
 
     formatter.format_request_status.assert_called_once()
     assert isinstance(result, InterfaceResponse)
@@ -239,10 +239,10 @@ async def test_cli_request_machines_delegates_format_request_response():
 
     args = _make_namespace(template_id="t1", machine_count=1, metadata={})
 
-    with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-        from orb.interface.request_command_handlers import handle_request_machines
+    args._container = container
+    from orb.interface.request_command_handlers import handle_request_machines
 
-        await handle_request_machines(args)
+    await handle_request_machines(args)
 
     formatter.format_request_operation.assert_called_once()
     call_arg = formatter.format_request_operation.call_args[0][0]
@@ -262,10 +262,10 @@ async def test_cli_passes_scheduler_return_value_through():
 
     args = _make_namespace(all=True)
 
-    with patch("orb.interface.request_command_handlers.get_container", return_value=container):
-        from orb.interface.request_command_handlers import handle_get_request_status
+    args._container = container
+    from orb.interface.request_command_handlers import handle_get_request_status
 
-        result = await handle_get_request_status(args)
+    result = await handle_get_request_status(args)
 
     assert isinstance(result, InterfaceResponse)
     assert result.data == sentinel_data

@@ -19,6 +19,11 @@ async def execute_command(args, app, resource_parsers) -> str | tuple[str, int]:
 
     build_registry()
 
+    # Resolve the container once at the dispatch boundary and attach it to
+    # args so handler functions can use args._container instead of calling
+    # get_container() inside their bodies (service-locator anti-pattern).
+    args._container = get_container()
+
     # Parse -f/--file and -d/--data into args.input_data
     if not hasattr(args, "input_data") or args.input_data is None:
         file_path = getattr(args, "file", None) or getattr(args, "hf_file", None)
@@ -61,7 +66,6 @@ async def execute_command(args, app, resource_parsers) -> str | tuple[str, int]:
         output_format = getattr(args, "format", "json")
         return format_output(result, output_format), 1
 
-    container = get_container()
-    scheduler_port = container.get(SchedulerPort)
+    scheduler_port = args._container.get(SchedulerPort)
     formatter = create_cli_formatter(scheduler_port)
     return formatter.format_response(result, args)

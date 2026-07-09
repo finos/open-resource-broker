@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Any
 
 from orb.application.dto.interface_response import InterfaceResponse
 from orb.domain.base.exceptions import DuplicateError, EntityNotFoundError
-from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
 from orb.interface.response_formatting_service import ResponseFormattingService
 
@@ -28,7 +27,7 @@ async def handle_list_templates(
     from orb.application.services.orchestration.list_templates import ListTemplatesOrchestrator
     from orb.domain.base.ports.console_port import ConsolePort
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(ListTemplatesOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
@@ -94,7 +93,7 @@ async def handle_get_template(
             exit_code=1,
         )
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(GetTemplateOrchestrator)
     scheduler = container.get(SchedulerPort)
     formatter = container.get(ResponseFormattingService)
@@ -183,7 +182,7 @@ async def handle_create_template(
             "validate_only": True,
         }
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(CreateTemplateOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
@@ -282,7 +281,7 @@ async def handle_update_template(
             exit_code=1,
         )
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(UpdateTemplateOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
@@ -351,7 +350,7 @@ async def handle_delete_template(
             "dry_run": True,
         }
 
-    container = get_container()
+    container = args._container
     formatter = container.get(ResponseFormattingService)
 
     if not getattr(args, "force", False):
@@ -402,7 +401,7 @@ async def handle_validate_template(
         ValidateTemplateOrchestrator,
     )
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(ValidateTemplateOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
@@ -509,7 +508,7 @@ async def handle_refresh_templates(
         RefreshTemplatesOrchestrator,
     )
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(RefreshTemplatesOrchestrator)
     formatter = container.get(ResponseFormattingService)
 
@@ -527,7 +526,7 @@ async def handle_get_multiple_templates(
     from orb.application.dto.bulk_queries import GetMultipleTemplatesQuery
     from orb.infrastructure.di.buses import QueryBus
 
-    container = get_container()
+    container = args._container
     template_ids: list[str] = []
     if hasattr(args, "template_ids") and args.template_ids:
         template_ids.extend(args.template_ids)

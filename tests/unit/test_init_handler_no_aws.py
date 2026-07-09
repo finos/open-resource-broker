@@ -263,7 +263,9 @@ def test_interactive_setup_raises_when_no_providers_registered():
         patch("builtins.input", return_value="1"),
     ):
         try:
-            _interactive_setup()
+            from unittest.mock import MagicMock
+
+            _interactive_setup(MagicMock())
             assert False, "Expected ValueError was not raised"
         except ValueError as exc:
             assert "No providers registered" in str(exc)
@@ -283,7 +285,9 @@ def test_get_default_config_raises_when_no_providers_and_no_provider_arg():
         return_value=[],
     ):
         try:
-            _get_default_config(args)
+            from unittest.mock import MagicMock
+
+            _get_default_config(args, MagicMock())
             assert False, "Expected ValueError was not raised"
         except ValueError as exc:
             assert "No providers registered" in str(exc)

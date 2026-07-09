@@ -42,7 +42,9 @@ class TestStubHandlers:
     async def test_handle_validate_provider_config_returns_not_implemented(self):
         from orb.interface.system_command_handlers import handle_validate_provider_config
 
-        result = await handle_validate_provider_config(_ns())
+        _tmp_args = _ns()
+        _tmp_args._container = MagicMock()
+        result = await handle_validate_provider_config(_tmp_args)
 
         assert isinstance(result, dict)
         assert result.get("error") == "Not implemented"
@@ -65,10 +67,9 @@ class TestStubHandlers:
             mock_formatter if t is ResponseFormattingService else mock_registry
         )
 
-        with patch(
-            "orb.interface.system_command_handlers.get_container", return_value=mock_container
-        ):
-            result = await handle_reload_provider_config(_ns())
+        _reload_args = _ns()
+        _reload_args._container = mock_container
+        result = await handle_reload_provider_config(_reload_args)
 
         assert isinstance(result, InterfaceResponse)
 
@@ -100,8 +101,9 @@ class TestHandleProviderHealth:
         container = MagicMock()
         container.get.return_value = orchestrator
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            result = await handle_provider_health(_ns())
+        _tmp_args = _ns()
+        _tmp_args._container = container
+        result = await handle_provider_health(_tmp_args)
 
         orchestrator.execute.assert_awaited_once()
         assert isinstance(result, dict)
@@ -121,8 +123,9 @@ class TestHandleProviderConfig:
         container = MagicMock()
         container.get.return_value = orchestrator
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            result = await handle_provider_config(_ns())
+        _tmp_args = _ns()
+        _tmp_args._container = container
+        result = await handle_provider_config(_tmp_args)
 
         orchestrator.execute.assert_awaited_once()
         assert isinstance(result, dict)
@@ -142,8 +145,9 @@ class TestHandleProviderMetrics:
         container = MagicMock()
         container.get.return_value = orchestrator
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            result = await handle_provider_metrics(_ns(provider_name="aws"))
+        _tmp_args = _ns(provider_name="aws")
+        _tmp_args._container = container
+        result = await handle_provider_metrics(_tmp_args)
 
         orchestrator.execute.assert_awaited_once()
         call_input = orchestrator.execute.call_args[0][0]
@@ -159,8 +163,9 @@ class TestHandleProviderMetrics:
         container = MagicMock()
         container.get.return_value = orchestrator
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            await handle_provider_metrics(_ns())
+        _tmp_args = _ns()
+        _tmp_args._container = container
+        await handle_provider_metrics(_tmp_args)
 
         call_input = orchestrator.execute.call_args[0][0]
         assert call_input.provider_name is None
@@ -184,8 +189,9 @@ class TestHandleSystemStatus:
             query_bus if t.__name__ == "QueryBus" else mock_formatter
         )
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            result = await handle_system_status(_ns(verbose=True))
+        _tmp_args = _ns(verbose=True)
+        _tmp_args._container = container
+        result = await handle_system_status(_tmp_args)
 
         query_bus.execute.assert_awaited_once()
         q = query_bus.execute.call_args[0][0]
@@ -209,8 +215,9 @@ class TestHandleSystemStatus:
             query_bus if t.__name__ == "QueryBus" else mock_formatter
         )
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            await handle_system_status(_ns())
+        _tmp_args = _ns()
+        _tmp_args._container = container
+        await handle_system_status(_tmp_args)
 
         q = query_bus.execute.call_args[0][0]
         assert isinstance(q, GetSystemStatusQuery)
@@ -240,8 +247,9 @@ class TestHandleListProviders:
         container = MagicMock()
         container.get.return_value = mock_orchestrator
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            result = await handle_list_providers(_ns())
+        _tmp_args = _ns()
+        _tmp_args._container = container
+        result = await handle_list_providers(_tmp_args)
 
         assert result["count"] == 1
         assert result["providers"][0]["name"] == "aws-default"
@@ -263,8 +271,9 @@ class TestHandleListProviders:
         container = MagicMock()
         container.get.return_value = mock_orchestrator
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            result = await handle_list_providers(_ns())
+        _tmp_args = _ns()
+        _tmp_args._container = container
+        result = await handle_list_providers(_tmp_args)
 
         assert result["count"] == 0
         assert result["providers"] == []
@@ -276,9 +285,10 @@ class TestHandleListProviders:
         container = MagicMock()
         container.get.side_effect = RuntimeError("container exploded")
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            with pytest.raises(Exception, match="container exploded"):
-                await handle_list_providers(_ns())
+        with pytest.raises(Exception, match="container exploded"):
+            _tmp_args = _ns()
+            _tmp_args._container = container
+            await handle_list_providers(_tmp_args)
 
 
 # ---------------------------------------------------------------------------
@@ -337,8 +347,9 @@ class TestHandleSystemMetrics:
         container = MagicMock()
         container.get_optional.return_value = mock_metrics
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            result = await handle_system_metrics(_ns())
+        _tmp_args = _ns()
+        _tmp_args._container = container
+        result = await handle_system_metrics(_tmp_args)
 
         assert result.data["metrics"] == {"requests_total": 5}
 
@@ -349,8 +360,9 @@ class TestHandleSystemMetrics:
         container = MagicMock()
         container.get_optional.return_value = None
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            result = await handle_system_metrics(_ns())
+        _tmp_args = _ns()
+        _tmp_args._container = container
+        result = await handle_system_metrics(_tmp_args)
 
         assert result.data["metrics"] == {}
 
@@ -364,8 +376,9 @@ class TestHandleSystemMetrics:
         container = MagicMock()
         container.get_optional.return_value = mock_metrics
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            result = await handle_system_metrics(_ns())
+        _tmp_args = _ns()
+        _tmp_args._container = container
+        result = await handle_system_metrics(_tmp_args)
 
         assert result.data["metrics"] == {}
         assert "error" in result.data
