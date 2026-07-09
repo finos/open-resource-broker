@@ -100,16 +100,19 @@ azure = [
     "azure-mgmt-resource-subscriptions==1.0.0b1",
     "httpx>=0.27.0",
 ]
-# gcp = [
-#     "google-cloud-compute>=1.14.0",
-#     "google-auth>=2.23.0",
-# ]
+# GCP provider. Install with:
+#   pip install orb-py[gcp]
+gcp = [
+    "google-cloud-compute>=1.14.0",
+    "google-auth>=2.23.0",
+]
 
 # Meta-extra: all currently implemented providers
 all-providers = [
     "orb-py[aws]",
     "orb-py[azure]",
     "orb-py[k8s]",
+    "orb-py[gcp]",
 ]
 
 # Legacy k8s HostFactory plugin — heavy deps gated behind optional extra.
