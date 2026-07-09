@@ -7,7 +7,7 @@ maintaining clean separation of concerns:
 - Clean Architecture: No repository knowledge in storage layer
 """
 
-from typing import Any, Optional
+from typing import Optional
 
 from orb.application.events.bus.event_bus import EventBus
 from orb.config.manager import ConfigurationManager
@@ -131,64 +131,3 @@ class UnitOfWorkFactory(AbstractUnitOfWorkFactory):
     def create_unit_of_work(self) -> UnitOfWork:
         """Create unit of work instance (abstract interface implementation)."""
         return self.create()
-
-
-@injectable
-class RepositoryFactoryWithStrategies:
-    """
-    Repository factory that provides repositories with caching.
-
-    This class creates repositories once and caches them for reuse.
-    """
-
-    def __init__(self, config_manager: ConfigurationManager, logger: LoggingPort) -> None:
-        """Initialize factory with optional configuration manager."""
-        self.logger = logger
-        self._repositories = {}
-        self._config_manager = config_manager
-
-    def _get_config_manager(self):
-        """Get configuration manager."""
-        if self._config_manager is None:
-            from orb.config.managers.configuration_manager import ConfigurationManager
-            from orb.infrastructure.di.container import get_container
-
-            container = get_container()
-            self._config_manager = container.get(ConfigurationManager)
-        return self._config_manager
-
-    def get_machine_repository(self) -> MachineRepositoryInterface:
-        """Get machine repository (cached)."""
-        if "machine" not in self._repositories:
-            config_manager = self._get_config_manager()
-            factory = RepositoryFactory(config_manager, self.logger)
-            self._repositories["machine"] = factory.create_machine_repository()
-        return self._repositories["machine"]
-
-    def get_request_repository(self) -> RequestRepositoryInterface:
-        """Get request repository (cached)."""
-        if "request" not in self._repositories:
-            config_manager = self._get_config_manager()
-            factory = RepositoryFactory(config_manager, self.logger)
-            self._repositories["request"] = factory.create_request_repository()
-        return self._repositories["request"]
-
-    def get_template_repository(self) -> TemplateRepositoryInterface:
-        """Get template repository (cached)."""
-        if "template" not in self._repositories:
-            config_manager = self._get_config_manager()
-            factory = RepositoryFactory(config_manager, self.logger)
-            self._repositories["template"] = factory.create_template_repository()
-        return self._repositories["template"]
-
-    def get_repository(self, repository_interface: type) -> Any:
-        """Get repository by interface type."""
-        # Map interface types to repository names
-        if repository_interface == MachineRepositoryInterface:
-            return self.get_machine_repository()
-        elif repository_interface == RequestRepositoryInterface:
-            return self.get_request_repository()
-        elif repository_interface == TemplateRepositoryInterface:
-            return self.get_template_repository()
-        else:
-            raise ValueError(f"Unknown repository interface: {repository_interface}")

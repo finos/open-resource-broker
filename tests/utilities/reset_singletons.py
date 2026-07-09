@@ -4,31 +4,6 @@ import importlib
 from typing import Any
 
 
-# Define a fallback registry class
-class _FallbackRegistry:
-    """Fallback implementation if SingletonRegistry is not available."""
-
-    _instance = None
-
-    @classmethod
-    def get_instance(cls):
-        """Get the singleton instance."""
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
-
-    def reset(self, singleton_class=None):
-        """Reset one or all singleton instances."""
-
-
-# Import the singleton registry
-try:
-    from orb.infrastructure.patterns.singleton_registry import SingletonRegistry
-except ImportError:
-    # If the singleton registry doesn't exist yet, use the fallback
-    SingletonRegistry = _FallbackRegistry
-
-
 def _safe_reset_class_instance(module_name: str, class_name: str) -> None:
     """
     Safely reset a class instance.
@@ -89,13 +64,9 @@ def reset_all_singletons() -> None:
     """
     Reset all singletons for testing.
 
-    This function resets all singleton instances in the registry,
-    ensuring that tests start with a clean state.
+    This function resets all singleton instances, ensuring that tests start
+    with a clean state.
     """
-    # Reset all singletons in the registry
-    registry = SingletonRegistry.get_instance()
-    registry.reset()
-
     # Reset the DI container so dependency_overrides work correctly in FastAPI tests
     try:
         from orb.infrastructure.di.container import reset_container
@@ -107,36 +78,21 @@ def reset_all_singletons() -> None:
     # Reset circuit breaker shared state
     _reset_circuit_breaker_states()
 
-    # Also reset the registry itself
-    _safe_reset_class_instance(
-        "orb.infrastructure.patterns.singleton_registry", "SingletonRegistry"
-    )
-
     # Reset any global singleton instances
     _safe_reset_global_variable(
         "orb.infrastructure.aws.aws_client_singleton", "_aws_client_singleton_instance"
     )
     reset_provider_registry()
     _safe_reset_class_instance("orb.infrastructure.config.manager", "ConfigurationManager")
-    _safe_reset_class_instance("orb.infrastructure.logging.logger_singleton", "LoggerSingleton")
 
 
 def reset_singleton(singleton_class: type[Any]) -> None:
     """
     Reset a specific singleton for testing.
 
-    This function resets a specific singleton instance in the registry,
-    ensuring that tests start with a clean state for that singleton.
-
     Args:
         singleton_class: The singleton class to reset
     """
-    # Reset the singleton in the registry
-    registry = SingletonRegistry.get_instance()
-    registry.reset(singleton_class)
-
-    # Also reset any global singleton instance
-    # This is for backward compatibility with old singleton implementations
     class_name = singleton_class.__name__
     if class_name == "AWSClient":
         _safe_reset_global_variable(
@@ -145,5 +101,3 @@ def reset_singleton(singleton_class: type[Any]) -> None:
         )
     elif class_name == "ConfigurationManager":
         _safe_reset_class_instance("orb.infrastructure.config.manager", "ConfigurationManager")
-    elif class_name == "LoggerSingleton":
-        _safe_reset_class_instance("orb.infrastructure.logging.logger_singleton", "LoggerSingleton")
