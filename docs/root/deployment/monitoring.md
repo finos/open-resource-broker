@@ -170,7 +170,7 @@ When telemetry is disabled:
 
 ### `GET /health`
 
-Application health check; see [health documentation](../operational/health.md).
+Application health check (liveness/readiness probe).
 
 ## Traces
 
