@@ -11,7 +11,6 @@ from orb.domain.base.ports import (
 )
 from orb.infrastructure.di.buses import CommandBus, QueryBus
 from orb.infrastructure.di.container import DIContainer
-from orb.monitoring.metrics import MetricsCollector
 from orb.providers.base.metrics import NoOpProviderMetrics, OtelProviderMetrics, ProviderMetricsPort
 
 
@@ -26,15 +25,6 @@ def register_core_services(container: DIContainer) -> None:
             return ConfigurationManager()  # Uses default config discovery
 
         container.register_singleton(ConfigurationManager, create_configuration_manager)
-
-    # Register metrics collector with configuration from ConfigurationPort
-    def create_metrics_collector(c):
-        config_port = c.get(ConfigurationPort)
-        metrics_config = config_port.get_metrics_config()
-        return MetricsCollector(metrics_config, logger=c.get(LoggingPort))
-
-    # Register as singleton so the same collector instance is shared
-    container.register_singleton(MetricsCollector, create_metrics_collector)
 
     # Register ProviderMetricsPort — OtelProviderMetrics when SDK available and
     # configured; NoOpProviderMetrics otherwise (safe default, no guards needed).

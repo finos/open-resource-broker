@@ -321,50 +321,67 @@ class TestHandleSystemHealth:
 
 
 # ---------------------------------------------------------------------------
-# handle_system_metrics — uses MetricsCollector via container.get_optional
+# handle_system_metrics — reads prometheus_client REGISTRY via generate_latest
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestHandleSystemMetrics:
     @pytest.mark.asyncio
-    async def test_returns_metrics_when_collector_available(self):
+    async def test_returns_metrics_from_registry(self):
+        """Returns a dict of metric_name→value scraped from REGISTRY."""
         from orb.interface.system_command_handlers import handle_system_metrics
 
-        mock_metrics = MagicMock()
-        mock_metrics.get_metrics.return_value = {"requests_total": 5}
+        # Feed a minimal Prometheus text response from REGISTRY.
+        fake_text = (
+            "# HELP requests_total Total requests\n"
+            "# TYPE requests_total counter\n"
+            "requests_total 5.0\n"
+        ).encode("utf-8")
 
-        container = MagicMock()
-        container.get_optional.return_value = mock_metrics
-
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
+        with patch("prometheus_client.generate_latest", return_value=fake_text):
             result = await handle_system_metrics(_ns())
 
-        assert result.data["metrics"] == {"requests_total": 5}
+        assert result.data["metrics"].get("requests_total") == 5.0
 
     @pytest.mark.asyncio
-    async def test_returns_empty_metrics_when_collector_unavailable(self):
+    async def test_returns_empty_metrics_when_prometheus_client_absent(self):
+        """When prometheus_client raises ImportError, returns empty metrics dict."""
+        import sys
+
         from orb.interface.system_command_handlers import handle_system_metrics
 
-        container = MagicMock()
-        container.get_optional.return_value = None
+        # Remove prometheus_client from sys.modules so the inline import fails.
+        saved = {k: v for k, v in sys.modules.items() if k.startswith("prometheus_client")}
+        for k in list(saved):
+            sys.modules.pop(k, None)
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            result = await handle_system_metrics(_ns())
+        import builtins
+
+        original_import = builtins.__import__
+
+        def _block_prometheus(name, *args, **kwargs):
+            if name.startswith("prometheus_client"):
+                raise ImportError("prometheus_client not installed")
+            return original_import(name, *args, **kwargs)
+
+        try:
+            with patch("builtins.__import__", side_effect=_block_prometheus):
+                result = await handle_system_metrics(_ns())
+        finally:
+            sys.modules.update(saved)
 
         assert result.data["metrics"] == {}
+        assert result.exit_code == 0
 
     @pytest.mark.asyncio
-    async def test_returns_error_dict_when_get_metrics_raises(self):
+    async def test_returns_error_dict_when_generate_latest_raises(self):
+        """On unexpected error, returns empty metrics and sets error key."""
         from orb.interface.system_command_handlers import handle_system_metrics
 
-        mock_metrics = MagicMock()
-        mock_metrics.get_metrics.side_effect = RuntimeError("metrics broken")
-
-        container = MagicMock()
-        container.get_optional.return_value = mock_metrics
-
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
+        with patch(
+            "prometheus_client.generate_latest", side_effect=RuntimeError("registry broken")
+        ):
             result = await handle_system_metrics(_ns())
 
         assert result.data["metrics"] == {}

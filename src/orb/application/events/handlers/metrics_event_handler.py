@@ -1,11 +1,11 @@
 """Metrics event handler — records provisioning metrics on domain events.
 
-Migration note (bead 2512)
---------------------------
-Emit sites have been moved from ``MetricsCollector`` to the OpenTelemetry
-Meter API.  ``MetricsCollector`` is NOT deleted here — the ``/metrics``
-endpoint still reads it until a later agent removes the homegrown collector
-entirely.  This handler simply stops writing to it.
+Implementation note
+-------------------
+Emit sites use the OpenTelemetry Meter API directly.  The homegrown
+``MetricsCollector`` has been deleted; the ``/metrics`` endpoint now serves
+``generate_latest(REGISTRY)`` which includes all OTel instruments bridged
+via ``PrometheusMetricReader``.
 
 Instruments used
 ----------------

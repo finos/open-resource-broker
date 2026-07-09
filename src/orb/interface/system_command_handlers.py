@@ -6,7 +6,6 @@ from typing import Any, cast
 from orb.application.dto.interface_response import InterfaceResponse
 from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
-from orb.monitoring.metrics import MetricsCollector
 
 
 @handle_interface_exceptions(context="system_health", interface_type="cli")
@@ -162,23 +161,46 @@ async def handle_system_status(args) -> InterfaceResponse:
 
 @handle_interface_exceptions(context="system_metrics", interface_type="cli")
 async def handle_system_metrics(args) -> InterfaceResponse:
-    """Handle get system metrics operations."""
-    container = get_container()
-    try:
-        metrics = container.get_optional(MetricsCollector)
-    except Exception:
-        metrics = None
+    """Handle get system metrics operations.
 
-    if not metrics:
+    Scrapes the prometheus_client global REGISTRY (which includes OTel
+    PrometheusMetricReader output and native k8s/process metrics) and returns
+    a dict of ``{metric_name: sample_value}`` pairs for the latest sample of
+    each series.  Returns an empty dict when prometheus_client is not installed
+    (optional [monitoring] extra).
+    """
+    try:
+        from prometheus_client import REGISTRY, generate_latest
+
+        raw = generate_latest(REGISTRY).decode("utf-8")
+        # Parse the Prometheus text format into a flat name→value dict.
+        # Each non-comment, non-empty line has the form:
+        #   metric_name[{labels}] value [timestamp]
+        metrics_dict: dict[str, Any] = {}
+        for line in raw.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            if len(parts) >= 2:
+                name_with_labels = parts[0]
+                value_str = parts[1]
+                # Strip label set to get the bare metric name for the key.
+                bare_name = name_with_labels.split("{")[0]
+                try:
+                    value = float(value_str)
+                except ValueError:
+                    value = value_str  # type: ignore[assignment]
+                metrics_dict[bare_name] = value
         return InterfaceResponse(
-            data={"metrics": {}, "message": "MetricsCollector not available"}, exit_code=0
+            data={"metrics": metrics_dict, "message": "System metrics retrieved successfully"},
+            exit_code=0,
         )
-
-    try:
+    except ImportError:
         return InterfaceResponse(
             data={
-                "metrics": metrics.get_metrics(),
-                "message": "System metrics retrieved successfully",
+                "metrics": {},
+                "message": "prometheus_client not available (install [monitoring] extra)",
             },
             exit_code=0,
         )

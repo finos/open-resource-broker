@@ -142,6 +142,15 @@ class OtelConfig(BaseModel):
             "No-op when opentelemetry-instrumentation-logging is not installed."
         ),
     )
+    instrument_fastapi: bool = Field(
+        True,
+        description=(
+            "Enable FastAPIInstrumentor (HTTP request spans + http.server.request.duration "
+            "histogram and http.server.active_requests UpDownCounter). "
+            "The /health and /metrics routes are excluded to avoid self-telemetry noise. "
+            "No-op when opentelemetry-instrumentation-fastapi is not installed."
+        ),
+    )
 
     @model_validator(mode="after")
     def _apply_otel_env_overrides(self) -> "OtelConfig":
