@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from orb.providers.aws.infrastructure.services.aws_native_spec_service import (
         AWSNativeSpecService,
-        NativeSpecServiceProtocol,
     )
+    from orb.providers.base.native_spec_protocol import NativeSpecServiceProtocol
 
 from orb.domain.base.ports import ConfigurationPort, LoggingPort
 from orb.domain.template.template_aggregate import Template

@@ -31,9 +31,7 @@ from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.request.aggregate import Request
 from orb.infrastructure.utilities.common.deep_merge import deep_merge
-from orb.providers.aws.infrastructure.services.aws_native_spec_service import (
-    NativeSpecServiceProtocol,
-)
+from orb.providers.base.native_spec_protocol import NativeSpecServiceProtocol
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.domain.template.k8s_template import (
     K8sTemplate,
