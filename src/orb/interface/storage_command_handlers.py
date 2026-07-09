@@ -189,17 +189,12 @@ async def handle_storage_migrate(
         try:
             from orb.config.manager import ConfigurationManager
             from orb.config.schemas.storage_schema import StorageConfig
+            from orb.infrastructure.storage.sql.registration import _build_connection_string
 
             cfg = container.get(ConfigurationManager)
             storage_cfg = cfg.get_typed(StorageConfig)
             sql_cfg = storage_cfg.sql_strategy
-            if sql_cfg.type == "sqlite":
-                db_url = f"sqlite:///{sql_cfg.name}"
-            elif sql_cfg.type == "postgresql":
-                db_url = (
-                    f"postgresql://{sql_cfg.username}:{sql_cfg.password}"
-                    f"@{sql_cfg.host}:{sql_cfg.port}/{sql_cfg.name}"
-                )
+            db_url = _build_connection_string(sql_cfg)
         except Exception:
             pass  # Fall back to alembic.ini default
 
