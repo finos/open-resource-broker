@@ -147,7 +147,7 @@ class AWSRetryStrategy(RetryStrategy):
             exception: Exception that occurred
         """
         error_info = get_aws_error_info(exception)
-        delay = self.calculate_delay(attempt)  # type: ignore[attr-defined]
+        delay = self.get_delay(attempt)
 
         self._logger.warning(
             "Retrying AWS %s operation (attempt %s/%s) after %.2fs delay due to %s",

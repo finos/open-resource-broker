@@ -28,7 +28,6 @@ from orb.application.request.queries import GetRequestMetricsQuery
 from orb.domain.base.exceptions import EntityNotFoundError
 from orb.domain.machine.value_objects import MachineStatus
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

@@ -27,7 +27,6 @@ from orb.application.queries.bulk_handlers import (
 )
 from orb.domain.base.exceptions import EntityNotFoundError
 
-
 # ---------------------------------------------------------------------------
 # Construction helpers — bypass __init__ to avoid lazy-import dependencies
 # ---------------------------------------------------------------------------
@@ -203,9 +202,7 @@ class TestGetMultipleTemplatesHandler:
             side_effect=EntityNotFoundError("Template", "tmpl-gone")
         )
 
-        result = await handler.execute_query(
-            GetMultipleTemplatesQuery(template_ids=["tmpl-gone"])
-        )
+        result = await handler.execute_query(GetMultipleTemplatesQuery(template_ids=["tmpl-gone"]))
 
         assert result.found_count == 0
         assert "tmpl-gone" in result.not_found_ids
@@ -234,7 +231,10 @@ class TestGetMultipleMachinesHandler:
         dto_b = MachineDTO.model_validate({"machine_id": "mc-b", **_mc_fields})
 
         handler._query_service.get_machine = AsyncMock(
-            side_effect=[MagicMock(machine_id="mc-a", request_id=None), MagicMock(machine_id="mc-b", request_id=None)]
+            side_effect=[
+                MagicMock(machine_id="mc-a", request_id=None),
+                MagicMock(machine_id="mc-b", request_id=None),
+            ]
         )
         handler._dto_factory.create_from_domain.side_effect = [dto_a, dto_b]
 
@@ -282,7 +282,10 @@ class TestGetMultipleMachinesHandler:
         dto_a = MachineDTO.model_validate({"machine_id": "mc-a", **_mc_fields})
 
         handler._query_service.get_machine = AsyncMock(
-            side_effect=[MagicMock(machine_id="mc-a", request_id=None), EntityNotFoundError("Machine", "mc-gone")]
+            side_effect=[
+                MagicMock(machine_id="mc-a", request_id=None),
+                EntityNotFoundError("Machine", "mc-gone"),
+            ]
         )
         handler._dto_factory.create_from_domain.return_value = dto_a
 
