@@ -110,7 +110,6 @@ def test_gcp_template_dto_roundtrip_preserves_provider_fields() -> None:
         service_account_scopes=["https://www.googleapis.com/auth/compute"],
         labels={"component": "worker"},
         network_tags=["ssh"],
-        provisioning_model="STANDARD",
         boot_disk_type="pd-balanced",
         boot_disk_size_gb=64,
         instance_template_name_prefix="orb-worker",
@@ -159,6 +158,26 @@ def test_gcp_template_rejects_invalid_provider_config_type() -> None:
         )
 
 
+def test_gcp_template_rejects_gcp_api_provisioning_model_input() -> None:
+    with pytest.raises(ValueError):
+        GCPTemplate.model_validate(
+            {
+                "template_id": "gcp-provisioning-model-input",
+                "provider_type": "gcp",
+                "provider_api": "MIG",
+                "project_id": "orb-example-12345",
+                "region": "us-central1",
+                "zones": ["us-central1-a", "us-central1-b"],
+                "mig_scope": "regional",
+                "instance_type": "e2-standard-4",
+                "max_instances": 2,
+                "provisioning_model": "STANDARD",
+                "source_image_family": "debian-12",
+                "source_image_project": "debian-cloud",
+            }
+        )
+
+
 def test_gcp_template_accepts_provider_config_extension_payload() -> None:
     template = GCPTemplate.model_validate(
         {
@@ -172,6 +191,7 @@ def test_gcp_template_accepts_provider_config_extension_payload() -> None:
                 "region": "us-central1",
                 "zones": ["us-central1-a", "us-central1-b"],
                 "mig_scope": "regional",
+                "price_type": "spot",
                 "source_image_family": "debian-12",
                 "source_image_project": "debian-cloud",
                 "instance_template_name_prefix": "orb",
@@ -181,6 +201,7 @@ def test_gcp_template_accepts_provider_config_extension_payload() -> None:
 
     assert template.provider_api == "MIG"
     assert template.instance_type == "e2-standard-4"
+    assert template.price_type == "spot"
     assert template.project_id.value == "orb-example-12345"
     assert [zone.value for zone in template.zones] == ["us-central1-a", "us-central1-b"]
     assert template.instance_template_name_prefix == "orb"

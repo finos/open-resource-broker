@@ -12,12 +12,6 @@ from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
 def validate_gcp_template(template_config: dict[str, Any]) -> dict[str, Any]:
     """Validate a GCP template configuration."""
     warnings: list[str] = []
-    provisioning_model = template_config.get("provisioning_model")
-    if provisioning_model and provisioning_model not in {"STANDARD", "SPOT"}:
-        warnings.append(
-            "provisioning_model should usually be 'STANDARD' or 'SPOT' "
-            "(Spot VMs: https://cloud.google.com/compute/docs/instances/spot)"
-        )
 
     try:
         GCPTemplate.model_validate(template_config)

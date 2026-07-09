@@ -85,13 +85,6 @@ class GCPDiskTypeName(_GCPStringValue):
     _error = "boot_disk_type must be a disk type resource name such as 'pd-balanced'"
 
 
-class GCPProvisioningModel(str, Enum):
-    """Compute Engine provisioning model."""
-
-    STANDARD = "STANDARD"
-    SPOT = "SPOT"
-
-
 class GCPMIGScope(str, Enum):
     """Managed Instance Group scope."""
 

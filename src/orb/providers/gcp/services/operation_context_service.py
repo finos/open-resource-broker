@@ -139,9 +139,6 @@ class GCPOperationContextService:
         merged.setdefault("boot_disk_type", defaults.boot_disk_type)
         merged.setdefault("source_image_family", defaults.source_image_family)
         merged.setdefault("source_image_project", defaults.source_image_project)
-        merged.setdefault("provisioning_model", defaults.provisioning_model)
-        if merged.get("price_type") == "spot":
-            merged["provisioning_model"] = "SPOT"
 
         # Runtime metadata and request sizing are applied last so the caller's
         # explicit template values still win over provider-level defaults.
