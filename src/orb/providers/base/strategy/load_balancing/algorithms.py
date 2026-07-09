@@ -2,7 +2,7 @@
 
 from enum import Enum
 
-from orb.domain.base.dependency_injection import injectable
+from orb.infrastructure.di.injectable import injectable
 
 
 @injectable

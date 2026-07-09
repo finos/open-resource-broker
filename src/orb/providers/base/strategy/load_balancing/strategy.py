@@ -4,8 +4,8 @@ import threading
 import time
 from typing import Any, Optional
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
+from orb.infrastructure.di.injectable import injectable
 from orb.providers.base.strategy.provider_strategy import (
     ProviderCapabilities,
     ProviderHealthStatus,

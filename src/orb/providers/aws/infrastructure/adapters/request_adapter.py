@@ -10,11 +10,11 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from botocore.exceptions import ClientError
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
 from orb.domain.request.aggregate import Request
 from orb.domain.request.value_objects import RequestType
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
+from orb.infrastructure.di.injectable import injectable
 from orb.providers.aws.infrastructure.aws_client import AWSClient
 
 if TYPE_CHECKING:

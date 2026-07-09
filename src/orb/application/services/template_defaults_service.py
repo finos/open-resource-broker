@@ -2,7 +2,6 @@
 
 from typing import Any, Optional
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
@@ -15,7 +14,6 @@ from orb.domain.template.ports.template_extension_registry_port import (
 from orb.domain.template.template_aggregate import Template
 
 
-@injectable
 class TemplateDefaultsService(TemplateDefaultsPort):
     """
     Service for resolving hierarchical template defaults.

@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from orb.domain.base.dependency_injection import injectable
+from orb.infrastructure.di.injectable import injectable
 from orb.infrastructure.storage.base.unit_of_work import BaseUnitOfWork
 
 # Import new simplified repositories

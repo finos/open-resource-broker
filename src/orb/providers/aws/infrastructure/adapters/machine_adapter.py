@@ -7,11 +7,11 @@ It extracts AWS-specific logic from the domain layer.
 
 from typing import Any
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.value_objects import InstanceType
 from orb.domain.machine.aggregate import Machine
 from orb.domain.machine.value_objects import MachineStatus, PriceType
+from orb.infrastructure.di.injectable import injectable
 from orb.providers.aws.domain.template.value_objects import ProviderApi
 from orb.providers.aws.exceptions.aws_exceptions import (
     AWSError,

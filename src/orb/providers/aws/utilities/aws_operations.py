@@ -9,9 +9,9 @@ from typing import Any, Callable, Optional
 
 from botocore.exceptions import ClientError
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import ConfigurationPort, LoggingPort
 from orb.domain.request.aggregate import Request
+from orb.infrastructure.di.injectable import injectable
 from orb.infrastructure.resilience import CircuitBreakerOpenError
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError

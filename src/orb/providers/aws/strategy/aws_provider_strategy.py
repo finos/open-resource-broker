@@ -11,10 +11,10 @@ import asyncio
 import time
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.operation_outcome import Accepted, Completed, Failed, OperationOutcome
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
+from orb.infrastructure.di.injectable import injectable
 
 # Import AWS-specific components
 from orb.providers.aws.configuration.config import AWSProviderConfig

@@ -3,7 +3,6 @@
 import re
 from typing import Optional
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.provider_interfaces import (
     ProviderInstanceState,
@@ -13,6 +12,7 @@ from orb.domain.base.provider_interfaces import (
     ProviderResourceValidator,
     ProviderStateMapper,
 )
+from orb.infrastructure.di.injectable import injectable
 
 
 class AWSStateMapper:

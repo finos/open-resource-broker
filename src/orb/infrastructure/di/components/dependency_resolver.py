@@ -6,8 +6,7 @@ import typing
 from contextlib import suppress
 from typing import Any, Callable, Optional, TypeVar, get_type_hints
 
-from orb.domain.base.dependency_injection import get_injectable_metadata, is_injectable
-from orb.domain.base.di_contracts import DependencyRegistration, DILifecycle, DIScope
+from orb.infrastructure.di.contracts import DependencyRegistration, DILifecycle, DIScope
 from orb.infrastructure.di.exceptions import (
     CircularDependencyError,
     DependencyResolutionError,
@@ -16,6 +15,7 @@ from orb.infrastructure.di.exceptions import (
     UnregisteredDependencyError,
     UntypedParameterError,
 )
+from orb.infrastructure.di.injectable import get_injectable_metadata, is_injectable
 from orb.infrastructure.logging.logger import get_logger
 
 T = TypeVar("T")

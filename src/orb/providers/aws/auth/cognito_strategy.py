@@ -20,7 +20,6 @@ _DEFAULT_CONFIG = Config(
     retries={"max_attempts": 3},
 )
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.adapters.ports.auth import (
     AuthContext,
@@ -28,6 +27,7 @@ from orb.infrastructure.adapters.ports.auth import (
     AuthResult,
     AuthStatus,
 )
+from orb.infrastructure.di.injectable import injectable
 
 if TYPE_CHECKING:
     pass

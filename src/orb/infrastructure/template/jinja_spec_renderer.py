@@ -5,9 +5,9 @@ from typing import Any
 from jinja2 import BaseLoader, select_autoescape
 from jinja2.sandbox import SandboxedEnvironment
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.ports.spec_rendering_port import SpecRenderingPort
+from orb.infrastructure.di.injectable import injectable
 
 
 @injectable

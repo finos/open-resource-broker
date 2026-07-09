@@ -26,10 +26,10 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.operation_outcome import OperationOutcome
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
+from orb.infrastructure.di.injectable import injectable
 from orb.infrastructure.logging.logger import get_logger
 from orb.providers.base.strategy import (
     ProviderCapabilities,

@@ -7,7 +7,6 @@ It implements the ResourceProvisioningPort interface from the domain layer.
 
 from typing import Any, Optional
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.exceptions import InfrastructureError
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
@@ -16,6 +15,7 @@ from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.adapters.ports.resource_provisioning_port import (
     ResourceProvisioningPort,
 )
+from orb.infrastructure.di.injectable import injectable
 from orb.infrastructure.template.configuration_manager import TemplateConfigurationManager
 from orb.providers.aws.exceptions.aws_exceptions import (
     AWSEntityNotFoundError,

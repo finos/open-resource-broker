@@ -13,17 +13,17 @@ import time
 
 import pytest
 
-from orb.domain.base.dependency_injection import (
+from orb.infrastructure.di.container import DIContainer
+from orb.infrastructure.di.contracts import DIScope
+from orb.infrastructure.di.exceptions import (
+    CircularDependencyError,
+    InstantiationError,
+)
+from orb.infrastructure.di.injectable import (
     get_injectable_metadata,
     injectable,
     is_injectable,
     singleton,
-)
-from orb.domain.base.di_contracts import DIScope
-from orb.infrastructure.di.container import DIContainer
-from orb.infrastructure.di.exceptions import (
-    CircularDependencyError,
-    InstantiationError,
 )
 
 

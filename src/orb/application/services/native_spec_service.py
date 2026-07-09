@@ -2,13 +2,11 @@
 
 from typing import Any
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.ports.spec_rendering_port import SpecRenderingPort
 
 
-@injectable
 class NativeSpecService:
     """Generic native spec processing service - provider agnostic."""
 

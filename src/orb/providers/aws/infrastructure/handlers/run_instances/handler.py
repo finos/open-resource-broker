@@ -31,13 +31,13 @@ from typing import Any, Optional
 
 from botocore.exceptions import ClientError
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.provider_fulfilment import CheckHostsStatusResult, ProviderFulfilment
 from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
+from orb.infrastructure.di.injectable import injectable
 from orb.infrastructure.error.decorators import handle_infrastructure_exceptions
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.exceptions.aws_exceptions import (

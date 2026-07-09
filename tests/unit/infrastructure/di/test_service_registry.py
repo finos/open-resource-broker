@@ -2,8 +2,8 @@
 
 import threading
 
-from orb.domain.base.di_contracts import DependencyRegistration, DILifecycle, DIScope
 from orb.infrastructure.di.components.service_registry import ServiceRegistry
+from orb.infrastructure.di.contracts import DependencyRegistration, DILifecycle, DIScope
 
 
 class TestServiceRegistry:

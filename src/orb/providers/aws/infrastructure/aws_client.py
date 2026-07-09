@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any, Optional, TypeVar
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import ConfigurationPort, LoggingPort
+from orb.infrastructure.di.injectable import injectable
 from orb.monitoring.metrics import MetricsCollector
 from orb.providers.aws.exceptions.aws_exceptions import (
     AuthorizationError,

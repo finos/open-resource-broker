@@ -23,8 +23,8 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Optional
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
+from orb.infrastructure.di.injectable import injectable
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 from orb.providers.k8s.watch.pod_state_cache import PodStateCache

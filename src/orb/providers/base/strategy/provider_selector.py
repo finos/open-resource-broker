@@ -12,8 +12,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, Optional
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
+from orb.infrastructure.di.injectable import injectable
 from orb.providers.base.strategy.provider_strategy import (
     ProviderOperation,
     ProviderStrategy,

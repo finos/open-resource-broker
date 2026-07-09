@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Any, Optional
 
 from orb.application.ports.scheduler_port import SchedulerPort
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.events.domain_events import (
     TemplateCreatedEvent,
     TemplateDeletedEvent,
@@ -18,6 +17,7 @@ from orb.domain.base.events.domain_events import (
 from orb.domain.base.exceptions import EntityNotFoundError
 from orb.domain.base.ports.event_publisher_port import EventPublisherPort
 from orb.domain.base.ports.logging_port import LoggingPort
+from orb.infrastructure.di.injectable import injectable
 from orb.infrastructure.template.dtos import TemplateDTO
 
 

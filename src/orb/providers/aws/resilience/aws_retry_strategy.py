@@ -2,8 +2,8 @@
 
 import secrets
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
+from orb.infrastructure.di.injectable import injectable
 from orb.infrastructure.resilience.strategy.base import RetryStrategy
 from orb.providers.aws.resilience.aws_retry_config import DEFAULT_AWS_RETRY_CONFIG
 from orb.providers.aws.resilience.aws_retry_errors import (

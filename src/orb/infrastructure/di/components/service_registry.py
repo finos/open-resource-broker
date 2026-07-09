@@ -3,7 +3,7 @@
 import threading
 from typing import Any, Callable, Optional, TypeVar
 
-from orb.domain.base.di_contracts import DependencyRegistration, DIScope
+from orb.infrastructure.di.contracts import DependencyRegistration, DIScope
 from orb.infrastructure.logging.logger import get_logger
 
 T = TypeVar("T")

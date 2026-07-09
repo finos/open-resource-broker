@@ -27,9 +27,9 @@ from __future__ import annotations
 import os
 from typing import Any, Optional
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.request.aggregate import Request
+from orb.infrastructure.di.injectable import injectable
 from orb.infrastructure.utilities.common.deep_merge import deep_merge
 from orb.providers.base.native_spec_protocol import NativeSpecServiceProtocol
 from orb.providers.k8s.configuration.config import K8sProviderConfig

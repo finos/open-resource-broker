@@ -12,7 +12,6 @@ from typing import Optional
 from orb.application.events.bus.event_bus import EventBus
 from orb.config.manager import ConfigurationManager
 from orb.domain.base import UnitOfWorkFactory as AbstractUnitOfWorkFactory
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.domain_interfaces import UnitOfWork
 from orb.domain.base.ports import LoggingPort
 
@@ -20,6 +19,7 @@ from orb.domain.base.ports import LoggingPort
 from orb.domain.machine.repository import MachineRepository as MachineRepositoryInterface
 from orb.domain.request.repository import RequestRepository as RequestRepositoryInterface
 from orb.domain.template.repository import TemplateRepository as TemplateRepositoryInterface
+from orb.infrastructure.di.injectable import injectable
 from orb.infrastructure.storage.registry import get_storage_registry
 
 

@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any, Optional
 from botocore.config import Config
 from botocore.exceptions import ClientError, NoCredentialsError
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.adapters.ports.auth import (
     AuthContext,
@@ -16,6 +15,7 @@ from orb.infrastructure.adapters.ports.auth import (
     AuthResult,
     AuthStatus,
 )
+from orb.infrastructure.di.injectable import injectable
 from orb.providers.aws.session_factory import AWSSessionFactory
 
 if TYPE_CHECKING:

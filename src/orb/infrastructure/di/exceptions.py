@@ -150,3 +150,17 @@ class FactoryError(DependencyResolutionError):
             cause: Optional cause of the error
         """
         super().__init__(dependency_type, message, None, None, cause)
+
+
+class DependencyRegistrationError(Exception):
+    """Raised when dependency registration fails."""
+
+    def __init__(self, dependency_type: type, message: str) -> None:
+        """Initialize with the failing type and message."""
+        self.dependency_type = dependency_type
+        self.message = message
+        super().__init__(f"Registration failed for {dependency_type}: {message}")
+
+
+class DIConfigurationError(Exception):
+    """Raised when DI container configuration is invalid."""

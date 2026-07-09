@@ -8,24 +8,24 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any, Optional, TypeVar
 
-from orb.domain.base.dependency_injection import is_injectable
-from orb.domain.base.di_contracts import (
-    CQRSHandlerRegistrationPort,
-    DependencyRegistration,
-    DIContainerPort,
-    DIScope,
-)
 from orb.domain.base.ports import ContainerPort
 from orb.infrastructure.di.components import (
     CQRSHandlerRegistry,
     DependencyResolver,
     ServiceRegistry,
 )
+from orb.infrastructure.di.contracts import (
+    CQRSHandlerRegistrationPort,
+    DependencyRegistration,
+    DIContainerPort,
+    DIScope,
+)
 from orb.infrastructure.di.exceptions import (
     CircularDependencyError,
     DependencyResolutionError,
     UnregisteredDependencyError,
 )
+from orb.infrastructure.di.injectable import is_injectable
 from orb.infrastructure.di.lazy_config import LazyLoadingConfig
 from orb.infrastructure.logging.logger import get_logger
 

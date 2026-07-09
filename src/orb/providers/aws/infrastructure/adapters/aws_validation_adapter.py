@@ -2,9 +2,9 @@
 
 from typing import Any
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.ports.provider_validation_port import BaseProviderValidationAdapter
+from orb.infrastructure.di.injectable import injectable
 from orb.providers.aws.configuration.validator import (
     AWSHandlerConfig,
     AWSProviderConfig,

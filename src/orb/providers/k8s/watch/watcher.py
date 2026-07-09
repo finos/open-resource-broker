@@ -30,8 +30,8 @@ import time
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Callable, Generator, Optional
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
+from orb.infrastructure.di.injectable import injectable
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 from orb.providers.k8s.utilities.pod_state import (
     extract_status_reason,
