@@ -6,7 +6,7 @@ import argparse
 
 import pytest
 
-from orb.domain.base.ports.provider_cli_spec_port import ProviderCLISpecPort
+from orb.providers.base.provider_cli_spec_port import ProviderCLISpecPort
 from orb.providers.k8s.cli.k8s_cli_spec import K8sCLISpec
 
 

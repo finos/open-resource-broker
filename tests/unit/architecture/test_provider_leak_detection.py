@@ -68,6 +68,11 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
         ("infrastructure/template/configuration_manager.py", "orb.providers.base.strategy"),
         ("infrastructure/template/configuration_manager.py", "orb.providers.registry"),
         ("infrastructure/adapters/provider_discovery_adapter.py", "orb.providers.registry"),
+        # ProviderCLISpecPort moved out of domain (E2) — registry uses the protocol type
+        (
+            "infrastructure/registry/cli_spec_registry.py",
+            "orb.providers.base.provider_cli_spec_port",
+        ),
         # DI wiring — intentional: storage registration must wire AWS provider
         ("infrastructure/storage/registration.py", "orb.providers.aws.storage.registration"),
         # The cpu/ram lookup (derive_cpu_ram_from_instance_type) has been moved

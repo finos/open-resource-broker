@@ -1,4 +1,10 @@
-"""Protocol defining how a provider exposes itself to the CLI."""
+"""Protocol defining how a provider exposes itself to the CLI.
+
+Placed in orb.providers.base (not orb.domain) because it carries an
+argparse dependency, which is a CLI framework.  Domain must remain
+framework-free; providers is the correct neutral location for protocols
+that bridge provider implementations with the CLI tier.
+"""
 
 import argparse
 from typing import Any, Protocol, runtime_checkable

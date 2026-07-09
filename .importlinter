@@ -1,7 +1,6 @@
 [importlinter]
 root_package = orb
 include_external_packages = True
-source_paths = src
 
 # ---------------------------------------------------------------------------
 # Contract 1: domain-is-clean
@@ -36,12 +35,9 @@ forbidden_modules =
     orb.cli
     argparse
 allow_indirect_imports = True
-# Suppress "unmatched ignore" noise for edges removed by E2 after rebase
-unmatched_ignore_imports_alerting = warn
-# TODO(E2/same-branch): remove this entry after provider_cli_spec_port is moved
-# out of domain — that commit deletes the ignore entry and enforces the rule.
-ignore_imports =
-    orb.domain.base.ports.provider_cli_spec_port -> argparse
+# No baseline ignore_imports needed: the only domain argparse violation
+# (provider_cli_spec_port) was moved to orb.providers.base in this branch (E2).
+# Any future argparse-in-domain import is now a real CI failure.
 
 
 # ---------------------------------------------------------------------------

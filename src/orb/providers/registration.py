@@ -196,8 +196,8 @@ def register_all_provider_cli_specs() -> None:
     as part of ``initialize_<name>_provider``.  This alias is retained so that
     ``cli/args.py`` and other early-bootstrap callers continue to work.
     """
-    from orb.domain.base.ports.provider_cli_spec_port import ProviderCLISpecPort
     from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
+    from orb.providers.base.provider_cli_spec_port import ProviderCLISpecPort
 
     # Provider-agnostic discovery: import ``orb.providers.<name>.cli.<name>_cli_spec``
     # and pick the first class defined in that module whose runtime instance

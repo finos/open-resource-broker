@@ -1,7 +1,7 @@
 """CLI spec registry — maps provider type strings to ProviderCLISpecPort instances."""
 
-from orb.domain.base.ports.provider_cli_spec_port import ProviderCLISpecPort
 from orb.infrastructure.registry.simple_registry import SimpleRegistry
+from orb.providers.base.provider_cli_spec_port import ProviderCLISpecPort
 
 
 class CLISpecRegistry(SimpleRegistry[ProviderCLISpecPort]):
