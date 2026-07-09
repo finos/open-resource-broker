@@ -532,3 +532,184 @@ class TestDependencyResolverIntegration:
         assert self.cqrs_registry.has_command_handler(TestCommand)
         handler_type = self.cqrs_registry.get_command_handler_type(TestCommand)
         assert handler_type == TestCommandHandler
+
+
+class TestDependencyResolverUnionTypes:
+    """Regression tests for union/Optional constructor param resolution.
+
+    Covers the bug: 'types.UnionType' object has no attribute '__name__'
+    when a handler has a PEP 604 ``X | None`` annotated parameter.
+    """
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.service_registry = ServiceRegistry()
+        self.cqrs_registry = CQRSHandlerRegistry()
+        self.resolver = DependencyResolver(
+            self.service_registry, self.cqrs_registry, container=None
+        )
+
+    def test_pep604_optional_param_with_default_resolves_without_error(self):
+        """PEP 604 ``X | None = None`` param must not raise AttributeError.
+
+        Regression for: 'types.UnionType' object has no attribute '__name__'
+        """
+
+        class ConcreteService:
+            def __init__(self) -> None:
+                self.name = "concrete"
+
+        class HandlerWithOptionalUnion:
+            """Mimics ListActiveRequestsHandler's ``config: ConfigurationPort | None = None``."""
+
+            def __init__(
+                self,
+                service: ConcreteService,
+                optional_dep: ConcreteService | None = None,
+            ) -> None:
+                self.service = service
+                self.optional_dep = optional_dep
+
+        # ConcreteService is registered — resolver should wire it for both params.
+        self.service_registry.register_singleton(ConcreteService)
+
+        # Must not raise AttributeError or any resolver error.
+        instance = self.resolver.resolve(HandlerWithOptionalUnion)
+
+        assert isinstance(instance, HandlerWithOptionalUnion)
+        assert isinstance(instance.service, ConcreteService)
+        # optional_dep is resolved because ConcreteService IS registered
+        assert instance.optional_dep is not None
+
+    def test_pep604_optional_param_unregistered_uses_default(self):
+        """When the concrete arm of ``X | None`` is not registered, resolver either
+        creates it directly (concrete class) or falls back to the default.
+
+        The key requirement is that no AttributeError is raised.  A plain concrete
+        class with a no-arg ``__init__`` *can* be instantiated by the resolver even
+        without explicit registration, so the optional_dep will be non-None in that
+        case.  What must NOT happen is an ``AttributeError: 'types.UnionType' object
+        has no attribute '__name__'``.
+        """
+
+        class UnregisteredService:
+            pass
+
+        class HandlerWithUnregisteredOptional:
+            def __init__(
+                self,
+                optional_dep: UnregisteredService | None = None,
+            ) -> None:
+                self.optional_dep = optional_dep
+
+        # Must not raise AttributeError regardless of whether the service is
+        # resolved or the default is used.
+        instance = self.resolver.resolve(HandlerWithUnregisteredOptional)
+
+        assert isinstance(instance, HandlerWithUnregisteredOptional)
+        # optional_dep is either resolved (concrete class) or None (default) — both are fine.
+        assert instance.optional_dep is None or isinstance(
+            instance.optional_dep, UnregisteredService
+        )
+
+    def test_typing_optional_param_with_default_resolves_without_error(self):
+        """``typing.Optional[X]`` (= ``Union[X, None]``) with default must also work."""
+        from typing import Optional
+
+        class ConcreteService:
+            def __init__(self) -> None:
+                self.name = "concrete"
+
+        class HandlerWithTypingOptional:
+            def __init__(
+                self,
+                service: ConcreteService,
+                optional_dep: Optional[ConcreteService] = None,
+            ) -> None:
+                self.service = service
+                self.optional_dep = optional_dep
+
+        self.service_registry.register_singleton(ConcreteService)
+
+        instance = self.resolver.resolve(HandlerWithTypingOptional)
+
+        assert isinstance(instance, HandlerWithTypingOptional)
+        assert isinstance(instance.service, ConcreteService)
+
+    def test_multi_arm_union_with_default_skips_gracefully(self):
+        """A genuine multi-type union ``A | B`` with a default must not crash."""
+
+        class ServiceA:
+            pass
+
+        class ServiceB:
+            pass
+
+        class HandlerWithMultiUnion:
+            def __init__(
+                self,
+                dep: ServiceA | ServiceB = None,  # type: ignore[assignment]
+            ) -> None:
+                self.dep = dep
+
+        # Must not raise — falls back to default (None) when union is ambiguous.
+        instance = self.resolver.resolve(HandlerWithMultiUnion)
+        assert isinstance(instance, HandlerWithMultiUnion)
+        assert instance.dep is None
+
+    def test_multi_arm_union_without_default_raises_resolution_error(self):
+        """A required multi-type union ``A | B`` with no default must raise DependencyResolutionError."""
+
+        class ServiceA:
+            pass
+
+        class ServiceB:
+            pass
+
+        class HandlerWithRequiredMultiUnion:
+            def __init__(self, dep: ServiceA | ServiceB) -> None:
+                self.dep = dep
+
+        with pytest.raises(DependencyResolutionError):
+            self.resolver.resolve(HandlerWithRequiredMultiUnion)
+
+    def test_unwrap_union_type_pep604_optional(self):
+        """_unwrap_union_type returns the concrete arm for X | None."""
+
+        class MyService:
+            pass
+
+        result = self.resolver._unwrap_union_type(MyService | None)
+        assert result is MyService
+
+    def test_unwrap_union_type_typing_optional(self):
+        """_unwrap_union_type returns the concrete arm for Optional[X]."""
+        from typing import Optional
+
+        class MyService:
+            pass
+
+        result = self.resolver._unwrap_union_type(Optional[MyService])
+        assert result is MyService
+
+    def test_unwrap_union_type_multi_arm_returns_none(self):
+        """_unwrap_union_type returns None for genuine multi-arm unions."""
+
+        class ServiceA:
+            pass
+
+        class ServiceB:
+            pass
+
+        result = self.resolver._unwrap_union_type(ServiceA | ServiceB)
+        assert result is None
+
+    def test_unwrap_union_type_non_union_returns_none(self):
+        """_unwrap_union_type returns None for non-union types."""
+
+        class PlainClass:
+            pass
+
+        assert self.resolver._unwrap_union_type(PlainClass) is None
+        assert self.resolver._unwrap_union_type(int) is None
+        assert self.resolver._unwrap_union_type(str) is None
