@@ -324,3 +324,28 @@ def test_short_network_names_expand_to_compute_engine_resource_paths(monkeypatch
     assert payload.network_interfaces[0].subnetwork == (
         "regions/us-central1/subnetworks/default"
     )
+
+
+def test_instance_payloads_include_default_network_interface(monkeypatch) -> None:
+    _install_fake_compute_v1(monkeypatch)
+    config = _config()
+    single_vm_handler = GCPSingleVMHandler(
+        compute_client=_ComputeClientStub(),
+        config=config,
+        logger=MagicMock(),
+    )
+    mig_handler = GCPManagedInstanceGroupHandler(
+        compute_client=_ComputeClientStub(),
+        config=config,
+        logger=MagicMock(),
+    )
+    single_vm_template = _template("SingleVM")
+    mig_template = _template("MIG")
+
+    instance_payload = single_vm_handler._build_instance_payload("vm-1", single_vm_template)
+    template_payload = mig_handler._build_instance_template_payload(mig_template, "tmpl-1")
+
+    assert instance_payload.network_interfaces[0].network == "global/networks/default"
+    assert template_payload.properties.network_interfaces[0].network == (
+        "global/networks/default"
+    )

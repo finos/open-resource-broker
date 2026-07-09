@@ -42,6 +42,7 @@ class GCPMutationParameters(BaseModel):
     region: NonEmptyString | None = None
     zone: NonEmptyString | None = None
     zones: list[NonEmptyString] = Field(default_factory=list)
+    requested_count: int | None = Field(default=None, ge=0)
     request_metadata: GCPRequestMetadataParameters = Field(
         default_factory=GCPRequestMetadataParameters
     )

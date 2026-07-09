@@ -130,11 +130,13 @@ class GCPProvisioningService:
         provider_api = context.template.provider_api.value
         instances = [] if provider_api == "SingleVM" else outcome.instances
         successful_ids = outcome.resource_ids
+        instance_ids = successful_ids if provider_api == "SingleVM" else []
         results = {
             **{resource_id: True for resource_id in successful_ids},
             **{failure.target_id: False for failure in failed_operations},
         }
         provider_data = dict(outcome.provider_data)
+        provider_data["provider_api"] = provider_api
         if provider_api == "MIG" and outcome.resource_ids:
             provider_data["fulfillment_final"] = True
         if fleet_errors:
@@ -142,7 +144,7 @@ class GCPProvisioningService:
         return ProviderResult.success_result(
             {
                 "resource_ids": outcome.resource_ids,
-                "instance_ids": successful_ids,
+                "instance_ids": instance_ids,
                 "instances": instances,
                 "provider_api": provider_api,
                 "count": context.count,

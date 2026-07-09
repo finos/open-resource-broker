@@ -132,3 +132,4 @@ class GCPMutationOperationContext:
     instance_ids: list[str]
     resource_ids: list[str]
     handler_context: GCPHandlerContext
+    requested_count: int | None = None
