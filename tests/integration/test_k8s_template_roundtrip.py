@@ -17,9 +17,12 @@ from __future__ import annotations
 
 import pytest
 
+from orb.application.dto.template import TemplateDTO
 from orb.domain.template.factory import TemplateFactory
 from orb.infrastructure.registry.template_extension_registry import TemplateExtensionRegistry
-from orb.infrastructure.template.dtos import TemplateDTO
+from orb.infrastructure.template.factories import TemplateDTOFactory
+
+_template_dto_factory = TemplateDTOFactory()
 from orb.providers.k8s.domain.template.k8s_template import (
     K8sEnvVar,
     K8sTemplate,
@@ -88,7 +91,7 @@ def _build_template(provider_api: str, extra: dict | None = None) -> K8sTemplate
 
 def _do_roundtrip(template: K8sTemplate, factory: TemplateFactory) -> K8sTemplate:
     """template → TemplateDTO → dict → TemplateFactory.create_template."""
-    dto: TemplateDTO = TemplateDTO.from_domain(template)
+    dto: TemplateDTO = _template_dto_factory.from_domain(template)
     raw: dict = dto.model_dump()
     result = factory.create_template(raw)
     assert isinstance(result, K8sTemplate), (

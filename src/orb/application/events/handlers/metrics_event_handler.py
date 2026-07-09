@@ -4,14 +4,14 @@ import time
 from typing import Optional
 
 from orb.application.events.base.event_handler import EventHandler
+from orb.application.ports.metrics_port import MetricsPort
 from orb.domain.base.events import DomainEvent
 from orb.domain.base.ports import LoggingPort
-from orb.monitoring.metrics import MetricsCollector
 
 
 class MetricsEventHandler(EventHandler):
     """
-    Subscribes to provisioning domain events and updates MetricsCollector.
+    Subscribes to provisioning domain events and updates a MetricsPort.
 
     Handles:
     - RequestCreatedEvent  -> increments pending_requests gauge
@@ -22,7 +22,7 @@ class MetricsEventHandler(EventHandler):
 
     def __init__(
         self,
-        collector: MetricsCollector,
+        collector: MetricsPort,
         logger: Optional[LoggingPort] = None,
     ) -> None:
         super().__init__(logger)

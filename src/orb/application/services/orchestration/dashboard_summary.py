@@ -13,6 +13,7 @@ from orb.application.services.orchestration.dtos import (
 )
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.ports.logging_port import LoggingPort
+from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 from orb.domain.request.request_types import RequestStatus
 
 # RequestStatus enum values are: pending / in_progress / acquiring /
@@ -31,23 +32,6 @@ _REQUEST_STATUS_KEYS = [
     "cancelled",
     "timeout",
 ]
-
-
-def _get_template_provider_api_keys() -> list[str]:
-    """Return the list of known provider API names from the registry.
-
-    Queries the global provider registry at call time so the dashboard
-    summary includes keys for every registered provider and API, not just
-    the hard-coded AWS set.  Falls back to an empty list on any error;
-    the ``setdefault`` loop in the orchestrator will then simply produce
-    no zero-count entries for APIs absent from the data.
-    """
-    try:
-        from orb.providers.registry import get_provider_registry
-
-        return get_provider_registry().list_all_provider_apis()
-    except Exception:
-        return []
 
 
 def _to_iso(value: Any) -> Optional[str]:
@@ -97,9 +81,11 @@ class DashboardSummaryOrchestrator(OrchestratorBase[DashboardSummaryInput, Dashb
         self,
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
+        provider_registry: ProviderRegistryPort,
     ) -> None:
         self._uow_factory = uow_factory
         self._logger = logger
+        self._provider_registry = provider_registry
 
     async def execute(self, input: DashboardSummaryInput) -> DashboardSummaryOutput:
         self._logger.info("DashboardSummaryOrchestrator: building dashboard aggregate")
@@ -159,7 +145,11 @@ class DashboardSummaryOrchestrator(OrchestratorBase[DashboardSummaryInput, Dashb
                 )
                 provider_api_counts = {}
             templates_total = sum(provider_api_counts.values())
-            for key in _get_template_provider_api_keys():
+            try:
+                _provider_api_keys = self._provider_registry.list_all_provider_apis()
+            except Exception:
+                _provider_api_keys = []
+            for key in _provider_api_keys:
                 provider_api_counts.setdefault(key, 0)
             templates_section: dict[str, Any] = {
                 "total": templates_total,

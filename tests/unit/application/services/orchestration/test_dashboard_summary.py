@@ -106,9 +106,12 @@ def _make_orchestrator(
     )
     factory = _make_factory(uow)
     logger = MagicMock()
+    provider_registry = MagicMock()
+    provider_registry.list_all_provider_apis.return_value = []
     return DashboardSummaryOrchestrator(
         uow_factory=factory,
         logger=logger,
+        provider_registry=provider_registry,
     )
 
 
@@ -292,9 +295,12 @@ class TestDashboardSummaryOrchestrator:
             request_by_status={"pending": 1},
         )
         factory = _make_factory(uow)
+        _pr = MagicMock()
+        _pr.list_all_provider_apis.return_value = []
         orchestrator = DashboardSummaryOrchestrator(
             uow_factory=factory,
             logger=MagicMock(),
+            provider_registry=_pr,
         )
         await orchestrator.execute(DashboardSummaryInput())
 
@@ -325,9 +331,12 @@ class TestDashboardSummaryOrchestrator:
             recent_requests=[r1],
         )
         factory = _make_factory(uow)
+        _pr = MagicMock()
+        _pr.list_all_provider_apis.return_value = []
         orchestrator = DashboardSummaryOrchestrator(
             uow_factory=factory,
             logger=MagicMock(),
+            provider_registry=_pr,
         )
         result = await orchestrator.execute(DashboardSummaryInput())
 
@@ -348,9 +357,12 @@ class TestDashboardSummaryOrchestrator:
             request_by_status={"pending": 1},
         )
         factory = _make_factory(uow)
+        _pr = MagicMock()
+        _pr.list_all_provider_apis.return_value = []
         orchestrator = DashboardSummaryOrchestrator(
             uow_factory=factory,
             logger=MagicMock(),
+            provider_registry=_pr,
         )
         await orchestrator.execute(DashboardSummaryInput())
         uow.machines.count_by_status.assert_called_once()

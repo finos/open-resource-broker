@@ -2,6 +2,7 @@
 
 from orb.application.base.handlers import BaseCommandHandler
 from orb.application.decorators import command_handler
+from orb.application.dto.template import TemplateDTO
 from orb.application.template.commands import (
     CreateTemplateCommand,
     DeleteTemplateCommand,
@@ -14,7 +15,6 @@ from orb.domain.base.ports import (
     LoggingPort,
 )
 from orb.domain.base.ports.template_configuration_port import TemplateConfigurationPort
-from orb.infrastructure.template.dtos import TemplateDTO
 
 
 @command_handler(CreateTemplateCommand)  # type: ignore[arg-type]

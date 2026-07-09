@@ -101,3 +101,8 @@ class ProviderRegistryPort(ABC):
         Returns None if the provider type is not registered or has no default API.
         """
         pass  # type: ignore[return]
+
+    @abstractmethod
+    def list_all_provider_apis(self) -> list[str]:
+        """Return a deduplicated sorted list of all provider API names from registered strategies."""
+        pass  # type: ignore[return]

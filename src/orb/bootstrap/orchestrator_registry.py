@@ -310,6 +310,7 @@ def register_orchestrators(container: DIContainer) -> None:
         DashboardSummaryOrchestrator,
     )
     from orb.domain.base import UnitOfWorkFactory
+    from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 
     if not container.is_registered(DashboardSummaryOrchestrator):
         container.register_singleton(
@@ -317,5 +318,6 @@ def register_orchestrators(container: DIContainer) -> None:
             lambda c: DashboardSummaryOrchestrator(
                 uow_factory=c.get(UnitOfWorkFactory),
                 logger=c.get(LoggingPort),
+                provider_registry=c.get(ProviderRegistryPort),
             ),
         )

@@ -20,9 +20,11 @@ class TestImportGuards:
     def test_cli_console_without_rich(self):
         """Test CLI console works without Rich installed."""
         with patch.dict(sys.modules, {"rich": None, "rich.console": None, "rich_argparse": None}):
-            # Force reimport to test fallback
-            if "orb.cli.console" in sys.modules:
-                del sys.modules["orb.cli.console"]
+            # Force reimport to test fallback — must also clear the adapter since
+            # cli/console.py now delegates to it (cli → infrastructure).
+            for _mod in ("orb.cli.console", "orb.infrastructure.adapters.console_adapter"):
+                if _mod in sys.modules:
+                    del sys.modules[_mod]
 
             from orb.cli.console import get_console, print_error, print_success
 

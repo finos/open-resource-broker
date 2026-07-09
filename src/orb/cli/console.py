@@ -1,136 +1,36 @@
-"""Shared Rich console for CLI output with graceful fallback."""
+"""Shared console helpers for CLI output — delegates to the infrastructure adapter.
 
-import os
-import sys
-from functools import wraps
+All Rich setup and output logic lives in
+``orb.infrastructure.adapters.console_adapter``.  This module re-exports the
+public helpers so that existing ``from orb.cli.console import print_*`` call
+sites keep working without change.  The dependency now flows downward:
+cli → infrastructure (correct), not infrastructure → cli (violation).
+"""
 
-from orb.infrastructure.constants import CONSOLE_SEPARATOR_WIDTH
+from orb.infrastructure.adapters.console_adapter import (
+    get_console,
+    print_command,
+    print_console,
+    print_error,
+    print_info,
+    print_json,
+    print_newline,
+    print_section,
+    print_separator,
+    print_success,
+    print_warning,
+)
 
-# Try to import Rich, fallback to plain print if not available
-try:
-    from rich.console import Console
-
-    RICH_AVAILABLE = True
-    _no_color_stdout = not sys.stdout.isatty() or "--no-color" in sys.argv
-    _no_color_stderr = not sys.stderr.isatty() or "--no-color" in sys.argv
-    _console = Console(no_color=_no_color_stdout, width=None if sys.stdout.isatty() else 2**31 - 1)
-    _error_console = Console(
-        stderr=True,
-        no_color=_no_color_stderr,
-        width=None if sys.stderr.isatty() else 2**31 - 1,
-    )
-except ImportError:
-    RICH_AVAILABLE = False
-
-    # Create plain print wrappers
-    class PlainConsole:
-        def print(self, text="", **kwargs):
-            # Strip Rich markup
-            import re
-
-            clean = re.sub(r"\[.*?\]", "", str(text))
-            print(clean)
-
-    class PlainErrorConsole:
-        def print(self, text="", **kwargs):
-            import re
-
-            clean = re.sub(r"\[.*?\]", "", str(text))
-            print(clean, file=sys.stderr)
-
-    _console = PlainConsole()
-    _error_console = PlainErrorConsole()
-
-
-def _should_print() -> bool:
-    """Check if console output is enabled.
-
-    Console output is suppressed when:
-    - ORB_LOG_CONSOLE_ENABLED=false (explicit opt-out)
-    - stdout is not a TTY and ORB_LOG_CONSOLE_ENABLED is not explicitly set to true
-      (e.g. serve mode started by programmatic callers like orb-go)
-
-    This ensures Rich ANSI output never leaks into machine-consumed stdout.
-    """
-    val = os.environ.get("ORB_LOG_CONSOLE_ENABLED")
-    if val is not None:
-        return val.lower() == "true"
-    return True  # default: always print (was incorrectly suppressing non-TTY)
-
-
-def _console_output(func):
-    """Decorator to check if console output is enabled."""
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        if _should_print():
-            return func(*args, **kwargs)
-
-    return wrapper
-
-
-def get_console():
-    """Get the shared console instance."""
-    return _console
-
-
-@_console_output
-def print_success(message: str):
-    """Print success message."""
-    _console.print(f"[green]{message}[/green]")
-
-
-@_console_output
-def print_error(message: str):
-    """Print error message to stderr."""
-    _error_console.print(f"[red]{message}[/red]")
-
-
-@_console_output
-def print_info(message: str):
-    """Print info message."""
-    _console.print(f"[cyan]{message}[/cyan]")
-
-
-@_console_output
-def print_warning(message: str):
-    """Print warning message."""
-    _console.print(f"[yellow]{message}[/yellow]")
-
-
-@_console_output
-def print_command(message: str):
-    """Print command example."""
-    _console.print(f"[yellow]{message}[/yellow]")
-
-
-@_console_output
-def print_separator(width: int = CONSOLE_SEPARATOR_WIDTH, char: str = "━", color: str = "green"):
-    """Print separator line."""
-    _console.print(f"[{color}]{char * width}[/{color}]")
-
-
-@_console_output
-def print_section(title: str, width: int = CONSOLE_SEPARATOR_WIDTH):
-    """Print section header."""
-    _console.print(f"\n[cyan]{title}[/cyan]")
-    _console.print(f"[cyan]{'-' * width}[/cyan]")
-
-
-@_console_output
-def print_newline():
-    """Print an empty line."""
-    _console.print()
-
-
-@_console_output
-def print_console(message: str):
-    """Print plain text message with no colour formatting."""
-    _console.print(message)
-
-
-def print_json(data: dict):
-    """Print JSON data (always outputs, ignores LOG_CONSOLE_ENABLED)."""
-    import json
-
-    print(json.dumps(data, indent=2))
+__all__ = [
+    "get_console",
+    "print_command",
+    "print_console",
+    "print_error",
+    "print_info",
+    "print_json",
+    "print_newline",
+    "print_section",
+    "print_separator",
+    "print_success",
+    "print_warning",
+]

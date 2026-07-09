@@ -12,11 +12,14 @@ from datetime import date, datetime
 
 import pytest
 
+from orb.application.dto.template import TemplateDTO
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
     HostFactorySchedulerStrategy,
 )
-from orb.infrastructure.template.dtos import TemplateDTO
+from orb.infrastructure.template.factories import TemplateDTOFactory
+
+_template_dto_factory = TemplateDTOFactory()
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
 
@@ -28,7 +31,7 @@ def _make_strategy() -> HostFactorySchedulerStrategy:
 
 def _template_to_dto(template: Template) -> TemplateDTO:
     """Convert an AWSTemplate to a TemplateDTO, stamping a created_at timestamp."""
-    dto = TemplateDTO.from_domain(template)
+    dto = _template_dto_factory.from_domain(template)
     # Stamp a fixed timestamp so round-trip assertions are deterministic
     object.__setattr__(dto, "created_at", datetime(2024, 1, 15, 12, 0, 0))
     return dto

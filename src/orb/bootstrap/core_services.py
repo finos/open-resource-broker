@@ -1,5 +1,6 @@
 """Core service registrations for dependency injection."""
 
+from orb.application.ports.metrics_port import MetricsPort
 from orb.application.ports.scheduler_port import SchedulerPort
 from orb.config.managers.configuration_manager import ConfigurationManager
 from orb.domain.base.ports import (
@@ -34,6 +35,8 @@ def register_core_services(container: DIContainer) -> None:
 
     # Register as singleton so the same collector instance is shared
     container.register_singleton(MetricsCollector, create_metrics_collector)
+    # Expose via port so application-layer callers can resolve MetricsPort
+    container.register_singleton(MetricsPort, lambda c: c.get(MetricsCollector))
 
     # Register factories
     from orb.infrastructure.scheduler.factory import SchedulerStrategyFactory

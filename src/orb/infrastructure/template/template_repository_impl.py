@@ -8,6 +8,9 @@ from orb.domain.template.repository import TemplateRepository
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.template.configuration_manager import TemplateConfigurationManager
 from orb.infrastructure.template.dtos import TemplateDTO
+from orb.infrastructure.template.factories import TemplateDTOFactory
+
+_template_dto_factory = TemplateDTOFactory()
 
 
 def _dto_to_template(dto: TemplateDTO) -> Template:
@@ -44,7 +47,7 @@ class TemplateRepositoryImpl(TemplateRepository):
     def save(self, aggregate: Template) -> None:
         """Save a template aggregate."""
         self._logger.debug("Saving template: %s", aggregate.template_id)
-        dto = TemplateDTO.from_domain(aggregate)
+        dto = _template_dto_factory.from_domain(aggregate)
         _run_async(self._template_manager.save_template(dto))
 
     def find_by_id(self, aggregate_id: str) -> Optional[Template]:
@@ -110,7 +113,7 @@ class TemplateRepositoryImpl(TemplateRepository):
 
     def validate_template(self, template: Template) -> list[str]:
         """Validate template configuration."""
-        dto = TemplateDTO.from_domain(template)
+        dto = _template_dto_factory.from_domain(template)
         validation_result = _run_async(self._template_manager.validate_template(dto))
         errors: list[str] = validation_result.get("errors", [])
         return errors if not validation_result.get("is_valid", True) else []

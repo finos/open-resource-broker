@@ -13,6 +13,7 @@ from orb.application.dto.queries import (
     ListTemplatesQuery,
     ValidateTemplateQuery,
 )
+from orb.application.dto.template import TemplateDTO
 from orb.application.queries.template_query_handlers import (
     GetConfigurationHandler,
     GetTemplateHandler,
@@ -22,7 +23,7 @@ from orb.application.queries.template_query_handlers import (
 from orb.domain.base.exceptions import EntityNotFoundError
 from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
 from orb.domain.base.ports.template_configuration_port import TemplateConfigurationPort
-from orb.infrastructure.template.dtos import TemplateDTO
+from orb.infrastructure.template.factories import TemplateDTOFactory
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -60,6 +61,7 @@ def _make_get_handler(container) -> GetTemplateHandler:
         error_handler=Mock(spec=ErrorHandlingPort),
         container=container,
         template_factory=TemplateFactory(),
+        template_dto_factory=TemplateDTOFactory(),
     )
 
 
@@ -144,6 +146,7 @@ async def test_get_template_defaults_resolution_branch() -> None:
         error_handler=Mock(spec=ErrorHandlingPort),
         container=container,
         template_factory=TemplateFactory(),
+        template_dto_factory=TemplateDTOFactory(),
     )
 
     result = await handler.execute_query(GetTemplateQuery(template_id="tpl-defaults"))

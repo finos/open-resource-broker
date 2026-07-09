@@ -4,12 +4,13 @@ from unittest.mock import Mock
 import pytest
 
 from orb.application.dto.queries import GetTemplateQuery
+from orb.application.dto.template import TemplateDTO
 from orb.application.queries.template_query_handlers import GetTemplateHandler
 from orb.domain.base.ports.container_port import ContainerPort
 from orb.domain.base.ports.error_handling_port import ErrorHandlingPort
 from orb.domain.base.ports.template_configuration_port import TemplateConfigurationPort
 from orb.domain.template.factory import TemplateFactory
-from orb.infrastructure.template.dtos import TemplateDTO
+from orb.infrastructure.template.factories import TemplateDTOFactory
 
 
 class _FakeTemplateManager:
@@ -72,6 +73,7 @@ async def test_get_template_handler_retains_existing_launch_template():
         error_handler=Mock(spec=ErrorHandlingPort),
         container=container,
         template_factory=TemplateFactory(),
+        template_dto_factory=TemplateDTOFactory(),
     )
     query = GetTemplateQuery(template_id="EC2FleetInstantTemplate")
 

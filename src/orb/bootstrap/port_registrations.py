@@ -114,6 +114,14 @@ def register_port_adapters(container):
 
     container.register_singleton(ConsolePort, lambda c: RichConsoleAdapter())
 
+    # Register TemplateDTOFactory as the TemplateDTOFactoryPort implementation.
+    # GetTemplateHandler (application layer) injects TemplateDTOFactoryPort to convert
+    # domain templates to TemplateDTOs without importing infrastructure directly.
+    from orb.application.ports.template_dto_factory_port import TemplateDTOFactoryPort
+    from orb.infrastructure.template.factories import TemplateDTOFactory
+
+    container.register_singleton(TemplateDTOFactoryPort, lambda c: TemplateDTOFactory())
+
     # Register response formatting service
     from orb.application.ports.scheduler_port import SchedulerPort
     from orb.interface.response_formatting_service import ResponseFormattingService

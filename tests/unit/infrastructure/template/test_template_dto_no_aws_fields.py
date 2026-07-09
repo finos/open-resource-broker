@@ -3,7 +3,9 @@
 import ast
 import os
 
-from orb.infrastructure.template.dtos import TemplateDTO
+from orb.infrastructure.template.factories import TemplateDTOFactory
+
+_factory = TemplateDTOFactory()
 from orb.providers.aws.domain.template.aws_template_aggregate import (
     ABISInstanceRequirements,
     AWSFleetType,
@@ -18,7 +20,7 @@ from orb.providers.aws.domain.template.aws_template_dto_config import AWSTemplat
 
 _DTOS_PATH = os.path.join(
     os.path.dirname(__file__),
-    "../../../../src/orb/infrastructure/template/dtos.py",
+    "../../../../src/orb/application/dto/template.py",
 )
 _AWS_FIELDS = {
     "fleet_role",
@@ -110,18 +112,18 @@ def _make_aws_template(**kwargs) -> AWSTemplate:
 
 
 class TestFromDomainPopulatesProviderConfig:
-    """TemplateDTO.from_domain() must move AWS fields into the typed provider_config."""
+    """_factory.from_domain() must move AWS fields into the typed provider_config."""
 
     def test_provider_config_is_aws_dto_config_type(self):
         template = _make_aws_template(fleet_type=AWSFleetType.MAINTAIN)
-        dto = TemplateDTO.from_domain(template)
+        dto = _factory.from_domain(template)
         assert isinstance(dto.provider_config, AWSTemplateDTOConfig), (
             "provider_config must be an AWSTemplateDTOConfig instance for AWS templates"
         )
 
     def test_fleet_type_in_provider_config(self):
         template = _make_aws_template(fleet_type=AWSFleetType.MAINTAIN)
-        dto = TemplateDTO.from_domain(template)
+        dto = _factory.from_domain(template)
         assert isinstance(dto.provider_config, AWSTemplateDTOConfig)
         assert dto.provider_config.fleet_type == "maintain", (
             "fleet_type must be stored in provider_config, not as a top-level field"
@@ -129,19 +131,19 @@ class TestFromDomainPopulatesProviderConfig:
 
     def test_fleet_role_in_provider_config(self):
         template = _make_aws_template(fleet_role="arn:aws:iam::123:role/MyRole")
-        dto = TemplateDTO.from_domain(template)
+        dto = _factory.from_domain(template)
         assert isinstance(dto.provider_config, AWSTemplateDTOConfig)
         assert dto.provider_config.fleet_role == "arn:aws:iam::123:role/MyRole"
 
     def test_percent_on_demand_in_provider_config(self):
         template = _make_aws_template(price_type="heterogeneous", percent_on_demand=40)
-        dto = TemplateDTO.from_domain(template)
+        dto = _factory.from_domain(template)
         assert isinstance(dto.provider_config, AWSTemplateDTOConfig)
         assert dto.provider_config.percent_on_demand == 40
 
     def test_launch_template_id_in_provider_config(self):
         template = _make_aws_template(launch_template_id="lt-0abc123def456")
-        dto = TemplateDTO.from_domain(template)
+        dto = _factory.from_domain(template)
         assert isinstance(dto.provider_config, AWSTemplateDTOConfig)
         assert dto.provider_config.launch_template_id == "lt-0abc123def456"
 
@@ -151,7 +153,7 @@ class TestFromDomainPopulatesProviderConfig:
             MemoryMiB=AWSRequiredIntegerRange(Min=4096, Max=16384),
         )
         template = _make_aws_template(abis_instance_requirements=abis)
-        dto = TemplateDTO.from_domain(template)
+        dto = _factory.from_domain(template)
         assert isinstance(dto.provider_config, AWSTemplateDTOConfig)
         stored = dto.provider_config.abis_instance_requirements
         assert stored is not None, "abis_instance_requirements must be stored in provider_config"
@@ -161,7 +163,7 @@ class TestFromDomainPopulatesProviderConfig:
     def test_none_fleet_type_not_polluting_metadata(self):
         """When fleet_type is None on the domain object, metadata must stay clean."""
         template = _make_aws_template(provider_api="RunInstances")
-        dto = TemplateDTO.from_domain(template)
+        dto = _factory.from_domain(template)
         assert "fleet_type" not in dto.metadata, (
             "fleet_type must not pollute the cross-provider metadata dict"
         )
@@ -172,7 +174,7 @@ class TestFromDomainPopulatesProviderConfig:
             fleet_type=AWSFleetType.REQUEST,
             metadata={"custom_key": "custom_value"},
         )
-        dto = TemplateDTO.from_domain(template)
+        dto = _factory.from_domain(template)
         assert dto.metadata.get("custom_key") == "custom_value", (
             "Pre-existing metadata keys must be preserved"
         )
@@ -196,7 +198,7 @@ class TestFromDomainPopulatesProviderConfig:
             fleet_role="arn:aws:iam::123:role/R",
             percent_on_demand=50,
         )
-        dto = TemplateDTO.from_domain(template)
+        dto = _factory.from_domain(template)
         leaked = aws_only_keys & set(dto.metadata.keys())
         assert not leaked, f"AWS fields leaked into metadata: {leaked}"
 
@@ -211,32 +213,32 @@ class TestAWSTemplateRoundTrip:
 
     def test_fleet_type_maintain_roundtrip(self):
         original = _make_aws_template(fleet_type=AWSFleetType.MAINTAIN)
-        dto = TemplateDTO.from_domain(original)
+        dto = _factory.from_domain(original)
         restored = AWSTemplate.model_validate(dto.model_dump())
         assert restored.fleet_type == AWSFleetType.MAINTAIN
 
     def test_fleet_type_request_roundtrip(self):
         original = _make_aws_template(fleet_type=AWSFleetType.REQUEST)
-        dto = TemplateDTO.from_domain(original)
+        dto = _factory.from_domain(original)
         restored = AWSTemplate.model_validate(dto.model_dump())
         assert restored.fleet_type == AWSFleetType.REQUEST
 
     def test_fleet_role_roundtrip(self):
         role = "arn:aws:iam::123456789:role/SpotFleetRole"
         original = _make_aws_template(fleet_role=role)
-        dto = TemplateDTO.from_domain(original)
+        dto = _factory.from_domain(original)
         restored = AWSTemplate.model_validate(dto.model_dump())
         assert restored.fleet_role == role
 
     def test_percent_on_demand_roundtrip(self):
         original = _make_aws_template(price_type="heterogeneous", percent_on_demand=60)
-        dto = TemplateDTO.from_domain(original)
+        dto = _factory.from_domain(original)
         restored = AWSTemplate.model_validate(dto.model_dump())
         assert restored.percent_on_demand == 60
 
     def test_launch_template_id_roundtrip(self):
         original = _make_aws_template(launch_template_id="lt-0deadbeef")
-        dto = TemplateDTO.from_domain(original)
+        dto = _factory.from_domain(original)
         restored = AWSTemplate.model_validate(dto.model_dump())
         assert restored.launch_template_id == "lt-0deadbeef"
 
@@ -246,7 +248,7 @@ class TestAWSTemplateRoundTrip:
             MemoryMiB=AWSRequiredIntegerRange(Min=8192, Max=32768),
         )
         original = _make_aws_template(abis_instance_requirements=abis)
-        dto = TemplateDTO.from_domain(original)
+        dto = _factory.from_domain(original)
         restored = AWSTemplate.model_validate(dto.model_dump())
         assert restored.abis_instance_requirements is not None
         assert restored.abis_instance_requirements.vcpu_count.min == 4

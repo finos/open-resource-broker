@@ -9,12 +9,6 @@ include_external_packages = True
 # frameworks (argparse, etc.).  This is the strictest contract — any new
 # violation here is a clean-architecture regression.
 #
-# Baseline violations (TODO: shrink these via future tickets):
-#
-#   D1 — orb.domain.base.ports.provider_cli_spec_port imports argparse
-#        Fixed by: E2 (this file is being moved out of domain in the same
-#        branch — this ignore entry is removed by that commit).
-#
 # NOTE: allow_indirect_imports = True is required because import-linter
 # resolves the root `orb` package as an intermediate node when any domain
 # module does `from orb.domain...`.  The root orb/__init__.py re-exports
@@ -47,19 +41,10 @@ allow_indirect_imports = True
 # provider implementations, or monitoring adapters.  It may only depend on
 # domain (pure) and its own cross-cutting application interfaces.
 #
-# Baseline violations (TODO: shrink via ticket #1358):
-#
-#   A1 — orb.application.commands.template_handlers imports
-#        orb.infrastructure.template.dtos (TemplateDTO should move to domain
-#        or application DTOs)  — remove when ticket #1358 is done.
-#
-#   A2 — orb.application.queries.template_query_handlers imports
-#        orb.infrastructure.template.dtos — same fix as A1.
-#
-#   A3 — orb.application.events.handlers.metrics_event_handler imports
-#        orb.monitoring.metrics (MetricsCollector should be injected via a
-#        port/protocol, not imported directly) — remove when ticket #1358
-#        is done.
+# All A1/A2/A3 baseline violations have been fixed by Epic E4 / ticket #1358:
+#   A1 — TemplateDTO moved to orb.application.dto.template
+#   A2 — same fix as A1
+#   A3 — MetricsCollector now injected via MetricsPort
 # ---------------------------------------------------------------------------
 [importlinter:contract:application-no-infra-concretes]
 name = Application layer does not import infrastructure concretes
@@ -70,14 +55,6 @@ forbidden_modules =
     orb.providers
     orb.monitoring
 allow_indirect_imports = True
-unmatched_ignore_imports_alerting = warn
-# TODO(#1358): remove A1 once TemplateDTO is moved to application/domain layer
-ignore_imports =
-    orb.application.commands.template_handlers -> orb.infrastructure.template.dtos
-# TODO(#1358): remove A2 once TemplateDTO is moved to application/domain layer
-    orb.application.queries.template_query_handlers -> orb.infrastructure.template.dtos
-# TODO(#1358): remove A3 once MetricsCollector is injected via a port
-    orb.application.events.handlers.metrics_event_handler -> orb.monitoring.metrics
 
 
 # ---------------------------------------------------------------------------
@@ -87,12 +64,9 @@ ignore_imports =
 # It adapts domain ports to external systems; it must not depend on the
 # presentation/CLI tier.
 #
-# Baseline violations (TODO: shrink via ticket #1358):
-#
-#   I1 — orb.infrastructure.adapters.console_adapter imports orb.cli.console
-#        (console_adapter uses lazy local imports to call CLI print helpers;
-#        this should be inverted so the CLI layer calls the adapter, not the
-#        other way around) — remove when ticket #1358 is done.
+# I1 baseline violation has been fixed by Epic E4 / ticket #1358:
+#   I1 — console_adapter inverted: it now owns Rich logic and cli/console.py
+#        delegates downward to the adapter (cli → infrastructure, correct).
 # ---------------------------------------------------------------------------
 [importlinter:contract:infrastructure-no-upward]
 name = Infrastructure layer does not import upward layers
@@ -102,7 +76,3 @@ forbidden_modules =
     orb.interface
     orb.cli
 allow_indirect_imports = True
-unmatched_ignore_imports_alerting = warn
-# TODO(#1358): remove I1 once console_adapter no longer calls orb.cli.console
-ignore_imports =
-    orb.infrastructure.adapters.console_adapter -> orb.cli.console

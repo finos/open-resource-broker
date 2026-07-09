@@ -24,6 +24,7 @@ from orb.domain.base.ports.logging_port import LoggingPort
 from orb.infrastructure.di.injectable import injectable
 
 from .dtos import TemplateDTO
+from .factories import TemplateDTOFactory
 from .services.template_storage_service import TemplateStorageService
 from .template_cache_service import TemplateCacheService, create_template_cache_service
 
@@ -214,8 +215,8 @@ class TemplateConfigurationManager:
         # preserving fields that base Template silently drops (extra="ignore").
         template_domain = self.template_factory.create_template(template_dict)
 
-        # Convert domain → DTO using existing method
-        return TemplateDTO.from_domain(template_domain)
+        # Convert domain → DTO using factory (factory owns the TemplateExtensionRegistry call)
+        return TemplateDTOFactory().from_domain(template_domain)
 
     def _get_active_provider_types(self) -> set[str]:
         """Return the set of active provider type strings, or an empty set on failure."""
