@@ -580,7 +580,9 @@ class K8sTemplate(Template):
             # accepted here for any raw provider_config dicts that were
             # serialised before the field rename (belt-and-suspenders).
             if self.env is None:
-                env_input = pc.get("env") if pc.get("env") is not None else pc.get("environment_variables")
+                env_input = (
+                    pc.get("env") if pc.get("env") is not None else pc.get("environment_variables")
+                )
                 if env_input is not None:
                     object.__setattr__(self, "env", _coerce_env(env_input))
             if self.volumes is None and pc.get("volumes") is not None:
