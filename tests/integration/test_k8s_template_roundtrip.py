@@ -6,12 +6,11 @@ path: domain object → TemplateDTO (via from_domain) → plain dict
 supported provider_api (Pod, Deployment, StatefulSet, Job) so each
 workload type's field surface is covered.
 
-Note on env vars: the typed ``K8sTemplate.env`` (list[K8sEnvVar]) does not
-survive the TemplateDTO round-trip because ``K8sTemplateDTOConfig`` stores
-environment variables under ``environment_variables`` (dict[str, str]).
-The tests use the dict-style ``env`` input (coerced by the K8sTemplate
-field validator) and verify only the fields that the DTO layer actually
-preserves.
+The ``env`` field (typed ``K8sTemplate.env``, a list[K8sEnvVar] on the
+domain) is stored as a ``dict[str, str]`` wire form in
+``K8sTemplateDTOConfig.env``.  Dict-style input is coerced by the
+``K8sTemplate`` field validator so dict env vars survive the round-trip
+and are reassembled into ``K8sEnvVar`` entries on the rebuilt template.
 """
 
 from __future__ import annotations
@@ -22,6 +21,7 @@ from orb.domain.template.factory import TemplateFactory
 from orb.infrastructure.registry.template_extension_registry import TemplateExtensionRegistry
 from orb.infrastructure.template.dtos import TemplateDTO
 from orb.providers.k8s.domain.template.k8s_template import (
+    K8sEnvVar,
     K8sTemplate,
     K8sToleration,
 )
@@ -68,6 +68,9 @@ _RICH_FIELDS = dict(
     args=["-m", "myapp", "--workers=4"],
     annotations={"prometheus.io/scrape": "true", "prometheus.io/port": "8080"},
     service_account="orb-service-account",
+    # dict[str, str] form — coerced to list[K8sEnvVar] by the domain
+    # validator and stored back as env on the rebuilt template.
+    env={"WORKER_MODE": "batch", "LOG_LEVEL": "info"},
 )
 
 
@@ -123,6 +126,17 @@ def _assert_common_fields(original: K8sTemplate, rebuilt: K8sTemplate) -> None:
     assert rebuilt.resource_limits is not None
     assert rebuilt.resource_limits.cpu == "2"
     assert rebuilt.resource_limits.memory == "4Gi"
+
+    # env survives the DTO round-trip: dict[str,str] input -> list[K8sEnvVar]
+    # on both the original and the rebuilt template.
+    assert rebuilt.env is not None and len(rebuilt.env) == 2
+    env_names = {e.name for e in rebuilt.env}
+    assert env_names == {"WORKER_MODE", "LOG_LEVEL"}
+    env_map = {e.name: e.value for e in rebuilt.env}
+    assert env_map["WORKER_MODE"] == "batch"
+    assert env_map["LOG_LEVEL"] == "info"
+    # Confirm domain type is preserved.
+    assert all(isinstance(e, K8sEnvVar) for e in rebuilt.env)
 
 
 # ---------------------------------------------------------------------------

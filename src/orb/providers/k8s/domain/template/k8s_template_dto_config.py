@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 
 class K8sTemplateDTOConfig(BaseModel):
@@ -71,8 +71,13 @@ class K8sTemplateDTOConfig(BaseModel):
     )
 
     # Container environment / mounts
-    environment_variables: Optional[dict[str, str]] = Field(
-        None, description="Environment variables injected into the container."
+    # Field name is ``env`` (matching K8sTemplate.env).  The legacy name
+    # ``environment_variables`` is accepted as a back-compat alias so
+    # existing operator YAML and serialised TemplateDTO dicts still parse.
+    env: Optional[dict[str, str]] = Field(
+        None,
+        validation_alias=AliasChoices("env", "environment_variables"),
+        description="Environment variables injected into the container (dict[str, str] wire form).",
     )
     volume_mounts: Optional[list[dict[str, Any]]] = Field(
         None, description="Volume mounts attached to the container."
@@ -145,6 +150,39 @@ class K8sTemplateDTOConfig(BaseModel):
             "the provider's native-spec escape hatch is enabled."
         ),
     )
+
+    @field_validator("env", mode="before")
+    @classmethod
+    def _coerce_env_wire_form(cls, v: Any) -> Optional[dict[str, str]]:
+        """Accept dict[str, str] (canonical wire form) or list[dict] (domain dump).
+
+        When ``from_domain`` serialises a ``K8sTemplate`` to a flat dict
+        and hands it to this class, ``env`` arrives as the domain's
+        ``list[K8sEnvVar-dict]`` form (``[{"name": "K", "value": "V", ...}]``).
+        Only entries with a plain ``value`` string are round-tripped; entries
+        with ``valueFrom`` are silently dropped because the dict wire form
+        cannot express them.
+        """
+        if v is None:
+            return None
+        if isinstance(v, dict):
+            return {str(k): str(val) for k, val in v.items()}
+        if isinstance(v, list):
+            out: dict[str, str] = {}
+            for entry in v:
+                if isinstance(entry, dict):
+                    name = entry.get("name")
+                    value = entry.get("value")
+                    # Only capture simple value entries; valueFrom entries are
+                    # not representable in the dict wire form.
+                    if name is not None and value is not None:
+                        out[str(name)] = str(value)
+                elif hasattr(entry, "name") and hasattr(entry, "value"):
+                    # K8sEnvVar model instance (rare but handle gracefully).
+                    if entry.name is not None and entry.value is not None:
+                        out[str(entry.name)] = str(entry.value)
+            return out or None
+        return v  # let Pydantic's own type checker reject anything else
 
     @field_validator("namespace")
     @classmethod

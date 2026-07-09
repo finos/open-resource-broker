@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 
 class K8sTemplateExtensionConfig(BaseModel):
@@ -80,8 +80,13 @@ class K8sTemplateExtensionConfig(BaseModel):
     )
 
     # Container environment / mounts
-    environment_variables: Optional[dict[str, str]] = Field(
-        None, description="Default environment variables injected into the container."
+    # Field name is ``env`` (matching K8sTemplate.env).  The legacy name
+    # ``environment_variables`` is accepted as a back-compat alias so
+    # existing operator YAML using the old spelling still parses.
+    env: Optional[dict[str, str]] = Field(
+        None,
+        validation_alias=AliasChoices("env", "environment_variables"),
+        description="Default environment variables injected into the container (dict[str, str] wire form).",
     )
     volume_mounts: Optional[list[dict[str, Any]]] = Field(
         None, description="Default volume mounts attached to the container."

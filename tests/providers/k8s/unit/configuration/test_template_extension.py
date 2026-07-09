@@ -61,6 +61,20 @@ class TestK8sTemplateExtensionConfig:
         assert "labels" not in fields
         assert "replicas" not in fields
 
+    def test_environment_variables_alias_accepted(self) -> None:
+        """Back-compat: the old ``environment_variables`` spelling is still accepted."""
+        config = K8sTemplateExtensionConfig.model_validate({"environment_variables": {"X": "1"}})
+        assert config.env == {"X": "1"}
+        defaults = config.to_template_defaults()
+        assert defaults["env"] == {"X": "1"}
+        assert "environment_variables" not in defaults
+
+    def test_env_field_in_defaults(self) -> None:
+        """The canonical ``env`` key appears in the defaults dict when set."""
+        config = K8sTemplateExtensionConfig(env={"FOO": "bar"})
+        defaults = config.to_template_defaults()
+        assert defaults["env"] == {"FOO": "bar"}
+
 
 class TestK8sTemplateDTOConfig:
     """Tests for the typed DTO config registered with ``TemplateExtensionRegistry``."""
@@ -75,7 +89,7 @@ class TestK8sTemplateDTOConfig:
             namespace="prod",
             resource_requests={"cpu": "1", "memory": "2Gi"},
             resource_limits={"cpu": "2", "memory": "4Gi"},
-            environment_variables={"DEBUG": "1"},
+            env={"DEBUG": "1"},
             command=["/bin/run"],
             args=["--workers", "4"],
         )
@@ -83,9 +97,18 @@ class TestK8sTemplateDTOConfig:
         assert defaults["namespace"] == "prod"
         assert defaults["resource_requests"] == {"cpu": "1", "memory": "2Gi"}
         assert defaults["resource_limits"] == {"cpu": "2", "memory": "4Gi"}
-        assert defaults["environment_variables"] == {"DEBUG": "1"}
+        assert defaults["env"] == {"DEBUG": "1"}
         assert defaults["command"] == ["/bin/run"]
         assert defaults["args"] == ["--workers", "4"]
+
+    def test_environment_variables_alias_accepted(self) -> None:
+        """Back-compat: the old ``environment_variables`` spelling is still accepted."""
+        config = K8sTemplateDTOConfig.model_validate({"environment_variables": {"LEGACY": "1"}})
+        assert config.env == {"LEGACY": "1"}
+        defaults = config.to_template_defaults()
+        assert defaults["env"] == {"LEGACY": "1"}
+        # The old key must not appear in the output dict.
+        assert "environment_variables" not in defaults
 
     def test_namespace_rejects_blank(self) -> None:
         with pytest.raises(ValidationError):

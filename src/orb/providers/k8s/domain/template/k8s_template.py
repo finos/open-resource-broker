@@ -576,13 +576,13 @@ class K8sTemplate(Template):
                     "resource_limits",
                     _coerce_resource_quantities(pc.get("resource_limits")),
                 )
-            if self.env is None and (
-                pc.get("env") is not None or pc.get("environment_variables") is not None
-            ):
-                env_input = (
-                    pc.get("env") if pc.get("env") is not None else pc.get("environment_variables")
-                )
-                object.__setattr__(self, "env", _coerce_env(env_input))
+            # ``env`` is the canonical key; ``environment_variables`` is still
+            # accepted here for any raw provider_config dicts that were
+            # serialised before the field rename (belt-and-suspenders).
+            if self.env is None:
+                env_input = pc.get("env") if pc.get("env") is not None else pc.get("environment_variables")
+                if env_input is not None:
+                    object.__setattr__(self, "env", _coerce_env(env_input))
             if self.volumes is None and pc.get("volumes") is not None:
                 object.__setattr__(self, "volumes", _coerce_volumes(pc.get("volumes")))
 
