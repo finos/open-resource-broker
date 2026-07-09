@@ -7,6 +7,7 @@ from typing import Optional
 from pydantic import ConfigDict, Field, model_validator
 
 from orb.domain.template.template_aggregate import Template
+from orb.providers.gcp.configuration.template_extension import GCPTemplateExtensionConfig
 from orb.providers.gcp.constants import (
     DEFAULT_GCP_SERVICE_ACCOUNT_SCOPES,
 )
@@ -22,6 +23,24 @@ from orb.providers.gcp.domain.template.value_objects import (
     GCPRegion,
     GCPZone,
 )
+
+
+def _has_template_value(value: object) -> bool:
+    """Return whether a provider_config value should override template input."""
+    if value is None or value == "":
+        return False
+    if isinstance(value, (dict, list)) and not value:
+        return False
+    return True
+
+
+def _is_missing_template_value(value: object) -> bool:
+    """Return whether a template field still needs a provider_config value."""
+    if value is None or value == "":
+        return True
+    if isinstance(value, (dict, list)) and not value:
+        return True
+    return False
 
 
 class GCPTemplate(Template):
@@ -66,6 +85,16 @@ class GCPTemplate(Template):
         if not isinstance(data, dict):
             return data
         data = dict(data)
+
+        raw_provider_config = data.pop("provider_config", None)
+        if raw_provider_config is not None:
+            provider_defaults = GCPTemplateExtensionConfig.model_validate(
+                raw_provider_config
+            ).to_template_defaults()
+            for key, value in provider_defaults.items():
+                if _has_template_value(value) and _is_missing_template_value(data.get(key)):
+                    data[key] = value
+
         if "max_number" in data:
             if "max_instances" not in data:
                 data["max_instances"] = data["max_number"]

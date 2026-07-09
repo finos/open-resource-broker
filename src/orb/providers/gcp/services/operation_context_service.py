@@ -92,6 +92,7 @@ class GCPOperationContextService:
             instance_ids=params.instance_ids,
             resource_ids=resource_ids,
             handler_context=handler_context,
+            requested_count=params.requested_count,
         )
 
     def _build_gcp_template_config(
@@ -109,7 +110,16 @@ class GCPOperationContextService:
         merged.setdefault("provider_api", defaults.provider_api)
         merged.setdefault("project_id", self._config.project_id)
         merged.setdefault("region", self._config.region)
-        merged.setdefault("zones", self._config.zones)
+        zones = merged.get("zones")
+        zones_were_missing = zones is None or zones == "" or zones == []
+        if zones_were_missing:
+            merged["zones"] = self._config.zones
+        if (
+            zones_were_missing
+            and merged.get("provider_api") == GCPProviderApi.SINGLE_VM.value
+            and self._config.zones
+        ):
+            merged["zones"] = [self._config.zones[0]]
 
         # Network settings are provider-config driven unless the template overrides them.
         merged.setdefault("network", self._config.network)
@@ -130,6 +140,8 @@ class GCPOperationContextService:
         merged.setdefault("source_image_family", defaults.source_image_family)
         merged.setdefault("source_image_project", defaults.source_image_project)
         merged.setdefault("provisioning_model", defaults.provisioning_model)
+        if merged.get("price_type") == "spot":
+            merged["provisioning_model"] = "SPOT"
 
         # Runtime metadata and request sizing are applied last so the caller's
         # explicit template values still win over provider-level defaults.

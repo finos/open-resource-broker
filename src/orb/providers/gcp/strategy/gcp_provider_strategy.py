@@ -116,15 +116,31 @@ class GCPProviderStrategy(ProviderStrategy):
     def get_defaults_config(cls) -> dict:
         """Expose template defaults used when generating provider config."""
         defaults = GCPTemplateExtensionConfig().to_template_defaults()
+        handlers = {
+            api_name: {
+                "handler_class": capabilities["handler_class"],
+                "supported_fleet_types": capabilities["supported_fleet_types"],
+                "supports_spot": capabilities["supports_spot"],
+                "supports_ondemand": capabilities["supports_on_demand"],
+                "max_instances": capabilities["max_instances"],
+            }
+            for api_name, capabilities in get_supported_api_capabilities().items()
+        }
         return {
             "provider": {
                 "provider_defaults": {
                     "gcp": {
+                        "handlers": handlers,
                         "template_defaults": defaults,
                     }
                 },
             }
         }
+
+    @classmethod
+    def get_supported_apis(cls) -> list[str]:
+        """Return canonical GCP provider API names."""
+        return get_supported_apis()
 
     def initialize(self) -> bool:
         """Initialize the GCP runtime clients and handler factory."""
@@ -313,6 +329,7 @@ class GCPProviderStrategy(ProviderStrategy):
         return self._inventory_service.build_status_result(
             operation_name="get_instance_status",
             instances=instances,
+            requested_count=mutation_context.requested_count,
         )
 
     def _handle_describe_resource_instances(self, operation: ProviderOperation) -> ProviderResult:
@@ -326,6 +343,7 @@ class GCPProviderStrategy(ProviderStrategy):
         return self._inventory_service.build_status_result(
             operation_name="describe_resource_instances",
             instances=instances,
+            requested_count=mutation_context.requested_count,
         )
 
     def _handle_resolve_image(self, operation: ProviderOperation) -> ProviderResult:

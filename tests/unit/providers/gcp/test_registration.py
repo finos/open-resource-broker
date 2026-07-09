@@ -66,6 +66,25 @@ def test_load_strategy_defaults_includes_gcp_defaults_without_provider_bootstrap
     register_all.assert_not_called()
     get_provider_registry.assert_not_called()
     assert "gcp" in defaults["provider"]["provider_defaults"]
+    handlers = defaults["provider"]["provider_defaults"]["gcp"]["handlers"]
+    assert set(handlers) == {"MIG", "SingleVM"}
+    assert handlers["MIG"]["supports_spot"] is True
+    assert handlers["SingleVM"]["supports_spot"] is True
+
+
+def test_gcp_strategy_defaults_expose_supported_handlers() -> None:
+    """Config-based template validation must see GCP provider APIs."""
+    from orb.providers.gcp.strategy.gcp_provider_strategy import GCPProviderStrategy
+
+    defaults = GCPProviderStrategy.get_defaults_config()
+
+    handlers = defaults["provider"]["provider_defaults"]["gcp"]["handlers"]
+    assert set(handlers) == {"MIG", "SingleVM"}
+    assert handlers["MIG"]["handler_class"] == "GCPManagedInstanceGroupHandler"
+    assert handlers["SingleVM"]["handler_class"] == "GCPSingleVMHandler"
+    assert handlers["MIG"]["supports_spot"] is True
+    assert handlers["MIG"]["supports_ondemand"] is True
+    assert handlers["SingleVM"]["max_instances"] == 1
 
 
 def test_register_all_provider_types_includes_gcp() -> None:

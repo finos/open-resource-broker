@@ -26,6 +26,7 @@ from orb.providers.gcp.exceptions import (
 from orb.providers.gcp.infrastructure.gcp_handler_factory import GCPHandlerFactory
 from orb.providers.gcp.infrastructure.handlers.mig_handler import GCPManagedInstanceGroupHandler
 from orb.providers.gcp.infrastructure.handlers.single_vm_handler import GCPSingleVMHandler
+from orb.providers.gcp.services.inventory_service import GCPInventoryService
 from orb.providers.gcp.services.provisioning_service import GCPProvisioningService
 from orb.providers.gcp.strategy.gcp_provider_strategy import GCPProviderStrategy
 from orb.providers.gcp.types import (
@@ -714,6 +715,91 @@ def test_provisioning_service_single_vm_create_result_waits_for_status_sync() ->
     assert result.metadata["provider_data"]["operation_status"] == "submitted"
 
 
+def test_provisioning_service_mig_create_result_tracks_resource_not_machine_id() -> None:
+    template = GCPTemplate.model_validate(
+        {
+            "template_id": "gcp-mig",
+            "provider_type": "gcp",
+            "provider_api": "MIG",
+            "project_id": "orb-example-12345",
+            "region": "us-central1",
+            "zones": ["us-central1-a", "us-central1-b"],
+            "mig_scope": "regional",
+            "instance_type": "e2-standard-4",
+            "max_instances": 5,
+            "source_image_family": "debian-12",
+            "source_image_project": "debian-cloud",
+        }
+    )
+    request = Request.create_new_request(
+        request_type=RequestType.ACQUIRE,
+        template_id="gcp-mig",
+        machine_count=1,
+        provider_type="gcp",
+    )
+    context = GCPCreateOperationContext(
+        template=template,
+        request=request,
+        handler=MagicMock(),
+        count=1,
+    )
+
+    result = GCPProvisioningService.build_provider_result(
+        context=context,
+        outcome=GCPCreateOutcome(
+            resource_ids=["orb-gcp-mig-12345678"],
+            instances=[],
+            provider_data={
+                "mig_name": "orb-gcp-mig-12345678",
+                "scope": "regional",
+                "region": "us-central1",
+                "target_size": 1,
+            },
+        ),
+    )
+
+    assert result.data["resource_ids"] == ["orb-gcp-mig-12345678"]
+    assert result.data["instance_ids"] == []
+    assert result.data["instances"] == []
+    assert result.data["results"] == {"orb-gcp-mig-12345678": True}
+    assert result.metadata["provider_data"]["provider_api"] == "MIG"
+    assert result.metadata["provider_data"]["fulfillment_final"] is True
+
+
+def test_inventory_service_emits_fulfilment_for_running_instances() -> None:
+    result = GCPInventoryService.build_status_result(
+        operation_name="describe_resource_instances",
+        requested_count=1,
+        instances=[
+            {
+                "instance_id": "vm-a",
+                "status": "running",
+                "provider_data": {"resource_id": "mig-a"},
+            }
+        ],
+    )
+
+    fulfilment = result.metadata["provider_fulfilment"]
+    assert fulfilment.state == "fulfilled"
+    assert fulfilment.target_units == 1
+    assert fulfilment.fulfilled_units == 1
+    assert fulfilment.running_count == 1
+
+
+def test_inventory_service_emits_in_progress_fulfilment_before_mig_members_are_visible() -> None:
+    result = GCPInventoryService.build_status_result(
+        operation_name="describe_resource_instances",
+        requested_count=1,
+        instances=[],
+    )
+
+    fulfilment = result.metadata["provider_fulfilment"]
+    assert fulfilment.state == "in_progress"
+    assert fulfilment.target_units == 1
+    assert fulfilment.fulfilled_units == 0
+    assert fulfilment.running_count == 0
+
+
 def test_mig_handler_terminates_multiple_resource_ids() -> None:
     compute_client = _ComputeClientStub()
     handler = GCPManagedInstanceGroupHandler(
@@ -959,8 +1045,60 @@ async def test_strategy_create_instances_delegates_to_handler() -> None:
     assert result.data["resource_ids"] == ["mig-demo"]
     assert result.metadata["provider_data"] == {
         "scope": "regional",
+        "provider_api": "MIG",
         "fulfillment_final": True,
     }
+
+
+@pytest.mark.asyncio
+async def test_strategy_describe_resource_instances_emits_provider_fulfilment() -> None:
+    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    assert strategy.initialize() is True
+
+    handler = MagicMock()
+    handler.check_hosts_status.return_value = [
+        {
+            "instance_id": "vm-a",
+            "status": "running",
+            "provider_data": {"resource_id": "mig-demo"},
+        }
+    ]
+    strategy._handler_factory = SimpleNamespace(create_handler=lambda _api: handler)
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
+            parameters={
+                "resource_ids": ["mig-demo"],
+                "provider_api": "MIG",
+                "requested_count": 1,
+                "request_metadata": {
+                    "scope": "regional",
+                    "region": "us-central1",
+                    "provider_api": "MIG",
+                },
+            },
+        )
+    )
+
+    assert result.success is True
+    assert result.data["instances"][0]["instance_id"] == "vm-a"
+    fulfilment = result.metadata["provider_fulfilment"]
+    assert fulfilment.state == "fulfilled"
+    assert fulfilment.target_units == 1
+    assert fulfilment.running_count == 1
+    handler.check_hosts_status.assert_called_once_with(
+        resource_ids=["mig-demo"],
+        instance_ids=[],
+        context={
+            "region": "us-central1",
+            "scope": "regional",
+            "provider_api": "MIG",
+            "project_id": "orb-example-12345",
+            "zone": "us-central1-a",
+            "mig_name": "mig-demo",
+        },
+    )
 
 
 @pytest.mark.asyncio
@@ -1002,6 +1140,82 @@ async def test_strategy_create_instances_dry_run_short_circuits_handler_calls() 
     assert result.metadata["provider_data"]["dry_run"] is True
     assert result.metadata["provider_data"]["fulfillment_final"] is True
     assert is_dry_run_active() is False
+
+
+@pytest.mark.asyncio
+async def test_strategy_create_single_vm_uses_provider_zone_when_template_dto_has_empty_zones() -> None:
+    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    assert strategy.initialize() is True
+
+    handler = MagicMock()
+    handler.acquire_hosts.side_effect = AssertionError("dry-run should not reach acquire_hosts")
+    strategy._handler_factory = SimpleNamespace(create_handler=lambda _api: handler)
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={
+                "count": 1,
+                "template_config": {
+                    "template_id": "gcp-single",
+                    "provider_type": "gcp",
+                    "provider_api": "SingleVM",
+                    "zones": [],
+                    "instance_type": "e2-micro",
+                    "source_image_family": "debian-12",
+                    "source_image_project": "debian-cloud",
+                    "provider_config": {
+                        "provider_api": "SingleVM",
+                        "zones": [],
+                        "instance_template_name_prefix": "orb",
+                    },
+                },
+            },
+            context={"dry_run": True},
+        )
+    )
+
+    assert result.success is True
+    assert result.data["provider_api"] == "SingleVM"
+    assert result.metadata["provider_data"]["zone"] == "us-central1-a"
+
+
+@pytest.mark.asyncio
+async def test_strategy_create_spot_template_derives_gcp_provisioning_model() -> None:
+    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    assert strategy.initialize() is True
+
+    handler = MagicMock()
+    handler.acquire_hosts.side_effect = AssertionError("dry-run should not reach acquire_hosts")
+    strategy._handler_factory = SimpleNamespace(create_handler=lambda _api: handler)
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={
+                "count": 2,
+                "template_config": {
+                    "template_id": "gcp-mig-spot",
+                    "provider_type": "gcp",
+                    "provider_api": "MIG",
+                    "mig_scope": "regional",
+                    "price_type": "spot",
+                    "instance_type": "e2-standard-4",
+                    "source_image_family": "debian-12",
+                    "source_image_project": "debian-cloud",
+                    "provider_config": {
+                        "provider_api": "MIG",
+                        "provisioning_model": "STANDARD",
+                    },
+                },
+            },
+            context={"dry_run": True},
+        )
+    )
+
+    assert result.success is True
+    assert result.data["provider_api"] == "MIG"
+    assert result.data["resource_ids"] == ["dry-run-gcp-mig-spot"]
 
 
 @pytest.mark.asyncio

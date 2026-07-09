@@ -1,5 +1,7 @@
 """Unit tests for GCP template validation."""
 
+import pytest
+
 from orb.infrastructure.template.dtos import TemplateDTO
 from orb.providers.gcp.configuration.template_extension import GCPTemplateExtensionConfig
 from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
@@ -136,3 +138,49 @@ def test_gcp_template_dto_roundtrip_preserves_provider_fields() -> None:
     assert restored.labels == {"component": "worker"}
     assert restored.network_tags == ["ssh"]
     assert restored.boot_disk_size_gb == 64
+
+
+def test_gcp_template_rejects_invalid_provider_config_type() -> None:
+    with pytest.raises(ValueError):
+        GCPTemplate.model_validate(
+            {
+                "template_id": "gcp-invalid-provider-config",
+                "provider_type": "gcp",
+                "provider_api": "SingleVM",
+                "project_id": "orb-example-12345",
+                "region": "us-central1",
+                "zones": ["us-central1-a"],
+                "instance_type": "e2-standard-4",
+                "max_instances": 1,
+                "source_image_family": "debian-12",
+                "source_image_project": "debian-cloud",
+                "provider_config": "not-a-provider-config",
+            }
+        )
+
+
+def test_gcp_template_accepts_provider_config_extension_payload() -> None:
+    template = GCPTemplate.model_validate(
+        {
+            "template_id": "gcp-mig",
+            "provider_type": "gcp",
+            "max_instances": 3,
+            "provider_config": {
+                "provider_api": "MIG",
+                "machine_type": "e2-standard-4",
+                "project_id": "orb-example-12345",
+                "region": "us-central1",
+                "zones": ["us-central1-a", "us-central1-b"],
+                "mig_scope": "regional",
+                "source_image_family": "debian-12",
+                "source_image_project": "debian-cloud",
+                "instance_template_name_prefix": "orb",
+            },
+        }
+    )
+
+    assert template.provider_api == "MIG"
+    assert template.instance_type == "e2-standard-4"
+    assert template.project_id.value == "orb-example-12345"
+    assert [zone.value for zone in template.zones] == ["us-central1-a", "us-central1-b"]
+    assert template.instance_template_name_prefix == "orb"

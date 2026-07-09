@@ -9,6 +9,7 @@ from orb.providers.gcp.domain.template.value_objects import GCPProviderApi
 
 _GCP_API_CAPABILITIES: dict[str, dict[str, Any]] = {
     GCPProviderApi.MIG.value: {
+        "handler_class": "GCPManagedInstanceGroupHandler",
         "supported_fleet_types": [],
         "supports_spot": True,
         "supports_on_demand": True,
@@ -18,6 +19,7 @@ _GCP_API_CAPABILITIES: dict[str, dict[str, Any]] = {
         "native_cleanup": "managed_instance_group_resize_or_delete",
     },
     GCPProviderApi.SINGLE_VM.value: {
+        "handler_class": "GCPSingleVMHandler",
         "supported_fleet_types": [],
         "supports_spot": True,
         "supports_on_demand": True,

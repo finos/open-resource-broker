@@ -128,15 +128,15 @@ class GCPHandler(ABC):
         }
 
         network_interface = compute_v1.NetworkInterface()
-        if template.network:
-            network_interface.network = self._normalize_network_reference(template.network)
-        if template.subnetwork:
+        network = template.network or self._config.network or "default"
+        subnetwork = template.subnetwork or self._config.subnetwork
+        network_interface.network = self._normalize_network_reference(network)
+        if subnetwork:
             network_interface.subnetwork = self._normalize_subnetwork_reference(
-                template.subnetwork,
+                subnetwork,
                 region=template.region.value,
             )
-        if template.network or template.subnetwork:
-            payload["network_interfaces"] = [network_interface]
+        payload["network_interfaces"] = [network_interface]
 
         if template.service_account_email:
             payload["service_accounts"] = [
