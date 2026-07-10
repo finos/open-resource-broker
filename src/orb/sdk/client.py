@@ -254,6 +254,15 @@ class ORBClient:
             if self._app and hasattr(self._app, "cleanup"):
                 await self._app.cleanup()  # type: ignore[attr-defined]
 
+        # Flush OTel providers.  This is idempotent and a no-op when telemetry
+        # was not configured or when Application.cleanup() already called it.
+        try:
+            from orb.bootstrap.telemetry import shutdown_telemetry
+
+            shutdown_telemetry()
+        except Exception:
+            pass  # Never let telemetry flush abort SDK cleanup.
+
         # Always clean up state
         self._initialized = False
         self._methods.clear()

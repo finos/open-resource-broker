@@ -7,7 +7,11 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from orb.application.dto.queries import ListTemplatesQuery
-from orb.application.services.orchestration.dtos import ListTemplatesInput, ListTemplatesOutput
+from orb.application.services.orchestration.dtos import (
+    ListTemplatesInput,
+    ListTemplatesOutput,
+    Paginated,
+)
 from orb.application.services.orchestration.list_templates import ListTemplatesOrchestrator
 
 
@@ -105,3 +109,14 @@ class TestListTemplatesOrchestrator:
         mock_query_bus.execute.side_effect = Exception("query failed")
         with pytest.raises(Exception, match="query failed"):
             await orchestrator.execute(ListTemplatesInput())
+
+    @pytest.mark.asyncio
+    async def test_execute_paginated_result_returns_items(self, orchestrator, mock_query_bus):
+        """Regression guard: Paginated return shape surfaces .items without crashing."""
+        t1 = MagicMock()
+        t2 = MagicMock()
+        mock_query_bus.execute.return_value = Paginated(items=[t1, t2], total_count=2)
+        result = await orchestrator.execute(ListTemplatesInput())
+        assert isinstance(result, ListTemplatesOutput)
+        assert result.templates == [t1, t2]
+        assert result.count == 2

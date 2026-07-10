@@ -14,6 +14,7 @@ from .common_schema import (
 from .logging_schema import LoggingConfig
 from .metrics_schema import MetricsConfig
 from .native_spec_schema import NativeSpecConfig
+from .observability_schema import OtelConfig
 from .performance_schema import CircuitBreakerConfig, PerformanceConfig
 from .provider_strategy_schema import ProviderConfig
 from .scheduler_schema import SchedulerConfig
@@ -28,20 +29,21 @@ class AppConfig(BaseModel):
 
     version: str = Field("2.0.0", description="Configuration version")
     provider: ProviderConfig
-    scheduler: SchedulerConfig = Field(default_factory=lambda: SchedulerConfig())  # type: ignore[call-arg]
-    naming: NamingConfig = Field(default_factory=lambda: NamingConfig())  # type: ignore[call-arg]
-    logging: LoggingConfig = Field(default_factory=lambda: LoggingConfig())  # type: ignore[call-arg]
-    metrics: MetricsConfig = Field(default_factory=lambda: MetricsConfig())  # type: ignore[call-arg]
+    scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)  # type: ignore[call-arg]
+    naming: NamingConfig = Field(default_factory=NamingConfig)  # type: ignore[call-arg]
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)  # type: ignore[call-arg]
+    metrics: MetricsConfig = Field(default_factory=MetricsConfig)  # type: ignore[call-arg]
+    observability: OtelConfig = Field(default_factory=OtelConfig)  # type: ignore[call-arg]
     template: Optional[TemplateConfig] = None
-    events: EventsConfig = Field(default_factory=lambda: EventsConfig())  # type: ignore[call-arg]
-    storage: StorageConfig = Field(default_factory=lambda: StorageConfig())  # type: ignore[call-arg]
-    resource: ResourceConfig = Field(default_factory=lambda: ResourceConfig())  # type: ignore[call-arg]
-    request: RequestConfig = Field(default_factory=lambda: RequestConfig())  # type: ignore[call-arg]
-    circuit_breaker: CircuitBreakerConfig = Field(default_factory=lambda: CircuitBreakerConfig())  # type: ignore[call-arg]
-    performance: PerformanceConfig = Field(default_factory=lambda: PerformanceConfig())  # type: ignore[call-arg]
-    server: ServerConfig = Field(default_factory=lambda: ServerConfig())  # type: ignore[call-arg]
+    events: EventsConfig = Field(default_factory=EventsConfig)  # type: ignore[call-arg]
+    storage: StorageConfig = Field(default_factory=StorageConfig)  # type: ignore[call-arg]
+    resource: ResourceConfig = Field(default_factory=ResourceConfig)  # type: ignore[call-arg]
+    request: RequestConfig = Field(default_factory=RequestConfig)  # type: ignore[call-arg]
+    circuit_breaker: CircuitBreakerConfig = Field(default_factory=CircuitBreakerConfig)  # type: ignore[call-arg]
+    performance: PerformanceConfig = Field(default_factory=PerformanceConfig)  # type: ignore[call-arg]
+    server: ServerConfig = Field(default_factory=ServerConfig)  # type: ignore[call-arg]
     ui: UIConfig = Field(default_factory=UIConfig)  # type: ignore[arg-type]
-    native_spec: NativeSpecConfig = Field(default_factory=lambda: NativeSpecConfig())  # type: ignore[call-arg]
+    native_spec: NativeSpecConfig = Field(default_factory=NativeSpecConfig)  # type: ignore[call-arg]
     environment: str = Field("development", description="Environment")
     debug: bool = Field(False, description="Debug mode")
     allow_destructive_admin: bool = Field(

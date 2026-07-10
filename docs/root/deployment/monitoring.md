@@ -2,229 +2,311 @@
 
 ## Overview
 
-Comprehensive monitoring and observability for the Open Resource Broker in production environments.
+ORB uses [OpenTelemetry](https://opentelemetry.io/) as its observability foundation.
+Metrics, traces, and logs are emitted through the OTel API and exported via configurable
+backends.  The `[monitoring]` install extra activates the full stack; a minimal install
+without it runs without any metrics overhead (the OTel API no-op default).
 
-## Health Checks
-
-### Basic Health Check
+## Installation
 
 ```bash
-# Check application health
-curl http://localhost:8000/health
+# Full observability stack (Prometheus scrape + OTLP push + FastAPI/botocore spans)
+pip install orb-py[monitoring]
 
-# Expected response
-{
-  "status": "healthy",
-  "service": "open-resource-broker",
-  "version": "1.0.0",
-  "timestamp": "2025-01-07T10:00:00Z"
-}
+# AWS-specific (adds botocore instrumentation)
+pip install orb-py[monitoring-aws]
+
+# API-only embedding (OTel API, no SDK weight — for library consumers)
+pip install orb-py[otel]
 ```
 
-### Kubernetes Health Checks
+## Configuration
 
-```yaml
-livenessProbe:
-  httpGet:
-    path: /health
-    port: 8000
-  initialDelaySeconds: 30
-  periodSeconds: 10
-
-readinessProbe:
-  httpGet:
-    path: /health
-    port: 8000
-  initialDelaySeconds: 5
-  periodSeconds: 5
-```
-
-## Metrics Collection
-
-### Prometheus Integration
-
-```yaml
-# prometheus.yml
-scrape_configs:
-  - job_name: 'orb-api'
-    static_configs:
-      - targets: ['orb-api:8000']
-    metrics_path: /metrics
-    scrape_interval: 30s
-```
-
-### Custom Metrics
-
-The application exposes metrics for:
-
-- Request count and duration
-- Authentication success/failure rates
-- AWS API call metrics
-- Error rates by endpoint
-- Resource provisioning metrics
-
-## Logging
-
-### Structured Logging
+Observability is configured under the `observability` key in your ORB config file, or
+via standard `OTEL_*` environment variables (env vars win over file values).
 
 ```json
+// config.json
 {
-  "logging": {
-    "level": "INFO",
-    "format": "json",
-    "file_enabled": true,
-    "file_path": "/app/logs/orb.log",
-    "console_enabled": true
+  "observability": {
+    "enabled": true,
+    "service_name": "my-orb-instance",
+    "metrics_exporters": ["prometheus", "file"],
+    "traces_exporter": "file",
+    "otlp_endpoint": "http://collector:4317",
+    "traces_sample_rate": 0.1,
+    "telemetry_file_dir": "/var/log/orb/telemetry"
   }
 }
 ```
 
-### Log Aggregation
+> **Config format note:** ORB configuration is JSON, not YAML.  The canonical
+> filename is `config.json` (default path `~/.orb/config/config.json`; an
+> annotated example ships at `config/config.example.json`).  Standard
+> `OTEL_*` environment variables are also accepted and take precedence over
+> file values (`OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_ENDPOINT`,
+> `OTEL_TRACES_SAMPLER_ARG`, `ORB_TELEMETRY_FILE_DIR`).
+>
+> **Strict key validation:** The `observability` section uses strict schema
+> validation — unknown keys are rejected with a `ValidationError` at startup
+> (unlike some other config sections).  Typos in key names will hard-crash
+> config load by design, so the key names above must be used exactly.
 
-#### ELK Stack
+### Metrics exporters
+
+| Value | Effect |
+|---|---|
+| `"prometheus"` | Registers a `PrometheusMetricReader` on the global `prometheus_client.REGISTRY`; expose via the `/metrics` route. |
+| `"otlp"` | Pushes via `PeriodicExportingMetricReader(OTLPMetricExporter(...))`. |
+| `"file"` | Writes OTLP JSON Lines to `telemetry_file_dir/metrics.jsonl`. Mandatory for CLI commands — the process exits before any scrape fires. |
+
+Multiple values can be listed simultaneously (e.g. `["prometheus", "file"]`).
+
+### Auto-instrumentation toggles
+
+All default to `true` when `enabled: true` and the package is installed.
+
+| Toggle | Package required | What it instruments |
+|---|---|---|
+| `instrument_fastapi` | `opentelemetry-instrumentation-fastapi` | HTTP request spans + `http.server.request.duration` histogram, `http.server.active_requests` gauge |
+| `instrument_sqlalchemy` | `opentelemetry-instrumentation-sqlalchemy` | Database query spans |
+| `instrument_botocore` | `opentelemetry-instrumentation-botocore` | AWS API call spans (complements `BotocoreMetricsHandler`) |
+| `instrument_click` | `opentelemetry-instrumentation-click` | Span per CLI command invocation |
+| `instrument_system_metrics` | `opentelemetry-instrumentation-system-metrics` | CPU, memory, GC, thread gauges |
+| `instrument_logging` | `opentelemetry-instrumentation-logging` | Injects `trace_id`/`span_id` into log records |
+
+## Per-surface export model
+
+ORB runs as four distinct surfaces with different process lifecycles:
+
+| Surface | Recommended exporters | Notes |
+|---|---|---|
+| REST server (`uvicorn`) | `["prometheus"]` or `["prometheus", "otlp"]` | Long-lived; scrape works. Multiprocess caveat: each uvicorn worker has its own in-process REGISTRY; only one worker's metrics are exposed per scrape when `workers > 1`. |
+| CLI (`orb` commands) | `["file"]` | Short-lived; `MeterProvider.shutdown()` is called at process exit to flush all pending data before termination. |
+| MCP server | `["otlp"]` or `["file"]` | OTLP push is the safe default regardless of transport. |
+| SDK (embedded library) | Host application supplies its own `MeterProvider` | ORB uses OTel API internally; the host wires the provider. |
+
+## What is instrumented
+
+### Domain / application metrics (OTel Meter, bridged to Prometheus)
+
+| OTel instrument name | Prometheus name | Type | Description |
+|---|---|---|---|
+| `orb.requests.pending` | `orb_requests_pending` | UpDownCounter | Requests in-flight |
+| `orb.requests.total` | `orb_requests_total` | Counter | Completed requests |
+| `orb.active.instances` | `orb_active_instances` | UpDownCounter | Active machine instances |
+| `orb.provisioning.duration` | `orb_provisioning_duration_seconds` | Histogram | End-to-end provisioning wall-clock |
+| `orb.requests.failed.total` | `orb_requests_failed_total` | Counter | Failed requests |
+
+### AWS provider metrics (via `BotocoreMetricsHandler`)
+
+Per-service/operation labelled counters and histograms for AWS API calls, errors,
+throttles, retries, and payload sizes.  8 OTel instruments total: 5 counters
+(`orb_aws_api_calls_total`, `orb_aws_api_errors_total`, `orb_aws_api_successes_total`,
+`orb_aws_api_retries_total`, `orb_aws_api_throttles_total`) and 3 histograms
+(`orb_aws_api_duration_seconds`, `orb_aws_api_response_size_bytes`,
+`orb_aws_api_request_size_bytes`).
+
+### k8s provider metrics (OTel Meter, bridged to Prometheus)
+
+`orb_k8s_acquire_total`, `orb_k8s_release_total`, `orb_k8s_pod_creations_total`,
+`orb_k8s_watch_events_total`, `orb_k8s_watch_reconnects_total`,
+`orb_k8s_active_pods`, `orb_k8s_active_requests`, `orb_k8s_apiserver_latency_seconds`,
+`orb_k8s_circuit_breaker_state`.
+
+### Storage operation metrics (OTel Meter)
+
+Per-operation labelled counters and histograms for storage backend calls.
+
+### FastAPI auto-instrumentation (when `instrument_fastapi: true`)
+
+`http_server_request_duration_seconds` (histogram) and `http_server_active_requests`
+(gauge) per route; request spans for distributed tracing.  The `/health` and `/metrics`
+routes are excluded from instrumentation to avoid self-telemetry noise.
+
+## Endpoints
+
+### `GET /metrics`
+
+Serves Prometheus text format.  Includes:
+
+- OTel SDK metrics bridged via `PrometheusMetricReader`
+- Native `prometheus_client` metrics (k8s `K8sMetrics`, process collectors)
+- Python process metrics (`python_gc_*`, `python_info`, etc.)
+
+```bash
+curl http://localhost:8000/metrics
+```
+
+Prometheus scrape configuration:
 
 ```yaml
-# Filebeat configuration
-filebeat.inputs:
-- type: log
-  paths:
-    - /app/logs/*.log
-  fields:
-    service: orb-api
-  fields_under_root: true
-
-output.elasticsearch:
-  hosts: ["elasticsearch:9200"]
+scrape_configs:
+  - job_name: orb-api
+    static_configs:
+      - targets: [orb-api:8000]
+    metrics_path: /metrics
+    scrape_interval: 30s
 ```
 
-#### Fluentd
+### `GET /api/v1/observability/telemetry`
 
-```conf
-<source>
-  @type tail
-  path /app/logs/orb.log
-  pos_file /var/log/fluentd/orb.log.pos
-  tag orb.api
-  format json
-</source>
+Read-only status endpoint.  Returns the current OTel configuration — enabled state,
+active exporters, service name, sampler rate, and which instrumentors are active.
+Requires `viewer` role.
 
-<match orb.**>
-  @type elasticsearch
-  host elasticsearch
-  port 9200
-  index_name orb-logs
-</match>
+```bash
+curl http://localhost:8000/api/v1/observability/telemetry
 ```
 
-## Alerting
-
-### Prometheus Alerts
-
-```yaml
-groups:
-- name: orb-api
-  rules:
-  - alert: ORBAPIDown
-    expr: up{job="orb-api"} == 0
-    for: 1m
-    labels:
-      severity: critical
-    annotations:
-      summary: "ORB API is down"
-
-  - alert: ORBHighErrorRate
-    expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
-    for: 2m
-    labels:
-      severity: warning
-    annotations:
-      summary: "High error rate detected"
-```
-
-### AWS CloudWatch
+Example response (telemetry enabled):
 
 ```json
 {
-  "MetricName": "APIErrors",
-  "Namespace": "ORB/API",
-  "Dimensions": [
-    {
-      "Name": "Service",
-      "Value": "orb-api"
-    }
-  ],
-  "Value": 1,
-  "Unit": "Count"
+  "enabled": true,
+  "service_name": "orb",
+  "metrics_exporters": ["prometheus"],
+  "traces_exporter": null,
+  "traces_sample_rate": 0.1,
+  "instrumentors": {
+    "fastapi": true,
+    "sqlalchemy": true,
+    "botocore": true,
+    "click": true,
+    "system_metrics": true,
+    "logging": true
+  }
 }
 ```
 
-## Dashboards
+When telemetry is disabled:
 
-### Grafana Dashboard
+```json
+{"enabled": false}
+```
 
-Key metrics to monitor:
+### `GET /health`
 
-- Request rate and response time
-- Error rates by endpoint
-- Authentication success/failure
-- AWS API call latency
-- Resource provisioning success rate
-- Container resource usage
+Application health check (liveness/readiness probe).
 
-### Sample Queries
+## Traces
+
+When `traces_exporter` is set, ORB emits distributed traces.
+
+| Backend | Config |
+|---|---|
+| OTLP (Jaeger / Grafana Tempo / AWS X-Ray via ADOT) | `traces_exporter: otlp` + `otlp_endpoint: http://collector:4317` |
+| File (offline / debug) | `traces_exporter: file` + optionally `telemetry_file_dir: /path` |
+
+Traces include:
+- FastAPI request spans (when `instrument_fastapi: true`)
+- AWS botocore spans (when `instrument_botocore: true`)
+- SQLAlchemy query spans (when `instrument_sqlalchemy: true`)
+- Click CLI command spans (when `instrument_click: true`)
+
+W3C TraceContext propagation is active (OTel SDK default).
+
+## Logging
+
+When `instrument_logging: true`, the `LoggingInstrumentor` injects `trace_id` and
+`span_id` into every Python `logging` log record as extra fields.  Any log aggregator
+that ingests both traces and logs (e.g. CloudWatch Insights, Grafana Loki) can use
+these fields to correlate log lines with the originating trace.
+
+## Alerting (Prometheus)
+
+```yaml
+groups:
+  - name: orb-api
+    rules:
+      - alert: ORBAPIDown
+        expr: up{job="orb-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: ORB API is down
+
+      - alert: ORBHighProvisioningFailureRate
+        expr: |
+          rate(orb_requests_failed_total[5m]) /
+          rate(orb_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: High provisioning failure rate (> 5%)
+
+      - alert: ORBHighResponseLatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(http_server_request_duration_seconds_bucket[5m])
+          ) > 2.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: p95 response time > 2s
+```
+
+## Grafana dashboard queries
 
 ```promql
-# Request rate
-rate(http_requests_total[5m])
+# Active provisioning requests
+orb_requests_pending
 
-# Error rate
-rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m])
+# Provisioning throughput (req/min)
+rate(orb_requests_total[5m]) * 60
 
-# Response time percentiles
-histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+# p95 provisioning duration
+histogram_quantile(0.95, rate(orb_provisioning_duration_seconds_bucket[5m]))
+
+# HTTP request rate by route
+rate(http_server_request_duration_seconds_count[5m])
+
+# AWS API throttle rate
+rate(orb_aws_api_throttles_total[5m])
 ```
 
-## Distributed Tracing
+## SDK usage guide
 
-### OpenTelemetry
+ORB library code calls OTel **API** instruments only (`meter.create_counter(...)` etc.).
+The host application controls which backend receives the data by configuring the OTel
+global `MeterProvider`.
+
+Minimal example for an embedded consumer:
 
 ```python
-from opentelemetry import trace
-from opentelemetry.exporter.jaeger.thrift import JaegerExporter
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+from opentelemetry import metrics
 
-# Configure tracing
-trace.set_tracer_provider(TracerProvider())
-tracer = trace.get_tracer(__name__)
+# Wire OTel global before importing ORB components
+reader = PeriodicExportingMetricReader(OTLPMetricExporter(endpoint="http://collector:4317"))
+provider = MeterProvider(metric_readers=[reader])
+metrics.set_meter_provider(provider)
 
-jaeger_exporter = JaegerExporter(
-    agent_host_name="jaeger",
-    agent_port=6831,
-)
-
-span_processor = BatchSpanProcessor(jaeger_exporter)
-trace.get_tracer_provider().add_span_processor(span_processor)
+# ORB instruments now emit to the above provider
+from orb.sdk import ORBClient
+client = ORBClient(...)
 ```
 
-## Performance Monitoring
+For file-based offline use:
 
-### Application Performance
+```python
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import (
+    ConsoleMetricExporter,
+    PeriodicExportingMetricReader,
+)
+from opentelemetry import metrics
 
-Monitor:
-- Memory usage and garbage collection
-- CPU utilization
-- Database connection pool usage
-- AWS API rate limiting
-- Cache hit rates
+reader = PeriodicExportingMetricReader(ConsoleMetricExporter())
+provider = MeterProvider(metric_readers=[reader])
+metrics.set_meter_provider(provider)
+# Call provider.shutdown() when done to flush pending data.
+```
 
-### Infrastructure Monitoring
-
-Monitor:
-- Container resource usage
-- Network latency
-- Disk I/O
-- Load balancer metrics
-- Auto-scaling events
-
-For complete monitoring setup, see the [deployment guide](readme.md).
+> **Note:** Frontend / browser-side observability (RUM, browser OTel JS) is a
+> separate workstream and is not covered by this guide.

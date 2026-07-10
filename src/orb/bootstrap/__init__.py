@@ -12,6 +12,7 @@ from typing import Any, Optional
 # Register the composition root factory immediately on import.
 # This must happen before any call to get_container().
 from orb.bootstrap.services import register_all_services
+from orb.bootstrap.telemetry import shutdown_telemetry
 from orb.infrastructure.di.container import set_container_factory
 
 set_container_factory(register_all_services)
@@ -421,12 +422,14 @@ class Application:
             }
 
     def shutdown(self) -> None:
-        """Shutdown the application."""
+        """Shutdown the application, flushing OTel providers before exit."""
         self.logger.info("Shutting down application")
+        shutdown_telemetry()
         self._initialized = False
 
     async def cleanup(self) -> None:
-        """Async cleanup — delegates to synchronous shutdown."""
+        """Async cleanup — flushes OTel providers then delegates to synchronous shutdown."""
+        shutdown_telemetry()
         self.shutdown()
 
     async def __aenter__(self) -> Application:

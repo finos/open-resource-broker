@@ -2,6 +2,7 @@
 
 import inspect
 import threading
+import types
 import typing
 from contextlib import suppress
 from typing import Any, Callable, Optional, TypeVar, get_type_hints
@@ -218,6 +219,35 @@ class DependencyResolver:
                 if isinstance(param_type, str):
                     param_type = self._resolve_string_annotation(param_type, cls)
 
+                # Handle union types (PEP 604 X | Y, typing.Union, typing.Optional).
+                # types.UnionType has no .__name__ and cannot be resolved directly —
+                # we must unwrap to a concrete arm before proceeding.
+                unwrapped = self._unwrap_union_type(param_type)
+                if unwrapped is not None:
+                    # Optional[X] / X | None — resolve the concrete arm.
+                    # Treat the same as an optional parameter regardless of
+                    # whether a default is present: if the concrete type is not
+                    # registered we fall back gracefully.
+                    if param.default != inspect.Parameter.empty:
+                        with suppress(DependencyResolutionError, UnregisteredDependencyError):
+                            parameters[param_name] = self.resolve(unwrapped, cls, dependency_chain)
+                    else:
+                        parameters[param_name] = self.resolve(unwrapped, cls, dependency_chain)
+                    continue
+                elif typing.get_origin(param_type) is typing.Union or isinstance(
+                    param_type, types.UnionType
+                ):
+                    # Multi-arm union with no single resolvable type — skip if
+                    # a default is available, otherwise raise.
+                    if param.default != inspect.Parameter.empty:
+                        continue
+                    else:
+                        raise DependencyResolutionError(
+                            cls,
+                            f"Cannot resolve multi-type union annotation for parameter "
+                            f"'{param_name}' (no default value provided).",
+                        )
+
                 # Skip primitive types that can't be resolved as dependencies
                 if self._is_primitive_type(param_type):
                     if param.default != inspect.Parameter.empty:
@@ -225,9 +255,10 @@ class DependencyResolver:
                         continue
                     else:
                         # Primitive type without default - can't resolve
+                        type_name = getattr(param_type, "__name__", repr(param_type))
                         raise DependencyResolutionError(
                             cls,
-                            f"Cannot resolve primitive type '{param_type.__name__}' for parameter '{param_name}'. "
+                            f"Cannot resolve primitive type '{type_name}' for parameter '{param_name}'. "
                             f"Primitive types must have default values or be provided explicitly.",
                         )
 
@@ -374,7 +405,7 @@ class DependencyResolver:
                 f"Failed to resolve string annotation '{annotation}': {e!s}",
             )
 
-    def _is_primitive_type(self, param_type: type) -> bool:
+    def _is_primitive_type(self, param_type: Any) -> bool:
         """Check if a type is a primitive type that can't be resolved as a dependency."""
         primitive_types = {
             str,
@@ -401,6 +432,36 @@ class DependencyResolver:
                 return True
 
         return False
+
+    def _unwrap_union_type(self, param_type: Any) -> type | None:
+        """Unwrap a union annotation to a single resolvable type, if possible.
+
+        Handles both PEP 604 ``X | Y`` (``types.UnionType``) and
+        ``typing.Union[X, Y]`` / ``typing.Optional[X]``.
+
+        Returns the single non-None concrete type when the union is of the form
+        ``X | None`` (i.e. Optional).  Returns ``None`` when the union contains
+        more than one non-None arm (ambiguous — caller should treat as
+        unresolvable and fall back to any default value).
+        """
+        # Detect PEP 604 X | Y  (types.UnionType, Python 3.10+)
+        # and typing.Union[X, Y] / typing.Optional[X]
+        origin = typing.get_origin(param_type)
+        is_union = isinstance(param_type, types.UnionType) or origin is typing.Union
+
+        if not is_union:
+            return None  # Not a union — caller should handle normally
+
+        args = typing.get_args(param_type)
+        # Filter out NoneType arms
+        non_none_args = [a for a in args if a is not type(None)]
+
+        if len(non_none_args) == 1:
+            # Optional[X] or X | None — resolve the concrete arm
+            return non_none_args[0]  # type: ignore[return-value]
+
+        # Multi-type union with no unambiguous concrete arm
+        return None
 
     def _get_container_instance(self):
         """Get the container instance for factory function parameters."""

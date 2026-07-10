@@ -489,32 +489,29 @@ def create_fastapi_app(server_config: Any) -> Any:
     # Add metrics endpoint
     @app.get("/metrics", tags=["System"])
     async def metrics() -> Any:
-        """Prometheus metrics endpoint."""
-        from orb.infrastructure.di.container import get_container
-        from orb.monitoring.metrics import MetricsCollector
+        """Prometheus metrics endpoint.
 
-        try:
-            collector = get_container().get_optional(MetricsCollector)
-            homegrown_text: str = collector.to_prometheus_text() if collector is not None else ""
-        except Exception:
-            homegrown_text = ""
+        Serves all metrics from the prometheus_client global REGISTRY, which
+        includes:
+          - OTel SDK metrics bridged via PrometheusMetricReader (all provider +
+            domain-level OTel instruments: AWS botocore, k8s, event handler,
+            storage decorator, base handler, fallback strategy)
+          - Native prometheus_client metrics (k8s K8sMetrics registered
+            directly on REGISTRY)
+          - Default python process metrics (python_gc_*, python_info, etc.)
 
-        # Append prometheus_client REGISTRY output (k8s metrics live there).
+        prometheus_client is an optional [monitoring] extra — when absent the
+        endpoint returns an empty 200 rather than a 500 so a minimal install
+        remains usable.
+        """
         # prometheus_client is an optional [monitoring] extra — guard the import
-        # so a minimal install without it still returns the homegrown text.
-        registry_text: str = ""
+        # so a minimal install without it still serves an empty but valid response.
         try:
             from prometheus_client import REGISTRY, generate_latest
 
-            registry_text = generate_latest(REGISTRY).decode("utf-8")
+            body = generate_latest(REGISTRY).decode("utf-8")
         except Exception:  # noqa: BLE001 — ImportError or prometheus_client internal error
-            # prometheus_client is an optional [monitoring] extra; a minimal
-            # install without it must still serve the homegrown collector text.
-            registry_text = ""
-
-        body = homegrown_text
-        if registry_text:
-            body = body + "\n" + registry_text if body else registry_text
+            body = ""
 
         return Response(content=body, media_type="text/plain; version=0.0.4")  # type: ignore[misc]
 
@@ -541,6 +538,37 @@ def create_fastapi_app(server_config: Any) -> Any:
 
     # Register API routers
     _register_routers(app)
+
+    # FastAPI auto-instrumentation — must be called after routers are registered
+    # so the instrumentor sees the complete route table when building span names.
+    # Guarded try/except ImportError: no crash when the package is absent.
+    # Gated on OtelConfig.instrument_fastapi (default True when OTel is enabled).
+    try:
+        from orb.config.schemas.app_schema import AppConfig
+        from orb.config.schemas.observability_schema import OtelConfig
+        from orb.infrastructure.di.container import get_container as _get_container
+
+        try:
+            from orb.domain.base.ports.configuration_port import ConfigurationPort
+
+            _otel_cfg: OtelConfig = (
+                _get_container().get(ConfigurationPort).get_typed(AppConfig).observability  # type: ignore[arg-type]
+            )
+        except Exception:
+            _otel_cfg = OtelConfig.model_validate({})
+
+        if _otel_cfg.enabled and _otel_cfg.instrument_fastapi:
+            try:
+                from opentelemetry.instrumentation.fastapi import (  # type: ignore[import-not-found]
+                    FastAPIInstrumentor,
+                )
+
+                FastAPIInstrumentor().instrument_app(app, excluded_urls="/health,/metrics")
+                logger.info("FastAPI OTel auto-instrumentation enabled")
+            except ImportError:
+                pass  # opentelemetry-instrumentation-fastapi not installed; skip.
+    except Exception:
+        pass  # Config or DI resolution failed; skip without crashing.
 
     # Warn when multiple uvicorn workers are configured alongside the SSE
     # events router.  The in-process pubsub (SseEventBus) is not shared across

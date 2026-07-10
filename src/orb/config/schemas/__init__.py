@@ -12,6 +12,7 @@ from .common_schema import (
     StatusValuesConfig,
 )
 from .logging_schema import LoggingConfig
+from .observability_schema import OtelConfig
 from .performance_schema import (
     AdaptiveBatchSizingConfig,
     CircuitBreakerConfig,
@@ -70,6 +71,8 @@ __all__: list[str] = [
     # Storage configurations
     "StorageConfig",
     "StrategyCircuitBreakerConfig",
+    # Observability configuration
+    "OtelConfig",
     # Template configuration
     "TemplateConfig",
     # UI configuration

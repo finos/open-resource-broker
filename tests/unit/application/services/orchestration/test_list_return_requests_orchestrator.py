@@ -10,6 +10,7 @@ from orb.application.dto.queries import SyncAndListReturnRequestsQuery
 from orb.application.services.orchestration.dtos import (
     ListReturnRequestsInput,
     ListReturnRequestsOutput,
+    Paginated,
 )
 from orb.application.services.orchestration.list_return_requests import (
     ListReturnRequestsOrchestrator,
@@ -131,3 +132,15 @@ class TestListReturnRequestsOrchestrator:
         mock_query_bus.execute.side_effect = Exception("query failed")
         with pytest.raises(Exception, match="query failed"):
             await orchestrator.execute(ListReturnRequestsInput())
+
+    @pytest.mark.asyncio
+    async def test_execute_paginated_result_returns_items(self, orchestrator, mock_query_bus):
+        """Regression guard: Paginated return shape surfaces .items without crashing."""
+        r = MagicMock(spec=["model_dump"])
+        r.model_dump.return_value = {"request_id": "ret-p1"}
+        mock_query_bus.execute.return_value = Paginated(items=[r], total_count=1)
+        result = await orchestrator.execute(ListReturnRequestsInput())
+        assert isinstance(result, ListReturnRequestsOutput)
+        assert len(result.requests) == 1
+        assert result.requests[0]["request_id"] == "ret-p1"
+        assert result.requests[0]["grace_period"] == 300

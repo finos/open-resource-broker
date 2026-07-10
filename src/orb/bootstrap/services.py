@@ -21,6 +21,7 @@ from orb.bootstrap.monitoring_services import register_monitoring_services
 from orb.bootstrap.provider_services import register_provider_services
 from orb.bootstrap.server_services import register_server_services
 from orb.bootstrap.storage_services import register_storage_services
+from orb.bootstrap.telemetry import configure_telemetry
 
 
 def register_all_services(container: "DIContainer") -> "DIContainer":
@@ -126,6 +127,10 @@ def _register_services_lazy(container: "DIContainer") -> "DIContainer":
     # 3. Register remaining core services
     register_core_services(container)
 
+    # 3b. Initialise OTel SDK (no-op when disabled or SDK absent; must run
+    #     before any Meter or CQRS handler is acquired).
+    configure_telemetry(container)
+
     # 4. Register domain services
     register_domain_services(container)
 
@@ -197,6 +202,7 @@ def _register_services_eager(container: "DIContainer") -> "DIContainer":
 
     register_port_adapters(container)
     register_core_services(container)
+    configure_telemetry(container)
     register_domain_services(container)
     setup_cqrs_infrastructure(container)
     register_provider_services(container)

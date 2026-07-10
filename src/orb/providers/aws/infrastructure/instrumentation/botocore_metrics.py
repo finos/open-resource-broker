@@ -3,6 +3,27 @@ AWS API metrics collection using botocore event hooks.
 
 This module provides centralized metrics collection for all AWS API calls
 by leveraging boto3's native event system for minimal-overhead instrumentation.
+
+Metrics are recorded via the OpenTelemetry Meter API so that they surface on
+the shared ``prometheus_client.REGISTRY`` (when the Prometheus reader is
+configured).  When the OTel SDK or API is not installed the handler acquires a
+**no-op Meter** and continues to function — boto3 events fire normally, the
+record calls become no-ops.
+
+Instrument layout (OTel names → Prometheus names via dot→underscore + unit):
+  orb.aws.api.calls           Counter  {service, operation}
+  orb.aws.api.errors          Counter  {service, operation, error_code, error_type}
+  orb.aws.api.successes       Counter  {service, operation}
+  orb.aws.api.retries         Counter  {service, operation}
+  orb.aws.api.throttles       Counter  {service, operation, error_code}
+  orb.aws.api.duration        Histogram(seconds)  {service, operation, outcome}
+  orb.aws.api.response_size   Histogram(bytes)    {service, operation}
+  orb.aws.api.request_size    Histogram(bytes)    {service, operation}
+
+Design notes:
+  - Duration is a Histogram; backends compute percentiles from histogram buckets.
+  - Service+operation are OTel attributes (Prometheus labels), not embedded in
+    metric names, keeping the instrument count bounded.
 """
 
 import re
@@ -14,7 +35,48 @@ from typing import Any, Dict, Optional
 from botocore.exceptions import ClientError
 
 from orb.domain.base.ports import LoggingPort
-from orb.monitoring.metrics import MetricsCollector
+
+# ---------------------------------------------------------------------------
+# OTel API import — guard so AWS provider works without the monitoring extra.
+# Matches the silent-skip pattern in core_services.py.
+# ---------------------------------------------------------------------------
+try:
+    from opentelemetry import metrics as _otel_metrics  # type: ignore[import-not-found]
+
+    _OTEL_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    _OTEL_AVAILABLE = False
+
+
+def _get_meter(name: str):  # type: ignore[return]
+    """Return an OTel Meter, or a no-op stub when the API is absent."""
+    if _OTEL_AVAILABLE:
+        return _otel_metrics.get_meter(name)
+    return _NoOpMeter()
+
+
+class _NoOpCounter:
+    """Stub counter used when OTel API is unavailable."""
+
+    def add(self, amount: float, attributes: Optional[dict] = None) -> None:
+        pass
+
+
+class _NoOpHistogram:
+    """Stub histogram used when OTel API is unavailable."""
+
+    def record(self, amount: float, attributes: Optional[dict] = None) -> None:
+        pass
+
+
+class _NoOpMeter:
+    """Stub meter returned when opentelemetry-api is not installed."""
+
+    def create_counter(self, name: str, **kwargs) -> _NoOpCounter:  # type: ignore[return]
+        return _NoOpCounter()
+
+    def create_histogram(self, name: str, **kwargs) -> _NoOpHistogram:  # type: ignore[return]
+        return _NoOpHistogram()
 
 
 @dataclass
@@ -30,20 +92,24 @@ class RequestContext:
 
 
 class BotocoreMetricsHandler:
-    """Centralized AWS API metrics collection using botocore events."""
+    """Centralized AWS API metrics collection using botocore events.
+
+    Writes to an OTel Meter (``opentelemetry.metrics.get_meter``).  Service,
+    operation, outcome, and error code are OTel *attributes* (Prometheus labels)
+    rather than being embedded in metric names.
+    """
 
     def __init__(
         self,
-        metrics_collector: MetricsCollector,
         logger: LoggingPort,
         aws_metrics_config: Optional[dict[str, Any]] = None,
     ):
-        self.metrics = metrics_collector
         self.logger = logger
 
         cfg = aws_metrics_config or {}
         self.enabled = bool(cfg.get("provider_metrics_enabled", False))
-        self.sample_rate = float(cfg.get("sample_rate", 1.0) or 1.0)
+        _raw_rate = cfg.get("sample_rate", 1.0)
+        self.sample_rate = float(_raw_rate) if _raw_rate is not None else 1.0
         self.monitored_services = set(cfg.get("monitored_services", []) or [])
         self.monitored_operations = set(cfg.get("monitored_operations", []) or [])
         self.track_payload_sizes = bool(cfg.get("track_payload_sizes", False))
@@ -63,7 +129,7 @@ class BotocoreMetricsHandler:
         self._event_pattern = re.compile(r"(before|after)-call\.([^.]+)\.([^.]+)")
         self._event_cache: Dict[str, tuple] = {}
 
-        # Error classification
+        # Error classification — exactly 5 throttle codes (must be preserved)
         self._throttling_errors = {
             "Throttling",
             "ThrottlingException",
@@ -71,6 +137,59 @@ class BotocoreMetricsHandler:
             "TooManyRequestsException",
             "ProvisionedThroughputExceededException",
         }
+
+        # ------------------------------------------------------------------ #
+        # OTel instruments                                                     #
+        # Acquired once at construction; get_meter() returns a no-op when     #
+        # the SDK is not configured — instruments are then no-ops too.         #
+        # ------------------------------------------------------------------ #
+        meter = _get_meter(__name__)
+
+        # Call counters
+        self._calls_counter = meter.create_counter(
+            "orb.aws.api.calls",
+            unit="1",
+            description="Total AWS API calls, labelled by service and operation.",
+        )
+        self._errors_counter = meter.create_counter(
+            "orb.aws.api.errors",
+            unit="1",
+            description="Total AWS API errors, labelled by service, operation, error_code, and error_type.",
+        )
+        self._successes_counter = meter.create_counter(
+            "orb.aws.api.successes",
+            unit="1",
+            description="Total successful AWS API calls, labelled by service and operation.",
+        )
+        self._retries_counter = meter.create_counter(
+            "orb.aws.api.retries",
+            unit="1",
+            description="Total AWS API retries, labelled by service and operation.",
+        )
+        self._throttles_counter = meter.create_counter(
+            "orb.aws.api.throttles",
+            unit="1",
+            description="Total throttled AWS API calls, labelled by service, operation, and error_code.",
+        )
+
+        # Duration histogram — replaces the old rolling-average gauge
+        self._duration_histogram = meter.create_histogram(
+            "orb.aws.api.duration",
+            unit="s",
+            description="AWS API call duration in seconds, labelled by service, operation, and outcome.",
+        )
+
+        # Payload size histograms (only populated when track_payload_sizes=True)
+        self._response_size_histogram = meter.create_histogram(
+            "orb.aws.api.response_size",
+            unit="By",
+            description="Estimated AWS API response payload size in bytes.",
+        )
+        self._request_size_histogram = meter.create_histogram(
+            "orb.aws.api.request_size",
+            unit="By",
+            description="Estimated AWS API request payload size in bytes.",
+        )
 
     def register_events(self, session) -> None:
         """Register event handlers with boto3 session only if metrics are enabled."""
@@ -111,7 +230,7 @@ class BotocoreMetricsHandler:
             if self.monitored_operations and operation not in self.monitored_operations:
                 return
 
-            # Apply sampling
+            # Apply deterministic every-Nth-call sampling (modulo _sample_counter, NOT random)
             if not self._should_sample():
                 return
 
@@ -151,9 +270,15 @@ class BotocoreMetricsHandler:
                 self._active_requests[request_id] = context
             request_context["metrics_context"] = context
 
-            # Record metrics (align with current MetricsCollector API: no labels/histograms)
-            self.metrics.increment_counter(f"aws.{service}.{operation}.calls_total")
-            self.metrics.increment_counter("aws_api_calls_total")
+            # Record call counter with OTel labels
+            attrs = {"service": service, "operation": operation}
+            self._calls_counter.add(1, attrs)
+
+            # Record request size if tracking enabled
+            if self.track_payload_sizes and request_size > 0:
+                self._request_size_histogram.record(
+                    float(request_size), {"service": service, "operation": operation}
+                )
 
             # Store request ID for correlation
             if "request_dict" in kwargs:
@@ -181,43 +306,42 @@ class BotocoreMetricsHandler:
             if not context:
                 return
 
-            # Calculate metrics
-            duration_ms = (time.perf_counter() - context.start_time) * 1000
+            # Calculate duration
+            duration_s = time.perf_counter() - context.start_time
             response_size = self._estimate_response_size(kwargs.get("parsed", {}))
 
             # Determine status code if available
             http_response = kwargs.get("http_response")
             status_code = getattr(http_response, "status_code", 200)
 
-            # Record metrics (using current collector)
-            self.metrics.record_time(
-                f"aws.{context.service}.{context.operation}.duration",
-                duration_ms / 1000.0,
+            attrs_base = {"service": context.service, "operation": context.operation}
+
+            # Record duration histogram
+            if status_code and status_code >= 400:
+                outcome = "error"
+            else:
+                outcome = "success"
+
+            self._duration_histogram.record(
+                duration_s,
+                {**attrs_base, "outcome": outcome},
             )
 
-            # Record response size metrics
-            self.metrics.set_gauge(
-                f"aws.{context.service}.{context.operation}.response_size",
-                response_size,
-            )
-            self.metrics.set_gauge("aws_api_response_size", response_size)
+            # Record response size
+            if self.track_payload_sizes and response_size > 0:
+                self._response_size_histogram.record(float(response_size), attrs_base)
 
             if status_code and status_code >= 400:
-                self.metrics.increment_counter(
-                    f"aws.{context.service}.{context.operation}.errors_total"
+                self._errors_counter.add(
+                    1,
+                    {**attrs_base, "error_code": "HTTPError", "error_type": "HTTPError"},
                 )
-                self.metrics.increment_counter("aws_api_errors_total")
             else:
-                self.metrics.increment_counter(
-                    f"aws.{context.service}.{context.operation}.success_total"
-                )
-                self.metrics.increment_counter("aws_api_success_total")
+                self._successes_counter.add(1, attrs_base)
 
             # Record retry metrics if retries occurred
             if context.retry_count > 0:
-                self.metrics.increment_counter(
-                    f"aws.{context.service}.{context.operation}.retries_total"
-                )
+                self._retries_counter.add(context.retry_count, attrs_base)
 
         except Exception as e:
             self.logger.warning(f"Error in after_call_success handler: {e}")
@@ -241,8 +365,8 @@ class BotocoreMetricsHandler:
             if not context:
                 return
 
-            # Calculate metrics
-            duration_ms = (time.perf_counter() - context.start_time) * 1000
+            # Calculate duration
+            duration_s = time.perf_counter() - context.start_time
 
             # Extract error information
             exception = kwargs.get("exception")
@@ -251,34 +375,32 @@ class BotocoreMetricsHandler:
             else:
                 error_code, error_type = "Unknown", "Unknown"
 
-            # Record error metrics (using current collector)
-            self.metrics.record_time(
-                f"aws.{context.service}.{context.operation}.duration",
-                duration_ms / 1000.0,
-            )
-            self.metrics.increment_counter(
-                f"aws.{context.service}.{context.operation}.errors_total"
-            )
-            self.metrics.increment_counter("aws_api_errors_total")
+            attrs_base = {"service": context.service, "operation": context.operation}
 
-            # Record error type classification
-            self.metrics.increment_counter(
-                f"aws.{context.service}.{context.operation}.errors.{error_type.lower()}"
+            # Record duration histogram with error outcome
+            self._duration_histogram.record(
+                duration_s,
+                {**attrs_base, "outcome": "error"},
             )
-            self.metrics.increment_counter(f"aws_api_errors_{error_type.lower()}_total")
 
-            # Special handling for throttling
+            # Record error counter with classification labels
+            self._errors_counter.add(
+                1,
+                {**attrs_base, "error_code": error_code, "error_type": error_type},
+            )
+
+            # Special handling for throttling — exactly the 5 known codes
             if self._is_throttling_error(error_code):
-                self.metrics.increment_counter(
-                    f"aws.{context.service}.{context.operation}.throttling_total"
+                self._throttles_counter.add(
+                    1,
+                    {**attrs_base, "error_code": error_code},
                 )
-                self.metrics.increment_counter("aws_api_throttling_total")
 
         except Exception as e:
             self.logger.warning(f"Error in after_call_error handler: {e}")
 
     def _on_retry_needed(self, event_name: str, **kwargs) -> None:
-        """Handle retry decision events."""
+        """Handle retry decision events — increments retry_count on the context."""
         try:
             context = None
             request_context = kwargs.get("request_context")
@@ -295,13 +417,10 @@ class BotocoreMetricsHandler:
             self.logger.warning(f"Error in retry_needed handler: {e}")
 
     def _before_retry(self, event_name: str, **kwargs) -> None:
-        """Handle before retry events."""
+        """Handle before-retry events — emits a retry counter tick."""
         try:
             service, operation = self._parse_event_name(event_name)
-
-            self.metrics.increment_counter(f"aws.{service}.{operation}.retries_total")
-            self.metrics.increment_counter("aws_api_retries_total")
-
+            self._retries_counter.add(1, {"service": service, "operation": operation})
         except Exception as e:
             self.logger.warning(f"Error in before_retry handler: {e}")
 
@@ -384,7 +503,7 @@ class BotocoreMetricsHandler:
         return error_code, error_type
 
     def _is_throttling_error(self, error_code: str) -> bool:
-        """Check if error code indicates throttling."""
+        """Check if error code indicates throttling (exactly 5 recognised codes)."""
         return error_code in self._throttling_errors
 
     def _estimate_request_size(self, params: dict) -> int:
@@ -410,7 +529,11 @@ class BotocoreMetricsHandler:
             return 0
 
     def _should_sample(self) -> bool:
-        """Determine if this request should be sampled based on configuration."""
+        """Determine if this request should be sampled.
+
+        Uses deterministic every-Nth-call modulo logic (NOT random) so
+        sampling is reproducible — critical for compliance use cases.
+        """
         if self.sample_rate >= 1.0:
             return True
         if self.sample_rate <= 0:

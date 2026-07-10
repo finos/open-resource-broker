@@ -185,8 +185,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mako" },
     { name = "sqlalchemy" },
-    { name = "tomli", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "tomli", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
     { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1a/cc/ac0bed8e562e7407fe55c3ba85a4dce86e6dbd8730887bd1e406a6c5c18a/alembic-1.18.5.tar.gz", hash = "sha256:1554982221dd17e9a749b53902407578eb305e453f71999e8c7f0a48389fff8e", size = 2060480, upload-time = "2026-06-25T15:20:54.888Z" }
@@ -500,8 +499,7 @@ dependencies = [
     { name = "importlib-metadata", marker = "python_full_version < '3.10.2' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
     { name = "packaging" },
     { name = "pyproject-hooks" },
-    { name = "tomli", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "tomli", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/78/e0/df5e171f685f82f37b12e1f208064e24244911079d7b767447d1af7e0d70/build-1.5.0.tar.gz", hash = "sha256:302c22c3ba2a0fd5f3911918651341ebb3896176cbdec15bd421f80b1afc7647", size = 89796, upload-time = "2026-04-30T03:18:25.17Z" }
 wheels = [
@@ -780,30 +778,10 @@ wheels = [
 
 [[package]]
 name = "click"
-version = "8.1.8"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.11'",
-    "python_full_version < '3.11'",
-]
-dependencies = [
-    { name = "colorama", marker = "(sys_platform == 'win32' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/b9/2e/0090cbf739cee7d23781ad4b89a9894a41538e4fcf4c31dcdd705b78eb8b/click-8.1.8.tar.gz", hash = "sha256:ed53c9d8990d83c2a27deae68e4ee337473f6330c040a31d4225c9574d16096a", size = 226593, upload-time = "2024-12-21T18:38:44.339Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/7e/d4/7ebdbd03970677812aac39c869717059dbb71a4cfc033ca6e5221787892c/click-8.1.8-py3-none-any.whl", hash = "sha256:63c132bbbed01578a06712a2d1f497bb62d9c1c0d329b7903a866228027263b2", size = 98188, upload-time = "2024-12-21T18:38:41.666Z" },
-]
-
-[[package]]
-name = "click"
 version = "8.4.2"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.11'",
-    "python_full_version < '3.11'",
-]
 dependencies = [
-    { name = "colorama", marker = "(sys_platform == 'win32' and extra == 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/d4/81420972a676e8ffea40450d8c8c92943e7218a78fe9b64359836cc9876b/click-8.4.2.tar.gz", hash = "sha256:9a6cea6e60b17ebe0a44c5cc636d94f09bd66142c1cd7d8b4cd731c4917a15f6", size = 338000, upload-time = "2026-06-24T17:45:15.148Z" }
 wheels = [
@@ -815,8 +793,7 @@ name = "click-option-group"
 version = "0.5.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "click", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
+    { name = "click" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ef/ff/d291d66595b30b83d1cb9e314b2c9be7cfc7327d4a0d40a15da2416ea97b/click_option_group-0.5.9.tar.gz", hash = "sha256:f94ed2bc4cf69052e0f29592bd1e771a1789bd7bfc482dd0bc482134aff95823", size = 22222, upload-time = "2025-10-09T09:38:01.474Z" }
 wheels = [
@@ -932,8 +909,7 @@ wheels = [
 
 [package.optional-dependencies]
 toml = [
-    { name = "tomli", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version <= '3.11' and extra == 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "tomli", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version <= '3.11' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "tomli", marker = "python_full_version <= '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
 ]
 
 [[package]]
@@ -1003,8 +979,7 @@ dependencies = [
     { name = "packageurl-python" },
     { name = "packaging" },
     { name = "pip-requirements-parser" },
-    { name = "tomli", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "tomli", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/6c/e1/700aea05811f8988a60636e045914ffb155ce5318879f14b5c9016a12da5/cyclonedx_bom-7.3.0.tar.gz", hash = "sha256:d54080d65731980945de38e52009a5e5711f4a3c31377a3d13af96eaca5fcf3d", size = 4420319, upload-time = "2026-03-30T12:30:08.438Z" }
 wheels = [
@@ -1105,8 +1080,7 @@ version = "0.6.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "packaging" },
-    { name = "tomli", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "tomli", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/29/ee/96c65e17222b973f0d3d0aa9bad6a59104ca1b0eb5b659c25c2900fccd85/dparse-0.6.4.tar.gz", hash = "sha256:90b29c39e3edc36c6284c82c4132648eaf28a01863eb3c231c2512196132201a", size = 27912, upload-time = "2024-11-08T16:52:06.444Z" }
 wheels = [
@@ -1328,8 +1302,7 @@ dependencies = [
     { name = "packaging" },
     { name = "platformdirs" },
     { name = "semver" },
-    { name = "tomli", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "tomli", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
     { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/01/7f/17e58ec656fd79d4a3b02517923e24a93b28fe2e4518568aedb4ce038fb9/git_changelog-2.9.4.tar.gz", hash = "sha256:06a38a0d174a069b760430ec41493bf53307be13f16b0e48ce379be1646ea9a0", size = 92601, upload-time = "2026-04-29T14:01:39.575Z" }
@@ -1365,14 +1338,10 @@ wheels = [
 name = "glom"
 version = "22.1.0"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.11'",
-    "python_full_version < '3.11'",
-]
 dependencies = [
-    { name = "attrs", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "boltons", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "face", marker = "extra == 'extra-6-orb-py-ui'" },
+    { name = "attrs" },
+    { name = "boltons" },
+    { name = "face" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3f/d1/69432deefa6f5283ec75b246d0540097ae26f618b915519ee3824c4c5dd6/glom-22.1.0.tar.gz", hash = "sha256:1510c6587a8f9c64a246641b70033cbc5ebde99f02ad245693678038e821aeb5", size = 189738, upload-time = "2022-01-24T09:34:04.874Z" }
 wheels = [
@@ -1380,41 +1349,11 @@ wheels = [
 ]
 
 [[package]]
-name = "glom"
-version = "25.12.0"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.11'",
-    "python_full_version < '3.11'",
-]
-dependencies = [
-    { name = "attrs", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "boltons", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "face", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/78/74/8387f95565ba7c30cd152a585b275ebb9a834d1d32782425c5d2fe0a102c/glom-25.12.0.tar.gz", hash = "sha256:1ae7da88be3693df40ad27bdf57a765a55c075c86c971bcddd67927403eb0069", size = 196128, upload-time = "2025-12-29T06:29:07.274Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a7/e6/4129d9a3baa72d747533bb33376543ccadd9a7f9944e5a6e3ae2e245f5d6/glom-25.12.0-py3-none-any.whl", hash = "sha256:b9f21e77f71a6576a43864e85066b8cc3f0f778d0d50961563f8981377a6dcb1", size = 103295, upload-time = "2025-12-29T06:29:06.074Z" },
-]
-
-[[package]]
-name = "googleapis-common-protos"
-version = "1.75.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "protobuf", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/b5/c8/f439cffde755cffa462bfbb156278fa6f9d09119719af9814b858fd4f81f/googleapis_common_protos-1.75.0.tar.gz", hash = "sha256:53a062ff3c32552fbd62c11fe23768b78e4ddf0494d5e5fd97d3f4689c75fbbd", size = 151035, upload-time = "2026-05-07T08:04:49.423Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e7/c8/e2645aa8ed02fd4c7a2f59d68783b65b1f3cbdfe39a6308e156509d1fee8/googleapis_common_protos-1.75.0-py3-none-any.whl", hash = "sha256:961ed60399c457ceb0ee8f285a84c870aabc9c6a832b9d37bb281b5bebde43ed", size = 300631, upload-time = "2026-05-07T08:03:30.345Z" },
-]
-
-[[package]]
 name = "granian"
 version = "2.7.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click", version = "8.4.2", source = { registry = "https://pypi.org/simple" } },
+    { name = "click" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b0/cc/9c752e6173df02c5e37c0df7bffd50c1341109e4b4f8e5073bfd3a72dc82/granian-2.7.9.tar.gz", hash = "sha256:096d9a3396b13826bc63d2cf424ed04daf1ea077beed361d48dca2d55cb4b527", size = 129789, upload-time = "2026-07-03T12:42:03.314Z" }
 wheels = [
@@ -1747,15 +1686,6 @@ wheels = [
 ]
 
 [[package]]
-name = "httpx-sse"
-version = "0.4.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/0f/4c/751061ffa58615a32c31b2d82e8482be8dd4a89154f003147acee90f2be9/httpx_sse-0.4.3.tar.gz", hash = "sha256:9b1ed0127459a66014aec3c56bebd93da3c1bc8bb6618c8082039a44889a755d", size = 15943, upload-time = "2025-10-10T21:48:22.271Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d2/fd/6668e5aec43ab844de6fc74927e155a3b37bf40d7c3790e49fc0406b6578/httpx_sse-0.4.3-py3-none-any.whl", hash = "sha256:0ac1c9fe3c0afad2e0ebb25a934a59f4c7823b60792691f779fad2c5568830fc", size = 8960, upload-time = "2025-10-10T21:48:21.158Z" },
-]
-
-[[package]]
 name = "id"
 version = "1.6.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1790,12 +1720,10 @@ name = "import-linter"
 version = "2.13"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "click", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
+    { name = "click" },
     { name = "grimp" },
     { name = "rich" },
-    { name = "tomli", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "tomli", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
     { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/97/c6/42962eb043df4d6984c1540220735b20442572fe37dab5e65ac807c939b9/import_linter-2.13.tar.gz", hash = "sha256:13af4a1d6b06044c58ea784e8732fd7fe48eec821a75feb4d6a1a2de36dd5c27", size = 1279761, upload-time = "2026-07-03T14:00:31.285Z" }
@@ -1840,8 +1768,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "decorator" },
     { name = "ipython" },
-    { name = "tomli", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "tomli", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3d/1b/7e07e7b752017f7693a0f4d41c13e5ca29ce8cbcfdcc1fd6c4ad8c0a27a0/ipdb-0.13.13.tar.gz", hash = "sha256:e3ac6018ef05126d442af680aad863006ec19d02290561ac88b8b1c0b0cfc726", size = 17042, upload-time = "2023-03-09T15:40:57.487Z" }
 wheels = [
@@ -2190,8 +2117,7 @@ name = "line-profiler"
 version = "5.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "tomli", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "tomli", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
     { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/03/b6/6d18ad201417a9c5168995541d0fd7981b5652b2b34f6e46a3a93c0f1beb/line_profiler-5.0.2.tar.gz", hash = "sha256:8d8a990c84c64bcde45af22af502d17bc0ae107be405ce41bba92af5c39c0000", size = 407075, upload-time = "2026-02-23T23:31:20.698Z" }
@@ -2516,31 +2442,6 @@ wheels = [
 ]
 
 [[package]]
-name = "mcp"
-version = "1.23.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "anyio", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "httpx", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "httpx-sse", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "jsonschema", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "pydantic", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "pydantic-settings", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "pyjwt", extra = ["crypto"], marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "python-multipart", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "pywin32", marker = "(sys_platform == 'win32' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "sse-starlette", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "starlette", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "typing-extensions", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "typing-inspection", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "uvicorn", marker = "(sys_platform != 'emscripten' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a7/a4/d06a303f45997e266f2c228081abe299bbcba216cb806128e2e49095d25f/mcp-1.23.3.tar.gz", hash = "sha256:b3b0da2cc949950ce1259c7bfc1b081905a51916fcd7c8182125b85e70825201", size = 600697, upload-time = "2025-12-09T16:04:37.351Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/32/c6/13c1a26b47b3f3a3b480783001ada4268917c9f42d78a079c336da2e75e5/mcp-1.23.3-py3-none-any.whl", hash = "sha256:32768af4b46a1b4f7df34e2bfdf5c6011e7b63d7f1b0e321d0fdef4cd6082031", size = 231570, upload-time = "2025-12-09T16:04:35.56Z" },
-]
-
-[[package]]
 name = "mdurl"
 version = "0.1.2"
 source = { registry = "https://pypi.org/simple" }
@@ -2592,8 +2493,7 @@ name = "mkdocs"
 version = "1.6.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "click", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
+    { name = "click" },
     { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
     { name = "ghp-import" },
     { name = "jinja2" },
@@ -3086,8 +2986,7 @@ name = "nltk"
 version = "3.9.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "click", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
+    { name = "click" },
     { name = "joblib" },
     { name = "regex" },
     { name = "tqdm" },
@@ -3151,50 +3050,33 @@ wheels = [
 
 [[package]]
 name = "opentelemetry-api"
-version = "1.37.0"
+version = "1.43.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "importlib-metadata" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/63/04/05040d7ce33a907a2a02257e601992f0cdf11c73b33f13c4492bf6c3d6d5/opentelemetry_api-1.37.0.tar.gz", hash = "sha256:540735b120355bd5112738ea53621f8d5edb35ebcd6fe21ada3ab1c61d1cd9a7", size = 64923, upload-time = "2025-09-11T10:29:01.662Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ae/cc/e4c9584181f86494df0f6bdec1a4f3280c50db44704dc2a407e994fc87bb/opentelemetry_api-1.43.0.tar.gz", hash = "sha256:107d0d03857ea8fc7c5fcbbbd83f800c281f0d560553d61c1d675fccfd1761c1", size = 73476, upload-time = "2026-06-24T15:19:55.323Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/91/48/28ed9e55dcf2f453128df738210a980e09f4e468a456fa3c763dbc8be70a/opentelemetry_api-1.37.0-py3-none-any.whl", hash = "sha256:accf2024d3e89faec14302213bc39550ec0f4095d1cf5ca688e1bfb1c8612f47", size = 65732, upload-time = "2025-09-11T10:28:41.826Z" },
+    { url = "https://files.pythonhosted.org/packages/17/83/6dba32b85f31868400440dc7ad2ca1eab94cbbf3a7b0459ed39f8311a9e2/opentelemetry_api-1.43.0-py3-none-any.whl", hash = "sha256:20acf45e9b21851926835292e4045d290acade1edd2ff3de86d2f069687ba1fd", size = 61912, upload-time = "2026-06-24T15:19:35.434Z" },
 ]
 
 [[package]]
-name = "opentelemetry-exporter-otlp-proto-common"
-version = "1.37.0"
+name = "opentelemetry-exporter-prometheus"
+version = "0.64b0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "opentelemetry-proto", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-sdk" },
+    { name = "prometheus-client" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/dc/6c/10018cbcc1e6fff23aac67d7fd977c3d692dbe5f9ef9bb4db5c1268726cc/opentelemetry_exporter_otlp_proto_common-1.37.0.tar.gz", hash = "sha256:c87a1bdd9f41fdc408d9cc9367bb53f8d2602829659f2b90be9f9d79d0bfe62c", size = 20430, upload-time = "2025-09-11T10:29:03.605Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/97/b3/f778f705289ea5f1c54589ae4494d318c9cede052f18ca33979fda0ef016/opentelemetry_exporter_prometheus-0.64b0.tar.gz", hash = "sha256:96fec79be9527cb9dc994d7e663051df35161eb936fe2d41954725e4595abbc1", size = 16405, upload-time = "2026-06-24T15:20:02.278Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/08/13/b4ef09837409a777f3c0af2a5b4ba9b7af34872bc43609dda0c209e4060d/opentelemetry_exporter_otlp_proto_common-1.37.0-py3-none-any.whl", hash = "sha256:53038428449c559b0c564b8d718df3314da387109c4d36bd1b94c9a641b0292e", size = 18359, upload-time = "2025-09-11T10:28:44.939Z" },
-]
-
-[[package]]
-name = "opentelemetry-exporter-otlp-proto-http"
-version = "1.37.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "googleapis-common-protos", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "opentelemetry-api", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "opentelemetry-exporter-otlp-proto-common", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "opentelemetry-proto", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "opentelemetry-sdk", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "requests", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "typing-extensions", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/5d/e3/6e320aeb24f951449e73867e53c55542bebbaf24faeee7623ef677d66736/opentelemetry_exporter_otlp_proto_http-1.37.0.tar.gz", hash = "sha256:e52e8600f1720d6de298419a802108a8f5afa63c96809ff83becb03f874e44ac", size = 17281, upload-time = "2025-09-11T10:29:04.844Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e9/e9/70d74a664d83976556cec395d6bfedd9b85ec1498b778367d5f93e373397/opentelemetry_exporter_otlp_proto_http-1.37.0-py3-none-any.whl", hash = "sha256:54c42b39945a6cc9d9a2a33decb876eabb9547e0dcb49df090122773447f1aef", size = 19576, upload-time = "2025-09-11T10:28:46.726Z" },
+    { url = "https://files.pythonhosted.org/packages/fe/dd/d95db7ac5bec037b3dcc8ea6fe64cd5dc4bc87017d2e06e7410318e85dc0/opentelemetry_exporter_prometheus-0.64b0-py3-none-any.whl", hash = "sha256:9979a15f8d007d442bc7a6e16f4cbde5e8e0c5e99689887ceb5f33da251f0655", size = 13031, upload-time = "2026-06-24T15:19:44.159Z" },
 ]
 
 [[package]]
 name = "opentelemetry-instrumentation"
-version = "0.58b0"
+version = "0.64b0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "opentelemetry-api" },
@@ -3202,14 +3084,14 @@ dependencies = [
     { name = "packaging" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f6/36/7c307d9be8ce4ee7beb86d7f1d31027f2a6a89228240405a858d6e4d64f9/opentelemetry_instrumentation-0.58b0.tar.gz", hash = "sha256:df640f3ac715a3e05af145c18f527f4422c6ab6c467e40bd24d2ad75a00cb705", size = 31549, upload-time = "2025-09-11T11:42:14.084Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7e/97/02fe6e1c8b1ffac42d0b429c18080edb24e0e0d18c86612edf72b5752382/opentelemetry_instrumentation-0.64b0.tar.gz", hash = "sha256:b47d528dead6271d7743114417eb67fc915bd9258111c48dbf9a4951d2efa88d", size = 41935, upload-time = "2026-06-24T15:19:12.951Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d4/db/5ff1cd6c5ca1d12ecf1b73be16fbb2a8af2114ee46d4b0e6d4b23f4f4db7/opentelemetry_instrumentation-0.58b0-py3-none-any.whl", hash = "sha256:50f97ac03100676c9f7fc28197f8240c7290ca1baa12da8bfbb9a1de4f34cc45", size = 33019, upload-time = "2025-09-11T11:41:00.624Z" },
+    { url = "https://files.pythonhosted.org/packages/d2/0c/cb9fe342de5299c7af24582eb7d788661cc53a1c4b904da92309caaa9417/opentelemetry_instrumentation-0.64b0-py3-none-any.whl", hash = "sha256:133ab7ffca796557aec059bf6be3190a34b6dea987f25be3d9409e230cbdad8b", size = 35880, upload-time = "2026-06-24T15:18:17.277Z" },
 ]
 
 [[package]]
 name = "opentelemetry-instrumentation-asgi"
-version = "0.58b0"
+version = "0.64b0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asgiref" },
@@ -3218,28 +3100,45 @@ dependencies = [
     { name = "opentelemetry-semantic-conventions" },
     { name = "opentelemetry-util-http" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7b/e2/03ff707d881d590c7adaed5e9d1979aed7e5e53fc1ed89035e5ed9f304af/opentelemetry_instrumentation_asgi-0.58b0.tar.gz", hash = "sha256:3ccc0c9c1c8c71e8d9da5945c6dcd9c0c8d147839f208536b7042c6dd98e65c9", size = 25116, upload-time = "2025-09-11T11:42:18.437Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/85/0c/71c696fccb86d37af383ea1604af4729fabad0af2fabaf203e4c79c1e859/opentelemetry_instrumentation_asgi-0.64b0.tar.gz", hash = "sha256:4dd3eee566a4303f8e6b9b84f2a0a7abc57a6640df768926c68a3868bf5b2090", size = 26136, upload-time = "2026-06-24T15:19:17.003Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8c/71/a00884c6655387c70070138acbf79a6616ad5d4489680f40708d75b598a7/opentelemetry_instrumentation_asgi-0.58b0-py3-none-any.whl", hash = "sha256:508a6d79e333d648d2afee0e140b6e80eb5d443be183be58e81d9ff88373168a", size = 16798, upload-time = "2025-09-11T11:41:08.105Z" },
+    { url = "https://files.pythonhosted.org/packages/51/20/218b65a63d847a7ed28d1bea84c39234689160b74480b8702272e37f4240/opentelemetry_instrumentation_asgi-0.64b0-py3-none-any.whl", hash = "sha256:e0840b66e15303a9254b0540946010bd008aa0504f4d89b8e1b7fb63490a36f0", size = 15906, upload-time = "2026-06-24T15:18:23.107Z" },
 ]
 
 [[package]]
-name = "opentelemetry-instrumentation-boto"
-version = "0.58b0"
+name = "opentelemetry-instrumentation-botocore"
+version = "0.64b0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-instrumentation" },
+    { name = "opentelemetry-propagator-aws-xray" },
+    { name = "opentelemetry-semantic-conventions" },
+    { name = "wrapt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/09/57/da42fca6537571c9a62e85439d70b6f7274da1afe684e1be0c6d8c41bb15/opentelemetry_instrumentation_botocore-0.64b0.tar.gz", hash = "sha256:e437907352a451c2b9d5b966197cf94785234ef4782ceee5b528d1f8a8875092", size = 125106, upload-time = "2026-06-24T15:19:20.755Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/77/d9/27e199e15dd78c423c848c3705cced8e45f77f798dcb61257ac6c12df5cf/opentelemetry_instrumentation_botocore-0.64b0-py3-none-any.whl", hash = "sha256:d55f359942021457e76a2c4d7d6dd44f6d8f9155f10c81b92922f2e364e470bc", size = 36242, upload-time = "2026-06-24T15:18:28.786Z" },
+]
+
+[[package]]
+name = "opentelemetry-instrumentation-click"
+version = "0.64b0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "opentelemetry-api" },
     { name = "opentelemetry-instrumentation" },
     { name = "opentelemetry-semantic-conventions" },
+    { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/26/69/764153b11526480568c787cf77c2f0e3d490fe59db4d053bfd1758f639e7/opentelemetry_instrumentation_boto-0.58b0.tar.gz", hash = "sha256:1f9b543c26fae287d7f838edfacbeb0ee18d68da7c9d30cddbc5b5de54e49008", size = 9705, upload-time = "2025-09-11T11:42:22.778Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d5/18/70c7caaf71eca3148bd87058c58e3371f594de2d64dd4903901b5d5ce71a/opentelemetry_instrumentation_click-0.64b0.tar.gz", hash = "sha256:e819f7caa98c79177a4977a7ad30cdcbc86b62475e285aadf47fef08dd88ac1f", size = 3969, upload-time = "2026-06-24T15:19:22.875Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/58/b3/8cbb7d337d1dceb48d6b3f9deed09ccdd9d84d89a0f8ac4cc9ba9788a064/opentelemetry_instrumentation_boto-0.58b0-py3-none-any.whl", hash = "sha256:5f9d7f0a5f587803166167269583ef4c7b2f61ff26a557ae039f60203992d253", size = 10156, upload-time = "2025-09-11T11:41:14.72Z" },
+    { url = "https://files.pythonhosted.org/packages/b5/b5/9cb4f79645a4368f67d757519393ae5662d208b073b06a0fc397b9459f48/opentelemetry_instrumentation_click-0.64b0-py3-none-any.whl", hash = "sha256:88a2e1d3827070a5079ac82751cb60e222d9320656c521fa9186729921454a66", size = 4181, upload-time = "2026-06-24T15:18:31.66Z" },
 ]
 
 [[package]]
 name = "opentelemetry-instrumentation-fastapi"
-version = "0.58b0"
+version = "0.64b0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "opentelemetry-api" },
@@ -3248,29 +3147,28 @@ dependencies = [
     { name = "opentelemetry-semantic-conventions" },
     { name = "opentelemetry-util-http" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/64/09/4f8fcab834af6b403e5e2d94bdfb2d0835ba8cd1049bcc156995f47b65fb/opentelemetry_instrumentation_fastapi-0.58b0.tar.gz", hash = "sha256:03da470d694116a0a40f4e76319e42f3ff9efc49abf804b2acc2c07f96661497", size = 24598, upload-time = "2025-09-11T11:42:35.325Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/db/a1/52282e2cc5c08f4df13b087896d9907258fe2ff4f34035d3b21aa92684c3/opentelemetry_instrumentation_fastapi-0.64b0.tar.gz", hash = "sha256:05f75149929e433c1630de381688e650bf651c1e1cce7f9a7b649a807dac8a98", size = 26236, upload-time = "2026-06-24T15:19:27.219Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/45/fb/82de06eba54e5cb979274f073065ebc374794853502d342b5155073d1194/opentelemetry_instrumentation_fastapi-0.58b0-py3-none-any.whl", hash = "sha256:d89bfec69c9ffc5d9f3fe58655d6660a66b2bca863b9132712c06edcde68b6fa", size = 13460, upload-time = "2025-09-11T11:41:28.507Z" },
+    { url = "https://files.pythonhosted.org/packages/72/2d/4f48dc2d6f289f2febc5b871940dbea9f3b04ab9186d23342581b49cb984/opentelemetry_instrumentation_fastapi-0.64b0-py3-none-any.whl", hash = "sha256:43cbbfb2d3079dc81104478a2950ae93ac6d0e90a5020fa3987a236f8f2bdef1", size = 13263, upload-time = "2026-06-24T15:18:38.553Z" },
 ]
 
 [[package]]
-name = "opentelemetry-instrumentation-requests"
-version = "0.58b0"
+name = "opentelemetry-instrumentation-logging"
+version = "0.64b0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "opentelemetry-api", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "opentelemetry-instrumentation", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "opentelemetry-semantic-conventions", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "opentelemetry-util-http", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-instrumentation" },
+    { name = "opentelemetry-semantic-conventions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/36/42/83ee32de763b919779aaa595b60c5a7b9c0a4b33952bbe432c5f6a783085/opentelemetry_instrumentation_requests-0.58b0.tar.gz", hash = "sha256:ae9495e6ff64e27bdb839fce91dbb4be56e325139828e8005f875baf41951a2e", size = 15188, upload-time = "2025-09-11T11:42:51.268Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/88/8e/3b7191ba5817f139867612e960fbe06a69fe0d522d3b2c5e9c8e89b3ef8c/opentelemetry_instrumentation_logging-0.64b0.tar.gz", hash = "sha256:6435b4d215bf8183e15f7e3416a10ebe1c411810d3411fbfc62667daae3abacb", size = 20000, upload-time = "2026-06-24T15:19:30.946Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/90/4d/f3476b28ea167d1762134352d01ae9693940a42c78994d9f1b32a4477816/opentelemetry_instrumentation_requests-0.58b0-py3-none-any.whl", hash = "sha256:672a0be0bb5b52bea0c11820b35e27edcf4cd22d34abe4afc59a92a80519f8a8", size = 12966, upload-time = "2025-09-11T11:41:52.67Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/07/9f97b0ccbb38363d12c7a2bfe44912ae7440c97aae250e2eedb32739f662/opentelemetry_instrumentation_logging-0.64b0-py3-none-any.whl", hash = "sha256:9b56f19648798ddb331c206b74d36c5f2a71e5c6b771e96298f167b2b590e40d", size = 16062, upload-time = "2026-06-24T15:18:44.019Z" },
 ]
 
 [[package]]
 name = "opentelemetry-instrumentation-sqlalchemy"
-version = "0.58b0"
+version = "0.64b0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "opentelemetry-api" },
@@ -3279,71 +3177,72 @@ dependencies = [
     { name = "packaging" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/91/6f/fa2c45d5dfb8da0bcc337a421fd12946994cb5e9782c40a21c669e78460d/opentelemetry_instrumentation_sqlalchemy-0.58b0.tar.gz", hash = "sha256:3e4b444a05088ba473710df9d5c730bb08969c8ea71e04f2886a0f7efee22c12", size = 14993, upload-time = "2025-09-11T11:42:52.053Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/46/d7/86e333dede47a67a0f989f383da5d0840162ee21e0b252ca56cf61351c59/opentelemetry_instrumentation_sqlalchemy-0.64b0.tar.gz", hash = "sha256:dd737e0b0a72500961aa0dbb6fb2a10525f8dbb5299f9315ddf82d415cc64719", size = 18006, upload-time = "2026-06-24T15:19:40.225Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/42/26/7a86285adf7131801fe297bdb756b00bc3f43f78bc7e18668d88f7308e53/opentelemetry_instrumentation_sqlalchemy-0.58b0-py3-none-any.whl", hash = "sha256:7c11d11887b3a4dbc3fccdd58a24903e306052ff7a59685caea1dd7797f82b0a", size = 14212, upload-time = "2025-09-11T11:41:53.76Z" },
+    { url = "https://files.pythonhosted.org/packages/49/90/5424365cb111d2383747b36ca3dbc558e86ef5ec6694efb53bfcb771f046/opentelemetry_instrumentation_sqlalchemy-0.64b0-py3-none-any.whl", hash = "sha256:687ee4c453020c7db009a7f3e390bb2b28eab4e61517e6d267e6e448c3eedcfb", size = 14410, upload-time = "2026-06-24T15:18:57.287Z" },
 ]
 
 [[package]]
-name = "opentelemetry-instrumentation-threading"
-version = "0.58b0"
+name = "opentelemetry-instrumentation-system-metrics"
+version = "0.64b0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "opentelemetry-api", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "opentelemetry-instrumentation", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "wrapt", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-instrumentation" },
+    { name = "opentelemetry-semantic-conventions" },
+    { name = "psutil" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/70/a9/3888cb0470e6eb48ea17b6802275ae71df411edd6382b9a8e8f391936fda/opentelemetry_instrumentation_threading-0.58b0.tar.gz", hash = "sha256:f68c61f77841f9ff6270176f4d496c10addbceacd782af434d705f83e4504862", size = 8770, upload-time = "2025-09-11T11:42:56.308Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6c/55/ffa2d8f9a11356fde23fa48eb450a896b4935f6af05cae035f79e65dfa54/opentelemetry_instrumentation_system_metrics-0.64b0.tar.gz", hash = "sha256:ec8280693cdf6ea9020384c3fe884eea64a43ae78f1e2f6edc20951c871aac7e", size = 17412, upload-time = "2026-06-24T15:19:42.512Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a5/54/add1076cb37980e617723a96e29c84006983e8ad6fc589dde7f69ddc57d4/opentelemetry_instrumentation_threading-0.58b0-py3-none-any.whl", hash = "sha256:eacc072881006aceb5b9b6831bcdce718c67ef6f31ac0b32bd6a23a94d979b4a", size = 9312, upload-time = "2025-09-11T11:41:58.603Z" },
+    { url = "https://files.pythonhosted.org/packages/df/08/b6037ef930e84a49905f09660f1e6cd928fb8f8ff4af1bccb1c689f0f463/opentelemetry_instrumentation_system_metrics-0.64b0-py3-none-any.whl", hash = "sha256:38bc9c4ed4fccea2a68b1a43d57764649d1c3096927dc7244c5e7f173899044b", size = 14007, upload-time = "2026-06-24T15:18:59.896Z" },
 ]
 
 [[package]]
-name = "opentelemetry-proto"
-version = "1.37.0"
+name = "opentelemetry-propagator-aws-xray"
+version = "1.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "protobuf", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
+    { name = "opentelemetry-api" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/dd/ea/a75f36b463a36f3c5a10c0b5292c58b31dbdde74f6f905d3d0ab2313987b/opentelemetry_proto-1.37.0.tar.gz", hash = "sha256:30f5c494faf66f77faeaefa35ed4443c5edb3b0aa46dad073ed7210e1a789538", size = 46151, upload-time = "2025-09-11T10:29:11.04Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f4/31/40004e9e55b1e5694ef3a7526f0b7637df44196fc68a8b7d248a3684680f/opentelemetry_propagator_aws_xray-1.0.2.tar.gz", hash = "sha256:6b2cee5479d2ef0172307b66ed2ed151f598a0fd29b3c01133ac87ca06326260", size = 10994, upload-time = "2024-08-05T17:45:57.601Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c4/25/f89ea66c59bd7687e218361826c969443c4fa15dfe89733f3bf1e2a9e971/opentelemetry_proto-1.37.0-py3-none-any.whl", hash = "sha256:8ed8c066ae8828bbf0c39229979bdf583a126981142378a9cbe9d6fd5701c6e2", size = 72534, upload-time = "2025-09-11T10:28:56.831Z" },
+    { url = "https://files.pythonhosted.org/packages/ea/89/849a0847871fd9745315896ad9e23d6479db84d90b8b36c4c26dc46e92b8/opentelemetry_propagator_aws_xray-1.0.2-py3-none-any.whl", hash = "sha256:1c99181ee228e99bddb638a0c911a297fa21f1c3a0af951f841e79919b5f1934", size = 10856, upload-time = "2024-08-05T17:45:56.492Z" },
 ]
 
 [[package]]
 name = "opentelemetry-sdk"
-version = "1.37.0"
+version = "1.43.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "opentelemetry-api" },
     { name = "opentelemetry-semantic-conventions" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f4/62/2e0ca80d7fe94f0b193135375da92c640d15fe81f636658d2acf373086bc/opentelemetry_sdk-1.37.0.tar.gz", hash = "sha256:cc8e089c10953ded765b5ab5669b198bbe0af1b3f89f1007d19acd32dc46dda5", size = 170404, upload-time = "2025-09-11T10:29:11.779Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3e/eb/5041074274ac0956b03637cc039d434569112468e875eddfcc9a0674ce06/opentelemetry_sdk-1.43.0.tar.gz", hash = "sha256:d8187c81c162df9913e4003dd6485f7390d9a24fc17026ec7387b8b8218b08e9", size = 254744, upload-time = "2026-06-24T15:20:08.467Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9f/62/9f4ad6a54126fb00f7ed4bb5034964c6e4f00fcd5a905e115bd22707e20d/opentelemetry_sdk-1.37.0-py3-none-any.whl", hash = "sha256:8f3c3c22063e52475c5dbced7209495c2c16723d016d39287dfc215d1771257c", size = 131941, upload-time = "2025-09-11T10:28:57.83Z" },
+    { url = "https://files.pythonhosted.org/packages/49/e3/b17be23af124201c9f52eececd4cc8ddfed1597d37b4ee771895d325805c/opentelemetry_sdk-1.43.0-py3-none-any.whl", hash = "sha256:d1323a547c1ce69d6a069a17a44b7da82bb8b332051ecb074041f87642c86823", size = 178852, upload-time = "2026-06-24T15:19:52.169Z" },
 ]
 
 [[package]]
 name = "opentelemetry-semantic-conventions"
-version = "0.58b0"
+version = "0.64b0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "opentelemetry-api" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/aa/1b/90701d91e6300d9f2fb352153fb1721ed99ed1f6ea14fa992c756016e63a/opentelemetry_semantic_conventions-0.58b0.tar.gz", hash = "sha256:6bd46f51264279c433755767bb44ad00f1c9e2367e1b42af563372c5a6fa0c25", size = 129867, upload-time = "2025-09-11T10:29:12.597Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5a/30/5f26df29509eccd86b99b481ac9ffa39da49ba9577cc69071c552ae30447/opentelemetry_semantic_conventions-0.64b0.tar.gz", hash = "sha256:72f76fb2d1582d9d033dd1fcd84532e961e6ff3d90d24ba6fabc72975a83864c", size = 148340, upload-time = "2026-06-24T15:20:09.267Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/07/90/68152b7465f50285d3ce2481b3aec2f82822e3f52e5152eeeaf516bab841/opentelemetry_semantic_conventions-0.58b0-py3-none-any.whl", hash = "sha256:5564905ab1458b96684db1340232729fce3b5375a06e140e8904c78e4f815b28", size = 207954, upload-time = "2025-09-11T10:28:59.218Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/ca/23ba87a221b574a7c5a99d48849d80bfe8b047624681357e2b002e566187/opentelemetry_semantic_conventions-0.64b0-py3-none-any.whl", hash = "sha256:ea77e85e354b8f604ddbe5f3d9135216f982fa4d77e5859ac30f6d8a50505aa6", size = 203713, upload-time = "2026-06-24T15:19:53.339Z" },
 ]
 
 [[package]]
 name = "opentelemetry-util-http"
-version = "0.58b0"
+version = "0.64b0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/c6/5f/02f31530faf50ef8a41ab34901c05cbbf8e9d76963ba2fb852b0b4065f4e/opentelemetry_util_http-0.58b0.tar.gz", hash = "sha256:de0154896c3472c6599311c83e0ecee856c4da1b17808d39fdc5cce5312e4d89", size = 9411, upload-time = "2025-09-11T11:43:05.602Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c3/1b/1029a805fd7242f7dfce91633b244c3b14a94d703232878f71e01ce862b1/opentelemetry_util_http-0.64b0.tar.gz", hash = "sha256:8a86a220dbfc56d736f47f1e5c4e7932a21fcf69052312e1bcf166444dc79322", size = 11102, upload-time = "2026-06-24T15:19:48.974Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a5/a3/0a1430c42c6d34d8372a16c104e7408028f0c30270d8f3eb6cccf2e82934/opentelemetry_util_http-0.58b0-py3-none-any.whl", hash = "sha256:6c6b86762ed43025fbd593dc5f700ba0aa3e09711aedc36fd48a13b23d8cb1e7", size = 7652, upload-time = "2025-09-11T11:42:09.682Z" },
+    { url = "https://files.pythonhosted.org/packages/1c/c7/5f8ec5b30546f2dc22cd5fc5759bce2ab5be6e89a2e710a405ac9ef64ed3/opentelemetry_util_http-0.64b0-py3-none-any.whl", hash = "sha256:c1e5350d25507c1afcd6076cf9ac062485a0a4f79cd9971366996fd3056bacdb", size = 8204, upload-time = "2026-06-24T15:19:09.02Z" },
 ]
 
 [[package]]
@@ -3375,8 +3274,12 @@ all = [
     { name = "jinja2" },
     { name = "kubernetes" },
     { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-prometheus" },
+    { name = "opentelemetry-instrumentation-click" },
     { name = "opentelemetry-instrumentation-fastapi" },
+    { name = "opentelemetry-instrumentation-logging" },
     { name = "opentelemetry-instrumentation-sqlalchemy" },
+    { name = "opentelemetry-instrumentation-system-metrics" },
     { name = "opentelemetry-sdk" },
     { name = "prometheus-client" },
     { name = "psutil" },
@@ -3428,16 +3331,15 @@ ci = [
     { name = "pathspec" },
     { name = "peewee" },
     { name = "pg8000" },
-    { name = "pip-audit", version = "2.9.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "pip-audit", version = "2.10.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
+    { name = "pip-audit" },
     { name = "prometheus-client" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-benchmark" },
     { name = "pytest-cov" },
-    { name = "pytest-env", version = "1.1.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "pytest-env", version = "1.6.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or extra != 'extra-6-orb-py-ui' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "pytest-env", version = "1.1.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "pytest-env", version = "1.6.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
     { name = "pytest-html" },
     { name = "pytest-mock" },
     { name = "pytest-timeout" },
@@ -3446,11 +3348,9 @@ ci = [
     { name = "responses" },
     { name = "ruff" },
     { name = "safety" },
-    { name = "semgrep", version = "1.79.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "semgrep", version = "1.168.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
+    { name = "semgrep" },
     { name = "tenacity" },
-    { name = "tomli", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "tomli", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
+    { name = "tomli" },
     { name = "types-python-dateutil" },
     { name = "types-pyyaml" },
     { name = "uvicorn" },
@@ -3498,8 +3398,7 @@ dev = [
     { name = "pathspec" },
     { name = "peewee" },
     { name = "pg8000" },
-    { name = "pip-audit", version = "2.9.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "pip-audit", version = "2.10.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
+    { name = "pip-audit" },
     { name = "pip-tools" },
     { name = "pre-commit" },
     { name = "prometheus-client" },
@@ -3510,8 +3409,8 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-benchmark" },
     { name = "pytest-cov" },
-    { name = "pytest-env", version = "1.1.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "pytest-env", version = "1.6.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or extra != 'extra-6-orb-py-ui' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "pytest-env", version = "1.1.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "pytest-env", version = "1.6.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
     { name = "pytest-html" },
     { name = "pytest-mock" },
     { name = "pytest-timeout" },
@@ -3522,11 +3421,9 @@ dev = [
     { name = "responses" },
     { name = "ruff" },
     { name = "safety" },
-    { name = "semgrep", version = "1.79.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "semgrep", version = "1.168.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
+    { name = "semgrep" },
     { name = "tenacity" },
-    { name = "tomli", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "tomli", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
+    { name = "tomli" },
     { name = "twine" },
     { name = "types-python-dateutil" },
     { name = "types-pyyaml" },
@@ -3558,8 +3455,12 @@ k8s-legacy = [
 ]
 monitoring = [
     { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-prometheus" },
+    { name = "opentelemetry-instrumentation-click" },
     { name = "opentelemetry-instrumentation-fastapi" },
+    { name = "opentelemetry-instrumentation-logging" },
     { name = "opentelemetry-instrumentation-sqlalchemy" },
+    { name = "opentelemetry-instrumentation-system-metrics" },
     { name = "opentelemetry-sdk" },
     { name = "prometheus-client" },
     { name = "psutil" },
@@ -3568,12 +3469,19 @@ monitoring-aws = [
     { name = "boto3" },
     { name = "botocore" },
     { name = "opentelemetry-api" },
-    { name = "opentelemetry-instrumentation-boto" },
+    { name = "opentelemetry-exporter-prometheus" },
+    { name = "opentelemetry-instrumentation-botocore" },
+    { name = "opentelemetry-instrumentation-click" },
     { name = "opentelemetry-instrumentation-fastapi" },
+    { name = "opentelemetry-instrumentation-logging" },
     { name = "opentelemetry-instrumentation-sqlalchemy" },
+    { name = "opentelemetry-instrumentation-system-metrics" },
     { name = "opentelemetry-sdk" },
     { name = "prometheus-client" },
     { name = "psutil" },
+]
+otel = [
+    { name = "opentelemetry-api" },
 ]
 sql = [
     { name = "alembic" },
@@ -3621,17 +3529,26 @@ ci = [
     { name = "mkdocstrings-python" },
     { name = "moto", extra = ["all"], marker = "extra == 'group-6-orb-py-ci' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
     { name = "nltk" },
+    { name = "opentelemetry-exporter-prometheus" },
+    { name = "opentelemetry-instrumentation-botocore" },
+    { name = "opentelemetry-instrumentation-click" },
+    { name = "opentelemetry-instrumentation-fastapi" },
+    { name = "opentelemetry-instrumentation-logging" },
+    { name = "opentelemetry-instrumentation-sqlalchemy" },
+    { name = "opentelemetry-instrumentation-system-metrics" },
+    { name = "opentelemetry-sdk" },
     { name = "pathspec" },
     { name = "peewee" },
     { name = "pg8000" },
-    { name = "pip-audit", version = "2.10.1", source = { registry = "https://pypi.org/simple" } },
+    { name = "pip-audit" },
     { name = "prometheus-client" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-benchmark" },
     { name = "pytest-cov" },
-    { name = "pytest-env", version = "1.6.0", source = { registry = "https://pypi.org/simple" } },
+    { name = "pytest-env", version = "1.1.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "pytest-env", version = "1.6.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
     { name = "pytest-html" },
     { name = "pytest-mock" },
     { name = "pytest-timeout" },
@@ -3640,9 +3557,9 @@ ci = [
     { name = "responses" },
     { name = "ruff" },
     { name = "safety" },
-    { name = "semgrep", version = "1.168.0", source = { registry = "https://pypi.org/simple" } },
+    { name = "semgrep" },
     { name = "tenacity" },
-    { name = "tomli", version = "2.4.1", source = { registry = "https://pypi.org/simple" } },
+    { name = "tomli" },
     { name = "types-python-dateutil" },
     { name = "types-pyyaml" },
     { name = "uvicorn" },
@@ -3683,10 +3600,18 @@ dev = [
     { name = "mkdocstrings-python" },
     { name = "moto", extra = ["all"], marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
     { name = "nltk" },
+    { name = "opentelemetry-exporter-prometheus" },
+    { name = "opentelemetry-instrumentation-botocore" },
+    { name = "opentelemetry-instrumentation-click" },
+    { name = "opentelemetry-instrumentation-fastapi" },
+    { name = "opentelemetry-instrumentation-logging" },
+    { name = "opentelemetry-instrumentation-sqlalchemy" },
+    { name = "opentelemetry-instrumentation-system-metrics" },
+    { name = "opentelemetry-sdk" },
     { name = "pathspec" },
     { name = "peewee" },
     { name = "pg8000" },
-    { name = "pip-audit", version = "2.10.1", source = { registry = "https://pypi.org/simple" } },
+    { name = "pip-audit" },
     { name = "pip-tools" },
     { name = "pre-commit" },
     { name = "prometheus-client" },
@@ -3697,7 +3622,8 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-benchmark" },
     { name = "pytest-cov" },
-    { name = "pytest-env", version = "1.6.0", source = { registry = "https://pypi.org/simple" } },
+    { name = "pytest-env", version = "1.1.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "pytest-env", version = "1.6.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
     { name = "pytest-html" },
     { name = "pytest-mock" },
     { name = "pytest-timeout" },
@@ -3708,9 +3634,9 @@ dev = [
     { name = "responses" },
     { name = "ruff" },
     { name = "safety" },
-    { name = "semgrep", version = "1.168.0", source = { registry = "https://pypi.org/simple" } },
+    { name = "semgrep" },
     { name = "tenacity" },
-    { name = "tomli", version = "2.4.1", source = { registry = "https://pypi.org/simple" } },
+    { name = "tomli" },
     { name = "twine" },
     { name = "types-python-dateutil" },
     { name = "types-pyyaml" },
@@ -3771,10 +3697,14 @@ requires-dist = [
     { name = "moto", extras = ["all"], marker = "extra == 'ci'", specifier = ">=5.1.19,<6.0.0" },
     { name = "moto", extras = ["ec2", "iam", "ec2instanceconnect", "autoscaling", "ssm", "dynamodb", "sts", "sqs", "sns"], marker = "extra == 'test-aws'", specifier = ">=5.1.19,<6.0.0" },
     { name = "nltk", marker = "extra == 'ci'", specifier = ">=3.9.3" },
-    { name = "opentelemetry-api", marker = "extra == 'monitoring'", specifier = ">=1.20.0" },
-    { name = "opentelemetry-instrumentation-boto", marker = "extra == 'monitoring-aws'", specifier = ">=0.41b0" },
-    { name = "opentelemetry-instrumentation-fastapi", marker = "extra == 'monitoring'", specifier = ">=0.41b0" },
-    { name = "opentelemetry-instrumentation-sqlalchemy", marker = "extra == 'monitoring'", specifier = ">=0.41b0" },
+    { name = "opentelemetry-api", marker = "extra == 'otel'", specifier = ">=1.20.0" },
+    { name = "opentelemetry-exporter-prometheus", marker = "extra == 'monitoring'", specifier = ">=0.64b0,<1.0" },
+    { name = "opentelemetry-instrumentation-botocore", marker = "extra == 'monitoring-aws'", specifier = ">=0.64b0,<1.0" },
+    { name = "opentelemetry-instrumentation-click", marker = "extra == 'monitoring'", specifier = ">=0.64b0,<1.0" },
+    { name = "opentelemetry-instrumentation-fastapi", marker = "extra == 'monitoring'", specifier = ">=0.41b0,<1.0" },
+    { name = "opentelemetry-instrumentation-logging", marker = "extra == 'monitoring'", specifier = ">=0.64b0,<1.0" },
+    { name = "opentelemetry-instrumentation-sqlalchemy", marker = "extra == 'monitoring'", specifier = ">=0.41b0,<1.0" },
+    { name = "opentelemetry-instrumentation-system-metrics", marker = "extra == 'monitoring'", specifier = ">=0.64b0,<1.0" },
     { name = "opentelemetry-sdk", marker = "extra == 'monitoring'", specifier = ">=1.20.0" },
     { name = "orb-py", extras = ["aws"], marker = "extra == 'all-providers'" },
     { name = "orb-py", extras = ["aws"], marker = "extra == 'test-aws'" },
@@ -3783,6 +3713,7 @@ requires-dist = [
     { name = "orb-py", extras = ["cli", "api", "sql", "monitoring", "all-providers"], marker = "extra == 'all'" },
     { name = "orb-py", extras = ["k8s"], marker = "extra == 'all-providers'" },
     { name = "orb-py", extras = ["k8s"], marker = "extra == 'test-k8s'" },
+    { name = "orb-py", extras = ["otel"], marker = "extra == 'monitoring'" },
     { name = "pathspec", marker = "extra == 'ci'", specifier = ">=0.11.0" },
     { name = "peewee", marker = "extra == 'ci'", specifier = ">=3.18.3" },
     { name = "pg8000", marker = "extra == 'ci'" },
@@ -3847,7 +3778,7 @@ requires-dist = [
     { name = "werkzeug", marker = "extra == 'ci'", specifier = ">=3.1.6" },
     { name = "wheel", marker = "extra == 'ci'", specifier = ">=0.41.3,<1.0.0" },
 ]
-provides-extras = ["sql", "aws", "k8s", "all-providers", "k8s-legacy", "ui", "cli", "api", "monitoring", "monitoring-aws", "all", "test-aws", "test-k8s", "ci", "dev"]
+provides-extras = ["sql", "aws", "k8s", "all-providers", "k8s-legacy", "ui", "cli", "api", "otel", "monitoring", "monitoring-aws", "all", "test-aws", "test-k8s", "ci", "dev"]
 
 [package.metadata.requires-dev]
 ci = [
@@ -3877,6 +3808,14 @@ ci = [
     { name = "mkdocstrings-python", specifier = ">=1.1.0,<3.0.0" },
     { name = "moto", extras = ["all"], specifier = ">=5.1.19,<6.0.0" },
     { name = "nltk", specifier = ">=3.9.3" },
+    { name = "opentelemetry-exporter-prometheus", specifier = ">=0.64b0,<1.0" },
+    { name = "opentelemetry-instrumentation-botocore", specifier = ">=0.64b0,<1.0" },
+    { name = "opentelemetry-instrumentation-click", specifier = ">=0.64b0,<1.0" },
+    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.41b0,<1.0" },
+    { name = "opentelemetry-instrumentation-logging", specifier = ">=0.64b0,<1.0" },
+    { name = "opentelemetry-instrumentation-sqlalchemy", specifier = ">=0.41b0,<1.0" },
+    { name = "opentelemetry-instrumentation-system-metrics", specifier = ">=0.64b0,<1.0" },
+    { name = "opentelemetry-sdk", specifier = ">=1.20.0" },
     { name = "pathspec", specifier = ">=0.11.0" },
     { name = "peewee", specifier = ">=3.18.3" },
     { name = "pg8000" },
@@ -3939,6 +3878,14 @@ dev = [
     { name = "mkdocstrings-python", specifier = ">=1.1.0,<3.0.0" },
     { name = "moto", extras = ["all"], specifier = ">=5.1.19,<6.0.0" },
     { name = "nltk", specifier = ">=3.9.3" },
+    { name = "opentelemetry-exporter-prometheus", specifier = ">=0.64b0,<1.0" },
+    { name = "opentelemetry-instrumentation-botocore", specifier = ">=0.64b0,<1.0" },
+    { name = "opentelemetry-instrumentation-click", specifier = ">=0.64b0,<1.0" },
+    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.41b0,<1.0" },
+    { name = "opentelemetry-instrumentation-logging", specifier = ">=0.64b0,<1.0" },
+    { name = "opentelemetry-instrumentation-sqlalchemy", specifier = ">=0.41b0,<1.0" },
+    { name = "opentelemetry-instrumentation-system-metrics", specifier = ">=0.64b0,<1.0" },
+    { name = "opentelemetry-sdk", specifier = ">=1.20.0" },
     { name = "pathspec", specifier = ">=0.11.0" },
     { name = "peewee", specifier = ">=3.18.3" },
     { name = "pg8000" },
@@ -4102,49 +4049,20 @@ wheels = [
 name = "pip-audit"
 version = "2.9.0"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.11'",
-    "python_full_version < '3.11'",
-]
 dependencies = [
-    { name = "cachecontrol", extra = ["filecache"], marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "cyclonedx-python-lib", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "packaging", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "pip-api", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "pip-requirements-parser", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "platformdirs", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "requests", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "rich", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "toml", marker = "extra == 'extra-6-orb-py-ui'" },
+    { name = "cachecontrol", extra = ["filecache"] },
+    { name = "cyclonedx-python-lib" },
+    { name = "packaging" },
+    { name = "pip-api" },
+    { name = "pip-requirements-parser" },
+    { name = "platformdirs" },
+    { name = "requests" },
+    { name = "rich" },
+    { name = "toml" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/cc/7f/28fad19a9806f796f13192ab6974c07c4a04d9cbb8e30dd895c3c11ce7ee/pip_audit-2.9.0.tar.gz", hash = "sha256:0b998410b58339d7a231e5aa004326a294e4c7c6295289cdc9d5e1ef07b1f44d", size = 52089, upload-time = "2025-04-07T16:45:23.679Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/43/9e/f4dfd9d3dadb6d6dc9406f1111062f871e2e248ed7b584cca6020baf2ac1/pip_audit-2.9.0-py3-none-any.whl", hash = "sha256:348b16e60895749a0839875d7cc27ebd692e1584ebe5d5cb145941c8e25a80bd", size = 58634, upload-time = "2025-04-07T16:45:22.056Z" },
-]
-
-[[package]]
-name = "pip-audit"
-version = "2.10.1"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.11'",
-    "python_full_version < '3.11'",
-]
-dependencies = [
-    { name = "cachecontrol", extra = ["filecache"], marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "cyclonedx-python-lib", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "packaging", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "pip-api", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "pip-requirements-parser", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "platformdirs", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "requests", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "rich", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "tomli", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "tomli-w", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/66/a4/f21d5f0a0edabcbce31560b73c7c5a6f72ae87af4236fd1069c8f59a353d/pip_audit-2.10.1.tar.gz", hash = "sha256:1eb4565d19ebe5d48996f4b770b4d2b32887e12cb12cfa637f1a064011b55ffc", size = 54275, upload-time = "2026-06-10T22:17:01.744Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a3/a7/b0c504148114047bd1bc9d97447453c6850ca176bb2f3c0038835994e8b7/pip_audit-2.10.1-py3-none-any.whl", hash = "sha256:99ef3f600a317c1945f1e89e227ef26e1c2d618429b8bd3fa6f4f7c440c4611a", size = 62023, upload-time = "2026-06-10T22:17:00.309Z" },
 ]
 
 [[package]]
@@ -4166,13 +4084,11 @@ version = "7.5.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "build" },
-    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "click", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
+    { name = "click" },
     { name = "pip" },
     { name = "pyproject-hooks" },
     { name = "setuptools" },
-    { name = "tomli", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "tomli", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
     { name = "wheel" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/4a/db/c6e2a02db5d98aa5f3250a305ce71e8bc3d1a022d1f47a54d14492ae23de/pip_tools-7.5.3.tar.gz", hash = "sha256:8fa364779ebc010cbfe17cb9de404457ac733e100840423f28f6955de7742d41", size = 176153, upload-time = "2026-02-11T18:25:07.72Z" }
@@ -4368,8 +4284,7 @@ name = "properdocs"
 version = "1.6.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "click", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
+    { name = "click" },
     { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
     { name = "ghp-import" },
     { name = "jinja2" },
@@ -4385,21 +4300,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ec/29/f27a4e1eddf72ed3db6e47818fbafe6debbf09fd7051f9c1a007239b46ef/properdocs-1.6.7.tar.gz", hash = "sha256:adc7b16e562890af0e098a7e5b02e3a81c20894a87d6a28d345c9300de73c26e", size = 276141, upload-time = "2026-03-20T20:07:48.167Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bd/4d/fc923f5c85318ee8cc903566dc4e0ebe41b2dfc1d2ecf5546db232397ed6/properdocs-1.6.7-py3-none-any.whl", hash = "sha256:6fa0cfa2e01bf338f684892c8a506cf70ea88ae7f3479c933b6fa20168101cbd", size = 225406, upload-time = "2026-03-20T20:07:46.875Z" },
-]
-
-[[package]]
-name = "protobuf"
-version = "6.33.6"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/66/70/e908e9c5e52ef7c3a6c7902c9dfbb34c7e29c25d2f81ade3856445fd5c94/protobuf-6.33.6.tar.gz", hash = "sha256:a6768d25248312c297558af96a9f9c929e8c4cee0659cb07e780731095f38135", size = 444531, upload-time = "2026-03-18T19:05:00.988Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/fc/9f/2f509339e89cfa6f6a4c4ff50438db9ca488dec341f7e454adad60150b00/protobuf-6.33.6-cp310-abi3-win32.whl", hash = "sha256:7d29d9b65f8afef196f8334e80d6bc1d5d4adedb449971fefd3723824e6e77d3", size = 425739, upload-time = "2026-03-18T19:04:48.373Z" },
-    { url = "https://files.pythonhosted.org/packages/76/5d/683efcd4798e0030c1bab27374fd13a89f7c2515fb1f3123efdfaa5eab57/protobuf-6.33.6-cp310-abi3-win_amd64.whl", hash = "sha256:0cd27b587afca21b7cfa59a74dcbd48a50f0a6400cfb59391340ad729d91d326", size = 437089, upload-time = "2026-03-18T19:04:50.381Z" },
-    { url = "https://files.pythonhosted.org/packages/5c/01/a3c3ed5cd186f39e7880f8303cc51385a198a81469d53d0fdecf1f64d929/protobuf-6.33.6-cp39-abi3-macosx_10_9_universal2.whl", hash = "sha256:9720e6961b251bde64edfdab7d500725a2af5280f3f4c87e57c0208376aa8c3a", size = 427737, upload-time = "2026-03-18T19:04:51.866Z" },
-    { url = "https://files.pythonhosted.org/packages/ee/90/b3c01fdec7d2f627b3a6884243ba328c1217ed2d978def5c12dc50d328a3/protobuf-6.33.6-cp39-abi3-manylinux2014_aarch64.whl", hash = "sha256:e2afbae9b8e1825e3529f88d514754e094278bb95eadc0e199751cdd9a2e82a2", size = 324610, upload-time = "2026-03-18T19:04:53.096Z" },
-    { url = "https://files.pythonhosted.org/packages/9b/ca/25afc144934014700c52e05103c2421997482d561f3101ff352e1292fb81/protobuf-6.33.6-cp39-abi3-manylinux2014_s390x.whl", hash = "sha256:c96c37eec15086b79762ed265d59ab204dabc53056e3443e702d2681f4b39ce3", size = 339381, upload-time = "2026-03-18T19:04:54.616Z" },
-    { url = "https://files.pythonhosted.org/packages/16/92/d1e32e3e0d894fe00b15ce28ad4944ab692713f2e7f0a99787405e43533a/protobuf-6.33.6-cp39-abi3-manylinux2014_x86_64.whl", hash = "sha256:e9db7e292e0ab79dd108d7f1a94fe31601ce1ee3f7b79e0692043423020b0593", size = 323436, upload-time = "2026-03-18T19:04:55.768Z" },
-    { url = "https://files.pythonhosted.org/packages/c4/72/02445137af02769918a93807b2b7890047c32bfb9f90371cbc12688819eb/protobuf-6.33.6-py3-none-any.whl", hash = "sha256:77179e006c476e69bf8e8ce866640091ec42e1beb80b213c3900006ecfba6901", size = 170656, upload-time = "2026-03-18T19:04:59.826Z" },
 ]
 
 [[package]]
@@ -4668,11 +4568,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/a3/5e/ecf12fdb62546d64385c158514e9b2b671f7832108ef2ecd2020ce0af2d1/pyjwt-2.13.0-py3-none-any.whl", hash = "sha256:66adcc2aff09b3f1bbd95fc1e1577df8ac8723c978552fd43304c8a290ac5728", size = 31274, upload-time = "2026-05-21T19:54:35.362Z" },
 ]
 
-[package.optional-dependencies]
-crypto = [
-    { name = "cryptography", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-]
-
 [[package]]
 name = "pymdown-extensions"
 version = "11.0.1"
@@ -4728,8 +4623,7 @@ dependencies = [
     { name = "packaging" },
     { name = "pluggy" },
     { name = "pygments" },
-    { name = "tomli", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "tomli", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
 wheels = [
@@ -4785,8 +4679,8 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "pytest", marker = "(python_full_version < '3.11' and extra == 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "tomli", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "pytest", marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1f/31/27f28431a16b83cab7a636dce59cf397517807d247caa38ee67d65e71ef8/pytest_env-1.1.5.tar.gz", hash = "sha256:91209840aa0e43385073ac464a554ad2947cc2fd663a9debf88d03b01e0cc1cf", size = 8911, upload-time = "2024-09-17T22:39:18.566Z" }
 wheels = [
@@ -4799,12 +4693,10 @@ version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.11'",
-    "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "pytest", marker = "python_full_version >= '3.11' or extra != 'extra-6-orb-py-ui' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "python-dotenv", marker = "python_full_version >= '3.11' or extra != 'extra-6-orb-py-ui' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "tomli", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "pytest", marker = "python_full_version >= '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "python-dotenv", marker = "python_full_version >= '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ff/69/4db1c30625af0621df8dbe73797b38b6d1b04e15d021dd5d26a6d297f78c/pytest_env-1.6.0.tar.gz", hash = "sha256:ac02d6fba16af54d61e311dd70a3c61024a4e966881ea844affc3c8f0bf207d3", size = 16163, upload-time = "2026-03-12T22:39:43.78Z" }
 wheels = [
@@ -4947,8 +4839,7 @@ name = "python-semantic-release"
 version = "10.6.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "click", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
+    { name = "click" },
     { name = "click-option-group" },
     { name = "deprecated" },
     { name = "dotty-dict" },
@@ -5146,7 +5037,7 @@ name = "reflex"
 version = "0.9.6.post1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click", version = "8.4.2", source = { registry = "https://pypi.org/simple" } },
+    { name = "click" },
     { name = "granian", extra = ["reload"], marker = "extra == 'extra-6-orb-py-ui'" },
     { name = "httpx" },
     { name = "packaging" },
@@ -5360,7 +5251,7 @@ name = "reflex-hosting-cli"
 version = "0.1.67"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click", version = "8.4.2", source = { registry = "https://pypi.org/simple" } },
+    { name = "click" },
     { name = "httpx" },
     { name = "packaging" },
     { name = "platformdirs" },
@@ -5859,29 +5750,12 @@ wheels = [
 name = "ruamel-yaml"
 version = "0.17.40"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.11'",
-    "python_full_version < '3.11'",
-]
 dependencies = [
-    { name = "ruamel-yaml-clib", marker = "(python_full_version < '3.13' and platform_python_implementation == 'CPython' and extra == 'extra-6-orb-py-ui') or (python_full_version >= '3.13' and extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (python_full_version >= '3.13' and extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev') or (platform_python_implementation != 'CPython' and extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (platform_python_implementation != 'CPython' and extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "ruamel-yaml-clib", marker = "(python_full_version < '3.13' and platform_python_implementation == 'CPython') or (python_full_version >= '3.13' and extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (python_full_version >= '3.13' and extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev') or (platform_python_implementation != 'CPython' and extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (platform_python_implementation != 'CPython' and extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d1/d6/eb2833ccba5ea36f8f4de4bcfa0d1a91eb618f832d430b70e3086821f251/ruamel.yaml-0.17.40.tar.gz", hash = "sha256:6024b986f06765d482b5b07e086cc4b4cd05dd22ddcbc758fa23d54873cf313d", size = 137672, upload-time = "2023-10-20T12:53:56.073Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/35/79/5e2cffa1c77432f11cd93a5351f30732c997a239d3a3090856a72d6d8ba7/ruamel.yaml-0.17.40-py3-none-any.whl", hash = "sha256:b16b6c3816dff0a93dca12acf5e70afd089fa5acb80604afd1ffa8b465b7722c", size = 113666, upload-time = "2023-10-20T12:53:52.628Z" },
-]
-
-[[package]]
-name = "ruamel-yaml"
-version = "0.19.1"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.11'",
-    "python_full_version < '3.11'",
-]
-sdist = { url = "https://files.pythonhosted.org/packages/c7/3b/ebda527b56beb90cb7652cb1c7e4f91f48649fbcd8d2eb2fb6e77cd3329b/ruamel_yaml-0.19.1.tar.gz", hash = "sha256:53eb66cd27849eff968ebf8f0bf61f46cdac2da1d1f3576dd4ccee9b25c31993", size = 142709, upload-time = "2026-01-02T16:50:31.84Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b8/0c/51f6841f1d84f404f92463fc2b1ba0da357ca1e3db6b7fbda26956c3b82a/ruamel_yaml-0.19.1-py3-none-any.whl", hash = "sha256:27592957fedf6e0b62f281e96effd28043345e0e66001f97683aa9a40c667c93", size = 118102, upload-time = "2026-01-02T16:50:29.201Z" },
 ]
 
 [[package]]
@@ -5986,8 +5860,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "authlib" },
     { name = "certifi" },
-    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "click", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
+    { name = "click" },
     { name = "dparse" },
     { name = "filelock" },
     { name = "httpx" },
@@ -5996,12 +5869,10 @@ dependencies = [
     { name = "nltk" },
     { name = "packaging" },
     { name = "pydantic" },
-    { name = "ruamel-yaml", version = "0.17.40", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "ruamel-yaml", version = "0.19.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
+    { name = "ruamel-yaml" },
     { name = "safety-schemas" },
     { name = "tenacity" },
-    { name = "tomli", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "tomli", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
     { name = "tomlkit" },
     { name = "truststore" },
     { name = "typer" },
@@ -6020,8 +5891,7 @@ dependencies = [
     { name = "dparse" },
     { name = "packaging" },
     { name = "pydantic" },
-    { name = "ruamel-yaml", version = "0.17.40", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "ruamel-yaml", version = "0.19.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
+    { name = "ruamel-yaml" },
     { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c2/ef/0e07dfdb4104c4e42ae9fc6e8a0da7be2d72ac2ee198b32f7500796de8f3/safety_schemas-0.0.16.tar.gz", hash = "sha256:3bb04d11bd4b5cc79f9fa183c658a6a8cf827a9ceec443a5ffa6eed38a50a24e", size = 54815, upload-time = "2025-09-16T14:35:31.973Z" }
@@ -6068,41 +5938,28 @@ wheels = [
 ]
 
 [[package]]
-name = "semantic-version"
-version = "2.10.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/7d/31/f2289ce78b9b473d582568c234e104d2a342fd658cc288a7553d83bb8595/semantic_version-2.10.0.tar.gz", hash = "sha256:bdabb6d336998cbb378d4b9db3a4b56a1e3235701dc05ea2690d9a997ed5041c", size = 52289, upload-time = "2022-05-26T13:35:23.454Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/6a/23/8146aad7d88f4fcb3a6218f41a60f6c2d4e3a72de72da1825dc7c8f7877c/semantic_version-2.10.0-py2.py3-none-any.whl", hash = "sha256:de78a3b8e0feda74cabc54aab2da702113e33ac9d9eb9d2389bcf1f58b7d9177", size = 15552, upload-time = "2022-05-26T13:35:21.206Z" },
-]
-
-[[package]]
 name = "semgrep"
 version = "1.79.0"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.11'",
-    "python_full_version < '3.11'",
-]
 dependencies = [
-    { name = "attrs", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "boltons", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "click", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "click-option-group", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "colorama", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "defusedxml", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "exceptiongroup", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "glom", version = "22.1.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "jsonschema", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "packaging", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "peewee", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "requests", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "rich", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "ruamel-yaml", version = "0.17.40", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "tomli", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "typing-extensions", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "urllib3", marker = "extra == 'extra-6-orb-py-ui'" },
-    { name = "wcmatch", marker = "extra == 'extra-6-orb-py-ui'" },
+    { name = "attrs" },
+    { name = "boltons" },
+    { name = "click" },
+    { name = "click-option-group" },
+    { name = "colorama" },
+    { name = "defusedxml" },
+    { name = "exceptiongroup" },
+    { name = "glom" },
+    { name = "jsonschema" },
+    { name = "packaging" },
+    { name = "peewee" },
+    { name = "requests" },
+    { name = "rich" },
+    { name = "ruamel-yaml" },
+    { name = "tomli" },
+    { name = "typing-extensions" },
+    { name = "urllib3" },
+    { name = "wcmatch" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/45/61/9ee9e601ddc9f9073708d4e6886d0c7021b59b3180b6cb53c0bd01b393d9/semgrep-1.79.0.tar.gz", hash = "sha256:fde15d090b4beb865e12c2c727404c8dee2f41b9d793a7f972b278cdefb22bea", size = 27421587, upload-time = "2024-07-10T10:06:05.122Z" }
 wheels = [
@@ -6110,54 +5967,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/e9/23/eff37582f900cf742b5fc7709dfd0e63cc2bc0faefe6ec200f150666fa7a/semgrep-1.79.0-cp38.cp39.cp310.cp311.py37.py38.py39.py310.py311-none-macosx_10_14_x86_64.whl", hash = "sha256:4b22b5f4db17204648baf8bc58fcd74c09eb5f41bd407422193253b4de9af18e", size = 28050871, upload-time = "2024-07-10T10:05:52.086Z" },
     { url = "https://files.pythonhosted.org/packages/d6/88/35615a4e1142755cb3d2c86d63160f63ab770c111c82de9318bba27fb888/semgrep-1.79.0-cp38.cp39.cp310.cp311.py37.py38.py39.py310.py311-none-macosx_11_0_arm64.whl", hash = "sha256:fe5cf0ac8afdb786cbd4e6c97c418ca7adc8f4c42584a69dc7c10e15db5f7d9b", size = 33805877, upload-time = "2024-07-10T10:05:56.42Z" },
     { url = "https://files.pythonhosted.org/packages/fd/84/3b6afc829f54b331f47d55c565096ef74a98d96d794612d2e5330062d373/semgrep-1.79.0-cp38.cp39.cp310.cp311.py37.py38.py39.py310.py311-none-musllinux_1_0_aarch64.manylinux2014_aarch64.whl", hash = "sha256:41797931371d05c41a6e09861b3d631136b4fe644d80802b2fd48af650e5fa5a", size = 32479030, upload-time = "2024-07-10T10:06:00.777Z" },
-]
-
-[[package]]
-name = "semgrep"
-version = "1.168.0"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.11'",
-    "python_full_version < '3.11'",
-]
-dependencies = [
-    { name = "attrs", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "boltons", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "click-option-group", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "colorama", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "exceptiongroup", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "glom", version = "25.12.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "jsonschema", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "mcp", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "opentelemetry-api", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "opentelemetry-exporter-otlp-proto-http", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "opentelemetry-instrumentation-requests", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "opentelemetry-instrumentation-threading", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "opentelemetry-sdk", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "packaging", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "peewee", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "pyjwt", extra = ["crypto"], marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "pywin32", marker = "(sys_platform == 'win32' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "requests", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "rich", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "ruamel-yaml", version = "0.19.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "ruamel-yaml-clib", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "semantic-version", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "tomli", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "typing-extensions", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "urllib3", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "wcmatch", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/ed/33/c40bd1f104d66817c082773cb9b6ba65ff50c53ccd118f8da747205dac0b/semgrep-1.168.0.tar.gz", hash = "sha256:a072b1734b5c54e39cbbe957b10cf0b83a114b9b9fc762b4ea51afe2f114cd11", size = 497911, upload-time = "2026-06-24T19:37:38.805Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e9/04/bfeed9429e302db73c54b1f06993361b7abd5d9e4abcdfee0031e35f90a3/semgrep-1.168.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-macosx_10_14_x86_64.whl", hash = "sha256:1a5d6b5b47347b22bcb1d6f15a5e51a21e734244884624c3494e09bc1de955cd", size = 45011229, upload-time = "2026-06-24T19:38:58.978Z" },
-    { url = "https://files.pythonhosted.org/packages/f6/61/c3aaf9b1d435707af74f7008063402107b9e2532337aa8b7cffea00e11bc/semgrep-1.168.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-macosx_11_0_arm64.whl", hash = "sha256:e6b85d84e815ff86f56dcb6b4a6370b98f1bc0e402144daafa9b41aa00ea9a90", size = 49030891, upload-time = "2026-06-24T19:39:02.608Z" },
-    { url = "https://files.pythonhosted.org/packages/76/31/e4545bb66c7334660541ababf771189a123259f6bf5d945d20ca2045d2ab/semgrep-1.168.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-manylinux_2_34_aarch64.whl", hash = "sha256:fa22f0a41ee3857ecec1b3883b2920b1d41d07ef1bdd7e216da3c519210ae5fb", size = 70903799, upload-time = "2026-06-24T19:39:05.888Z" },
-    { url = "https://files.pythonhosted.org/packages/01/6c/3398532fe8ced8d3f01fad16231f496b878c83c534d9266df1cbe4aaea35/semgrep-1.168.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-manylinux_2_34_x86_64.whl", hash = "sha256:09dfacb0530ed4a17bd2deb7914e9a25fc3581d5d84d5365cdac77bbebed8081", size = 68761991, upload-time = "2026-06-24T19:39:09.255Z" },
-    { url = "https://files.pythonhosted.org/packages/35/d4/bff2a3216900c4d564ca84fb2f4ca2811e2127b684edd90124e07b68732d/semgrep-1.168.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-musllinux_1_2_aarch64.whl", hash = "sha256:d288699c4c056cc3d7cf82830e00f9c07fac33227c3a5290a2113bd1be63da46", size = 77644734, upload-time = "2026-06-24T19:39:12.826Z" },
-    { url = "https://files.pythonhosted.org/packages/b1/7c/e10a59a82120eb2561281edbbb688419688d8c9b589ca9a32bd47968ae2e/semgrep-1.168.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-musllinux_1_2_x86_64.whl", hash = "sha256:c4a664f4dda097fbdf657d64f79217e94c4d87502c16c991fac569f07aaecb8e", size = 75161809, upload-time = "2026-06-24T19:39:16.695Z" },
-    { url = "https://files.pythonhosted.org/packages/eb/b4/3fc0345031d40f49354b1052ac4faf603dcb92019dacdc4b8fd4e3639b9b/semgrep-1.168.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-win_amd64.whl", hash = "sha256:86e99b095b80492b6cfe5087bf4a3b0175a1132c9c9dcd25a96c3745cc58d85a", size = 56931035, upload-time = "2026-06-24T19:39:20.217Z" },
 ]
 
 [[package]]
@@ -6282,19 +6091,6 @@ wheels = [
 ]
 
 [[package]]
-name = "sse-starlette"
-version = "3.4.5"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "anyio", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "starlette", marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/d2/1b/bc9e3e7a72dcdad7dc7888758f5d00f56f8909ed5cfdff822bd72bb4c520/sse_starlette-3.4.5.tar.gz", hash = "sha256:83072538bc211a2f68b7b0422226c4af3e9b62e106e07034664b832ca019842a", size = 35249, upload-time = "2026-06-20T17:36:58.322Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/78/75/c88d3f5dafd59c791da1ce27650d30bf5b70cbf1cbf01cd00e5f9e360915/sse_starlette-3.4.5-py3-none-any.whl", hash = "sha256:e71bad53323f65573c3864a6c3bd0c1eb6e5f092b2e48082b0c35927d19ca296", size = 16518, upload-time = "2026-06-20T17:36:56.729Z" },
-]
-
-[[package]]
 name = "stack-data"
 version = "0.6.3"
 source = { registry = "https://pypi.org/simple" }
@@ -6379,80 +6175,9 @@ wheels = [
 name = "tomli"
 version = "2.0.2"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.11'",
-    "python_full_version < '3.11'",
-]
 sdist = { url = "https://files.pythonhosted.org/packages/35/b9/de2a5c0144d7d75a57ff355c0c24054f965b2dc3036456ae03a51ea6264b/tomli-2.0.2.tar.gz", hash = "sha256:d46d457a85337051c36524bc5349dd91b1877838e2979ac5ced3e710ed8a60ed", size = 16096, upload-time = "2024-10-02T10:46:13.208Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cf/db/ce8eda256fa131af12e0a76d481711abe4681b6923c27efb9a255c9e4594/tomli-2.0.2-py3-none-any.whl", hash = "sha256:2ebe24485c53d303f690b0ec092806a085f07af5a5aa1464f3931eec36caaa38", size = 13237, upload-time = "2024-10-02T10:46:11.806Z" },
-]
-
-[[package]]
-name = "tomli"
-version = "2.4.1"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.11'",
-    "python_full_version < '3.11'",
-]
-sdist = { url = "https://files.pythonhosted.org/packages/22/de/48c59722572767841493b26183a0d1cc411d54fd759c5607c4590b6563a6/tomli-2.4.1.tar.gz", hash = "sha256:7c7e1a961a0b2f2472c1ac5b69affa0ae1132c39adcb67aba98568702b9cc23f", size = 17543, upload-time = "2026-03-25T20:22:03.828Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f4/11/db3d5885d8528263d8adc260bb2d28ebf1270b96e98f0e0268d32b8d9900/tomli-2.4.1-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:f8f0fc26ec2cc2b965b7a3b87cd19c5c6b8c5e5f436b984e85f486d652285c30", size = 154704, upload-time = "2026-03-25T20:21:10.473Z" },
-    { url = "https://files.pythonhosted.org/packages/6d/f7/675db52c7e46064a9aa928885a9b20f4124ecb9bc2e1ce74c9106648d202/tomli-2.4.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:4ab97e64ccda8756376892c53a72bd1f964e519c77236368527f758fbc36a53a", size = 149454, upload-time = "2026-03-25T20:21:12.036Z" },
-    { url = "https://files.pythonhosted.org/packages/61/71/81c50943cf953efa35bce7646caab3cf457a7d8c030b27cfb40d7235f9ee/tomli-2.4.1-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:96481a5786729fd470164b47cdb3e0e58062a496f455ee41b4403be77cb5a076", size = 237561, upload-time = "2026-03-25T20:21:13.098Z" },
-    { url = "https://files.pythonhosted.org/packages/48/c1/f41d9cb618acccca7df82aaf682f9b49013c9397212cb9f53219e3abac37/tomli-2.4.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:5a881ab208c0baf688221f8cecc5401bd291d67e38a1ac884d6736cbcd8247e9", size = 243824, upload-time = "2026-03-25T20:21:14.569Z" },
-    { url = "https://files.pythonhosted.org/packages/22/e4/5a816ecdd1f8ca51fb756ef684b90f2780afc52fc67f987e3c61d800a46d/tomli-2.4.1-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:47149d5bd38761ac8be13a84864bf0b7b70bc051806bc3669ab1cbc56216b23c", size = 242227, upload-time = "2026-03-25T20:21:15.712Z" },
-    { url = "https://files.pythonhosted.org/packages/6b/49/2b2a0ef529aa6eec245d25f0c703e020a73955ad7edf73e7f54ddc608aa5/tomli-2.4.1-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:ec9bfaf3ad2df51ace80688143a6a4ebc09a248f6ff781a9945e51937008fcbc", size = 247859, upload-time = "2026-03-25T20:21:17.001Z" },
-    { url = "https://files.pythonhosted.org/packages/83/bd/6c1a630eaca337e1e78c5903104f831bda934c426f9231429396ce3c3467/tomli-2.4.1-cp311-cp311-win32.whl", hash = "sha256:ff2983983d34813c1aeb0fa89091e76c3a22889ee83ab27c5eeb45100560c049", size = 97204, upload-time = "2026-03-25T20:21:18.079Z" },
-    { url = "https://files.pythonhosted.org/packages/42/59/71461df1a885647e10b6bb7802d0b8e66480c61f3f43079e0dcd315b3954/tomli-2.4.1-cp311-cp311-win_amd64.whl", hash = "sha256:5ee18d9ebdb417e384b58fe414e8d6af9f4e7a0ae761519fb50f721de398dd4e", size = 108084, upload-time = "2026-03-25T20:21:18.978Z" },
-    { url = "https://files.pythonhosted.org/packages/b8/83/dceca96142499c069475b790e7913b1044c1a4337e700751f48ed723f883/tomli-2.4.1-cp311-cp311-win_arm64.whl", hash = "sha256:c2541745709bad0264b7d4705ad453b76ccd191e64aa6f0fc66b69a293a45ece", size = 95285, upload-time = "2026-03-25T20:21:20.309Z" },
-    { url = "https://files.pythonhosted.org/packages/c1/ba/42f134a3fe2b370f555f44b1d72feebb94debcab01676bf918d0cb70e9aa/tomli-2.4.1-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:c742f741d58a28940ce01d58f0ab2ea3ced8b12402f162f4d534dfe18ba1cd6a", size = 155924, upload-time = "2026-03-25T20:21:21.626Z" },
-    { url = "https://files.pythonhosted.org/packages/dc/c7/62d7a17c26487ade21c5422b646110f2162f1fcc95980ef7f63e73c68f14/tomli-2.4.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:7f86fd587c4ed9dd76f318225e7d9b29cfc5a9d43de44e5754db8d1128487085", size = 150018, upload-time = "2026-03-25T20:21:23.002Z" },
-    { url = "https://files.pythonhosted.org/packages/5c/05/79d13d7c15f13bdef410bdd49a6485b1c37d28968314eabee452c22a7fda/tomli-2.4.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:ff18e6a727ee0ab0388507b89d1bc6a22b138d1e2fa56d1ad494586d61d2eae9", size = 244948, upload-time = "2026-03-25T20:21:24.04Z" },
-    { url = "https://files.pythonhosted.org/packages/10/90/d62ce007a1c80d0b2c93e02cab211224756240884751b94ca72df8a875ca/tomli-2.4.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:136443dbd7e1dee43c68ac2694fde36b2849865fa258d39bf822c10e8068eac5", size = 253341, upload-time = "2026-03-25T20:21:25.177Z" },
-    { url = "https://files.pythonhosted.org/packages/1a/7e/caf6496d60152ad4ed09282c1885cca4eea150bfd007da84aea07bcc0a3e/tomli-2.4.1-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:5e262d41726bc187e69af7825504c933b6794dc3fbd5945e41a79bb14c31f585", size = 248159, upload-time = "2026-03-25T20:21:26.364Z" },
-    { url = "https://files.pythonhosted.org/packages/99/e7/c6f69c3120de34bbd882c6fba7975f3d7a746e9218e56ab46a1bc4b42552/tomli-2.4.1-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:5cb41aa38891e073ee49d55fbc7839cfdb2bc0e600add13874d048c94aadddd1", size = 253290, upload-time = "2026-03-25T20:21:27.46Z" },
-    { url = "https://files.pythonhosted.org/packages/d6/2f/4a3c322f22c5c66c4b836ec58211641a4067364f5dcdd7b974b4c5da300c/tomli-2.4.1-cp312-cp312-win32.whl", hash = "sha256:da25dc3563bff5965356133435b757a795a17b17d01dbc0f42fb32447ddfd917", size = 98141, upload-time = "2026-03-25T20:21:28.492Z" },
-    { url = "https://files.pythonhosted.org/packages/24/22/4daacd05391b92c55759d55eaee21e1dfaea86ce5c571f10083360adf534/tomli-2.4.1-cp312-cp312-win_amd64.whl", hash = "sha256:52c8ef851d9a240f11a88c003eacb03c31fc1c9c4ec64a99a0f922b93874fda9", size = 108847, upload-time = "2026-03-25T20:21:29.386Z" },
-    { url = "https://files.pythonhosted.org/packages/68/fd/70e768887666ddd9e9f5d85129e84910f2db2796f9096aa02b721a53098d/tomli-2.4.1-cp312-cp312-win_arm64.whl", hash = "sha256:f758f1b9299d059cc3f6546ae2af89670cb1c4d48ea29c3cacc4fe7de3058257", size = 95088, upload-time = "2026-03-25T20:21:30.677Z" },
-    { url = "https://files.pythonhosted.org/packages/07/06/b823a7e818c756d9a7123ba2cda7d07bc2dd32835648d1a7b7b7a05d848d/tomli-2.4.1-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:36d2bd2ad5fb9eaddba5226aa02c8ec3fa4f192631e347b3ed28186d43be6b54", size = 155866, upload-time = "2026-03-25T20:21:31.65Z" },
-    { url = "https://files.pythonhosted.org/packages/14/6f/12645cf7f08e1a20c7eb8c297c6f11d31c1b50f316a7e7e1e1de6e2e7b7e/tomli-2.4.1-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:eb0dc4e38e6a1fd579e5d50369aa2e10acfc9cace504579b2faabb478e76941a", size = 149887, upload-time = "2026-03-25T20:21:33.028Z" },
-    { url = "https://files.pythonhosted.org/packages/5c/e0/90637574e5e7212c09099c67ad349b04ec4d6020324539297b634a0192b0/tomli-2.4.1-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:c7f2c7f2b9ca6bdeef8f0fa897f8e05085923eb091721675170254cbc5b02897", size = 243704, upload-time = "2026-03-25T20:21:34.51Z" },
-    { url = "https://files.pythonhosted.org/packages/10/8f/d3ddb16c5a4befdf31a23307f72828686ab2096f068eaf56631e136c1fdd/tomli-2.4.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:f3c6818a1a86dd6dca7ddcaaf76947d5ba31aecc28cb1b67009a5877c9a64f3f", size = 251628, upload-time = "2026-03-25T20:21:36.012Z" },
-    { url = "https://files.pythonhosted.org/packages/e3/f1/dbeeb9116715abee2485bf0a12d07a8f31af94d71608c171c45f64c0469d/tomli-2.4.1-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:d312ef37c91508b0ab2cee7da26ec0b3ed2f03ce12bd87a588d771ae15dcf82d", size = 247180, upload-time = "2026-03-25T20:21:37.136Z" },
-    { url = "https://files.pythonhosted.org/packages/d3/74/16336ffd19ed4da28a70959f92f506233bd7cfc2332b20bdb01591e8b1d1/tomli-2.4.1-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:51529d40e3ca50046d7606fa99ce3956a617f9b36380da3b7f0dd3dd28e68cb5", size = 251674, upload-time = "2026-03-25T20:21:38.298Z" },
-    { url = "https://files.pythonhosted.org/packages/16/f9/229fa3434c590ddf6c0aa9af64d3af4b752540686cace29e6281e3458469/tomli-2.4.1-cp313-cp313-win32.whl", hash = "sha256:2190f2e9dd7508d2a90ded5ed369255980a1bcdd58e52f7fe24b8162bf9fedbd", size = 97976, upload-time = "2026-03-25T20:21:39.316Z" },
-    { url = "https://files.pythonhosted.org/packages/6a/1e/71dfd96bcc1c775420cb8befe7a9d35f2e5b1309798f009dca17b7708c1e/tomli-2.4.1-cp313-cp313-win_amd64.whl", hash = "sha256:8d65a2fbf9d2f8352685bc1364177ee3923d6baf5e7f43ea4959d7d8bc326a36", size = 108755, upload-time = "2026-03-25T20:21:40.248Z" },
-    { url = "https://files.pythonhosted.org/packages/83/7a/d34f422a021d62420b78f5c538e5b102f62bea616d1d75a13f0a88acb04a/tomli-2.4.1-cp313-cp313-win_arm64.whl", hash = "sha256:4b605484e43cdc43f0954ddae319fb75f04cc10dd80d830540060ee7cd0243cd", size = 95265, upload-time = "2026-03-25T20:21:41.219Z" },
-    { url = "https://files.pythonhosted.org/packages/3c/fb/9a5c8d27dbab540869f7c1f8eb0abb3244189ce780ba9cd73f3770662072/tomli-2.4.1-cp314-cp314-macosx_10_15_x86_64.whl", hash = "sha256:fd0409a3653af6c147209d267a0e4243f0ae46b011aa978b1080359fddc9b6cf", size = 155726, upload-time = "2026-03-25T20:21:42.23Z" },
-    { url = "https://files.pythonhosted.org/packages/62/05/d2f816630cc771ad836af54f5001f47a6f611d2d39535364f148b6a92d6b/tomli-2.4.1-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:a120733b01c45e9a0c34aeef92bf0cf1d56cfe81ed9d47d562f9ed591a9828ac", size = 149859, upload-time = "2026-03-25T20:21:43.386Z" },
-    { url = "https://files.pythonhosted.org/packages/ce/48/66341bdb858ad9bd0ceab5a86f90eddab127cf8b046418009f2125630ecb/tomli-2.4.1-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:559db847dc486944896521f68d8190be1c9e719fced785720d2216fe7022b662", size = 244713, upload-time = "2026-03-25T20:21:44.474Z" },
-    { url = "https://files.pythonhosted.org/packages/df/6d/c5fad00d82b3c7a3ab6189bd4b10e60466f22cfe8a08a9394185c8a8111c/tomli-2.4.1-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:01f520d4f53ef97964a240a035ec2a869fe1a37dde002b57ebc4417a27ccd853", size = 252084, upload-time = "2026-03-25T20:21:45.62Z" },
-    { url = "https://files.pythonhosted.org/packages/00/71/3a69e86f3eafe8c7a59d008d245888051005bd657760e96d5fbfb0b740c2/tomli-2.4.1-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:7f94b27a62cfad8496c8d2513e1a222dd446f095fca8987fceef261225538a15", size = 247973, upload-time = "2026-03-25T20:21:46.937Z" },
-    { url = "https://files.pythonhosted.org/packages/67/50/361e986652847fec4bd5e4a0208752fbe64689c603c7ae5ea7cb16b1c0ca/tomli-2.4.1-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:ede3e6487c5ef5d28634ba3f31f989030ad6af71edfb0055cbbd14189ff240ba", size = 256223, upload-time = "2026-03-25T20:21:48.467Z" },
-    { url = "https://files.pythonhosted.org/packages/8c/9a/b4173689a9203472e5467217e0154b00e260621caa227b6fa01feab16998/tomli-2.4.1-cp314-cp314-win32.whl", hash = "sha256:3d48a93ee1c9b79c04bb38772ee1b64dcf18ff43085896ea460ca8dec96f35f6", size = 98973, upload-time = "2026-03-25T20:21:49.526Z" },
-    { url = "https://files.pythonhosted.org/packages/14/58/640ac93bf230cd27d002462c9af0d837779f8773bc03dee06b5835208214/tomli-2.4.1-cp314-cp314-win_amd64.whl", hash = "sha256:88dceee75c2c63af144e456745e10101eb67361050196b0b6af5d717254dddf7", size = 109082, upload-time = "2026-03-25T20:21:50.506Z" },
-    { url = "https://files.pythonhosted.org/packages/d5/2f/702d5e05b227401c1068f0d386d79a589bb12bf64c3d2c72ce0631e3bc49/tomli-2.4.1-cp314-cp314-win_arm64.whl", hash = "sha256:b8c198f8c1805dc42708689ed6864951fd2494f924149d3e4bce7710f8eb5232", size = 96490, upload-time = "2026-03-25T20:21:51.474Z" },
-    { url = "https://files.pythonhosted.org/packages/45/4b/b877b05c8ba62927d9865dd980e34a755de541eb65fffba52b4cc495d4d2/tomli-2.4.1-cp314-cp314t-macosx_10_15_x86_64.whl", hash = "sha256:d4d8fe59808a54658fcc0160ecfb1b30f9089906c50b23bcb4c69eddc19ec2b4", size = 164263, upload-time = "2026-03-25T20:21:52.543Z" },
-    { url = "https://files.pythonhosted.org/packages/24/79/6ab420d37a270b89f7195dec5448f79400d9e9c1826df982f3f8e97b24fd/tomli-2.4.1-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:7008df2e7655c495dd12d2a4ad038ff878d4ca4b81fccaf82b714e07eae4402c", size = 160736, upload-time = "2026-03-25T20:21:53.674Z" },
-    { url = "https://files.pythonhosted.org/packages/02/e0/3630057d8eb170310785723ed5adcdfb7d50cb7e6455f85ba8a3deed642b/tomli-2.4.1-cp314-cp314t-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:1d8591993e228b0c930c4bb0db464bdad97b3289fb981255d6c9a41aedc84b2d", size = 270717, upload-time = "2026-03-25T20:21:55.129Z" },
-    { url = "https://files.pythonhosted.org/packages/7a/b4/1613716072e544d1a7891f548d8f9ec6ce2faf42ca65acae01d76ea06bb0/tomli-2.4.1-cp314-cp314t-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:734e20b57ba95624ecf1841e72b53f6e186355e216e5412de414e3c51e5e3c41", size = 278461, upload-time = "2026-03-25T20:21:56.228Z" },
-    { url = "https://files.pythonhosted.org/packages/05/38/30f541baf6a3f6df77b3df16b01ba319221389e2da59427e221ef417ac0c/tomli-2.4.1-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:8a650c2dbafa08d42e51ba0b62740dae4ecb9338eefa093aa5c78ceb546fcd5c", size = 274855, upload-time = "2026-03-25T20:21:57.653Z" },
-    { url = "https://files.pythonhosted.org/packages/77/a3/ec9dd4fd2c38e98de34223b995a3b34813e6bdadf86c75314c928350ed14/tomli-2.4.1-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:504aa796fe0569bb43171066009ead363de03675276d2d121ac1a4572397870f", size = 283144, upload-time = "2026-03-25T20:21:59.089Z" },
-    { url = "https://files.pythonhosted.org/packages/ef/be/605a6261cac79fba2ec0c9827e986e00323a1945700969b8ee0b30d85453/tomli-2.4.1-cp314-cp314t-win32.whl", hash = "sha256:b1d22e6e9387bf4739fbe23bfa80e93f6b0373a7f1b96c6227c32bef95a4d7a8", size = 108683, upload-time = "2026-03-25T20:22:00.214Z" },
-    { url = "https://files.pythonhosted.org/packages/12/64/da524626d3b9cc40c168a13da8335fe1c51be12c0a63685cc6db7308daae/tomli-2.4.1-cp314-cp314t-win_amd64.whl", hash = "sha256:2c1c351919aca02858f740c6d33adea0c5deea37f9ecca1cc1ef9e884a619d26", size = 121196, upload-time = "2026-03-25T20:22:01.169Z" },
-    { url = "https://files.pythonhosted.org/packages/5a/cd/e80b62269fc78fc36c9af5a6b89c835baa8af28ff5ad28c7028d60860320/tomli-2.4.1-cp314-cp314t-win_arm64.whl", hash = "sha256:eab21f45c7f66c13f2a9e0e1535309cee140182a9cdae1e041d02e47291e8396", size = 100393, upload-time = "2026-03-25T20:22:02.137Z" },
-    { url = "https://files.pythonhosted.org/packages/7b/61/cceae43728b7de99d9b847560c262873a1f6c98202171fd5ed62640b494b/tomli-2.4.1-py3-none-any.whl", hash = "sha256:0d85819802132122da43cb86656f8d1f8c6587d54ae7dcaf30e90533028b49fe", size = 14583, upload-time = "2026-03-25T20:22:03.012Z" },
-]
-
-[[package]]
-name = "tomli-w"
-version = "1.2.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/19/75/241269d1da26b624c0d5e110e8149093c759b7a286138f4efd61a60e75fe/tomli_w-1.2.0.tar.gz", hash = "sha256:2dd14fac5a47c27be9cd4c976af5a12d87fb1f0b4512f81d69cce3b35ae25021", size = 7184, upload-time = "2025-01-15T12:07:24.262Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/c7/18/c86eb8e0202e32dd3df50d43d7ff9854f8e0603945ff398974c1d91ac1ef/tomli_w-1.2.0-py3-none-any.whl", hash = "sha256:188306098d013b691fcadc011abd66727d3c414c571bb01b1a174ba8c983cf90", size = 6675, upload-time = "2025-01-15T12:07:22.074Z" },
 ]
 
 [[package]]
@@ -6520,8 +6245,7 @@ version = "0.23.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "annotated-doc" },
-    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "click", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
+    { name = "click" },
     { name = "rich" },
     { name = "shellingham" },
 ]
@@ -6583,8 +6307,7 @@ name = "uvicorn"
 version = "0.50.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "click", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-6-orb-py-ui'" },
+    { name = "click" },
     { name = "h11" },
     { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
 ]

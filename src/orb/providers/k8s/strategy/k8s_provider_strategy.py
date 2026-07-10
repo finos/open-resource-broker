@@ -526,24 +526,14 @@ class K8sProviderStrategy(ProviderStrategy):
         Returns ``None`` when ``config.metrics_enabled=False`` so
         handlers and the watcher stay silent.  Constructed once per
         strategy instance; a second invocation returns the same
-        object so all recorders share the same registry.
+        object so all recorders share the same OTel meter.
         """
         if not self._k8s_config.metrics_enabled:
             return None
         if self._metrics is None:
             from orb.providers.k8s.infrastructure.services.metrics import K8sMetrics
 
-            try:
-                self._metrics = K8sMetrics()
-            except RuntimeError as exc:
-                # Duplicate registration means a second strategy tried
-                # to bind to the same shared REGISTRY.  Log and stay
-                # silent rather than crash provider start-up.
-                self._logger.warning(
-                    "K8sMetrics registration failed; metrics disabled for this instance: %s",
-                    exc,
-                )
-                self._metrics = None
+            self._metrics = K8sMetrics()
         return self._metrics
 
     def _shared_cache(self) -> PodStateCache:

@@ -1,9 +1,14 @@
-"""Unit tests for FallbackProviderStrategy metrics emission."""
+"""Unit tests for FallbackProviderStrategy metrics emission.
+
+Updated for bead 2512: metric emission uses ProviderMetricsPort.record_counter()
+instead of MetricsCollector.increment().  Tests assert via the new interface.
+"""
 
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from orb.providers.base.metrics import NoOpProviderMetrics, ProviderMetricsPort
 from orb.providers.base.strategy.fallback_strategy import (
     FallbackConfig,
     FallbackMode,
@@ -32,6 +37,12 @@ def _make_operation() -> ProviderOperation:
     return ProviderOperation(operation_type=ProviderOperationType.HEALTH_CHECK, parameters={})
 
 
+def _make_metrics_mock() -> MagicMock:
+    """Return a MagicMock that satisfies the ProviderMetricsPort interface."""
+    m = MagicMock(spec=ProviderMetricsPort)
+    return m
+
+
 def _make_fallback_strategy(primary, fallbacks, metrics=None, mode=FallbackMode.IMMEDIATE):
     logger = MagicMock()
     config = FallbackConfig(mode=mode)
@@ -47,48 +58,49 @@ def _make_fallback_strategy(primary, fallbacks, metrics=None, mode=FallbackMode.
 
 
 # ---------------------------------------------------------------------------
-# provider_fallback_total
+# provider_fallback_total  (via record_counter)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_fallback_increments_provider_fallback_total():
-    """When primary fails and fallback succeeds, provider_fallback_total is incremented."""
+    """When primary fails and fallback succeeds, provider.fallback.total is recorded."""
     primary = _make_strategy("primary-provider", success=False)
     fallback = _make_strategy("fallback-provider", success=True)
-    metrics = MagicMock()
+    metrics = _make_metrics_mock()
 
     strategy = _make_fallback_strategy(primary, [fallback], metrics=metrics)
     await strategy.execute_operation(_make_operation())
 
-    metrics.increment.assert_called_once_with(
-        "provider_fallback_total",
+    metrics.record_counter.assert_called_once_with(
+        "provider.fallback.total",
         labels={"primary": "primary-provider", "fallback": "fallback-provider"},
     )
 
 
 @pytest.mark.asyncio
 async def test_no_fallback_metric_when_primary_succeeds():
-    """When primary succeeds, provider_fallback_total is NOT incremented."""
+    """When primary succeeds, provider.fallback.total is NOT recorded."""
     primary = _make_strategy("primary-provider", success=True)
     fallback = _make_strategy("fallback-provider", success=True)
-    metrics = MagicMock()
+    metrics = _make_metrics_mock()
 
     strategy = _make_fallback_strategy(primary, [fallback], metrics=metrics)
     await strategy.execute_operation(_make_operation())
 
-    metrics.increment.assert_not_called()
+    metrics.record_counter.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_no_metrics_injected_does_not_raise():
-    """FallbackProviderStrategy works correctly when no MetricsCollector is injected."""
+async def test_no_metrics_injected_uses_noop():
+    """FallbackProviderStrategy with metrics=None uses NoOpProviderMetrics and does not raise."""
     primary = _make_strategy("primary-provider", success=False)
     fallback = _make_strategy("fallback-provider", success=True)
 
     strategy = _make_fallback_strategy(primary, [fallback], metrics=None)
+    # _metrics should be a NoOpProviderMetrics instance
+    assert isinstance(strategy._metrics, NoOpProviderMetrics)
     result = await strategy.execute_operation(_make_operation())
-
     assert result.success
 
 
@@ -99,10 +111,10 @@ async def test_no_metrics_injected_does_not_raise():
 
 @pytest.mark.asyncio
 async def test_circuit_breaker_opened_metric_emitted():
-    """When failures reach threshold, circuit_breaker_opened_total is incremented."""
+    """When failures reach threshold, circuit_breaker.opened.total is recorded."""
     primary = _make_strategy("primary-provider", success=False)
     fallback = _make_strategy("fallback-provider", success=True)
-    metrics = MagicMock()
+    metrics = _make_metrics_mock()
 
     config = FallbackConfig(mode=FallbackMode.CIRCUIT_BREAKER, circuit_breaker_threshold=1)
     logger = MagicMock()
@@ -117,20 +129,20 @@ async def test_circuit_breaker_opened_metric_emitted():
 
     await strategy.execute_operation(_make_operation())
 
-    metrics.increment.assert_any_call(
-        "circuit_breaker_opened_total",
+    metrics.record_counter.assert_any_call(
+        "circuit_breaker.opened.total",
         labels={"provider": "primary-provider"},
     )
 
 
 @pytest.mark.asyncio
 async def test_circuit_breaker_closed_metric_emitted():
-    """When circuit recovers via HALF_OPEN, circuit_breaker_closed_total is incremented."""
+    """When circuit recovers via HALF_OPEN, circuit_breaker.closed.total is recorded."""
     from orb.providers.base.strategy.fallback_strategy import CircuitState
 
     primary = _make_strategy("primary-provider", success=True)
     fallback = _make_strategy("fallback-provider", success=True)
-    metrics = MagicMock()
+    metrics = _make_metrics_mock()
 
     config = FallbackConfig(
         mode=FallbackMode.CIRCUIT_BREAKER,
@@ -152,7 +164,7 @@ async def test_circuit_breaker_closed_metric_emitted():
 
     await strategy.execute_operation(_make_operation())
 
-    metrics.increment.assert_any_call(
-        "circuit_breaker_closed_total",
+    metrics.record_counter.assert_any_call(
+        "circuit_breaker.closed.total",
         labels={"provider": "primary-provider"},
     )

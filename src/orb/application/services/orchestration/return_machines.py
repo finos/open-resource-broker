@@ -13,7 +13,11 @@ from orb.application.services.orchestration.base import (
     TERMINAL_STATUSES as _TERMINAL_STATUSES,
     OrchestratorBase,
 )
-from orb.application.services.orchestration.dtos import ReturnMachinesInput, ReturnMachinesOutput
+from orb.application.services.orchestration.dtos import (
+    Paginated,
+    ReturnMachinesInput,
+    ReturnMachinesOutput,
+)
 from orb.domain.base.exceptions import ApplicationError
 from orb.domain.base.ports.logging_port import LoggingPort
 
@@ -49,16 +53,14 @@ class ReturnMachinesOrchestrator(OrchestratorBase[ReturnMachinesInput, ReturnMac
         )
 
         if input.all_machines:
-            machine_dtos = (
-                await self._query_bus.execute(
-                    ListMachinesQuery(
-                        all_resources=True,
-                        provider_name=input.provider_name,
-                        provider_type=input.provider_type,
-                    )
+            result = await self._query_bus.execute(
+                ListMachinesQuery(
+                    all_resources=True,
+                    provider_name=input.provider_name,
+                    provider_type=input.provider_type,
                 )
-                or []
             )
+            machine_dtos = result.items if isinstance(result, Paginated) else (result or [])
             machine_ids = [dto.machine_id for dto in machine_dtos]
             if not machine_ids:
                 self._logger.warning(

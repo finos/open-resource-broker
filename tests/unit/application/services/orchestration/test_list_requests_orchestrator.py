@@ -8,7 +8,11 @@ import pytest
 
 from orb.application.dto.queries import SyncAndListActiveRequestsQuery
 from orb.application.request.queries import ListRequestsQuery
-from orb.application.services.orchestration.dtos import ListRequestsInput, ListRequestsOutput
+from orb.application.services.orchestration.dtos import (
+    ListRequestsInput,
+    ListRequestsOutput,
+    Paginated,
+)
 from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
 
 
@@ -133,3 +137,14 @@ class TestListRequestsOrchestrator:
         query = mock_query_bus.execute.call_args[0][0]
         assert isinstance(query, SyncAndListActiveRequestsQuery)
         assert query.status is None
+
+    @pytest.mark.asyncio
+    async def test_execute_paginated_result_returns_items(self, orchestrator, mock_query_bus):
+        """Regression guard: Paginated return shape surfaces .items without crashing."""
+        r = MagicMock(spec=["to_dict"])
+        r.to_dict.return_value = {"request_id": "req-1"}
+        mock_query_bus.execute.return_value = Paginated(items=[r], total_count=1)
+        result = await orchestrator.execute(ListRequestsInput())
+        assert isinstance(result, ListRequestsOutput)
+        assert result.requests == [{"request_id": "req-1"}]
+        assert result.count == 1

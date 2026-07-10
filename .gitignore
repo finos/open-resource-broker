@@ -269,6 +269,10 @@ health/
 *.metrics
 metrics.json
 metrics.prom
+# Re-include source packages named metrics/ that are tracked in version control.
+# Git cannot un-ignore files inside an ignored directory; must un-ignore the directory.
+!src/orb/providers/base/metrics
+!tests/unit/providers/base/metrics
 
 # Visualise directories
 visualise/test/

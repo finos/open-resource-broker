@@ -1,4 +1,4 @@
-"""Observability API routes — machine metrics and request timeline."""
+"""Observability API routes — machine metrics, request timeline, and telemetry status."""
 
 from typing import Any, Optional
 
@@ -195,3 +195,73 @@ async def get_request_timeline(
     events.sort(key=lambda e: e["ts"])
 
     return JSONResponse(content={"request_id": request_id, "events": events})
+
+
+@router.get(
+    "/observability/telemetry",
+    summary="Get Telemetry Status",
+    description=(
+        "Return the current OpenTelemetry instrumentation status — whether telemetry "
+        "is enabled, which metric and trace exporters are active, the service name, "
+        "and which auto-instrumentors have been wired.  Read-only; no auth-sensitive "
+        "configuration detail is included."
+    ),
+)
+async def get_telemetry_status(
+    _user=Depends(require_role("viewer")),
+) -> JSONResponse:
+    """
+    Return OpenTelemetry instrumentation status.
+
+    The response shape is::
+
+        {
+          "enabled": true,
+          "service_name": "orb",
+          "metrics_exporters": ["prometheus"],
+          "traces_exporter": null,
+          "traces_sample_rate": 0.1,
+          "instrumentors": {
+            "fastapi": true,
+            "sqlalchemy": true,
+            "botocore": true,
+            "click": true,
+            "system_metrics": true,
+            "logging": true
+          }
+        }
+
+    When telemetry is disabled or the SDK is not installed the response is::
+
+        {"enabled": false}
+    """
+    try:
+        from orb.config.schemas.app_schema import AppConfig
+        from orb.domain.base.ports.configuration_port import ConfigurationPort
+        from orb.infrastructure.di.container import get_container
+
+        config_port = get_container().get(ConfigurationPort)
+        app_config: AppConfig = config_port.get_typed(AppConfig)  # type: ignore[arg-type]
+        otel_cfg = app_config.observability
+    except Exception:
+        return JSONResponse(content={"enabled": False})
+
+    if not otel_cfg.enabled:
+        return JSONResponse(content={"enabled": False})
+
+    payload: dict[str, Any] = {
+        "enabled": True,
+        "service_name": otel_cfg.service_name,
+        "metrics_exporters": otel_cfg.metrics_exporters,
+        "traces_exporter": otel_cfg.traces_exporter,
+        "traces_sample_rate": otel_cfg.traces_sample_rate,
+        "instrumentors": {
+            "fastapi": otel_cfg.instrument_fastapi,
+            "sqlalchemy": otel_cfg.instrument_sqlalchemy,
+            "botocore": otel_cfg.instrument_botocore,
+            "click": otel_cfg.instrument_click,
+            "system_metrics": otel_cfg.instrument_system_metrics,
+            "logging": otel_cfg.instrument_logging,
+        },
+    }
+    return JSONResponse(content=payload)
