@@ -365,6 +365,7 @@ def _add(instrument: object, value: float, attrs: dict) -> None:
     try:
         instrument.add(value, attributes=attrs)  # type: ignore[union-attr]
     except Exception:
+        # Metrics recording must never break the caller; swallow all errors.
         pass
 
 
@@ -372,4 +373,5 @@ def _record(instrument: object, value: float, attrs: dict) -> None:
     try:
         instrument.record(value, attributes=attrs)  # type: ignore[union-attr]
     except Exception:
+        # Metrics recording must never break the caller; swallow all errors.
         pass

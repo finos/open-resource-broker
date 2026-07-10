@@ -548,7 +548,6 @@ def create_fastapi_app(server_config: Any) -> Any:
         from orb.config.schemas.observability_schema import OtelConfig
         from orb.infrastructure.di.container import get_container as _get_container
 
-        _app_config: AppConfig = _get_container().get(AppConfig) if False else None  # type: ignore[assignment]
         try:
             from orb.domain.base.ports.configuration_port import ConfigurationPort
 

@@ -376,12 +376,14 @@ def reset_container() -> None:
         _container_ready.clear()
         # Reset OTel idempotency flag so the next bootstrap call can
         # re-initialise the SDK (matches _container_ready.clear() intent).
+        # Telemetry reset is optional: bootstrap.telemetry is not a hard
+        # dependency of the DI container, so ImportError is silently skipped.
         try:
             from orb.bootstrap.telemetry import _reset_telemetry_state
 
             _reset_telemetry_state()
         except ImportError:
-            pass
+            logger.debug("orb.bootstrap.telemetry not available; skipping OTel state reset")
 
 
 __all__: list[str] = [

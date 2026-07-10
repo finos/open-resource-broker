@@ -22,7 +22,11 @@ def _flush_telemetry_mcp() -> None:
 
         shutdown_telemetry()
     except Exception:
-        pass
+        # Best-effort cleanup: telemetry flush must never prevent MCP shutdown.
+        get_logger(__name__).debug(
+            "telemetry flush during MCP shutdown failed (ignored, best-effort cleanup)",
+            exc_info=True,
+        )
 
 
 @handle_interface_exceptions(context="mcp_server", interface_type="cli")

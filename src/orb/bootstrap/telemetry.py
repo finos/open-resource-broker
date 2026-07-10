@@ -77,7 +77,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, TextIO
 
 if TYPE_CHECKING:
     from orb.infrastructure.di.container import DIContainer
@@ -92,6 +92,13 @@ _telemetry_configured: bool = False
 _meter_provider: Optional[object] = None
 _tracer_provider: Optional[object] = None
 
+# File handles for the SDK-native ConsoleMetricExporter / ConsoleSpanExporter
+# fallbacks when the dedicated OTLP-JSON-file exporter is not installed.
+# Stored here so they can be closed deterministically in shutdown_telemetry()
+# and _reset_telemetry_state() rather than leaking for the process lifetime.
+_metrics_file_handle: Optional[TextIO] = None
+_traces_file_handle: Optional[TextIO] = None
+
 # Flag to prevent double-shutdown (shutdown_telemetry() is idempotent).
 _telemetry_shutdown: bool = False
 
@@ -100,9 +107,32 @@ def _reset_telemetry_state() -> None:
     """Reset the idempotency flag so the next call re-runs configuration.
 
     Called by ``DIContainer.reset()`` so each test starts with a clean state.
-    Also clears the provider references and the shutdown flag.
+    Also clears the provider references, the shutdown flag, and closes any
+    open file handles so they are not leaked across test boundaries.
     """
-    global _telemetry_configured, _meter_provider, _tracer_provider, _telemetry_shutdown
+    global \
+        _telemetry_configured, \
+        _meter_provider, \
+        _tracer_provider, \
+        _telemetry_shutdown, \
+        _metrics_file_handle, \
+        _traces_file_handle
+    # Close file handles before clearing references so the OS releases the
+    # descriptors.  Guarded against double-close (e.g. if shutdown_telemetry()
+    # already ran) — closing an already-closed file is a no-op here because we
+    # null the reference immediately after.
+    if _metrics_file_handle is not None:
+        try:
+            _metrics_file_handle.close()
+        except Exception:
+            pass  # Closing errors must not prevent state reset.
+        _metrics_file_handle = None
+    if _traces_file_handle is not None:
+        try:
+            _traces_file_handle.close()
+        except Exception:
+            pass  # Closing errors must not prevent state reset.
+        _traces_file_handle = None
     _telemetry_configured = False
     _meter_provider = None
     _tracer_provider = None
@@ -256,13 +286,17 @@ def configure_telemetry(container: "DIContainer") -> None:  # noqa: C901
                 # data is durably written before shutdown_telemetry() returns.
                 # Format: one JSON object per line (JSONL) — readable by any
                 # standard JSON Lines tooling.
+                # The handle is stored in _metrics_file_handle so that
+                # shutdown_telemetry() and _reset_telemetry_state() can close
+                # it deterministically, preventing a resource leak.
                 from opentelemetry.sdk.metrics.export import ConsoleMetricExporter
 
-                _metrics_fh = open(  # noqa: SIM115,WPS515
+                global _metrics_file_handle
+                _metrics_file_handle = open(  # noqa: SIM115,WPS515
                     metrics_path, "a", encoding="utf-8"
                 )
                 _metric_file_exporter = ConsoleMetricExporter(
-                    out=_metrics_fh,
+                    out=_metrics_file_handle,
                     formatter=lambda md: md.to_json(indent=None) + "\n",
                 )
 
@@ -315,13 +349,17 @@ def configure_telemetry(container: "DIContainer") -> None:  # noqa: C901
                 # SDK-native fallback: ConsoleSpanExporter redirected to a
                 # file handle with a compact (single-line) JSON formatter.
                 # Each span is exported as one JSON object on its own line.
+                # The handle is stored in _traces_file_handle so that
+                # shutdown_telemetry() and _reset_telemetry_state() can close
+                # it deterministically, preventing a resource leak.
                 from opentelemetry.sdk.trace.export import ConsoleSpanExporter
 
-                _traces_fh = open(  # noqa: SIM115,WPS515
+                global _traces_file_handle
+                _traces_file_handle = open(  # noqa: SIM115,WPS515
                     traces_path, "a", encoding="utf-8"
                 )
                 _span_file_exporter = ConsoleSpanExporter(
-                    out=_traces_fh,
+                    out=_traces_file_handle,
                     formatter=lambda span: span.to_json(indent=None) + "\n",
                 )
 
@@ -414,7 +452,12 @@ def shutdown_telemetry() -> None:
       - **Never raises**: exceptions from the SDK shutdown calls are swallowed
         so that process teardown is never interrupted.
     """
-    global _telemetry_shutdown, _meter_provider, _tracer_provider
+    global \
+        _telemetry_shutdown, \
+        _meter_provider, \
+        _tracer_provider, \
+        _metrics_file_handle, \
+        _traces_file_handle
 
     if _telemetry_shutdown:
         return
@@ -432,3 +475,20 @@ def shutdown_telemetry() -> None:
             _tracer_provider.shutdown()  # type: ignore[union-attr]
         except Exception:
             pass  # Shutdown errors must never interrupt process teardown.
+
+    # Close file handles opened for the SDK-native Console*Exporter fallbacks.
+    # Shutdown() above cascades force_flush() to all readers, so data is
+    # already written by the time we reach here.  Closing the handle releases
+    # the OS file descriptor and is idempotent (nulled immediately after close).
+    if _metrics_file_handle is not None:
+        try:
+            _metrics_file_handle.close()
+        except Exception:
+            pass  # Closing errors must not interrupt process teardown.
+        _metrics_file_handle = None
+    if _traces_file_handle is not None:
+        try:
+            _traces_file_handle.close()
+        except Exception:
+            pass  # Closing errors must not interrupt process teardown.
+        _traces_file_handle = None

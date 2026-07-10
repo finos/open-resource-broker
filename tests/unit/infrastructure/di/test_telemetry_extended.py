@@ -150,29 +150,29 @@ class TestFileExporterFlushOnExit:
         # (single-line) JSON formatter directed to an open file handle.
         # This is the exact pattern wired in telemetry.py's "file" branch
         # when opentelemetry-exporter-otlp-json-file is absent.
-        fh = open(metrics_path, "a", encoding="utf-8")  # noqa: SIM115,WPS515
-        exporter = ConsoleMetricExporter(
-            out=fh,
-            formatter=lambda md: md.to_json(indent=None) + "\n",
-        )
-        reader = PeriodicExportingMetricReader(exporter, export_interval_millis=60_000)
-        resource = Resource.create({SERVICE_NAME: "orb-test"})
-        provider = MeterProvider(resource=resource, metric_readers=[reader])
+        with open(metrics_path, "a", encoding="utf-8") as fh:  # noqa: WPS515
+            exporter = ConsoleMetricExporter(
+                out=fh,
+                formatter=lambda md: md.to_json(indent=None) + "\n",
+            )
+            reader = PeriodicExportingMetricReader(exporter, export_interval_millis=60_000)
+            resource = Resource.create({SERVICE_NAME: "orb-test"})
+            provider = MeterProvider(resource=resource, metric_readers=[reader])
 
-        # Install as global and register with the shutdown machinery.
-        otel_metrics.set_meter_provider(provider)
-        telemetry_module._meter_provider = provider
-        telemetry_module._telemetry_configured = True
-        telemetry_module._telemetry_shutdown = False
+            # Install as global and register with the shutdown machinery.
+            otel_metrics.set_meter_provider(provider)
+            telemetry_module._meter_provider = provider
+            telemetry_module._telemetry_configured = True
+            telemetry_module._telemetry_shutdown = False
 
-        # Record a metric.
-        meter = otel_metrics.get_meter("orb.test")
-        counter = meter.create_counter("test.shutdown.counter")
-        counter.add(42)
+            # Record a metric.
+            meter = otel_metrics.get_meter("orb.test")
+            counter = meter.create_counter("test.shutdown.counter")
+            counter.add(42)
 
-        # Flush — export_interval is 60 s so without shutdown() nothing would write.
-        shutdown_telemetry()
-        fh.flush()
+            # Flush — export_interval is 60 s so without shutdown() nothing would write.
+            shutdown_telemetry()
+            fh.flush()
 
         # The file must exist and contain valid JSON Lines.
         assert metrics_path.exists(), "metrics.jsonl was not created"
