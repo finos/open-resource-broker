@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from orb.domain.base.exceptions import ApplicationError
 
@@ -10,7 +10,6 @@ if TYPE_CHECKING:
     from orb.domain.template.template_aggregate import Template
 
 from orb.domain.base.ports import ContainerPort, LoggingPort, ProviderSelectionPort
-from orb.domain.base.ports.provider_validation_port import ProviderValidationPort
 from orb.domain.base.results import ProviderSelectionResult
 
 
@@ -22,12 +21,10 @@ class ProviderValidationService:
         container: ContainerPort,
         logger: LoggingPort,
         provider_selection_port: ProviderSelectionPort,
-        validator: Optional[ProviderValidationPort] = None,
     ) -> None:
         self._container = container
         self.logger = logger
         self._provider_selection_port = provider_selection_port
-        self._validator = validator
 
     async def select_and_validate_provider(self, template: Template) -> ProviderSelectionResult:
         """Select provider and validate template compatibility."""
@@ -37,13 +34,6 @@ class ProviderValidationService:
             selection_result.provider_name,
             selection_result.selection_reason,
         )
-
-        if self._validator is not None:
-            template_dict = template if isinstance(template, dict) else vars(template)
-            result = self._validator.validate_template_configuration(template_dict)
-            if not result.get("valid", True):
-                errors = result.get("errors", [])
-                raise ApplicationError("; ".join(errors))
 
         validation_result = self._provider_selection_port.validate_template_requirements(
             template,

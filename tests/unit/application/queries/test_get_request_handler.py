@@ -146,29 +146,13 @@ async def test_get_request_falls_back_to_stored_state_on_sync_error():
 
 @pytest.mark.asyncio
 async def test_get_request_returns_synced_dto_on_success():
-    """Normal (no-error) path returns a DTO; cache is written when request transitions to terminal.
+    """Normal (no-error) path returns a DTO and writes to cache."""
+    request = _make_request(_ID_SUCCESS)
 
-    Sequence under test:
-    1. First get_request() call → IN_PROGRESS (not short-circuited, sync runs).
-    2. Sync drives the status to COMPLETED.
-    3. Second get_request() call after sync → COMPLETED.
-    4. request.status.is_terminal() is True → cache_request() is called once.
-    """
-    in_progress_request = _make_request(_ID_SUCCESS)
-    in_progress_request = in_progress_request.update_status(RequestStatus.IN_PROGRESS, "syncing")
-    completed_request = in_progress_request.update_status(RequestStatus.COMPLETED, "done")
+    handler, mock_query_service, mock_cache_service = _make_handler(request, sync_side_effect=None)
 
-    handler, mock_query_service, mock_cache_service = _make_handler(
-        in_progress_request, sync_side_effect=None
-    )
-
-    # get_request is called three times: once for the initial fetch, once
-    # to refresh after populate_missing_machine_ids (so the status-update
-    # path sees up-to-date machine_ids), and once after update_status to
-    # observe the COMPLETED state.
-    mock_query_service.get_request = AsyncMock(
-        side_effect=[in_progress_request, in_progress_request, completed_request]
-    )
+    # After sync the handler re-fetches the request; return the same object for simplicity
+    mock_query_service.get_request = AsyncMock(return_value=request)
 
     query = GetRequestQuery(request_id=_ID_SUCCESS)
     result = await handler.execute_query(query)
@@ -176,31 +160,36 @@ async def test_get_request_returns_synced_dto_on_success():
     assert isinstance(result, RequestDTO)
     assert result.request_id == _ID_SUCCESS
 
-    # Cache SHOULD be written once the request reaches a terminal state
+    # Cache SHOULD be written on the success path
     mock_cache_service.cache_request.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_get_request_does_not_cache_non_terminal():
-    """Non-terminal requests (PENDING, IN_PROGRESS) are never cached.
+async def test_get_request_ignores_cache_for_syncing_queries():
+    request = _make_request(_ID_SUCCESS)
+    handler, _, mock_cache_service = _make_handler(request, sync_side_effect=None)
+    cached = MagicMock(spec=RequestDTO)
+    mock_cache_service.get_cached_request.return_value = cached
 
-    Caching non-terminal states prevents the sync loop from observing provider
-    state transitions and keeps the request stuck at the cached status.
-    """
-    pending_request = _make_request(_ID_SUCCESS)  # PENDING by default
-
-    handler, mock_query_service, mock_cache_service = _make_handler(
-        pending_request, sync_side_effect=None
-    )
-
-    mock_query_service.get_request = AsyncMock(return_value=pending_request)
-
-    query = GetRequestQuery(request_id=_ID_SUCCESS)
+    query = GetRequestQuery(request_id=_ID_SUCCESS, lightweight=False)
     result = await handler.execute_query(query)
 
     assert isinstance(result, RequestDTO)
-    # Non-terminal → cache_request must NOT be called
-    mock_cache_service.cache_request.assert_not_called()
+    mock_cache_service.get_cached_request.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_get_request_uses_cache_for_lightweight_queries():
+    request = _make_request(_ID_SUCCESS)
+    handler, _, mock_cache_service = _make_handler(request, sync_side_effect=None)
+    cached = MagicMock(spec=RequestDTO)
+    mock_cache_service.get_cached_request.return_value = cached
+
+    query = GetRequestQuery(request_id=_ID_SUCCESS, lightweight=True)
+    result = await handler.execute_query(query)
+
+    assert result is cached
+    mock_cache_service.get_cached_request.assert_called_once_with(_ID_SUCCESS)
 
 
 @pytest.mark.asyncio

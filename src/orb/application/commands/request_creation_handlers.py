@@ -16,6 +16,7 @@ from orb.application.services.provider_validation_service import ProviderValidat
 from orb.application.services.provisioning_orchestration_service import (
     ProvisioningOrchestrationService,
 )
+from orb.application.services.request_follow_up_context import with_request_follow_up_context
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.configuration_service import DomainConfigurationService
 from orb.domain.base.exceptions import ApplicationError, EntityNotFoundError
@@ -30,6 +31,9 @@ from orb.domain.request.aggregate import Request
 from orb.domain.request.request_identifiers import RequestId
 from orb.domain.request.request_types import RequestStatus
 from orb.domain.request.value_objects import RequestType
+from orb.domain.template.factory import TemplateFactoryPort
+from orb.domain.template.template_aggregate import Template
+from orb.infrastructure.template.dtos import TemplateDTO
 
 
 @command_handler(CreateRequestCommand)  # type: ignore[arg-type]
@@ -120,7 +124,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
 
         self.logger.info("Machine request created successfully: %s", request.request_id)
 
-    async def _load_template(self, template_id: str) -> Any:
+    async def _load_template(self, template_id: str) -> Template:
         """Load template using CQRS QueryBus."""
         if not self._query_bus:
             raise ApplicationError("QueryBus is required for template lookup")
@@ -132,6 +136,14 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
 
         if not template:
             raise EntityNotFoundError("Template", template_id)
+
+        # The query bus may return a TemplateDTO (production path) or a domain
+        # Template (test paths, or callers that pre-construct one). Only convert
+        # in the DTO case — calling .to_template_config() on a domain Template
+        # would AttributeError.
+        if isinstance(template, TemplateDTO):
+            template_factory = self._container.get(TemplateFactoryPort)
+            template = template_factory.create_template(template.to_template_config())
 
         self.logger.debug("Template found: %s (id=%s)", type(template), template.template_id)
         return template
@@ -479,6 +491,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
 
             # Update request status based on result
             if provisioning_result.get("success", False):
+                self._persist_return_follow_up_context(request, provisioning_result)
                 self._update_machines_to_pending(machine_ids)
                 if skipped_ids:
                     from orb.application.dto.commands import UpdateRequestStatusCommand
@@ -530,6 +543,21 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                         MachineStatus.SHUTTING_DOWN, "Termination in progress"
                     )
                     uow.machines.save(updated_machine)
+
+    def _persist_return_follow_up_context(
+        self, request: Any, provisioning_result: dict[str, Any]
+    ) -> None:
+        """Persist durable provider follow-up metadata needed after this process exits."""
+        provider_data = provisioning_result.get("provider_data")
+        if not isinstance(provider_data, dict) or not provider_data:
+            return
+
+        with self.uow_factory.create_unit_of_work() as uow:
+            current_request = uow.requests.get_by_id(request.request_id) or request
+            updated_request = with_request_follow_up_context(current_request, provider_data)
+            events = uow.requests.save(updated_request)
+            for event in events or []:
+                self.event_publisher.publish(event)  # type: ignore[union-attr]
 
     async def _update_request_status(
         self, request: Request, status: RequestStatus, message: str
@@ -603,17 +631,3 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             RequestStatus.IN_PROGRESS,
             "Termination accepted: waiting for instances to reach terminated state",
         )
-
-    async def _update_request_to_completed(self, request: Any) -> None:
-        """Update return request status to completed and persist."""
-        try:
-            await self._update_request_status(
-                request,
-                RequestStatus.COMPLETED,
-                "Return request completed: termination initiated",
-            )
-        except Exception as update_error:
-            # Ensure the request reaches a terminal status so callers don't poll forever
-            await self._update_request_to_failed(
-                request, [f"Failed to mark completed: {update_error}"]
-            )

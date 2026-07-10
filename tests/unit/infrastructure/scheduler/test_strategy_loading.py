@@ -35,11 +35,6 @@ _HF_TEMPLATE_WITH_TAGS: dict[str, Any] = {
 }
 
 
-def _no_op_config(_container: Any) -> None:
-    """Config factory used by the scheduler-registry tests below."""
-    return None
-
-
 # ---------------------------------------------------------------------------
 # load_templates_from_path — both schedulers
 # ---------------------------------------------------------------------------
@@ -153,14 +148,14 @@ def test_default_load_delegates_hf_file_to_hf_strategy(tmp_path):
         registry.register(
             "hostfactory",
             HostFactorySchedulerStrategy,
-            _no_op_config,
+            lambda c: None,
             strategy_class=HostFactorySchedulerStrategy,
         )
     if not registry.is_registered("default"):
         registry.register(
             "default",
             DefaultSchedulerStrategy,
-            _no_op_config,
+            lambda c: None,
             strategy_class=DefaultSchedulerStrategy,
         )
 
@@ -181,14 +176,14 @@ def test_hf_load_delegates_default_file_to_default_strategy(tmp_path):
         registry.register(
             "hostfactory",
             HostFactorySchedulerStrategy,
-            _no_op_config,
+            lambda c: None,
             strategy_class=HostFactorySchedulerStrategy,
         )
     if not registry.is_registered("default"):
         registry.register(
             "default",
             DefaultSchedulerStrategy,
-            _no_op_config,
+            lambda c: None,
             strategy_class=DefaultSchedulerStrategy,
         )
 
@@ -421,3 +416,20 @@ def test_default_round_trip_generate_write_load(tmp_path):
     assert len(loaded) == 1
     assert loaded[0]["template_id"] == _MINIMAL_SNAKE_TEMPLATE["template_id"]
     assert loaded[0]["max_instances"] == _MINIMAL_SNAKE_TEMPLATE["max_instances"]
+
+
+def test_base_strategy_infers_provider_type_from_config_when_registry_missing():
+    strategy = HostFactorySchedulerStrategy()
+
+    class _AppConfig:
+        @staticmethod
+        def model_dump():
+            return {"provider": {"active_provider": "azure-default"}}
+
+    class _ConfigManager:
+        app_config = _AppConfig()
+
+    strategy._config_manager = _ConfigManager()
+    strategy._provider_registry_service = None
+
+    assert strategy._get_active_provider_type() == "azure"

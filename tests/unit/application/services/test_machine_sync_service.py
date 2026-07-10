@@ -1,145 +1,223 @@
-"""Unit tests for MachineSyncService — basic behaviour and OperationOutcome awareness.
+"""Behavior tests for MachineSyncService request-context propagation."""
 
-The sync service does not directly call acquire/return_machines/get_status; it uses
-execute_operation via ProviderRegistryService.  These tests cover the core paths
-that interact with the outcome-aware request status logic.
-"""
+from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from orb.application.services.machine_sync_service import MachineSyncService
-from orb.domain.machine.machine_status import MachineStatus
+from orb.domain.base.operations import OperationType
 
 
-def _make_service() -> MachineSyncService:
+@pytest.mark.unit
+@pytest.mark.application
+@pytest.mark.asyncio
+async def test_fetch_provider_machines_replays_persisted_request_metadata():
     command_bus = MagicMock()
     uow_factory = MagicMock()
     config_port = MagicMock()
+    config_port.get_provider_instance_config.return_value = MagicMock()
     logger = MagicMock()
-    return MachineSyncService(
+    provider_registry_service = MagicMock()
+    provider_registry_service.execute_operation = AsyncMock(
+        return_value=MagicMock(success=True, data={"instances": []}, metadata={})
+    )
+
+    service = MachineSyncService(
         command_bus=command_bus,
         uow_factory=uow_factory,
         config_port=config_port,
         logger=logger,
+        provider_registry_service=provider_registry_service,
+    )
+
+    request = MagicMock()
+    request.request_type.value = "acquire"
+    request.resource_ids = ["vmss-demo"]
+    request.machine_ids = []
+    request.provider_api = "VMSS"
+    request.template_id = "azure-cheapest-vmss"
+    request.request_id = "req-00000000-0000-0000-0000-000000000001"
+    request.provider_name = "azure-default"
+    request.provider_type = "azure"
+    request.metadata = {"provider_selection_reason": "configured-default"}
+    request.provider_data = {
+        "follow_up_context": {
+            "resource_group": "orb-test-rg",
+            "deployment_name": "dep-1234",
+        }
+    }
+
+    await service.fetch_provider_machines(request, db_machines=[])
+
+    operation = provider_registry_service.execute_operation.await_args.args[1]
+    assert operation.operation_type == OperationType.DESCRIBE_RESOURCE_INSTANCES
+    assert operation.parameters["request_metadata"]["resource_group"] == "orb-test-rg"
+    assert operation.parameters["request_metadata"]["deployment_name"] == "dep-1234"
+    assert (
+        operation.parameters["request_metadata"]["provider_selection_reason"]
+        == "configured-default"
     )
 
 
-def _make_request(request_type: str = "acquire", provider_api: str = "RunInstances"):
-    req = MagicMock()
-    req.request_id = MagicMock()
-    req.request_id.__str__ = lambda self: "req-sync-test"
-    req.request_type.value = request_type
-    req.provider_name = "aws_default_us-east-1"
-    req.provider_api = provider_api
-    req.template_id = "tmpl-1"
-    req.resource_ids = ["fleet-1"]
-    req.machine_ids = []
-    req.metadata = {}
-    return req
+@pytest.mark.unit
+@pytest.mark.application
+@pytest.mark.asyncio
+async def test_fetch_provider_machines_for_return_forwards_resource_id():
+    command_bus = MagicMock()
+    uow_factory = MagicMock()
+    config_port = MagicMock()
+    config_port.get_provider_instance_config.return_value = MagicMock()
+    logger = MagicMock()
+    provider_registry_service = MagicMock()
+    provider_registry_service.execute_operation = AsyncMock(
+        return_value=MagicMock(success=True, data={"instances": []}, metadata={})
+    )
 
+    service = MachineSyncService(
+        command_bus=command_bus,
+        uow_factory=uow_factory,
+        config_port=config_port,
+        logger=logger,
+        provider_registry_service=provider_registry_service,
+    )
 
-def _make_machine(mid: str, status: MachineStatus = MachineStatus.RUNNING):
-    m = MagicMock()
-    m.machine_id.value = mid
-    m.status = status
-    return m
+    request = MagicMock()
+    request.request_type.value = "return"
+    request.resource_ids = []
+    request.machine_ids = ["vmss-demo_000001"]
+    request.provider_api = "VMSS"
+    request.template_id = "azure-cheapest-vmss"
+    request.request_id = "ret-00000000-0000-0000-0000-000000000001"
+    request.provider_name = "azure-default"
+    request.provider_type = "azure"
+    request.metadata = {"provider_selection_reason": "configured-default"}
+    request.provider_data = {"follow_up_context": {"resource_group": "orb-test-rg"}}
+
+    db_machine = MagicMock()
+    db_machine.machine_id.value = "vmss-demo_000001"
+    db_machine.resource_id = "vmss-demo"
+
+    await service.fetch_provider_machines(request, db_machines=[db_machine])
+
+    operation = provider_registry_service.execute_operation.await_args.args[1]
+    assert operation.operation_type == OperationType.GET_INSTANCE_STATUS
+    assert operation.parameters["provider_api"] == "VMSS"
+    assert operation.parameters["resource_id"] == "vmss-demo"
+    assert "resource_mapping" not in operation.parameters
+    assert operation.parameters["request_metadata"]["resource_group"] == "orb-test-rg"
 
 
 @pytest.mark.unit
-class TestFetchProviderMachinesNoRegistryService:
-    """fetch_provider_machines returns (db_machines, {}) when no registry service."""
+@pytest.mark.application
+@pytest.mark.asyncio
+async def test_fetch_provider_machines_for_return_resolves_resource_id_from_follow_up_context():
+    command_bus = MagicMock()
+    uow_factory = MagicMock()
+    config_port = MagicMock()
+    config_port.get_provider_instance_config.return_value = MagicMock()
+    logger = MagicMock()
+    provider_registry_service = MagicMock()
+    provider_registry_service.execute_operation = AsyncMock(
+        return_value=MagicMock(success=True, data={"instances": []}, metadata={})
+    )
 
-    @pytest.mark.asyncio
-    async def test_returns_db_machines_when_registry_service_missing(self):
-        svc = _make_service()
-        db_machines = [_make_machine("i-1")]
-        req = _make_request()
+    service = MachineSyncService(
+        command_bus=command_bus,
+        uow_factory=uow_factory,
+        config_port=config_port,
+        logger=logger,
+        provider_registry_service=provider_registry_service,
+    )
 
-        # No provider_registry_service injected → should raise RuntimeError
-        # which is caught internally and returns (db_machines, {})
-        machines, meta = await svc.fetch_provider_machines(req, db_machines)  # type: ignore[arg-type]
-        assert machines == db_machines
-        assert meta == {}
+    request = MagicMock()
+    request.request_type.value = "return"
+    request.resource_ids = []
+    request.machine_ids = ["vmss-demo_000001"]
+    request.provider_api = "VMSS"
+    request.template_id = "azure-cheapest-vmss"
+    request.request_id = "ret-00000000-0000-0000-0000-000000000002"
+    request.provider_name = "azure-default"
+    request.provider_type = "azure"
+    request.metadata = {"provider_selection_reason": "configured-default"}
+    request.provider_data = {
+        "follow_up_context": {
+            "resource_group": "orb-test-rg",
+            "termination_requests": [
+                {
+                    "pending_resource_cleanup": {
+                        "resource_group": "orb-test-rg",
+                        "resource_id": "vmss-demo",
+                        "machine_ids": ["vmss-demo_000001"],
+                        "delete_vmss_when_empty": True,
+                    }
+                }
+            ],
+        }
+    }
+
+    await service.fetch_provider_machines(request, db_machines=[])
+
+    operation = provider_registry_service.execute_operation.await_args.args[1]
+    assert operation.operation_type == OperationType.GET_INSTANCE_STATUS
+    assert operation.parameters["provider_api"] == "VMSS"
+    assert operation.parameters["resource_id"] == "vmss-demo"
+    assert "resource_mapping" not in operation.parameters
+    assert operation.parameters["request_metadata"]["resource_group"] == "orb-test-rg"
 
 
 @pytest.mark.unit
-class TestFetchProviderMachinesEmpty:
-    """fetch_provider_machines returns ([], {}) when no machine context."""
+@pytest.mark.application
+@pytest.mark.asyncio
+async def test_fetch_provider_machines_preserves_instance_owned_resource_id_for_multi_resource_requests():
+    command_bus = MagicMock()
+    uow_factory = MagicMock()
+    config_port = MagicMock()
+    config_port.get_provider_instance_config.return_value = MagicMock()
+    logger = MagicMock()
+    provider_registry_service = MagicMock()
+    provider_registry_service.execute_operation = AsyncMock(
+        return_value=MagicMock(
+            success=True,
+            data={
+                "instances": [
+                    {
+                        "instance_id": "vmss-b_000001",
+                        "status": "running",
+                        "instance_type": "Standard_D4s_v5",
+                        "provider_type": "azure",
+                        "provider_data": {
+                            "resource_id": "vmss-b",
+                        },
+                    }
+                ]
+            },
+            metadata={},
+        )
+    )
 
-    @pytest.mark.asyncio
-    async def test_no_resource_ids_and_no_db_machines_returns_empty(self):
-        svc = _make_service()
-        req = _make_request()
-        req.resource_ids = []
-        req.machine_ids = []
+    service = MachineSyncService(
+        command_bus=command_bus,
+        uow_factory=uow_factory,
+        config_port=config_port,
+        logger=logger,
+        provider_registry_service=provider_registry_service,
+    )
 
-        machines, meta = await svc.fetch_provider_machines(req, [])
-        assert machines == []
-        assert meta == {}
+    request = MagicMock()
+    request.request_type.value = "acquire"
+    request.resource_ids = ["vmss-a", "vmss-b"]
+    request.machine_ids = []
+    request.provider_api = "VMSS"
+    request.template_id = "azure-cheapest-vmss"
+    request.request_id = "req-00000000-0000-0000-0000-000000000003"
+    request.provider_name = "azure-default"
+    request.provider_type = "azure"
+    request.metadata = {}
+    request.provider_data = {}
 
+    provider_machines, _metadata = await service.fetch_provider_machines(request, db_machines=[])
 
-@pytest.mark.unit
-class TestFetchProviderMachinesWithMockRegistry:
-    """fetch_provider_machines propagates provider instance data."""
-
-    @pytest.mark.asyncio
-    async def test_acquire_path_calls_registry_service(self):
-        """fetch_provider_machines calls the registry service for acquire requests."""
-        from orb.providers.base.strategy.provider_strategy import ProviderResult
-
-        svc = _make_service()
-
-        captured: list = []
-
-        async def _capture(provider_name, operation):
-            captured.append(operation.operation_type.value)
-            return ProviderResult.success_result(data={"instances": []})
-
-        registry_svc = MagicMock()
-        registry_svc.execute_operation = _capture
-        svc._provider_registry_service = registry_svc
-
-        req = _make_request(request_type="acquire")
-        db_machines: list = []
-
-        machines, _meta = await svc.fetch_provider_machines(req, db_machines)
-        # The registry was called and returned empty instances → machines is empty
-        assert "describe_resource_instances" in captured
-        assert machines == []
-
-    @pytest.mark.asyncio
-    async def test_return_path_uses_instance_status_operation(self):
-        """For return requests with machine_ids, the GET_INSTANCE_STATUS operation is used."""
-        from orb.providers.base.strategy.provider_strategy import ProviderResult
-
-        svc = _make_service()
-
-        called_operations: list = []
-
-        async def _capture(provider_name, operation):
-            called_operations.append(operation.operation_type.value)
-            return ProviderResult.success_result(
-                data={
-                    "instances": [
-                        {
-                            "instance_id": "i-1",
-                            "status": "shutting-down",
-                            "instance_type": "m5.large",
-                        }
-                    ]
-                },
-            )
-
-        registry_svc = MagicMock()
-        registry_svc.execute_operation = _capture
-        svc._provider_registry_service = registry_svc
-
-        req = _make_request(request_type="return")
-        req.machine_ids = ["i-1"]
-
-        db_machines = [_make_machine("i-1", MachineStatus.RUNNING)]
-        await svc.fetch_provider_machines(req, db_machines)  # type: ignore[arg-type]
-
-        assert "get_instance_status" in called_operations
+    assert len(provider_machines) == 1
+    assert provider_machines[0].resource_id == "vmss-b"

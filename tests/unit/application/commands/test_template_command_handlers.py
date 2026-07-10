@@ -1,6 +1,7 @@
 """Unit tests for template command handlers — TDD for store-unification fix."""
 
 from unittest.mock import AsyncMock, Mock
+from typing import Any
 
 import pytest
 
@@ -21,6 +22,12 @@ from orb.domain.base.ports import (
     LoggingPort,
 )
 from orb.infrastructure.template.dtos import TemplateDTO
+from orb.providers.aws.domain.template.aws_template_dto_config import AWSTemplateDTOConfig
+
+
+def _provider_config_dict(dto: TemplateDTO) -> dict[str, Any]:
+    assert isinstance(dto.provider_config, AWSTemplateDTOConfig)
+    return dto.provider_config.model_dump(exclude_none=True)
 
 
 def _make_dto(**kwargs: object) -> TemplateDTO:
@@ -101,6 +108,33 @@ async def test_create_saves_via_manager():
     saved: TemplateDTO = manager.save_template.call_args[0][0]
     assert saved.template_id == "tpl-1"
     assert command.created is True
+
+
+@pytest.mark.asyncio
+async def test_create_preserves_provider_specific_configuration_in_provider_config():
+    manager = _make_manager(existing=None)
+    port = _make_template_port(manager)
+    handler = _make_create_handler(port)
+
+    command = CreateTemplateCommand(
+        template_id="aws-ec2-fleet",
+        provider_api="EC2Fleet",
+        image_id="ami-000",
+        configuration={
+            "provider_type": "aws",
+            "provider_name": "aws-default",
+            "fleet_type": "maintain",
+            "fleet_role": "arn:aws:iam::123456789012:role/SpotFleetRole",
+        },
+    )
+
+    await handler.handle(command)
+
+    saved: TemplateDTO = manager.save_template.call_args[0][0]
+    provider_config = _provider_config_dict(saved)
+    assert saved.provider_type == "aws"
+    assert provider_config["fleet_type"] == "maintain"
+    assert provider_config["fleet_role"] == "arn:aws:iam::123456789012:role/SpotFleetRole"
 
 
 @pytest.mark.asyncio
@@ -231,10 +265,38 @@ async def test_update_validation_errors_sets_updated_false() -> None:
 
     command = UpdateTemplateCommand(
         template_id="tpl-1",
-        configuration={"bad_field": "x"},
+        image_id="ami-invalid",
     )
     await handler.handle(command)
 
     assert command.updated is False
     assert command.validation_errors == ["invalid field"]
     manager.save_template.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_update_validates_promoted_provider_specific_configuration() -> None:
+    existing = TemplateDTO.model_validate(
+        {
+            "template_id": "aws-ec2-fleet",
+            "name": "aws-ec2-fleet",
+            "provider_api": "EC2Fleet",
+            "provider_type": "aws",
+            "provider_name": "aws-default",
+            "provider_config": {"fleet_type": "maintain", "fleet_role": "old-role"},
+        }
+    )
+    manager = _make_manager(existing=existing)
+    port = _make_template_port(manager)
+    handler = _make_update_handler(port)
+
+    command = UpdateTemplateCommand(
+        template_id="aws-ec2-fleet",
+        configuration={"fleet_role": "new-role"},
+    )
+    await handler.handle(command)
+
+    validated_config = port.validate_template_config.call_args.args[0]
+    assert validated_config["fleet_type"] == "maintain"
+    assert validated_config["fleet_role"] == "new-role"
+    assert "provider_config" not in validated_config

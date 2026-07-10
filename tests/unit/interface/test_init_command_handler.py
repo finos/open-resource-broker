@@ -10,11 +10,7 @@ def _make_strategy(regions=None, default_region="us-east-1"):
     strategy.get_available_regions.return_value = regions or []
     strategy.get_default_region.return_value = default_region
     strategy.get_available_credential_sources.return_value = [
-        {
-            "name": "default",
-            "description": "Default profile",
-            "config_delta": {"profile": "default"},
-        }
+        {"name": "default", "description": "Default profile"}
     ]
     strategy.test_credentials.return_value = {"success": True}
     strategy.get_credential_requirements.return_value = {}
@@ -31,9 +27,10 @@ def _mock_container():
     return container
 
 
-def test_discover_infrastructure_uses_create_strategy_by_type():
-    """_discover_infrastructure must use create_strategy_by_type with the operator's config."""
+def test_discover_infrastructure_uses_fresh_strategy():
+    """_discover_infrastructure must call create_strategy_by_type, not get_or_create_strategy."""
     mock_registry = MagicMock()
+    mock_registry.ensure_provider_type_registered.return_value = True
     mock_strategy = MagicMock()
     mock_strategy.discover_infrastructure_interactive.return_value = {"vpc_id": "vpc-123"}
     mock_registry.create_strategy_by_type.return_value = mock_strategy
@@ -52,7 +49,9 @@ def test_discover_infrastructure_uses_create_strategy_by_type():
         ),
     ):
         result = _mod._discover_infrastructure(
-            "aws", {"region": "us-east-1", "profile": "my-profile"}, mock_registry
+            "aws",
+            {"region": "us-east-1", "profile": "my-profile"},
+            mock_registry,
         )
 
     mock_registry.create_strategy_by_type.assert_called_once_with(
@@ -100,9 +99,10 @@ def test_operational_requirements_separate_from_credential_requirements():
     assert cred_reqs != op_reqs
 
 
-def test_discover_infrastructure_forwards_region_and_profile_to_strategy():
-    """_discover_infrastructure forwards region + profile via the strategy's discover call."""
+def test_discover_infrastructure_passes_correct_region_and_profile():
+    """_discover_infrastructure must pass region and profile to create_strategy_by_type."""
     mock_registry = MagicMock()
+    mock_registry.ensure_provider_type_registered.return_value = True
     mock_strategy = MagicMock()
     mock_strategy.discover_infrastructure_interactive.return_value = {}
     mock_registry.create_strategy_by_type.return_value = mock_strategy
@@ -112,16 +112,14 @@ def test_discover_infrastructure_forwards_region_and_profile_to_strategy():
         patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
     ):
         _mod._discover_infrastructure(
-            "aws", {"region": "eu-west-2", "profile": "my-prod-profile"}, mock_registry
+            "aws",
+            {"region": "eu-west-2", "profile": "my-prod-profile"},
+            mock_registry,
         )
 
-    mock_registry.create_strategy_by_type.assert_called_once_with(
-        "aws", {"region": "eu-west-2", "profile": "my-prod-profile"}
-    )
-    full_config = mock_strategy.discover_infrastructure_interactive.call_args[0][0]
-    assert full_config["type"] == "aws"
-    assert full_config["config"]["region"] == "eu-west-2"
-    assert full_config["config"]["profile"] == "my-prod-profile"
+    call_args = mock_registry.create_strategy_by_type.call_args
+    assert call_args[0][1]["region"] == "eu-west-2"
+    assert call_args[0][1]["profile"] == "my-prod-profile"
     mock_registry.get_or_create_strategy.assert_not_called()
 
 
@@ -133,9 +131,9 @@ def test_interactive_setup_tests_credentials_before_asking_for_region():
         call_order.append("test_credentials")
         return (True, "")
 
-    def mock_prompt_operational_params(strategy_class):
-        call_order.append("prompt_operational_params")
-        return {"region": "us-east-1"}
+    def mock_pick_region(regions, default):
+        call_order.append("pick_region")
+        return "us-east-1"
 
     # inputs: scheduler choice, provider choice, credential choice, discover infra, add another
     inputs = iter(["1", "1", "1", "N", "N"])
@@ -144,9 +142,7 @@ def test_interactive_setup_tests_credentials_before_asking_for_region():
     with (
         patch("builtins.input", side_effect=inputs),
         patch.object(_mod, "_test_provider_credentials", side_effect=mock_test_creds),
-        patch.object(
-            _mod, "_prompt_operational_params", side_effect=mock_prompt_operational_params
-        ),
+        patch.object(_mod, "_pick_region", side_effect=mock_pick_region),
         patch.object(
             _mod,
             "_get_available_schedulers",
@@ -162,13 +158,7 @@ def test_interactive_setup_tests_credentials_before_asking_for_region():
         patch.object(
             _mod,
             "_get_available_credential_sources",
-            return_value=[
-                {
-                    "name": "default",
-                    "description": "Default",
-                    "config_delta": {"profile": "default"},
-                }
-            ],
+            return_value=[{"name": "default", "description": "Default"}],
         ),
         patch.object(
             _mod,
@@ -180,8 +170,8 @@ def test_interactive_setup_tests_credentials_before_asking_for_region():
         _mod._interactive_setup()
 
     assert "test_credentials" in call_order
-    assert "prompt_operational_params" in call_order
-    assert call_order.index("test_credentials") < call_order.index("prompt_operational_params")
+    assert "pick_region" in call_order
+    assert call_order.index("test_credentials") < call_order.index("pick_region")
 
 
 def test_interactive_setup_returns_empty_on_credential_failure():
@@ -209,13 +199,7 @@ def test_interactive_setup_returns_empty_on_credential_failure():
         patch.object(
             _mod,
             "_get_available_credential_sources",
-            return_value=[
-                {
-                    "name": "default",
-                    "description": "Default",
-                    "config_delta": {"profile": "default"},
-                }
-            ],
+            return_value=[{"name": "default", "description": "Default"}],
         ),
         patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
     ):
@@ -265,16 +249,12 @@ def test_write_config_file_fleet_role_in_config_subnet_ids_in_template_defaults(
         ],
     }
 
-    mock_strategy_class = MagicMock()
-    mock_strategy_class.get_cli_extra_config_keys.return_value = {"fleet_role"}
-    mock_strategy_class.generate_provider_name.return_value = "aws_instance-profile_us-east-1"
-
-    mock_reg = MagicMock()
-    mock_reg.strategy_class = mock_strategy_class
+    mock_strategy = MagicMock()
+    mock_strategy.get_cli_extra_config_keys.return_value = {"fleet_role"}
+    mock_strategy.generate_provider_name.return_value = "aws_instance-profile_us-east-1"
 
     mock_factory = MagicMock()
-    mock_factory.ensure_provider_type_registered.return_value = True
-    mock_factory._get_type_registration.return_value = mock_reg
+    mock_factory.create_strategy_by_type.return_value = mock_strategy
 
     mock_container = MagicMock()
     mock_container.get.return_value = mock_factory
@@ -323,159 +303,124 @@ def test_write_config_file_fleet_role_in_config_subnet_ids_in_template_defaults(
     )
 
 
-# ---------------------------------------------------------------------------
-# _get_provider_strategy — init-path tests
-# ---------------------------------------------------------------------------
-
-
-def test_get_provider_strategy_returns_strategy_class() -> None:
-    """_get_provider_strategy must return the strategy CLASS (not an instance).
-
-    The init flow has no provider config yet; classmethods can be called
-    directly on the class without constructing an instance.
-    """
-    mock_cls = MagicMock()
-    mock_reg = MagicMock()
-    mock_reg.strategy_class = mock_cls
-    mock_registry = MagicMock()
-    mock_registry.ensure_provider_type_registered.return_value = True
-    mock_registry._get_type_registration.return_value = mock_reg
-
-    result = _mod._get_provider_strategy("k8s", registry=mock_registry)
-
-    mock_registry.ensure_provider_type_registered.assert_called_once_with("k8s")
-    mock_registry.get_or_create_strategy.assert_not_called()
-    assert result is mock_cls
-
-
-def test_get_provider_strategy_k8s_does_not_touch_get_or_create_strategy() -> None:
-    """_get_provider_strategy must not call registry.get_or_create_strategy."""
-    mock_cls = MagicMock()
-    mock_reg = MagicMock()
-    mock_reg.strategy_class = mock_cls
-    mock_registry = MagicMock()
-    mock_registry.ensure_provider_type_registered.return_value = True
-    mock_registry._get_type_registration.return_value = mock_reg
-
-    _mod._get_provider_strategy("k8s", registry=mock_registry)
-
-    mock_registry.get_or_create_strategy.assert_not_called()
-
-
-def test_get_provider_strategy_aws_returns_strategy_class() -> None:
-    """All provider types go through the classmethod path (no special-casing)."""
-    mock_cls = MagicMock()
-    mock_reg = MagicMock()
-    mock_reg.strategy_class = mock_cls
-    mock_registry = MagicMock()
-    mock_registry.ensure_provider_type_registered.return_value = True
-    mock_registry._get_type_registration.return_value = mock_reg
-
-    result = _mod._get_provider_strategy("aws", registry=mock_registry)
-
-    mock_registry.ensure_provider_type_registered.assert_called_once_with("aws")
-    mock_registry.get_or_create_strategy.assert_not_called()
-    assert result is mock_cls
-
-
-def test_get_provider_strategy_returns_none_on_error() -> None:
-    """_get_provider_strategy returns None when the type lookup raises."""
-    mock_registry = MagicMock()
-    mock_registry.ensure_provider_type_registered.return_value = True
-    mock_registry._get_type_registration.side_effect = ValueError("not registered")
-
-    result = _mod._get_provider_strategy("k8s", registry=mock_registry)
-
-    assert result is None
-
-
-# ---------------------------------------------------------------------------
-# test_init_handler_uses_strategy_generate_provider_name
-# ---------------------------------------------------------------------------
-
-
-def _write_config_file_with_strategy(tmp_path, provider_data, strategy_name_return):
-    """Helper: run _write_config_file with a mocked strategy class."""
-    import json
-
-    config_file = tmp_path / "config.json"
-    user_config = {"scheduler_type": "default", "providers": [provider_data]}
-
-    mock_strategy_class = MagicMock()
-    mock_strategy_class.get_cli_extra_config_keys.return_value = set()
-    mock_strategy_class.generate_provider_name.return_value = strategy_name_return
-
-    mock_reg = MagicMock()
-    mock_reg.strategy_class = mock_strategy_class
-
-    mock_factory = MagicMock()
-    mock_factory.ensure_provider_type_registered.return_value = True
-    mock_factory._get_type_registration.return_value = mock_reg
-
-    mock_container = MagicMock()
-    mock_container.get.return_value = mock_factory
-
-    mock_scheduler_registry = MagicMock()
-    mock_scheduler_registry.get_extra_config_for_type.return_value = {}
-
-    fake_default = json.dumps({"scheduler": {}, "provider": {}})
-
-    class _FakeResource:
-        def read_text(self):
-            return fake_default
-
-    class _FakeFiles:
-        def joinpath(self, name):
-            return _FakeResource()
+def test_interactive_setup_preserves_azure_provider_config():
+    """Interactive init must keep Azure-specific config instead of collapsing to profile/region."""
+    inputs = iter(
+        [
+            "1",  # scheduler
+            "1",  # provider
+            "1",  # credentials
+            "12345678-1234-1234-1234-123456789012",  # subscription_id
+            "orb-test-rg",  # resource_group
+            "eastus2",  # region
+            "managed-identity-client-id",  # client_id
+            "N",  # discover infrastructure
+            "N",  # add another provider
+        ]
+    )
+    strategy = MagicMock()
+    strategy.get_available_regions.return_value = []
+    strategy.get_default_region.return_value = "eastus2"
 
     with (
-        patch("orb.interface.init_command_handler.get_container", return_value=mock_container),
-        patch(
-            "orb.infrastructure.scheduler.registry.get_scheduler_registry",
-            return_value=mock_scheduler_registry,
+        patch("builtins.input", side_effect=inputs),
+        patch.object(_mod, "_test_provider_credentials", return_value=(True, "")),
+        patch.object(
+            _mod,
+            "_get_available_schedulers",
+            return_value=[{"type": "default", "display_name": "Default", "description": ""}],
         ),
-        patch("importlib.resources.files", return_value=_FakeFiles()),
+        patch.object(
+            _mod,
+            "_get_available_providers",
+            return_value=[{"type": "azure", "display_name": "Azure", "description": ""}],
+        ),
+        patch.object(_mod, "_get_provider_strategy", return_value=strategy),
+        patch.object(_mod, "_get_credential_requirements", return_value={}),
+        patch.object(
+            _mod,
+            "_get_available_credential_sources",
+            return_value=[{"name": None, "description": "Default"}],
+        ),
+        patch.object(
+            _mod,
+            "_get_operational_requirements",
+            return_value={
+                "subscription_id": {"required": True, "description": "Azure subscription ID"},
+                "resource_group": {"required": True, "description": "Azure resource group"},
+                "region": {"required": True, "description": "Azure location"},
+                "client_id": {
+                    "required": False,
+                    "prompt": True,
+                    "description": "Managed identity client ID (optional)",
+                },
+            },
+        ),
+        patch("orb.interface.init_command_handler.get_container", return_value=_mock_container()),
     ):
-        _mod._write_config_file(config_file, user_config)
+        result = _mod._interactive_setup()
 
-    with open(config_file) as f:
-        written = json.load(f)
+    provider = result["providers"][0]
+    assert provider["type"] == "azure"
+    assert provider["config"]["subscription_id"] == "12345678-1234-1234-1234-123456789012"
+    assert provider["config"]["resource_group"] == "orb-test-rg"
+    assert provider["config"]["region"] == "eastus2"
+    assert provider["config"]["client_id"] == "managed-identity-client-id"
 
-    return written["provider"]["providers"][0], mock_strategy_class
 
+def test_get_default_config_preserves_azure_non_interactive_config():
+    """Non-interactive init must keep Azure-specific config from CLI args."""
+    args = MagicMock()
+    args.provider = "azure"
+    args.scheduler = "default"
+    args.region = None
+    args.profile = None
+    args.azure_subscription_id = "12345678-1234-1234-1234-123456789012"
+    args.azure_resource_group = "orb-test-rg"
+    args.azure_location = "eastus2"
+    args.azure_client_id = "managed-identity-client-id"
+    args.azure_cyclecloud_url = "https://cyclecloud.example.com"
+    args.azure_cyclecloud_credential_path = "op://vault/item/cred"
+    args.azure_cyclecloud_auth_mode = None
+    args.azure_cyclecloud_aad_scope = None
+    args.azure_cyclecloud_verify_ssl = False
+    args.azure_cyclecloud_no_verify_ssl = True
 
-def test_init_handler_uses_strategy_generate_provider_name(tmp_path) -> None:
-    """_write_config_file routes provider name generation through the strategy."""
-    provider_data = {
-        "type": "k8s",
-        "profile": "ms-karpenter",
-        "region": "",
-        "is_default": True,
-        "infrastructure_defaults": {},
+    strategy = MagicMock()
+    strategy.get_default_region.return_value = "eastus2"
+    strategy.get_cli_provider_config.return_value = {
+        "subscription_id": args.azure_subscription_id,
+        "resource_group": args.azure_resource_group,
+        "region": args.azure_location,
+        "client_id": args.azure_client_id,
+        "cyclecloud": {
+            "url": args.azure_cyclecloud_url,
+            "credential_path": args.azure_cyclecloud_credential_path,
+            "verify_ssl": False,
+        },
     }
-    p, mock_strategy = _write_config_file_with_strategy(tmp_path, provider_data, "k8s_ms-karpenter")
-    mock_strategy.generate_provider_name.assert_called_once()
-    assert p["name"] == "k8s_ms-karpenter"
+    strategy.get_cli_infrastructure_defaults.return_value = {}
+
+    with (
+        patch.object(
+            _mod,
+            "_get_available_providers",
+            return_value=[{"type": "azure", "display_name": "Azure", "description": ""}],
+        ),
+        patch.object(_mod, "_get_provider_strategy", return_value=strategy),
+    ):
+        result = _mod._get_default_config(args)
+
+    provider = result["providers"][0]
+    assert provider["config"]["subscription_id"] == args.azure_subscription_id
+    assert provider["config"]["resource_group"] == args.azure_resource_group
+    assert provider["config"]["region"] == args.azure_location
+    assert provider["config"]["client_id"] == args.azure_client_id
+    assert provider["config"]["cyclecloud"]["verify_ssl"] is False
 
 
-def test_init_handler_uses_strategy_name_for_aws(tmp_path) -> None:
-    """generate_provider_name is called for AWS providers too."""
-    provider_data = {
-        "type": "aws",
-        "profile": "my-profile",
-        "region": "eu-west-1",
-        "is_default": False,
-        "infrastructure_defaults": {},
-    }
-    p, mock_strategy = _write_config_file_with_strategy(
-        tmp_path, provider_data, "aws_my-profile_eu-west-1"
-    )
-    mock_strategy.generate_provider_name.assert_called_once()
-    assert p["name"] == "aws_my-profile_eu-west-1"
-
-
-def test_init_handler_fallback_name_when_strategy_unavailable(tmp_path) -> None:
-    """When the strategy cannot be created, _fallback_provider_name is used."""
+def test_write_config_file_preserves_azure_provider_config(tmp_path):
+    """init config writing must preserve Azure provider config fields."""
     import json
 
     config_file = tmp_path / "config.json"
@@ -483,20 +428,33 @@ def test_init_handler_fallback_name_when_strategy_unavailable(tmp_path) -> None:
         "scheduler_type": "default",
         "providers": [
             {
-                "type": "aws",
-                "config": {"profile": "default", "region": "us-west-2"},
-                "is_default": False,
+                "type": "azure",
+                "config": {
+                    "subscription_id": "12345678-1234-1234-1234-123456789012",
+                    "resource_group": "orb-test-rg",
+                    "region": "eastus2",
+                    "client_id": "managed-identity-client-id",
+                    "cyclecloud": {
+                        "url": "https://cyclecloud.example.com",
+                        "credential_path": "op://vault/item/cred",
+                        "verify_ssl": False,
+                    },
+                },
+                "is_default": True,
                 "infrastructure_defaults": {},
             }
         ],
     }
 
-    mock_factory = MagicMock()
-    mock_factory.ensure_provider_type_registered.return_value = True
-    mock_factory._get_type_registration.side_effect = RuntimeError("no strategy")
+    mock_strategy = MagicMock()
+    mock_strategy.get_cli_extra_config_keys.return_value = set()
+    mock_strategy.generate_provider_name.return_value = "azure_12345678-1234-1234-1234-123456789012_eastus2"
+
+    mock_registry = MagicMock()
+    mock_registry.create_strategy_by_type.return_value = mock_strategy
 
     mock_container = MagicMock()
-    mock_container.get.return_value = mock_factory
+    mock_container.get.return_value = mock_registry
 
     mock_scheduler_registry = MagicMock()
     mock_scheduler_registry.get_extra_config_for_type.return_value = {}
@@ -524,8 +482,10 @@ def test_init_handler_fallback_name_when_strategy_unavailable(tmp_path) -> None:
     with open(config_file) as f:
         written = json.load(f)
 
-    p = written["provider"]["providers"][0]
-    # Fallback: provider_type + sha256(sorted config) — provider-agnostic; the
-    # specific hash isn't stable across config-key additions but the shape is.
-    assert p["name"].startswith("aws_")
-    assert len(p["name"].split("_")[1]) == 8  # sha256 first-8-chars
+    provider = written["provider"]["providers"][0]
+    assert provider["name"] == "azure_12345678-1234-1234-1234-123456789012_eastus2"
+    assert provider["config"]["subscription_id"] == "12345678-1234-1234-1234-123456789012"
+    assert provider["config"]["resource_group"] == "orb-test-rg"
+    assert provider["config"]["region"] == "eastus2"
+    assert provider["config"]["client_id"] == "managed-identity-client-id"
+    assert provider["config"]["cyclecloud"]["credential_path"] == "op://vault/item/cred"

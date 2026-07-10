@@ -61,8 +61,7 @@ def test_strategy_class_accessible_after_registration() -> None:
         strategy_class=_StubStrategy,
     )
 
-    reg = registry._get_type_registration("stubprovider")
-    assert reg.strategy_class is _StubStrategy
+    assert registry.get_strategy_class("stubprovider") is _StubStrategy
 
 
 # ---------------------------------------------------------------------------
@@ -94,8 +93,8 @@ def test_classmethods_callable_on_strategy_class() -> None:
         strategy_class=_CredStrategy,
     )
 
-    reg = registry._get_type_registration("aws")
-    strategy_class = reg.strategy_class
+    strategy_class = registry.get_strategy_class("aws")
+    assert strategy_class is _CredStrategy
 
     sources = strategy_class.get_available_credential_sources()
     assert isinstance(sources, list)

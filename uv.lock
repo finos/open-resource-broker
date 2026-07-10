@@ -3681,6 +3681,7 @@ requires-dist = [
     { name = "pyjwt", specifier = ">=2.8.0" },
     { name = "pyright", marker = "extra == 'ci'", specifier = ">=1.1.408,<2.0.0" },
     { name = "pytest", marker = "extra == 'ci'", specifier = ">=7.4.3,<10.0.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.2" },
     { name = "pytest-asyncio", marker = "extra == 'ci'", specifier = ">=0.21.1,<2.0.0" },
     { name = "pytest-benchmark", marker = "extra == 'ci'", specifier = ">=5.1.0,<6.0.0" },
     { name = "pytest-cov", marker = "extra == 'ci'", specifier = ">=4.1.0,<8.0.0" },

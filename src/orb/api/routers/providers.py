@@ -82,17 +82,16 @@ def _get_schema_for_provider_type(provider_type: str) -> list[dict[str, Any]]:
     Raises ``KeyError`` when the provider type is not registered.
     """
     from orb.providers.registry.provider_registry import get_provider_registry
-    from orb.providers.registry.types import ProviderRegistration
 
     registry = get_provider_registry()
-    reg = registry._get_type_registration(provider_type)  # raises ValueError if missing
-    if not isinstance(reg, ProviderRegistration) or reg.strategy_class is None:
+    strategy_class = registry.get_strategy_class(provider_type)
+    if strategy_class is None:
         return []
 
     try:
         # Call the classmethod directly — no instance needed.
         # get_ui_column_schema only constructs UIColumnDescriptor objects; no I/O.
-        schema = reg.strategy_class.get_ui_column_schema()
+        schema = strategy_class.get_ui_column_schema()
         return [col.to_dict() for col in schema]
     except Exception as exc:
         logger.warning(

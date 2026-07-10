@@ -1,10 +1,59 @@
 """Port interface for provider registry operations used by the application layer."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any, Optional, Protocol
 
 from orb.domain.base.results import ProviderSelectionResult
 from orb.domain.template.template_aggregate import Template
+
+
+class ProviderStrategyClass(Protocol):
+    """Class-level provider hooks used before a strategy instance exists."""
+
+    @classmethod
+    def get_available_credential_sources(cls) -> list[dict[str, Any]]:
+        """Return visible credential sources for interactive init."""
+        ...
+
+    @classmethod
+    def test_credentials(cls, credential_source: Optional[str] = None, **kwargs: Any) -> dict:
+        """Verify credentials for interactive init."""
+        ...
+
+    @classmethod
+    def get_credential_requirements(cls) -> dict:
+        """Return pre-auth credential fields required by the provider."""
+        ...
+
+    @classmethod
+    def get_operational_requirements(cls) -> dict:
+        """Return post-auth operational fields required by the provider."""
+        ...
+
+    @classmethod
+    def get_cli_provider_config(cls, args: Any) -> dict[str, Any]:
+        """Extract non-interactive provider config from CLI args."""
+        ...
+
+    @classmethod
+    def get_cli_infrastructure_defaults(cls, args: Any) -> dict[str, Any]:
+        """Extract non-interactive infrastructure defaults from CLI args."""
+        ...
+
+    @classmethod
+    def get_cli_extra_config_keys(cls) -> set[str]:
+        """Return infrastructure default keys that belong in provider config."""
+        ...
+
+    @classmethod
+    def generate_provider_name(cls, config: dict[str, Any]) -> str:
+        """Generate a provider instance name from provider config."""
+        ...
+
+    @classmethod
+    def get_ui_column_schema(cls) -> list[Any]:
+        """Return provider-specific UI column descriptors."""
+        ...
 
 
 class ProviderRegistryPort(ABC):
@@ -90,8 +139,8 @@ class ProviderRegistryPort(ABC):
         pass  # type: ignore[return]
 
     @abstractmethod
-    def create_validator(self, provider_type: str) -> Optional[Any]:
-        """Create a template validator using the registered factory for the given provider type."""
+    def create_validator(self, provider_type: str, config: Any = None) -> Optional[Any]:
+        """Create a template validator using provider config data for the given provider type."""
         pass  # type: ignore[return]
 
     @abstractmethod
@@ -100,4 +149,9 @@ class ProviderRegistryPort(ABC):
 
         Returns None if the provider type is not registered or has no default API.
         """
+        pass  # type: ignore[return]
+
+    @abstractmethod
+    def get_strategy_class(self, provider_type: str) -> Optional[type[ProviderStrategyClass]]:
+        """Return the registered strategy class for a provider type, if available."""
         pass  # type: ignore[return]

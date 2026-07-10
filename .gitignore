@@ -180,6 +180,7 @@ terraform.rc
 
 # Application specific
 config/config.json
+config/cyclecloud-credentials.json
 # Runtime-generated script copies (orb init)
 /scripts/
 data/

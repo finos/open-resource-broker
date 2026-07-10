@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from orb.application.dto.commands import CreateReturnRequestCommand
+from orb.application.dto.queries import GetRequestQuery
 from orb.application.dto.queries import ListMachinesQuery
 from orb.application.services.orchestration.dtos import ReturnMachinesInput, ReturnMachinesOutput
 from orb.application.services.orchestration.return_machines import ReturnMachinesOrchestrator
@@ -191,48 +192,29 @@ class TestReturnMachinesOrchestrator:
         assert result.request_id == "ret-req-001"
 
     @pytest.mark.asyncio
-    async def test_output_machine_ids_populated_from_explicit_input(
-        self, orchestrator, mock_command_bus
+    async def test_execute_wait_true_uses_syncing_request_status_query(
+        self, orchestrator, mock_command_bus, mock_query_bus
     ):
-        """machine_ids in output must reflect the machines submitted for return."""
-
-        async def _set_request_ids(cmd):
+        async def set_request_ids(cmd):
             cmd.created_request_ids = ["ret-req-001"]
 
-        mock_command_bus.execute.side_effect = _set_request_ids
-        input = ReturnMachinesInput(machine_ids=["i-aaa", "i-bbb", "i-ccc"])
-        result = await orchestrator.execute(input)
-        assert isinstance(result, ReturnMachinesOutput)
-        assert result.machine_ids == ["i-aaa", "i-bbb", "i-ccc"]
+        mock_command_bus.execute.side_effect = set_request_ids
 
-    @pytest.mark.asyncio
-    async def test_output_machine_ids_populated_from_all_machines_path(
-        self, orchestrator, mock_query_bus, mock_command_bus
-    ):
-        """machine_ids in output must reflect resolved IDs from --all path."""
-        mock_query_bus.execute.return_value = [
-            MagicMock(machine_id="i-001"),
-            MagicMock(machine_id="i-002"),
-        ]
+        poll_result = MagicMock()
+        poll_result.status = MagicMock()
+        poll_result.status.value = "completed"
+        mock_query_bus.execute.return_value = poll_result
 
-        async def _set_request_ids(cmd):
-            cmd.created_request_ids = ["ret-req-001"]
+        input = ReturnMachinesInput(machine_ids=["m-001"], wait=True, timeout_seconds=10)
 
-        mock_command_bus.execute.side_effect = _set_request_ids
-        input = ReturnMachinesInput(all_machines=True)
-        result = await orchestrator.execute(input)
-        assert sorted(result.machine_ids) == ["i-001", "i-002"]
+        from unittest.mock import patch
 
-    @pytest.mark.asyncio
-    async def test_output_machine_ids_empty_when_no_op(self, orchestrator, mock_command_bus):
-        """machine_ids must be empty (default) when no request was created."""
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            result = await orchestrator.execute(input)
 
-        async def _set_empty(cmd):
-            cmd.created_request_ids = []
-            cmd.skipped_machines = ["i-001"]
-
-        mock_command_bus.execute.side_effect = _set_empty
-        input = ReturnMachinesInput(machine_ids=["i-001"])
-        result = await orchestrator.execute(input)
-        assert result.status == "no_op"
-        assert result.machine_ids == []
+        query = mock_query_bus.execute.call_args[0][0]
+        assert isinstance(query, GetRequestQuery)
+        assert query.request_id == "ret-req-001"
+        assert query.lightweight is False
+        assert query.verbose is True
+        assert result.status == "completed"

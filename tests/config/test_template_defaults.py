@@ -158,6 +158,25 @@ class TestTemplateDefaultsService:
         )
         assert result == "EC2Fleet"  # From provider type defaults
 
+    def test_resolve_template_defaults_keeps_global_max_number_in_shared_output(
+        self,
+        template_defaults_service,
+        mock_config_manager,
+        sample_provider_config,
+        sample_template_config,
+    ):
+        """Shared defaults service keeps config-layer max_number in resolved output."""
+        mock_config_manager.get_template_config.return_value = sample_template_config
+        mock_config_manager.get_provider_config.return_value = sample_provider_config
+
+        result = template_defaults_service.resolve_template_defaults(
+            {"template_id": "azure-template", "max_instances": 3},
+            None,
+        )
+
+        assert result["max_instances"] == 3
+        assert result["max_number"] == 10
+
     def test_get_effective_template_defaults(
         self,
         template_defaults_service,

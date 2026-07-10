@@ -16,11 +16,13 @@ from orb.domain.base.ports.path_resolution_port import PathResolutionPort
 from orb.domain.constants import PROVIDER_TYPE_AWS
 from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
 from orb.infrastructure.template.dtos import TemplateDTO
+from orb.infrastructure.utilities.common.string_utils import extract_provider_type
 
 if TYPE_CHECKING:
     from orb.application.services.provider_registry_service import ProviderRegistryService
     from orb.domain.base.ports.configuration_port import ConfigurationPort
     from orb.domain.base.ports.logging_port import LoggingPort
+    from orb.domain.template.template_aggregate import Template
 
 
 class BaseSchedulerStrategy(SchedulerPort, ABC):
@@ -76,14 +78,32 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
         """Get the active provider type."""
         try:
             if self._provider_registry_service is None:
-                return PROVIDER_TYPE_AWS
+                return self._infer_provider_type_from_config()
             selection_result = self._provider_registry_service.select_active_provider()
             provider_type = selection_result.provider_type
             self.logger.debug("Active provider type: %s", provider_type)
             return provider_type
         except Exception as e:
-            self.logger.warning("Failed to get active provider type, defaulting to 'aws': %s", e)
-            return PROVIDER_TYPE_AWS
+            inferred_provider_type = self._infer_provider_type_from_config()
+            self.logger.warning(
+                "Failed to get active provider type, falling back to '%s': %s",
+                inferred_provider_type,
+                e,
+            )
+            return inferred_provider_type
+
+    def _infer_provider_type_from_config(self) -> str:
+        """Infer provider type from configured active provider when the registry is unavailable."""
+        try:
+            if self._config_manager is not None and hasattr(self._config_manager, "app_config"):
+                config = self._config_manager.app_config.model_dump()
+                provider_config = config.get("provider", {})
+                active_provider = provider_config.get("active_provider")
+                if active_provider:
+                    return extract_provider_type(str(active_provider))
+        except Exception as exc:
+            self.logger.debug("Could not infer provider type from config: %s", exc)
+        return PROVIDER_TYPE_AWS
 
     def _load_single_file(self, template_path: str) -> list[dict[str, Any]]:
         """Load templates from a single file."""
@@ -228,7 +248,7 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
         return self._coalesce_directory(
             config_override=getattr(self.config_manager.app_config.scheduler, "config_dir", None),
             env_var_name="CONFIG_DIR",
-            default_factory=lambda: self._get_platform_config_dir(),
+            default_factory=self._get_platform_config_dir,
         )
 
     def get_working_directory(self) -> str:
@@ -236,7 +256,7 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
         return self._coalesce_directory(
             config_override=getattr(self.config_manager.app_config.scheduler, "work_dir", None),
             env_var_name="WORK_DIR",
-            default_factory=lambda: self._get_platform_work_dir(),
+            default_factory=self._get_platform_work_dir,
         )
 
     def get_logs_directory(self) -> str:
@@ -244,7 +264,7 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
         return self._coalesce_directory(
             config_override=getattr(self.config_manager.app_config.scheduler, "log_dir", None),
             env_var_name="LOG_DIR",
-            default_factory=lambda: self._get_platform_logs_dir(),
+            default_factory=self._get_platform_logs_dir,
         )
 
     def get_log_level(self) -> str:
@@ -397,9 +417,11 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
         """Default implementation - clean to_dict without scheduler-specific formatting."""
         return template.to_dict()
 
-    def format_template_for_provider(self, template: TemplateDTO) -> dict[str, Any]:
-        """Default implementation - clean to_dict without scheduler-specific formatting."""
-        return template.to_dict()
+    def format_template_for_provider(self, template: "TemplateDTO | Template") -> dict[str, Any]:
+        """Format either a stored template DTO or a domain template for provider operations."""
+        if isinstance(template, TemplateDTO):
+            return template.to_template_config()
+        return template.model_dump(mode="json", exclude_none=True)
 
     @staticmethod
     def _unwrap_request_id(value: Any) -> str | None:

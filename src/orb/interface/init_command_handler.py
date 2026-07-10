@@ -4,7 +4,7 @@ import json
 import platform
 import shutil
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Protocol, runtime_checkable
 
 from orb.config.platform_dirs import (
     get_config_location,
@@ -13,12 +13,30 @@ from orb.config.platform_dirs import (
     get_work_location,
 )
 from orb.domain.base.ports.console_port import ConsolePort
-from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
+from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort, ProviderStrategyClass
 from orb.infrastructure.di.container import get_container
 from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
 
 logger = get_logger(__name__)
+
+
+@runtime_checkable
+class _OperationalParamChoicesProvider(Protocol):
+    """Optional class-level hook for constrained init prompt choices."""
+
+    def get_operational_param_choices(self, param: str) -> list[tuple[str, str]]:
+        """Return selectable values for an operational init parameter."""
+        ...
+
+
+@runtime_checkable
+class _OperationalParamDefaultProvider(Protocol):
+    """Optional class-level hook for init prompt defaults."""
+
+    def get_operational_param_default(self, param: str) -> str:
+        """Return the default value for an operational init parameter."""
+        ...
 
 
 async def handle_init(args) -> int:
@@ -446,7 +464,9 @@ def _configure_additional_provider() -> Optional[Dict[str, Any]]:
         return None
 
 
-def _get_provider_strategy(provider_type: str, registry: Any = None) -> Optional[type]:
+def _get_provider_strategy(
+    provider_type: str, registry: Any = None
+) -> Optional[type[ProviderStrategyClass]]:
     """Return the strategy CLASS for a provider type.
 
     The credential inquiry methods (``get_available_credential_sources``,
@@ -463,14 +483,14 @@ def _get_provider_strategy(provider_type: str, registry: Any = None) -> Optional
             registry = get_container().get(ProviderRegistryPort)
         # Ensure the provider type is registered so its class is available.
         registry.ensure_provider_type_registered(provider_type)
-        reg = registry._get_type_registration(provider_type)
-        strategy_class = getattr(reg, "strategy_class", None)
-        return strategy_class
+        return registry.get_strategy_class(provider_type)
     except Exception:
         return None
 
 
-def _prompt_operational_params(strategy_class: Optional[type]) -> dict[str, Any]:
+def _prompt_operational_params(
+    strategy_class: Optional[type[ProviderStrategyClass]],
+) -> dict[str, Any]:
     """Interactively collect operational parameters from the operator.
 
     Calls ``get_operational_requirements()`` on the strategy class to discover
@@ -505,14 +525,14 @@ def _prompt_operational_params(strategy_class: Optional[type]) -> dict[str, Any]
         choices: list[tuple[str, str]] = []
         default_value: str = ""
         try:
-            if hasattr(strategy_class, "get_operational_param_choices"):
+            if isinstance(strategy_class, _OperationalParamChoicesProvider):
                 choices = strategy_class.get_operational_param_choices(param) or []
         except Exception:
             # Strategy hook raised or returned a broken shape; free-text prompt
             # is the safe fallback so init keeps working with degraded UX.
             choices = []
         try:
-            if hasattr(strategy_class, "get_operational_param_default"):
+            if isinstance(strategy_class, _OperationalParamDefaultProvider):
                 default_value = strategy_class.get_operational_param_default(param) or ""
         except Exception:
             # Strategy hook raised or returned a broken shape; empty default

@@ -91,34 +91,66 @@ class TemplateDTO(BaseDTO):
         """Serialise the typed provider_config to a plain dict for model_dump() consumers."""
         if value is None:
             return None
-        return value.model_dump()
+        return value.model_dump(exclude_none=True)
 
     @model_validator(mode="before")
     @classmethod
     def _set_defaults(cls, data: Any) -> Any:
-        """Set default values for optional fields derived from other fields."""
+        """Set defaults and validate provider-specific configuration."""
         if isinstance(data, dict):
+            data = dict(data)
             if not data.get("name"):
                 data["name"] = data.get("template_id")
+
+            provider_config = data.get("provider_config")
+            provider_type = data.get("provider_type")
+            if provider_config is not None:
+                if not provider_type:
+                    raise ValueError("provider_type is required when provider_config is supplied")
+
+                provider_type_key = str(provider_type)
+                extension_class = TemplateExtensionRegistry.get_extension_class(provider_type_key)
+                if extension_class is None:
+                    raise ValueError(
+                        f"provider_config supplied for unregistered provider {provider_type_key!r}"
+                    )
+
+                if isinstance(provider_config, dict):
+                    data["provider_config"] = extension_class.model_validate(provider_config)
+                elif not isinstance(provider_config, extension_class):
+                    raise ValueError(
+                        "provider_config type does not match the registered "
+                        f"extension for provider {provider_type_key!r}"
+                    )
         return data
+
+    def to_template_config(self) -> dict[str, Any]:
+        """Convert this DTO to flat template data for ``TemplateFactory``."""
+        data = self.model_dump(mode="python", exclude_none=True)
+        provider_config = data.pop("provider_config", None)
+        if provider_config is None:
+            return data
+
+        if isinstance(provider_config, BaseModel):
+            provider_config_data = provider_config.model_dump(exclude_none=True)
+        else:
+            provider_config_data = {
+                key: value for key, value in dict(provider_config).items() if value is not None
+            }
+
+        return {**provider_config_data, **data}
 
     @classmethod
     def from_domain(cls, template) -> "TemplateDTO":
         """Convert domain template to DTO."""
-        # Delegate provider-specific field extraction to the extension registry.
-        # Each provider registers an extension class that knows which fields to
-        # capture.  Infrastructure layer stays provider-agnostic.
-        _provider_type = getattr(template, "provider_type", None)
-        _provider_config: Optional[BaseModel] = None
-        if _provider_type:
-            # Serialise the domain object to a plain dict so the extension class
-            # can pick up its own fields (with extra="ignore").
-            if hasattr(template, "model_dump"):
-                _template_data = template.model_dump()
-            else:
-                _template_data = vars(template)
-            _provider_config = TemplateExtensionRegistry.create_extension_config(
-                _provider_type, _template_data
+        provider_type = getattr(template, "provider_type", None)
+        provider_config: Optional[BaseModel] = None
+        if provider_type:
+            template_data = (
+                template.model_dump() if hasattr(template, "model_dump") else vars(template)
+            )
+            provider_config = TemplateExtensionRegistry.create_extension_config(
+                str(provider_type), template_data
             )
 
         return cls(
@@ -129,20 +161,19 @@ class TemplateDTO(BaseDTO):
             # Instance configuration
             image_id=getattr(template, "image_id", None),
             max_instances=getattr(template, "max_instances", 1),
-            # Machine types configuration (unified)
+            # Machine types configuration
             machine_types=getattr(template, "machine_types", {}),
             machine_types_ondemand=getattr(template, "machine_types_ondemand", {}),
             machine_types_priority=getattr(template, "machine_types_priority", {}),
             # Network configuration
             subnet_ids=getattr(template, "subnet_ids", []),
             security_group_ids=getattr(template, "security_group_ids", []),
+            network_zones=getattr(template, "network_zones", []),
+            public_ip_assignment=getattr(template, "public_ip_assignment", None),
             # Pricing and allocation
             price_type=getattr(template, "price_type", "ondemand"),
             allocation_strategy=getattr(template, "allocation_strategy", None),
             max_price=getattr(template, "max_price", None),
-            # Network configuration
-            network_zones=getattr(template, "network_zones", []),
-            public_ip_assignment=getattr(template, "public_ip_assignment", None),
             # Storage configuration
             root_device_volume_size=getattr(template, "root_device_volume_size", None),
             volume_type=getattr(template, "volume_type", None),
@@ -156,14 +187,13 @@ class TemplateDTO(BaseDTO):
             instance_profile=getattr(template, "instance_profile", None),
             # Advanced configuration
             monitoring_enabled=getattr(template, "monitoring_enabled", None),
-            # Tags and metadata (cross-provider opaque data only)
+            # Metadata
             tags=getattr(template, "tags", {}),
             metadata=getattr(template, "metadata", {}),
-            # Typed provider-specific configuration (populated via registry)
-            provider_config=_provider_config,
+            provider_config=provider_config,
             provider_data=getattr(template, "provider_data", {}),
             # Provider identification
-            provider_type=_provider_type,
+            provider_type=provider_type,
             provider_name=getattr(template, "provider_name", None),
             provider_api=getattr(template, "provider_api", None),
             # Timestamps

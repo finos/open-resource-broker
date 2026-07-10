@@ -30,10 +30,8 @@ def _mock_strategy_class():
 def _mock_registry(strategy_class=None):
     """Build a mock registry that exposes the strategy class via registration."""
     registry = MagicMock()
-    reg = MagicMock()
-    reg.strategy_class = strategy_class
     registry.ensure_provider_type_registered.return_value = True
-    registry._get_type_registration.return_value = reg
+    registry.get_strategy_class.return_value = strategy_class
     return registry
 
 
@@ -45,7 +43,7 @@ def test_init_handler_returns_strategy_class() -> None:
     result = _mod._get_provider_strategy("aws", registry=registry)
 
     registry.ensure_provider_type_registered.assert_called_once_with("aws")
-    registry._get_type_registration.assert_called_once_with("aws")
+    registry.get_strategy_class.assert_called_once_with("aws")
     assert result is mock_cls
 
 
@@ -80,10 +78,10 @@ def test_init_handler_returns_none_when_no_strategy_class() -> None:
 
 
 def test_init_handler_returns_none_on_registration_error() -> None:
-    """_get_provider_strategy returns None when _get_type_registration raises."""
+    """_get_provider_strategy returns None when strategy class lookup raises."""
     registry = MagicMock()
     registry.ensure_provider_type_registered.return_value = True
-    registry._get_type_registration.side_effect = ValueError("not registered")
+    registry.get_strategy_class.side_effect = ValueError("not registered")
 
     result = _mod._get_provider_strategy("notfound", registry=registry)
 

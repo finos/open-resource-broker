@@ -7,6 +7,9 @@ if TYPE_CHECKING:
     from orb.application.services.provider_registry_service import ProviderRegistryService
 
 from orb.application.ports.command_bus_port import CommandBusPort
+from orb.application.services.request_follow_up_context import (
+    merge_request_metadata_with_follow_up_context,
+)
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.logging_port import LoggingPort
@@ -69,11 +72,16 @@ class MachineSyncService:
             # machines being returned — not resource-level discovery which returns all
             # ASG/fleet instances including unrelated ones.
             if request.request_type.value == "return" and request.machine_ids:
+                resource_id = self._resolve_return_resource_id(request, db_machines)
                 operation_type = ProviderOperationType.GET_INSTANCE_STATUS
                 parameters = {
                     "instance_ids": request.machine_ids,
+                    "provider_api": request.provider_api,
                     "template_id": request.template_id,
+                    "request_metadata": self._build_request_metadata(request),
                 }
+                if resource_id:
+                    parameters["resource_id"] = resource_id
             # Use resource-level discovery for acquire requests (handles scaling/replacement)
             elif request.resource_ids:
                 operation_type = ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES
@@ -81,6 +89,7 @@ class MachineSyncService:
                     "resource_ids": request.resource_ids,
                     "provider_api": request.provider_api,
                     "template_id": request.template_id,
+                    "request_metadata": self._build_request_metadata(request),
                     "requested_count": request.requested_count,
                 }
             # Fallback to instance-level discovery for requests without resource tracking
@@ -90,6 +99,7 @@ class MachineSyncService:
                 parameters = {
                     "instance_ids": instance_ids,
                     "template_id": request.template_id,
+                    "request_metadata": self._build_request_metadata(request),
                 }
             else:
                 return [], {}
@@ -129,7 +139,10 @@ class MachineSyncService:
                         processed_data = {
                             **instance_data,
                             "request_id": str(request.request_id),
-                            "resource_id": request.resource_ids[0] if request.resource_ids else "",
+                            "resource_id": self._resolve_instance_resource_id(
+                                instance_data,
+                                request.resource_ids,
+                            ),
                         }
                         terminal_states = {"shutting-down", "terminated", "stopping", "stopped"}
                         instance_status = processed_data.get("status", "")
@@ -147,14 +160,16 @@ class MachineSyncService:
                     except Exception as e:
                         self.logger.warning(f"Failed to create machine from instance data: {e}")
 
-                # For return requests: instances missing from AWS response have been
-                # terminated and purged (~1hr window). Treat them as terminated.
+                # For return requests: instances missing from provider status results
+                # have effectively disappeared from the provider view. Treat them as
+                # terminated so request-status reconciliation can finish.
                 if request.request_type.value == "return":
                     queried_ids = set(parameters.get("instance_ids", []))
                     missing_ids = queried_ids - returned_ids
                     for missing_id in missing_ids:
                         self.logger.info(
-                            f"Instance {missing_id} not found in AWS — treating as terminated"
+                            "Instance %s not found in provider status response — treating as terminated",
+                            missing_id,
                         )
                         existing = next(
                             (m for m in db_machines if m.machine_id.value == missing_id), None
@@ -170,6 +185,72 @@ class MachineSyncService:
         except Exception as e:
             self.logger.error(f"Failed to fetch provider machines: {e}")
             return db_machines, {}
+
+    @staticmethod
+    def _build_request_metadata(request: Request) -> dict:
+        """Merge durable request metadata with persisted provider follow-up context."""
+        return merge_request_metadata_with_follow_up_context(request)
+
+    @staticmethod
+    def _resolve_instance_resource_id(
+        instance_data: dict,
+        request_resource_ids: list[str],
+    ) -> str:
+        """Prefer instance-owned resource identity over request-level fallback."""
+        provider_data = instance_data.get("provider_data") or {}
+        candidate_resource_ids = (
+            instance_data.get("resource_id"),
+            provider_data.get("resource_id") if isinstance(provider_data, dict) else None,
+            request_resource_ids[0] if request_resource_ids else None,
+        )
+        for resource_id in candidate_resource_ids:
+            if resource_id not in (None, ""):
+                return str(resource_id)
+        return ""
+
+    def _resolve_return_resource_id(
+        self,
+        request: Request,
+        db_machines: list[Machine],
+    ) -> str:
+        """Resolve the single resource ID for a return status request."""
+        resource_ids: set[str] = set()
+        requested_ids = {str(machine_id) for machine_id in request.machine_ids}
+
+        for machine in db_machines:
+            resource_id = machine.resource_id
+            machine_id = machine.machine_id.value
+            if resource_id in (None, "") or machine_id in (None, ""):
+                continue
+            if str(machine_id) in requested_ids:
+                resource_ids.add(str(resource_id))
+
+        request_metadata = self._build_request_metadata(request)
+        termination_requests = request_metadata.get("termination_requests")
+        if not isinstance(termination_requests, list):
+            return next(iter(resource_ids)) if len(resource_ids) == 1 else ""
+
+        for termination_request in termination_requests:
+            if not isinstance(termination_request, dict):
+                continue
+            pending_cleanup = termination_request.get("pending_resource_cleanup")
+            if not isinstance(pending_cleanup, dict):
+                continue
+
+            resource_id = pending_cleanup.get("resource_id")
+            if resource_id in (None, ""):
+                continue
+
+            pending_machine_ids = pending_cleanup.get("machine_ids", [])
+            if not isinstance(pending_machine_ids, list):
+                continue
+
+            for machine_id in pending_machine_ids:
+                machine_id_str = str(machine_id)
+                if machine_id_str and machine_id_str in requested_ids:
+                    resource_ids.add(str(resource_id))
+
+        return next(iter(resource_ids)) if len(resource_ids) == 1 else ""
 
     def _create_machine_from_processed_data(
         self, processed_data: dict, request: Request
@@ -312,10 +393,8 @@ class MachineSyncService:
                         #     Stamp a terminal "Terminated" if provider didn't
                         #     supply something more specific (EC2's StateReason).
                         #   - Otherwise pass through whatever provider returned.
-                        from orb.domain.machine.machine_status import MachineStatus as _MS
-
                         _new_reason = provider_machine.status_reason
-                        if provider_machine.status == _MS.TERMINATED:
+                        if provider_machine.status == MachineStatus.TERMINATED:
                             if not _new_reason or "in progress" in (_new_reason or "").lower():
                                 _new_reason = "Terminated"
                         machine_data["status_reason"] = _new_reason

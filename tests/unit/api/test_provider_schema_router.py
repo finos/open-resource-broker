@@ -277,22 +277,13 @@ class TestProviderSchemaEndpoint:
     """Tests for GET /providers/{name}/schema."""
 
     def _make_mock_registry(self, *, registered: bool, schema: list | None = None):
-        from orb.providers.registry.types import ProviderRegistration
-
         registry = MagicMock()
         registry.is_provider_registered.return_value = registered
 
         if registered and schema is not None:
             mock_strategy_class = MagicMock()
-            mock_instance = MagicMock()
-            mock_instance.get_ui_column_schema.return_value = schema
-            mock_strategy_class.return_value = mock_instance
-
-            reg = MagicMock(spec=ProviderRegistration)
-            reg.strategy_class = mock_strategy_class
-
-            # _get_type_registration is called inside _get_schema_for_provider_type
-            registry._get_type_registration.return_value = reg
+            mock_strategy_class.get_ui_column_schema.return_value = schema
+            registry.get_strategy_class.return_value = mock_strategy_class
         return registry
 
     def test_returns_404_for_unknown_provider(self):

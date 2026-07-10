@@ -10,9 +10,10 @@ if TYPE_CHECKING:
     from orb.domain.base.ports import LoggingPort
     from orb.providers.registry import ProviderRegistry
 
-# Template extension imports for our new functionality
-from orb.domain.template.factory import TemplateFactory
 from orb.infrastructure.registry.template_extension_registry import TemplateExtensionRegistry
+from orb.domain.template.factory import TemplateFactory
+from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
+from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec
 from orb.providers.aws.configuration.template_extension import AWSTemplateExtensionConfig
 from orb.providers.aws.domain.template.aws_template_dto_config import AWSTemplateDTOConfig
 
@@ -96,11 +97,11 @@ def create_aws_strategy(provider_config: Any) -> Any:
 
             if strategy.aws_client is not None:
                 health_check = get_container().get(HealthCheckPort)
-                _storage_strategy = "json"
+                storage_strategy = "json"
                 if config_port is not None:
                     with suppress(Exception):
-                        _storage_strategy = config_port.get_storage_strategy()
-                register_aws_health_checks(health_check, strategy.aws_client, _storage_strategy)
+                        storage_strategy = config_port.get_storage_strategy()
+                register_aws_health_checks(health_check, strategy.aws_client, storage_strategy)
 
         # Set provider name for identification
         if hasattr(strategy, "name") and provider_name:
@@ -205,11 +206,7 @@ def create_aws_validator(provider_config: Any = None) -> Any:
 
 
 def _load_aws_default_api() -> Optional[str]:
-    """Extract the default provider API from aws_defaults.json.
-
-    Returns the value at provider.provider_defaults.aws.template_defaults.provider_api,
-    or None if the file cannot be read or the key is absent.
-    """
+    """Extract the configured default provider API from aws_defaults.json."""
     try:
         defaults_file = Path(__file__).parent / "config" / "aws_defaults.json"
         data = json.loads(defaults_file.read_text())
@@ -244,6 +241,7 @@ def register_aws_provider(
 
     try:
         from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
+        CLISpecRegistry.register("aws", AWSCLISpec())
 
         if instance_name:
             # Register as named instance
@@ -369,18 +367,9 @@ def register_aws_provider_instance(provider_instance, logger=None) -> bool:
         return True
 
     except Exception as e:
-        # Extract the config snippet that was attempted so operators can diagnose
-        # the failure without grepping code.
-        config_data = getattr(provider_instance, "config", None) or {}
         if logger:
             logger.error(
-                "Failed to register AWS provider instance '%s': %s  "
-                "(config keys attempted: region=%r, profile=%r)",
-                provider_instance.name,
-                e,
-                config_data.get("region"),
-                config_data.get("profile"),
-                exc_info=True,
+                "Failed to register AWS provider instance '%s': %s", provider_instance.name, str(e)
             )
         return False
 
@@ -395,9 +384,7 @@ def register_aws_extensions(logger: Optional["LoggingPort"] = None) -> None:
         logger: Optional logger for registration messages
     """
     try:
-        # Register AWS DTO config as the typed provider_config class for TemplateDTO
-        # serialisation.  AWSTemplateDTOConfig covers the fields that were previously
-        # split between the top-level TemplateDTO and the opaque metadata dict.
+        # Register AWS template extension configuration
         TemplateExtensionRegistry.register_extension("aws", AWSTemplateDTOConfig)
 
         if logger:
@@ -451,15 +438,8 @@ def get_aws_extension_defaults() -> dict:
     return default_config.to_template_defaults()
 
 
-def register_aws_auth_strategies(logger: "Optional[LoggingPort]" = None) -> None:
-    """Register AWS authentication strategies with the auth registry.
-
-    Registers the ``iam`` and ``cognito`` strategies so that ``AuthRegistry``
-    can resolve them without server.py importing provider-specific classes.
-
-    Args:
-        logger: Optional logger for registration messages
-    """
+def register_aws_auth_strategies(logger: Optional["LoggingPort"] = None) -> None:
+    """Register AWS authentication strategies with the auth registry."""
     try:
         from orb.infrastructure.auth.registry import get_auth_registry
 
@@ -479,12 +459,10 @@ def register_aws_auth_strategies(logger: "Optional[LoggingPort]" = None) -> None
             if logger:
                 logger.debug("AWS Cognito auth strategy registered")
 
-    except ImportError as e:
-        if logger:
-            logger.warning("AWS auth strategies not available: %s", e)
     except Exception as e:
+        error_msg = f"Failed to register AWS auth strategies: {e}"
         if logger:
-            logger.error("Failed to register AWS auth strategies: %s", e, exc_info=True)
+            logger.error(error_msg, exc_info=True)
         raise
 
 
@@ -521,7 +499,6 @@ def initialize_aws_provider(
 
         CLISpecRegistry.register("aws", AWSCLISpec())
 
-        # Register AWS HostFactory field-mapping adapter
         from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import (
             FieldMappingRegistry,
         )
@@ -529,7 +506,6 @@ def initialize_aws_provider(
 
         FieldMappingRegistry.register("aws", AWSFieldMapping())
 
-        # Register AWS defaults loader
         from orb.providers.aws.defaults_loader import AWSDefaultsLoader
         from orb.providers.registry.defaults_loader_registry import DefaultsLoaderRegistry
 
@@ -582,7 +558,7 @@ def register_aws_services_with_di(container) -> None:
 
         # Register the AWS template example generator into the per-provider registry.
         # The handler factory is constructed with no AWS client because
-        # generate_example_templates only calls handler classmethods — no live
+        # generate_example_templates only calls handler classmethods; no live
         # AWS connection is needed.
         from orb.infrastructure.registry.template_example_generator_registry import (
             TemplateExampleGeneratorRegistry,

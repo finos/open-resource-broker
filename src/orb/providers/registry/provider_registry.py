@@ -3,7 +3,7 @@
 import importlib
 import re
 import threading
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, List, Optional, cast
 
 # Only allow simple snake_case identifiers as provider types to prevent
 # module-injection via crafted provider_type strings (e.g. containing dots
@@ -13,7 +13,7 @@ _VALID_PROVIDER_TYPE_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 from orb.domain.base.exceptions import ConfigurationError
 from orb.domain.base.ports.configuration_port import ConfigurationPort
-from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
+from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort, ProviderStrategyClass
 from orb.domain.base.results import ProviderSelectionResult
 from orb.infrastructure.registry.base_registry import BaseRegistration, BaseRegistry, RegistryMode
 from orb.infrastructure.utilities.common.string_utils import extract_provider_type
@@ -314,6 +314,17 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
             pass
         return None
 
+    def get_strategy_class(self, provider_type: str) -> Optional[type[ProviderStrategyClass]]:
+        """Return the registered strategy class for a provider type, if available."""
+        try:
+            registration = self._get_type_registration(provider_type)
+        except (ValueError, KeyError):
+            return None
+        return cast(
+            Optional[type[ProviderStrategyClass]],
+            getattr(registration, "strategy_class", None),
+        )
+
     def register_provider(
         self,
         provider_type: str,
@@ -431,17 +442,18 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         """
         return self.create_additional_component(provider_type, "resolver_factory")
 
-    def create_validator(self, provider_type: str) -> Optional[Any]:
+    def create_validator(self, provider_type: str, config: Any = None) -> Optional[Any]:
         """
         Create a template validator using registered factory.
 
         Args:
             provider_type: Type identifier for the provider
+            config: Optional provider config data to pass to the factory
 
         Returns:
             Created template validator instance or None if not registered
         """
-        return self.create_additional_component(provider_type, "validator_factory")
+        return self.create_additional_component(provider_type, "validator_factory", config)
 
     def unregister_provider(self, provider_type: str) -> bool:
         """

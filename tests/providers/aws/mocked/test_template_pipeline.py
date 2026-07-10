@@ -180,20 +180,24 @@ def test_default_strategy_loads_snake_case_passthrough(tmp_path):
 
 def test_default_strategy_delegates_hf_file_to_hf_strategy(tmp_path):
     """Default strategy detects scheduler_type=hostfactory and delegates via registry when registered."""
-    from orb.infrastructure.scheduler.registration import (
-        register_default_scheduler,
-        register_symphony_hostfactory_scheduler,
-    )
     from orb.infrastructure.scheduler.registry import get_scheduler_registry
 
     registry = get_scheduler_registry()
-    # Use the canonical registration helpers so strategy_class is populated correctly.
-    # register_type is idempotent, so these are safe to call even if a prior test already
-    # registered the types via the DI container boot path.
+    # Register both types so delegation can resolve the HF strategy class
     if not registry.is_registered("hostfactory"):
-        register_symphony_hostfactory_scheduler(registry)
+        registry.register(
+            "hostfactory",
+            HostFactorySchedulerStrategy,
+            lambda c: None,
+            strategy_class=HostFactorySchedulerStrategy,
+        )
     if not registry.is_registered("default"):
-        register_default_scheduler(registry)
+        registry.register(
+            "default",
+            DefaultSchedulerStrategy,
+            lambda c: None,
+            strategy_class=DefaultSchedulerStrategy,
+        )
 
     tpl_file = tmp_path / "aws_templates.json"
     _write_hf_file(tpl_file, [_MINIMAL_HF_TEMPLATE])

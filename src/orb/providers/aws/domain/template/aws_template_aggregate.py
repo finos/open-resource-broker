@@ -12,8 +12,10 @@ from pydantic import (
     model_validator,
 )
 
+from orb.domain.base.value_objects import AllocationStrategy
 from orb.domain.template.template_aggregate import Template
 from orb.providers.aws.domain.template.value_objects import (
+    AWSAllocationStrategy,
     AWSConfiguration,
     AWSFleetType,
     AWSInstanceType,
@@ -21,8 +23,8 @@ from orb.providers.aws.domain.template.value_objects import (
     AWSSubnetId,
     AWSTags,
     ProviderApi,
+    normalise_allocation_strategy,
 )
-from orb.providers.aws.value_objects import AWSAllocationStrategy, normalise_allocation_strategy
 
 
 class AWSOptionalIntegerRange(BaseModel):
@@ -202,9 +204,6 @@ class AWSTemplate(Template):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    # Typed provider-config forwarded from TemplateDTO (round-trip via model_dump).
-    # Accepts a dict (serialised AWSTemplateDTOConfig) or None; values are promoted
-    # to their respective fields in validate_aws_template before use.
     provider_config: Optional[dict[str, Any]] = None
 
     # AWS-specific fields
@@ -257,37 +256,46 @@ class AWSTemplate(Template):
         # (generic/example templates may have empty subnet_ids/image_id, filled at runtime
         # from provider.template_defaults via _coalesce_merge)
 
-        # Promote AWS-specific fields from provider_config dict (DTO round-trip path).
-        # provider_config is injected by TemplateDTO.from_domain via AWSTemplateDTOConfig.
-        _pc = getattr(self, "provider_config", None)
-        if isinstance(_pc, dict):
+        provider_config = self.provider_config
+        if isinstance(provider_config, dict):
             if not self.fleet_type:
-                _ft = _pc.get("fleet_type")
-                if _ft:
+                fleet_type = provider_config.get("fleet_type")
+                if fleet_type:
                     try:
-                        object.__setattr__(self, "fleet_type", AWSFleetType(str(_ft).lower()))
+                        object.__setattr__(self, "fleet_type", AWSFleetType(str(fleet_type).lower()))
                     except (ValueError, TypeError):
                         pass
             if not self.fleet_role:
-                _fr = _pc.get("fleet_role")
-                if _fr:
-                    object.__setattr__(self, "fleet_role", _fr)
+                fleet_role = provider_config.get("fleet_role")
+                if fleet_role:
+                    object.__setattr__(self, "fleet_role", fleet_role)
             if self.percent_on_demand is None:
-                _pod = _pc.get("percent_on_demand")
-                if _pod is not None:
-                    object.__setattr__(self, "percent_on_demand", int(_pod))
+                percent_on_demand = provider_config.get("percent_on_demand")
+                if percent_on_demand is not None:
+                    object.__setattr__(self, "percent_on_demand", int(percent_on_demand))
             if not self.launch_template_id:
-                _ltid = _pc.get("launch_template_id")
-                if _ltid:
-                    object.__setattr__(self, "launch_template_id", _ltid)
+                launch_template_id = provider_config.get("launch_template_id")
+                if launch_template_id:
+                    object.__setattr__(self, "launch_template_id", launch_template_id)
             if self.abis_instance_requirements is None:
-                _abis = _pc.get("abis_instance_requirements")
-                if _abis is not None:
+                instance_requirements = provider_config.get("abis_instance_requirements")
+                if instance_requirements is not None:
                     object.__setattr__(
                         self,
                         "abis_instance_requirements",
-                        ABISInstanceRequirements.model_validate(_abis),
+                        ABISInstanceRequirements.model_validate(instance_requirements),
                     )
+
+        if self.allocation_strategy == AllocationStrategy.SPOT_PLACEMENT_SCORE.value:
+            if self.price_type != "spot":
+                raise ValueError("spotPlacementScore allocation strategy requires price_type='spot'")
+            candidate_types = list((self.machine_types or {}).keys())
+            if self.instance_type and self.instance_type not in candidate_types:
+                candidate_types.insert(0, self.instance_type)
+            if len(candidate_types) < 2:
+                raise ValueError(
+                    "spotPlacementScore allocation strategy requires at least two candidate instance types"
+                )
 
         # Auto-assign default fleet_type if not provided
         # Set fleet_type from metadata if not already set

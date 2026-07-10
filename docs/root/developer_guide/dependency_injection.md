@@ -11,7 +11,7 @@ Before working with the DI system, you should understand:
 
 This guide provides practical implementation guidance for using the dependency injection system in the Open Resource Broker. For comprehensive technical details, see the [Architecture Reference](../architecture/dependency_injection.md).
 
-The plugin uses a comprehensive dependency injection system that follows Clean Architecture principles, with DI abstractions moved to the domain layer while maintaining backward compatibility.
+The project uses a comprehensive dependency injection system that follows Clean Architecture principles, with DI abstractions moved to the domain layer.
 
 ## Next Steps
 
@@ -28,7 +28,7 @@ The DI system follows correct dependency direction:
 
 ```python
 # [[]] Clean Architecture compliant
-from src.domain.base.dependency_injection import injectable
+from orb.domain.base.dependency_injection import injectable
 
 @injectable
 class ApplicationService:
@@ -41,7 +41,7 @@ class ApplicationService:
 
 ## Domain DI Layer
 
-**Location:** `src/domain/base/dependency_injection.py`
+**Location:** `src/orb/domain/base/dependency_injection.py`
 
 ### Available Decorators
 
@@ -69,7 +69,7 @@ The domain DI layer provides these decorators:
 
 ## Infrastructure DI Container
 
-**Location:** `src/infrastructure/di/container.py`
+**Location:** `src/orb/infrastructure/di/container.py`
 
 The `DIContainer` class implements domain contracts:
 
@@ -100,7 +100,7 @@ The `DIContainer` class implements domain contracts:
 ### Basic Dependency Injection
 
 ```python
-from src.domain.base.dependency_injection import injectable
+from orb.domain.base.dependency_injection import injectable
 
 @injectable
 class ApplicationService:
@@ -109,7 +109,7 @@ class ApplicationService:
         self.config = config
 
 # Container automatically resolves dependencies
-from src.infrastructure.di.container import get_container
+from orb.infrastructure.di.container import get_container
 container = get_container()
 app_service = container.get(ApplicationService)
 ```
@@ -117,7 +117,7 @@ app_service = container.get(ApplicationService)
 ### Singleton Pattern
 
 ```python
-from src.domain.base.dependency_injection import injectable, singleton
+from orb.domain.base.dependency_injection import injectable, singleton
 
 @singleton
 @injectable
@@ -142,21 +142,21 @@ The system includes actual command and query handlers:
 #### Command Handlers (Actual Examples)
 
 ```python
-# From src/application/commands/request_handlers.py
+# From src/orb/application/commands/request_handlers.py
 @injectable
 class CreateMachineRequestHandler:
     def __init__(self, repository, logger):
         self.repository = repository
         self.logger = logger
 
-# From src/application/commands/template_handlers.py
+# From src/orb/application/commands/template_handlers.py
 @injectable
 class CreateTemplateHandler:
     def handle(self, command):
         # Handle template creation
         pass
 
-# From src/application/commands/system_handlers.py
+# From src/orb/application/commands/system_handlers.py
 @injectable
 class MigrateProviderConfigHandler:
     def handle(self, command):
@@ -167,21 +167,21 @@ class MigrateProviderConfigHandler:
 #### Query Handlers (Actual Examples)
 
 ```python
-# From src/application/queries/handlers.py
+# From src/orb/application/queries/request_query_handlers.py
 @injectable
 class GetRequestHandler:
     def handle(self, query):
         # Handle request retrieval
         pass
 
-# From src/application/queries/system_handlers.py
+# From src/orb/application/queries/system_handlers.py
 @injectable
 class GetProviderConfigHandler:
     def handle(self, query):
         # Handle provider config retrieval
         pass
 
-# From src/application/queries/specialized_handlers.py
+# From src/orb/application/queries/specialized_handlers.py
 @injectable
 class GetActiveMachineCountHandler:
     def handle(self, query):
@@ -194,7 +194,7 @@ class GetActiveMachineCountHandler:
 The system defines these actual commands and queries:
 
 ```python
-# From src/application/dto/commands.py
+# From src/orb/application/dto/commands.py
 class CreateRequestCommand(Command, BaseModel):
     template_id: str
     count: int
@@ -205,7 +205,7 @@ class UpdateRequestStatusCommand(Command, BaseModel):
     status: str
     # ... other fields
 
-# From src/application/dto/queries.py
+# From src/orb/application/dto/queries.py
 class GetRequestQuery(Query, BaseModel):
     request_id: str
     # ... other fields
@@ -218,7 +218,7 @@ class ListActiveRequestsQuery(Query, BaseModel):
 ### Container Operations
 
 ```python
-from src.infrastructure.di.container import get_container
+from orb.infrastructure.di.container import get_container
 
 container = get_container()
 
@@ -248,22 +248,21 @@ The DI system integrates with registry patterns for strategy-based component sel
 The scheduler port demonstrates registry integration for configuration-driven strategy selection:
 
 ```python
-# Automatic registration using registry pattern
-def create_scheduler_port(container):
-    from src.infrastructure.registry.scheduler_registry import get_scheduler_registry
-    from src.config.manager import get_config_manager
+# Registration pattern used by the bootstrap layer
+from orb.application.services.scheduler_registry_service import SchedulerRegistryService
+from orb.infrastructure.scheduler.registry import get_scheduler_registry
 
-    config_manager = get_config_manager()
-    scheduler_config = config_manager.get_scheduler_config()
-    scheduler_type = scheduler_config.get('strategy', 'hostfactory')
-
-    registry = get_scheduler_registry()
-    return registry.get_active_strategy(scheduler_type, scheduler_config)
+container.register_singleton(
+    SchedulerRegistryService,
+    lambda c: SchedulerRegistryService(
+        registry=get_scheduler_registry(),
+        logger=c.get(LoggingPort),
+    ),
+)
 
 # Usage - transparent to consumers
-from src.domain.base.ports import SchedulerPort
-
-scheduler = container.get(SchedulerPort)  # Automatically resolves via registry
+scheduler_registry_service = container.get(SchedulerRegistryService)
+available_schedulers = scheduler_registry_service.get_available_schedulers()
 ```
 
 ### Benefits of Registry Integration
@@ -279,22 +278,22 @@ scheduler = container.get(SchedulerPort)  # Automatically resolves via registry
 Based on actual codebase analysis:
 
 ### Application Layer
-- `ApplicationService` - Main application orchestrator [[]] Injectable
-- Command handlers in `src/application/commands/`:
+- CQRS handlers such as `CreateMachineRequestHandler`, `CreateTemplateHandler`, and `GetRequestHandler`
+- Command handlers in `src/orb/application/commands/`:
   - `CreateMachineRequestHandler`
   - `CreateTemplateHandler`
   - `MigrateProviderConfigHandler`
   - And many more...
-- Query handlers in `src/application/queries/`:
+- Query handlers in `src/orb/application/queries/`:
   - `GetRequestHandler`
   - `GetProviderConfigHandler`
   - `GetActiveMachineCountHandler`
   - And many more...
 
 ### Provider Layer
-- `AWSInstanceManager` - AWS instance management [[]] Injectable
-- `AWSOperations` - AWS operations wrapper [[]] Injectable
-- Various AWS adapters and handlers throughout `src/providers/aws/`
+- `AWSOperations` - AWS operations wrapper
+- Provider infrastructure such as `AWSClient` and handler factories
+- Various AWS adapters and handlers throughout `src/orb/providers/aws/`
 
 ### Infrastructure Layer
 - Various infrastructure services and adapters
@@ -306,8 +305,8 @@ Some services are registered manually in the DI container instead of using the `
 
 ```python
 # Example: TemplateConfigurationManager registration
-# Location: src/infrastructure/di/port_registrations.py
-def _register_template_configuration_services(container: DIContainer) -> None:
+# Location: src/orb/bootstrap/infrastructure_services.py
+def register_infrastructure_services(container: DIContainer) -> None:
     """Register template configuration services."""
 
     # Factory-based singleton registration with complex initialization
@@ -326,23 +325,23 @@ def _register_template_configuration_services(container: DIContainer) -> None:
 ## Migration Guide
 
 ### For Existing Code
-All existing code continues to work with backward compatibility:
+Use the canonical `orb` imports:
 
 ```python
-# Existing imports still work
-from src.application.service import ApplicationService
-from src.infrastructure.di.container import get_container
+# Canonical imports
+from orb.application.commands.template_handlers import CreateTemplateHandler
+from orb.infrastructure.di.container import get_container
 
-# Classes that were injectable remain injectable
+# Injectable handlers resolve through the container
 container = get_container()
-service = container.get(ApplicationService)
+handler = container.get(CreateTemplateHandler)
 ```
 
 ### For New Code
-Use domain DI imports for new classes:
+Use canonical `orb` imports for new classes:
 
 ```python
-from src.domain.base.dependency_injection import injectable
+from orb.domain.base.dependency_injection import injectable
 
 @injectable
 class NewService:
@@ -353,7 +352,7 @@ class NewService:
 ## Testing with DI
 
 ```python
-from src.infrastructure.di.container import DIContainer
+from orb.infrastructure.di.container import DIContainer
 
 def test_service():
     # Create test container

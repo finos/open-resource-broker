@@ -186,8 +186,17 @@ class ProvisioningOrchestrationService:
             request = request.update_metadata({"provisioning_attempt": attempt_number})
 
             try:
+                remaining_timeout_seconds = max(
+                    timeout_seconds
+                    - (datetime.now(timezone.utc) - started_at).total_seconds(),
+                    0.001,
+                )
                 last_result = await self._dispatch_single_attempt(
-                    template, request, selection_result, attempt_count, dispatch_timeout_seconds
+                    template,
+                    request,
+                    selection_result,
+                    attempt_count,
+                    min(dispatch_timeout_seconds, remaining_timeout_seconds),
                 )
             except Exception as e:
                 if not isinstance(e, CircuitBreakerOpenError):
@@ -542,9 +551,12 @@ class ProvisioningOrchestrationService:
                 # provider_data sub-key for handlers that have not yet been
                 # migrated to the flat shape (e.g. legacy code paths).
                 metadata_dict: dict[str, Any] = dict(result.metadata or {})
-                legacy_pd = result.data.get("provider_data") or {}
-                if isinstance(legacy_pd, dict):
-                    for k, v in legacy_pd.items():
+                provider_data = metadata_dict.pop("provider_data", None)
+                legacy_provider_data = result.data.get("provider_data") or {}
+                for provider_payload in (provider_data, legacy_provider_data):
+                    if not isinstance(provider_payload, dict):
+                        continue
+                    for k, v in provider_payload.items():
                         metadata_dict.setdefault(k, v)
 
                 # ``requires_async_polling`` — True means the caller must
@@ -562,7 +574,8 @@ class ProvisioningOrchestrationService:
                 # "still pending" (provider just hasn't reported yet) from
                 # "stuck pending" (provider returned a capacity error).
                 # Provider handlers set the flag; consumers read it.
-                merged_provider_data["capacity_constrained"] = has_capacity_error
+                if "capacity_constrained" in metadata_dict:
+                    merged_provider_data["capacity_constrained"] = has_capacity_error
 
                 # requires_async_polling=False means the provider has finished
                 # provisioning and the result is final — emit Completed.
@@ -592,12 +605,16 @@ class ProvisioningOrchestrationService:
                     # is_final derived from outcome in __post_init__
                 )
             else:
+                provider_data = dict(result.metadata or {})
+                nested_provider_data = provider_data.pop("provider_data", None)
+                if isinstance(nested_provider_data, dict):
+                    provider_data = {**nested_provider_data, **provider_data}
                 return ProvisioningResult(
                     success=False,
                     resource_ids=[],
                     machine_ids=[],
                     instances=[],
-                    provider_data=result.metadata or {},
+                    provider_data=provider_data,
                     error_message=result.error_message,
                     outcome=Failed(
                         error=result.error_message or "Provider returned failure",
@@ -609,7 +626,7 @@ class ProvisioningOrchestrationService:
             raise  # do not swallow — let it propagate to execute_provisioning
 
         except TimeoutError:
-            timeout_msg = f"Dispatch timed out after {dispatch_timeout_seconds:.0f}s"
+            timeout_msg = "Provisioning operation timed out; provider submission status is unknown"
             self._logger.warning(
                 "Dispatch timed out after %.1fs for provider %s (request %s)",
                 dispatch_timeout_seconds,
@@ -621,7 +638,11 @@ class ProvisioningOrchestrationService:
                 resource_ids=[],
                 machine_ids=[],
                 instances=[],
-                provider_data={},
+                provider_data={
+                    "operation_status": "timeout",
+                    "submission_status": "unknown",
+                    "timed_out": True,
+                },
                 error_message=timeout_msg,
                 outcome=Failed(error=timeout_msg, recoverable=True),
             )

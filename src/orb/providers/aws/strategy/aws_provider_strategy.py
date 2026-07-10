@@ -9,8 +9,17 @@ architecture and single responsibility principle.
 
 import asyncio
 import time
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Optional
 
+from orb.application.services.spot_placement_execution import (
+    SpotPlacementExecutionService,
+    build_planned_execution_metadata,
+    create_acquire_request,
+)
+from orb.application.services.spot_placement_planner import (
+    PlacementPlanEntry,
+    SpotPlacementPlanner,
+)
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.operation_outcome import Accepted, Completed, Failed, OperationOutcome
 from orb.domain.base.ports import LoggingPort
@@ -18,7 +27,11 @@ from orb.domain.base.ports.configuration_port import ConfigurationPort
 
 # Import AWS-specific components
 from orb.providers.aws.configuration.config import AWSProviderConfig
+from orb.providers.aws.exceptions.aws_exceptions import AWSConfigurationError
 from orb.providers.aws.infrastructure.aws_client import AWSClient
+from orb.providers.aws.infrastructure.services.spot_placement_score_adapter import (
+    AWSSpotPlacementScoreAdapter,
+)
 from orb.providers.aws.services.capability_service import AWSCapabilityService
 from orb.providers.aws.services.handler_registry import AWSHandlerRegistry
 from orb.providers.aws.services.health_check_service import AWSHealthCheckService
@@ -94,6 +107,8 @@ class AWSProviderStrategy(ProviderStrategy):
         self._infrastructure_service: Optional[AWSInfrastructureDiscoveryService] = None
         self._handler_registry: Optional[AWSHandlerRegistry] = None
         self._capability_service: Optional[AWSCapabilityService] = None
+        self._spot_placement_planner = SpotPlacementPlanner()
+        self._spot_placement_execution = SpotPlacementExecutionService()
 
     _API_ALIASES: dict[str, str] = {
         "AutoScalingGroup": "ASG",
@@ -390,6 +405,9 @@ class AWSProviderStrategy(ProviderStrategy):
     async def _execute_operation_internal(self, operation: ProviderOperation) -> ProviderResult:
         """Route operations to appropriate services."""
         if operation.operation_type == ProviderOperationType.CREATE_INSTANCES:
+            template_config = operation.parameters.get("template_config", {})
+            if template_config.get("allocation_strategy") == "spotPlacementScore":
+                return self._execute_planned_spot_launches(operation)
             handlers = self._get_handler_registry().get_available_handlers()
             return await self._get_instance_service().create_instances(operation, handlers)
         elif operation.operation_type == ProviderOperationType.TERMINATE_INSTANCES:
@@ -420,6 +438,160 @@ class AWSProviderStrategy(ProviderStrategy):
             return ProviderResult.error_result(
                 f"Unsupported operation: {operation.operation_type}", "UNSUPPORTED_OPERATION"
             )
+
+    def _build_spot_placement_plan(self, aws_template: Any, count: int) -> list[PlacementPlanEntry]:
+        aws_client = self.aws_client
+        if aws_client is None:
+            raise AWSConfigurationError("AWS client is required for spot placement scoring")
+
+        adapter = AWSSpotPlacementScoreAdapter(
+            aws_client=aws_client,
+            logger=self._logger,
+            region=self._aws_config.region,
+        )
+        scores = adapter.score_candidates(requested_count=count, template=aws_template)
+        return self._spot_placement_planner.create_plan(
+            requested_count=count,
+            scores=scores,
+            split_strategy=aws_template.placement_split_strategy,
+            primary_share_percent=aws_template.placement_primary_share_percent,
+        )
+
+    @staticmethod
+    def _is_capacity_like_failure(child_result: dict[str, Any]) -> bool:
+        error_codes = set(child_result.get("error_codes", []))
+        return bool(
+            error_codes
+            & {
+                "InsufficientInstanceCapacity",
+                "UnfulfillableCapacity",
+                "MaxSpotInstanceCountExceeded",
+                "SpotMaxPriceTooLow",
+            }
+        )
+
+    @staticmethod
+    def _clone_template_for_plan_entry(aws_template: Any, plan_entry: PlacementPlanEntry) -> Any:
+        from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+
+        cloned_data = aws_template.model_dump(mode="json", exclude_none=True)
+        selected_instance_type = plan_entry.score.candidate.instance_type
+        selected_weight = (aws_template.machine_types or {}).get(selected_instance_type, 1)
+        cloned_data["instance_type"] = selected_instance_type
+        cloned_data["machine_types"] = {selected_instance_type: selected_weight}
+        cloned_data["allocation_strategy"] = "capacityOptimized"
+        cloned_data["placement_regions"] = []
+        cloned_data["placement_zones"] = []
+        return AWSTemplate.model_validate(cloned_data)
+
+    @staticmethod
+    def _planned_child_result_with_fulfillment(
+        *,
+        provider_api: str,
+        requested_count: int,
+        raw_result: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        result = dict(raw_result)
+        if "fulfilled_count" in result:
+            return result
+
+        if not result.get("success", True):
+            result["fulfilled_count"] = 0
+            return result
+
+        if provider_api == "RunInstances":
+            instance_ids = result.get("instance_ids")
+            result["fulfilled_count"] = len(instance_ids) if isinstance(instance_ids, list) else 0
+            return result
+
+        if provider_api == "EC2Fleet":
+            provider_data = result.get("provider_data")
+            fleet_errors = (
+                provider_data.get("fleet_errors") if isinstance(provider_data, Mapping) else None
+            )
+            if fleet_errors:
+                instance_ids = result.get("instance_ids")
+                result["fulfilled_count"] = (
+                    len(instance_ids) if isinstance(instance_ids, list) else 0
+                )
+            else:
+                result["fulfilled_count"] = requested_count
+            return result
+
+        result["fulfilled_count"] = requested_count
+        return result
+
+    def _execute_planned_spot_launches(self, operation: ProviderOperation) -> ProviderResult:
+        template_config = operation.parameters.get("template_config", {})
+        count = operation.parameters.get("count", 1)
+        provider_api = template_config.get("provider_api", "RunInstances")
+
+        handler = self.get_handler(provider_api)
+        if not handler:
+            return ProviderResult.error_result(
+                f"No handler available for provider_api: {provider_api}",
+                "HANDLER_NOT_FOUND",
+            )
+
+        from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+
+        aws_template = AWSTemplate.model_validate(template_config)
+        plan = self._build_spot_placement_plan(aws_template, count)
+        if not plan:
+            return ProviderResult.error_result(
+                "No viable spot placement candidates returned scores",
+                "NO_PLACEMENT_CANDIDATES",
+            )
+
+        request_metadata = dict(operation.parameters.get("request_metadata", {}) or {})
+        base_request_id = operation.parameters.get("request_id") or (
+            operation.context.get("request_id") if operation.context else None
+        )
+
+        summary = self._spot_placement_execution.execute_plan(
+            plan=plan,
+            total_count=count,
+            build_child_template=lambda plan_entry: self._clone_template_for_plan_entry(
+                aws_template, plan_entry
+            ),
+            build_child_request=lambda requested_for_entry, idx: create_acquire_request(
+                template_id=aws_template.template_id,
+                count=requested_for_entry,
+                provider_type=self.provider_type,
+                provider_name=self._provider_name,
+                provider_api=provider_api,
+                request_metadata=request_metadata,
+                parent_request_id=base_request_id,
+                plan_entry_index=idx,
+            ),
+            launch_child=lambda child_request, child_template: self._planned_child_result_with_fulfillment(
+                provider_api=provider_api,
+                requested_count=child_request.requested_count,
+                raw_result=handler.acquire_hosts(child_request, child_template),
+            ),
+            is_capacity_like_failure=self._is_capacity_like_failure,
+        )
+
+        if not summary.resource_ids and summary.terminal_error_message:
+            return ProviderResult.error_result(
+                summary.terminal_error_message,
+                "PLANNED_SPOT_ACQUIRE_ERROR",
+                metadata=build_planned_execution_metadata(plan, summary),
+            )
+
+        return ProviderResult.success_result(
+            {
+                "resource_ids": summary.resource_ids,
+                "instances": summary.instances,
+                "provider_api": provider_api,
+                "count": count,
+                "template_id": aws_template.template_id,
+            },
+            {
+                "method": "planned_handler",
+                "provider_data": build_planned_execution_metadata(plan, summary),
+            },
+        )
 
     def get_capabilities(self) -> ProviderCapabilities:
         """Get AWS provider capabilities."""
@@ -638,12 +810,7 @@ class AWSProviderStrategy(ProviderStrategy):
             )
             request.resource_ids = resource_ids
 
-            # check_hosts_status makes blocking boto3 I/O calls (describe_fleet_instances,
-            # describe_instances, etc.).  Running it directly in an async handler blocks
-            # the uvicorn event loop, which prevents uvicorn from accepting any further
-            # connections until the call completes.  For large requests (e.g. 100 instances)
-            # this starvation causes all concurrent polls to fail with ConnectionError.
-            # Offloading to a thread pool executor keeps the event loop responsive.
+            # check_hosts_status performs blocking boto3 I/O; keep it off the async event loop.
             check_result = await asyncio.to_thread(handler.check_hosts_status, request)
             instance_details = check_result.instances
             fulfilment: ProviderFulfilment = check_result.fulfilment
@@ -890,10 +1057,8 @@ class AWSProviderStrategy(ProviderStrategy):
     async def acquire(self, request: Request) -> OperationOutcome:
         """Submit an acquisition request to AWS.
 
-        AWS provider operations are asynchronous: the API call (EC2Fleet,
-        SpotFleet, RunInstances, ASG) returns a request/fleet ID immediately
-        while instances transition through ``pending``.  The outcome is
-        therefore always ``Accepted`` on success.
+        AWS provider operations return provider-side resource IDs while
+        instances may still be transitioning.
 
         Args:
             request: Domain request describing resources to acquire.

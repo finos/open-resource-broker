@@ -88,6 +88,15 @@ def test_provider_strategy_has_get_cli_infrastructure_defaults():
     )
 
 
+def test_provider_strategy_has_get_cli_provider_config():
+    """Base ProviderStrategy must have get_cli_provider_config method."""
+    from orb.providers.base.strategy.provider_strategy import ProviderStrategy
+
+    assert hasattr(ProviderStrategy, "get_cli_provider_config"), (
+        "get_cli_provider_config not on ProviderStrategy"
+    )
+
+
 def test_provider_strategy_base_defaults():
     """Base ProviderStrategy default implementations return empty/no-op values."""
     from unittest.mock import MagicMock
@@ -128,6 +137,7 @@ def test_provider_strategy_base_defaults():
     strategy = _ConcreteStrategy(config)
 
     assert strategy.get_cli_extra_config_keys() == set()
+    assert strategy.get_cli_provider_config(MagicMock()) == {}
     assert strategy.get_cli_infrastructure_defaults(MagicMock()) == {}
     assert strategy.get_cli_provider_config(MagicMock()) == {}
 

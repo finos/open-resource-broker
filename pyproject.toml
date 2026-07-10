@@ -276,6 +276,7 @@ dev = [
     "pip-tools>=7.3.0,<8.0.0",
     "twine>=4.0.0",
     "git-changelog>=2.6.0,<3.0.0",
+    "pytest>=9.0.2",
 ]
 
 [dependency-groups]
@@ -627,6 +628,9 @@ line-ending = "auto"
 [tool.ruff.lint.isort]
 known-first-party = ["orb"]
 combine-as-imports = true
+
+[tool.pycodestyle]
+max-line-length = 100
 
 [tool.pyright]
 pythonVersion = "3.12"

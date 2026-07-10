@@ -20,6 +20,7 @@ The return path is unchanged.
 import dataclasses
 from typing import Optional, Tuple
 
+from orb.application.services.request_follow_up_context import get_request_follow_up_context
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.exceptions import ProviderContractError
 from orb.domain.base.ports.logging_port import LoggingPort
@@ -86,8 +87,9 @@ class RequestStatusService:
         fulfilment: Optional[ProviderFulfilment] = provider_metadata.get("provider_fulfilment")
 
         if fulfilment is None:
+            provider_name = request.provider_name or "unknown"
             raise ProviderContractError(
-                f"Provider {getattr(request, 'provider_name', 'unknown')} did not emit "
+                f"Provider {provider_name} did not emit "
                 "ProviderFulfilment for acquire request. Every provider's "
                 "check_hosts_status must return CheckHostsStatusResult with fulfilment."
             )
@@ -121,6 +123,9 @@ class RequestStatusService:
     ) -> Tuple[Optional[str], Optional[str]]:
         """Determine return request status from machine termination states."""
         db_machine_count = len(db_machines)
+        follow_up_pending_message = "Return in progress: awaiting provider follow-up cleanup"
+        follow_up_context = get_request_follow_up_context(request)
+        termination_follow_up_pending = follow_up_context.get("follow_up_kind") == "termination"
 
         # For return requests: empty provider_machines *with* DB records means all
         # instances are gone from AWS — genuinely terminated.  But if we have
@@ -130,6 +135,8 @@ class RequestStatusService:
         # prematurely stamping COMPLETED when provider_machines came back empty
         # before the instances ever appeared.
         if not provider_machines:
+            if termination_follow_up_pending:
+                return RequestStatus.IN_PROGRESS.value, follow_up_pending_message
             if db_machines:
                 # We had machines on record, now provider reports none — genuinely terminated.
                 return (
@@ -159,6 +166,8 @@ class RequestStatusService:
 
         effectively_done_count = terminated_count
         if effectively_done_count >= completion_target and running_count == 0:
+            if termination_follow_up_pending:
+                return RequestStatus.IN_PROGRESS.value, follow_up_pending_message
             return (
                 RequestStatus.COMPLETED.value,
                 f"Return request completed: {terminated_count} terminated, "
@@ -205,64 +214,62 @@ class RequestStatusService:
         Downgrades (COMPLETED -> PARTIAL/FAILED, CANCELLED -> anything, etc.)
         remain blocked.
         """
-        if request.status.is_terminal():
-            # Allow PARTIAL -> COMPLETED upgrade; everything else stays put.
-            new_status_enum: Optional[RequestStatus] = None
-            try:
-                new_status_enum = RequestStatus(status)
-            except ValueError as exc:
-                self.logger.debug(
-                    "Unknown status %r on terminal-state upgrade check: %s; rejecting upgrade",
-                    status,
-                    exc,
-                )
-                new_status_enum = None
-            is_upgrade_to_complete = (
-                request.status == RequestStatus.PARTIAL
-                and new_status_enum == RequestStatus.COMPLETED
-            )
-            if not is_upgrade_to_complete:
-                return request
         try:
             status_enum = RequestStatus(status)
-            updated_request = request.update_status(status_enum, message)
-
-            # Reconcile the persisted counters with reality. The acquire
-            # fulfilment path transitions directly via ``update_status``,
-            # which does not touch ``successful_count`` — it is only
-            # bumped by ``update_with_provisioning_result``. That works
-            # for batched-instance providers but not for instant fulfilment
-            # (e.g. EC2Fleet instant) where the provider reports
-            # "fulfilled" without emitting instance_ids. Use the request's
-            # own machine_ids list — which is the authoritative count of
-            # machines associated with this request — as the source of
-            # truth for ``successful_count`` whenever it disagrees with
-            # the persisted value.
-            if status_enum in (
-                RequestStatus.COMPLETED,
-                RequestStatus.PARTIAL,
-                RequestStatus.IN_PROGRESS,
-            ):
-                actual_count = len(updated_request.machine_ids)
-                if actual_count and actual_count != updated_request.successful_count:
-                    updated_request = updated_request.model_copy(
-                        update={"successful_count": actual_count}
-                    )
-
-            # Cache the latest ProviderFulfilment snapshot so DTO callers can surface it.
-            if provider_metadata:
-                fulfilment = provider_metadata.get("provider_fulfilment")
-                if fulfilment is not None:
-                    updated_request = updated_request.with_last_fulfilment(
-                        dataclasses.asdict(fulfilment)
-                    )
 
             # Save updated request
             with self.uow_factory.create_unit_of_work() as uow:
+                persisted_request = uow.requests.get_by_id(request.request_id)
+                current_request = (
+                    persisted_request if isinstance(persisted_request, Request) else request
+                )
+
+                if current_request.status.is_terminal():
+                    is_upgrade_to_complete = (
+                        current_request.status == RequestStatus.PARTIAL
+                        and status_enum == RequestStatus.COMPLETED
+                    )
+                    if not is_upgrade_to_complete:
+                        return current_request
+
+                updated_request = current_request.update_status(status_enum, message)
+
+                # Reconcile the persisted counters with reality. The acquire
+                # fulfilment path transitions directly via ``update_status``,
+                # which does not touch ``successful_count`` — it is only
+                # bumped by ``update_with_provisioning_result``. That works
+                # for batched-instance providers but not for instant fulfilment
+                # (e.g. EC2Fleet instant) where the provider reports
+                # "fulfilled" without emitting instance_ids. Use the request's
+                # own machine_ids list — which is the authoritative count of
+                # machines associated with this request — as the source of
+                # truth for ``successful_count`` whenever it disagrees with
+                # the persisted value.
+                if status_enum in (
+                    RequestStatus.COMPLETED,
+                    RequestStatus.PARTIAL,
+                    RequestStatus.IN_PROGRESS,
+                ):
+                    actual_count = len(updated_request.machine_ids)
+                    if actual_count and actual_count != updated_request.successful_count:
+                        updated_request = updated_request.model_copy(
+                            update={"successful_count": actual_count}
+                        )
+
+                # Cache the latest ProviderFulfilment snapshot so DTO callers can surface it.
+                if provider_metadata:
+                    fulfilment = provider_metadata.get("provider_fulfilment")
+                    if fulfilment is not None:
+                        updated_request = updated_request.with_last_fulfilment(
+                            dataclasses.asdict(fulfilment)
+                        )
+
                 uow.requests.save(updated_request)
 
-            self.logger.info(f"Updated request {request.request_id.value} status to {status}")
-            return updated_request
+                self.logger.info(
+                    f"Updated request {current_request.request_id.value} status to {status}"
+                    )
+                return updated_request
 
         except Exception as e:
             self.logger.error(f"Failed to update request status: {e}")

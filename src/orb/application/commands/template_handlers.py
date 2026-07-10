@@ -1,5 +1,7 @@
 """Template command handlers for CQRS pattern."""
 
+from typing import Any
+
 from orb.application.base.handlers import BaseCommandHandler
 from orb.application.decorators import command_handler
 from orb.application.template.commands import (
@@ -86,8 +88,14 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  #
             )
 
         # Build DTO from command fields — configuration provides defaults, named fields win
+        valid_fields = set(TemplateDTO.model_fields.keys()) - {"provider_config"}
+        provider_specific_config = {
+            k: v
+            for k, v in command.configuration.items()
+            if k not in valid_fields and k != "metadata" and v is not None
+        }
         dto_fields = {
-            **command.configuration,
+            **{k: v for k, v in command.configuration.items() if k in valid_fields},
             "template_id": command.template_id,
             "name": command.name or command.template_id,
             "description": command.description,
@@ -98,6 +106,8 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  #
         # instance_type → machine_types (backward compat)
         if command.instance_type is not None and "machine_types" not in dto_fields:
             dto_fields["machine_types"] = {command.instance_type: 1}
+        if provider_specific_config:
+            dto_fields["provider_config"] = provider_specific_config
         # Remove None values so TemplateDTO defaults apply
         dto_fields = {k: v for k, v in dto_fields.items() if v is not None}
         dto = TemplateDTO(**dto_fields)
@@ -147,16 +157,21 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, None]):  #
         if not existing:
             raise EntityNotFoundError("Template", command.template_id)
 
-        # Apply updates onto the existing DTO
-        from typing import Any
-
         update_fields: dict[str, Any] = {}
 
         # Apply configuration as field overrides first
+        provider_specific_updates: dict[str, Any] = {}
         if command.configuration:
-            valid_fields = TemplateDTO.model_fields.keys()
+            valid_fields = set(TemplateDTO.model_fields.keys()) - {"provider_config"}
             update_fields.update(
                 {k: v for k, v in command.configuration.items() if k in valid_fields}
+            )
+            provider_specific_updates.update(
+                {
+                    k: v
+                    for k, v in command.configuration.items()
+                    if k not in valid_fields and k != "metadata" and v is not None
+                }
             )
 
         # Named fields override configuration
@@ -171,14 +186,25 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, None]):  #
         # instance_type → machine_types (backward compat)
         if command.instance_type is not None and "machine_types" not in update_fields:
             update_fields["machine_types"] = {command.instance_type: 1}
+        if provider_specific_updates:
+            existing_provider_config = (
+                existing.provider_config.model_dump(exclude_none=True)
+                if existing.provider_config is not None
+                else {}
+            )
+            update_fields["provider_config"] = {
+                **existing_provider_config,
+                **provider_specific_updates,
+            }
 
         if update_fields:
-            updated = existing.model_copy(update=update_fields)
+            current_fields = {field: getattr(existing, field) for field in type(existing).model_fields}
+            updated = TemplateDTO(**{**current_fields, **update_fields})
         else:
             updated = existing
 
         # Validate the fully-merged DTO (not the raw partial patch)
-        validation_errors = self._template_port.validate_template_config(updated.model_dump())
+        validation_errors = self._template_port.validate_template_config(updated.to_template_config())
         if validation_errors:
             self.logger.warning(
                 "Template update validation failed for %s: %s",
