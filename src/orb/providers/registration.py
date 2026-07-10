@@ -295,7 +295,7 @@ def register_fallback_provider(
         fallback_strategies: List of fallback ProviderStrategy instances.
         config: Optional FallbackConfig.
         logger: Optional LoggingPort.
-        metrics: Optional MetricsCollector for emitting fallback/circuit-breaker metrics.
+        metrics: Optional ProviderMetricsPort for emitting fallback/circuit-breaker metrics.
     """
     from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
     from orb.providers.base.strategy.fallback_strategy import FallbackProviderStrategy

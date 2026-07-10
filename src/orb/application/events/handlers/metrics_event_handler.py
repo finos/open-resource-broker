@@ -2,10 +2,9 @@
 
 Implementation note
 -------------------
-Emit sites use the OpenTelemetry Meter API directly.  The homegrown
-``MetricsCollector`` has been deleted; the ``/metrics`` endpoint now serves
-``generate_latest(REGISTRY)`` which includes all OTel instruments bridged
-via ``PrometheusMetricReader``.
+Emit sites use the OpenTelemetry Meter API directly.  The ``/metrics``
+endpoint serves ``generate_latest(REGISTRY)`` which includes all OTel
+instruments bridged via ``PrometheusMetricReader``.
 
 Instruments used
 ----------------

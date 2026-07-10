@@ -1,16 +1,11 @@
 """Metrics decorators for storage operations.
 
-Migration note (bead 2512)
---------------------------
-Storage operation metrics are now emitted to OTel instruments instead of
-``MetricsCollector``.  The ``get_metrics`` parameter is retained so that
-the decorator signature is unchanged and no call sites need updating.
-However, the metrics object is no longer used — OTel instruments are
-acquired from the global meter via ``get_meter(__name__)``.
+Storage operation metrics are emitted to OTel instruments.  The ``get_metrics``
+parameter is retained so that the decorator signature is unchanged and no call
+sites need updating; the passed-in object is not used for emission — OTel
+instruments are acquired from the global meter via ``get_meter(__name__)``.
 
-The nine metric names are preserved in their OTel form as instrument names:
-
-    MetricsCollector name                  OTel instrument name
+Metric names (OTel instrument names):
     storage.json.{op}_total        →   orb.storage.json.{op}.total
     storage.json.{op}_errors_total →   orb.storage.json.{op}.errors.total
     storage.json.{op}_duration     →   orb.storage.json.{op}.duration

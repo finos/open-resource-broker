@@ -5,12 +5,10 @@ This module implements fallback and resilience patterns for provider strategies,
 enabling automatic failover, circuit breaker patterns, and graceful degradation
 when primary providers fail or become unavailable.
 
-Migration note (bead 2512)
---------------------------
-Metric emission uses ``ProviderMetricsPort.record_counter()`` instead of
-``MetricsCollector.increment()``.  The ``metrics`` constructor parameter type
-changes from ``Optional[MetricsCollector]`` to
-``Optional[ProviderMetricsPort]``.  The three CB metric names are preserved:
+Metric emission
+---------------
+The ``metrics`` constructor parameter is typed as ``Optional[ProviderMetricsPort]``
+and uses ``record_counter()``.  The three CB metric names are:
 - ``circuit_breaker.opened.total``  (label: provider)
 - ``circuit_breaker.closed.total``  (label: provider)
 - ``provider.fallback.total``       (labels: primary, fallback)

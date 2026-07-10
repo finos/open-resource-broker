@@ -112,8 +112,8 @@ class AWSClient:
             self._account_id = None
             self._credentials_validated = False
 
-            # Initialize metrics handler — BotocoreMetricsHandler now writes
-            # directly to an OTel Meter; no MetricsCollector needed.
+            # Initialize metrics handler — BotocoreMetricsHandler writes
+            # directly to an OTel Meter.
             self._metrics_handler: Optional[BotocoreMetricsHandler] = None
             if self._should_enable_aws_metrics():
                 aws_metrics_cfg = self._get_aws_metrics_config()

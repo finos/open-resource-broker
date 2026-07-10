@@ -133,12 +133,12 @@ class K8sHandlerBase(ABC):
     def _record_acquire(self, *, namespace: str, spec_kind: str) -> None:
         """Increment ``orb_k8s_acquire_total`` when metrics are wired."""
         if self._metrics is not None:
-            self._metrics._acquire_total.add(1, {"namespace": namespace, "spec_kind": spec_kind})
+            self._metrics.record_acquire(namespace=namespace, spec_kind=spec_kind)
 
     def _record_release(self, *, namespace: str, spec_kind: str) -> None:
         """Increment ``orb_k8s_release_total`` when metrics are wired."""
         if self._metrics is not None:
-            self._metrics._release_total.add(1, {"namespace": namespace, "spec_kind": spec_kind})
+            self._metrics.record_release(namespace=namespace, spec_kind=spec_kind)
 
     def _record_pod_creation(self, *, namespace: str, status: str) -> None:
         """Bucket a pod-creation outcome; safe under any input."""

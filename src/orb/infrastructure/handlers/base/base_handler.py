@@ -2,12 +2,10 @@
 
 Migration note (bead 2512)
 --------------------------
-``with_metrics`` now emits to OTel instruments instead of
-``MetricsCollector``.  The ``metrics`` constructor parameter is kept for
-backward compatibility (existing callers may pass a ``MetricsCollector``),
-but it is no longer used for metric emission.  OTel instruments are
-acquired via ``get_meter(__name__)`` so the path is no-op when the SDK is
-absent.
+``with_metrics`` emits to OTel instruments.  The ``metrics`` constructor
+parameter is kept for backward compatibility but is no longer used for metric
+emission.  OTel instruments are acquired via ``get_meter(__name__)`` so the
+path is no-op when the SDK is absent.
 
 OTel instruments
 ----------------

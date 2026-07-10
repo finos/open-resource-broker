@@ -1,18 +1,12 @@
 """Provider Execution Service - Registry-based strategy execution.
 
-Migration note (bead 2512)
---------------------------
-Metric emission has been moved from ``MetricsCollector`` (name-embedded
-dimensions) to ``ProviderMetricsPort`` (label-based).
+Metric emission
+---------------
+Metric emission uses ``ProviderMetricsPort`` (label-based), injected via
+constructor (defaults to ``NoOpProviderMetrics`` when no DI container is used).
 
-Previous: ``provider.{id}.{op}.success_total`` — one metric name per
-provider×operation combination → unbounded key-space.
-
-Now: ``orb.provider.operation.total{provider_id, operation, outcome}`` —
-a single Counter with three label dimensions.  Same data, proper cardinality.
-
-``ProviderMetricsPort`` is injected via constructor and defaults to
-``NoOpProviderMetrics`` so callers without a DI container still work.
+Instrument: ``orb.provider.operation.total{provider_id, operation, outcome}`` —
+a single Counter with three label dimensions, keeping cardinality bounded.
 """
 
 import time

@@ -25,19 +25,32 @@ pip install orb-py[otel]
 Observability is configured under the `observability` key in your ORB config file, or
 via standard `OTEL_*` environment variables (env vars win over file values).
 
-```yaml
-# orb-config.yml
-observability:
-  enabled: true
-  service_name: my-orb-instance          # OTEL_SERVICE_NAME also accepted
-  metrics_exporters:
-    - prometheus                          # scrape /metrics (REST server)
-    - file                                # write JSONL (CLI commands)
-  traces_exporter: file                  # "otlp" | "file" | null
-  otlp_endpoint: http://collector:4317   # OTEL_EXPORTER_OTLP_ENDPOINT also accepted
-  traces_sample_rate: 0.1                # OTEL_TRACES_SAMPLER_ARG also accepted
-  telemetry_file_dir: /var/log/orb/telemetry  # ORB_TELEMETRY_FILE_DIR also accepted
+```json
+// config.json
+{
+  "observability": {
+    "enabled": true,
+    "service_name": "my-orb-instance",
+    "metrics_exporters": ["prometheus", "file"],
+    "traces_exporter": "file",
+    "otlp_endpoint": "http://collector:4317",
+    "traces_sample_rate": 0.1,
+    "telemetry_file_dir": "/var/log/orb/telemetry"
+  }
+}
 ```
+
+> **Config format note:** ORB configuration is JSON, not YAML.  The canonical
+> filename is `config.json` (default path `~/.orb/config/config.json`; an
+> annotated example ships at `config/config.example.json`).  Standard
+> `OTEL_*` environment variables are also accepted and take precedence over
+> file values (`OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_ENDPOINT`,
+> `OTEL_TRACES_SAMPLER_ARG`, `ORB_TELEMETRY_FILE_DIR`).
+>
+> **Strict key validation:** The `observability` section uses strict schema
+> validation — unknown keys are rejected with a `ValidationError` at startup
+> (unlike some other config sections).  Typos in key names will hard-crash
+> config load by design, so the key names above must be used exactly.
 
 ### Metrics exporters
 
@@ -88,12 +101,16 @@ ORB runs as four distinct surfaces with different process lifecycles:
 ### AWS provider metrics (via `BotocoreMetricsHandler`)
 
 Per-service/operation labelled counters and histograms for AWS API calls, errors,
-throttles, retries, and payload sizes.  15 metric names total.
+throttles, retries, and payload sizes.  8 OTel instruments total: 5 counters
+(`orb_aws_api_calls_total`, `orb_aws_api_errors_total`, `orb_aws_api_successes_total`,
+`orb_aws_api_retries_total`, `orb_aws_api_throttles_total`) and 3 histograms
+(`orb_aws_api_duration_seconds`, `orb_aws_api_response_size_bytes`,
+`orb_aws_api_request_size_bytes`).
 
 ### k8s provider metrics (OTel Meter, bridged to Prometheus)
 
-`orb_k8s_acquire_total`, `orb_k8s_release_total`, `orb_k8s_pod_startup_seconds`,
-`orb_k8s_poll_total`, `orb_k8s_watch_reconnect_total`, `orb_k8s_pod_creation_total`,
+`orb_k8s_acquire_total`, `orb_k8s_release_total`, `orb_k8s_pod_creations_total`,
+`orb_k8s_watch_events_total`, `orb_k8s_watch_reconnects_total`,
 `orb_k8s_active_pods`, `orb_k8s_active_requests`, `orb_k8s_apiserver_latency_seconds`,
 `orb_k8s_circuit_breaker_state`.
 
@@ -187,8 +204,7 @@ Traces include:
 - SQLAlchemy query spans (when `instrument_sqlalchemy: true`)
 - Click CLI command spans (when `instrument_click: true`)
 
-W3C TraceContext propagation is active; `X-Amzn-Trace-Id` is also propagated
-(via `opentelemetry-propagator-aws-xray`).
+W3C TraceContext propagation is active (OTel SDK default).
 
 ## Logging
 
@@ -249,7 +265,7 @@ histogram_quantile(0.95, rate(orb_provisioning_duration_seconds_bucket[5m]))
 rate(http_server_request_duration_seconds_count[5m])
 
 # AWS API throttle rate
-rate(orb_aws_throttle_total[5m])
+rate(orb_aws_api_throttles_total[5m])
 ```
 
 ## SDK usage guide

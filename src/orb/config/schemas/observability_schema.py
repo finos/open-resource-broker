@@ -55,12 +55,16 @@ class OtelConfig(BaseModel):
         log records for log-trace correlation.
 
     **File exporter path resolution** (``telemetry_file_dir``):
-      Follows the same 3-tier permission fallback as MetricsCollector:
+      3-tier permission fallback:
         1. ``telemetry_file_dir`` from config (or ``ORB_TELEMETRY_FILE_DIR`` env).
         2. ``~/.orb/work/telemetry``.
         3. A temporary directory (``tempfile.mkdtemp``).
     """
 
+    # Strict by design: unknown keys under "observability" raise a ValidationError
+    # at startup rather than being silently ignored.  This catches config typos
+    # loudly (e.g. "metric_exporters" instead of "metrics_exporters") — unlike
+    # most other ORB config sections which use the Pydantic default (extra="ignore").
     model_config = ConfigDict(extra="forbid")
 
     enabled: bool = Field(False, description="Enable OpenTelemetry SDK initialisation")

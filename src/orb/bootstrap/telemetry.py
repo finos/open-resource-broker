@@ -57,7 +57,7 @@ Shutdown:
   never configured.
 
 File exporter path resolution (``telemetry_file_dir``):
-  Matches the MetricsCollector 3-tier fallback:
+  3-tier fallback:
     1. ``otel_config.telemetry_file_dir`` (from config or ORB_TELEMETRY_FILE_DIR).
     2. ``~/.orb/work/telemetry``.
     3. ``tempfile.mkdtemp(prefix="orb-telemetry-")``.
@@ -442,8 +442,8 @@ def configure_telemetry(container: "DIContainer") -> None:  # noqa: C901
             pass  # opentelemetry-instrumentation-click not installed; skip.
 
     # SystemMetricsInstrumentor: OS-level CPU/memory/GC/thread gauges.
-    # Replaces the dead memory_usage_bytes/cpu_usage_percent gauges from
-    # the homegrown MetricsCollector stack.
+    # Replaces the dead memory_usage_bytes/cpu_usage_percent gauges that
+    # were previously emitted by the homegrown metrics stack.
     if otel_config.instrument_system_metrics:
         try:
             from opentelemetry.instrumentation.system_metrics import (  # type: ignore[import-not-found]

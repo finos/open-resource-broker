@@ -6,10 +6,9 @@ by leveraging boto3's native event system for minimal-overhead instrumentation.
 
 Metrics are recorded via the OpenTelemetry Meter API so that they surface on
 the shared ``prometheus_client.REGISTRY`` (when the Prometheus reader is
-configured) without requiring the homegrown ``MetricsCollector``.  When the
-OTel SDK or API is not installed the handler acquires a **no-op Meter** and
-continues to function — boto3 events fire normally, the record calls become
-no-ops.
+configured).  When the OTel SDK or API is not installed the handler acquires a
+**no-op Meter** and continues to function — boto3 events fire normally, the
+record calls become no-ops.
 
 Instrument layout (OTel names → Prometheus names via dot→underscore + unit):
   orb.aws.api.calls           Counter  {service, operation}
@@ -21,12 +20,10 @@ Instrument layout (OTel names → Prometheus names via dot→underscore + unit):
   orb.aws.api.response_size   Histogram(bytes)    {service, operation}
   orb.aws.api.request_size    Histogram(bytes)    {service, operation}
 
-Conscious drops vs the old MetricsCollector-based handler:
-  - ``record_time`` rolling arithmetic-mean gauge replaced by Histogram;
-    backend computes percentiles from histogram buckets.
-  - Unbounded ``self.timers[name]`` list (memory leak) is gone.
-  - Name-embedded dimensions (``aws.{service}.{operation}.calls_total``)
-    replaced by labelled instruments — no key-space explosion.
+Design notes:
+  - Duration is a Histogram; backends compute percentiles from histogram buckets.
+  - Service+operation are OTel attributes (Prometheus labels), not embedded in
+    metric names, keeping the instrument count bounded.
 """
 
 import re
@@ -97,10 +94,9 @@ class RequestContext:
 class BotocoreMetricsHandler:
     """Centralized AWS API metrics collection using botocore events.
 
-    Writes to an OTel Meter (``opentelemetry.metrics.get_meter``) instead of
-    the homegrown ``MetricsCollector``.  Service, operation, outcome, and
-    error code are OTel *attributes* (Prometheus labels) rather than being
-    embedded in metric names.
+    Writes to an OTel Meter (``opentelemetry.metrics.get_meter``).  Service,
+    operation, outcome, and error code are OTel *attributes* (Prometheus labels)
+    rather than being embedded in metric names.
     """
 
     def __init__(

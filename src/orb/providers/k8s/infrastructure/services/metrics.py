@@ -295,6 +295,14 @@ class K8sMetrics:
     # to keep cardinality bounded.
     # ------------------------------------------------------------------
 
+    def record_acquire(self, *, namespace: str, spec_kind: str) -> None:
+        """Increment ``orb_k8s_acquire_total`` for *namespace* and *spec_kind*."""
+        self._acquire_total.add(1, {"namespace": namespace, "spec_kind": spec_kind})
+
+    def record_release(self, *, namespace: str, spec_kind: str) -> None:
+        """Increment ``orb_k8s_release_total`` for *namespace* and *spec_kind*."""
+        self._release_total.add(1, {"namespace": namespace, "spec_kind": spec_kind})
+
     def record_watch_reconnect(self, *, namespace: str, reason: str) -> None:
         """Increment ``orb_k8s_watch_reconnects_total`` with an enum-checked reason."""
         safe_reason = _validate_label("reason", reason, WATCH_RECONNECT_REASONS)

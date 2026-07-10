@@ -173,6 +173,21 @@
     "trace_buffer_size": 1000,
     "trace_file_max_size_mb": 10
   },
+  "observability": {
+    "enabled": false,
+    "service_name": "orb",
+    "metrics_exporters": [],
+    "traces_exporter": null,
+    "otlp_endpoint": null,
+    "traces_sample_rate": 0.1,
+    "telemetry_file_dir": null,
+    "instrument_fastapi": true,
+    "instrument_sqlalchemy": true,
+    "instrument_botocore": true,
+    "instrument_click": true,
+    "instrument_system_metrics": true,
+    "instrument_logging": true
+  },
   "storage": {
     "strategy": "json",
     "json_strategy": {

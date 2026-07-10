@@ -181,6 +181,11 @@ class OtelProviderMetrics(ProviderMetricsPort):
         self._counters: dict[str, object] = {}
         self._gauges: dict[str, object] = {}
         self._histograms: dict[str, object] = {}
+        # Tracks the last-known absolute value per gauge key so that each
+        # record_gauge(name, abs_value) call can compute the UpDownCounter
+        # delta.  Initialised here (not lazily) to avoid the hasattr
+        # anti-pattern and a theoretical data-race on first access.
+        self._gauge_current: dict[str, float] = {}
 
     def _get_meter(self) -> object:
         """Return the OTel Meter (or a no-op if SDK absent)."""
@@ -265,9 +270,6 @@ class OtelProviderMetrics(ProviderMetricsPort):
         ``record_gauge(name, abs_value)`` call computes the delta and passes
         it to the UpDownCounter, preserving absolute-set semantics.
         """
-        if not hasattr(self, "_gauge_current"):
-            self._gauge_current: dict[str, float] = {}
-
         key = f"{name}:{sorted((labels or {}).items())}"
         prev = self._gauge_current.get(key, 0.0)
         delta = value - prev
@@ -286,7 +288,16 @@ class OtelProviderMetrics(ProviderMetricsPort):
     def record_histogram(
         self, name: str, value: float, labels: Optional[dict[str, str]] = None
     ) -> None:
-        """Record an observation into a named OTel Histogram."""
+        """Record an observation into a named OTel Histogram.
+
+        **Value unit**: seconds.  The Prometheus exporter appends ``_seconds``
+        to the translated metric name, so *name* MUST NOT already end in
+        ``_seconds`` or ``_duration_seconds`` — that would produce a double
+        suffix (``_seconds_seconds``) in Prometheus output.  Use a bare
+        descriptive name such as ``"provisioning.duration"`` or
+        ``"operation.duration"`` and let the unit suffix come from the
+        exporter.
+        """
         meter = self._get_meter()
         if name not in self._histograms:
             self._histograms[name] = _create_histogram(
