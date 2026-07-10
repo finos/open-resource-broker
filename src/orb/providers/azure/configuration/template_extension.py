@@ -36,102 +36,118 @@ class AzureTemplateExtensionConfig(BaseModel):
 
     # Azure DTO-only fields preserved by TemplateDTO.provider_config round-trips.
     resource_group: Optional[AzureResourceGroupName] = Field(
-        None, description="Azure resource group for the template"
+        default=None, description="Azure resource group for the template"
     )
-    location: Optional[str] = Field(None, description="Azure location for the template")
+    location: Optional[str] = Field(default=None, description="Azure location for the template")
     subscription_id: Optional[str] = Field(
-        None, description="Azure subscription override for the template"
+        default=None, description="Azure subscription override for the template"
     )
-    vmss_name: Optional[str] = Field(None, description="Explicit VMSS name")
+    vmss_name: Optional[str] = Field(default=None, description="Explicit VMSS name")
     orchestration_mode: Optional[AzureVMSSOrchestrationMode] = Field(
-        None, description="VMSS orchestration mode"
+        default=None, description="VMSS orchestration mode"
     )
     platform_fault_domain_count: Optional[int] = Field(
-        None, description="Fault domain count for Flexible orchestration"
+        default=None, description="Fault domain count for Flexible orchestration"
     )
     single_placement_group: Optional[bool] = Field(
-        None, description="Restrict VMSS to a single placement group"
+        default=None, description="Restrict VMSS to a single placement group"
     )
-    image: Optional[AzureImageReference] = Field(None, description="Azure VM image reference")
-    eviction_policy: Optional[AzureEvictionPolicy] = Field(None, description="Spot eviction policy")
-    billing_profile_max_price: Optional[float] = Field(None, description="Maximum Spot VM price")
-    spot_percentage: Optional[int] = Field(None, description="Desired percentage of Spot VMs")
+    image: Optional[AzureImageReference] = Field(
+        default=None, description="Azure VM image reference"
+    )
+    eviction_policy: Optional[AzureEvictionPolicy] = Field(
+        default=None, description="Spot eviction policy"
+    )
+    billing_profile_max_price: Optional[float] = Field(
+        default=None, description="Maximum Spot VM price"
+    )
+    spot_percentage: Optional[int] = Field(
+        default=None, description="Desired percentage of Spot VMs"
+    )
     base_regular_priority_count: Optional[int] = Field(
-        None, description="Base regular-priority VM count for priority mix"
+        default=None, description="Base regular-priority VM count for priority mix"
     )
-    spot_restore_enabled: Optional[bool] = Field(None, description="Enable Spot Try-Restore")
+    spot_restore_enabled: Optional[bool] = Field(
+        default=None, description="Enable Spot Try-Restore"
+    )
     spot_restore_timeout: Optional[str] = Field(
-        None, description="ISO 8601 Spot Try-Restore timeout"
+        default=None, description="ISO 8601 Spot Try-Restore timeout"
     )
     spot_placement_score_enabled: Optional[bool] = Field(
-        None, description="Enable Azure Spot Placement Score planning before launch"
+        default=None, description="Enable Azure Spot Placement Score planning before launch"
     )
     placement_split_strategy: Optional[PlacementSplitStrategy] = Field(
-        None, description="How Spot Placement Score launches split capacity"
+        default=None, description="How Spot Placement Score launches split capacity"
     )
     placement_primary_share_percent: Optional[int] = Field(
-        None, description="Capacity percentage assigned to the top placement candidate"
+        default=None, description="Capacity percentage assigned to the top placement candidate"
     )
     placement_regions: Optional[list[str]] = Field(
-        None, description="Azure regions considered for Spot Placement Score planning"
+        default=None, description="Azure regions considered for Spot Placement Score planning"
     )
     placement_zones: Optional[list[str]] = Field(
-        None, description="Azure zones considered for Spot Placement Score planning"
+        default=None, description="Azure zones considered for Spot Placement Score planning"
     )
-    zones: Optional[list[str]] = Field(None, description="Availability zones")
-    zone_balance: Optional[bool] = Field(None, description="Enable zone balancing")
+    zones: Optional[list[str]] = Field(default=None, description="Availability zones")
+    zone_balance: Optional[bool] = Field(default=None, description="Enable zone balancing")
     proximity_placement_group_id: Optional[AzureProximityPlacementGroupId] = Field(
-        None, description="Proximity placement group ARM resource ID"
+        default=None, description="Proximity placement group ARM resource ID"
     )
     capacity_reservation_group_id: Optional[AzureCapacityReservationGroupId] = Field(
-        None, description="Capacity reservation group ARM resource ID"
+        default=None, description="Capacity reservation group ARM resource ID"
     )
-    os_disk: Optional[AzureOSDiskConfig] = Field(None, description="OS disk config")
-    data_disks: Optional[list[AzureDataDisk]] = Field(None, description="Data disks")
+    os_disk: Optional[AzureOSDiskConfig] = Field(default=None, description="OS disk config")
+    data_disks: Optional[list[AzureDataDisk]] = Field(default=None, description="Data disks")
     network_config: Optional[AzureNetworkConfig] = Field(
-        None, description="Azure networking config"
+        default=None, description="Azure networking config"
     )
-    security_type: Optional[AzureSecurityType] = Field(None, description="VM security type")
-    secure_boot_enabled: Optional[bool] = Field(None, description="Enable UEFI Secure Boot")
-    vtpm_enabled: Optional[bool] = Field(None, description="Enable vTPM")
-    encryption_at_host: Optional[bool] = Field(None, description="Enable host-based encryption")
+    security_type: Optional[AzureSecurityType] = Field(default=None, description="VM security type")
+    secure_boot_enabled: Optional[bool] = Field(default=None, description="Enable UEFI Secure Boot")
+    vtpm_enabled: Optional[bool] = Field(default=None, description="Enable vTPM")
+    encryption_at_host: Optional[bool] = Field(
+        default=None, description="Enable host-based encryption"
+    )
     disk_encryption_set_id: Optional[AzureDiskEncryptionSetId] = Field(
-        None, description="Disk encryption set ARM resource ID"
+        default=None, description="Disk encryption set ARM resource ID"
     )
-    ssh_key_name: Optional[str] = Field(None, description="Azure SSH Public Key resource name")
-    ssh_public_keys: Optional[list[str]] = Field(None, description="Inline SSH public keys")
+    ssh_key_name: Optional[str] = Field(
+        default=None, description="Azure SSH Public Key resource name"
+    )
+    ssh_public_keys: Optional[list[str]] = Field(default=None, description="Inline SSH public keys")
     user_assigned_identity_ids: Optional[list[str]] = Field(
-        None, description="User-assigned managed identity ARM resource IDs"
+        default=None, description="User-assigned managed identity ARM resource IDs"
     )
     system_assigned_identity: Optional[bool] = Field(
-        None, description="Enable system-assigned managed identity"
+        default=None, description="Enable system-assigned managed identity"
     )
-    custom_data: Optional[str] = Field(None, description="Base64 custom-data payload")
+    custom_data: Optional[str] = Field(default=None, description="Base64 custom-data payload")
     extension_profile: Optional[list[dict[str, Any]]] = Field(
-        None, description="VMSS extension definitions"
+        default=None, description="VMSS extension definitions"
     )
-    overprovision: Optional[bool] = Field(None, description="Enable VMSS overprovisioning")
+    overprovision: Optional[bool] = Field(default=None, description="Enable VMSS overprovisioning")
     upgrade_policy_mode: Optional[AzureUpgradePolicyMode] = Field(
-        None, description="VMSS upgrade policy mode"
+        default=None, description="VMSS upgrade policy mode"
     )
     provider_api_spec: Optional[dict[str, Any]] = Field(
-        None, description="Raw Azure provider request payload override"
+        default=None, description="Raw Azure provider request payload override"
     )
     provider_api_spec_file: Optional[str] = Field(
-        None, description="Path to a native Azure provider spec file"
+        default=None, description="Path to a native Azure provider spec file"
     )
-    cluster_name: Optional[str] = Field(None, description="CycleCloud cluster name")
-    node_array: Optional[str] = Field(None, description="CycleCloud node array")
-    cyclecloud_url: Optional[str] = Field(None, description="CycleCloud API URL")
+    cluster_name: Optional[str] = Field(default=None, description="CycleCloud cluster name")
+    node_array: Optional[str] = Field(default=None, description="CycleCloud node array")
+    cyclecloud_url: Optional[str] = Field(default=None, description="CycleCloud API URL")
     cyclecloud_credential_path: Optional[str] = Field(
-        None, description="CycleCloud credential reference path"
+        default=None, description="CycleCloud credential reference path"
     )
     cyclecloud_verify_ssl: Optional[bool] = Field(
-        None, description="CycleCloud SSL verification setting"
+        default=None, description="CycleCloud SSL verification setting"
     )
-    cyclecloud_auth_mode: Optional[str] = Field(None, description="CycleCloud auth mode override")
-    cyclecloud_aad_scope: Optional[str] = Field(None, description="CycleCloud AAD scope")
-    provider_api: Optional[AzureProviderApi] = Field(None, description="Azure provider API")
+    cyclecloud_auth_mode: Optional[str] = Field(
+        default=None, description="CycleCloud auth mode override"
+    )
+    cyclecloud_aad_scope: Optional[str] = Field(default=None, description="CycleCloud AAD scope")
+    provider_api: Optional[AzureProviderApi] = Field(default=None, description="Azure provider API")
 
     # VM configuration
     vm_size: Optional[str] = Field(
@@ -152,16 +168,18 @@ class AzureTemplateExtensionConfig(BaseModel):
     )
 
     # Pricing
-    priority: AzurePriority = Field(AzurePriority.REGULAR, description="Default VM priority")
+    priority: AzurePriority = Field(
+        default=AzurePriority.REGULAR, description="Default VM priority"
+    )
 
     # OS disk
-    os_disk_type: Optional[str] = Field(None, description="Default OS disk type")
+    os_disk_type: Optional[str] = Field(default=None, description="Default OS disk type")
     os_disk_size_gb: Optional[int] = Field(
-        None, description="OS disk size in GiB (None = image default)"
+        default=None, description="OS disk size in GiB (None = image default)"
     )
 
     # Identity
-    admin_username: str = Field("azureuser", description="Default admin username")
+    admin_username: str = Field(default="azureuser", description="Default admin username")
 
     # Freeform attributes
     node_attributes: dict[str, Any] = Field(

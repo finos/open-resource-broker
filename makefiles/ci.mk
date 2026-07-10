@@ -16,6 +16,7 @@ ci-quality-radon:  ## Run radon complexity analysis
 	$(call run-tool,radon,cc $(PACKAGE) --min B --show-complexity)
 	$(call run-tool,radon,mi $(PACKAGE) --min B)
 
+ci-quality-pyright: RUN_TOOL_UV_OPTIONS := --extra all-providers
 ci-quality-pyright:  ## Run pyright type checking
 	@echo "Running pyright type check..."
 	$(call run-tool,pyright,)

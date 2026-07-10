@@ -526,10 +526,7 @@ def register_azure_template_factory(
 def get_azure_extension_defaults() -> dict[str, Any]:
     """Get default Azure extension configuration."""
     return AzureTemplateExtensionConfig(
-        priority="Regular",
         os_disk_type="Premium_LRS",
-        os_disk_size_gb=None,
-        admin_username="azureuser",
     ).to_template_defaults()
 
 
