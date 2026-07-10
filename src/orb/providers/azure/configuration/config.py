@@ -3,7 +3,8 @@
 import re
 from typing import Optional
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from orb.infrastructure.interfaces.provider import BaseProviderConfig
 
@@ -64,7 +65,7 @@ class CycleCloudConfig(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class AzureProviderConfig(BaseProviderConfig):
+class AzureProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]  # Pydantic model mixin MRO is valid at runtime.
     """Configuration for the Azure provider (VMSS / Compute Fleet).
 
     The shared provider interface uses ``region`` across providers. Azure's
@@ -73,7 +74,14 @@ class AzureProviderConfig(BaseProviderConfig):
     Azure-native ``location`` input at the boundary.
     """
 
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+    # Pydantic's inherited model_config annotations disagree despite compatible runtime values.
+    model_config = SettingsConfigDict(  # type: ignore[assignment]
+        env_prefix="ORB_AZURE_",
+        case_sensitive=False,
+        populate_by_name=True,
+        env_nested_delimiter="__",
+        extra="forbid",
+    )
 
     # ------------------------------------------------------------------
     # Provider identity
@@ -82,7 +90,6 @@ class AzureProviderConfig(BaseProviderConfig):
     region: str = Field(
         default="eastus2",
         description="Azure location slug",
-        validation_alias=AliasChoices("location", "region"),
     )
 
     # ------------------------------------------------------------------

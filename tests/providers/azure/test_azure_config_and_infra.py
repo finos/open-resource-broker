@@ -36,6 +36,11 @@ from orb.providers.registry import ProviderRegistry
 
 
 class TestAzureProviderConfig:
+    def test_loads_provider_settings_from_azure_environment_prefix(self, monkeypatch):
+        monkeypatch.setenv("ORB_AZURE_REGION", "westeurope")
+
+        assert AzureProviderConfig().region == "westeurope"
+
     def test_location_alias_populates_region(self):
         config = AzureProviderConfig(
             subscription_id="12345678-1234-1234-1234-123456789012",

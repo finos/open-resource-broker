@@ -290,7 +290,7 @@ class AzureResourceMetadataService:
     ) -> CheckHostsStatusResult:
         """Attach and return the canonical provider status contract."""
         status_result = CheckHostsStatusResult(
-            instances=list(instances),
+            instances=[dict(instance) for instance in instances],
             fulfilment=_build_provider_fulfilment(
                 metadata=metadata,
                 instances=instances,
