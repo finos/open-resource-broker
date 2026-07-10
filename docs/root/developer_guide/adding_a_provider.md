@@ -53,7 +53,7 @@ Complete these steps in order. Each one has a corresponding section in the exten
 
 ### 1. Create the provider package
 
-Create `src/orb/providers/<name>/` following the layout above. The strategy class must extend `BaseProviderStrategy` from `orb.providers.base.strategy.base_provider_strategy`.
+Create `src/orb/providers/<name>/` following the layout above. The strategy class must extend `ProviderStrategy` from `orb.providers.base.strategy` (see `src/orb/providers/base/strategy/provider_strategy.py`). Both the AWS and k8s providers use this base — for example, `AWSProviderStrategy(ProviderStrategy)` in `src/orb/providers/aws/strategy/aws_provider_strategy.py`.
 
 ### 2. Add an enum entry
 
@@ -579,6 +579,6 @@ The AWS provider tests are the reference layout:
 ## Cross-references
 
 - [Clean Architecture](../architecture/clean_architecture.md) — layer boundaries enforced by architecture tests
-- [Strategy Pattern](../patterns/strategy_pattern.md) — how `BaseProviderStrategy` and `ProviderRegistry` work together
+- [Strategy Pattern](../patterns/strategy_pattern.md) — how `ProviderStrategy` and `ProviderRegistry` work together
 - [Ports and Adapters](../patterns/ports_and_adapters.md) — the port/registry decoupling pattern used throughout
 - AWS reference implementation: `src/orb/providers/aws/registration.py`

@@ -44,13 +44,13 @@ sequenceDiagram
 sequenceDiagram
     participant HF as HostFactory
     participant CLI as CLI/API
-    participant QRY as GetRequestHandler
+    participant QRY as SyncAndGetRequestHandler
     participant DB as Storage
     participant AWS as AWS Provider
     participant HAND as AWS Handler
 
     HF->>CLI: getRequestStatus.sh req-12345
-    CLI->>QRY: GetRequestQuery
+    CLI->>QRY: SyncAndGetRequestQuery
     QRY->>DB: Find request by ID
     DB-->>QRY: Request (with resource_ids + provider_api)
     QRY->>DB: Find machines by request_id

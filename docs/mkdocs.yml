@@ -115,8 +115,6 @@ nav:
       - Multi-Provider Design: architecture/multi-provider-design.md
       - Field Mapping Architecture: architecture/field_mapping_architecture.md
       - Metrics Report: architecture/metrics_report.md
-    - Architecture Decision Records:
-      - "ADR-0001: CQRS Mutable Commands and Sync-on-Read Queries": architecture/adr/0001-cqrs-mutable-commands-and-sync-on-read-queries.md
     - Design Patterns:
       - Strategy Pattern: patterns/strategy_pattern.md
       - Factory Pattern: patterns/factory_pattern.md

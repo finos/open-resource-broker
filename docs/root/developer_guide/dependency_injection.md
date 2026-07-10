@@ -167,11 +167,11 @@ class MigrateProviderConfigHandler:
 #### Query Handlers (Actual Examples)
 
 ```python
-# From src/application/queries/handlers.py
+# From src/application/queries/request_query_handlers.py
 @injectable
-class GetRequestHandler:
+class SyncAndGetRequestHandler:
     def handle(self, query):
-        # Handle request retrieval
+        # Handle sync-and-get request retrieval
         pass
 
 # From src/application/queries/system_handlers.py
@@ -206,7 +206,7 @@ class UpdateRequestStatusCommand(Command, BaseModel):
     # ... other fields
 
 # From src/application/dto/queries.py
-class GetRequestQuery(Query, BaseModel):
+class SyncAndGetRequestQuery(Query, BaseModel):
     request_id: str
     # ... other fields
 
@@ -286,7 +286,7 @@ Based on actual codebase analysis:
   - `MigrateProviderConfigHandler`
   - And many more...
 - Query handlers in `src/application/queries/`:
-  - `GetRequestHandler`
+  - `SyncAndGetRequestHandler`
   - `GetProviderConfigHandler`
   - `GetActiveMachineCountHandler`
   - And many more...

@@ -98,7 +98,7 @@ Create a return request for one or more machines.
 
 Retrieve the current status of a provisioning or return request.
 
-**CQRS query:** `GetRequestQuery`
+**CQRS query:** `SyncAndGetRequestQuery`
 
 | Interface | Parameter | CQRS field | Notes |
 |-----------|-----------|------------|-------|
@@ -145,7 +145,7 @@ Note: the REST handler uses `ListRequestsQuery` (from `orb.application.request.q
 
 List requests pending machine return.
 
-**CQRS query:** `ListReturnRequestsQuery`
+**CQRS query:** `SyncAndListReturnRequestsQuery`
 
 | Interface | Parameter | CQRS field | Notes |
 |-----------|-----------|------------|-------|
@@ -397,9 +397,9 @@ The SDK auto-discovers CQRS handlers and derives method names by stripping the `
 | `CreateTemplateCommand` | `create_template` |
 | `UpdateTemplateCommand` | `update_template` |
 | `DeleteTemplateCommand` | `delete_template` |
-| `GetRequestQuery` | `get_request` |
+| `SyncAndGetRequestQuery` | `get_request` |
 | `ListActiveRequestsQuery` | `list_active_requests` |
-| `ListReturnRequestsQuery` | `list_return_requests` |
+| `SyncAndListReturnRequestsQuery` | `list_return_requests` |
 | `GetTemplateQuery` | `get_template` |
 | `ListTemplatesQuery` | `list_templates` |
 | `ValidateTemplateQuery` | `validate_template` |

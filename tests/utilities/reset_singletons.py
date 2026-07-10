@@ -78,12 +78,7 @@ def reset_all_singletons() -> None:
     # Reset circuit breaker shared state
     _reset_circuit_breaker_states()
 
-    # Reset any global singleton instances
-    _safe_reset_global_variable(
-        "orb.infrastructure.aws.aws_client_singleton", "_aws_client_singleton_instance"
-    )
     reset_provider_registry()
-    _safe_reset_class_instance("orb.infrastructure.config.manager", "ConfigurationManager")
 
 
 def reset_singleton(singleton_class: type[Any]) -> None:
@@ -93,11 +88,6 @@ def reset_singleton(singleton_class: type[Any]) -> None:
     Args:
         singleton_class: The singleton class to reset
     """
-    class_name = singleton_class.__name__
-    if class_name == "AWSClient":
-        _safe_reset_global_variable(
-            "orb.infrastructure.aws.aws_client_singleton",
-            "_aws_client_singleton_instance",
-        )
-    elif class_name == "ConfigurationManager":
-        _safe_reset_class_instance("orb.infrastructure.config.manager", "ConfigurationManager")
+    # No known singleton classes require explicit reset here; the reset_all_singletons()
+    # path handles DI container + circuit breaker + provider registry globally.
+    pass

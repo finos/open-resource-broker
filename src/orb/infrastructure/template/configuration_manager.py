@@ -348,7 +348,7 @@ class TemplateConfigurationManager:
         """Return True when the active provider requires SSM / image-ID resolution.
 
         Delegates to the active provider strategy's
-        :meth:`~orb.providers.base.strategy.base_provider_strategy.BaseProviderStrategy.is_image_resolution_needed`
+        :meth:`~orb.providers.aws.strategy.aws_provider_strategy.AWSProviderStrategy.is_image_resolution_needed`
         classmethod so the decision is provider-owned and does not require the
         configuration manager to hard-code AWS-specific knowledge.
 

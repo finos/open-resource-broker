@@ -245,8 +245,8 @@ Queries represent read operations that don't change system state:
 
 ```python
 @dataclass(frozen=True)
-class GetRequestQuery:
-    """Query to get a specific request."""
+class SyncAndGetRequestQuery:
+    """Query to sync provider state and get a specific request."""
     request_id: str
 
     def validate(self) -> None:
@@ -283,14 +283,14 @@ class GetRequestStatusQuery:
 Query handlers retrieve and format data for read operations:
 
 ```python
-class GetRequestQueryHandler:
-    """Handles request retrieval queries."""
+class SyncAndGetRequestHandler:
+    """Handles sync-and-get request queries."""
 
     def __init__(self, request_read_model: RequestReadModel):
         self._read_model = request_read_model
         self._logger = get_logger(__name__)
 
-    async def handle(self, query: GetRequestQuery) -> Optional[RequestDto]:
+    async def handle(self, query: SyncAndGetRequestQuery) -> Optional[RequestDto]:
         """Handle the get request query."""
         try:
             query.validate()
@@ -478,8 +478,8 @@ def configure_cqrs(container: DIContainer) -> Tuple[CommandBus, QueryBus]:
 
     # Register query handlers
     query_bus.register_handler(
-        GetRequestQuery,
-        GetRequestQueryHandler(request_read_model)
+        SyncAndGetRequestQuery,
+        SyncAndGetRequestHandler(request_read_model)
     )
 
     return command_bus, query_bus
@@ -505,7 +505,7 @@ print(f"Created request: {request_id}")
 
 ```python
 # Get a specific request
-query = GetRequestQuery(request_id="req-123")
+query = SyncAndGetRequestQuery(request_id="req-123")
 request = await query_bus.dispatch(query)
 
 if request:
