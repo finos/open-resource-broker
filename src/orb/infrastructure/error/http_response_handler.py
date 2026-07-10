@@ -10,6 +10,7 @@ from typing import Callable
 
 from orb.domain.base.exceptions import (
     BusinessRuleViolationError,
+    ConcurrencyError,
     ConfigurationError,
     DuplicateError,
     EntityNotFoundError,
@@ -73,6 +74,7 @@ class HTTPErrorResponseHandler:
             ValidationError: self._handle_validation_error_http,
             EntityNotFoundError: self._handle_not_found_error_http,
             BusinessRuleViolationError: self._handle_business_rule_error_http,
+            ConcurrencyError: self._handle_concurrency_error_http,
             DuplicateError: self._handle_duplicate_error_http,
             # Request errors
             RequestNotFoundError: self._handle_request_not_found_http,
@@ -106,6 +108,16 @@ class HTTPErrorResponseHandler:
             category=ErrorCategory.NOT_FOUND,
             details=getattr(exception, "details", {}),
             http_status=HTTPStatus.NOT_FOUND,
+        )
+
+    def _handle_concurrency_error_http(self, exception: ConcurrencyError) -> ErrorResponse:
+        """Handle concurrency conflict errors for HTTP responses."""
+        return ErrorResponse(
+            error_code="CONCURRENCY_ERROR",
+            message="The resource was modified concurrently; please retry.",
+            category=ErrorCategory.BUSINESS_RULE,
+            details=getattr(exception, "details", {}),
+            http_status=HTTPStatus.CONFLICT,
         )
 
     def _handle_duplicate_error_http(self, exception: DuplicateError) -> ErrorResponse:

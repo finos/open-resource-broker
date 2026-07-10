@@ -10,7 +10,7 @@ from orb.application.dto.commands import (
     UpdateRequestStatusCommand,
 )
 from orb.domain.base import UnitOfWorkFactory
-from orb.domain.base.exceptions import EntityNotFoundError
+from orb.domain.base.exceptions import ConcurrencyError, EntityNotFoundError
 from orb.domain.base.ports import (
     ErrorHandlingPort,
     EventPublisherPort,
@@ -48,47 +48,74 @@ class UpdateRequestStatusHandler(BaseCommandHandler[UpdateRequestStatusCommand, 
         """Handle request status update command."""
         self.logger.info("Updating request status: %s -> %s", command.request_id, command.status)
 
-        try:
-            # Find, update, and save within a single UoW to avoid race conditions
-            with self.uow_factory.create_unit_of_work() as uow:
-                request = uow.requests.find_by_id(command.request_id)
-                if not request:
-                    raise EntityNotFoundError("Request", command.request_id)
+        _MAX_CONCURRENCY_RETRIES = 3
 
-                # Note: ``started_at`` is stamped inside
-                # ``Request.update_status`` on first non-PENDING
-                # transition — no per-handler logic needed.
-                request = request.update_status(
-                    status=command.status,
-                    message=command.message or "",
+        for attempt in range(_MAX_CONCURRENCY_RETRIES + 1):
+            try:
+                # Find, update, and save within a single UoW to avoid race conditions.
+                # The entire block is safely replayable: each iteration re-reads the
+                # current aggregate state from the DB and re-applies the same idempotent
+                # status mutation, satisfying the OCC reload-reapply contract.
+                with self.uow_factory.create_unit_of_work() as uow:
+                    request = uow.requests.find_by_id(command.request_id)
+                    if not request:
+                        raise EntityNotFoundError("Request", command.request_id)
+
+                    # Note: ``started_at`` is stamped inside
+                    # ``Request.update_status`` on first non-PENDING
+                    # transition — no per-handler logic needed.
+                    request = request.update_status(
+                        status=command.status,
+                        message=command.message or "",
+                    )
+
+                    events = uow.requests.save(request)
+                    for event in events:
+                        self.event_publisher.publish(event)  # type: ignore[union-attr]
+
+                self.logger.info(
+                    "Request status updated: %s -> %s", command.request_id, command.status
                 )
+                return
 
-                events = uow.requests.save(request)
-                for event in events:
-                    self.event_publisher.publish(event)  # type: ignore[union-attr]
+            except ConcurrencyError as exc:
+                if attempt >= _MAX_CONCURRENCY_RETRIES:
+                    self.logger.error(
+                        "ConcurrencyError updating request status for %s after %d retries: %s",
+                        command.request_id,
+                        _MAX_CONCURRENCY_RETRIES,
+                        exc,
+                    )
+                    raise
+                self.logger.warning(
+                    "ConcurrencyError updating request status for %s (attempt %d/%d); "
+                    "reloading and retrying.",
+                    command.request_id,
+                    attempt + 1,
+                    _MAX_CONCURRENCY_RETRIES,
+                )
+                continue
 
-            self.logger.info("Request status updated: %s -> %s", command.request_id, command.status)
-
-        except EntityNotFoundError:
-            self.logger.error(
-                "Request not found for status update: %s",
-                command.request_id,
-                extra={"request_id": command.request_id},
-            )
-            raise
-        except Exception as e:
-            self.logger.error(
-                "Failed to update request status for %s: %s",
-                command.request_id,
-                e,
-                exc_info=True,
-                extra={
-                    "request_id": command.request_id,
-                    "target_status": command.status,
-                    "error_type": type(e).__name__,
-                },
-            )
-            raise
+            except EntityNotFoundError:
+                self.logger.error(
+                    "Request not found for status update: %s",
+                    command.request_id,
+                    extra={"request_id": command.request_id},
+                )
+                raise
+            except Exception as e:
+                self.logger.error(
+                    "Failed to update request status for %s: %s",
+                    command.request_id,
+                    e,
+                    exc_info=True,
+                    extra={
+                        "request_id": command.request_id,
+                        "target_status": command.status,
+                        "error_type": type(e).__name__,
+                    },
+                )
+                raise
 
 
 @command_handler(CancelRequestCommand)  # type: ignore[arg-type]
