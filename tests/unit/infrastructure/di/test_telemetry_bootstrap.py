@@ -13,6 +13,7 @@ Scope:
 from __future__ import annotations
 
 import sys
+from contextlib import suppress
 from typing import Any
 from unittest.mock import MagicMock, Mock, patch
 
@@ -77,12 +78,10 @@ def _reset_otel_globals():
 
     # Restore the global meter provider to what it was before the test.
     if _original_meter_provider is not None:
-        try:
+        with suppress(Exception):
             from opentelemetry import metrics as _otel_metrics
 
             _otel_metrics.set_meter_provider(_original_meter_provider)
-        except Exception:
-            pass
 
 
 # ---------------------------------------------------------------------------
@@ -549,12 +548,11 @@ class TestShutdownTelemetryCallSiteWiring:
             # Prevent sys.exit from actually exiting.
             patch("sys.exit", side_effect=SystemExit),
         ):
-            try:
+            # We only care that _flush_telemetry was called in main()'s
+            # finally block; the exit path itself may raise SystemExit or any
+            # error, both of which are irrelevant to this assertion.
+            with suppress(SystemExit, Exception):
                 asyncio.run(cli_main_mod.main())
-            except SystemExit:
-                pass
-            except Exception:
-                pass  # We only care that _flush_telemetry was called.
 
         assert flush_calls, (
             "CLI main()'s finally block did not call _flush_telemetry — "
