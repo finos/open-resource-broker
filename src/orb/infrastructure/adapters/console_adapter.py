@@ -21,7 +21,6 @@ from orb.infrastructure.constants import CONSOLE_SEPARATOR_WIDTH
 try:
     from rich.console import Console as _RichConsole
 
-    _RICH_AVAILABLE = True
     _no_color_stdout = not sys.stdout.isatty() or "--no-color" in sys.argv
     _no_color_stderr = not sys.stderr.isatty() or "--no-color" in sys.argv
     _console = _RichConsole(
@@ -34,8 +33,6 @@ try:
         width=None if sys.stderr.isatty() else 2**31 - 1,
     )
 except ImportError:
-    _RICH_AVAILABLE = False
-
     import re as _re
 
     class _PlainConsole:  # type: ignore[no-redef]
@@ -76,6 +73,7 @@ def _console_output(func):
     def wrapper(*args, **kwargs):
         if _should_print():
             return func(*args, **kwargs)
+        return None
 
     return wrapper
 

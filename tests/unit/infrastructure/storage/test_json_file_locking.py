@@ -163,13 +163,16 @@ class TestFlockAcquireRelease:
             flock_calls.append(operation)
             original_flock(fd, operation)
 
+        def _raise_inside_lock() -> None:
+            with fm.exclusive_write_lock():
+                raise RuntimeError("simulated body error")
+
         with patch(
             "orb.infrastructure.storage.components.file_manager._fcntl.flock",
             side_effect=recording_flock,
         ):
             with pytest.raises(RuntimeError):
-                with fm.exclusive_write_lock():
-                    raise RuntimeError("simulated body error")
+                _raise_inside_lock()
 
         assert fcntl.LOCK_UN in flock_calls, "LOCK_UN not called after exception in body"
 
