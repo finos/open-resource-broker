@@ -194,9 +194,13 @@ class AzureTemplateExtensionConfig(BaseModel):
             defaults["placement_regions"] = self.placement_regions
         if self.placement_zones:
             defaults["placement_zones"] = self.placement_zones
-        if self.os_disk_size_gb is not None:
-            defaults["os_disk"] = {
+        if self.os_disk is not None:
+            defaults["os_disk"] = self.os_disk.model_dump(mode="json", exclude_none=True)
+        elif self.os_disk_type is not None or self.os_disk_size_gb is not None:
+            legacy_os_disk: dict[str, Any] = {
                 "storage_account_type": self.os_disk_type or "Premium_LRS",
-                "disk_size_gb": self.os_disk_size_gb,
             }
+            if self.os_disk_size_gb is not None:
+                legacy_os_disk["disk_size_gb"] = self.os_disk_size_gb
+            defaults["os_disk"] = legacy_os_disk
         return defaults

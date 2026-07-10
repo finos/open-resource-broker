@@ -116,14 +116,10 @@ class AzureCLISpec:
 
     def generate_name(self, args: argparse.Namespace) -> str:
         """Generate a provider instance name from Azure subscription and location."""
-        try:
-            subscription_id = self._arg(args, "azure_subscription_id") or "default"
-            location = self._arg(args, "azure_location") or "eastus2"
-            sanitized_subscription = re.sub(r"[^a-zA-Z0-9\-_]", "-", subscription_id)
-            return f"azure_{sanitized_subscription}_{location}"
-        except Exception:
-            pass
-        return "azure_default"
+        subscription_id = self._arg(args, "azure_subscription_id") or "default"
+        location = self._arg(args, "azure_location") or "eastus2"
+        sanitized_subscription = re.sub(r"[^a-zA-Z0-9\-_]", "-", subscription_id)
+        return f"azure_{sanitized_subscription}_{location}"
 
     def format_display(self, config: dict[str, Any]) -> list[tuple[str, str]]:
         """Return (label, value) pairs for display."""

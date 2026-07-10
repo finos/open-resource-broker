@@ -53,19 +53,11 @@ class AzureValidationAdapter(BaseProviderValidationAdapter):
         Returns:
             True if the API is supported by azure configuration
         """
-        try:
-            supported_apis = set(get_supported_apis())
-            is_valid = api in supported_apis
-
-            if not is_valid:
-                self._logger.debug("azure API validation failed: %s not in %s", api, supported_apis)
-
-            return is_valid
-
-        except Exception as e:
-            self._logger.error("Error validating azure provider API %s: %s", api, e)
-            # Fall back to canonical API names so validation still works without helper wiring.
-            return api in {"VMSS", "CycleCloud", "SingleVM", "VMSSUniform"}
+        supported_apis = set(get_supported_apis())
+        is_valid = api in supported_apis
+        if not is_valid:
+            self._logger.debug("azure API validation failed: %s not in %s", api, supported_apis)
+        return is_valid
 
     def get_supported_provider_apis(self) -> list[str]:
         """
@@ -74,12 +66,7 @@ class AzureValidationAdapter(BaseProviderValidationAdapter):
         Returns:
             List of supported azure provider API identifiers
         """
-        try:
-            return sorted(get_supported_apis())
-        except Exception as e:
-            self._logger.error("Error getting supported azure APIs: %s", e)
-            # Fallback to hardcoded list for safety
-            return ["VMSS", "CycleCloud", "SingleVM", "VMSSUniform"]
+        return sorted(get_supported_apis())
 
     @staticmethod
     def get_api_capabilities(api: str) -> dict[str, Any]:

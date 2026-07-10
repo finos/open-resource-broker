@@ -422,6 +422,31 @@ class TestTemplateExtension:
         defaults = ext.to_template_defaults()
         assert defaults["vm_size"] == "Standard_B1s"
 
+    def test_defaults_include_structured_os_disk(self):
+        ext = AzureTemplateExtensionConfig(
+            os_disk={
+                "storage_account_type": "StandardSSD_LRS",
+                "caching": "ReadOnly",
+                "ephemeral_os_disk": True,
+            }
+        )
+
+        defaults = ext.to_template_defaults()
+
+        assert defaults["os_disk"] == {
+            "storage_account_type": "StandardSSD_LRS",
+            "caching": "ReadOnly",
+            "ephemeral_os_disk": True,
+            "ephemeral_placement": "CacheDisk",
+        }
+
+    def test_defaults_include_legacy_os_disk_type_without_size(self):
+        ext = AzureTemplateExtensionConfig(os_disk_type="StandardSSD_LRS")
+
+        defaults = ext.to_template_defaults()
+
+        assert defaults["os_disk"] == {"storage_account_type": "StandardSSD_LRS"}
+
     def test_defaults_preserve_spot_placement_score_fields(self):
         ext = AzureTemplateExtensionConfig(
             spot_placement_score_enabled=True,
