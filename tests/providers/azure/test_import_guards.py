@@ -34,7 +34,8 @@ def _isolated_azure_provider_import():
             del sys.modules[key]
 
     for key, value in _MISSING_AZURE_MODULES.items():
-        sys.modules[key] = value
+        # None is Python's import-blocking sentinel, omitted from typeshed's module map.
+        sys.modules[key] = value  # type: ignore[assignment]
 
     try:
         yield
@@ -48,6 +49,13 @@ def _isolated_azure_provider_import():
             else:
                 sys.modules.pop(key, None)
         sys.modules.update(saved_orb_modules)
+        for module_name, module in sorted(
+            saved_orb_modules.items(), key=lambda item: item[0].count(".")
+        ):
+            parent_name, attribute_name = module_name.rsplit(".", maxsplit=1)
+            parent_module = sys.modules.get(parent_name)
+            if parent_module is not None:
+                setattr(parent_module, attribute_name, module)
 
 
 def test_azure_package_import_does_not_require_azure_sdk() -> None:

@@ -5,8 +5,8 @@ from typing import Any
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.ports.provider_validation_port import BaseProviderValidationAdapter
-from orb.providers.azure import AzureProviderConfig
 from orb.providers.azure.capabilities import get_supported_api_capabilities, get_supported_apis
+from orb.providers.azure.configuration.config import AzureProviderConfig
 from orb.providers.azure.configuration.validator import validate_azure_template
 
 

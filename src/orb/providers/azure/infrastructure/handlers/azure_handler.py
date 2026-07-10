@@ -6,7 +6,7 @@ create, status, and release operations used by Azure services.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, NotRequired, Optional, TypeAlias, TypedDict
+from typing import Any, Optional, TypeAlias, TypedDict
 
 from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
@@ -20,14 +20,19 @@ from orb.providers.azure.infrastructure.azure_client import AzureClient
 from orb.providers.azure.infrastructure.cyclecloud_session import CycleCloudRequestContext
 
 
-class AzureAcquireHostsResult(TypedDict):
-    """Normalized result returned by Azure create handlers."""
+class _AzureAcquireHostsRequiredResult(TypedDict):
+    """Fields returned by every Azure create handler."""
 
     success: bool
     resource_ids: list[str]
     instances: list[dict[str, Any]]
-    error_message: NotRequired[str | None]
-    provider_data: NotRequired[dict[str, Any]]
+
+
+class AzureAcquireHostsResult(_AzureAcquireHostsRequiredResult, total=False):
+    """Normalized result returned by Azure create handlers."""
+
+    error_message: str | None
+    provider_data: dict[str, Any]
 
 
 class AzureStatusProviderData(TypedDict, total=False):
