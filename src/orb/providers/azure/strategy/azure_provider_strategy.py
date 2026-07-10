@@ -213,11 +213,8 @@ class AzureProviderStrategy(ProviderStrategy):
     @property
     def handlers(self) -> dict[str, AzureHandler]:
         """Get handler mapping, including any explicit test overrides."""
-        handlers = dict(self._handlers)
         handler_factory = self._get_handler_factory()
-        if handler_factory is None:
-            return handlers
-        handlers.update(handler_factory.get_all_handlers())
+        handlers = handler_factory.get_all_handlers() if handler_factory is not None else {}
         handlers.update(self._handlers)
         return handlers
 
@@ -442,10 +439,6 @@ class AzureProviderStrategy(ProviderStrategy):
 
     def get_capabilities(self) -> ProviderCapabilities:
         """Get Azure provider capabilities."""
-        # TODO: Keep Azure and AWS capability metadata dynamic together.
-        # These example regions / instance types and operational heuristics are
-        # still hard-coded in both providers, we should evaluate if they can be made
-        # dynamic
         return ProviderCapabilities(
             provider_type="azure",
             supported_operations=[
@@ -457,8 +450,8 @@ class AzureProviderStrategy(ProviderStrategy):
                 ProviderOperationType.GET_AVAILABLE_TEMPLATES,
                 ProviderOperationType.HEALTH_CHECK,
             ],
+            supported_apis=get_supported_apis(),
             features={
-                "supported_apis": get_supported_apis(),
                 "api_capabilities": get_supported_api_capabilities(),
                 "instance_management": True,
                 "spot_instances": True,
@@ -470,29 +463,6 @@ class AzureProviderStrategy(ProviderStrategy):
                 "key_pairs": True,
                 "tags_support": True,
                 "monitoring": True,
-                "regions": ["eastus", "eastus2", "westus2", "westeurope", "northeurope"],
-                "instance_types": [
-                    "Standard_D2s_v5",
-                    "Standard_D4s_v5",
-                    "Standard_D8s_v5",
-                    "Standard_E4s_v5",
-                    "Standard_F4s_v2",
-                ],
-                "max_instances_per_request": 1000,
-                "supports_windows": False,
-                "supports_linux": True,
-            },
-            limitations={
-                "max_concurrent_requests": 100,
-                "rate_limit_per_second": 20,
-                "max_instance_lifetime_hours": 8760,
-                "requires_vpc": True,
-                "requires_key_pair": True,
-            },
-            performance_metrics={
-                "typical_create_time_seconds": 120,
-                "typical_terminate_time_seconds": 60,
-                "health_check_timeout_seconds": 15,
             },
         )
 

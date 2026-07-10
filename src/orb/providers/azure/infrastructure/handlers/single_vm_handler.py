@@ -160,7 +160,6 @@ class SingleVMHandler(AzureHandler):
             "resource_id": str(vm.name),
             "cloud_host_id": vm.vm_id or vm.name,
             "vm_name": str(vm.name),
-            "vm_id": str(vm.vm_id),
             "resource_group": resource_group,
             "location": str(vm.location),
             "availability_zone": availability_zone,
@@ -168,6 +167,8 @@ class SingleVMHandler(AzureHandler):
             "nic_name": network_identity["nic_name"],
             "vnet_id": network_identity["vnet_id"],
         }
+        if vm.vm_id is not None:
+            provider_data["vm_id"] = vm.vm_id
         return {
             "instance_id": str(vm.name),
             "name": str(vm.name),

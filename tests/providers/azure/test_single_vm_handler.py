@@ -14,6 +14,10 @@ from orb.providers.azure.infrastructure.handlers.single_vm_handler import (
     SingleVMHandler,
     _format_azure_error_message,
 )
+from orb.providers.azure.infrastructure.sdk_shapes import AzureVmRuntimeStatusProtocol
+from orb.providers.azure.infrastructure.services.azure_network_identity_resolver import (
+    AzureNetworkIdentity,
+)
 from tests.providers.azure.strategy_test_support import (
     AsyncPager,
     make_azure_template,
@@ -70,6 +74,36 @@ def _make_template(**overrides):
 
 def _make_azure_client() -> MagicMock:
     return make_single_vm_azure_client()
+
+
+def test_status_result_omits_absent_vm_id():
+    vm = MagicMock(spec=AzureVmRuntimeStatusProtocol)
+    vm.name = "vm-1"
+    vm.vm_id = None
+    vm.location = "eastus2"
+    vm.zones = None
+    vm.hardware_profile = None
+    vm.tags = None
+    network_identity: AzureNetworkIdentity = {
+        "private_ip": None,
+        "public_ip": None,
+        "subnet_id": None,
+        "vnet_id": None,
+        "nic_id": None,
+        "nic_name": None,
+    }
+
+    result = SingleVMHandler._build_status_result(
+        vm=vm,
+        resource_group="rg-1",
+        status="running",
+        network_identity=network_identity,
+    )
+
+    provider_data = result.get("provider_data")
+    assert provider_data is not None
+    assert provider_data.get("cloud_host_id") == "vm-1"
+    assert "vm_id" not in provider_data
 
 
 def test_acquire_hosts_submits_one_batched_deployment_and_returns_submitted_status():
