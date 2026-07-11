@@ -56,6 +56,7 @@ from orb.providers.k8s.services.instance_operation_service import (
     CancelResourceResult,
     K8sInstanceOperationService,
 )
+from orb.providers.k8s.services.start_stop_service import K8sStartStopService
 from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
 from orb.providers.k8s.value_objects import KubernetesProviderApi
 from orb.providers.k8s.watch.events_watcher import K8sEventsWatcher, K8sNodeEventsCache
@@ -225,6 +226,10 @@ class K8sProviderStrategy(ProviderStrategy):
             config=self._k8s_config,
             logger=self._logger,
         )
+        # Start/stop service (scale Deployment/StatefulSet) — constructed
+        # lazily by :meth:`_get_start_stop_service` on first use so the
+        # kubernetes client is resolved only when a start/stop is requested.
+        self._start_stop_service: Optional[K8sStartStopService] = None
         # Per-instance plugin factory registry — seeded from the class-level
         # defaults so every instance starts with the same empty set but is
         # fully isolated from other instances.  Two strategy objects for
@@ -836,6 +841,10 @@ class K8sProviderStrategy(ProviderStrategy):
                 result = await self._handle_get_instance_status(operation)
             elif operation.operation_type == ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES:
                 result = await self._handle_describe_resource_instances(operation)
+            elif operation.operation_type == ProviderOperationType.START_INSTANCES:
+                result = await self._get_start_stop_service().start_instances(operation)
+            elif operation.operation_type == ProviderOperationType.STOP_INSTANCES:
+                result = await self._get_start_stop_service().stop_instances(operation)
             elif operation.operation_type == ProviderOperationType.TERMINATE_INSTANCES and (
                 operation.context or {}
             ).get("cancel_mode"):
@@ -1460,6 +1469,21 @@ class K8sProviderStrategy(ProviderStrategy):
                 console=self._console,
             )
         return self._discovery_service
+
+    def _get_start_stop_service(self) -> K8sStartStopService:
+        """Return the start/stop service, constructing it lazily.
+
+        Owns the ``START_INSTANCES`` / ``STOP_INSTANCES`` scale operations
+        for Deployment/StatefulSet workloads.  Constructed on first use so
+        the kubernetes client is resolved only when a start/stop is actually
+        requested — mirrors the lazy discovery-service pattern above.
+        """
+        if self._start_stop_service is None:
+            self._start_stop_service = K8sStartStopService(
+                kubernetes_client=self.kubernetes_client,
+                logger=self._logger,
+            )
+        return self._start_stop_service
 
     def discover_infrastructure(self, provider_config: dict[str, Any]) -> dict[str, Any]:
         """Discover Kubernetes infrastructure for the configured cluster.

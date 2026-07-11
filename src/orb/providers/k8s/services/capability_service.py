@@ -59,12 +59,28 @@ class K8sCapabilityService:
                 ProviderOperationType.GET_INSTANCE_STATUS,
                 ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
                 ProviderOperationType.HEALTH_CHECK,
+                # START / STOP are supported for Deployment and StatefulSet
+                # workloads via spec.replicas scaling.  Pod and Job return
+                # UNSUPPORTED_OPERATION_FOR_KIND at runtime — they are listed
+                # here because the operation type IS handled (not blindly
+                # rejected) and the caller needs to know it is wired.
+                ProviderOperationType.START_INSTANCES,
+                ProviderOperationType.STOP_INSTANCES,
             ],
             supported_apis=list(_SUPPORTED_APIS),
             features={
                 "selective_termination": False,
                 "selective_termination_by_api": {
                     "Pod": True,
+                    "Deployment": True,
+                    "StatefulSet": True,
+                    "Job": False,
+                },
+                # START / STOP via spec.replicas scale are supported only
+                # for controller-backed workloads.
+                "start_stop_supported": True,
+                "start_stop_supported_by_api": {
+                    "Pod": False,
                     "Deployment": True,
                     "StatefulSet": True,
                     "Job": False,

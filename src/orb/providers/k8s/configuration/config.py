@@ -479,6 +479,23 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         ),
     )
 
+    # Inbound HTTP auth
+    inbound_auth_enabled: bool = Field(
+        False,
+        description=(
+            "Opt-in flag for the Kubernetes inbound HTTP auth strategy "
+            "(``KubeAuthStrategy``).  When True, ORB registers a "
+            "``KubeAuthStrategy`` with the ``AuthRegistry`` so that callers "
+            "of ORB's own REST API can be authenticated via a Kubernetes "
+            "ServiceAccount Bearer token validated through the cluster's "
+            "``authentication.k8s.io/v1 TokenReview`` API.  Default False "
+            "because this requires a ``system:auth-delegator`` "
+            "``ClusterRoleBinding`` (or a targeted ``tokenreviews: create`` "
+            "RBAC grant) for the ORB pod's ServiceAccount — a privilege "
+            "operators must opt in to deliberately."
+        ),
+    )
+
     # Controller-status cache
     controller_status_cache_ttl_seconds: float = Field(
         5.0,
