@@ -54,7 +54,7 @@ from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.di.injectable import injectable
 from orb.providers.k8s.configuration.config import K8sProviderConfig
-from orb.providers.k8s.exceptions.k8s_errors import K8sError
+from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
 from orb.providers.k8s.infrastructure.handlers.base_handler import K8sHandlerBase
 from orb.providers.k8s.infrastructure.handlers.job_status import JobStatusResolver
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
@@ -81,7 +81,12 @@ class K8sJobHandler(K8sHandlerBase):
         kubernetes_client: K8sClient,
         config: K8sProviderConfig,
         logger: LoggingPort,
+        max_retries: int = 3,
+        base_delay: float = 1.0,
+        max_delay: float = 30.0,
         *,
+        circuit_breaker_failure_threshold: int = 5,
+        circuit_breaker_reset_timeout: int = 60,
         pod_state_cache: Optional[PodStateCache] = None,
         cache_alive: Optional[Callable[[], bool]] = None,
         stale_cache_timeout_seconds: Optional[float] = None,
@@ -93,6 +98,11 @@ class K8sJobHandler(K8sHandlerBase):
             kubernetes_client=kubernetes_client,
             config=config,
             logger=logger,
+            max_retries=max_retries,
+            base_delay=base_delay,
+            max_delay=max_delay,
+            circuit_breaker_failure_threshold=circuit_breaker_failure_threshold,
+            circuit_breaker_reset_timeout=circuit_breaker_reset_timeout,
             pod_state_cache=pod_state_cache,
             cache_alive=cache_alive,
             stale_cache_timeout_seconds=stale_cache_timeout_seconds,
@@ -338,7 +348,7 @@ class K8sJobHandler(K8sHandlerBase):
     @classmethod
     def get_example_templates(cls) -> list[Template]:
         """Return one example template that submits as a ``Job``."""
-        from orb.providers.k8s.domain.template.k8s_template import (
+        from orb.providers.k8s.domain.template.k8s_template_aggregate import (
             K8sResourceQuantities,
             K8sTemplate,
         )

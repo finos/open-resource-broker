@@ -37,7 +37,7 @@ def _build_request(*, requested_count: int = 3) -> Request:
 
 def _build_template(**k8s_fields) -> Template:
     """Build a :class:`K8sTemplate` for tests."""
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
 
     image_id = k8s_fields.pop("container_image", None) or k8s_fields.pop(
         "image_id", "busybox:latest"

@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from orb.domain.template.template_aggregate import Template
 from orb.providers.k8s.configuration.template_extension import K8sTemplateExtensionConfig
-from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
 from orb.providers.k8s.domain.template.k8s_template_dto_config import K8sTemplateDTOConfig
 from orb.providers.k8s.infrastructure.adapters.template_adapter import _SUPPORTED_FIELDS
 from orb.providers.k8s.scheduler.hostfactory_field_mapping import K8sFieldMapping

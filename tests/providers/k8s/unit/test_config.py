@@ -29,6 +29,12 @@ def test_defaults_match_documented_spec() -> None:
     assert cfg.stale_cache_timeout_seconds == 600
     assert cfg.watch_enabled is True
     assert cfg.min_kubernetes_version == "1.28"
+    # Circuit-breaker + retry knob defaults must match K8sHandlerBase hardcoded values.
+    assert cfg.circuit_breaker_failure_threshold == 5
+    assert cfg.circuit_breaker_reset_timeout == 60
+    assert cfg.max_retries == 3
+    assert cfg.retry_base_delay == 1.0
+    assert cfg.retry_max_delay == 30.0
 
 
 def test_overrides_are_applied(tmp_path) -> None:  # type: ignore[no-untyped-def]
@@ -166,3 +172,56 @@ def test_native_spec_disabled_with_no_rejection_is_valid() -> None:
     cfg = K8sProviderConfig(native_spec_enabled=False, reject_high_risk_pod_fields=False)
     assert cfg.native_spec_enabled is False
     assert cfg.reject_high_risk_pod_fields is False
+
+
+# ---------------------------------------------------------------------------
+# Group C: circuit-breaker + retry knob round-trips
+# ---------------------------------------------------------------------------
+
+
+def test_circuit_breaker_knobs_round_trip() -> None:
+    """Operator-supplied circuit-breaker values are stored and returned verbatim."""
+    cfg = K8sProviderConfig(
+        circuit_breaker_failure_threshold=10,
+        circuit_breaker_reset_timeout=120,
+    )
+    assert cfg.circuit_breaker_failure_threshold == 10
+    assert cfg.circuit_breaker_reset_timeout == 120
+
+
+def test_retry_knobs_round_trip() -> None:
+    """Operator-supplied retry values are stored and returned verbatim."""
+    cfg = K8sProviderConfig(
+        max_retries=5,
+        retry_base_delay=2.5,
+        retry_max_delay=60.0,
+    )
+    assert cfg.max_retries == 5
+    assert cfg.retry_base_delay == 2.5
+    assert cfg.retry_max_delay == 60.0
+
+
+def test_circuit_breaker_defaults_unchanged() -> None:
+    """Default circuit-breaker values match K8sHandlerBase constructor defaults exactly.
+
+    This test acts as a canary: if someone changes K8sHandlerBase's defaults
+    without updating K8sProviderConfig (or vice-versa) this test will fail and
+    flag the discrepancy before it silently changes operator behaviour.
+    """
+    import inspect
+
+    from orb.providers.k8s.infrastructure.handlers.base_handler import K8sHandlerBase
+
+    sig = inspect.signature(K8sHandlerBase.__init__)
+    params = sig.parameters
+
+    cfg = K8sProviderConfig()
+
+    # The config default must equal the handler's positional default.
+    assert (
+        cfg.circuit_breaker_failure_threshold == params["circuit_breaker_failure_threshold"].default
+    )
+    assert cfg.circuit_breaker_reset_timeout == params["circuit_breaker_reset_timeout"].default
+    assert cfg.max_retries == params["max_retries"].default
+    assert cfg.retry_base_delay == params["base_delay"].default
+    assert cfg.retry_max_delay == params["max_delay"].default

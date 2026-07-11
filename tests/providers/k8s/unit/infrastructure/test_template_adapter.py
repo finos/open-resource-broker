@@ -27,7 +27,7 @@ def _make_adapter() -> K8sTemplateAdapter:
 
 
 def _make_k8s_template(**kwargs: Any) -> Any:
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
 
     defaults: dict[str, Any] = {
         "template_id": "tpl-unit",
@@ -125,7 +125,7 @@ def test_extend_template_fields_preserves_existing_provider_api() -> None:
 
 def test_validate_field_values_accepts_valid_template() -> None:
     """A well-formed k8s template with valid resource quantities produces no errors."""
-    from orb.providers.k8s.domain.template.k8s_template import (
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import (
         K8sResourceQuantities,
     )
 
@@ -141,7 +141,7 @@ def test_validate_field_values_accepts_valid_template() -> None:
 
 def test_validate_field_values_requires_image_id() -> None:
     """A template without image_id must produce an error on the image_id field."""
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
 
     tpl = K8sTemplate(
         template_id="tpl-no-image",
@@ -164,7 +164,7 @@ def test_validate_field_values_rejects_invalid_namespace() -> None:
 
 def test_validate_field_values_rejects_invalid_resource_quantity() -> None:
     """An invalid resource quantity string must produce a resource_requests error."""
-    from orb.providers.k8s.domain.template.k8s_template import (
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import (
         K8sResourceQuantities,
     )
 

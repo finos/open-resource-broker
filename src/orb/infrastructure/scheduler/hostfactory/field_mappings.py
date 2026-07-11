@@ -67,6 +67,54 @@ class HostFactoryFieldMappings:
             "launchTemplateId": "launch_template_id",
             "userDataScript": "user_data",
         },
+        # Kubernetes-specific fields — no-bootstrap fallback so static consumers
+        # (e.g. unit tests that exercise the mapper without booting the k8s
+        # provider) keep working.  The canonical list lives in
+        # ``providers/k8s/scheduler/hostfactory_field_mapping.py:K8sFieldMapping``
+        # registered into ``FieldMappingRegistry`` during provider bootstrap.
+        # Keep this table in sync with ``K8sFieldMapping._PROVIDER_MAPPINGS``.
+        "k8s": {
+            # Scheduling / placement
+            "namespace": "namespace",
+            "namespaces": "namespaces",
+            "runtimeClass": "runtime_class",
+            "nodeSelector": "node_selector",
+            "tolerations": "tolerations",
+            "serviceAccount": "service_account",
+            # Resource requests / limits
+            "resourceRequests": "resource_requests",
+            "resourceLimits": "resource_limits",
+            # Workload sizing overrides for the Job handler
+            "completions": "completions",
+            "parallelism": "parallelism",
+            # Pod metadata
+            "annotations": "annotations",
+            # Storage / runtime
+            "volumeMounts": "volume_mounts",
+            "volumes": "volumes",
+            # Container environment
+            "env": "env",
+            "environment": "env",
+            # Container entrypoint override
+            "command": "command",
+            "args": "args",
+            # Image pull
+            "imagePullSecret": "image_pull_secret",
+            # Raw partial pod-spec override
+            "podSpecOverride": "pod_spec_override",
+            # Pod scheduling priority
+            "priorityClassName": "priority_class_name",
+            # Pod termination
+            "terminationGracePeriodSeconds": "termination_grace_period_seconds",
+            # Container health probes
+            "readinessProbe": "readiness_probe",
+            "livenessProbe": "liveness_probe",
+            # Pod-level security context
+            "securityContext": "security_context",
+            # Job lifecycle
+            "ttlSecondsAfterFinished": "ttl_seconds_after_finished",
+            "activeDeadlineSeconds": "active_deadline_seconds",
+        },
     }
 
     @classmethod

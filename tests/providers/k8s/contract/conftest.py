@@ -26,7 +26,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"
 from orb.domain.base.ports.provider_validation_port import BaseProviderValidationAdapter
 from orb.domain.base.provider_fulfilment import CheckHostsStatusResult
 from orb.providers.k8s.configuration.config import K8sProviderConfig
-from orb.providers.k8s.domain.template.k8s_template import K8sResourceQuantities, K8sTemplate
+from orb.providers.k8s.domain.template.k8s_template_aggregate import (
+    K8sResourceQuantities,
+    K8sTemplate,
+)
 from orb.providers.k8s.infrastructure.adapters.template_adapter import (
     _SUPPORTED_PROVIDER_APIS,
 )

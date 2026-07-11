@@ -433,3 +433,74 @@ def test_default_map_input_empty_dict():
 def test_default_map_output_empty_dict():
     mapper = DefaultFieldMapper()
     assert mapper.map_output_fields({}) == {}
+
+
+# ---------------------------------------------------------------------------
+# HostFactoryFieldMappings — k8s static fallback
+# ---------------------------------------------------------------------------
+
+
+def test_get_mappings_k8s_returns_at_least_26_entries():
+    """get_mappings('k8s') must include all k8s-specific entries without provider bootstrap."""
+    mappings = HostFactoryFieldMappings.get_mappings("k8s")
+    # 17 generic + 26 k8s-specific = at least 26 k8s-specific entries present in total
+    k8s_only = {
+        k: v for k, v in mappings.items() if k not in HostFactoryFieldMappings.MAPPINGS["generic"]
+    }
+    assert len(k8s_only) >= 26, (
+        f"Expected at least 26 k8s-specific entries in get_mappings('k8s'), got {len(k8s_only)}"
+    )
+
+
+def test_get_mappings_k8s_contains_known_k8s_camel_keys():
+    """Spot-check that well-known k8s camelCase keys survive the no-bootstrap path."""
+    mappings = HostFactoryFieldMappings.get_mappings("k8s")
+    expected = {
+        "namespace": "namespace",
+        "namespaces": "namespaces",
+        "runtimeClass": "runtime_class",
+        "nodeSelector": "node_selector",
+        "tolerations": "tolerations",
+        "serviceAccount": "service_account",
+        "resourceRequests": "resource_requests",
+        "resourceLimits": "resource_limits",
+        "completions": "completions",
+        "parallelism": "parallelism",
+        "annotations": "annotations",
+        "volumeMounts": "volume_mounts",
+        "volumes": "volumes",
+        "env": "env",
+        "environment": "env",
+        "command": "command",
+        "args": "args",
+        "imagePullSecret": "image_pull_secret",
+        "podSpecOverride": "pod_spec_override",
+        "priorityClassName": "priority_class_name",
+        "terminationGracePeriodSeconds": "termination_grace_period_seconds",
+        "readinessProbe": "readiness_probe",
+        "livenessProbe": "liveness_probe",
+        "securityContext": "security_context",
+        "ttlSecondsAfterFinished": "ttl_seconds_after_finished",
+        "activeDeadlineSeconds": "active_deadline_seconds",
+    }
+    for camel_key, snake_val in expected.items():
+        assert mappings.get(camel_key) == snake_val, (
+            f"k8s mapping missing or wrong: '{camel_key}' -> expected '{snake_val}', "
+            f"got '{mappings.get(camel_key)}'"
+        )
+
+
+def test_get_mappings_k8s_static_matches_k8s_field_mapping_class():
+    """The static MAPPINGS['k8s'] table must match K8sFieldMapping._PROVIDER_MAPPINGS exactly.
+
+    This test acts as a sync-check: if K8sFieldMapping gains or changes entries,
+    this will fail and remind the developer to update the static fallback table.
+    """
+    from orb.providers.k8s.scheduler.hostfactory_field_mapping import K8sFieldMapping
+
+    canonical = K8sFieldMapping().get_mappings()
+    static = HostFactoryFieldMappings.MAPPINGS["k8s"]
+    assert static == canonical, (
+        "HostFactoryFieldMappings.MAPPINGS['k8s'] is out of sync with "
+        "K8sFieldMapping._PROVIDER_MAPPINGS. Update field_mappings.py to match."
+    )

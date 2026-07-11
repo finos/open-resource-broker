@@ -57,7 +57,7 @@ def test_load_config_with_valid_kubeconfig(tmp_path: pytest.TempPathFactory) -> 
 
 def test_load_config_propagates_k8s_auth_error(tmp_path: pytest.TempPathFactory) -> None:
     """load_config with in_cluster=False propagates K8sAuthError from load_kubeconfig."""
-    from orb.providers.k8s.exceptions.k8s_errors import K8sAuthError
+    from orb.providers.k8s.exceptions.k8s_exceptions import K8sAuthError
     from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 
     cfg = K8sProviderConfig(in_cluster=False)  # type: ignore[call-arg]

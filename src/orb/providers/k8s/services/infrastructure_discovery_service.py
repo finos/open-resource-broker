@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from orb.domain.base.discovery_context import DiscoveryContext, discovery_context_from_dict
 from orb.providers.k8s.auth.in_cluster import is_in_cluster
-from orb.providers.k8s.exceptions.k8s_errors import K8sDiscoveryError, K8sError
+from orb.providers.k8s.exceptions.k8s_exceptions import K8sDiscoveryError, K8sError
 from orb.providers.k8s.services.discovery_models import (
     KubeContextInfo,
     NamespaceInfo,

@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from orb.providers.k8s.exceptions.k8s_errors import K8sError
+from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
 from orb.providers.k8s.infrastructure.handlers.job_handler import K8sJobHandler
 
 

@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from orb.providers.k8s.domain.template.k8s_template import (
+from orb.providers.k8s.domain.template.k8s_template_aggregate import (
     K8sResourceQuantities,
     K8sTemplate,
     K8sToleration,

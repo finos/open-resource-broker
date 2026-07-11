@@ -60,7 +60,7 @@ _NAMESPACE_MAX_LEN = 63
 
 
 # ---------------------------------------------------------------------------
-# Exceptions (avoid circular import — must not import from k8s_errors here
+# Exceptions (avoid circular import — must not import from k8s_exceptions here
 # because utilities is imported by handlers which import exceptions already)
 # ---------------------------------------------------------------------------
 

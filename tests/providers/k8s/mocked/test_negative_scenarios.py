@@ -73,7 +73,7 @@ def _make_pod_handler(core_v1: Any) -> Any:
 
 
 def _make_template(provider_api: str = "Pod") -> Any:
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
 
     return K8sTemplate(
         template_id="tpl-neg",
@@ -121,7 +121,7 @@ def test_load_config_missing_kubeconfig_raises_auth_error(tmp_path: Any) -> None
     """
     from unittest.mock import patch
 
-    from orb.providers.k8s.exceptions.k8s_errors import K8sAuthError
+    from orb.providers.k8s.exceptions.k8s_exceptions import K8sAuthError
     from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 
     # Create a real file so K8sProviderConfig accepts it at construction.
@@ -257,7 +257,7 @@ def test_load_config_connection_refused_raises_auth_error(tmp_path: Any) -> None
     """
     from unittest.mock import patch
 
-    from orb.providers.k8s.exceptions.k8s_errors import K8sAuthError
+    from orb.providers.k8s.exceptions.k8s_exceptions import K8sAuthError
     from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 
     kube_file = tmp_path / "kubeconfig"

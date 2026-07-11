@@ -18,7 +18,7 @@ import pytest
 from pydantic import ValidationError
 
 from orb.domain.template.template_aggregate import Template
-from orb.providers.k8s.domain.template.k8s_template import (
+from orb.providers.k8s.domain.template.k8s_template_aggregate import (
     K8sEnvVar,
     K8sResourceQuantities,
     K8sTemplate,
@@ -264,7 +264,7 @@ def test_env_var_rejects_value_and_value_from() -> None:
 
 def test_volume_accepts_inline_source_shape() -> None:
     """Common ``{"name": "data", "emptyDir": {}}`` shape is accepted."""
-    from orb.providers.k8s.domain.template.k8s_template import _coerce_volumes
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import _coerce_volumes
 
     out = _coerce_volumes([{"name": "data", "emptyDir": {}}])
     assert out is not None
@@ -303,4 +303,4 @@ def test_pod_spec_override_accepts_arbitrary_dict() -> None:
 
 def test_value_object_imports_are_exported() -> None:
     """``K8sVolume`` is exported alongside the other value objects."""
-    assert K8sVolume.__module__.endswith("k8s_template")
+    assert K8sVolume.__module__.endswith("k8s_template_aggregate")

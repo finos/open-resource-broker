@@ -574,6 +574,12 @@ class K8sWatcher:
             list(getattr(status, "container_statuses", None) or []) if status is not None else []
         )
 
+        # Capture the primary container's image so the cache-fed code path
+        # can populate image_id on the instance dict (mirrors instance_dict_for_pod).
+        containers = list(getattr(spec, "containers", None) or []) if spec is not None else []
+        raw_image = getattr(containers[0], "image", None) if containers else None
+        image_id: Optional[str] = str(raw_image) if raw_image else None
+
         # Read the provider-API type from the pod label so the Succeeded
         # phase mapping can apply the correct semantics per workload kind.
         pod_provider_api: Optional[str] = labels.get(self._provider_api_label)
@@ -628,6 +634,7 @@ class K8sWatcher:
             disrupted_reason=disrupted_reason,
             disrupted_message=disrupted_message,
             restart_count=restart_count,
+            image_id=image_id,
         )
 
 

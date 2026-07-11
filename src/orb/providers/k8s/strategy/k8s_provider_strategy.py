@@ -1154,6 +1154,148 @@ class K8sProviderStrategy(ProviderStrategy):
         """
         return self._API_ALIASES.get(raw_api, raw_api)
 
+    @classmethod
+    def get_ui_column_schema(cls) -> list:  # type: ignore[override]
+        """Return k8s-specific UI column descriptors for machines, requests, and templates."""
+        from orb.application.dto.system import UIColumnDescriptor
+
+        return [
+            # ------------------------------------------------------------------
+            # machines — pod/workload-level columns
+            # ------------------------------------------------------------------
+            UIColumnDescriptor(
+                key="k8s_namespace",
+                path="provider_data.namespace",
+                label="Namespace",
+                kind="badge",
+                resource_type="machines",
+                provider="k8s",
+                sortable=True,
+                default_visible=True,
+            ),
+            UIColumnDescriptor(
+                key="k8s_node_name",
+                path="provider_data.node_name",
+                label="Node",
+                kind="text",
+                resource_type="machines",
+                provider="k8s",
+                sortable=True,
+                default_visible=True,
+            ),
+            UIColumnDescriptor(
+                key="k8s_phase",
+                path="provider_data.phase",
+                label="Phase",
+                kind="badge",
+                resource_type="machines",
+                provider="k8s",
+                badge_color_map={
+                    "Running": "green",
+                    "Pending": "orange",
+                    "Succeeded": "teal",
+                    "Failed": "red",
+                    "Unknown": "gray",
+                },
+                sortable=True,
+                default_visible=True,
+            ),
+            UIColumnDescriptor(
+                key="k8s_restart_count",
+                path="provider_data.restart_count",
+                label="Restarts",
+                kind="count",
+                resource_type="machines",
+                provider="k8s",
+                sortable=True,
+                default_visible=False,
+            ),
+            UIColumnDescriptor(
+                key="k8s_capacity_type",
+                path="provider_data.node_capacity_type",
+                label="Capacity Type",
+                kind="badge",
+                resource_type="machines",
+                provider="k8s",
+                badge_color_map={"spot": "orange", "on-demand": "blue", "on_demand": "blue"},
+                sortable=True,
+                default_visible=False,
+            ),
+            UIColumnDescriptor(
+                key="k8s_workload_kind",
+                path="provider_api",
+                label="Workload Kind",
+                kind="badge",
+                resource_type="machines",
+                provider="k8s",
+                badge_color_map={
+                    "Pod": "blue",
+                    "Deployment": "purple",
+                    "StatefulSet": "teal",
+                    "Job": "orange",
+                },
+                sortable=True,
+                default_visible=False,
+            ),
+            # ------------------------------------------------------------------
+            # requests — provider-level request columns
+            # ------------------------------------------------------------------
+            UIColumnDescriptor(
+                key="k8s_request_namespace",
+                path="provider_data.namespace",
+                label="Namespace",
+                kind="badge",
+                resource_type="requests",
+                provider="k8s",
+                sortable=True,
+                default_visible=True,
+            ),
+            UIColumnDescriptor(
+                key="k8s_request_provider_api",
+                path="provider_data.provider_api",
+                label="Workload Kind",
+                kind="badge",
+                resource_type="requests",
+                provider="k8s",
+                badge_color_map={
+                    "Pod": "blue",
+                    "Deployment": "purple",
+                    "StatefulSet": "teal",
+                    "Job": "orange",
+                },
+                default_visible=True,
+            ),
+            # ------------------------------------------------------------------
+            # templates — k8s template surface
+            # ------------------------------------------------------------------
+            UIColumnDescriptor(
+                key="k8s_template_provider_api",
+                path="provider_api",
+                label="Workload Kind",
+                kind="badge",
+                resource_type="templates",
+                provider="k8s",
+                badge_color_map={
+                    "Pod": "blue",
+                    "Deployment": "purple",
+                    "StatefulSet": "teal",
+                    "Job": "orange",
+                },
+                default_visible=True,
+                sortable=True,
+            ),
+            UIColumnDescriptor(
+                key="k8s_template_namespace",
+                path="namespace",
+                label="Namespace",
+                kind="text",
+                resource_type="templates",
+                provider="k8s",
+                default_visible=True,
+                sortable=True,
+            ),
+        ]
+
     # ------------------------------------------------------------------
     # Region / CLI helpers
     # ------------------------------------------------------------------

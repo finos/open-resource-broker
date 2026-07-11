@@ -151,6 +151,11 @@ class K8sHandlerRegistry:
                 kubernetes_client=self._client_provider(),
                 config=self._config,
                 logger=self._logger,
+                max_retries=self._config.max_retries,
+                base_delay=self._config.retry_base_delay,
+                max_delay=self._config.retry_max_delay,
+                circuit_breaker_failure_threshold=self._config.circuit_breaker_failure_threshold,
+                circuit_breaker_reset_timeout=self._config.circuit_breaker_reset_timeout,
                 pod_state_cache=cache,
                 cache_alive=alive,
                 native_spec_service=native_spec_service,
@@ -162,15 +167,21 @@ class K8sHandlerRegistry:
 
         # Plugin-supplied handlers — see ``K8sProviderStrategy.register_handler``
         # and ``docs/root/providers/k8s/plugin-authoring.md``.
-        # Factories receive the full seven-kwarg surface so plugins that
-        # consume ``native_spec_service`` or ``node_state_cache`` do not
-        # silently receive ``None``.
+        # Factories receive the full kwarg surface so plugins that consume
+        # ``native_spec_service`` or ``node_state_cache`` do not silently receive
+        # ``None``.  The circuit-breaker and retry knobs are forwarded from config
+        # so plugin handlers benefit from operator-tuned resilience settings too.
         factory = self._plugin_factories().get(provider_api)
         if factory is not None:
             handler = factory(
                 kubernetes_client=self._client_provider(),
                 config=self._config,
                 logger=self._logger,
+                max_retries=self._config.max_retries,
+                base_delay=self._config.retry_base_delay,
+                max_delay=self._config.retry_max_delay,
+                circuit_breaker_failure_threshold=self._config.circuit_breaker_failure_threshold,
+                circuit_breaker_reset_timeout=self._config.circuit_breaker_reset_timeout,
                 pod_state_cache=cache,
                 cache_alive=alive,
                 native_spec_service=native_spec_service,
@@ -440,7 +451,7 @@ class K8sHandlerRegistry:
         from orb.domain.template.template_aggregate import (
             Template as _Template,
         )
-        from orb.providers.k8s.domain.template.k8s_template import (
+        from orb.providers.k8s.domain.template.k8s_template_aggregate import (
             K8sTemplate,
             upcast_to_k8s_template,
         )

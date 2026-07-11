@@ -20,7 +20,7 @@ from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.utilities.common.deep_merge import deep_merge
 from orb.providers.k8s.configuration.config import K8sProviderConfig
-from orb.providers.k8s.domain.template.k8s_template import (
+from orb.providers.k8s.domain.template.k8s_template_aggregate import (
     K8sProbe,
     K8sSecurityContext,
     K8sTemplate,
@@ -127,7 +127,7 @@ def apply_pod_spec_override(pod: V1Pod, override: Optional[dict[str, Any]]) -> V
         return pod
     from kubernetes.client import V1PodSpec
 
-    from orb.providers.k8s.exceptions.k8s_errors import K8sError
+    from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
 
     if pod.spec is None:  # pragma: no cover — defensive
         return pod

@@ -1,7 +1,7 @@
 """Kubernetes template validator — registration-time structural checks.
 
 Validates :class:`~orb.domain.template.template_aggregate.Template` (and its
-:class:`~orb.providers.k8s.domain.template.k8s_template.K8sTemplate`
+:class:`~orb.providers.k8s.domain.template.k8s_template_aggregate.K8sTemplate`
 subclass) against the rules that can be evaluated entirely from the template
 data itself, without any live Kubernetes API contact.
 
@@ -29,7 +29,7 @@ Validation rules
    :func:`~orb.providers.k8s.utilities.quantity_parser.parse_memory_quantity`
    (for all other entries).
 8. ``tolerations`` — when set, each entry must be parseable as a
-   :class:`~orb.providers.k8s.domain.template.k8s_template.K8sToleration`
+   :class:`~orb.providers.k8s.domain.template.k8s_template_aggregate.K8sToleration`
    (Pydantic-backed, tolerates dict or model input).
 """
 
@@ -110,7 +110,7 @@ class K8sTemplateValidator:
 
         Args:
             template: A :class:`~orb.domain.template.template_aggregate.Template`
-                or :class:`~orb.providers.k8s.domain.template.k8s_template.K8sTemplate`
+                or :class:`~orb.providers.k8s.domain.template.k8s_template_aggregate.K8sTemplate`
                 instance.
 
         Returns:
@@ -275,7 +275,7 @@ def _is_k8s_toleration(obj: Any) -> bool:
     """Return True when *obj* is an instance of K8sToleration."""
     # Avoid importing at module level to keep the validator lightweight.
     try:
-        from orb.providers.k8s.domain.template.k8s_template import K8sToleration
+        from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sToleration
 
         return isinstance(obj, K8sToleration)
     except ImportError:
@@ -288,7 +288,7 @@ def _validate_toleration_dict(entry: dict[str, Any], label: str) -> Optional[str
     Returns an error string on failure or ``None`` on success.
     """
     try:
-        from orb.providers.k8s.domain.template.k8s_template import K8sToleration
+        from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sToleration
 
         K8sToleration.model_validate(entry)
         return None

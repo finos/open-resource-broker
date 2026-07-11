@@ -27,8 +27,8 @@ from orb.domain.request.aggregate import Request
 from orb.domain.request.value_objects import RequestId, RequestType
 from orb.infrastructure.template.jinja_spec_renderer import JinjaSpecRenderer
 from orb.providers.k8s.configuration.config import K8sProviderConfig
-from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
-from orb.providers.k8s.exceptions.k8s_errors import K8sError
+from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
+from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
 from orb.providers.k8s.infrastructure.services.k8s_native_spec_service import (
     _SUPPORTED_API_TYPES,
     K8sNativeSpecService,

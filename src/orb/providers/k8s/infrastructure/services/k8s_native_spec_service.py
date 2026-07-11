@@ -33,11 +33,11 @@ from orb.infrastructure.di.injectable import injectable
 from orb.infrastructure.utilities.common.deep_merge import deep_merge
 from orb.providers.base.native_spec_protocol import NativeSpecServiceProtocol
 from orb.providers.k8s.configuration.config import K8sProviderConfig
-from orb.providers.k8s.domain.template.k8s_template import (
+from orb.providers.k8s.domain.template.k8s_template_aggregate import (
     K8sTemplate,
     upcast_to_k8s_template,
 )
-from orb.providers.k8s.exceptions.k8s_errors import K8sError
+from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
 
 # Supported per-API spec keys; each corresponds to a directory under
 # ``providers/k8s/specs/`` containing a ``default.json`` Jinja template.

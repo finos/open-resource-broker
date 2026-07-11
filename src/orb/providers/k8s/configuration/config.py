@@ -8,7 +8,6 @@ integrates with the configuration loader and the provider settings registry.
 from __future__ import annotations
 
 import contextlib
-import logging
 import re
 from pathlib import Path
 from typing import Any, Optional
@@ -17,6 +16,7 @@ from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from orb.infrastructure.interfaces.provider import BaseProviderConfig
+from orb.infrastructure.logging.logger import get_logger
 
 _SA_NAMESPACE_FILE = Path("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 
@@ -36,19 +36,21 @@ _LEGACY_FIELD_MAP: dict[str, str] = {
 }
 
 
-def _get_logger() -> logging.Logger:
-    """Return a stdlib logger for namespace auto-detection messages.
+def _get_logger() -> Any:
+    """Return a logger for namespace auto-detection messages.
 
     The K8sProviderConfig model validator runs during Pydantic construction,
     before any DI container is available, so injecting a LoggingPort here is
-    not feasible without a service-locator.  The stdlib logging module is used
-    directly and the call-site is limited to a single informational message.
+    not feasible without a service-locator.  The project ``get_logger``
+    wrapper (a thin alias over ``logging.getLogger``) is used instead of bare
+    ``logging.getLogger`` so the call follows the project-wide logging
+    convention.
 
     TODO: move namespace auto-detection out of the validator and into the
     provider strategy's initialize() path so the injected LoggingPort can
     be used instead.
     """
-    return logging.getLogger(__name__)
+    return get_logger(__name__)
 
 
 def _read_in_cluster_namespace() -> Optional[str]:
@@ -342,6 +344,55 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
             "so operators opt in deliberately — the escape hatch surrenders "
             "the typed-builder invariants (label injection, restart policy, "
             "selector wiring) to the operator's spec."
+        ),
+    )
+
+    # Circuit-breaker and retry knobs.
+    # These values are threaded through K8sHandlerRegistry.get_handler() into
+    # each K8sHandlerBase constructor so operators can tune resilience behaviour
+    # without recompiling.  Defaults match the K8sHandlerBase hardcoded values
+    # so this change is a no-op for existing deployments.
+    circuit_breaker_failure_threshold: int = Field(
+        5,
+        description=(
+            "Number of consecutive apiserver failures that trips the per-handler "
+            "circuit breaker.  Once open, calls fast-fail with "
+            "``CircuitBreakerOpenError`` until the reset window expires.  "
+            "Default 5 — matches the K8sHandlerBase hardcoded value."
+        ),
+    )
+    circuit_breaker_reset_timeout: int = Field(
+        60,
+        description=(
+            "Seconds after the circuit opens before the breaker transitions to "
+            "half-open and allows a probe request through.  Default 60 — matches "
+            "the K8sHandlerBase hardcoded value."
+        ),
+    )
+    max_retries: int = Field(
+        3,
+        description=(
+            "Maximum number of retry attempts for transient apiserver errors "
+            "(429 / 5xx) before giving up.  Non-recoverable status codes "
+            "(400 / 403 / 404 / 409 / 410 / 422) are never retried regardless "
+            "of this value.  Default 3 — matches the K8sHandlerBase hardcoded value."
+        ),
+    )
+    retry_base_delay: float = Field(
+        1.0,
+        description=(
+            "Base delay in seconds for the exponential-backoff retry strategy.  "
+            "The first retry waits this many seconds; subsequent retries double "
+            "the delay up to ``retry_max_delay``.  Default 1.0 — matches the "
+            "K8sHandlerBase hardcoded value."
+        ),
+    )
+    retry_max_delay: float = Field(
+        30.0,
+        description=(
+            "Maximum delay in seconds between retry attempts.  The exponential "
+            "backoff is capped at this value.  Default 30.0 — matches the "
+            "K8sHandlerBase hardcoded value."
         ),
     )
 

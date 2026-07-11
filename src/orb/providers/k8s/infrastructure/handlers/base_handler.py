@@ -164,7 +164,7 @@ class K8sHandlerBase(ABC):
           ``False``, the entire audit is skipped silently.
         * ``reject_high_risk_pod_fields`` (default ``False``) — when
           ``True`` *and* findings are non-empty, a
-          :class:`orb.providers.k8s.exceptions.k8s_errors.K8sError` is
+          :class:`orb.providers.k8s.exceptions.k8s_exceptions.K8sError` is
           raised with the joined findings so the acquire call fails fast
           before touching the apiserver.
 
@@ -192,7 +192,7 @@ class K8sHandlerBase(ABC):
         findings = audit_pod_spec(spec_dict, self._logger)
 
         if findings and self._config.reject_high_risk_pod_fields:
-            from orb.providers.k8s.exceptions.k8s_errors import K8sError
+            from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
 
             raise K8sError(
                 "Acquire rejected: pod spec contains high-risk fields — " + "; ".join(findings)

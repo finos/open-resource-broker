@@ -23,7 +23,7 @@ from orb.infrastructure.registry.template_extension_registry import TemplateExte
 from orb.infrastructure.template.factories import TemplateDTOFactory
 
 _template_dto_factory = TemplateDTOFactory()
-from orb.providers.k8s.domain.template.k8s_template import (
+from orb.providers.k8s.domain.template.k8s_template_aggregate import (
     K8sEnvVar,
     K8sTemplate,
     K8sToleration,

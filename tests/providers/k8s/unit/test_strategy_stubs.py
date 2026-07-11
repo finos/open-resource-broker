@@ -238,6 +238,45 @@ async def test_unsupported_provider_api_returns_failed() -> None:
     assert "not yet implemented" in outcome.error
 
 
+def test_get_ui_column_schema_returns_k8s_columns() -> None:
+    """get_ui_column_schema returns at least 5 k8s-specific column descriptors.
+
+    Validates the shape of each descriptor and the presence of the core
+    machine columns that the UI depends on: namespace, node, phase,
+    restart_count, and capacity_type.
+    """
+    from orb.application.dto.system import UIColumnDescriptor
+
+    schema = K8sProviderStrategy.get_ui_column_schema()
+
+    assert len(schema) >= 5, f"expected at least 5 columns, got {len(schema)}"
+    assert all(isinstance(col, UIColumnDescriptor) for col in schema), (
+        "all entries must be UIColumnDescriptor instances"
+    )
+
+    keys = {col.key for col in schema}
+    assert "k8s_namespace" in keys, "namespace column missing"
+    assert "k8s_node_name" in keys, "node column missing"
+    assert "k8s_phase" in keys, "phase column missing"
+    assert "k8s_restart_count" in keys, "restart_count column missing"
+    assert "k8s_capacity_type" in keys, "capacity_type column missing"
+
+
+def test_get_ui_column_schema_provider_is_k8s() -> None:
+    """All descriptors must declare provider='k8s'."""
+    schema = K8sProviderStrategy.get_ui_column_schema()
+    for col in schema:
+        assert col.provider == "k8s", f"column {col.key!r} has provider={col.provider!r}"
+
+
+def test_get_ui_column_schema_covers_machines_and_templates() -> None:
+    """Column schema must cover both machines and templates resource types."""
+    schema = K8sProviderStrategy.get_ui_column_schema()
+    resource_types = {col.resource_type for col in schema}
+    assert "machines" in resource_types
+    assert "templates" in resource_types
+
+
 def test_cleanup_idempotent() -> None:
     strategy = _make_strategy()
     strategy.cleanup()
@@ -255,7 +294,7 @@ def test_build_template_for_request_fallback_returns_k8s_template() -> None:
     so the spec builders always see the typed surface, even when the
     request carries no metadata.
     """
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
 
     strategy = _make_strategy()
 
@@ -299,7 +338,7 @@ def test_build_template_for_request_dict_payload_yields_k8s_template() -> None:
     above this protects the strategy's template-build path from the
     historical regression where k8s fields were silently dropped.
     """
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
 
     strategy = _make_strategy()
 

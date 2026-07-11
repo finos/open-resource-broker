@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING, Any, Optional
 from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
 from orb.providers.k8s.configuration.config import K8sProviderConfig
-from orb.providers.k8s.domain.template.k8s_template import upcast_to_k8s_template
+from orb.providers.k8s.domain.template.k8s_template_aggregate import upcast_to_k8s_template
 from orb.providers.k8s.utilities.pod_spec import (
     _DEFAULT_LABEL_PREFIX,
     apply_pod_spec_override,

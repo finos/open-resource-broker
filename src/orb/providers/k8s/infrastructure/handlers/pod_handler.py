@@ -80,7 +80,12 @@ class K8sPodHandler(K8sHandlerBase):
         config: K8sProviderConfig,
         logger: LoggingPort,
         max_concurrent_creates: int = _MAX_CONCURRENT_CREATES,
+        max_retries: int = 3,
+        base_delay: float = 1.0,
+        max_delay: float = 30.0,
         *,
+        circuit_breaker_failure_threshold: int = 5,
+        circuit_breaker_reset_timeout: int = 60,
         pod_state_cache: Optional[PodStateCache] = None,
         cache_alive: Optional[Callable[[], bool]] = None,
         stale_cache_timeout_seconds: Optional[float] = None,
@@ -92,6 +97,11 @@ class K8sPodHandler(K8sHandlerBase):
             kubernetes_client=kubernetes_client,
             config=config,
             logger=logger,
+            max_retries=max_retries,
+            base_delay=base_delay,
+            max_delay=max_delay,
+            circuit_breaker_failure_threshold=circuit_breaker_failure_threshold,
+            circuit_breaker_reset_timeout=circuit_breaker_reset_timeout,
             pod_state_cache=pod_state_cache,
             cache_alive=cache_alive,
             stale_cache_timeout_seconds=stale_cache_timeout_seconds,
@@ -419,7 +429,7 @@ class K8sPodHandler(K8sHandlerBase):
     @classmethod
     def get_example_templates(cls) -> list[Template]:
         """Return one example template that submits as a ``Pod``."""
-        from orb.providers.k8s.domain.template.k8s_template import (
+        from orb.providers.k8s.domain.template.k8s_template_aggregate import (
             K8sResourceQuantities,
             K8sTemplate,
         )

@@ -299,7 +299,7 @@ def test_native_spec_containers_list_replaces_default() -> None:
 
     from orb.application.services.native_spec_service import NativeSpecService
     from orb.infrastructure.template.jinja_spec_renderer import JinjaSpecRenderer
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
     from orb.providers.k8s.infrastructure.services.k8s_native_spec_service import (
         K8sNativeSpecService,
     )
@@ -365,7 +365,7 @@ def test_native_spec_containers_list_replaces_default() -> None:
 
 def test_build_pod_spec_uses_service_account_when_set() -> None:
     """Explicit service_account is written to spec.service_account_name."""
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
     from orb.providers.k8s.utilities.pod_spec import build_pod_spec
 
     template = K8sTemplate(
@@ -393,7 +393,7 @@ def test_build_pod_spec_falls_back_to_instance_profile() -> None:
     ``service_account`` when the latter is not set; ``build_pod_spec``
     then writes it as ``spec.service_account_name``.
     """
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
     from orb.providers.k8s.utilities.pod_spec import build_pod_spec
 
     template = K8sTemplate(
@@ -418,7 +418,7 @@ def test_build_pod_spec_falls_back_to_instance_profile() -> None:
 
 def test_build_pod_spec_no_service_account_when_both_absent() -> None:
     """When neither service_account nor instance_profile is set, no serviceAccountName."""
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
     from orb.providers.k8s.utilities.pod_spec import build_pod_spec
 
     template = K8sTemplate(
@@ -614,7 +614,7 @@ def test_hf_namespace_precedence_end_to_end() -> None:
     Conversely, when the HF JSON omits the ``namespace`` field the
     provider-config default is used.
     """
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
     from orb.providers.k8s.infrastructure.handlers.base_handler import K8sHandlerBase
     from orb.providers.k8s.scheduler.hostfactory_field_mapping import K8sFieldMapping
 

@@ -1,6 +1,6 @@
 """Kubernetes provider exceptions."""
 
-from orb.providers.k8s.exceptions.k8s_errors import (
+from orb.providers.k8s.exceptions.k8s_exceptions import (
     K8sAuthError,
     K8sDiscoveryError,
     K8sError,

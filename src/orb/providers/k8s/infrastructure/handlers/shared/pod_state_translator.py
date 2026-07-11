@@ -12,10 +12,25 @@ cache-fed read paths produce identical dicts downstream.
 Separating this logic into a standalone module means future handlers do
 not need to inherit from :class:`K8sHandlerBase` to get correct
 translation — they can call these functions directly.
+
+Field semantics vs AWS
+----------------------
+* ``image_id``      — container image:tag of the pod's first (primary)
+  container; mirrors the AMI ID field in AWS.
+* ``instance_type`` — ``"k8s/<provider_api>"`` (e.g. ``"k8s/Pod"``)
+  so UI grouping/filtering works identically to synthetic-terminated
+  entries produced by the handler registry.
+* ``public_ip``     — ``None``.  ``status.host_ip`` is the *node* IP,
+  not a publicly routable address.  It is preserved in
+  ``provider_data["host_ip"]`` so nothing is lost.
+* ``launch_time``   — ISO 8601 string (``"2026-06-19T12:34:56+00:00"``)
+  produced via :meth:`datetime.isoformat`; compatible with the
+  :func:`_parse_iso_timestamp` helper in ``timeout_gc.py``.
 """
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from orb.providers.k8s.utilities.pod_state import (
@@ -24,6 +39,29 @@ from orb.providers.k8s.utilities.pod_state import (
     is_pod_ready,
     pod_status_string,
 )
+
+
+def _to_iso8601(start_time: Any) -> Optional[str]:
+    """Normalise a kubernetes ``status.start_time`` value to ISO 8601.
+
+    The SDK field is a ``datetime`` object when the apiserver returns a
+    timestamp and ``None`` when the pod has not started yet.  ``str()``
+    on a ``datetime`` uses a space separator (``"2026-06-19 12:34:56+00:00"``)
+    which is technically RFC 3339 but not strict ISO 8601.
+    :meth:`datetime.isoformat` always uses ``"T"`` and is the canonical
+    form consumed by :func:`_parse_iso_timestamp` in ``timeout_gc.py``.
+
+    Strings that arrive already formatted (e.g. from the cache) are
+    returned unchanged.
+    """
+    if start_time is None:
+        return None
+    if isinstance(start_time, datetime):
+        if start_time.tzinfo is None:
+            start_time = start_time.replace(tzinfo=timezone.utc)
+        return start_time.isoformat()
+    # Already a string (e.g. from PodState.start_time); return as-is.
+    return str(start_time)
 
 
 def instance_dict_for_pod(
@@ -67,6 +105,14 @@ def instance_dict_for_pod(
         list(getattr(status, "container_statuses", None) or []) if status is not None else []
     )
 
+    # Derive image_id from the first (primary) container in the pod spec.
+    # Falls back to None when the spec is absent or containers is empty.
+    containers = list(getattr(spec, "containers", None) or []) if spec is not None else []
+    image_id: Optional[str] = None
+    if containers:
+        raw_image = getattr(containers[0], "image", None)
+        image_id = str(raw_image) if raw_image else None
+
     ready = is_pod_ready(conditions)
     status_str = pod_status_string(phase, ready, provider_api=provider_api)
     status_reason = extract_status_reason(container_statuses, conditions)
@@ -104,6 +150,9 @@ def instance_dict_for_pod(
     provider_data: dict[str, Any] = {
         "namespace": namespace,
         "node_name": node_name,
+        # host_ip is the node's IP — preserved here for diagnostics but NOT
+        # surfaced as public_ip (which implies an internet-routable address).
+        "host_ip": host_ip,
         "phase": phase,
         "ready": ready,
         "restart_count": restart_count,
@@ -124,10 +173,12 @@ def instance_dict_for_pod(
         "status": status_str,
         "status_reason": status_reason,
         "private_ip": pod_ip,
-        "public_ip": host_ip,
-        "launch_time": str(start_time) if start_time is not None else None,
-        "instance_type": "",
-        "image_id": "",
+        # Pods do not have internet-routable public IPs; host_ip is the node
+        # IP and is available in provider_data["host_ip"] above.
+        "public_ip": None,
+        "launch_time": _to_iso8601(start_time),
+        "instance_type": f"k8s/{provider_api}",
+        "image_id": image_id,
         "subnet_id": None,
         "security_group_ids": [],
         "vpc_id": None,
@@ -159,9 +210,17 @@ def instance_dict_for_state(
     Returns:
         A flat instance dict with ``provider_data`` populated.
     """
+    # Read image_id from the cached state.  The field was added to PodState
+    # after the initial cache design; getattr with a None default keeps the
+    # function compatible with any older PodState instances that lack it.
+    image_id: Optional[str] = getattr(state, "image_id", None) or None
+
     provider_data: dict[str, Any] = {
         "namespace": state.namespace,
         "node_name": state.node_name,
+        # host_ip is the node's IP — preserved here for diagnostics but NOT
+        # surfaced as public_ip (which implies an internet-routable address).
+        "host_ip": state.host_ip,
         "phase": state.phase,
         "ready": state.ready,
         "restart_count": state.restart_count,
@@ -182,10 +241,12 @@ def instance_dict_for_state(
         "status": state.status,
         "status_reason": state.status_reason,
         "private_ip": state.pod_ip,
-        "public_ip": state.host_ip,
-        "launch_time": state.start_time,
-        "instance_type": "",
-        "image_id": "",
+        # Pods do not have internet-routable public IPs; host_ip is the node
+        # IP and is available in provider_data["host_ip"] above.
+        "public_ip": None,
+        "launch_time": _to_iso8601(state.start_time),
+        "instance_type": f"k8s/{provider_api}",
+        "image_id": image_id,
         "subnet_id": None,
         "security_group_ids": [],
         "vpc_id": None,

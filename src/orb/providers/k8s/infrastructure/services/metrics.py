@@ -100,9 +100,9 @@ def _validate_label(name: str, value: str, allowed: frozenset[str]) -> str:
     """
     if value in allowed:
         return value
-    import logging
+    from orb.infrastructure.logging.logger import get_logger
 
-    logging.getLogger(__name__).warning(
+    get_logger(__name__).warning(
         "k8s metrics: label %s got value %r not in enum; bucketing as 'unknown'",
         name,
         value,

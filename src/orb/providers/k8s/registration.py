@@ -328,7 +328,7 @@ def register_k8s_template_factory(
     importing this module unconditionally.
     """
     try:
-        from orb.providers.k8s.domain.template.k8s_template import (
+        from orb.providers.k8s.domain.template.k8s_template_aggregate import (
             K8sTemplate,
         )
 

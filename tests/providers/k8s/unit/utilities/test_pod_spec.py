@@ -44,7 +44,7 @@ def _build_template(**k8s_fields) -> Template:
     accepted as a legacy alias for ``image_id`` to keep existing tests
     succinct.
     """
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
 
     image_id = k8s_fields.pop("container_image", None) or k8s_fields.pop(
         "image_id", "busybox:latest"
@@ -278,7 +278,7 @@ def test_apply_pod_spec_override_preserves_restart_policy_never() -> None:
 
 def test_apply_pod_spec_override_rejects_snake_case_restart_policy() -> None:
     """Supplying restart_policy != 'Never' in snake_case must raise K8sError."""
-    from orb.providers.k8s.exceptions.k8s_errors import K8sError
+    from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
     from orb.providers.k8s.utilities.pod_spec import apply_pod_spec_override
 
     request = _build_request()
@@ -292,7 +292,7 @@ def test_apply_pod_spec_override_rejects_snake_case_restart_policy() -> None:
 
 def test_apply_pod_spec_override_rejects_camel_case_restart_policy() -> None:
     """Supplying restartPolicy != 'Never' in camelCase must raise K8sError."""
-    from orb.providers.k8s.exceptions.k8s_errors import K8sError
+    from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
     from orb.providers.k8s.utilities.pod_spec import apply_pod_spec_override
 
     request = _build_request()

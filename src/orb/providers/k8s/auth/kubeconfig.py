@@ -18,6 +18,15 @@ Error messages emitted from the fallback ``except`` block are sanitised so
 that raw SDK exception text (which may embed file contents) is never
 forwarded to callers.  Only the config_file path and a coarse error
 category are included.
+
+HTTP proxy
+----------
+After loading, the module reads ``HTTPS_PROXY`` / ``https_proxy`` (preferred
+for apiserver TLS traffic) falling back to ``HTTP_PROXY`` / ``http_proxy``,
+and wires the resolved URL into ``kubernetes.client.Configuration.proxy``.
+``NO_PROXY`` / ``no_proxy`` is similarly honoured via
+``Configuration.no_proxy``.  When a proxy is applied a DEBUG log is emitted
+so operators can confirm their environment is wired correctly.
 """
 
 from __future__ import annotations
@@ -25,7 +34,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Optional
 
-from orb.providers.k8s.exceptions.k8s_errors import K8sAuthError
+from orb.providers.k8s.exceptions.k8s_exceptions import K8sAuthError
 
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
     from orb.domain.base.ports import LoggingPort
@@ -43,6 +52,77 @@ _ALLOWED_EXEC_COMMANDS: frozenset[str] = frozenset(
 )
 
 _ENV_ALLOW_UNKNOWN = "ORB_K8S_ALLOW_UNKNOWN_EXEC_PLUGIN"
+
+# ---------------------------------------------------------------------------
+# HTTP proxy helpers
+# ---------------------------------------------------------------------------
+
+
+def _resolve_proxy_url() -> Optional[str]:
+    """Return the proxy URL to use for apiserver connections, or ``None``.
+
+    Preference order: ``HTTPS_PROXY`` → ``https_proxy`` → ``HTTP_PROXY`` →
+    ``http_proxy``.  HTTPS variants are checked first because the Kubernetes
+    apiserver always serves TLS.
+    """
+    for var in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"):
+        value = os.environ.get(var, "").strip()
+        if value:
+            return value
+    return None
+
+
+def _resolve_no_proxy() -> Optional[str]:
+    """Return the ``NO_PROXY`` exclusion list, or ``None`` when unset."""
+    for var in ("NO_PROXY", "no_proxy"):
+        value = os.environ.get(var, "").strip()
+        if value:
+            return value
+    return None
+
+
+def _apply_proxy_to_default_configuration(logger: Optional[LoggingPort]) -> None:
+    """Patch the kubernetes global default Configuration with proxy settings.
+
+    This is called *after* ``load_kube_config`` so the loaded credentials are
+    already in place.  We read the proxy env vars, apply them to a copy of the
+    active default Configuration, then promote the patched copy back as the new
+    default.
+
+    When no proxy env vars are set this function is a no-op.
+
+    Args:
+        logger: Optional :class:`LoggingPort` for DEBUG messages.  When
+            ``None`` proxy wiring is still applied silently.
+    """
+    try:
+        from kubernetes.client import Configuration  # type: ignore[reportAttributeAccessIssue]
+    except ImportError:  # pragma: no cover — kubernetes extra not installed
+        return
+
+    proxy_url = _resolve_proxy_url()
+    no_proxy = _resolve_no_proxy()
+
+    if proxy_url is None and no_proxy is None:
+        return
+
+    # Retrieve the current default, patch it, and promote it back.
+    cfg = Configuration.get_default_copy()  # type: ignore[attr-defined]
+    if proxy_url is not None:
+        cfg.proxy = proxy_url  # type: ignore[attr-defined]
+        if logger is not None:
+            logger.debug(
+                "K8s kubeconfig: applying HTTP proxy from environment: %s",
+                proxy_url,
+            )
+    if no_proxy is not None:
+        cfg.no_proxy = no_proxy  # type: ignore[attr-defined]
+        if logger is not None:
+            logger.debug(
+                "K8s kubeconfig: NO_PROXY exclusion list from environment: %s",
+                no_proxy,
+            )
+    Configuration.set_default(cfg)  # type: ignore[attr-defined]
 
 
 def _sanitise_load_error(exc: Exception, config_file: Optional[str]) -> str:
@@ -173,6 +253,10 @@ def load_kubeconfig(
        blocked unless ``ORB_K8S_ALLOW_UNKNOWN_EXEC_PLUGIN=1`` is set.
     2. Sanitises error messages from the SDK so that raw exception text
        (which may embed file contents) is not forwarded to callers.
+    3. Wires any HTTP proxy configured in ``HTTPS_PROXY`` / ``https_proxy``
+       (preferred) or ``HTTP_PROXY`` / ``http_proxy`` into
+       ``kubernetes.client.Configuration.proxy``.  ``NO_PROXY`` / ``no_proxy``
+       is honoured via ``Configuration.no_proxy``.
 
     Args:
         config_file: Path to the kubeconfig file.  When ``None`` the
@@ -181,7 +265,8 @@ def load_kubeconfig(
         context: Name of the context to activate.  When ``None`` the
             current context from the kubeconfig is used.
         logger: Optional :class:`LoggingPort` for WARNING-level messages
-            about allowed-but-unknown exec plugins.
+            about allowed-but-unknown exec plugins and DEBUG-level messages
+            about proxy wiring.
 
     Raises:
         K8sAuthError: If the kubernetes SDK is not installed, an unknown
@@ -205,3 +290,6 @@ def load_kubeconfig(
         raise
     except Exception as exc:
         raise K8sAuthError(_sanitise_load_error(exc, config_file)) from exc
+
+    # Step 3 — wire HTTP proxy from environment into the loaded configuration.
+    _apply_proxy_to_default_configuration(logger)
