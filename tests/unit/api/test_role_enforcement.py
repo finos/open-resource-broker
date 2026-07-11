@@ -472,7 +472,11 @@ _READ_ENDPOINTS: list[tuple[Any, str, str, dict | None]] = [
     (requests_router, "GET", "/requests/return", None),
     (requests_router, "GET", "/requests/req-1/status", None),
     (requests_router, "POST", "/requests/status", {"request_ids": ["req-1"]}),
-    (requests_router, "GET", "/requests/req-1/stream", None),
+    # ?timeout=1 keeps the SSE stream from blocking on its 300s default: this
+    # test only asserts the role gate does not 403, which fires before the
+    # stream generator runs.  Without the override the generator loops until
+    # pytest-timeout kills it at 300s, dominating the whole unit leg.
+    (requests_router, "GET", "/requests/req-1/stream?timeout=1", None),
     # machines router
     (machines_router, "GET", "/machines/", None),
     (machines_router, "GET", "/machines/m-1/status", None),

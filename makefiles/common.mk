@@ -52,10 +52,18 @@ COVERAGE_REPORT := coverage.xml
 COVERAGE_HTML := htmlcov
 
 # Test settings
-PYTEST_ARGS := -v --tb=short --durations=10
-PYTEST_COV_ARGS := --cov=$(PACKAGE_ROOT) --cov-report=term-missing --cov-branch
-PYTEST_TIMEOUT := --timeout=300
+PYTEST_TIMEOUT := --timeout=$(shell yq '.ci.test_timeout' $(PROJECT_CONFIG) 2>/dev/null || echo "300")
 PYTEST_MAXFAIL := --maxfail=5
+PYTEST_ARGS := -v --tb=short --durations=25 $(PYTEST_TIMEOUT)
+COVERAGE_THRESHOLD := $(shell yq '.ci.coverage_threshold' $(PROJECT_CONFIG) 2>/dev/null || echo "70")
+PYTEST_COV_ARGS := --cov=$(PACKAGE_ROOT) --cov-report=term-missing --cov-branch
+# --cov-fail-under is intentionally absent from PYTEST_COV_ARGS.  Individual CI
+# test legs (unit-only, integration-only, infrastructure-only, providers-only) each
+# cover a fraction of the package; enforcing the threshold per-leg would fail every
+# leg that doesn't happen to exercise the other layers.  The combined threshold is
+# enforced by the ci-tests-coverage-check target which first runs `coverage combine`
+# to merge all per-leg .coverage files before applying --fail-under.
+PYTEST_COV_FAIL_UNDER := --cov-fail-under=$(COVERAGE_THRESHOLD)
 
 # Documentation settings
 DOCS_DIR := docs
