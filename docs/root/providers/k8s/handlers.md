@@ -39,20 +39,20 @@ it whenever you do not need controller-driven replica management.
 
 ### Template fields the Pod handler honours
 
-| Template field          | Meaning                                                                  |
-|-------------------------|--------------------------------------------------------------------------|
-| `container_image`       | Required.  Mapped to `spec.containers[0].image`.                         |
-| `namespace`             | Override the provider-level `namespace`.                                  |
-| `resource_requests`     | Container resource requests (e.g. `{"cpu":"1","memory":"2Gi"}`).          |
-| `resource_limits`       | Container resource limits.                                                |
-| `node_selector`         | `spec.nodeSelector`.                                                      |
-| `tolerations`           | `spec.tolerations`.                                                       |
-| `service_account`       | `spec.serviceAccountName`.                                                |
-| `runtime_class`         | `spec.runtimeClassName`.                                                  |
-| `environment_variables` | Injected into the container env.                                          |
-| `image_pull_secrets`    | Appended to `spec.imagePullSecrets`.                                      |
-| `labels`                | Merged into pod metadata labels (ORB labels always win).                  |
-| `annotations`           | Merged into pod metadata annotations.                                     |
+| Template field      | Meaning                                                                  |
+|---------------------|--------------------------------------------------------------------------|
+| `image_id`          | Required.  Container image reference (`registry/name:tag`).  Mapped to `spec.containers[0].image`. |
+| `namespace`         | Override the provider-level `namespace`.                                  |
+| `resource_requests` | Container resource requests (e.g. `{"cpu":"1","memory":"2Gi"}`).          |
+| `resource_limits`   | Container resource limits.                                                |
+| `node_selector`     | `spec.nodeSelector`.                                                      |
+| `tolerations`       | `spec.tolerations`.                                                       |
+| `service_account`   | `spec.serviceAccountName`.                                                |
+| `runtime_class`     | `spec.runtimeClassName`.                                                  |
+| `env`               | Container environment variables.  Accepts a `dict[str,str]` or a list of `{"name":…,"value":…}` objects. |
+| `image_pull_secret` | Single image-pull secret name added to `spec.imagePullSecrets`.           |
+| `labels`            | Merged into pod metadata labels (ORB labels always win).                  |
+| `annotations`       | Merged into pod metadata annotations.                                     |
 
 ## `Deployment`
 
