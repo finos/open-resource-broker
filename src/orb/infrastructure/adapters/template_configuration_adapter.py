@@ -58,12 +58,15 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         if not image_id:
             errors.append("Image ID is required")
 
-        # Use template manager for validation
+        # Delegate to the active provider's registered validator so
+        # provider-specific rules apply (e.g. the k8s validator rejects an
+        # unknown provider_api or a bad namespace).  This runs on top of the
+        # generic checks above; when no provider validator is available the
+        # generic checks are the whole verdict.
         try:
-            # Create a temporary template for validation
             from orb.domain.template.template_aggregate import Template
 
-            Template(
+            domain_template = Template(
                 template_id=template_id or "temp",
                 image_id=image_id or "",
                 instance_type=config.get("instanceType") or config.get("instance_type", ""),
@@ -72,16 +75,73 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
                 or config.get("security_group_ids", []),
                 price_type=config.get("priceType") or config.get("price_type", "ondemand"),
                 provider_api=provider_api or "",
+                provider_data=config.get("provider_data") or {},
                 metadata=config.get("metadata", {}),
             )
-
-            # Note: Template validation is skipped here as it requires async context.
-            # Validation is performed by the template manager during template operations.
+            provider_type = (
+                config.get("providerType")
+                or config.get("provider_type")
+                or self._PROVIDER_API_TO_TYPE.get(str(provider_api or ""))
+            )
+            errors.extend(self._provider_validation_errors(provider_type, domain_template))
         except Exception as e:
             self._logger.warning("Template validation failed: %s", e)
             errors.append(f"Template validation error: {e!s}")
 
-        return errors
+        # De-duplicate while preserving order (generic + provider checks may
+        # both flag e.g. a missing image).
+        return list(dict.fromkeys(errors))
+
+    # Map a template's provider_api to the registered provider-type key so the
+    # correct provider validator factory is selected.
+    _PROVIDER_API_TO_TYPE: dict[str, str] = {
+        "Pod": "k8s",
+        "Deployment": "k8s",
+        "StatefulSet": "k8s",
+        "Job": "k8s",
+        "EC2Fleet": "aws",
+        "SpotFleet": "aws",
+        "ASG": "aws",
+        "RunInstances": "aws",
+    }
+
+    def _provider_validation_errors(self, provider_type: Any, domain_template: Any) -> list[str]:
+        """Run the active provider's registered validator, returning its errors.
+
+        Best-effort: returns ``[]`` when no registry/validator is available or
+        the provider type cannot be resolved, so the generic checks remain the
+        verdict.  Handles both validator result shapes in use — the k8s
+        validator returns an object with ``.errors``; other validators may
+        return a dict with an ``errors`` key or a plain list of strings.
+        """
+        registry = getattr(self._template_manager, "_registry", None)
+        if registry is None or not hasattr(registry, "create_validator"):
+            return []
+
+        if not provider_type:
+            return []
+        provider_type = str(provider_type)
+
+        try:
+            validator = registry.create_validator(provider_type)
+        except Exception as e:  # pragma: no cover — defensive
+            self._logger.debug("Could not create %s validator: %s", provider_type, e)
+            return []
+        if validator is None or not hasattr(validator, "validate"):
+            return []
+
+        try:
+            result = validator.validate(domain_template)
+        except Exception as e:  # pragma: no cover — defensive
+            self._logger.debug("%s validator raised: %s", provider_type, e)
+            return []
+
+        raw_errors = getattr(result, "errors", None)
+        if raw_errors is None and isinstance(result, dict):
+            raw_errors = result.get("errors")
+        if raw_errors is None and isinstance(result, list):
+            raw_errors = result
+        return [str(e) for e in (raw_errors or [])]
 
     # Additional convenience methods for application layer
 
