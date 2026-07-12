@@ -65,6 +65,42 @@ def _to_iso8601(start_time: Any) -> Optional[str]:
     return str(start_time)
 
 
+def _cpu_quantity_to_vcpus(cpu: Any) -> Optional[int]:
+    """Parse a Kubernetes CPU quantity string to a whole-vCPU count.
+
+    Node ``status.capacity.cpu`` is reported either as a plain integer core
+    count (``"32"``) or in milli-CPU (``"32000m"``).  Returns the rounded-up
+    whole vCPUs, mirroring the ``provider_data["vcpus"]`` integer the AWS
+    provider surfaces.  Returns ``None`` when the value is absent or unparseable.
+    """
+    if cpu is None:
+        return None
+    text = str(cpu).strip()
+    if not text:
+        return None
+    try:
+        if text.endswith("m"):
+            millicores = int(text[:-1])
+            # Round up so a fractional core still counts as one usable vCPU.
+            return max(1, -(-millicores // 1000)) if millicores > 0 else 0
+        return int(float(text))
+    except (ValueError, TypeError):
+        return None
+
+
+def _pod_private_dns_name(pod_name: str, namespace: str) -> Optional[str]:
+    """Return the pod's in-cluster DNS name, or ``None`` when unknown.
+
+    Pods are addressable at ``<pod-name>.<namespace>.pod.cluster.local`` via
+    the cluster DNS service.  This mirrors the AWS provider's
+    ``private_dns_name`` field so consumers that resolve machines by hostname
+    have a value for the kubernetes provider too.
+    """
+    if not pod_name or not namespace:
+        return None
+    return f"{pod_name}.{namespace}.pod.cluster.local"
+
+
 def instance_dict_for_pod(
     pod: Any,
     namespace: str,
@@ -172,6 +208,7 @@ def instance_dict_for_pod(
     if node_name and node_state_cache is not None:
         node_state = node_state_cache.get(node_name)
 
+    private_dns_name = _pod_private_dns_name(name, namespace)
     provider_data: dict[str, Any] = {
         "namespace": namespace,
         "node_name": node_name,
@@ -183,6 +220,8 @@ def instance_dict_for_pod(
         "restart_count": restart_count,
         "disrupted_reason": disrupted_reason,
         "disrupted_message": disrupted_message,
+        # In-cluster DNS name; parity with the AWS provider's private_dns_name.
+        "private_dns_name": private_dns_name,
     }
     if node_state is not None:
         resolved_instance_type = node_state.instance_type or None
@@ -194,6 +233,12 @@ def instance_dict_for_pod(
         # Parity with AWS provider_data shape.
         provider_data["availability_zone"] = node_state.zone
         provider_data["region"] = node_state.region
+        # vCPU count derived from the node's CPU capacity — parity with the
+        # AWS provider_data["vcpus"] integer.  Only present when a node cache
+        # is available (node_watch_enabled).
+        vcpus = _cpu_quantity_to_vcpus(node_state.cpu_capacity)
+        if vcpus is not None:
+            provider_data["vcpus"] = vcpus
 
     return {
         "instance_id": name,
@@ -205,6 +250,9 @@ def instance_dict_for_pod(
         # Pods do not have internet-routable public IPs; host_ip is the node
         # IP and is available in provider_data["host_ip"] above.
         "public_ip": None,
+        # In-cluster DNS name; parity with the AWS provider's top-level field.
+        "private_dns_name": private_dns_name,
+        "public_dns_name": None,
         "launch_time": _to_iso8601(start_time),
         "instance_type": resolved_instance_type
         if resolved_instance_type
@@ -253,6 +301,7 @@ def instance_dict_for_state(
     if state.node_name and node_state_cache is not None:
         node_state = node_state_cache.get(state.node_name)
 
+    private_dns_name = _pod_private_dns_name(state.pod_name, state.namespace)
     provider_data: dict[str, Any] = {
         "namespace": state.namespace,
         "node_name": state.node_name,
@@ -264,6 +313,8 @@ def instance_dict_for_state(
         "restart_count": state.restart_count,
         "disrupted_reason": state.disrupted_reason,
         "disrupted_message": state.disrupted_message,
+        # In-cluster DNS name; parity with the AWS provider's private_dns_name.
+        "private_dns_name": private_dns_name,
     }
     if node_state is not None:
         resolved_instance_type = node_state.instance_type or None
@@ -275,6 +326,9 @@ def instance_dict_for_state(
         # Parity with AWS provider_data shape.
         provider_data["availability_zone"] = node_state.zone
         provider_data["region"] = node_state.region
+        vcpus = _cpu_quantity_to_vcpus(node_state.cpu_capacity)
+        if vcpus is not None:
+            provider_data["vcpus"] = vcpus
 
     return {
         "instance_id": state.pod_name,
@@ -286,6 +340,9 @@ def instance_dict_for_state(
         # Pods do not have internet-routable public IPs; host_ip is the node
         # IP and is available in provider_data["host_ip"] above.
         "public_ip": None,
+        # In-cluster DNS name; parity with the AWS provider's top-level field.
+        "private_dns_name": private_dns_name,
+        "public_dns_name": None,
         "launch_time": _to_iso8601(state.start_time),
         "instance_type": resolved_instance_type
         if resolved_instance_type

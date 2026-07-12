@@ -76,9 +76,14 @@ class K8sCapabilityService:
                     "StatefulSet": True,
                     "Job": False,
                 },
-                # START / STOP via spec.replicas scale are supported only
-                # for controller-backed workloads.
-                "start_stop_supported": True,
+                # START / STOP via spec.replicas scale are supported only for
+                # controller-backed workloads.  The top-level flag is the
+                # lowest-common-denominator (False, because Pod and Job cannot
+                # be scaled) — mirroring selective_termination above.  Callers
+                # that need the accurate per-workload answer must consult
+                # start_stop_supported_by_api; Pod/Job return
+                # UNSUPPORTED_OPERATION_FOR_KIND at runtime.
+                "start_stop_supported": False,
                 "start_stop_supported_by_api": {
                     "Pod": False,
                     "Deployment": True,

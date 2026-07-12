@@ -405,6 +405,9 @@ def test_get_capabilities_start_stop_supported_by_api_feature_flags() -> None:
     assert by_api.get("StatefulSet") is True
     assert by_api.get("Pod") is False
     assert by_api.get("Job") is False
+    # Top-level flag is the lowest-common-denominator (False) because Pod/Job
+    # cannot be scaled — callers must consult the per-api dict for the truth.
+    assert caps.features.get("start_stop_supported") is False
 
 
 @pytest.mark.asyncio
