@@ -89,14 +89,20 @@ def _resolve_service_name(k8s_template: K8sTemplate, fallback: str) -> str:
     """Resolve the ``spec.serviceName`` for a StatefulSet.
 
     The StatefulSet API requires a non-empty governing service name even
-    when no headless Service is actually deployed.  When the typed
-    template exposes a non-empty ``service_account`` we reuse it as the
-    service name (operators wiring a custom headless Service usually
-    align the names); otherwise we fall back to the StatefulSet's own
-    name so the StatefulSet API accepts the spec.
+    when no headless Service is actually deployed.  The ``service_name``
+    field on :class:`K8sTemplate` is the dedicated override for this
+    (operators deploying a custom headless Service should set it to the
+    name of that Service); when unset we fall back to the StatefulSet's
+    own name so the StatefulSet API accepts the spec without the operator
+    needing to pre-create a Service.
+
+    ``service_account`` is NOT used here — it is a different Kubernetes
+    resource (``v1/ServiceAccount`` vs ``v1/Service``).  Using the
+    ServiceAccount name as the Service name produced invalid pod DNS and
+    was the root cause of the bug tracked in the adversarial review.
     """
-    if k8s_template.service_account:
-        return str(k8s_template.service_account)
+    if getattr(k8s_template, "service_name", None):
+        return str(k8s_template.service_name)
     return fallback
 
 

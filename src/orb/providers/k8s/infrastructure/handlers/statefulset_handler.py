@@ -296,10 +296,17 @@ class K8sStatefulSetHandler(K8sHandlerBase):
             )
             return
 
+        # full_release is determined by comparing against spec.replicas (the
+        # desired count), not the live pod count.  In ORB-managed clusters these
+        # are typically in sync, but during a scale-up or after a node failure
+        # spec.replicas may exceed the live pod count.  We use spec.replicas
+        # intentionally: it matches the replica target set at acquire time and
+        # avoids an extra list_namespaced_pod call on the release path.
         full_release = len(machine_ids) >= current_replicas
         self._logger.info(
             "Kubernetes statefulset release: request_id=%s namespace=%s statefulset=%s "
-            "victims=%s current_replicas=%s full=%s",
+            "victims=%s spec_replicas=%s full=%s "
+            "(full_release based on spec.replicas, not live pod count)",
             request_id,
             namespace,
             statefulset_name,

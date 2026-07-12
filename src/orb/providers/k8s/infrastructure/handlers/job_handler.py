@@ -228,13 +228,17 @@ class K8sJobHandler(K8sHandlerBase):
             machine_ids: Pod names the caller wants to release.  Must
                 cover every pod of the Job (length ==
                 ``provider_data["parallelism"]``); a subset is rejected.
+                If ``provider_data["parallelism"]`` is absent or zero the
+                release is also refused — we cannot confirm the caller is
+                releasing the whole Job without knowing its parallelism.
             provider_data: The ``provider_data`` dict stamped onto the
                 Request aggregate at acquire time.  Carries ``namespace``,
                 ``job_name`` and ``parallelism``.
 
         Raises:
             K8sError: When ``machine_ids`` covers fewer pods than the
-                Job was created with.
+                Job was created with, or when ``parallelism`` is absent /
+                zero in ``provider_data``.
         """
         request_id = provider_data.get("request_id", "unknown")
         if not machine_ids:
@@ -249,7 +253,24 @@ class K8sJobHandler(K8sHandlerBase):
         self._record_release(namespace=namespace, spec_kind=self.PROVIDER_API)
 
         parallelism = int(provider_data.get("parallelism") or 0)
-        if parallelism and len(machine_ids) < parallelism:
+        if parallelism == 0:
+            # parallelism is absent or zero in provider_data — we cannot
+            # confirm whether machine_ids covers the full Job.  Deleting
+            # the Job would cascade-delete every pod, not just the ones
+            # the caller named.  Refuse to proceed rather than silently
+            # over-releasing.  Callers should ensure provider_data carries
+            # the parallelism written by acquire_hosts.
+            raise K8sError(
+                "Job release refused for "
+                f"request {request_id} (job={namespace}/{job_name}): "
+                f"provider_data is missing 'parallelism' so we cannot confirm "
+                f"that the {len(machine_ids)} machine_id(s) cover the full Job.  "
+                "Deleting the Job would cascade-delete all pods, not just the "
+                "requested subset.  Ensure provider_data['parallelism'] is set "
+                "(it is written by acquire_hosts).  requested_machine_ids="
+                f"{machine_ids}"
+            )
+        if len(machine_ids) < parallelism:
             raise K8sError(
                 "Job selective release refused for "
                 f"request {request_id} (job={namespace}/{job_name}): the Job "

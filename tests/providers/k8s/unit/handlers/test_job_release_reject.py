@@ -74,17 +74,22 @@ async def test_release_noop_when_empty_machine_ids() -> None:
 
 
 @pytest.mark.asyncio
-async def test_release_accepted_when_parallelism_absent_from_provider_data() -> None:
+async def test_release_refused_when_parallelism_absent_from_provider_data() -> None:
+    """Missing parallelism in provider_data is refused — cannot confirm full release.
+
+    A Job release without knowing parallelism would cascade-delete all pods even
+    if machine_ids only names a subset.  Callers must ensure provider_data carries
+    'parallelism' (written by acquire_hosts).
+    """
     handler = _make_handler()
-    # provider_data missing 'parallelism' — legacy shape.  Guard opens so
-    # the pre-existing full-delete behaviour is preserved for callers
-    # that never carried the field.
-    await handler.release_hosts(
-        machine_ids=["pod-1"],
-        provider_data={
-            "request_id": "req-test",
-            "namespace": "ns",
-            "job_name": "orb-job",
-        },
-    )
-    handler._delete_job.assert_awaited_once_with("ns", "orb-job")  # type: ignore[attr-defined]
+    with pytest.raises(K8sError, match="missing 'parallelism'"):
+        await handler.release_hosts(
+            machine_ids=["pod-1"],
+            provider_data={
+                "request_id": "req-test",
+                "namespace": "ns",
+                "job_name": "orb-job",
+                # 'parallelism' intentionally absent
+            },
+        )
+    handler._delete_job.assert_not_called()  # type: ignore[attr-defined]

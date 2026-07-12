@@ -380,6 +380,15 @@ class K8sTemplate(Template):
     # Identity overrides
     service_account: Optional[str] = None
 
+    # StatefulSet headless-Service name (``spec.serviceName``).  The
+    # StatefulSet API requires a non-empty governing service name; by
+    # default this is set to the StatefulSet's own name so the API
+    # accepts the spec without the operator needing to pre-create a
+    # Service.  When the operator deploys a dedicated headless Service
+    # (e.g. for stable pod DNS), they should set this field to the name
+    # of that Service explicitly — it is NOT the same as service_account.
+    service_name: Optional[str] = None
+
     # Pod scheduling priority
     priority_class_name: Optional[str] = None
 
@@ -569,6 +578,7 @@ class K8sTemplate(Template):
             self._promote_field(pc, "active_deadline_seconds")
             self._promote_field(pc, "pod_spec_override")
             self._promote_field(pc, "native_spec")
+            self._promote_field(pc, "service_name")
 
             # Coerced probe / security-context fields go through per-field validators.
             if self.readiness_probe is None and pc.get("readiness_probe") is not None:

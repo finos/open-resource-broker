@@ -35,6 +35,14 @@ class K8sTemplateDTOConfig(BaseModel):
     service_account: Optional[str] = Field(
         None, description="``serviceAccountName`` applied to pods."
     )
+    service_name: Optional[str] = Field(
+        None,
+        description=(
+            "StatefulSet ``spec.serviceName`` — the governing headless-Service name. "
+            "Defaults to the StatefulSet's own name when unset.  "
+            "Must not be set to the ServiceAccount name; those are different resources."
+        ),
+    )
     node_selector: Optional[dict[str, str]] = Field(
         None, description="``nodeSelector`` applied to pods."
     )

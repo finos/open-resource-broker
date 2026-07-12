@@ -271,7 +271,16 @@ class K8sPodHandler(K8sHandlerBase):
         pod_name: str,
         body: Any,
     ) -> str:
-        """Submit a single ``create_namespaced_pod`` call under the semaphore."""
+        """Submit a single ``create_namespaced_pod`` call under the semaphore.
+
+        409 AlreadyExists idempotency: when a retried create returns 409, the
+        pod may already exist from a previous attempt (e.g. the response was
+        lost in flight).  If the existing pod carries the same
+        ``orb.io/request-id`` label as the body being submitted, we treat the
+        create as succeeded — the pod is ours and is already present.  A 409
+        on a pod that belongs to a different request (genuine conflict) is
+        still treated as a failure.
+        """
         async with sem:
             try:
                 with self._timed_api_call("create_namespaced_pod"):
@@ -283,10 +292,61 @@ class K8sPodHandler(K8sHandlerBase):
                         operation_name="create_namespaced_pod",
                     )
             except Exception as exc:
+                if getattr(exc, "status", None) == 409:
+                    # 409 AlreadyExists — check whether the existing pod is ours.
+                    if await self._is_our_pod(namespace, pod_name, body):
+                        self._logger.debug(
+                            "Pod %s in %s already exists and belongs to this request "
+                            "(idempotent retry) — treating as created",
+                            pod_name,
+                            namespace,
+                        )
+                        return pod_name
+                    # Genuine conflict — a pod with this name exists but it is not
+                    # ours (different request-id label or no label at all).
                 raise self._classify_and_record_api_exception(
                     exc, operation="create_namespaced_pod"
                 ) from exc
         return pod_name
+
+    async def _is_our_pod(self, namespace: str, pod_name: str, body: Any) -> bool:
+        """Return True when the existing pod at ``pod_name`` carries our request-id label.
+
+        Used to distinguish idempotent 409s (retried create that already
+        landed) from genuine conflicts (same pod name, different request).
+        Returns False on any read failure so the caller falls through to the
+        normal error path.
+        """
+        label_prefix = self._config.label_prefix
+        # Extract the request-id from the body we were trying to submit so
+        # we can compare it against the existing pod's label.
+        try:
+            if isinstance(body, dict):
+                body_metadata: Any = body.get("metadata", {}) or {}
+            else:
+                body_metadata = getattr(body, "metadata", None) or {}
+            if isinstance(body_metadata, dict):
+                body_labels: dict[str, str] = dict(body_metadata.get("labels", {}) or {})
+            else:
+                body_labels = dict(getattr(body_metadata, "labels", None) or {})
+            our_request_id = body_labels.get(f"{label_prefix}/request-id")
+        except Exception:
+            return False
+
+        if not our_request_id:
+            return False
+
+        try:
+            existing = await asyncio.to_thread(
+                self.client.core_v1.read_namespaced_pod,
+                name=pod_name,
+                namespace=namespace,
+            )
+            existing_metadata = getattr(existing, "metadata", None)
+            existing_labels: dict[str, str] = dict(getattr(existing_metadata, "labels", None) or {})
+            return existing_labels.get(f"{label_prefix}/request-id") == our_request_id
+        except Exception:
+            return False
 
     # ------------------------------------------------------------------
     # check_hosts_status — delegated to PodStatusResolver

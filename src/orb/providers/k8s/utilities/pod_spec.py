@@ -269,13 +269,22 @@ def _camel_to_snake(name: str) -> str:
 def _normalise_sdk_kwargs(d: dict[str, Any]) -> dict[str, Any]:
     """Return a copy of *d* with camelCase keys converted to snake_case.
 
-    Nested dicts (but not lists) are also normalised recursively.
+    Nested dicts are normalised recursively.  List items that are dicts
+    are also normalised recursively so that camelCase keys nested inside
+    list-valued fields (e.g. ``containers[].volumeMounts[].mountPath``)
+    are converted correctly instead of raising a cryptic ``TypeError``
+    when the snake_case SDK constructor receives an unexpected camelCase
+    keyword argument.
     """
     out: dict[str, Any] = {}
     for key, value in d.items():
         snake_key = _camel_to_snake(key)
         if isinstance(value, dict):
             out[snake_key] = _normalise_sdk_kwargs(value)
+        elif isinstance(value, list):
+            out[snake_key] = [
+                _normalise_sdk_kwargs(item) if isinstance(item, dict) else item for item in value
+            ]
         else:
             out[snake_key] = value
     return out
