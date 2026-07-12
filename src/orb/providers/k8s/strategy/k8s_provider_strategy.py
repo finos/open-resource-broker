@@ -57,6 +57,7 @@ from orb.providers.k8s.services.instance_operation_service import (
     K8sInstanceOperationService,
 )
 from orb.providers.k8s.services.start_stop_service import K8sStartStopService
+from orb.providers.k8s.services.template_validation_service import K8sTemplateValidationService
 from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
 from orb.providers.k8s.value_objects import KubernetesProviderApi
 from orb.providers.k8s.watch.events_watcher import K8sEventsWatcher, K8sNodeEventsCache
@@ -218,6 +219,7 @@ class K8sProviderStrategy(ProviderStrategy):
         self._discovery_service: Optional[K8sInfrastructureDiscoveryService] = None
         # Focused service objects — mirror the AWS provider's layout.
         self._capability_service = K8sCapabilityService(logger=self._logger)
+        self._template_service = K8sTemplateValidationService(logger=self._logger)
         self._health_check_service = K8sHealthCheckService(
             config=self._k8s_config,
             logger=self._logger,
@@ -841,6 +843,8 @@ class K8sProviderStrategy(ProviderStrategy):
                 result = await self._handle_get_instance_status(operation)
             elif operation.operation_type == ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES:
                 result = await self._handle_describe_resource_instances(operation)
+            elif operation.operation_type == ProviderOperationType.VALIDATE_TEMPLATE:
+                result = self._template_service.validate_template(operation)
             elif operation.operation_type == ProviderOperationType.START_INSTANCES:
                 result = await self._get_start_stop_service().start_instances(operation)
             elif operation.operation_type == ProviderOperationType.STOP_INSTANCES:
@@ -1060,6 +1064,17 @@ class K8sProviderStrategy(ProviderStrategy):
     # ------------------------------------------------------------------
     # Capabilities & health
     # ------------------------------------------------------------------
+
+    @classmethod
+    def is_image_resolution_needed(cls) -> bool:
+        """Kubernetes does not resolve image references provider-side.
+
+        Container images are pulled by the kubelet at pod start from the image
+        string as-is; there is no SSM-style indirection to resolve.  Declaring
+        this explicitly stops the TemplateConfigurationManager from attempting
+        (and warning about) image resolution against the k8s strategy.
+        """
+        return False
 
     def get_capabilities(self) -> ProviderCapabilities:
         return self._capability_service.get_capabilities()

@@ -173,7 +173,7 @@ async def test_execute_operation_truly_unsupported_returns_error() -> None:
 
     strategy = _make_strategy()
     op = ProviderOperation(
-        operation_type=ProviderOperationType.VALIDATE_TEMPLATE,
+        operation_type=ProviderOperationType.RESOLVE_IMAGE,
         parameters={},
     )
     result = await strategy.execute_operation(op)
