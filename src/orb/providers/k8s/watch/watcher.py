@@ -171,6 +171,11 @@ class K8sWatcher:
         # the general case).  _stop_thread_event is set whenever _stop_event
         # is set so both surfaces stay in sync.
         self._stop_thread_event = threading.Event()
+        # Guards reads and writes of _active_watch.  Under CPython the GIL
+        # makes plain attribute assignment effectively atomic, but using an
+        # explicit lock documents the intent and is correct under all
+        # implementations.
+        self._active_watch_lock = threading.Lock()
         self._active_watch: Optional[Watch] = None
         # Tracked for diagnostics / liveness checks.  Updated each time
         # a watch session ends (cleanly or with error) so external
@@ -248,7 +253,8 @@ class K8sWatcher:
         """
         self._stop_event.set()
         self._stop_thread_event.set()
-        watch = self._active_watch
+        with self._active_watch_lock:
+            watch = self._active_watch
         if watch is not None:
             try:
                 # ``Watch.stop`` does its own socket shutdown -- protect
@@ -490,7 +496,8 @@ class K8sWatcher:
         Executed via :func:`asyncio.to_thread` from :meth:`_run`.
         """
         watch = self._watch_factory()
-        self._active_watch = watch
+        with self._active_watch_lock:
+            self._active_watch = watch
         try:
             api_func, kwargs = self._build_list_call(resource_version)
             kwargs.setdefault("label_selector", self._label_selector)
@@ -522,7 +529,8 @@ class K8sWatcher:
                 raise _ResourceTooOld() from exc
             raise
         finally:
-            self._active_watch = None
+            with self._active_watch_lock:
+                self._active_watch = None
 
     def _build_list_call(
         self,
@@ -538,25 +546,50 @@ class K8sWatcher:
         return core_v1.list_namespaced_pod, {"namespace": self._namespace, **kwargs}
 
     def _relist_snapshot(self) -> Optional[str]:
-        """Perform a full LIST and rebuild cache from the response.
+        """Perform a full LIST and reconcile the cache from the response.
 
-        Called after a 410-Gone response to obtain a consistent snapshot
-        of pods matching the label selector.  Returns the
-        ``resourceVersion`` of the LIST so the next watch session resumes
-        from a known-good point.  Cache is upserted with every observed
-        pod and any request rows not present in the snapshot are
-        implicitly stale (subsequent watch DELETE events will evict
-        them; the mark-stale sweeper handles longer gaps).
+        Called after a 410-Gone response (or by the periodic resync task)
+        to obtain a consistent snapshot of pods matching the label
+        selector.  Returns the ``resourceVersion`` of the LIST so the
+        next watch session resumes from a known-good point.
+
+        Reconciliation semantics
+        ------------------------
+        After upserting every pod from the LIST, pods that were in the
+        cache for the scoped namespace/request but are absent from the
+        LIST are evicted.  The scope of eviction matches the scope of the
+        LIST:
+
+        * namespace-scoped LIST  → only evict entries in that namespace.
+        * cluster-scoped LIST    → evict all entries absent from the LIST.
+
+        This prevents deleted pods from persisting in the cache until the
+        next watch DELETE event (which may not arrive if the stream was
+        disrupted).
+
+        To avoid overwriting a live watch-stream update that arrived
+        *after* the LIST snapshot was taken, upserts use
+        :meth:`PodStateCache.upsert_if_not_newer` with the monotonic
+        timestamp recorded just before the LIST call.  Watch events that
+        landed after that timestamp are left in place.
 
         Runs in a worker thread via :func:`asyncio.to_thread`.
         """
         core_v1 = self._client.core_v1
         kwargs: dict[str, Any] = {"label_selector": self._label_selector}
+        # Record the snapshot capture start time before the LIST so we
+        # can compare against existing cache entry timestamps and avoid
+        # overwriting watch events that arrived after this LIST began.
+        captured_before = time.monotonic()
         with self._timed_list("list_pods"):
             if self._namespace is None:
                 pod_list = core_v1.list_pod_for_all_namespaces(**kwargs)
             else:
                 pod_list = core_v1.list_namespaced_pod(namespace=self._namespace, **kwargs)
+
+        # Collect the (request_id, pod_name) pairs returned by the LIST.
+        # These are the pods that should remain in the cache after reconcile.
+        seen_keys: set[tuple[str, str]] = set()
         for pod in getattr(pod_list, "items", []) or []:
             metadata = getattr(pod, "metadata", None)
             if metadata is None:
@@ -570,9 +603,44 @@ class K8sWatcher:
                 continue
             namespace = getattr(metadata, "namespace", None) or self._namespace or ""
             state = self._pod_to_state(pod, request_id, namespace, deleted=False)
-            self._cache.upsert(state)
-        metadata = getattr(pod_list, "metadata", None)
-        resource_version = getattr(metadata, "resource_version", None)
+            self._cache.upsert_if_not_newer(state, captured_before)
+            seen_keys.add((request_id, pod_name))
+
+        # Evict cache entries that are within the LIST scope but absent
+        # from the results — these pods were deleted between the last
+        # watch event and this LIST.
+        #
+        # Scope: for a namespace-scoped LIST, only evict entries in the
+        # same namespace; for a cluster-scoped LIST evict all absent
+        # entries.  We never evict a pod that was written after
+        # ``captured_before`` (i.e. a pod created between the LIST start
+        # and now) because we only compare entries whose last_updated is
+        # at most ``captured_before``.
+        all_current = self._cache.all_states()
+        for cached_state in all_current:
+            if cached_state.deleted:
+                # Already being torn down by a concurrent watch DELETE.
+                continue
+            if (cached_state.request_id, cached_state.pod_name) in seen_keys:
+                continue
+            # Only evict within the scope the LIST covered.
+            if self._namespace is not None and cached_state.namespace != self._namespace:
+                continue
+            # Guard against evicting a pod that arrived in the cache
+            # after the LIST started (created concurrently with the LIST).
+            if cached_state.last_updated > captured_before:
+                continue
+            # Pod is absent from the LIST and within scope — evict.
+            self._logger.debug(
+                "Resync evicting pod absent from LIST (namespace=%s, pod=%s, request_id=%s)",
+                cached_state.namespace,
+                cached_state.pod_name,
+                cached_state.request_id,
+            )
+            self._cache.delete(cached_state.request_id, cached_state.pod_name)
+
+        list_metadata = getattr(pod_list, "metadata", None)
+        resource_version = getattr(list_metadata, "resource_version", None)
         if not resource_version:
             # Fallback: an empty rv would drop us straight back into a 410
             # loop.  Return ``None`` so the next session starts a fresh

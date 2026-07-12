@@ -61,7 +61,7 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from orb.domain.base.ports import LoggingPort
@@ -77,8 +77,32 @@ if TYPE_CHECKING:  # pragma: no cover -- type-checking only
 # (verbatim from the legacy parser in k8sutils.parse_node_event)
 # ---------------------------------------------------------------------------
 
+# Karpenter v0.x message strings (exact-match).
 KARPENTER_UNDERUTILIZED_DELETE = "Disrupting Node: Underutilized/Delete"
 KARPENTER_EMPTY_DELETE = "Disrupting Node: Empty/Delete"
+
+# Karpenter v1.x (>= 1.0, Oct 2024) uses reason="Disrupted" and emits
+# messages that start with "Disrupting node:".  The v1 messages encode
+# the disruption type differently from v0.x, but all share the same
+# reason string.  We normalise each v1 cause to a canonical v0-style
+# label so callers see a consistent value regardless of Karpenter version.
+KARPENTER_V1_REASON = "Disrupted"
+
+# Karpenter v1 message prefixes and their canonical reason labels.
+# Ordered longest-first so the most-specific prefix matches first.
+_KARPENTER_V1_MESSAGE_MAP: list[tuple[str, str]] = [
+    ("Disrupting node: Underutilized/Delete", "Underutilized/Delete"),
+    ("Disrupting node: Empty/Delete", "Empty/Delete"),
+    ("Disrupting node: Drift/Delete", "Drift/Delete"),
+    ("Disrupting node: Consolidat", "Consolidation/Delete"),  # prefix covers variants
+    ("Disrupting node:", "Disrupted"),  # generic v1 fallback
+]
+
+# Default TTL for entries in :class:`K8sNodeEventsCache`.  After a node
+# is scale-in terminated its name may be reused; entries older than this
+# window are evicted on read/insert so stale disruption signals from a
+# previous node with the same name do not bleed through.
+_DEFAULT_NODE_EVENT_TTL_SECONDS: int = 3600  # 1 hour
 
 # ---------------------------------------------------------------------------
 # Cache data structures
@@ -125,26 +149,65 @@ class K8sNodeEventsCache:
     Readers (status-check paths) run on the asyncio thread while the
     watcher writes from a background thread -- a :class:`threading.RLock`
     guards every mutation and read.
+
+    TTL eviction
+    ------------
+    To prevent stale disruption signals from a previous node that had the
+    same name (common after cluster scale-in), entries older than
+    ``ttl_seconds`` are silently evicted on :meth:`get` and pruned on
+    :meth:`upsert`.  The default TTL is 1 hour
+    (``_DEFAULT_NODE_EVENT_TTL_SECONDS``).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, ttl_seconds: int = _DEFAULT_NODE_EVENT_TTL_SECONDS) -> None:
         self._lock = threading.RLock()
         self._events: dict[str, K8sNodeDisruptionEvent] = {}
+        self._ttl = timedelta(seconds=max(ttl_seconds, 0))
+
+    def _is_expired(self, event: K8sNodeDisruptionEvent) -> bool:
+        """Return ``True`` when *event* is older than the configured TTL."""
+        if self._ttl.total_seconds() <= 0:
+            return False
+        age = datetime.now(tz=timezone.utc) - event.observed_at
+        return age > self._ttl
 
     def upsert(self, event: K8sNodeDisruptionEvent) -> None:
-        """Store or replace the most-recent disruption event for a node."""
+        """Store or replace the most-recent disruption event for a node.
+
+        Also evicts any other entries that have exceeded the TTL so the
+        dict does not grow unboundedly on long-running clusters with high
+        node churn.
+        """
         with self._lock:
             self._events[event.node_name] = event
+            # Prune expired entries on every write to bound the dict size.
+            # We do this under the same lock to avoid a separate
+            # background-sweep thread.  The linear scan is cheap because
+            # the number of distinct node names is small (O(fleet size)).
+            expired = [k for k, v in self._events.items() if self._is_expired(v)]
+            for k in expired:
+                del self._events[k]
 
     def get(self, node_name: str) -> Optional[K8sNodeDisruptionEvent]:
-        """Return the latest disruption event for *node_name*, or ``None``."""
+        """Return the latest disruption event for *node_name*, or ``None``.
+
+        Returns ``None`` (not the event) when the entry has exceeded the
+        TTL, and evicts it from the cache at the same time.
+        """
         with self._lock:
-            return self._events.get(node_name)
+            event = self._events.get(node_name)
+            if event is None:
+                return None
+            if self._is_expired(event):
+                del self._events[node_name]
+                return None
+            return event
 
     def all(self) -> list[K8sNodeDisruptionEvent]:
-        """Return a snapshot of all cached disruption events."""
+        """Return a snapshot of all non-expired cached disruption events."""
         with self._lock:
-            return list(self._events.values())
+            now = datetime.now(tz=timezone.utc)
+            return [v for v in self._events.values() if now - v.observed_at <= self._ttl]
 
     def clear(self) -> None:
         """Evict all cached entries.  Called on watcher restart."""
@@ -152,7 +215,7 @@ class K8sNodeEventsCache:
             self._events.clear()
 
     def size(self) -> int:
-        """Return the number of nodes currently tracked."""
+        """Return the number of nodes currently tracked (including expired)."""
         with self._lock:
             return len(self._events)
 
@@ -185,28 +248,54 @@ def _default_watch_factory() -> Watch:
 # ---------------------------------------------------------------------------
 
 
-def _parse_karpenter_reason(message: Optional[str]) -> Optional[str]:
-    """Extract a canonical Karpenter disruption reason from an event message.
+def _parse_karpenter_reason(
+    message: Optional[str],
+    reason: Optional[str] = None,
+) -> Optional[str]:
+    """Extract a canonical Karpenter disruption reason from an event.
 
-    Mirrors the legacy ``kube_watcher._postprocess_event`` logic.
+    Supports both Karpenter v0.x (pre-1.0) and v1.x (>= 1.0, Oct 2024):
+
+    * **v0.x** -- ``reason`` is typically ``"Disrupting"`` and the
+      ``message`` is one of the two exact strings
+      ``KARPENTER_UNDERUTILIZED_DELETE`` / ``KARPENTER_EMPTY_DELETE``.
+      Matched by exact-comparison so legacy parsing is unaffected.
+
+    * **v1.x** -- ``reason`` is ``"Disrupted"`` and ``message`` starts
+      with ``"Disrupting node:"`` followed by the disruption type.
+      Matched by prefix so new disruption types introduced in future
+      Karpenter releases are gracefully caught by the generic fallback.
 
     Returns one of:
 
-    * ``"Underutilized/Delete"`` -- message matches the Karpenter
-      underutilised-node-delete pattern.
-    * ``"Empty/Delete"`` -- message matches the Karpenter empty-node-delete
-      pattern.
+    * ``"Underutilized/Delete"`` -- underutilised node scheduled for deletion.
+    * ``"Empty/Delete"`` -- empty node reclaimed by Karpenter.
+    * ``"Drift/Delete"`` -- node drifted from desired state (v1 only).
+    * ``"Consolidation/Delete"`` -- node consolidated away (v1 only).
+    * ``"Disrupted"`` -- v1 disruption with unrecognised type (generic fallback).
     * ``None`` -- the message does not match any known Karpenter pattern.
 
     Args:
         message: The raw ``event.message`` string.
+        reason: The raw ``event.reason`` string.  When ``"Disrupted"``
+            (Karpenter v1.x), message prefix matching is used instead of
+            exact matching.  Optional for backward compatibility.
     """
     if not message:
         return None
+
+    # --- Karpenter v0.x: exact-match legacy strings ---------------------
     if message == KARPENTER_UNDERUTILIZED_DELETE:
         return "Underutilized/Delete"
     if message == KARPENTER_EMPTY_DELETE:
         return "Empty/Delete"
+
+    # --- Karpenter v1.x: reason="Disrupted" + prefix-match on message ---
+    if reason == KARPENTER_V1_REASON:
+        for prefix, canonical in _KARPENTER_V1_MESSAGE_MAP:
+            if message.startswith(prefix):
+                return canonical
+
     return None
 
 
@@ -306,7 +395,9 @@ class K8sEventsWatcher:
             daemon=True,
         )
         self._thread.start()
-        self._logger.info("Kubernetes events watcher started (events_watch_enabled=True)")
+        # Note: the strategy layer logs a matching "events watcher started"
+        # message when it calls start(); we do not duplicate it here to
+        # avoid a confusing double INFO line in the operator logs.
 
     def stop(self, *, timeout: float = _JOIN_TIMEOUT_SECONDS) -> None:
         """Signal the worker thread to stop and wait for it to exit.
@@ -489,7 +580,7 @@ class K8sEventsWatcher:
             ts_raw = getattr(metadata, "creation_timestamp", None)
         timestamp_str = str(ts_raw) if ts_raw is not None else None
 
-        karpenter_reason = _parse_karpenter_reason(message)
+        karpenter_reason = _parse_karpenter_reason(message, reason=reason)
 
         disruption_event = K8sNodeDisruptionEvent(
             node_name=node_name,
@@ -530,4 +621,5 @@ __all__ = [
     "_parse_karpenter_reason",
     "KARPENTER_UNDERUTILIZED_DELETE",
     "KARPENTER_EMPTY_DELETE",
+    "KARPENTER_V1_REASON",
 ]

@@ -158,6 +158,32 @@ class PodStateCache:
             self._states[key] = stamped
             self._by_request.setdefault(stamped.request_id, set()).add(stamped.pod_name)
 
+    def upsert_if_not_newer(self, state: PodState, captured_before: float) -> bool:
+        """Upsert ``state`` only when the existing entry is not newer than ``captured_before``.
+
+        Used by the periodic-resync and 410-recovery paths to avoid
+        overwriting a live watch-stream update (which arrived after the
+        LIST snapshot was taken) with stale LIST data.
+
+        ``captured_before`` is a :func:`time.monotonic` timestamp recorded
+        **before** the LIST call started.  If the existing cache entry's
+        ``last_updated`` is strictly greater than ``captured_before``, the
+        entry was written by a watch event that arrived *after* the LIST
+        began — we honour that newer state and skip the upsert.
+
+        Returns ``True`` if the entry was written, ``False`` if it was
+        skipped because a newer watch event was already present.
+        """
+        key = (state.request_id, state.pod_name)
+        with self._lock:
+            existing = self._states.get(key)
+            if existing is not None and existing.last_updated > captured_before:
+                # A watch event that arrived after the LIST started is
+                # more authoritative than what the LIST returned — keep it.
+                return False
+        self.upsert(state)
+        return True
+
     def delete(self, request_id: str, pod_name: str) -> None:
         """Remove the entry for ``(request_id, pod_name)``; no-op if missing."""
         key = (request_id, pod_name)
@@ -174,6 +200,11 @@ class PodStateCache:
         with self._lock:
             self._states.clear()
             self._by_request.clear()
+        # Prune the per-key stale-lock table under its own mutex so
+        # concurrent mark_stale calls on already-evicted keys don't keep
+        # accumulating lock objects after a full cache reset.
+        with self._stale_locks_mutex:
+            self._stale_locks.clear()
 
     # ------------------------------------------------------------------
     # Reads
@@ -239,25 +270,39 @@ class PodStateCache:
             key_lock = self._stale_locks[request_id]
 
         dropped: list[PodState] = []
+        request_fully_drained = False
         with key_lock:
             # Snapshot the names to evict while holding the global lock,
             # then mutate under the same lock in one pass.
             with self._lock:
                 bucket = self._by_request.get(request_id)
                 if bucket is None:
-                    return dropped
-                for name in list(bucket):
-                    key = (request_id, name)
-                    state = self._states.get(key)
-                    if state is None:
-                        bucket.discard(name)
-                        continue
-                    if state.last_updated < cutoff:
-                        dropped.append(state)
-                        self._states.pop(key, None)
-                        bucket.discard(name)
-                if not bucket:
-                    self._by_request.pop(request_id, None)
+                    # Request has no entries; prune the lock below.
+                    request_fully_drained = True
+                else:
+                    for name in list(bucket):
+                        key = (request_id, name)
+                        state = self._states.get(key)
+                        if state is None:
+                            bucket.discard(name)
+                            continue
+                        if state.last_updated < cutoff:
+                            dropped.append(state)
+                            self._states.pop(key, None)
+                            bucket.discard(name)
+                    if not bucket:
+                        self._by_request.pop(request_id, None)
+                        request_fully_drained = True
+
+        # Prune the per-request lock once the bucket is gone so the
+        # _stale_locks defaultdict does not grow without bound.  We only
+        # do this after releasing key_lock to avoid a
+        # lock-ordering issue (we would hold key_lock while acquiring
+        # _stale_locks_mutex, whereas creation only holds _stale_locks_mutex).
+        if request_fully_drained:
+            with self._stale_locks_mutex:
+                self._stale_locks.pop(request_id, None)
+
         return dropped
 
 
