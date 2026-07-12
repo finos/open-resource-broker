@@ -22,7 +22,7 @@ kubernetes==36.0.2
 markdown-it-py==4.2.0
 MarkupSafe==3.0.3
 mdurl==0.1.2
-mypy==2.1.0
+mypy==2.2.0
 mypy_extensions==1.1.0
 oauthlib==3.3.1
 packaging==26.2
