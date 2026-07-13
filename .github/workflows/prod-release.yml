@@ -249,13 +249,15 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     permissions:
-      contents: read
+      contents: write
       pages: write
       id-token: write
 
     steps:
     - name: Checkout code
       uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      with:
+        fetch-depth: 0
 
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
@@ -263,8 +265,14 @@ jobs:
         cache-key: prod-docs-${{ needs.config.outputs.package-version }}
         fail-on-cache-miss: false
 
-    - name: Build documentation
-      run: make ci-docs-build-for-pages
+    - name: Compute minor version
+      id: version
+      run: |
+        VERSION_MINOR=$(echo "${{ needs.config.outputs.package-version }}" | cut -d. -f1,2)
+        echo "minor=${VERSION_MINOR}" >> "$GITHUB_OUTPUT"
+
+    - name: Deploy versioned docs via mike
+      run: bash dev-tools/docs/mike_deploy.sh release "${{ steps.version.outputs.minor }}" --push
 
     - name: Upload Pages artifact
       id: upload
@@ -275,6 +283,9 @@ jobs:
     - name: Deploy to GitHub Pages
       id: deployment
       uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128  # v5
+
+    - name: Smoke-check deployed site
+      run: bash dev-tools/docs/smoke_check_pages.sh "${{ steps.deployment.outputs.page_url }}"
 
   container-cleanup:
     name: Cleanup Old Container Images

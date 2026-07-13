@@ -26,7 +26,7 @@ on:
   # sufficient — it runs immediately and is path-scoped to docs-relevant files.
 
 permissions:
-  contents: read
+  contents: write  # mike pushes to gh-pages branch
   pages: write
 
 concurrency:
@@ -75,10 +75,10 @@ jobs:
       - name: Build documentation
         run: |
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            # Build and deploy locally with mike (no push to remote)
-            make ci-docs-build-for-pages
+            # Deploy dev alias via mike, export docs/site for Pages upload.
+            bash dev-tools/docs/mike_deploy.sh dev --push
           else
-            # Build for PRs (validation only)
+            # PR path: strict build validation only — no versioning, no push.
             make ci-docs-build
           fi
 
@@ -103,3 +103,9 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128  # v5
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Smoke-check deployed site
+        run: bash dev-tools/docs/smoke_check_pages.sh "${{ steps.deployment.outputs.page_url }}"

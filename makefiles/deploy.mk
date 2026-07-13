@@ -50,8 +50,8 @@ docs-clean:  ## Clean documentation build files
 ci-docs-build:  ## Build documentation for CI PR testing (matches docs.yml PR builds)
 	@dev-tools/docs/ci_docs_build.sh
 
-ci-docs-build-for-pages:  ## Build documentation for GitHub Pages deployment (no push)
-	@dev-tools/docs/ci_docs_build_for_pages.sh
+ci-docs-build-for-pages:  ## Deploy dev alias via mike and export docs/site (no push)
+	@bash dev-tools/docs/mike_deploy.sh dev
 
 ci-docs-deploy:  ## Deploy documentation to GitHub Pages (matches docs.yml main branch)
 	@dev-tools/docs/ci_docs_deploy.sh
