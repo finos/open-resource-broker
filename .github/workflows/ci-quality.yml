@@ -21,19 +21,8 @@ on:
       - 'uv.lock'
       - '.ruff.toml'
       - '.github/workflows/ci-quality.yml'
-  # pull_request_target is needed only for the auto-format-suggest job to call
-  # the PR Reviews API on fork PRs. All other jobs gate on event_name to avoid
-  # double execution.
-  pull_request_target:
-    branches: [ main, develop ]
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'pyproject.toml'
-      - 'requirements*.txt'
-      - 'uv.lock'
-      - '.ruff.toml'
-      - '.github/workflows/ci-quality.yml'
+  # workflow_dispatch: allows re-running quality checks manually from the Actions UI
+  workflow_dispatch:
 
 # Cancel in-progress runs when a new push arrives on the same branch/ref.
 # The auto-format job is exempted via its own job-level concurrency block
@@ -51,45 +40,8 @@ jobs:
     name: Configuration
     uses: ./.github/workflows/shared-config.yml
 
-  quality-check:
-    name: Quality Standards
-    # Skip on pull_request_target — only auto-format-suggest needs that event.
-    if: github.event_name != 'pull_request_target'
-    runs-on: ubuntu-latest
-    needs: config
-    permissions:
-      contents: read
-    
-    env:
-      AWS_DEFAULT_REGION: ${{ needs.config.outputs.aws-region }}
-      AWS_ACCESS_KEY_ID: ${{ needs.config.outputs.aws-access-key }}
-      AWS_SECRET_ACCESS_KEY: ${{ needs.config.outputs.aws-secret-key }}
-      ENVIRONMENT: ${{ needs.config.outputs.environment }}
-      TESTING: ${{ needs.config.outputs.testing-flag }}
-    
-    steps:
-    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      with:
-        fetch-depth: 0
-    
-    - name: Setup Python and UV
-      uses: ./.github/actions/setup-uv-fresh
-      with:
-        python-version: ${{ needs.config.outputs.default-python-version }}
-        cache-key-suffix: quality
-    
-    - name: Run quality checks
-      run: |
-        if [ "${{ github.event_name }}" = "schedule" ]; then
-          make quality-check-all
-        else
-          make quality-check
-        fi
-
   setup-cache:
     name: Setup Cache
-    # Runs on both pull_request and pull_request_target — auto-format-suggest
-    # depends on it and needs to run on pull_request_target for fork PRs.
     needs: config
     uses: ./.github/workflows/cache-management.yml
     with:
@@ -106,6 +58,7 @@ jobs:
       && github.event.pull_request.head.repo.full_name == github.repository
       && github.actor != 'open-resource-broker-cicd[bot]'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [config, setup-cache]
     # Override the workflow-level concurrency so this job is never cancelled
     # mid-run.  If it were interrupted after `ruff` rewrites files but before
@@ -159,12 +112,17 @@ jobs:
     name: Auto-Format Suggestions
     # Fork PRs: post formatted changes as PR review suggestions for the
     # contributor to apply via the GitHub UI's "Commit suggestion" button.
-    # Uses pull_request_target so the GITHUB_TOKEN can call the PR Reviews API
-    # (POST /pulls/{id}/reviews) — pull_request fork-PR tokens cannot.
-    # The workflow file is evaluated at the base ref (safe); only the PR head
-    # code is checked out into a non-elevated working tree for formatting.
-    if: github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name != github.repository
+    # Runs under plain pull_request (not pull_request_target) — reviewdog
+    # action-suggester posts review comments via the GITHUB_TOKEN scoped to
+    # pull-requests: write, which works for fork PRs without needing
+    # pull_request_target's elevated context.  pull_request_target is
+    # deliberately avoided here: it would execute fork code with a write token
+    # (pwn-request risk).
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [config, setup-cache]
     permissions:
       contents: read
@@ -174,8 +132,6 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          # No token here — formatter does not need write access; this prevents
-          # untrusted PR code from authenticating with elevated permissions.
           persist-credentials: false
 
       - name: Setup UV with cache
@@ -196,8 +152,8 @@ jobs:
 
   lint-ruff:
     name: Ruff (Code Quality)
-    if: github.event_name != 'pull_request_target'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [config, setup-cache]
     permissions:
       contents: read
@@ -216,8 +172,8 @@ jobs:
 
   lint-ruff-optional:
     name: Ruff (Extended Checks)
-    if: github.event_name != 'pull_request_target'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [config, setup-cache, lint-ruff]
     permissions:
       contents: read
@@ -237,8 +193,8 @@ jobs:
 
   lint-pyright:
     name: Type Checking (pyright)
-    if: github.event_name != 'pull_request_target'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [config, setup-cache, lint-ruff]
     permissions:
       contents: read
@@ -258,8 +214,8 @@ jobs:
 
   arch-validation:
     name: Architecture Validation
-    if: github.event_name != 'pull_request_target'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [config, setup-cache, lint-ruff]
     permissions:
       contents: read
@@ -287,3 +243,22 @@ jobs:
 
     - name: Run architecture validation (${{ matrix.description }})
       run: make ci-arch-${{ matrix.check }}
+
+  python-version-drift:
+    name: Python Version Drift Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Runs independently of lint to give early signal on version drift.
+    # Only needs a checkout + pyyaml — no UV venv required.
+    needs: config
+    permissions:
+      contents: read
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+    - name: Install PyYAML
+      run: pip install --quiet pyyaml
+
+    - name: Check Python version drift
+      run: make ci-check-python-version-drift
