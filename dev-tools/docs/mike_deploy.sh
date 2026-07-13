@@ -21,7 +21,6 @@ PUSH=false
 case "$MODE" in
     dev)
         VERSION_ARG=""
-        ALIAS="dev"
         PUSH_ARG="${2:-}"
         ;;
     release)
