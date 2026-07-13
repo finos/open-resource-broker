@@ -18,9 +18,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from orb.api.dependencies import (
+    CurrentUser,
     get_acquire_machines_orchestrator,
     get_command_bus,
     get_create_template_orchestrator,
+    get_current_user,
     get_get_template_orchestrator,
     get_health_check_port,
     get_list_machines_orchestrator,
@@ -35,6 +37,41 @@ from orb.api.dependencies import (
 from orb.api.server import create_fastapi_app
 from orb.config.schemas.server_schema import AuthConfig, ServerConfig
 from orb.infrastructure.di.buses import CommandBus, QueryBus
+
+
+def _admin_user() -> CurrentUser:
+    """Return an admin CurrentUser for dependency override in e2e tests."""
+    return CurrentUser(username="test-admin", role="admin", claims={})
+
+
+class _StickyOverridesDict(dict):
+    """dict subclass that re-inserts a set of 'sticky' entries after every
+    ``clear()``.  Used so that auth overrides survive the per-step
+    ``app.dependency_overrides.clear()`` calls in lifecycle tests.
+    """
+
+    def __init__(self, sticky: dict, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._sticky = sticky
+        self.update(sticky)
+
+    def clear(self):
+        super().clear()
+        self.update(self._sticky)
+
+    def __eq__(self, other: object) -> bool:
+        # Include _sticky in equality so the added attribute is not ignored
+        # (CodeQL py/missing-equals). Two sticky dicts are equal when both
+        # their contents and their sticky sets match; comparison with a plain
+        # mapping falls back to dict contents for normal interoperability.
+        if isinstance(other, _StickyOverridesDict):
+            return dict.__eq__(self, other) and self._sticky == other._sticky
+        if isinstance(other, dict):
+            return dict.__eq__(self, other)
+        return NotImplemented
+
+    __hash__ = None  # type: ignore[assignment]  # mutable mapping is unhashable
+
 
 # ---------------------------------------------------------------------------
 # Shared helpers and fixtures
@@ -59,7 +96,15 @@ def _make_command_bus(return_value: Any = None) -> AsyncMock:
 
 @pytest.fixture
 def app():
-    return create_fastapi_app(_server_config())
+    _app = create_fastapi_app(_server_config())
+    # Auth is disabled in the test server config, so get_current_user would
+    # resolve to viewer (least privilege).  Replace dependency_overrides with a
+    # sticky-dict subclass that re-inserts the auth override after every
+    # .clear() call.  This lets multi-step lifecycle tests reset their
+    # orchestrator overrides between steps without losing the admin identity.
+    sticky = {get_current_user: _admin_user}
+    _app.dependency_overrides = _StickyOverridesDict(sticky)
+    return _app
 
 
 @pytest.fixture
@@ -373,6 +418,8 @@ class TestTemplateManagement:
         """GET /api/v1/templates/ returns empty list when no templates exist."""
         mock_result = Mock()
         mock_result.templates = []
+        mock_result.total_count = None
+        mock_result.next_cursor = None
         mock_orch = AsyncMock()
         mock_orch.execute = AsyncMock(return_value=mock_result)
 
@@ -401,6 +448,8 @@ class TestTemplateManagement:
         )
         mock_result = Mock()
         mock_result.templates = [mock_template]
+        mock_result.total_count = None
+        mock_result.next_cursor = None
         mock_orch = AsyncMock()
         mock_orch.execute = AsyncMock(return_value=mock_result)
 
@@ -647,6 +696,8 @@ class TestTemplateManagement:
         )
         mock_result = Mock()
         mock_result.templates = [mock_template]
+        mock_result.total_count = None
+        mock_result.next_cursor = None
         mock_orch = AsyncMock()
         mock_orch.execute = AsyncMock(return_value=mock_result)
 
@@ -757,6 +808,8 @@ class TestMachineLifecycle:
         """GET /api/v1/machines/ endpoint is reachable and returns results."""
         mock_result = Mock()
         mock_result.machines = []
+        mock_result.total_count = None
+        mock_result.next_cursor = None
         mock_orch = AsyncMock()
         mock_orch.execute = AsyncMock(return_value=mock_result)
 

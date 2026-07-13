@@ -31,8 +31,7 @@ class TestCLIIntegration:
         return self.config_path
 
     @pytest.mark.asyncio
-    @patch("orb.interface.system_command_handlers.get_container")
-    async def test_get_provider_config_cli_e2e(self, mock_get_container):
+    async def test_get_provider_config_cli_e2e(self):
         """Test getProviderConfig CLI operation end-to-end."""
         # Setup mocks
         mock_container = Mock()
@@ -50,12 +49,13 @@ class TestCLIIntegration:
         mock_orchestrator = Mock()
         mock_orchestrator.execute = mock_execute
         mock_container.get.return_value = mock_orchestrator
-        mock_get_container.return_value = mock_container
 
         # Test async function-based handler
         from orb.interface.command_handlers import handle_provider_config
 
+        # Handlers resolve the DI container from args._container.
         mock_command = Mock()
+        mock_command._container = mock_container
 
         result = await handle_provider_config(mock_command)
 
@@ -96,8 +96,7 @@ class TestCLIIntegration:
         assert "provider configuration" in result["message"].lower()
 
     @pytest.mark.asyncio
-    @patch("orb.interface.system_command_handlers.get_container")
-    async def test_reload_provider_config_cli_e2e(self, mock_get_container):
+    async def test_reload_provider_config_cli_e2e(self):
         """Test reloadProviderConfig CLI operation end-to-end."""
         from orb.application.dto.interface_response import InterfaceResponse
         from orb.application.services.provider_registry_service import ProviderRegistryService
@@ -125,12 +124,13 @@ class TestCLIIntegration:
             return Mock()
 
         mock_container.get.side_effect = container_get
-        mock_get_container.return_value = mock_container
 
         # Test async function-based handler
         from orb.interface.command_handlers import handle_reload_provider_config
 
+        # Handlers resolve the DI container from args._container.
         mock_command = Mock()
+        mock_command._container = mock_container
         mock_command.config_path = self.config_path
         mock_command.file = None
         mock_command.data = None

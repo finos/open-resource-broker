@@ -3,9 +3,29 @@
 Exercises the full ORB CLI lifecycle — templates list, machines request,
 requests status, full lifecycle, requests list — without a real cluster.
 
-The CLI is invoked in-process by setting sys.argv and calling asyncio.run(main())
-directly.  Because everything runs in the same process, the kmock server is
-reachable for all kubernetes SDK calls made by the CLI code.
+The CLI is invoked in-process by setting sys.argv and calling main() directly.
+Because everything runs in the same process, the kmock server is reachable for
+all kubernetes SDK calls made by the CLI code.
+
+Event-loop design
+-----------------
+Tests that do NOT touch the Kubernetes API (templates list, narrow-terminal JSON
+guard, unknown-template error) are synchronous and use ``asyncio.run(main())``
+via ``_run_orb_cli``.
+
+Tests that DO exercise a code path reaching the k8s provider (machines request,
+requests status, requests list, full lifecycle) MUST be async and must use
+``await _run_orb_cli_async(...)`` instead.
+
+The reason: the kmock aiohttp server is started by a pytest-asyncio async fixture
+and therefore runs on the pytest-asyncio event loop.  The synchronous k8s SDK
+wraps its urllib3 calls in ``asyncio.to_thread``.  When a *sync* test calls
+``asyncio.run(main())``, a brand-new event loop takes over the thread; the
+pytest-asyncio loop — and with it the kmock accept/handler coroutines — is
+suspended.  Every urllib3 thread then blocks waiting for a kmock response that
+never arrives (300 s hang).  Running the CLI with ``await main()`` inside an
+*async* test keeps execution on the pytest-asyncio loop so kmock can service
+the incoming HTTP requests between ``asyncio.to_thread`` continuations.
 
 kmock limitations accounted for:
 - kmock provides an in-process aiohttp server emulating the Kubernetes
@@ -109,6 +129,77 @@ def _run_orb_cli(args: list[str]) -> dict:  # type: ignore[return]
     return parsed  # type: ignore[return-value]
 
 
+async def _run_orb_cli_async(args: list[str]) -> dict:  # type: ignore[return]
+    """Async variant of _run_orb_cli for tests that run on the kmock event loop.
+
+    Tests that exercise CLI code paths reaching the Kubernetes API (machines
+    request, requests status, requests list, full lifecycle) MUST use this
+    helper instead of _run_orb_cli.
+
+    Background
+    ----------
+    The kmock aiohttp server is started by a pytest-asyncio async fixture and
+    therefore runs on the pytest-asyncio event loop.  The synchronous k8s SDK
+    uses ``urllib3`` for HTTP; the provider handlers wrap those calls with
+    ``asyncio.to_thread``.
+
+    When a *sync* test calls ``asyncio.run(main())``, a **brand-new** event
+    loop is created for the duration of that call.  The pytest-asyncio loop
+    — and with it the kmock aiohttp accept/handler coroutines — is suspended
+    for the entire duration, so the urllib3 TCP connections arrive at the
+    kmock socket but are never serviced → the thread blocks forever waiting
+    for a response that never comes.
+
+    Running the CLI coroutine with ``await main()`` inside an *async* test
+    keeps execution on the pytest-asyncio event loop.  The event loop can
+    interleave asyncio.to_thread continuations with kmock's aiohttp handlers,
+    so every urllib3 request gets a response promptly.
+
+    Usage: decorate callers with ``@pytest.mark.asyncio``.
+    """
+    import json
+    import os
+
+    from orb.cli.main import main
+    from orb.infrastructure.di.container import reset_container
+
+    original_argv = sys.argv[:]
+    original_console = os.environ.get("ORB_LOG_CONSOLE_ENABLED")
+    sys.argv = ["orb"] + args
+    os.environ["ORB_LOG_CONSOLE_ENABLED"] = "false"
+
+    stdout_capture = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(stdout_capture):
+            try:
+                await main()
+            except SystemExit:
+                pass  # CLI uses sys.exit(); suppressed intentionally in tests
+    finally:
+        sys.argv = original_argv
+        if original_console is None:
+            os.environ.pop("ORB_LOG_CONSOLE_ENABLED", None)
+        else:
+            os.environ["ORB_LOG_CONSOLE_ENABLED"] = original_console
+        reset_container()
+
+    output = stdout_capture.getvalue().strip()
+    assert output, f"CLI produced no output for args: {args}"
+
+    try:
+        parsed = json.loads(output)
+    except json.JSONDecodeError as exc:
+        raise AssertionError(
+            f"CLI output is not valid JSON for args {args}.\nOutput was:\n{output}"
+        ) from exc
+
+    # machines request returns [result_dict, exit_code] — unwrap to the dict
+    if isinstance(parsed, list) and len(parsed) == 2 and isinstance(parsed[0], dict):
+        return parsed[0]  # type: ignore[return-value]
+
+    return parsed  # type: ignore[return-value]
+
+
 # ---------------------------------------------------------------------------
 # Patched-initialize helper
 # ---------------------------------------------------------------------------
@@ -153,7 +244,8 @@ class TestCLIK8sTemplates:
 
 
 class TestCLIK8sMachinesRequest:
-    def test_cli_machines_request(self, orb_config_dir_k8s, kmock_k8s):
+    @pytest.mark.asyncio
+    async def test_cli_machines_request(self, orb_config_dir_k8s, kmock_k8s):
         """'orb machines request' against kmock returns a valid request_id."""
         from orb.bootstrap import Application
 
@@ -162,7 +254,7 @@ class TestCLIK8sMachinesRequest:
         _patched_initialize = _make_patched_initialize(kmock_k8s, logger)
 
         with patch.object(Application, "initialize", _patched_initialize):
-            result = _run_orb_cli(
+            result = await _run_orb_cli_async(
                 [
                     "machines",
                     "request",
@@ -181,7 +273,8 @@ class TestCLIK8sMachinesRequest:
 
 
 class TestCLIK8sRequestsStatus:
-    def test_cli_requests_status(self, orb_config_dir_k8s, kmock_k8s):
+    @pytest.mark.asyncio
+    async def test_cli_requests_status(self, orb_config_dir_k8s, kmock_k8s):
         """'orb requests status <id>' returns a known status and echoes back the request_id."""
         from orb.bootstrap import Application
 
@@ -190,7 +283,7 @@ class TestCLIK8sRequestsStatus:
         _patched_initialize = _make_patched_initialize(kmock_k8s, logger)
 
         with patch.object(Application, "initialize", _patched_initialize):
-            create_result = _run_orb_cli(
+            create_result = await _run_orb_cli_async(
                 [
                     "machines",
                     "request",
@@ -205,7 +298,7 @@ class TestCLIK8sRequestsStatus:
         assert request_id, f"No request_id in create response: {create_result}"
 
         with patch.object(Application, "initialize", _patched_initialize):
-            status_result = _run_orb_cli(["requests", "status", request_id])
+            status_result = await _run_orb_cli_async(["requests", "status", request_id])
 
         status = _extract_status(status_result)
         assert status in {"running", "complete", "complete_with_error", "pending"}, (
@@ -221,7 +314,8 @@ class TestCLIK8sRequestsStatus:
 
 
 class TestCLIK8sFullLifecycle:
-    def test_cli_full_lifecycle(self, orb_config_dir_k8s, kmock_k8s):
+    @pytest.mark.asyncio
+    async def test_cli_full_lifecycle(self, orb_config_dir_k8s, kmock_k8s):
         """request -> status -> return: machines appear and return succeeds."""
         from orb.bootstrap import Application
 
@@ -230,7 +324,7 @@ class TestCLIK8sFullLifecycle:
         _patched_initialize = _make_patched_initialize(kmock_k8s, logger)
 
         with patch.object(Application, "initialize", _patched_initialize):
-            create_result = _run_orb_cli(
+            create_result = await _run_orb_cli_async(
                 [
                     "machines",
                     "request",
@@ -248,7 +342,7 @@ class TestCLIK8sFullLifecycle:
         )
 
         with patch.object(Application, "initialize", _patched_initialize):
-            status_result = _run_orb_cli(["requests", "status", request_id])
+            status_result = await _run_orb_cli_async(["requests", "status", request_id])
 
         status = _extract_status(status_result)
         assert status in {"running", "complete", "complete_with_error", "pending"}, (
@@ -262,7 +356,7 @@ class TestCLIK8sFullLifecycle:
                 assert mid.startswith("orb-"), f"k8s machine_id {mid!r} does not start with 'orb-'"
 
             with patch.object(Application, "initialize", _patched_initialize):
-                return_result = _run_orb_cli(["machines", "return"] + machine_ids)
+                return_result = await _run_orb_cli_async(["machines", "return"] + machine_ids)
 
             assert return_result is not None
             message = return_result.get("message")
@@ -339,7 +433,8 @@ class TestCLIK8sErrorHandling:
 
 
 class TestCLIK8sRequestsList:
-    def test_cli_requests_list(self, orb_config_dir_k8s, kmock_k8s):
+    @pytest.mark.asyncio
+    async def test_cli_requests_list(self, orb_config_dir_k8s, kmock_k8s):
         """'orb requests list' includes the newly created request_id."""
         from orb.bootstrap import Application
 
@@ -348,7 +443,7 @@ class TestCLIK8sRequestsList:
         _patched_initialize = _make_patched_initialize(kmock_k8s, logger)
 
         with patch.object(Application, "initialize", _patched_initialize):
-            create_result = _run_orb_cli(
+            create_result = await _run_orb_cli_async(
                 [
                     "machines",
                     "request",
@@ -363,7 +458,9 @@ class TestCLIK8sRequestsList:
         assert request_id, f"No request_id in create response: {create_result}"
 
         with patch.object(Application, "initialize", _patched_initialize):
-            list_result = _run_orb_cli(["requests", "list", "--filter", f"request_id={request_id}"])
+            list_result = await _run_orb_cli_async(
+                ["requests", "list", "--filter", f"request_id={request_id}"]
+            )
 
         if isinstance(list_result, list):
             requests = list_result

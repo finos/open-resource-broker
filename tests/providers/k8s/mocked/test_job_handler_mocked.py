@@ -34,7 +34,9 @@ def _make_request(
     from orb.domain.request.aggregate import Request
     from orb.domain.request.value_objects import RequestId, RequestType
 
-    provider_data: dict[str, Any] = {"namespace": namespace}
+    # acquire_hosts writes parallelism into provider_data; release_hosts now
+    # requires it to confirm the machine_ids cover the full Job before deleting.
+    provider_data: dict[str, Any] = {"namespace": namespace, "parallelism": requested_count}
     if job_name:
         provider_data["job_name"] = job_name
     return Request(
@@ -188,12 +190,14 @@ async def test_job_handler_release_deletes_job(
     job_res = _register_jobs_resource(kmock_k8s)
 
     job_name = f"orb-{str(uuid.uuid4())[:8]}"
-    _preload_job(kmock_k8s, name=job_name)
+    _preload_job(kmock_k8s, name=job_name, parallelism=1)
 
     handler = _make_job_handler(k8s_client_facade, k8s_config)
     handler._max_retries = 1
 
-    request = _make_request(requested_count=2, job_name=job_name)
+    # Single-pod Job (parallelism=1): releasing the one machine_id is a full
+    # release, which the handler honours by deleting the whole Job.
+    request = _make_request(requested_count=1, job_name=job_name)
     await handler.release_hosts([job_name], request.provider_data)
 
     stored = kmock_k8s.objects[job_res, "orb-test", job_name]
@@ -282,7 +286,9 @@ def _make_request_with_id(
     from orb.domain.request.aggregate import Request
     from orb.domain.request.value_objects import RequestId, RequestType
 
-    provider_data: dict[str, Any] = {"namespace": namespace}
+    # acquire_hosts writes parallelism into provider_data; release_hosts now
+    # requires it to confirm the machine_ids cover the full Job before deleting.
+    provider_data: dict[str, Any] = {"namespace": namespace, "parallelism": requested_count}
     if job_name:
         provider_data["job_name"] = job_name
     return Request(

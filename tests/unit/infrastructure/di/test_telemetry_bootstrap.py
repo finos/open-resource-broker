@@ -525,6 +525,7 @@ class TestShutdownTelemetryCallSiteWiring:
         so it returns immediately).
         """
         import asyncio
+        import os
 
         import orb.cli.main as cli_main_mod
 
@@ -534,6 +535,10 @@ class TestShutdownTelemetryCallSiteWiring:
             flush_calls.append(1)
 
         with (
+            # Snapshot os.environ so that setup_environment()'s os.environ.setdefault
+            # calls (ORB_CONFIG_DIR/WORK_DIR/LOG_DIR/SCRIPTS_DIR) are automatically
+            # restored after this test, preventing env-var leakage into later tests.
+            patch.dict(os.environ),
             patch.object(cli_main_mod, "_flush_telemetry", side_effect=_mock_flush),
             patch.object(
                 cli_main_mod,

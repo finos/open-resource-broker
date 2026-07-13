@@ -335,7 +335,11 @@ async def test_job_release_404_tolerated() -> None:
     handler._base_delay = 0.0
     handler._max_delay = 0.0
 
-    await handler.release_hosts(["ghost-job"], {"namespace": "orb-test", "job_name": "ghost-job"})
+    # parallelism=1 + one machine_id = full release, so the handler proceeds to
+    # delete (and the 404 from the delete is what this test exercises).
+    await handler.release_hosts(
+        ["ghost-job"], {"namespace": "orb-test", "job_name": "ghost-job", "parallelism": 1}
+    )
 
 
 # ---------------------------------------------------------------------------
