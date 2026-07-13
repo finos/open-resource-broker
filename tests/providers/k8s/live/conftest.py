@@ -28,15 +28,26 @@ log = logging.getLogger("k8s.live.conftest")
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Apply the ``serial`` marker to every test collected in this subtree.
+    """Apply the ``serial`` marker to tests collected in this subtree.
+
+    The hook is scoped to items whose node-id starts with this directory so
+    that it does not accidentally mark tests from other directories (e.g.
+    unit/, mocked/, contract/) as serial when pytest collects multiple paths
+    in a single invocation.  Without the path guard every test in the session
+    would receive the serial marker, causing -m "not serial" to deselect the
+    entire suite and producing a 0-item run.
 
     ``pytestmark`` at module level is not picked up by conftest-level
     discovery; the collection hook is the canonical place to bulk-apply
     markers across a directory subtree.
     """
+    import pathlib
+
+    live_dir = str(pathlib.Path(__file__).parent)
     marker = pytest.mark.serial
     for item in items:
-        item.add_marker(marker)
+        if str(item.fspath).startswith(live_dir):
+            item.add_marker(marker)
 
 
 # ---------------------------------------------------------------------------

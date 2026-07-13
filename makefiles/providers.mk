@@ -5,6 +5,12 @@
 # Auto-discover providers with tests
 PROVIDERS := $(patsubst tests/providers/%/,%,$(sort $(wildcard tests/providers/*/)))
 
+# Emit PROVIDERS as a JSON array for consumption by CI scripts.
+# Only directories that have a testconf.mk fragment are considered real
+# provider targets (shared helpers like base/ and contract/ are excluded).
+print-providers:  ## Print discovered providers as a JSON array (used by CI discovery)
+	@python3 -c "import os,json; print(json.dumps(sorted([d for d in os.listdir('tests/providers') if os.path.isdir(os.path.join('tests/providers',d)) and not d.startswith('__') and os.path.exists(os.path.join('tests/providers',d,'testconf.mk'))])))"
+
 # Include per-provider override fragments (optional).
 # Each fragment may define:
 #   EXTRAS_<name>      — uv --extra flag value (default: <name>)
