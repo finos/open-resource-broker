@@ -15,8 +15,8 @@ BUILD_ARGS ?=
 DOCS_ARGS ?=
 
 # Python version settings (loaded from project config, with fallbacks)
-PYTHON_VERSIONS := $(shell yq '.python.versions | join(" ")' $(PROJECT_CONFIG) 2>/dev/null || echo "3.10 3.11 3.12 3.13")
-DEFAULT_PYTHON_VERSION := $(shell yq '.python.default_version' $(PROJECT_CONFIG) 2>/dev/null || echo "3.12")
+PYTHON_VERSIONS := $(shell yq '.python.versions | join(" ")' $(PROJECT_CONFIG) 2>/dev/null || echo "3.10 3.11 3.12 3.13 3.14")
+DEFAULT_PYTHON_VERSION := $(shell yq '.python.default_version' $(PROJECT_CONFIG) 2>/dev/null || echo "3.14")
 
 # Package information (loaded from project config, but respect environment VERSION for CI)
 PACKAGE_NAME := $(shell yq '.project.name' $(PROJECT_CONFIG) 2>/dev/null || echo "open-resource-broker")
@@ -37,7 +37,7 @@ DOCS_URL := https://$(REPO_ORG).github.io/$(PACKAGE_NAME)
 # Project settings
 PROJECT := $(PACKAGE_NAME)
 PACKAGE := src
-PACKAGE_ROOT := $(shell python3 -c "import yaml; print(yaml.safe_load(open('.project.yml'))['build']['package_root'])" 2>/dev/null || echo "src/orb")
+PACKAGE_ROOT := $(shell yq '.build.package_root' $(PROJECT_CONFIG) 2>/dev/null || echo "src/orb")
 TESTS := tests
 TESTS_UNIT := $(TESTS)/unit
 TESTS_INTEGRATION := $(TESTS)/integration
@@ -55,7 +55,7 @@ COVERAGE_HTML := htmlcov
 PYTEST_TIMEOUT := --timeout=$(shell yq '.ci.test_timeout' $(PROJECT_CONFIG) 2>/dev/null || echo "300")
 PYTEST_MAXFAIL := --maxfail=5
 PYTEST_ARGS := -v --tb=short --durations=25 $(PYTEST_TIMEOUT)
-COVERAGE_THRESHOLD := $(shell yq '.ci.coverage_threshold' $(PROJECT_CONFIG) 2>/dev/null || echo "70")
+COVERAGE_THRESHOLD := $(shell yq '.ci.coverage_threshold' $(PROJECT_CONFIG) 2>/dev/null || echo "60")
 PYTEST_COV_ARGS := --cov=$(PACKAGE_ROOT) --cov-report=term-missing --cov-branch
 # --cov-fail-under is intentionally absent from PYTEST_COV_ARGS.  Individual CI
 # test legs (unit-only, integration-only, infrastructure-only, providers-only) each

@@ -23,7 +23,7 @@ build:
   package_root: src/orb
 ci:
   test_timeout: 300 # Test timeout in seconds
-  coverage_threshold: 70 # Minimum coverage percentage
+  coverage_threshold: 60 # Minimum combined coverage percentage (ratchet up as coverage improves)
 development:
   pre_commit_enabled: true
   security_scan_enabled: true

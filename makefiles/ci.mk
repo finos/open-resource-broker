@@ -103,8 +103,13 @@ ci-build-sbom:  ## Generate SBOM files (matches publish.yml workflow)
 #
 # Tests that share global state (live AWS, docker daemon, e2e tempdirs) are
 # tagged ``serial`` and run sequentially via a second pytest pass (PYTEST_SERIAL).
+# PYTEST_N_WORKERS defaults to 2 (GitHub ubuntu-latest = 2 vCPU).  Larger-runner
+# CI legs override it (e.g. PYTEST_N_WORKERS=auto on ubuntu-latest-16-cores) to
+# use every core — the reusable-test workflow passes it through from its
+# `workers` input.
+PYTEST_N_WORKERS ?= 2
 PYTEST_PARALLEL_LOCAL := -n auto --dist=loadscope -m "not serial"
-PYTEST_PARALLEL_CI := -n 2 --dist=loadscope -m "not serial"
+PYTEST_PARALLEL_CI := -n $(PYTEST_N_WORKERS) --dist=loadscope -m "not serial"
 PYTEST_PARALLEL := $(PYTEST_PARALLEL_CI)
 PYTEST_SERIAL := -m serial
 
@@ -160,6 +165,13 @@ ci-tests-infrastructure:  ## Run infrastructure tests only (matches ci.yml infra
 	@echo "Running infrastructure tests (parallel)..."
 	$(call run-tool,pytest,$(TESTS_INFRASTRUCTURE) $(PYTEST_PARALLEL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-infrastructure.xml --junitxml=junit-infrastructure.xml)
 
+ci-tests-coverage-check:  ## Combined-coverage gate: merge per-leg data + enforce threshold
+	@echo "Combining per-leg coverage data and checking combined threshold ($(COVERAGE_THRESHOLD)%)..."
+	$(call run-tool,coverage,combine)
+	# `coverage report` uses --fail-under (the pytest-cov spelling
+	# --cov-fail-under is not valid for the coverage CLI).
+	$(call run-tool,coverage,report --fail-under=$(COVERAGE_THRESHOLD))
+
 # @SECTION UI Build
 
 ui-build:  ## Build the Reflex static bundle into src/orb/ui/_static
@@ -168,16 +180,22 @@ ui-build:  ## Build the Reflex static bundle into src/orb/ui/_static
 ci-tests-ui-smoke:  ## Boot embedded UI + curl each page + shut down (matches ci.yml ui-smoke job)
 	@./dev-tools/ci/run_ui_smoke.sh
 
+ci-check-python-version-drift:  ## Assert that workflow fallback strings match .project.yml python.versions
+	@echo "Checking Python version drift between .project.yml and workflow fallback strings..."
+	@python3 dev-tools/ci/check_python_version_drift.py
+
 ci-check:  ## Run comprehensive CI checks (matches GitHub Actions exactly)
 	@echo "Running comprehensive CI checks that match GitHub Actions pipeline..."
 	$(MAKE) ci-quality
 	$(MAKE) ci-architecture
+	$(MAKE) ci-check-python-version-drift
 	$(MAKE) ci-tests-unit
 
 ci-check-quick:  ## Run quick CI checks (fast checks only)
 	@echo "Running quick CI checks..."
 	$(MAKE) ci-quality
 	$(MAKE) ci-architecture
+	$(MAKE) ci-check-python-version-drift
 
 ci-check-verbose:  ## Run CI checks with verbose output
 	@echo "Running CI checks with verbose output..."
