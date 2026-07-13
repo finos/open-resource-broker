@@ -4,11 +4,15 @@ on:
   workflow_call:
     inputs:
       cache-type:
-        description: 'Type of cache (dependencies, build, container)'
+        # Only "dependencies" is used by any caller; the "build" and "container"
+        # variants were speculative and have never been called.  The input is
+        # kept for backwards-compat but anything other than "dependencies" falls
+        # through to a sha-based fallback key.
+        description: 'Type of cache (dependencies)'
         required: true
         type: string
       cache-key-base:
-        description: 'Base cache key'
+        description: 'Base cache key (e.g. test-deps, quality-deps)'
         required: true
         type: string
       python-version:
@@ -17,11 +21,8 @@ on:
         type: string
     outputs:
       cache-key:
-        description: 'Generated cache key'
+        description: 'Generated cache key for use in setup-uv-cached'
         value: ${{ jobs.generate-cache-key.outputs.cache-key }}
-      cache-hit:
-        description: 'Whether cache was hit'
-        value: ${{ jobs.generate-cache-key.outputs.cache-hit }}
 
 jobs:
   generate-cache-key:
@@ -31,7 +32,6 @@ jobs:
       contents: read
     outputs:
       cache-key: ${{ steps.cache-key.outputs.key }}
-      cache-hit: ${{ steps.cache.outputs.cache-hit }}
     steps:
     - name: Checkout code
       uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -42,12 +42,6 @@ jobs:
         case "${{ inputs.cache-type }}" in
           dependencies)
             KEY="${{ inputs.cache-key-base }}-py${{ inputs.python-version }}-${{ hashFiles('.project.yml', 'pyproject.toml', 'uv.lock') }}"
-            ;;
-          build)
-            KEY="${{ inputs.cache-key-base }}-py${{ inputs.python-version }}-${{ hashFiles('src/**/*.py', 'pyproject.toml') }}"
-            ;;
-          container)
-            KEY="${{ inputs.cache-key-base }}-py${{ inputs.python-version }}-${{ hashFiles('Dockerfile', 'src/**/*.py', 'pyproject.toml') }}"
             ;;
           *)
             KEY="${{ inputs.cache-key-base }}-${{ github.sha }}"
