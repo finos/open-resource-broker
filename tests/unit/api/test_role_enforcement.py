@@ -472,11 +472,6 @@ _READ_ENDPOINTS: list[tuple[Any, str, str, dict | None]] = [
     (requests_router, "GET", "/requests/return", None),
     (requests_router, "GET", "/requests/req-1/status", None),
     (requests_router, "POST", "/requests/status", {"request_ids": ["req-1"]}),
-    # ?timeout=1 keeps the SSE stream from blocking on its 300s default: this
-    # test only asserts the role gate does not 403, which fires before the
-    # stream generator runs.  Without the override the generator loops until
-    # pytest-timeout kills it at 300s, dominating the whole unit leg.
-    (requests_router, "GET", "/requests/req-1/stream?timeout=1", None),
     # machines router
     (machines_router, "GET", "/machines/", None),
     (machines_router, "GET", "/machines/m-1/status", None),
@@ -540,6 +535,93 @@ def test_read_endpoint_viewer_is_not_denied(router_obj, method, path, body):
     assert resp.status_code != 403, (
         f"Viewer should not be denied on {method} {path}, got {resp.status_code}"
     )
+
+
+# ---------------------------------------------------------------------------
+# SSE stream endpoint: role-gate tests that do not drain the streaming body
+#
+# GET /{request_id}/stream is a viewer-guarded SSE endpoint whose generator
+# loops with asyncio.sleep().  Draining it via client.get() would block until
+# the timeout expires — deadlocking under anyio >= 4.14.2 in xdist workers.
+#
+# Strategy: stub the status orchestrator so it returns a terminal status on
+# the first call.  The generator yields one event, sees "cancelled", and
+# returns immediately without ever reaching asyncio.sleep().  Both directions
+# of the role gate are covered: anonymous (role="none") → 403, and
+# viewer → not 403.
+# ---------------------------------------------------------------------------
+
+
+def _stub_terminal_status_orchestrator():
+    """Stub orchestrator that returns a terminal 'cancelled' status on execute.
+
+    Causes the SSE generator to exit after one iteration without sleeping.
+    """
+    from orb.application.services.orchestration.dtos import GetRequestStatusOutput
+
+    orc = AsyncMock()
+    orc.execute = AsyncMock(
+        return_value=GetRequestStatusOutput(
+            requests=[{"request_id": "req-1", "status": "cancelled"}]
+        )
+    )
+    return orc
+
+
+def _stub_request_formatter_terminal():
+    """Stub formatter that returns a terminal-status payload.
+
+    format_request_status() is called by the SSE generator; returning a
+    MagicMock whose .data is a dict with a cancelled request ensures
+    _is_terminal_status() fires on the first iteration.
+    """
+    fmt = MagicMock()
+    result = MagicMock()
+    result.data = {"requests": [{"request_id": "req-1", "status": "cancelled"}]}
+    fmt.format_request_status.return_value = result
+    return fmt
+
+
+def _stream_overrides():
+    from orb.api.dependencies import (
+        get_request_formatter,
+        get_request_status_orchestrator,
+    )
+
+    return {
+        get_request_status_orchestrator: _stub_terminal_status_orchestrator,
+        get_request_formatter: _stub_request_formatter_terminal,
+    }
+
+
+@pytest.mark.unit
+@pytest.mark.api
+@pytest.mark.timeout(30)
+def test_stream_endpoint_anonymous_gets_403():
+    """Zero-rank caller is denied 403 on the SSE stream endpoint.
+
+    The role gate fires during FastAPI dependency resolution, before the
+    streaming generator is entered, so no body is produced.
+    """
+    app = _app_with_no_rank_user(requests_router)
+    for dep, factory in _stream_overrides().items():
+        app.dependency_overrides[dep] = factory
+    resp = _client(app).get("/requests/req-1/stream?timeout=1&interval=0.5")
+    assert resp.status_code == 403
+
+
+@pytest.mark.unit
+@pytest.mark.api
+@pytest.mark.timeout(30)
+def test_stream_endpoint_viewer_is_not_denied():
+    """Viewer-role caller passes the role gate on the SSE stream endpoint.
+
+    The orchestrator stub returns a terminal status so the generator exits
+    after one iteration — asyncio.sleep() is never reached.
+    """
+    app = _app_with_router(requests_router, "viewer", _stream_overrides())
+    resp = _client(app).get("/requests/req-1/stream?timeout=1&interval=0.5")
+    assert resp.status_code != 403
 
 
 # ---------------------------------------------------------------------------

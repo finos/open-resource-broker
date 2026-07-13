@@ -534,6 +534,7 @@ markers = [
     "security: marks security tests",
     "serial: forces serial execution (use ``-n0`` or filter with ``-m 'not serial'`` under xdist)",
     "k8s_live: Live Kubernetes integration tests (require a real cluster — pass --run-k8s to enable)",
+    "timeout: Per-test wall-clock timeout (requires pytest-timeout; value in seconds)",
 ]
 # Provider-specific fake credentials live in
 # tests/providers/<name>/mocked/conftest.py.  The global pytest-env block
