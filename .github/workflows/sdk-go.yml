@@ -21,10 +21,16 @@ on:
 permissions:
   contents: read
 
+# Per-ref concurrency: prevents stale SDK CI runs from blocking a newer push.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     name: Go SDK Build & Test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
 
@@ -46,6 +52,7 @@ jobs:
   check-drift:
     name: Check Generated Code Drift
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     # Only run drift check when openapi.json changes

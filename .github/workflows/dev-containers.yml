@@ -14,7 +14,7 @@ on:
       - 'dev-tools/container/container_build.sh'
       - '.github/workflows/dev-containers.yml'
   workflow_run:
-    workflows: ["Quality Checks", "Unit Tests"]
+    workflows: ["Unit Tests"]
     types: [completed]
     branches: [main]
   pull_request:
@@ -39,7 +39,10 @@ permissions:
   packages: read
 
 concurrency:
-  group: "container-registry"
+  # Scope per ref so runs on different branches/PRs do not cancel each other.
+  # Without the ref suffix any container run repo-wide would cancel this one,
+  # causing PR jobs to show CANCELLED (the red-X on PR #292).
+  group: container-registry-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -51,6 +54,7 @@ jobs:
   calculate-tags:
     name: Calculate Container Tags
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: config
     permissions:
       contents: read
@@ -73,13 +77,18 @@ jobs:
     needs: config
     uses: ./.github/workflows/cache-management.yml
     with:
-      cache-type: build
+      # Use "dependencies" so the cache key hashes .project.yml/pyproject.toml/uv.lock
+      # and produces a warm hit for repeated container builds.  The old "build" value
+      # fell through to the SHA-based fallback arm in cache-management.yml, producing
+      # a cold key on every run and forcing a full dep reinstall each time.
+      cache-type: dependencies
       cache-key-base: container-build
       python-version: ${{ needs.config.outputs.default-python-version }}
 
   container-pipeline:
     name: Build and Scan Container Images
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     needs: [config, calculate-tags, setup-cache]
 
     strategy:
@@ -102,7 +111,7 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c  # v4
       with:
-        platforms: linux/amd64,linux/arm64
+        platforms: ${{ needs.config.outputs.build-platforms }}
 
     - name: Log in to Container Registry
       uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0  # v4
@@ -121,38 +130,62 @@ jobs:
       run: make build
 
     - name: Build and scan container image
+      shell: bash
       env:
         REGISTRY: ${{ needs.config.outputs.container-registry }}
         IMAGE_NAME: ${{ needs.config.outputs.container-image }}
         VERSION: ${{ needs.config.outputs.package-version }}
         PYTHON_VERSION: ${{ matrix.python-version }}
+        BUILD_PLATFORMS: ${{ needs.config.outputs.build-platforms }}
+        PACKAGE_NAME_SHORT: ${{ needs.config.outputs.short-name }}
       run: |
-        if [[ "${{ env.PUSH_TO_REGISTRY }}" == "true" && "${{ github.event_name }}" != "pull_request" ]]; then
+        # Trivy cannot scan a multi-arch manifest — it needs one concrete,
+        # locally-loaded image.  We derive the scan arch from the first entry
+        # of build-platforms (single source of truth from .project.yml) so
+        # that if amd64 is ever dropped or reordered the scan follows suit.
+        SCAN_PLATFORM=$(echo "$BUILD_PLATFORMS" | cut -d, -f1)
+
+        # Determine whether to push.  On workflow_dispatch the push_images input
+        # controls it explicitly; for all other triggers push unless it is a PR.
+        # The original expression `(dispatch && inputs.push_images) || 'true'`
+        # evaluated to 'true' even when push_images was false because the string
+        # literal 'true' was always the fallback.  The corrected form only sets
+        # DISPATCH_PUSH=false when the caller explicitly opted out on a dispatch.
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.push_images }}" == "false" ]]; then
+          DISPATCH_PUSH="false"
+        else
+          DISPATCH_PUSH="true"
+        fi
+        if [[ "${{ env.PUSH_TO_REGISTRY }}" == "true" && "${{ github.event_name }}" != "pull_request" && "$DISPATCH_PUSH" == "true" ]]; then
           # Build multi-platform image and push to registry
           docker buildx build \
-            --platform linux/amd64,linux/arm64 \
+            --platform "$BUILD_PLATFORMS" \
             --build-arg "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
             --build-arg "VERSION=$VERSION" \
             --build-arg "VCS_REF=$(git rev-parse --short HEAD)" \
             --build-arg "PYTHON_VERSION=$PYTHON_VERSION" \
-            --build-arg PACKAGE_NAME_SHORT=orb \
+            --build-arg "PACKAGE_NAME_SHORT=$PACKAGE_NAME_SHORT" \
             --cache-from type=gha \
             --cache-to type=gha,mode=max \
             --push \
             -t "$REGISTRY/$IMAGE_NAME:$VERSION-python$PYTHON_VERSION" \
             .
-          
-          # Pull back amd64 version for local scanning
-          docker pull --platform linux/amd64 "$REGISTRY/$IMAGE_NAME:$VERSION-python$PYTHON_VERSION"
+
+          # Pull back a single-arch image for local Trivy scanning.
+          # Multi-arch manifests cannot be loaded/scanned; we use the first
+          # entry of build-platforms (SCAN_PLATFORM) rather than hardcoding amd64.
+          docker pull --platform "$SCAN_PLATFORM" "$REGISTRY/$IMAGE_NAME:$VERSION-python$PYTHON_VERSION"
         else
-          # Build single platform for scanning only (PR/test builds)
+          # Build single platform for scanning only (PR/test builds).
+          # Use the first entry of build-platforms (SCAN_PLATFORM) so the
+          # scan arch tracks .project.yml rather than a hardcoded value.
           docker buildx build \
-            --platform linux/amd64 \
+            --platform "$SCAN_PLATFORM" \
             --build-arg "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
             --build-arg "VERSION=$VERSION" \
             --build-arg "VCS_REF=$(git rev-parse --short HEAD)" \
             --build-arg "PYTHON_VERSION=$PYTHON_VERSION" \
-            --build-arg PACKAGE_NAME_SHORT=orb \
+            --build-arg "PACKAGE_NAME_SHORT=$PACKAGE_NAME_SHORT" \
             --cache-from type=gha \
             --cache-to type=gha,mode=max \
             --load \
@@ -195,8 +228,10 @@ jobs:
   container-manifest:
     name: Create Multi-Architecture Manifests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [config, calculate-tags, setup-cache, container-pipeline]
-    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'release')
+    # 'release' is not a trigger for this workflow so the disjunct was dead; keep only the main-branch guard.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
 
     permissions:
       contents: read
@@ -245,8 +280,10 @@ jobs:
   container-validation:
     name: Validate Container Tags
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [config, calculate-tags, setup-cache, container-manifest]
-    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'release')
+    # 'release' is not a trigger for this workflow so the disjunct was dead; keep only the main-branch guard.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
 
     permissions:
       contents: read
@@ -298,6 +335,7 @@ jobs:
         IMAGE: ${{ needs.config.outputs.container-image }}
         VERSION: ${{ needs.config.outputs.package-version }}
         DEFAULT_PYTHON: ${{ needs.config.outputs.default-python-version }}
+        BUILD_PLATFORMS: ${{ needs.config.outputs.build-platforms }}
       run: |
         # Use buildx imagetools rather than `docker manifest inspect`:
         # imagetools authenticates via the existing docker login session and
@@ -308,11 +346,24 @@ jobs:
         INSPECT=$(docker buildx imagetools inspect --raw "$REF")
         echo "$INSPECT"
 
-        if echo "$INSPECT" | grep -q '"architecture": "amd64"' && \
-           echo "$INSPECT" | grep -q '"architecture": "arm64"'; then
-          echo "Multi-arch manifest contains both amd64 and arm64"
-        else
-          echo "Multi-arch manifest missing architectures"
+        # Derive expected arch list from BUILD_PLATFORMS (single source of truth).
+        # BUILD_PLATFORMS is a comma-separated list of "os/arch" pairs, e.g.
+        # "linux/amd64,linux/arm64".  Extract the arch component of each pair.
+        MISSING=0
+        IFS=',' read -ra PLATFORMS <<< "$BUILD_PLATFORMS"
+        for platform in "${PLATFORMS[@]}"; do
+          arch="${platform##*/}"
+          if echo "$INSPECT" | jq -e --arg arch "$arch" \
+              '.manifests[]?.platform.architecture == $arch' | grep -q true; then
+            echo "Found architecture: $arch"
+          else
+            echo "ERROR: architecture missing from manifest: $arch"
+            MISSING=1
+          fi
+        done
+        if [[ "$MISSING" -eq 1 ]]; then
+          echo "Multi-arch manifest missing one or more expected architectures"
           exit 1
         fi
+        echo "Multi-arch manifest contains all expected architectures"
 

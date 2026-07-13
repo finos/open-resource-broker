@@ -349,8 +349,11 @@ def get_current_user(request: Request) -> CurrentUser:
     user_id: str | None = getattr(request.state, "user_id", None)
 
     if not user_id:
-        # Auth disabled / excluded path — grant least privilege (viewer).
-        # Never elevate an unauthenticated caller to admin.
+        # Auth disabled or excluded path — grant least privilege (viewer).
+        # Never elevate an unauthenticated caller to admin, regardless of the
+        # auth_enabled flag.  Operators who need elevated access in an
+        # auth-disabled deployment should override get_current_user via
+        # dependency injection (e.g. in tests or internal tooling).
         return CurrentUser(username="anonymous", role="viewer", claims={})
 
     raw_roles: list[str] = getattr(request.state, "user_roles", []) or []

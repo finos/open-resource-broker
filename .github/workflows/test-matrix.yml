@@ -2,31 +2,38 @@ name: Test Matrix
 
 on:
   schedule:
-    # Run nightly comprehensive testing at 2 AM UTC
+    # Nightly comprehensive testing: all Python versions across the full matrix.
+    # Not triggered on push because ci-tests.yml already covers default-Python
+    # unit/integration on every main/develop push, and the multi-Python sweep
+    # would duplicate that work.  Keeping the nightly run ensures all supported
+    # versions are validated regularly without burning extra CI minutes on PRs.
     - cron: '0 2 * * *'
   workflow_dispatch:
-    # Allow manual triggering
-  push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'pyproject.toml'
-      - 'requirements*.txt'
-      - 'uv.lock'
-      - 'Makefile'
-      - 'makefiles/**'
-      - '.github/workflows/test-matrix.yml'
-    # Only run on main branch for comprehensive testing
+    # Allow manual triggering of the full matrix at any time.
+
+# Scope concurrency per-ref: two schedule runs can never overlap and a manual
+# dispatch on main won't cancel a running nightly sweep on a different ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   config:
     name: Get Configuration
     uses: ./.github/workflows/shared-config.yml
 
+  setup-cache:
+    name: Setup Test Cache
+    needs: config
+    uses: ./.github/workflows/cache-management.yml
+    with:
+      cache-type: dependencies
+      cache-key-base: test-deps
+      python-version: ${{ needs.config.outputs.default-python-version }}
+
   unit-tests:
     name: Unit Tests
-    needs: config
+    needs: [config, setup-cache]
     permissions:
       contents: read
     strategy:
@@ -37,11 +44,14 @@ jobs:
         # Update static list when adding new Python versions (currently 3.10-3.14)
         python-version: ${{ fromJSON(needs.config.outputs.python-versions || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
     uses: ./.github/workflows/reusable-test.yml
+    secrets: inherit
     with:
       test-type: unit
       python-version: ${{ matrix.python-version }}
       os: ${{ matrix.os }}
       default-python-version: ${{ needs.config.outputs.default-python-version }}
+      cache-key: ${{ needs.setup-cache.outputs.cache-key }}
+      artifact-prefix: test-matrix
       aws-region: ${{ needs.config.outputs.aws-region }}
       aws-access-key: ${{ needs.config.outputs.aws-access-key }}
       aws-secret-key: ${{ needs.config.outputs.aws-secret-key }}
@@ -50,7 +60,7 @@ jobs:
 
   integration-tests:
     name: Integration Tests
-    needs: [config]
+    needs: [config, setup-cache]
     permissions:
       contents: read
     strategy:
@@ -61,88 +71,61 @@ jobs:
         # Update static list when adding new Python versions (currently 3.10-3.14)
         python-version: ${{ fromJSON(needs.config.outputs.python-versions || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
     uses: ./.github/workflows/reusable-test.yml
+    secrets: inherit
     with:
       test-type: integration
       python-version: ${{ matrix.python-version }}
       os: ${{ matrix.os }}
       default-python-version: ${{ needs.config.outputs.default-python-version }}
+      cache-key: ${{ needs.setup-cache.outputs.cache-key }}
+      artifact-prefix: test-matrix
       aws-region: ${{ needs.config.outputs.aws-region }}
       aws-access-key: ${{ needs.config.outputs.aws-access-key }}
       aws-secret-key: ${{ needs.config.outputs.aws-secret-key }}
       environment: ${{ needs.config.outputs.environment }}
       testing-flag: ${{ needs.config.outputs.testing-flag }}
 
-  package-variant-tests:
-    name: Package Variant Tests
-    needs: [config, unit-tests]
+  # Provider matrix: auto-discovered from tests/providers/*/testconf.mk via
+  # shared-config.  Adding a new provider directory + testconf.mk fragment
+  # causes it to run here across all Python versions with no workflow edit.
+  providers-tests:
+    name: Providers Tests
+    needs: [config, setup-cache]
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        # Dynamic matrix from config with static fallback
         python-version: ${{ fromJSON(needs.config.outputs.python-versions || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
-        package-variant: 
-          - "."
-          - ".[cli]"
-          - ".[api]"
-          - ".[monitoring]"
-          - ".[all]"
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install package variant
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install -e "${{ matrix.package-variant }}"
-      - name: Test import guards
-        run: |
-          python -c "
-          import sys
-          variant = '${{ matrix.package-variant }}'
+        # Dynamic discovery: static fallback ['aws'] keeps CI valid in forks.
+        provider: ${{ fromJSON(needs.config.outputs.providers || '["aws"]') }}
+    uses: ./.github/workflows/reusable-test.yml
+    secrets: inherit
+    with:
+      test-type: providers
+      provider: ${{ matrix.provider }}
+      python-version: ${{ matrix.python-version }}
+      os: ${{ matrix.os }}
+      default-python-version: ${{ needs.config.outputs.default-python-version }}
+      cache-key: ${{ needs.setup-cache.outputs.cache-key }}
+      artifact-prefix: test-matrix
+      aws-region: ${{ needs.config.outputs.aws-region }}
+      aws-access-key: ${{ needs.config.outputs.aws-access-key }}
+      aws-secret-key: ${{ needs.config.outputs.aws-secret-key }}
+      environment: ${{ needs.config.outputs.environment }}
+      testing-flag: ${{ needs.config.outputs.testing-flag }}
 
-          # Test basic imports (should always work)
-          try:
-              import orb
-              print('✓ Basic orb import works')
-          except ImportError as e:
-              print(f'✗ Basic orb import failed: {e}')
-              sys.exit(1)
-
-          # Test CLI flag: RICH_AVAILABLE reflects whether rich is installed
-          from orb.cli.console import RICH_AVAILABLE
-          if variant in ['.[cli]', '.[all]']:
-              if not RICH_AVAILABLE:
-                  print(f'✗ Expected RICH_AVAILABLE=True for {variant} but got False')
-                  sys.exit(1)
-              print(f'✓ RICH_AVAILABLE=True as expected for {variant}')
-          else:
-              print(f'✓ RICH_AVAILABLE={RICH_AVAILABLE} (rich not required for {variant})')
-
-          # Test API imports: fastapi is only available with .[api] or .[all]
-          try:
-              from orb.api.routers.machines import router
-              if variant in ['.', '.[cli]', '.[monitoring]']:
-                  print(f'✗ Expected API import to fail for {variant} but it succeeded')
-                  sys.exit(1)
-              print(f'✓ API router import works for {variant}')
-          except ImportError as e:
-              if variant in ['.[api]', '.[all]']:
-                  print(f'✗ Unexpected API import failure for {variant}: {e}')
-                  sys.exit(1)
-              print(f'✓ Expected API import failure for {variant}')
-
-          print(f'✓ All import tests passed for {variant}')
-          "
+  # package-variant-tests was removed from this workflow.
+  # The authoritative package-variant testing lives in package-testing.yml which
+  # builds the wheel (not editable source), tests the minimal and all meta-extras,
+  # and includes import-guard, dependency-isolation, and error-message-quality
+  # steps.  Running a lighter import-probe matrix here too caused the same
+  # Python/extra combinations to be checked twice on every main push.
 
   e2e-tests:
     name: End-to-End Tests
-    needs: [config]
+    needs: [config, setup-cache]
     permissions:
       contents: read
     strategy:
@@ -153,11 +136,14 @@ jobs:
         # Update static list when adding new Python versions (currently 3.10-3.14)
         python-version: ${{ fromJSON(needs.config.outputs.python-versions || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
     uses: ./.github/workflows/reusable-test.yml
+    secrets: inherit
     with:
       test-type: e2e
       python-version: ${{ matrix.python-version }}
       os: ${{ matrix.os }}
       default-python-version: ${{ needs.config.outputs.default-python-version }}
+      cache-key: ${{ needs.setup-cache.outputs.cache-key }}
+      artifact-prefix: test-matrix
       aws-region: ${{ needs.config.outputs.aws-region }}
       aws-access-key: ${{ needs.config.outputs.aws-access-key }}
       aws-secret-key: ${{ needs.config.outputs.aws-secret-key }}
@@ -167,7 +153,8 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [unit-tests, integration-tests, package-variant-tests, e2e-tests]
+    timeout-minutes: 10
+    needs: [unit-tests, integration-tests, providers-tests, e2e-tests]
     if: always()
     permissions:
       contents: read

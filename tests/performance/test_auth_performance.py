@@ -21,10 +21,12 @@ class TestAuthenticationPerformance:
         from unittest.mock import MagicMock
 
         from orb.api.dependencies import get_health_check_port
+        from orb.config.schemas.server_schema import RateLimitConfig
 
         server_config = ServerConfig(  # type: ignore[call-arg]
             enabled=True,
             auth=AuthConfig(enabled=False, strategy="replace"),  # type: ignore[call-arg]
+            rate_limiting=RateLimitConfig(enabled=False),
         )
         app = create_fastapi_app(server_config)
         mock_health_port = MagicMock()
@@ -35,6 +37,11 @@ class TestAuthenticationPerformance:
     @pytest.fixture
     def auth_client_and_token(self):
         """Client with authentication and valid token."""
+        from unittest.mock import MagicMock
+
+        from orb.api.dependencies import get_health_check_port
+        from orb.config.schemas.server_schema import RateLimitConfig
+
         server_config = ServerConfig(  # type: ignore[call-arg]
             enabled=True,
             auth=AuthConfig(  # type: ignore[call-arg]
@@ -45,8 +52,12 @@ class TestAuthenticationPerformance:
                     "algorithm": "HS256",
                 },
             ),
+            rate_limiting=RateLimitConfig(enabled=False),
         )
         app = create_fastapi_app(server_config)
+        mock_health_port = MagicMock()
+        mock_health_port.get_status.return_value = {"status": "healthy"}
+        app.dependency_overrides[get_health_check_port] = lambda: mock_health_port
         client = TestClient(app)
 
         # Create valid token

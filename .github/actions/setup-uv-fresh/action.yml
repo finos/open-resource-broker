@@ -28,8 +28,13 @@ runs:
         cache-dependency-glob: "pyproject.toml"
         cache-suffix: ${{ inputs.cache-key-suffix }}
 
-    - name: Install system dependencies for Python 3.14
-      if: inputs.python-version == '3.14'
+    - name: Install system dependencies for Python 3.14+
+      # libxml2/libxslt are required for lxml on Python 3.14 and later because
+      # pre-built wheels are not yet available for those releases.  Use a
+      # version-threshold rather than a literal so this fires for 3.15, 3.16, …
+      # without a workflow edit.  The threshold is 3.14 (the first version that
+      # needs these headers); bump only if an older version is shown to need them.
+      if: fromJSON(inputs.python-version) >= 3.14
       shell: bash
       run: |
         sudo apt-get update
@@ -41,7 +46,7 @@ runs:
 
     - name: Upgrade pip to secure version
       shell: bash
-      run: python -m pip install --upgrade pip>=25.3
+      run: python -m pip install --upgrade "pip>=25.3"
 
     - name: Install dependencies
       if: inputs.install-deps == 'true'

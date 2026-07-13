@@ -25,6 +25,11 @@ on:
         required: false
         type: string
         default: 'ubuntu-latest'
+      workers:
+        description: 'pytest-xdist worker count (empty = leg default; "auto" = one per core, for larger runners)'
+        required: false
+        type: string
+        default: ''
       continue-on-error:
         description: 'Whether to continue on test failures'
         required: false
@@ -60,6 +65,26 @@ on:
         required: false
         type: string
         default: 'true'
+      cache-key:
+        description: >-
+          Pre-computed cache key from the caller's setup-cache step.  When
+          provided (recommended) the job hits the warm cache primed by the
+          caller's cache-management job.  When omitted the job falls back to
+          computing its own key (always cold — deps reinstalled).
+        required: false
+        type: string
+        default: ''
+      artifact-prefix:
+        description: >-
+          Caller-supplied prefix prepended to artifact names to prevent
+          collisions when multiple workflows produce the same test-type/os/py
+          combination (e.g. ci-tests vs test-matrix both running unit tests).
+        required: false
+        type: string
+        default: ''
+    secrets:
+      CODECOV_TOKEN:
+        required: false
 
 env:
   AWS_DEFAULT_REGION: ${{ inputs.aws-region }}
@@ -72,6 +97,7 @@ jobs:
   test:
     name: ${{ inputs.test-type == 'unit' && 'Unit Tests' || inputs.test-type == 'integration' && 'Integration Tests' || inputs.test-type == 'e2e' && 'End-to-End Tests' || (inputs.test-type == 'providers' && inputs.provider != '') && format('Providers Tests ({0})', inputs.provider) || format('{0} Tests', inputs.test-type) }}
     runs-on: ${{ inputs.os }}
+    timeout-minutes: 30
     permissions:
       contents: read
 
@@ -82,12 +108,36 @@ jobs:
       - name: Setup UV with cached environment
         uses: ./.github/actions/setup-uv-cached
         with:
-          cache-key: deps-${{ inputs.python-version }}-${{ hashFiles('.project.yml', 'pyproject.toml', 'requirements*.txt') }}
+          # Use the caller-supplied cache key when available so this job hits the
+          # warm cache primed by the caller's cache-management job.  Fallback
+          # mirrors the key format used by cache-management (dependencies type)
+          # so at least restore-keys can provide a partial hit.
+          cache-key: >-
+            ${{
+              inputs.cache-key != ''
+              && inputs.cache-key
+              || format('test-deps-py{0}-{1}',
+                   inputs.python-version || inputs.default-python-version,
+                   hashFiles('.project.yml', 'pyproject.toml', 'uv.lock'))
+            }}
           fail-on-cache-miss: false
 
       - name: Run tests
         id: run-tests
-        run: make ci-tests-${{ inputs.test-type }} PROVIDER=${{ inputs.provider }}
+        # Harden against shell-injection: pass caller inputs via env vars and
+        # reference them as shell variables, never interpolate ${{ }} into the
+        # run body.  PYTEST_N_WORKERS is only set when the caller passes workers
+        # (e.g. "auto" on a larger runner); empty → make's default (-n 2).
+        env:
+          TEST_TYPE: ${{ inputs.test-type }}
+          PROVIDER: ${{ inputs.provider }}
+          WORKERS: ${{ inputs.workers }}
+        run: |
+          if [ -n "$WORKERS" ]; then
+            make "ci-tests-${TEST_TYPE}" PROVIDER="$PROVIDER" PYTEST_N_WORKERS="$WORKERS"
+          else
+            make "ci-tests-${TEST_TYPE}" PROVIDER="$PROVIDER"
+          fi
         continue-on-error: ${{ inputs.continue-on-error }}
 
       # When continue-on-error is true the overall job status stays green even
@@ -97,12 +147,14 @@ jobs:
       # the raw log.
       - name: Annotate soft failure in job summary
         if: steps.run-tests.outcome == 'failure'
+        env:
+          TEST_TYPE: ${{ inputs.test-type }}
         run: |
-          echo "::warning::${{ inputs.test-type }} tests failed (continue-on-error=true). Review the test log for details."
+          echo "::warning::${TEST_TYPE} tests failed (continue-on-error=true). Review the test log for details."
           {
-            echo "## :warning: ${{ inputs.test-type }} test failures"
+            echo "## :warning: ${TEST_TYPE} test failures"
             echo ""
-            echo "The **${{ inputs.test-type }}** test suite reported failures."
+            echo "The **${TEST_TYPE}** test suite reported failures."
             echo "Overall job status is still green because \`continue-on-error: true\` is set,"
             echo "but these failures should be investigated before merging."
           } >> "$GITHUB_STEP_SUMMARY"
@@ -111,11 +163,27 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         if: always()
         with:
-          name: test-results-${{ inputs.test-type }}${{ inputs.provider != '' && format('-{0}', inputs.provider) || '' }}-${{ inputs.os }}-py${{ inputs.python-version || inputs.default-python-version }}
+          # Artifact name is namespaced by caller workflow (artifact-prefix) so
+          # ci-tests and test-matrix don't overwrite each other when they both
+          # produce unit tests on the same OS/Python combination.
+          name: >-
+            test-results-${{
+              inputs.artifact-prefix != ''
+              && format('{0}-', inputs.artifact-prefix)
+              || ''
+            }}${{ inputs.test-type }}${{
+              inputs.provider != '' && format('-{0}', inputs.provider) || ''
+            }}-${{ inputs.os }}-py${{ inputs.python-version || inputs.default-python-version }}
           retention-days: 30
+          # Include raw .coverage data files so the coverage-combine fan-in job
+          # can merge them across legs and enforce the combined threshold.
+          # include-hidden-files is required: .coverage is a dotfile and
+          # upload-artifact@v4+ excludes hidden files by default.
+          include-hidden-files: true
           path: |
             junit-*.xml
             coverage-*.xml
+            .coverage*
 
       - name: Upload coverage to Codecov
         if: inputs.upload-coverage && always()
@@ -128,7 +196,10 @@ jobs:
           name: ${{ inputs.test-type }}${{ inputs.provider != '' && format('-{0}', inputs.provider) || '' }}-tests
 
       - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
+        # Gated on upload-coverage: legs without pytest (e.g. ui-smoke) produce
+        # no junit-*.xml, so running test-results-action there yields a spurious
+        # "JUnit XML file not found" on the Codecov Test Analytics page.
+        if: ${{ inputs.upload-coverage && !cancelled() }}
         continue-on-error: true
         uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3  # v1
         with:

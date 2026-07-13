@@ -31,15 +31,18 @@ permissions:
   packages: write
 
 concurrency:
-  group: container-cleanup
+  # Distinct from container-cleanup-on-release so both can run concurrently without blocking.
+  group: container-cleanup-dev
   cancel-in-progress: false
 
 jobs:
   cleanup-dev:
     name: Prune Dev Container Tags
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Cleanup dev container versions
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OWNER: ${{ github.repository_owner }}
@@ -70,17 +73,29 @@ jobs:
             return 1
           }
 
+          # Detect owner type: /orgs/ only exists for org accounts; personal accounts
+          # use /users/.  Using the wrong path returns 404 (gh api exits 0 on 404,
+          # so the script would operate on malformed/empty data and mis-delete).
+          OWNER_TYPE=$(gh api "/users/${OWNER}" --jq '.type' 2>/dev/null || echo "")
+          if [[ "$OWNER_TYPE" == "Organization" ]]; then
+            PACKAGES_API="/orgs/${OWNER}/packages/container/${PACKAGE}/versions"
+          elif [[ "$OWNER_TYPE" == "User" ]]; then
+            PACKAGES_API="/users/${OWNER}/packages/container/${PACKAGE}/versions"
+          else
+            echo "ERROR: Could not determine owner type for '${OWNER}' (got: '${OWNER_TYPE}')" >&2
+            exit 1
+          fi
+          echo "Owner type: ${OWNER_TYPE} — using API path: ${PACKAGES_API}"
+
           # Paginate every container version on the package.
-          page=1
+          # --paginate follows Link headers automatically; --slurp merges pages into one array.
           : > /tmp/versions.jsonl
-          while true; do
-            resp=$(gh api "/orgs/${OWNER}/packages/container/${PACKAGE}/versions?per_page=100&page=${page}")
-            count=$(echo "$resp" | jq 'length')
-            if [[ "$count" -eq 0 ]]; then break; fi
-            echo "$resp" | jq -c '.[]' >> /tmp/versions.jsonl
-            if [[ "$count" -lt 100 ]]; then break; fi
-            page=$((page + 1))
-          done
+          if ! gh api --paginate "${PACKAGES_API}" --jq '.[]' > /tmp/versions.jsonl 2>/tmp/api_err.txt; then
+            echo "ERROR: gh api failed listing package versions:" >&2
+            cat /tmp/api_err.txt >&2
+            exit 1
+          fi
+          # Convert newline-delimited objects to one-object-per-line (--paginate + --jq '.[]' already does this)
 
           total=$(wc -l < /tmp/versions.jsonl)
           echo "Found ${total} container versions"
@@ -179,7 +194,7 @@ jobs:
             [[ -z "$line" ]] && continue
             id=$(echo "$line" | awk '{print $1}')
             echo "Deleting version ${id}"
-            gh api -X DELETE "/orgs/${OWNER}/packages/container/${PACKAGE}/versions/${id}" || {
+            gh api -X DELETE "${PACKAGES_API}/${id}" || {
               echo "  failed to delete ${id} (continuing)"
             }
             deleted=$((deleted + 1))
@@ -188,7 +203,7 @@ jobs:
             [[ -z "$line" ]] && continue
             id=$(echo "$line" | awk '{print $1}')
             echo "Deleting version ${id}"
-            gh api -X DELETE "/orgs/${OWNER}/packages/container/${PACKAGE}/versions/${id}" || {
+            gh api -X DELETE "${PACKAGES_API}/${id}" || {
               echo "  failed to delete ${id} (continuing)"
             }
             deleted=$((deleted + 1))

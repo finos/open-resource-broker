@@ -476,6 +476,15 @@ include-package-data = true
 testpaths = ["tests", "src/orb/k8s_legacy/tests"]
 norecursedirs = [
     "tests/providers/aws/live",
+    # k8s live tests require a real cluster; the parallel ci-tests-providers
+    # target passes -m "not serial" which would deselect every test if
+    # live/conftest.py's pytest_collection_modifyitems hook is allowed to run
+    # (it bulk-stamps serial on all collected items in the session).  Excluding
+    # this subtree from auto-discovery mirrors the aws/live pattern and keeps
+    # the parallel leg collecting only the mocked/unit/contract tests.  The
+    # serial ci-tests-providers-serial target points pytest at the path
+    # explicitly so live tests are still reachable when --run-k8s is passed.
+    "tests/providers/k8s/live",
     # Legacy k8s regression tests require a live cluster + kubeconfig; their
     # conftest calls `delete_pods_in_namespace()` at collection time, which
     # crashes in headless CI without a real kube context.  Run them
@@ -488,7 +497,11 @@ python_functions = ["test_*"]
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "function"
 junit_family = "legacy"
-addopts = "--tb=short --strict-markers --disable-warnings --cov=src/orb --cov-report=term-missing --cov-branch"
+# Coverage flags are NOT set here: CI drives coverage via makefiles/common.mk
+# (PYTEST_COV_ARGS), passed explicitly by each ci-tests-* target.  Keeping --cov
+# out of addopts means a bare `pytest` run is not instrumented (faster, no need
+# for --no-cov everywhere) while CI coverage is unchanged.
+addopts = "--tb=short --strict-markers --disable-warnings"
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",

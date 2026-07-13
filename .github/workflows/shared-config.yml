@@ -36,11 +36,27 @@ on:
       testing-flag:
         description: 'Testing flag'
         value: ${{ jobs.get-config.outputs.testing-flag }}
+      providers:
+        description: 'JSON array of discovered provider names (from tests/providers/*/testconf.mk)'
+        value: ${{ jobs.get-config.outputs.providers }}
+      package-extras:
+        description: 'JSON array of discovered feature extras (from pyproject.toml optional-dependencies, meta extras excluded)'
+        value: ${{ jobs.get-config.outputs.package-extras }}
+      pypi-name:
+        description: 'PyPI package name (project.pypi_name in .project.yml)'
+        value: ${{ jobs.get-config.outputs.pypi-name }}
+      build-platforms:
+        description: 'Comma-joined container build platforms (build.platforms in .project.yml)'
+        value: ${{ jobs.get-config.outputs.build-platforms }}
+      short-name:
+        description: 'Short CLI command name (project.short_name in .project.yml)'
+        value: ${{ jobs.get-config.outputs.short-name }}
 
 jobs:
   get-config:
     name: Get Configuration
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     outputs:
@@ -50,14 +66,27 @@ jobs:
       container-image: ${{ steps.config.outputs.container-image }}
       package-version: ${{ steps.config.outputs.package-version }}
       is-release: ${{ steps.config.outputs.is-release }}
+      # Intentional test stubs — hardcoded values that stand in for real AWS credentials
+      # in the testing environment.  Do NOT remove: reusable-test.yml and test-matrix.yml
+      # consume these outputs to configure the test harness (moto / localstack).
       aws-region: us-east-1
       aws-access-key: testing
       aws-secret-key: testing
       environment: testing
       testing-flag: "true"
+      providers: ${{ steps.discover.outputs.providers }}
+      package-extras: ${{ steps.discover.outputs.package-extras }}
+      pypi-name: ${{ steps.config.outputs.pypi-name }}
+      build-platforms: ${{ steps.config.outputs.build-platforms }}
+      short-name: ${{ steps.config.outputs.short-name }}
     steps:
     - name: Checkout code
       uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+    - name: Setup Python 3.12
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
+      with:
+        python-version: '3.12'
 
     - name: Setup cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v5
@@ -72,3 +101,43 @@ jobs:
     - name: Get project configuration
       id: config
       uses: ./.github/actions/get-config
+
+    - name: Discover providers and package extras
+      id: discover
+      run: |
+        # Providers: directories under tests/providers/ that own a testconf.mk.
+        # Shared helper dirs (base/, contract/, logs/) have no testconf.mk and
+        # are therefore excluded.  Static fallback keeps CI valid in forks or
+        # shallow clones where the directory structure might differ.
+        PROVIDERS=$(python3 -c "
+        import os, json
+        providers = sorted([
+            d for d in os.listdir('tests/providers')
+            if os.path.isdir(os.path.join('tests/providers', d))
+            and not d.startswith('__')
+            and os.path.exists(os.path.join('tests/providers', d, 'testconf.mk'))
+        ])
+        print(json.dumps(providers if providers else ['aws']))
+        ")
+
+        # Package extras: keys from [project.optional-dependencies] in pyproject.toml,
+        # excluding meta/aggregate extras that are not feature layers.
+        # Meta extras: all, dev, ci, test-*, all-providers, k8s-legacy, monitoring-aws
+        # tomllib is stdlib from Python 3.11+; fall back to the tomli backport on 3.10.
+        PACKAGE_EXTRAS=$(python3 -c "
+        try:
+            import tomllib
+        except ImportError:
+            import tomli as tomllib  # backport for Python < 3.11
+        import json
+        META = {'all', 'dev', 'ci', 'test-aws', 'test-k8s', 'all-providers', 'k8s-legacy', 'monitoring-aws'}
+        with open('pyproject.toml', 'rb') as f:
+            data = tomllib.load(f)
+        extras = [k for k in data['project']['optional-dependencies'].keys() if k not in META]
+        print(json.dumps(extras if extras else ['cli', 'api', 'monitoring']))
+        ")
+
+        echo "providers=${PROVIDERS}"
+        echo "package-extras=${PACKAGE_EXTRAS}"
+        echo "providers=${PROVIDERS}" >> "$GITHUB_OUTPUT"
+        echo "package-extras=${PACKAGE_EXTRAS}" >> "$GITHUB_OUTPUT"

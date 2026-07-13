@@ -143,8 +143,8 @@ get-version:  ## Generate unified version (works for PyPI, Docker, Git)
 	@if [ "$${IS_RELEASE:-false}" = "true" ]; then \
 		echo "$(VERSION)"; \
 	else \
-		commit=$$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown'); \
-		dev_int=$$(python3 -c "print(int('$${commit}'[:6], 16))"); \
+		commit=$$(git rev-parse HEAD 2>/dev/null || echo ''); \
+		dev_int=$$(python3 -c "c='$${commit}'; h=c[:10]; print(int(h,16) if h and all(ch in '0123456789abcdefABCDEF' for ch in h) else 0)"); \
 		echo "$(VERSION).dev$${dev_int}"; \
 	fi
 

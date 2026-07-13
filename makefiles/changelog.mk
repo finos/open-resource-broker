@@ -5,9 +5,10 @@ changelog-validate: dev-install  ## Validate changelog format and content
 	@echo "Validating changelog format..."
 	./dev-tools/release/changelog_manager.py validate
 
-changelog-preview: dev-install  ## Preview changelog changes for current commits
+FROM_COMMIT ?=
+changelog-preview: dev-install  ## Preview changelog changes for current commits (FROM_COMMIT=<sha> to scope)
 	@echo "Previewing changelog changes..."
-	./dev-tools/release/changelog_manager.py preview
+	./dev-tools/release/changelog_manager.py preview $(if $(FROM_COMMIT),--from-commit $(FROM_COMMIT),)
 
 changelog-delete: dev-install  ## Delete version from changelog (usage: make changelog-delete VERSION=1.0.0)
 	@if [ -z "$(VERSION)" ]; then \

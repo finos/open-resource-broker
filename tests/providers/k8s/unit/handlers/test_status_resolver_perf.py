@@ -714,9 +714,14 @@ def test_job_deleted_not_found_no_warning_flood(caplog: Any) -> None:
     """A not-found Job on read_job_status must log at DEBUG, not WARNING."""
     import logging
 
+    # Raise a real ApiException(404): the K8sRetryClassifier recognises it as
+    # non-retryable so the handler fails fast — no retry backoff, no sleep.
+    from kubernetes.client.exceptions import ApiException
+
     from orb.providers.k8s.infrastructure.handlers.job_handler import K8sJobHandler
 
-    not_found_exc = Exception("Not Found")
+    not_found_exc = ApiException(status=404)
+    not_found_exc.status = 404
 
     core_v1 = MagicMock()
     core_v1.list_namespaced_pod.return_value = SimpleNamespace(items=[])
@@ -731,9 +736,9 @@ def test_job_deleted_not_found_no_warning_flood(caplog: Any) -> None:
     logger_mock = MagicMock()
     handler = K8sJobHandler(kubernetes_client=client, config=config, logger=logger_mock)
 
-    # Make is_not_found return True for our exception.
-    handler.is_not_found = lambda exc: True  # type: ignore[method-assign]
-
+    # No is_not_found override or retry-backoff hack needed: the real
+    # ApiException(404) is recognised as not-found by the handler and as
+    # non-retryable by K8sRetryClassifier, so it fails fast on the first attempt.
     request = _req(provider_api="Job", deployment_name="job-1")
 
     with caplog.at_level(logging.WARNING):

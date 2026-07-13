@@ -8,9 +8,9 @@ Covers:
 * ``release_hosts`` selective path: when the victims are the top-of-stack
   ordinals, no warning is emitted and ``spec.replicas`` is patched down
   by the victim count.  Pods are never deleted directly.
-* ``release_hosts`` ordinal caveat: when victims include non-highest
-  ordinals, a WARNING is logged and the replicas patch still proceeds
-  (the controller will pick highest ordinals to evict).
+* ``release_hosts`` ordinal caveat: when victims are NOT the top-of-stack
+  ordinals, a ``K8sError`` is raised and no scale patch is issued.
+  Silently evicting different pods would cause data loss.
 * ``release_hosts`` full-release path: ``spec.replicas`` is patched to
   zero and the StatefulSet is deleted.
 * ``check_hosts_status`` reads both the pod list and the StatefulSet
@@ -31,6 +31,7 @@ from orb.domain.request.aggregate import Request
 from orb.domain.request.value_objects import RequestId, RequestType
 from orb.domain.template.template_aggregate import Template
 from orb.providers.k8s.configuration.config import K8sProviderConfig
+from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
 from orb.providers.k8s.infrastructure.handlers.statefulset_handler import K8sStatefulSetHandler
 
 # ---------------------------------------------------------------------------
@@ -246,11 +247,15 @@ async def test_release_hosts_selective_highest_ordinal_no_warning() -> None:
 
 
 @pytest.mark.asyncio
-async def test_release_hosts_selective_non_highest_ordinal_warns_and_still_scales() -> None:
-    """When the victims include non-highest ordinals, a WARNING is logged
-    and the controller still scales down by the victim count (it will
-    pick the highest-ordinal pods regardless of what the caller asked
-    for)."""
+async def test_release_hosts_selective_non_highest_ordinal_refused() -> None:
+    """When the victims are not the top-of-stack ordinals, the handler
+    raises K8sError and issues no scale patch.
+
+    Commit b4a77b1a deliberately changed this behaviour: silently evicting
+    different pods (the controller always picks the highest-ordinal set)
+    would cause data loss, so the handler refuses the request and tells
+    the caller which victims to supply instead.
+    """
     core_v1 = MagicMock()
     apps_v1 = MagicMock()
     apps_v1.read_namespaced_stateful_set.return_value = _make_statefulset_status(spec_replicas=5)
@@ -266,24 +271,17 @@ async def test_release_hosts_selective_non_highest_ordinal_warns_and_still_scale
     )
 
     # current=5, victims=[ordinal-1, ordinal-2] — non-highest ordinals.
-    # The controller will evict ordinals 3 and 4 instead.
-    await handler.release_hosts(["orb-deadbeef-1", "orb-deadbeef-2"], request.provider_data)
+    # The controller would evict ordinals 3 and 4 instead, so the handler
+    # refuses rather than silently releasing the wrong pods.
+    with pytest.raises(K8sError) as exc_info:
+        await handler.release_hosts(["orb-deadbeef-1", "orb-deadbeef-2"], request.provider_data)
 
-    # WARNING logged.
-    warning_messages = [
-        call.args[0]
-        for call in handler._logger.warning.call_args_list  # type: ignore[attr-defined]
-    ]
-    assert any("non-highest-ordinal" in msg for msg in warning_messages), warning_messages
+    # The error message must mention the correct top-of-stack victims.
+    assert "orb-deadbeef-3" in str(exc_info.value) or "orb-deadbeef-4" in str(exc_info.value)
 
-    # Replicas still patched down by the victim count (5 -> 3) — the
-    # caller asked to release 2 pods and 2 pods will be released; the
-    # only thing that changes is *which* ordinals.
-    apps_v1.patch_namespaced_stateful_set_scale.assert_called_once()
-    assert (
-        apps_v1.patch_namespaced_stateful_set_scale.call_args.kwargs["body"]["spec"]["replicas"]
-        == 3
-    )
+    # Refusal happens before any scale patch — the StatefulSet must be
+    # left untouched.
+    apps_v1.patch_namespaced_stateful_set_scale.assert_not_called()
 
     # Pods are NEVER deleted directly.
     core_v1.delete_namespaced_pod.assert_not_called()
@@ -291,10 +289,12 @@ async def test_release_hosts_selective_non_highest_ordinal_warns_and_still_scale
 
 
 @pytest.mark.asyncio
-async def test_release_hosts_selective_unparseable_victim_names_warns() -> None:
-    """Victim names that do not parse as ``<statefulset>-<ordinal>``
-    should also trigger the WARNING (since they cannot be the top-of-
-    stack ordinals)."""
+async def test_release_hosts_selective_unparseable_victim_names_refused() -> None:
+    """Victim names that do not parse as ``<statefulset>-<ordinal>`` are
+    refused with K8sError — an unparseable name cannot be the top-of-
+    stack ordinal, so honouring the request would silently evict the
+    wrong pods.
+    """
     core_v1 = MagicMock()
     apps_v1 = MagicMock()
     apps_v1.read_namespaced_stateful_set.return_value = _make_statefulset_status(spec_replicas=3)
@@ -310,19 +310,16 @@ async def test_release_hosts_selective_unparseable_victim_names_warns() -> None:
     )
 
     # Victim name does not match the StatefulSet's name prefix — its
-    # ordinal cannot be parsed.
-    await handler.release_hosts(["some-other-pod"], request.provider_data)
+    # ordinal cannot be parsed, so the handler refuses rather than
+    # silently releasing the wrong pod.
+    with pytest.raises(K8sError):
+        await handler.release_hosts(["some-other-pod"], request.provider_data)
 
-    warning_messages = [
-        call.args[0]
-        for call in handler._logger.warning.call_args_list  # type: ignore[attr-defined]
-    ]
-    assert any("non-highest-ordinal" in msg for msg in warning_messages)
-    # Still scales down by 1 victim (3 -> 2).
-    assert (
-        apps_v1.patch_namespaced_stateful_set_scale.call_args.kwargs["body"]["spec"]["replicas"]
-        == 2
-    )
+    # Refusal happens before any scale patch.
+    apps_v1.patch_namespaced_stateful_set_scale.assert_not_called()
+    # Pods are NEVER deleted directly.
+    core_v1.delete_namespaced_pod.assert_not_called()
+    apps_v1.delete_namespaced_stateful_set.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

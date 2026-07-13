@@ -241,8 +241,17 @@ class TestAbsoluteSetGaugeSemantics:
             metrics.set_active_pods(namespace="ns", count=10)
             metrics.set_active_pods(namespace="ns", count=4)  # should be 4, not 14
             text = _scrape(reg)
-            assert "4" in text or "4.0" in text
-            assert "14" not in text
+            # Assert on the actual gauge line, not a naked substring: the full
+            # scrape (HELP/target_info/other series) can incidentally contain
+            # "14", which made the old substring check flaky under xdist.
+            ns_lines = [
+                line
+                for line in text.split("\n")
+                if "orb_k8s_active_pods" in line and 'namespace="ns"' in line
+            ]
+            assert ns_lines, f"No orb_k8s_active_pods{{namespace=ns}} line in scrape:\n{text}"
+            value = float(ns_lines[0].rsplit(" ", 1)[1])
+            assert value == 4.0, f"Expected absolute value 4.0 (not cumulative 14), got {value}"
         finally:
             provider.shutdown()
 

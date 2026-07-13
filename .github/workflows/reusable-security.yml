@@ -20,6 +20,7 @@ jobs:
   security-scan:
     name: ${{ inputs.scan-type }} Security Scan
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       security-events: write
       actions: read
@@ -51,8 +52,14 @@ jobs:
       # Semgrep Static Analysis
       - name: Install Semgrep
         if: inputs.scan-type == 'semgrep'
-        run: pip install semgrep
+        run: pip install semgrep==1.127.0
 
+      # || true on the semgrep command below is INTENTIONAL: semgrep is advisory-only
+      # for now.  --error requests a non-zero exit on findings, but || true absorbs it
+      # so CI is never blocked.  Findings are still captured in semgrep.sarif and
+      # surfaced in the GitHub Security tab via the upload-sarif step that follows.
+      # TODO: remove || true once the finding backlog is triaged and semgrep is
+      # promoted to a hard gate.
       - name: Run Semgrep security analysis
         if: inputs.scan-type == 'semgrep'
         run: |
@@ -72,6 +79,12 @@ jobs:
           sarif_file: semgrep.sarif
 
       # Trivy Filesystem Scan
+      # Trivy is configured to emit SARIF only (no severity-threshold / exit-code
+      # inputs set), so it never fails the step regardless of findings.  This is
+      # INTENTIONAL: results are surfaced in the GitHub Security tab via the
+      # upload-sarif step below, but do not block CI.
+      # TODO: add severity: CRITICAL (or HIGH,CRITICAL) once the finding backlog
+      # has been triaged and Trivy is ready to act as a hard gate.
       - name: Run Trivy filesystem vulnerability scanner
         if: inputs.scan-type == 'trivy-fs'
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
@@ -88,6 +101,12 @@ jobs:
           sarif_file: 'trivy-fs-results.sarif'
 
       # Hadolint Dockerfile Scan
+      # no-fail: true is INTENTIONAL: hadolint is advisory-only for now.  Findings
+      # are written to hadolint-results.sarif and uploaded to the GitHub Security tab
+      # via the upload-sarif step below, but a non-zero hadolint exit code does not
+      # block CI.
+      # TODO: remove no-fail: true once Dockerfile best-practice rules have been
+      # reviewed and hadolint is ready to act as a hard gate.
       - name: Run Hadolint Dockerfile scan
         if: inputs.scan-type == 'hadolint'
         uses: hadolint/hadolint-action@2332a7b74a6de0dda2e2221d575162eba76ba5e5  # v3.3.0
@@ -104,6 +123,25 @@ jobs:
           sarif_file: hadolint-results.sarif
 
       # CodeQL Analysis
+      #
+      # continue-on-error: true on the init step is INTENTIONAL: the primary init
+      # requests the broader security-extended query pack which may not be available
+      # in all runner environments.  If it fails, the fallback init step re-runs with
+      # the narrower security-and-quality pack.  The analyze step runs unconditionally
+      # (conditioned only on scan-type == 'codeql') so that results are always
+      # uploaded regardless of which init path succeeded.  This ensures CodeQL
+      # findings always reach the GitHub Security tab even when the extended pack is
+      # unavailable.
+      #
+      # KNOWN COVERAGE GAPS (flagged for a future task):
+      # - CodeQL only runs on a schedule or when a commit message contains "[security]".
+      #   Regular PR pushes do NOT trigger CodeQL, so new code can land without a scan.
+      #   TODO: evaluate adding CodeQL to the standard PR gate (cost vs. latency trade-off).
+      # - TruffleHog (secret scanning) skips scheduled runs; it only runs on push/PR.
+      #   TODO: verify scheduled secret-scanning coverage or add a separate nightly job.
+      # - dependency-review only runs on pull_request events (PR-only by design in the
+      #   GitHub action), so direct pushes to main bypass it.
+      #   TODO: ensure branch protection prevents direct pushes to main.
       - name: Initialize CodeQL
         if: inputs.scan-type == 'codeql'
         uses: github/codeql-action/init@dc73d59c2d7bd4f8194098a91219eeee6d8a1719  # v4

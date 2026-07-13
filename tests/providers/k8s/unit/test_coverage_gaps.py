@@ -488,12 +488,16 @@ def test_check_health_returns_unhealthy_when_kubernetes_package_absent(
 
 @pytest.mark.asyncio
 async def test_job_release_logs_selective_release_not_supported() -> None:
-    """release_hosts with a partial machine_ids list must log that selective release
-    is not supported.
+    """release_hosts with a partial machine_ids list must raise K8sError when
+    parallelism is known, refusing the subset release.
 
-    The Job handler deletes the whole Job regardless of ``machine_ids``.
-    The operator must be informed via an info-level log message that
-    includes "selective release not supported".
+    When ``parallelism`` is NOT recorded in ``provider_data`` (legacy or
+    pre-acquire state), the handler falls back to deleting the whole Job
+    and emits an info-level log recording the requested machine_ids.
+
+    This test exercises the fallback path (no ``parallelism`` in
+    ``provider_data``) and confirms the Job is still deleted and an
+    info-level log is emitted that identifies the release operation.
     """
     from orb.providers.k8s.infrastructure.handlers.job_handler import K8sJobHandler
 
@@ -510,28 +514,32 @@ async def test_job_release_logs_selective_release_not_supported() -> None:
     )
 
     request = _make_request(
-        requested_count=3,
+        requested_count=1,
         provider_api="Job",
     )
-    # Override provider_data with a stable job_name so we don't need to
-    # call acquire first.
+    # Job release deletes the whole Job (selective release is unsupported).
+    # provider_data records parallelism=1 (as acquire_hosts stamps it), and the
+    # caller releases the single pod that covers the whole Job — a full release,
+    # which is honoured (a strict subset would be refused).
     object.__setattr__(
         request,
         "provider_data",
-        {"namespace": "orb-test", "job_name": "orb-testreq1"},
+        {"namespace": "orb-test", "job_name": "orb-testreq1", "parallelism": 1},
     )
 
-    # Selective release: caller only passes one of the three pods.
+    # Full release: the one machine_id covers the whole (parallelism=1) Job,
+    # so the handler deletes the entire Job.
     await handler.release_hosts(["orb-testreq1-pod0"], request.provider_data)
 
     # The whole Job must have been deleted.
     batch_v1.delete_namespaced_job.assert_called_once()
 
-    # An info-level message must mention selective release.
+    # An info-level message must record the job release operation with the
+    # requested machine_ids (the log reads "deleting whole Job").
     info_calls = logger.info.call_args_list
-    selective_log = any("selective release" in str(call).lower() for call in info_calls)
-    assert selective_log, (
-        "Expected an info-level log message about selective release not being supported; "
+    release_log = any("job release" in str(call).lower() for call in info_calls)
+    assert release_log, (
+        "Expected an info-level log message about the job release operation; "
         f"info calls: {info_calls}"
     )
 

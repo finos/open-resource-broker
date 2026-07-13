@@ -131,12 +131,16 @@ class TestExtensionRegistration:
     """Verify the DTO config is wired into ``TemplateExtensionRegistry``."""
 
     def test_extension_registered_after_bootstrap(self) -> None:
-        """Importing the kubernetes provider auto-registers the DTO config."""
-        # Importing registration triggers the auto-register block at module bottom.
+        """Running k8s extension registration wires the DTO config into the registry."""
+        # Registration is an explicit call, not an import side-effect — invoke it
+        # directly so the test is self-contained and order-independent (it must not
+        # rely on another test having bootstrapped the global registry first).
         from orb.infrastructure.registry.template_extension_registry import (
             TemplateExtensionRegistry,
         )
-        from orb.providers.k8s import registration  # noqa: F401
+        from orb.providers.k8s.registration import register_k8s_extensions
+
+        register_k8s_extensions()
 
         extension_class = TemplateExtensionRegistry.get_extension_class("k8s")
         assert extension_class is K8sTemplateDTOConfig

@@ -536,6 +536,11 @@ def create_fastapi_app(server_config: Any) -> Any:
 
             return FileResponse(_favicon_path, media_type="image/png")
 
+    # Stamp auth-enabled status on app state so request-time dependencies
+    # (get_current_user) can distinguish "auth disabled → grant admin" from
+    # "auth enabled but excluded path → grant viewer".
+    app.state.auth_enabled = server_config.auth.enabled
+
     # Register API routers
     _register_routers(app)
 

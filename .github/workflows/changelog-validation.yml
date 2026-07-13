@@ -14,6 +14,7 @@ jobs:
   config:
     name: Get Configuration
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     outputs:
@@ -37,6 +38,7 @@ jobs:
   validate-changelog:
     name: Validate Changelog Format
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [config, setup-cache]
     permissions:
       contents: read
@@ -98,5 +100,5 @@ jobs:
           echo ""
           echo '```markdown'
         } >> "$GITHUB_STEP_SUMMARY"
-        make changelog-preview --from-commit="${{ github.event.pull_request.base.sha }}" >> "$GITHUB_STEP_SUMMARY" || echo "No changes to preview" >> "$GITHUB_STEP_SUMMARY"
+        make changelog-preview FROM_COMMIT="${{ github.event.pull_request.base.sha }}" >> "$GITHUB_STEP_SUMMARY" || echo "No changes to preview" >> "$GITHUB_STEP_SUMMARY"
         echo '```' >> "$GITHUB_STEP_SUMMARY"

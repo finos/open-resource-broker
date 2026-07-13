@@ -20,6 +20,12 @@ on:
   schedule:
     - cron: '0 3 * * 0'
 
+# Per-ref concurrency: a rapid series of pushes to the same branch only runs
+# one security scan at a time; the newer push cancels the older.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   config:
     name: Configuration
@@ -78,6 +84,7 @@ jobs:
   security-trufflehog:
     name: TruffleHog (Secrets Scan)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000')
 
     permissions:
@@ -102,6 +109,7 @@ jobs:
   dependency-review:
     name: Dependency Review
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: github.event_name == 'pull_request'
 
     steps:
@@ -139,7 +147,7 @@ jobs:
   codeql-analysis:
     name: CodeQL Analysis
     needs: config
-    if: github.event_name == 'schedule' || contains(github.event.head_commit.message, '[security]')
+    if: github.event_name == 'pull_request' || github.event_name == 'schedule' || contains(github.event.head_commit.message, '[security]')
     permissions:
       contents: read
       actions: read
