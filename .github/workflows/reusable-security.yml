@@ -74,7 +74,7 @@ jobs:
 
       - name: Upload Semgrep SARIF results
         if: inputs.scan-type == 'semgrep' && always()
-        uses: github/codeql-action/upload-sarif@dc73d59c2d7bd4f8194098a91219eeee6d8a1719  # v4
+        uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9  # v4.37.0
         with:
           sarif_file: semgrep.sarif
 
@@ -96,7 +96,7 @@ jobs:
 
       - name: Upload Trivy filesystem scan results
         if: inputs.scan-type == 'trivy-fs' && always()
-        uses: github/codeql-action/upload-sarif@dc73d59c2d7bd4f8194098a91219eeee6d8a1719  # v4
+        uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9  # v4.37.0
         with:
           sarif_file: 'trivy-fs-results.sarif'
 
@@ -118,7 +118,7 @@ jobs:
 
       - name: Upload Hadolint SARIF results
         if: inputs.scan-type == 'hadolint' && always()
-        uses: github/codeql-action/upload-sarif@dc73d59c2d7bd4f8194098a91219eeee6d8a1719  # v4
+        uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9  # v4.37.0
         with:
           sarif_file: hadolint-results.sarif
 
@@ -144,7 +144,7 @@ jobs:
       #   TODO: ensure branch protection prevents direct pushes to main.
       - name: Initialize CodeQL
         if: inputs.scan-type == 'codeql'
-        uses: github/codeql-action/init@dc73d59c2d7bd4f8194098a91219eeee6d8a1719  # v4
+        uses: github/codeql-action/init@99df26d4f13ea111d4ec1a7dddef6063f76b97e9  # v4.37.0
         with:
           languages: python
           queries: security-extended,security-and-quality
@@ -153,13 +153,13 @@ jobs:
 
       - name: Initialize CodeQL (fallback)
         if: inputs.scan-type == 'codeql' && steps.codeql-init-extended.outcome == 'failure'
-        uses: github/codeql-action/init@dc73d59c2d7bd4f8194098a91219eeee6d8a1719  # v4
+        uses: github/codeql-action/init@99df26d4f13ea111d4ec1a7dddef6063f76b97e9  # v4.37.0
         with:
           languages: python
           queries: security-and-quality
 
       - name: Perform CodeQL Analysis
         if: inputs.scan-type == 'codeql'
-        uses: github/codeql-action/analyze@dc73d59c2d7bd4f8194098a91219eeee6d8a1719  # v4
+        uses: github/codeql-action/analyze@99df26d4f13ea111d4ec1a7dddef6063f76b97e9  # v4.37.0
         with:
           category: "/language:python"
